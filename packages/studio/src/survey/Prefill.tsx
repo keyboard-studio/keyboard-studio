@@ -20,11 +20,17 @@
 // the choose_base picker's path (its preview artifact capture and the F1
 // rebase gate in survey/chooseStart), which this screen does not host.
 
-import { useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { RemapPosture, StartKeyboard } from "@keyboard-studio/contracts";
+import {
+  buildProducedSet,
+  type KeyboardIR,
+  type RemapPosture,
+  type StartKeyboard,
+} from "@keyboard-studio/contracts";
+import { scriptExtensionsOf, scriptOf } from "@keyboard-studio/engine";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import {
@@ -46,9 +52,9 @@ import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 
 /** One labelled confirmation row in the prefill summary. */
 export interface PrefillRow {
-  /** Stable row id ("language" | "script" | "scriptClass" | "routingGroup" |
-   * "startingKeyboard" for {@link buildPrefillRows}; the question id for
-   * script-alignment rows). */
+  /** Stable row id ("language" | "script" | "scriptsIncluded" |
+   * "scriptClass" | "routingGroup" | "startingKeyboard" for
+   * {@link buildPrefillRows}; the question id for script-alignment rows). */
   id: string;
   label: string;
   value: string;
@@ -104,6 +110,43 @@ const LABEL_ROUTING_GROUP = msg({ id: "survey.prefill.row.routingGroup.label", m
 const NOTE_DERIVED_FROM_SCRIPT = msg({ id: "survey.prefill.row.derivedFromScript.note", message: "derived from script" });
 const LABEL_STARTING_KEYBOARD = msg({ id: "survey.prefill.row.startingKeyboard.label", message: "Starting keyboard" });
 const NOTE_YOUR_CHOSEN_BASE = msg({ id: "survey.prefill.row.startingKeyboard.note", message: "your chosen starting keyboard" });
+const LABEL_SCRIPTS_INCLUDED = msg({ id: "survey.prefill.row.scriptsIncluded.label", message: "Scripts included" });
+
+/** Script codes that attest no script of their own: common (digits,
+ * punctuation), inherited (combining marks), unknown, and unassigned.
+ * They ride along with whatever base they attach to and never count as
+ * part of a keyboard's script mix (same set as steps/evidence.ts). */
+/* eslint-disable lingui/no-unlocalized-strings -- ISO 15924 script
+   CODES, not copy. */
+const SCRIPT_NEUTRAL = new Set(["Zyyy", "Zinh", "Zzzz", "Zxxx"]);
+/* eslint-enable lingui/no-unlocalized-strings */
+
+/**
+ * The scripts a keyboard's produced output actually attests (issue 538,
+ * box 3): the mix the "Confirm the basics" card surfaces next to the
+ * target Script row, so an author building on a foreign-script base can
+ * SEE the mix instead of inferring it from later discard suggestions
+ * (the Greek-on-Latin-base failure in #1593). Composed from the same
+ * exported primitives, under the same skip rules, as the engine's own
+ * attested-scripts derivation (facets/casing.ts): walk the canonical
+ * produced set, skip shared characters (a ScriptExtensions list means
+ * the char belongs to many scripts, so it attests none of them), skip
+ * neutral scripts, and collect each remaining char's primary script.
+ * Returns ISO 15924 codes sorted alphabetically; display ordering
+ * (target first) is the row builder's concern.
+ */
+export function scriptsIncludedIn(ir: KeyboardIR): string[] {
+  const scripts = new Set<string>();
+  for (const ch of buildProducedSet(ir)) {
+    const cp = ch.codePointAt(0);
+    if (cp === undefined) continue;
+    if (scriptExtensionsOf(cp) !== undefined) continue; // shared → attests no single script
+    const primary = scriptOf(cp);
+    if (SCRIPT_NEUTRAL.has(primary)) continue;
+    scripts.add(primary);
+  }
+  return [...scripts].sort();
+}
 
 /**
  * Build the prefill confirmation rows from the identity-lite result and the
@@ -116,11 +159,12 @@ export function buildPrefillRows(
   identity: IdentityLiteResult,
   base: StartKeyboard,
   i18n?: I18n,
+  includedScripts?: readonly string[],
 ): PrefillRow[] {
   const { prefill } = identity;
   const scriptDisplay =
     prefill.variant !== undefined ? `${prefill.script} (${prefill.variant})` : prefill.script;
-  return [
+  const rows: PrefillRow[] = [
     { id: "language", label: resolveMessage(i18n, LABEL_LANGUAGE), value: identity.english || identity.autonym },
     { id: "script", label: resolveMessage(i18n, LABEL_SCRIPT), value: scriptDisplay, note: resolveMessage(i18n, NOTE_BCP47_SCRIPT_SUBTAG) },
     { id: "scriptClass", label: resolveMessage(i18n, LABEL_SCRIPT_CLASS), value: prefill.scriptClass, note: resolveMessage(i18n, NOTE_DERIVED_FROM_SCRIPT) },
@@ -132,6 +176,37 @@ export function buildPrefillRows(
       note: resolveMessage(i18n, NOTE_YOUR_CHOSEN_BASE),
     },
   ];
+  // The script-mix row (issue 538, box 3) sits directly under the target
+  // Script row it comments on. It renders only when the host supplied the
+  // starting keyboard's attested mix and that mix is non-empty. Any
+  // attested script other than the target is flagged — calmly, as a
+  // possibility, not an alarm: keeping e.g. Latin for URLs and filenames
+  // is a legitimate choice the author makes at the carve step, and this
+  // row's job is only to make the mix visible before they get there.
+  if (includedScripts !== undefined && includedScripts.length > 0) {
+    const extras = includedScripts.filter((s) => s !== prefill.script);
+    const ordered = [
+      ...(includedScripts.includes(prefill.script) ? [prefill.script] : []),
+      ...extras,
+    ];
+    rows.splice(2, 0, {
+      id: "scriptsIncluded",
+      label: resolveMessage(i18n, LABEL_SCRIPTS_INCLUDED),
+      value: ordered.join(", "),
+      ...(extras.length > 0
+        ? {
+            note: resolveMessage(
+              i18n,
+              msg({
+                id: "survey.prefill.row.scriptsIncluded.flagNote",
+                message: `${{ scripts: extras.join(", ") }} may not be needed for your language`,
+              }),
+            ),
+          }
+        : {}),
+    });
+  }
+  return rows;
 }
 
 /**
@@ -219,6 +294,11 @@ export interface RemapPostureConfirmation {
 export interface PrefillProps {
   identity: IdentityLiteResult;
   base: StartKeyboard;
+  /** The instantiated starting keyboard's IR — the working copy as it
+   * stands at confirmation time (pre-carve). When supplied, the card
+   * shows the script mix that keyboard actually attests (issue 538,
+   * box 3); absent or null, the card renders exactly as before. */
+  startIr?: KeyboardIR | null;
   onConfirm: () => void;
   onBack?: () => void;
   remapConfirmation?: RemapPostureConfirmation;
@@ -250,9 +330,13 @@ const REMAP_OPTIONS: ReadonlyArray<{
   },
 ];
 
-export function Prefill({ identity, base, onConfirm, onBack, remapConfirmation, identityEdits }: PrefillProps) {
+export function Prefill({ identity, base, startIr, onConfirm, onBack, remapConfirmation, identityEdits }: PrefillProps) {
   const { t, i18n } = useLingui();
-  const rows = buildPrefillRows(identity, base, i18n);
+  const includedScripts = useMemo(
+    () => (startIr !== null && startIr !== undefined ? scriptsIncludedIn(startIr) : undefined),
+    [startIr],
+  );
+  const rows = buildPrefillRows(identity, base, i18n, includedScripts);
 
   // Inline editing (issue 542): at most one row is in edit mode at a time.
   // While a row is being edited the step-level Enter-to-confirm below

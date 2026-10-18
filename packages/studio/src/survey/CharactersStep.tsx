@@ -41,7 +41,7 @@ import {
   useCharacterInventoryValue,
 } from "./useInventoryDraft.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
-import type { StartKeyboard } from "@keyboard-studio/contracts";
+import type { KeyboardIR, StartKeyboard } from "@keyboard-studio/contracts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
@@ -72,6 +72,7 @@ export interface CharactersStepExtras {
   Prefill: ComponentType<{
     identity: IdentityLiteResult;
     base: StartKeyboard;
+    startIr?: KeyboardIR | null;
     onConfirm: () => void;
     onBack?: () => void;
     remapConfirmation?: {
@@ -537,6 +538,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
       <Prefill
         identity={identityResult}
         base={localStart}
+        startIr={startIr}
         onConfirm={() => {
           // Only this prefill -> B transition may reset the draft alphabet —
           // never a BuildListView/CharacterMapPane render — and only when the

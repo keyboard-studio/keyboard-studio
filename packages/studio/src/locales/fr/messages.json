@@ -1922,6 +1922,8 @@
   "survey.prefill.row.script.label": "Écriture",
   "survey.prefill.row.script.note": "Sous-étiquette d’écriture BCP47 (§5)",
   "survey.prefill.row.scriptClass.label": "Classe d’écriture (A2)",
+  "survey.prefill.row.scriptsIncluded.flagNote": "",
+  "survey.prefill.row.scriptsIncluded.label": "",
   "survey.prefill.row.startingKeyboard.label": "Clavier de départ",
   "survey.prefill.row.startingKeyboard.note": "votre base choisie",
   "survey.prefill.scriptAlignment.latinSubProfile": "Sous-profil latin",
