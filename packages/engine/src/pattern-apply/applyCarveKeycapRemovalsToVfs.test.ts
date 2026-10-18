@@ -16,6 +16,9 @@
 //      touch layout; a char surviving via another group keeps its keycap.
 
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
   applyCarveKeycapRemovalsToVfs,
   collectCarvedKeycapTexts,
@@ -23,6 +26,7 @@ import {
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
 import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
+import { parse } from "../codec/parse.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -720,5 +724,85 @@ describe("applyCarveKeycapRemovalsToVfs — group-level carve (#1803)", () => {
     // ("kept, does nothing") is covered by the T020 suite above.
     expect(keys.some((k) => k.id === "K_Q")).toBe(false);
     expect(keys).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 104 T009 — resolver production matching in the touch keycap pass
+// ---------------------------------------------------------------------------
+
+describe("applyCarveKeycapRemovalsToVfs — resolver matching (spec 104 T009)", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const fixtureDir = resolve(here, "__fixtures__/touch-id/sil_cameroon_qwerty");
+  const kmn = readFileSync(resolve(fixtureDir, "sil_cameroon_qwerty.kmn"), "utf8");
+  const layoutJson = readFileSync(
+    resolve(fixtureDir, "sil_cameroon_qwerty.keyman-touch-layout"),
+    "utf8",
+  );
+  const ir = parse(kmn, "sil_cameroon_qwerty").ir;
+
+  function bareMarkRuleId(): string {
+    for (const group of ir.groups) {
+      for (const rule of group.rules) {
+        const hasVkey = rule.context.some((el) => el.kind === "vkey" && el.name === "T_0300");
+        const outChars = rule.output.filter((el) => el.kind === "char");
+        if (hasVkey && outChars.length === 1 && outChars[0]?.value === "̀") {
+          return rule.nodeId;
+        }
+      }
+    }
+    throw new Error("fixture: bare T_0300 rule not found");
+  }
+
+  function makeFixtureVfs() {
+    return createVirtualFS([
+      { path: "source/sil_cameroon_qwerty.kmn", content: kmn, isBinary: false },
+      {
+        path: "source/sil_cameroon_qwerty.keyman-touch-layout",
+        content: layoutJson,
+        isBinary: false,
+      },
+    ]);
+  }
+
+  it("removes the ruled T_0300 keys on every layer — their keycap text never spelled U+0300", () => {
+    const vfs = makeFixtureVfs();
+    const warnings = applyCarveKeycapRemovalsToVfs(vfs, "sil_cameroon_qwerty", ir, {
+      slotIds: new Set(),
+      wholeNodeIds: new Set([bareMarkRuleId()]),
+    });
+    expect(warnings.warnings).toEqual([]);
+
+    const data = JSON.parse(
+      vfs.get("source/sil_cameroon_qwerty.keyman-touch-layout")?.content as string,
+    );
+    const allIds: string[] = [];
+    for (const layer of data.tablet.layer) {
+      for (const row of layer.row) {
+        for (const key of row.key) allIds.push(`${layer.id}:${key.id}`);
+      }
+    }
+    // T_0300 (default + shift) is gone; the un-carved T_030D keys remain.
+    expect(allIds).not.toContain("default:T_0300");
+    expect(allIds).not.toContain("shift:T_0300");
+    expect(allIds).toContain("default:T_030D");
+    expect(allIds).toContain("shift:T_030D");
+    expect(allIds).toContain("default:T_002E");
+  });
+
+  it("keep-inert override keeps a production-matched T_ key, id neutralized to T_carved_*", () => {
+    const vfs = makeFixtureVfs();
+    applyCarveKeycapRemovalsToVfs(vfs, "sil_cameroon_qwerty", ir, {
+      slotIds: new Set(),
+      wholeNodeIds: new Set([bareMarkRuleId()]),
+      keepInertTouchChars: new Set(["̀"]),
+    });
+
+    const data = JSON.parse(
+      vfs.get("source/sil_cameroon_qwerty.keyman-touch-layout")?.content as string,
+    );
+    const defaultKeys = data.tablet.layer[0].row[0].key as { id: string }[];
+    expect(defaultKeys.some((k) => k.id === "T_carved_T_0300")).toBe(true);
+    expect(defaultKeys.some((k) => k.id === "T_0300")).toBe(false);
   });
 });

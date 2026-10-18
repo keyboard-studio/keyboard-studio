@@ -39,9 +39,17 @@
  * Pure — no mutation, no I/O.
  */
 
-import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type {
+  ResolveTouchProductionInputs,
+  TouchKeyIR,
+  TouchLayoutIR,
+} from "@keyboard-studio/contracts";
 import { unicodeKeyIdToChar } from "../shared/touch-ids.js";
-import { buildRemovalSet, keyMatchesRemovalSet } from "./touch-mechanism-shared.js";
+import {
+  buildRemovalSet,
+  keyMatchesRemovalSet,
+  type RemovalProductionContext,
+} from "./touch-mechanism-shared.js";
 import { touchFlickAddress, touchKeyAddress, touchSubKeyAddress } from "./touchKeyAddress.js";
 
 // ---------------------------------------------------------------------------
@@ -89,6 +97,20 @@ export interface TouchMethodDescriptor {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Options for {@link enumerateTouchMethodsForChar} (spec 104 T008). */
+export interface EnumerateTouchMethodsOptions {
+  /**
+   * Resolver inputs (the keyboard IR + its rule-join index). WITH them,
+   * production is resolved through the FR-003 resolver, so a ruled `T_`
+   * method — invisible to the legacy text/output/U_-decode matching
+   * (audit gap 1) — is enumerated, and deletable, on the same address
+   * scheme as K_/U_ methods. WITHOUT them, the legacy matching runs
+   * byte-identically (the Wave 1 migration precedent: an index/ir-less
+   * caller gets defined legacy behaviour, not a crash).
+   */
+  readonly production?: ResolveTouchProductionInputs;
+}
+
 /**
  * List every touch method in `layout` that currently produces `char`
  * (NFC-compared, matching `keyMatchesRemovalSet`'s canonical rule).
@@ -96,15 +118,28 @@ export interface TouchMethodDescriptor {
 export function enumerateTouchMethodsForChar(
   layout: TouchLayoutIR,
   char: string,
+  options?: EnumerateTouchMethodsOptions,
 ): TouchMethodDescriptor[] {
   const removalSet = buildRemovalSet([char]);
   const results: TouchMethodDescriptor[] = [];
 
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      const productionCtx: RemovalProductionContext | undefined =
+        options?.production !== undefined
+          ? { production: options.production, layerId: layer.id }
+          : undefined;
       for (const row of layer.rows) {
         for (const key of row.keys) {
-          collectDescriptorsForKey(platform.id, layer.id, key, char, removalSet, results);
+          collectDescriptorsForKey(
+            platform.id,
+            layer.id,
+            key,
+            char,
+            removalSet,
+            results,
+            productionCtx,
+          );
         }
       }
     }
@@ -144,11 +179,12 @@ function collectDescriptorsForKey(
   char: string,
   removalSet: ReadonlySet<string>,
   out: TouchMethodDescriptor[],
+  productionCtx?: RemovalProductionContext,
 ): void {
   const host = baseLabel(key);
   const baseField = host !== undefined ? { host } : {};
 
-  if (!isBackspaceKeyId(key.id) && keyMatchesRemovalSet(key, removalSet)) {
+  if (!isBackspaceKeyId(key.id) && keyMatchesRemovalSet(key, removalSet, productionCtx)) {
     const isLayerSwitch = key.nextlayer !== undefined;
     out.push({
       id: touchKeyAddress(platform, layerId, key.id),
@@ -163,7 +199,7 @@ function collectDescriptorsForKey(
   }
 
   for (const sub of key.sk ?? []) {
-    if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
+    if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet, productionCtx)) {
       const skLayerField =
         sub.layerAnnotation !== undefined ? { skLayerAnnotation: sub.layerAnnotation } : {};
       out.push({
@@ -180,7 +216,7 @@ function collectDescriptorsForKey(
   }
 
   for (const sub of key.multitap ?? []) {
-    if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
+    if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet, productionCtx)) {
       out.push({
         id: touchSubKeyAddress(platform, layerId, key.id, "multitap", sub.id),
         kind: "multitap",
@@ -196,7 +232,7 @@ function collectDescriptorsForKey(
   if (key.flick) {
     for (const direction of Object.keys(key.flick) as Array<keyof NonNullable<TouchKeyIR["flick"]>>) {
       const sub = key.flick[direction];
-      if (sub !== undefined && !isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
+      if (sub !== undefined && !isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet, productionCtx)) {
         out.push({
           id: touchFlickAddress(platform, layerId, key.id, direction),
           kind: "flick",
