@@ -678,3 +678,134 @@ describe("applyDesktopModifications — determinism", () => {
     expect(run1.warnings).toEqual(run2.warnings);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. Spec 104 FR-021 (T017) — placement replay addresses the slot's OCCUPANT
+//    through the production resolver, not by exact K_ id alone. A T_/U_ key
+//    occupying the placement's slot (its resolved production in the layer
+//    state equals the physical key's) receives the placement as a longpress;
+//    a key whose production cannot be established (rule-free T_) is NOT an
+//    occupant and the miss is reported as before.
+// ---------------------------------------------------------------------------
+
+import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
+import { parse as parseKmn } from "../codec/index.js";
+import type { PlacementResolverContext } from "./touch-mechanism-shared.js";
+
+function resolverCtxFor(kmn: string): PlacementResolverContext {
+  const { ir } = parseKmn(kmn, "t017");
+  return { ir, ruleIndex: buildTouchKeyRuleIndex(ir) };
+}
+
+const BARE_KMN = [
+  "store(&VERSION) '10.0'",
+  "store(&NAME) 't017'",
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  "+ [K_Q] > 'q'",
+].join("\n");
+
+describe("applyDesktopModifications — spec 104 T017 resolver-addressed placements", () => {
+  it("lands on a U_ occupant of the slot instead of appending a duplicate key", () => {
+    const seed = makeLayout([
+      makeKey("U_0031", { text: "1", output: "1" }),
+      makeKey("K_Q", { text: "q", output: "q" }),
+    ]);
+    const { layout, warnings } = applyDesktopModifications(
+      seed,
+      { removals: [], placements: [{ char: "ə", baseKey: "K_1" }] },
+      resolverCtxFor(BARE_KMN),
+    );
+
+    // No key appended anywhere; the occupant itself received the placement.
+    expect(phoneDefaultKeys(layout)).toHaveLength(2);
+    const occupant = getKey(layout, "U_0031")!;
+    expect(occupant.sk?.map((s) => s.id)).toEqual(["U_0259"]);
+    expect(occupant.sk?.[0]?.text).toBe("ə");
+    expect(warnings).toEqual([]);
+  });
+
+  it("lands on a ruled T_ occupant, preserving its id", () => {
+    const ctx = resolverCtxFor(
+      BARE_KMN + "\n+ [T_0031] > '1'",
+    );
+    const seed = makeLayout([
+      makeKey("T_0031", { text: "1", output: undefined }),
+      makeKey("K_Q", { text: "q", output: "q" }),
+    ]);
+    const { layout, warnings } = applyDesktopModifications(
+      seed,
+      { removals: [], placements: [{ char: "ə", baseKey: "K_1" }] },
+      ctx,
+    );
+
+    expect(phoneDefaultKeys(layout)).toHaveLength(2);
+    const occupant = getKey(layout, "T_0031")!;
+    expect(occupant.id).toBe("T_0031");
+    expect(occupant.sk?.map((s) => s.id)).toEqual(["U_0259"]);
+    expect(warnings).toEqual([]);
+  });
+
+  it("a rule-free T_ key at the slot is NOT an occupant — the miss is reported and the fallback applies", () => {
+    const seed = makeLayout([
+      makeKey("T_0031", { text: "1", output: undefined }),
+      makeKey("K_Q", { text: "q", output: "q" }),
+    ]);
+    const { layout, warnings } = applyDesktopModifications(
+      seed,
+      { removals: [], placements: [{ char: "ə", baseKey: "K_1" }] },
+      resolverCtxFor(BARE_KMN),
+    );
+
+    // The dead T_ key proves nothing about the slot: production is none.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/not found/);
+    expect(phoneDefaultKeys(layout).some((k) => k.id === "U_0259")).toBe(true);
+    expect(getKey(layout, "T_0031")!.sk).toBeUndefined();
+  });
+
+  it("an exact T_ host already producing the char by rule is a no-op (no duplicate longpress)", () => {
+    const ctx = resolverCtxFor(
+      [
+        "store(&VERSION) '10.0'",
+        "store(&NAME) 't017-guarded'",
+        "begin Unicode > use(main)",
+        "group(main) using keys",
+        "store(diablock) ' 0123456789'",
+        "any(diablock) + [T_0300] > context",
+        "+ [T_0300] > U+0300",
+      ].join("\n"),
+    );
+    const seed = makeLayout([
+      makeKey("T_0300", { text: "◌̀", output: undefined }),
+      makeKey("K_Q", { text: "q", output: "q" }),
+    ]);
+    const { layout, warnings } = applyDesktopModifications(
+      seed,
+      { removals: [], placements: [{ char: "̀", baseKey: "T_0300" }] },
+      ctx,
+    );
+
+    const host = getKey(layout, "T_0300")!;
+    expect(host.sk).toBeUndefined();
+    expect(host.text).toBe("◌̀");
+    expect(phoneDefaultKeys(layout)).toHaveLength(2);
+    expect(warnings).toEqual([]);
+  });
+
+  it("without a resolver context, the legacy exact-id behaviour is unchanged", () => {
+    const seed = makeLayout([
+      makeKey("U_0031", { text: "1", output: "1" }),
+      makeKey("K_Q", { text: "q", output: "q" }),
+    ]);
+    const { layout, warnings } = applyDesktopModifications(seed, {
+      removals: [],
+      placements: [{ char: "ə", baseKey: "K_1" }],
+    });
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/not found/);
+    expect(phoneDefaultKeys(layout).some((k) => k.id === "U_0259")).toBe(true);
+    expect(getKey(layout, "U_0031")!.sk).toBeUndefined();
+  });
+});

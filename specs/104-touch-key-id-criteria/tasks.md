@@ -57,9 +57,9 @@ Files: `packages/studio/src/survey/`, `packages/studio/src/steps/`, `packages/st
 
 Files: `packages/engine/src/pattern-apply/applyDesktopModifications.ts`, `packages/engine/src/pattern-apply/applyDesktopModificationsToRawJson.ts`, `packages/engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`, `packages/engine/src/scaffolder/scaffoldTouchLayout.ts`
 
-- [ ] **T017** [P] Placement replay addresses the resolver-resolved occupant of a slot: T_/U_ occupants receive the placement or the miss is reported; never append a duplicate key to the last row (FR-021; audit gap 2) · `packages/engine/src/pattern-apply/applyDesktopModifications.ts`, `packages/engine/src/pattern-apply/applyDesktopModificationsToRawJson.ts`
-- [ ] **T018** [P] Combo propagation: cloned layers preserve ids + productions of keys the combo does not redefine (no blanking of divergent T_/U_ slots); the bare combo is included in the propagation set (FR-021; audit gap 3) · `packages/engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`
-- [ ] **T019** Scaffolder/reseed: existing ruled T_ ids from the .kmn are placed with their linkage; no character produced by a ruled T_ key is re-minted under a new id; phone-from-tablet reseed preserves T_/U_ production (simulation-checked) (FR-022; audit gap 4) · `packages/engine/src/scaffolder/scaffoldTouchLayout.ts`
+- [x] **T017** [P] Placement replay addresses the resolver-resolved occupant of a slot: T_/U_ occupants receive the placement or the miss is reported; never append a duplicate key to the last row (FR-021; audit gap 2) · `packages/engine/src/pattern-apply/applyDesktopModifications.ts`, `packages/engine/src/pattern-apply/applyDesktopModificationsToRawJson.ts`
+- [x] **T018** [P] Combo propagation: cloned layers preserve ids + productions of keys the combo does not redefine (no blanking of divergent T_/U_ slots); the bare combo is included in the propagation set (FR-021; audit gap 3) · `packages/engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`
+- [x] **T019** Scaffolder/reseed: existing ruled T_ ids from the .kmn are placed with their linkage; no character produced by a ruled T_ key is re-minted under a new id; phone-from-tablet reseed preserves T_/U_ production (simulation-checked) (FR-022; audit gap 4) · `packages/engine/src/scaffolder/scaffoldTouchLayout.ts`
 
 ## Phase 6: Inspectability, corpus gate, probes (US6)
 

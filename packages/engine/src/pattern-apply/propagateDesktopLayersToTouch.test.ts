@@ -538,3 +538,120 @@ describe("propagateDesktopLayersToTouch — Keyman touch-layout schema", () => {
     expect(qOf("rightalt-shift").output).toBe("Ɛ");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 104 FR-021 (T018) — combo propagation addresses keys through the
+// resolver: cloned layers preserve the ids + productions of T_/U_ keys the
+// combo does not redefine, and the BARE combo (where T_ bare rules live)
+// is part of the propagation set, patching the default layer.
+// ---------------------------------------------------------------------------
+
+interface ParsedKey { id: string; text?: string; output?: string }
+interface ParsedLayer { id: string; row: Array<{ key: ParsedKey[] }> }
+
+function layersOf(json: string, platform = "phone"): ParsedLayer[] {
+  const parsed = JSON.parse(json) as Record<string, { layer: ParsedLayer[] }>;
+  return parsed[platform]!.layer;
+}
+
+function keysOf(json: string, layerId: string, platform = "phone"): ParsedKey[] {
+  return layersOf(json, platform)
+    .find((l) => l.id === layerId)!
+    .row.flatMap((r) => r.key);
+}
+
+function layoutWithDefaultKeys(keys: ParsedKey[]): string {
+  return JSON.stringify({
+    phone: {
+      layer: [
+        { id: "default", row: [{ id: 1, key: keys }] },
+      ],
+    },
+  });
+}
+
+describe("propagateDesktopLayersToTouch — spec 104 T018 resolver-addressed clones", () => {
+  it("a cloned combo layer preserves a U_ key's decoded production instead of blanking it", () => {
+    const ir = makeMinimalIR([makeGroup([makeRule("K_Q", ["RALT"], "œ")])]);
+    const raw = layoutWithDefaultKeys([
+      { id: "K_Q", text: "q" },
+      { id: "K_W", text: "w" },
+      { id: "U_20AC", text: "€" },
+      { id: "K_LOPT", text: "*opt*" },
+    ]);
+
+    const { json } = propagateDesktopLayersToTouch(raw, ir, []);
+    const ralt = keysOf(json, "rightalt");
+
+    expect(ralt.find((k) => k.id === "K_Q")?.text).toBe("œ");
+    // U_ decodes in every state: the clone keeps its production.
+    expect(ralt.find((k) => k.id === "U_20AC")?.text).toBe("€");
+    expect(ralt.find((k) => k.id === "U_20AC")?.output).toBe("€");
+    // A K_ key the combo does not redefine keeps the legacy blank (no
+    // fallback exists in the RALT state to preserve).
+    expect(ralt.find((k) => k.id === "K_W")?.text).toBe("");
+  });
+
+  it("a cloned combo layer preserves a T_ key whose combo-state production is a deadkey (invisible to the char key map)", () => {
+    const deadkeyRule: IRRule = {
+      nodeId: freshId("rule"),
+      context: [{ kind: "vkey", name: "T_DK", modifiers: ["RALT"] }],
+      output: [{ kind: "deadkey", id: 1 }],
+    };
+    const ir = makeMinimalIR([
+      makeGroup([makeRule("K_Q", ["RALT"], "œ"), deadkeyRule]),
+    ]);
+    const raw = layoutWithDefaultKeys([
+      { id: "K_Q", text: "q" },
+      { id: "T_DK", text: "´" },
+      { id: "K_LOPT", text: "*opt*" },
+    ]);
+
+    const { json } = propagateDesktopLayersToTouch(raw, ir, []);
+    const ralt = keysOf(json, "rightalt");
+    // The key map has no character for T_DK (its production is a deadkey),
+    // but the resolver credits it with a production in this state — the
+    // clone must not blank a producing key.
+    expect(ralt.find((k) => k.id === "T_DK")?.text).toBe("´");
+  });
+
+  it("a cloned combo layer still blanks a T_ key with NO production in the combo state (bare rule only)", () => {
+    const ir = makeMinimalIR([
+      makeGroup([makeRule("K_Q", ["RALT"], "œ"), makeRule("T_0300", [], "̀")]),
+    ]);
+    const raw = layoutWithDefaultKeys([
+      { id: "K_Q", text: "q" },
+      { id: "T_0300", text: "◌̀" },
+      { id: "K_LOPT", text: "*opt*" },
+    ]);
+
+    const { json } = propagateDesktopLayersToTouch(raw, ir, []);
+    const ralt = keysOf(json, "rightalt");
+    // Bare rules do not fire under RALT and T_ has no fallback: none.
+    expect(ralt.find((k) => k.id === "T_0300")?.text).toBe("");
+  });
+
+  it("the bare combo patches the default layer: a ruled T_ key gains its rule production as output, keycap preserved", () => {
+    const ir = makeMinimalIR([
+      makeGroup([
+        makeRule("K_Q", [], "q"),
+        makeRule("K_Q", ["RALT"], "œ"),
+        makeRule("T_0300", [], "̀"),
+      ]),
+    ]);
+    const raw = layoutWithDefaultKeys([
+      { id: "K_Q", text: "q" },
+      { id: "T_0300", text: "◌̀" },
+      { id: "K_LOPT", text: "*opt*" },
+    ]);
+
+    const { json } = propagateDesktopLayersToTouch(raw, ir, []);
+    const def = keysOf(json, "default");
+    // The bare rules' productions surface as the working-copy output...
+    expect(def.find((k) => k.id === "T_0300")?.output).toBe("̀");
+    expect(def.find((k) => k.id === "K_Q")?.output).toBe("q");
+    // ...without re-keycapping the author's shipped default layer.
+    expect(def.find((k) => k.id === "T_0300")?.text).toBe("◌̀");
+    expect(def.find((k) => k.id === "K_Q")?.text).toBe("q");
+  });
+});

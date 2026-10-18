@@ -1760,13 +1760,107 @@ type CompactLayerSkeletonBuilder = (
  * computed separately from TRUE post-build reachability, not from this
  * function's placement bookkeeping).
  */
+/**
+ * True when a keyMap vkey names a touch-native key (`T_`/`U_`) rather than
+ * a physical key. A ruled vkey in either family carries an identity the
+ * scaffold must reuse verbatim (spec 104 FR-022): the key's production
+ * lives in its rules (T_) or its rule + decode pairing (U_), and re-minting
+ * its character under a fresh U_ longpress — the overflow spill's only
+ * move — severs that linkage and, for guarded T_ marks, silently drops
+ * the guard.
+ */
+function isRuledTouchVkey(vkey: string): boolean {
+  const upper = vkey.toUpperCase();
+  return upper.startsWith("T_") || upper.startsWith("U_");
+}
+
+/**
+ * The ruled touch-native keys (T_/U_ vkeys with at least one char-producing
+ * rule) the scaffold must place as keys in their own right, per layer —
+ * see {@link appendRuledTouchKeys}. Frame-class T_ keys (nextlayer-only,
+ * no char output) never enter the keyMap and are not placed here; they
+ * have no production to preserve.
+ */
+function collectRuledTouchKeys(keyMap: KeyMap): Map<string, Map<LayerId, string>> {
+  const out = new Map<string, Map<LayerId, string>>();
+  for (const [vkey, layerMap] of keyMap) {
+    if (!isRuledTouchVkey(vkey) || layerMap.size === 0) continue;
+    out.set(vkey, layerMap);
+  }
+  return out;
+}
+
+/**
+ * Append the ruled touch-native keys ({@link collectRuledTouchKeys}) to the
+ * built layers as real keys — one key per (vkey, layer) its rules produce
+ * on, carrying the ORIGINAL id so the .kmn's rule linkage (and, for a
+ * guarded T_ mark, its guard) applies to the scaffolded layout unchanged.
+ * Rows are appended after the skeleton's own rows, chunked to the same
+ * ≤10-keys-per-row bound the skeleton observes. On the default layer a
+ * touch key also receives its deadkey successors as longpress entries,
+ * mirroring {@link buildLetterKey}'s treatment of skeleton keys.
+ */
+function appendRuledTouchKeys(
+  layers: TouchLayoutIR["platforms"][number]["layers"],
+  touchKeys: ReadonlyMap<string, Map<LayerId, string>>,
+  successors: DeadkeySuccessors,
+  minter: NodeIdMinter,
+): void {
+  if (touchKeys.size === 0) return;
+
+  for (const layer of layers) {
+    const layerId = layer.id as LayerId;
+    const keysForLayer: TouchKeyIR[] = [];
+
+    for (const [vkey, layerMap] of touchKeys) {
+      const ch = layerMap.get(layerId);
+      if (ch === undefined) continue;
+
+      const key: TouchKeyIR = {
+        nodeId: minter.mint("touchKey"),
+        id: vkey,
+        text: ch,
+        output: ch,
+        provenance: "physical-suggested",
+      };
+
+      if (layerId === "default") {
+        const succ = successors.get(vkey);
+        if (succ !== undefined && succ.length > 0) {
+          const sk = succ
+            .filter((c) => c !== ch)
+            .map((c) => ({
+              nodeId: minter.mint("touchKey"),
+              id: charToUnicodeKeyId(c),
+              text: c,
+              provenance: "physical-suggested" as const,
+            }));
+          if (sk.length > 0) key.sk = sk;
+        }
+      }
+
+      keysForLayer.push(key);
+    }
+
+    for (let i = 0; i < keysForLayer.length; i += 10) {
+      layer.rows.push({ keys: keysForLayer.slice(i, i + 10) });
+    }
+  }
+}
+
 function buildCompactLayers(
   keyMap: KeyMap,
   deadkeySuccessors: DeadkeySuccessors,
   minter: NodeIdMinter,
   buildLayers: CompactLayerSkeletonBuilder,
 ): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
-  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
+  // Spec 104 FR-022 (T019): ruled T_/U_ vkeys are placed as keys with
+  // their own ids (appendRuledTouchKeys below), so their characters are
+  // excluded from overflow routing — otherwise the same character would
+  // ALSO spill to a re-minted U_ longpress, forking its production.
+  const ruledTouchKeys = collectRuledTouchKeys(keyMap);
+  const covered = new Set<string>([...COVERED_VKEYS, ...ruledTouchKeys.keys()]);
+  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, covered);
   const charToVkey = buildCharToVkeyMap(keyMap);
 
   const markSuccessors = new Map<string, string[]>();
@@ -1832,6 +1926,10 @@ function buildCompactLayers(
         `longpress ("extras") menu instead of being dropped: ${tagged.join(", ")}`,
     );
   }
+
+  // Spec 104 FR-022 (T019): place the ruled touch-native keys last, on the
+  // finished layers, so no routing pass above can also claim their chars.
+  appendRuledTouchKeys(layers, ruledTouchKeys, combinedSuccessors, minter);
 
   return { layers };
 }

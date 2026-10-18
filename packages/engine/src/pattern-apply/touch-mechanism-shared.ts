@@ -8,6 +8,13 @@
  * @see applyDesktopModificationsToRawJson.ts — raw-JSON desktop-modification replay
  */
 
+import {
+  resolveTouchProduction,
+  touchKeyStateFromLayerId,
+  type KeyboardIR,
+  type TouchKeyIR,
+  type TouchKeyRuleIndex,
+} from "@keyboard-studio/contracts";
 import { unicodeKeyIdToChar } from "../shared/touch-ids.js";
 
 /**
@@ -129,6 +136,88 @@ export function keyMatchesRemovalSet(
   }
   const decoded = candidate.id !== undefined ? unicodeKeyIdToChar(candidate.id) : undefined;
   return decoded !== undefined && removalSet.has(decoded.normalize("NFC"));
+}
+
+/**
+ * The production-resolver inputs a placement replay needs to address keys
+ * through spec 104's resolver (FR-003/FR-021): the keyboard the layout
+ * belongs to and its spec 063 rule-join index. Optional at every call site
+ * — a caller that cannot supply it gets the legacy exact-id behaviour,
+ * byte for byte.
+ */
+export interface PlacementResolverContext {
+  readonly ir: KeyboardIR;
+  readonly ruleIndex: TouchKeyRuleIndex;
+}
+
+/** The id family of a touch key id (`K_` / `T_` / `U_`), or undefined for an unclassified id. */
+export function touchKeyIdFamily(id: string): "K_" | "T_" | "U_" | undefined {
+  const upper = id.toUpperCase();
+  if (upper.startsWith("K_")) return "K_";
+  if (upper.startsWith("T_")) return "T_";
+  if (upper.startsWith("U_")) return "U_";
+  return undefined;
+}
+
+/**
+ * The text productions the resolver credits `key` with in the state its
+ * layer encodes (the key's own per-key `layer` override wins, per spec 063
+ * FR-030), NFC-normalized for comparison against placement chars. This is
+ * the ONLY production reading the placement appliers take when a resolver
+ * context is supplied — keycap text and U_-decode alone do not establish
+ * production (FR-003).
+ */
+export function resolvedTextProductions(
+  ctx: PlacementResolverContext,
+  key: TouchKeyIR,
+  layerId: string,
+): string[] {
+  const state = touchKeyStateFromLayerId(key.layer ?? layerId);
+  const record = resolveTouchProduction(
+    { ir: ctx.ir, ruleIndex: ctx.ruleIndex },
+    key,
+    state,
+  );
+  const texts: string[] = [];
+  for (const entry of record.productions) {
+    if (entry.output.kind === "text") texts.push(entry.output.text.normalize("NFC"));
+  }
+  return texts;
+}
+
+/**
+ * Find the key among `candidates` that OCCUPIES the slot the physical key
+ * `baseKey` names in layer `layerId` — spec 104 FR-021's resolver-addressed
+ * occupant. The slot's identity is established by production, not by id:
+ * the physical key's resolved production in the layer state (its rules, or
+ * the US base fallback) must intersect a candidate's resolved production.
+ *
+ * Only `T_`/`U_` candidates qualify — a `K_` key with a different id is a
+ * different physical key, never this slot's occupant. A candidate whose
+ * production cannot be established (a rule-free `T_` key resolves to
+ * `none`) is NOT an occupant: occupancy is proven by production, never
+ * inferred from keycap text. Returns the first match in scan order
+ * (callers pass row-major order), or undefined when the slot has no
+ * resolvable occupant.
+ */
+export function findSlotOccupant(
+  ctx: PlacementResolverContext,
+  candidates: readonly TouchKeyIR[],
+  baseKey: string,
+  layerId: string,
+): TouchKeyIR | undefined {
+  const slotTexts = new Set(
+    resolvedTextProductions(ctx, { nodeId: "", id: baseKey }, layerId),
+  );
+  if (slotTexts.size === 0) return undefined;
+
+  for (const candidate of candidates) {
+    const family = touchKeyIdFamily(candidate.id);
+    if (family !== "T_" && family !== "U_") continue;
+    const texts = resolvedTextProductions(ctx, candidate, layerId);
+    if (texts.some((t) => slotTexts.has(t))) return candidate;
+  }
+  return undefined;
 }
 
 /**
