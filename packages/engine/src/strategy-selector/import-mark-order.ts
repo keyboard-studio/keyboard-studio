@@ -4,7 +4,7 @@
 // seedIrAxesFromStartIr (studio workingCopyStore.ts) runs this over the base IR
 // and seeds markInputOrder="postfix" onto irAxes, which flows through
 // defaultFillAxes into selectStrategy — so rule 3a fires in production, not just
-// in tests. (The engine's own importKeyboard() also surfaces it via axisFills.)
+// in tests.
 //
 // Complements the script-class default-fill prior (default-fill.ts), which
 // deliberately never fills markInputOrder="postfix" (that prior can only ever

@@ -1,7 +1,7 @@
 // useKeyboardArtifact — Layer A′ import-fidelity wiring proof.
 //
 // The live import path (this hook's full-run parse branch) must run the
-// engine's importKeyboard fidelity composition once per import — the parse
+// engine's Layer A′ fidelity stages once per import — the parse
 // stage + the SYNCHRONOUS emit stage (I3/I6) before `ready` publishes, and
 // functional I2 (round-trip) AFTER `ready`, appending its findings to the
 // ready stage's runtime-warning channel when they land — and surface the

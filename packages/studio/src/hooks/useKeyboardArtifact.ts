@@ -48,7 +48,7 @@ interface EngineModule {
   /** Emit a parsed IR back to .kmn text (the codec's emit, barrel name). */
   emitKmn?: (ir: KeyboardIR) => string;
   /**
-   * Layer A′ import-fidelity stages (engine importKeyboard's composition).
+   * Layer A′ import-fidelity stages (the engine's, composed inline here).
    * Parse stage runs on the raw ParseResult + source text; emit stage runs on
    * the parsed IR + its emitted text. Both return LintFinding[] (I1–I6).
    */
@@ -56,11 +56,6 @@ interface EngineModule {
     parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
     source: string,
   ) => LintFinding[];
-  runImportFidelityEmitChecks?: (
-    ir: KeyboardIR,
-    emitted: string,
-    roundTripDeps?: RoundTripDeps,
-  ) => Promise<LintFinding[]>;
   /**
    * The synchronous half of the emit stage (I3 + I6 + NUL behaviour) — the
    * only fidelity work allowed on the pre-`ready` path.
@@ -751,8 +746,8 @@ export function useKeyboardArtifact(
             const pr = engine.parseKmn(kmnText, compileId);
             const recognized = engine.recognizePatterns(pr.ir);
             let ir = recognized.ir;
-            // Layer A′ import-fidelity — steps 6+7 of the engine's
-            // importKeyboard composition, run here because this branch is
+            // Layer A′ import-fidelity — the engine's parse + emit
+            // stages, run here because this branch is
             // where the live path holds the raw ParseResult + source text.
             // FULL RUNS ONLY: a full run is the import moment (the parse
             // reads the base keyboard as fetched), while recompile() re-parses
@@ -761,7 +756,7 @@ export function useKeyboardArtifact(
             // outside the 300 ms debounce cycle, as designed (see
             // validator/index-import-fidelity.ts). The emit stage runs on the
             // recognized IR before the touch-layout carry-over below, exactly
-            // as importKeyboard emits it. A failure here must never break the
+            // as the codec emits it. A failure here must never break the
             // compile — same posture as parseTouchLayout below.
             let fidelityFindings: LintFinding[] = [];
             let roundTripInput: {

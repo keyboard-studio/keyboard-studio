@@ -32,8 +32,8 @@ export const STUDIO_METADATA_PREFIX = ".studio/" as const;
  *
  * Three matches, all with the same lifecycle:
  *   - `.kmn.imported` — the original imported source (decision D9).
- *   - `.kmn.imported.sha256` — its hash companion, pinned at import time by
- *     importKeyboard for I5 verification.
+ *   - `.kmn.imported.sha256` — its hash companion, pinned at import time
+ *     for I5 verification.
  *   - anything under {@link STUDIO_METADATA_PREFIX} — studio metadata such as
  *     the packaged decision record (specs/053-decision-audit FR-019).
  *

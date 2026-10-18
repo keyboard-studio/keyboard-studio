@@ -206,8 +206,7 @@ export function checkHeaderPreservation(
 /**
  * I4: Emit one informational finding summarising the inventory of opaque
  * features in the parsed IR. Non-blocking. The inventory array itself is
- * surfaced via ImportReport.opaqueFeatureInventory (assembled in
- * import-keyboard.ts).
+ * surfaced via ParseResult.opaqueFeatures.
  */
 export function checkOpaqueFeatureInventory(
   parseResult: ParseResult,
