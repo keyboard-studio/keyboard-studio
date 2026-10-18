@@ -90,6 +90,12 @@ function renderSeries() {
   return onComplete;
 }
 
+/** Spec 104: the guard station now closes the series — answer it and Continue to complete. */
+function answerGuardAndContinue(): void {
+  fireEvent.click(screen.getByTestId("guard-option-emit"));
+  fireEvent.click(screen.getByTestId("marks-continue"));
+}
+
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
@@ -106,6 +112,7 @@ describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
     const onComplete = renderSeries();
     walkToStation();
     fireEvent.click(screen.getByRole("button", { name: "Add these rules" }));
+    answerGuardAndContinue();
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     const result = onComplete.mock.calls[0]![0] as SurveyPhaseResult;
@@ -127,6 +134,7 @@ describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
     walkToStation();
     expect(screen.getByTestId("context-tolerance-checking")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
+    answerGuardAndContinue();
 
     const result = onComplete.mock.calls[0]![0] as SurveyPhaseResult;
     expect(result.marksContextTolerance).toBeUndefined();
@@ -142,6 +150,7 @@ describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
     expect(screen.getByTestId("context-tolerance-station").getAttribute("data-prior")).toBe("decline");
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     fireEvent.click(screen.getByTestId("marks-continue"));
+    answerGuardAndContinue();
 
     const result = onComplete.mock.calls[0]![0] as SurveyPhaseResult;
     expect(result.marksContextTolerance).toMatchObject({ decision: "decline", fingerprint: FINGERPRINT });

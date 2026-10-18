@@ -102,7 +102,7 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { GuardSpecification, KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { createKeyOccurrenceCounter, normalizeTouchKeyId } from "@keyboard-studio/contracts";
 import {
   applyCaseTripleSynthesis,
@@ -111,6 +111,7 @@ import {
   checkOpaqueGate,
   decomposeLayerId,
   ensureTouchKeyRule,
+  isCombiningMark,
   parseTouchKeyAddress,
   planCaseTripleSynthesis,
   planGuardSynthesis,
@@ -128,6 +129,8 @@ import {
   type NoCaseTripleReason,
 } from "@keyboard-studio/engine";
 import { promoteKeyAtAddressToHandSet } from "../touchBehavior.ts";
+import { GuardQuestionPrompt } from "../../../survey/marks/GuardStation.tsx";
+import type { GuardBehaviour } from "../../../survey/marks/guardSpecification.ts";
 import { CharScrollStrip } from "../parts/CharScrollStrip.tsx";
 import { parseCodepointInput } from "../../../survey/characterMap/rawCodepointEntry.ts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
@@ -240,6 +243,23 @@ export interface AssignPanelProps {
   capsHandled: boolean;
   /** BCP47 tag forwarded to `proposeKeyId`'s case-mapping. */
   bcp47?: string;
+  /**
+   * The keyboard's confirmed guard specification (spec 104 FR-013),
+   * forwarded to `proposeKeyId`: under `"swallow"` a combining mark mints
+   * guarded `T_`; absent (or `"emit"`) it mints `U_`. Supplied by the
+   * caller from the marks-treatment decision — this panel stays
+   * store-free like its siblings.
+   */
+  guardSpecification?: GuardSpecification;
+  /**
+   * FR-013's tail: fired when the author answers the guard question this
+   * panel routes to (a combining mark selected while no specification
+   * exists). The caller records the answer as the keyboard's
+   * GuardSpecification; the re-rendered panel then re-proposes with it.
+   * Omit to disable the routing (the mark then mints `U_`, the
+   * unguarded-by-default form the specification's absence means).
+   */
+  onGuardAnswer?: (behaviour: GuardBehaviour) => void;
   /**
    * The keyboard's own repertoire (declared exemplars or discovered
    * inventory) — REQUIRED so a freshly-minted guard store is never a
@@ -385,6 +405,8 @@ export function AssignPanel({
   characterMapChars,
   capsHandled,
   bcp47,
+  guardSpecification,
+  onGuardAnswer,
   repertoire,
   onCommit,
   label,
@@ -438,8 +460,9 @@ export function AssignPanel({
       capsHandled,
       ...(caseTripleRequested ? { caseTripleRequested } : {}),
       ...(bcp47 !== undefined ? { bcp47 } : {}),
+      ...(guardSpecification !== undefined ? { guardSpecification } : {}),
     });
-  }, [selectedChar, capsHandled, caseTripleRequested, bcp47]);
+  }, [selectedChar, capsHandled, caseTripleRequested, bcp47, guardSpecification]);
 
   const sharedCandidateCount = useMemo(() => {
     if (baseProposal?.alternative === undefined || selectedCell === null) return undefined;
@@ -453,9 +476,22 @@ export function AssignPanel({
       capsHandled,
       ...(caseTripleRequested ? { caseTripleRequested } : {}),
       ...(bcp47 !== undefined ? { bcp47 } : {}),
+      ...(guardSpecification !== undefined ? { guardSpecification } : {}),
       ...(sharedCandidateCount !== undefined ? { sharedCandidateCount } : {}),
     });
-  }, [selectedChar, capsHandled, caseTripleRequested, bcp47, sharedCandidateCount]);
+  }, [selectedChar, capsHandled, caseTripleRequested, bcp47, guardSpecification, sharedCandidateCount]);
+
+  // Spec 104 FR-013 (tail): a combining mark selected while the keyboard
+  // has NO guard specification routes the author to the question before
+  // any proposal is offered — minting `U_` here would be the
+  // unguarded-by-default form the specification exists to replace. The
+  // caller's recorded answer re-renders this panel WITH the
+  // specification, and the proposal above re-computes under it.
+  const guardAnswerNeeded =
+    onGuardAnswer !== undefined &&
+    guardSpecification === undefined &&
+    selectedChar !== null &&
+    isCombiningMark(selectedChar);
 
   const assignmentPlan = useMemo<AssignmentPlan | undefined>(() => {
     if (proposal === undefined || selectedChar === null) return undefined;
@@ -510,6 +546,7 @@ export function AssignPanel({
     selectedCell !== null &&
     assignmentPlan !== undefined &&
     proposal !== undefined &&
+    !guardAnswerNeeded &&
     !opaqueGate.blocked &&
     !guardUnavailable &&
     !caseTripleUnavailable;
@@ -707,7 +744,9 @@ export function AssignPanel({
         </label>
       )}
 
-      {proposal === undefined ? (
+      {guardAnswerNeeded && onGuardAnswer !== undefined ? (
+        <GuardQuestionPrompt onAnswer={onGuardAnswer} />
+      ) : proposal === undefined ? (
         <span style={{ fontSize: 12, color: TEXT_DIM }} data-testid="assign-panel-no-proposal">
           <Trans id="editor.assignLoop.keyGrid.assignPanel.noProposal">
             Pick a character to see what the studio will write.

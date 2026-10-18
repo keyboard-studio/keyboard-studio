@@ -210,6 +210,12 @@ import { FindPanel, type FindPanelResult } from "./keyGrid/FindPanel.tsx";
 import { useModeContextCarry } from "./keyGrid/useModeContextCarry.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
+import {
+  effectiveGuardSpecification,
+  recordGuardAnswer,
+  type GuardBehaviour,
+} from "../../survey/marks/guardSpecification.ts";
+import type { MarksTreatmentValue } from "../../survey/marks/marksValue.ts";
 import { collateInventory, loanwordsLast } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import {
@@ -1760,6 +1766,21 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   // Spec 088 FR-005: the recorded seed choice is a decision-store record.
   const touchSeedSourceStored = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
+
+  // Spec 104 FR-013: the keyboard's guard specification (recorded at the
+  // marks step, or by the assign panel's routed question below). Only a
+  // CONFIRMED record reaches the proposers — a provisional Track 2 seed
+  // mints nothing guarded until the author confirms it.
+  const guardSpecificationRecord = useDecisionStore(
+    (s) => (s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined)?.guardSpecification ?? undefined,
+  );
+  const guardSpecification = effectiveGuardSpecification(guardSpecificationRecord);
+  const handleGuardAnswer = useCallback(
+    (behaviour: GuardBehaviour) => {
+      recordGuardAnswer(behaviour);
+    },
+    [],
+  );
 
   // "Mark for later review" — authoring metadata only (surveySessionStore),
   // never the working copy. Touch-gallery counterpart of MechanismGallery's
@@ -4871,8 +4892,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       expectedOutputs,
       capsHandled,
       ...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {}),
+      ...(guardSpecification !== undefined ? { guardSpecification } : {}),
     });
-  }, [selectedKeyCell, keyModeRuleIndex, capsHandled, identityBcp47]);
+  }, [selectedKeyCell, keyModeRuleIndex, capsHandled, identityBcp47, guardSpecification]);
 
 
   // ---------------------------------------------------------------------------
@@ -6913,6 +6935,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                         inventoryChars={inventory}
                         capsHandled={capsHandled}
                         {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
+                        {...(guardSpecification !== undefined ? { guardSpecification } : {})}
+                        onGuardAnswer={handleGuardAnswer}
                         repertoire={inventory}
                         onCommit={handleAssignPanelCommit}
                       />
@@ -6941,6 +6965,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
             ir={ir}
             ruleIndex={keyModeRuleIndex}
+            {...(guardSpecification !== undefined ? { guardSpecification } : {})}
             onCancel={handleRenameCancel}
             onConfirm={handleRenameConfirm}
           />
