@@ -17,7 +17,7 @@ gaps are normal (001, 003, 004, 006, 054 never existed).
 | [081-footer-step-nav](081-footer-step-nav/) | Step library and footer navigation components |
 | [082-rule-access-tracks](082-rule-access-tracks/) | Rule access tracks (in flight) |
 | [103-first-class-if-guards](103-first-class-if-guards/) | First-class `if()` guards in KeyboardIR (ratified in principle 2026-10-15; implementation in flight) |
-| [104-touch-key-id-criteria](104-touch-key-id-criteria/) | Touch key identity criteria — when a touch key is K_, U_, or T_ (proposal adopted by Matthew 2026-10-17; draft spec) |
+| [104-touch-key-id-criteria](104-touch-key-id-criteria/) | Touch key identity criteria — when a touch key is K_, U_, or T_ (implemented 2026-10-17/18, PRs #2266/#2267/#2272 + Wave 4 close-out; see its AS-BUILT.md — T021/T022 pending there) |
 
 ## Proposed — privacy suite (7, drafted 2026-10-14, unreviewed)
 

@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-17",
+  "lastUpdated": "2026-10-18",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1097,6 +1097,33 @@
       "implements": [],
       "decisions": [],
       "notes": "Implemented and merged in PR #2190 (squash d012f262, closing #2163): ContextElement {kind:\"if\",store,value} in contracts, codec parse/emit, all ContextElement consumers, FR-009 round-trip vectors. Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15 (issue #2189); implementation verified on main, no code change needed. Known spec-text caveats (km-keyman review, all fail-closed with no shipped impact): Keyman not-equal is != not <> and a store-valued RHS is possible — both unmodelled and opaque per FR-003; the offset pin is vector-proven for index() only, guarded context(N) counting is unpinned/engine-divergent; &platform values are preserved verbatim, not evaluated (platform matching is a token-set match, and no shipped consumer evaluates the guard)."
+    },
+    "specs/104-touch-key-id-criteria": {
+      "title": "Feature Specification: Touch key identity criteria — when a touch key is K_, U_, or T_",
+      "hash": "sha256:dbeab34fa9c8e8ac",
+      "status": "implemented",
+      "implements": [
+        "packages/contracts/src/touchProduction.ts",
+        "packages/contracts/src/touch-key-ids.ts",
+        "packages/contracts/src/decisionRecord.ts",
+        "packages/contracts/src/touch-key-diagnostics.ts",
+        "packages/contracts/src/touch-coverage.ts",
+        "packages/engine/src/pattern-apply/severTouchKey.ts",
+        "packages/engine/src/pattern-apply/carveTouchProducers.ts",
+        "packages/engine/src/pattern-apply/keyIdMinting.ts",
+        "packages/engine/src/pattern-apply/proposeTouchKeyId.ts",
+        "packages/engine/src/simulator/tapSimulation.ts",
+        "packages/studio/src/lib/touchKeyIdentity.ts",
+        "packages/studio/src/lib/copyTouchParity.ts",
+        "packages/studio/src/components/TouchKeyIdentityList.tsx",
+        "packages/studio/src/survey/marks/GuardStation.tsx",
+        "packages/studio/src/survey/marks/guardSpecification.ts",
+        "packages/studio/src/editors/assignLoop/keyGrid/keyIdentityViewModel.ts",
+        "packages/studio/e2e/touch-key-identity.spec.ts",
+        "utilities/refusal-probe/probe.ts"
+      ],
+      "decisions": [],
+      "notes": "Implemented 2026-10-17/18 in four waves (PRs #2266, #2267, #2272 + the Wave 4 close-out branch): one production resolver in contracts (FR-003) consumed by coverage, diagnostics, carve, enumeration, placement replay, combo propagation, the scaffolder and the proposer; decideKeyIdForm() implements the contracts §2 decision table (FR-005); severTouchKey()/relinkTouchKey() rule-level transplants with refusal records (FR-008/FR-029); marks-step guard station + GuardSpecification decision (FR-013); Copy parity gate + repair list with the FR-015 unvisited-at-Output ruling; Track 2 inline identity choices with FR-017 fingerprint-pinned decline suppression; key-inspector criterion/production/provenance section (FR-025); four Playwright walks (T023). T026 refusal probe over the corpus: 745 K_-linked touch keys, 17.7% raw refusal / 12.4% candidate-adjusted (utilities/refusal-probe/refusal-report.md). Full FR-by-FR trace and the deviation/adjudication record: specs/104-touch-key-id-criteria/AS-BUILT.md. T021 (corpus gate) and T022 (caps-fallback probe) land with the sibling Wave 4 crew and are recorded as pending in the AS-BUILT. Per the ack-routing convention this entry is adjudicated from main; the hash acknowledges spec.md as merged."
     }
   }
 }
