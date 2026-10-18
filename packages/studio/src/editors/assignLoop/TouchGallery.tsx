@@ -136,6 +136,7 @@ import type {
   SeveranceNotice,
   TouchMethodDescriptor,
   TouchKeyIdProposal,
+} from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
