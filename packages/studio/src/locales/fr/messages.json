@@ -501,7 +501,6 @@
   "editor.assignLoop.keyGrid.identity.guardValue.emit": "La marque apparaît quand même",
   "editor.assignLoop.keyGrid.identity.guardValue.swallow": "Rien ne se passe — il n'y a pas de lettre où la marque peut se poser",
   "editor.assignLoop.keyGrid.identity.historyLabel": "Comment cette touche a pris sa forme",
-  "editor.assignLoop.keyGrid.identity.historyNone": "Aucune décision d'identité enregistrée pour cette touche.",
   "editor.assignLoop.keyGrid.identity.hostsLabel": "Vérifié par rapport au clavier {hosts}",
   "editor.assignLoop.keyGrid.identity.hostsLabelPlural": "Vérifié par rapport aux claviers {hosts}",
   "editor.assignLoop.keyGrid.identity.production.conditionLabel": "Quand",
