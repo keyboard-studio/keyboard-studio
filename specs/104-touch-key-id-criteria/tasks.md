@@ -13,8 +13,8 @@ component (T015), so T016 starts after T015 lands.
 
 ## Phase 1: Setup — fixtures
 
-- [ ] **T001** Vendor the idiom fixtures: minimal `.kmn` + `.keyman-touch-layout` pairs for sil_cameroon_qwerty (guarded T_), hindi_flick (ruled U_), one gff_* (T_ producer + navigation + subkey host), one fv_* (store-grouped T_ fans), one basic_* (dead T_<HEX>), each reduced to the smallest layout that still exhibits the idiom, with provenance notes (FR-028) · `packages/engine/src/pattern-apply/__fixtures__/touch-id/`
-- [ ] **T002** Tap-simulation harness over the vendored KMW: compile a fixture with kmc, drive every key in every layer, return the per-(key × state) output table; assert it reproduces research.md §1's verdicts on the T001 fixtures (ruled T_ produces, rule-free T_ is silent, U_ decodes, unmatched K_ falls back at state 0/SHIFT) · `packages/engine/src/simulator/tapSimulation.test.ts`
+- [x] **T001** Vendor the idiom fixtures: minimal `.kmn` + `.keyman-touch-layout` pairs for sil_cameroon_qwerty (guarded T_), hindi_flick (ruled U_), one gff_* (T_ producer + navigation + subkey host), one fv_* (store-grouped T_ fans), one basic_* (dead T_<HEX>), each reduced to the smallest layout that still exhibits the idiom, with provenance notes (FR-028) · `packages/engine/src/pattern-apply/__fixtures__/touch-id/`
+- [x] **T002** Tap-simulation harness over the vendored KMW: compile a fixture with kmc, drive every key in every layer, return the per-(key × state) output table; assert it reproduces research.md §1's verdicts on the T001 fixtures (ruled T_ produces, rule-free T_ is silent, U_ decodes, unmatched K_ falls back at state 0/SHIFT) · `packages/engine/src/simulator/tapSimulation.test.ts`
 
 ## Phase 2: Foundational — the resolver and the decision table
 

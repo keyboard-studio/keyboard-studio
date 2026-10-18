@@ -1,0 +1,23 @@
+c Spec 104 fixture — HAND-CONSTRUCTED (no fv_* keyboard is in this
+c machine's partial corpus checkout). It reproduces the idiom attested
+c in the spec 104 corpus census for fv_southern_carrier (FirstVoices,
+c Canadian Aboriginal syllabics): a touch-first syllable fan in T_
+c mnemonics — T_H both emits a syllable and navigates (nextlayer to a
+c per-consonant vowel layer) — with the fan's keys and outputs grouped
+c in parallel .kmn stores (any(fanHkeys) > index(fanH,1)). Reduced to
+c the H fan (3 forms).
+
+store(&VERSION) '10.0'
+store(&NAME) 'Southern Carrier (spec 104 fixture)'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'fv_southern_carrier.keyman-touch-layout'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
+store(fanHkeys) [T_H] [T_HI] [T_HU]
+store(fanH) "ᐸᐱᐲ"
+
++ any(fanHkeys) > index(fanH,1)

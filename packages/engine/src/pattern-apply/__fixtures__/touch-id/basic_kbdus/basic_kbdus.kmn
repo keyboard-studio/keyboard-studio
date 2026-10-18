@@ -1,0 +1,23 @@
+c Spec 104 fixture — REDUCED from release/basic/basic_kbdus (v1.2, the
+c Keyman Developer template family). The source .kmn carries 97 key
+c rules — every one for K_ keys (two kept verbatim below); NO rule in
+c the source references any T_ id, while the source touch layout's
+c symbol layer is built from T_<HEX> keys with keycap text and
+c nextlayer only. Those rule-free T_<HEX> keys are the dead-key
+c population of research.md §1/§2 (2,115 pairs corpus-wide): a T_ key
+c has no fallback, so without a rule it types nothing.
+
+store(&VERSION) '10.0'
+store(&NAME) 'US Basic'
+store(&COPYRIGHT) '© 2008-2020 SIL International'
+store(&KEYBOARDVERSION) '1.2'
+store(&LAYOUTFILE) 'basic_kbdus.keyman-touch-layout'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_SPACE] > U+0020
++ [K_0] > U+0030
++ [SHIFT K_0] > U+0029
