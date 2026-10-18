@@ -41,6 +41,7 @@ export * from "./placementStrategy";
 export * from "./provenance";
 export * from "./simulation";
 export * from "./strategy";
+export * from "./strategyDivergence";
 export * from "./surveyPhaseResult";
 export * from "./surveySession";
 export * from "./toleranceReport";
