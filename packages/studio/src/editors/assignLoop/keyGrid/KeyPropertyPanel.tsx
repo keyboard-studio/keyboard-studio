@@ -156,6 +156,11 @@ export interface KeyPropertyPanelProps {
    */
   assignSlot?: ReactNode;
   /**
+   * Spec 104 T016: the selected key's recorded key-identity provenance
+   * line, forwarded to the embedded inspector's provenance area.
+   */
+  identityNote?: string;
+  /**
    * The id proposal for the selected key (spec 065 FR-029…FR-032), or
    * `undefined` when none has been computed.
    *
@@ -319,6 +324,7 @@ export function KeyPropertyPanel({
   onDelete,
   onMove,
   assignSlot,
+  identityNote,
   idProposal,
   label,
 }: KeyPropertyPanelProps) {
@@ -472,6 +478,7 @@ export function KeyPropertyPanel({
           {...(layout !== undefined ? { layout } : {})}
           onSpChange={onSpChange}
           onApplyFix={onApplyFix}
+          {...(identityNote !== undefined ? { identityNote } : {})}
         />
       </div>
 

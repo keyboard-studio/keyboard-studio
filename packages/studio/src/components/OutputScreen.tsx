@@ -47,6 +47,7 @@ import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useDocsPreview } from "../hooks/useDocsPreview.ts";
 import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
 import { DocumentationFindingsSummary } from "./DocumentationFindingsSummary.tsx";
+import { UnappliedRepairList } from "./TouchKeyIdentityList.tsx";
 import { LintSummary } from "../lint/LintSummary.tsx";
 import { selectUnmappedFindings } from "../lint/lintToQuestion.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
@@ -882,6 +883,16 @@ export function OutputScreen() {
                 <LintSummary findings={otherOutputFindings} />
               </section>
             )}
+
+            {/* Spec 104 FR-015 (clarify ruling): a repair list never
+                visited downloads with its repairs UNAPPLIED — the
+                unapplied repairs are recorded as unvisited on the project
+                and listed here. Informational only; gates nothing, and
+                reaching this step never applies a repair. */}
+            <UnappliedRepairList
+              vfs={artifact.stage.kind === "ready" ? artifact.stage.vfs : null}
+              keyboardId={artifact.stage.kind === "ready" ? artifact.stage.keyboardId : null}
+            />
 
             {/* spec 080 FR-017: what documentation ships and where each file's
                 content came from. Informational only — reads state, gates
