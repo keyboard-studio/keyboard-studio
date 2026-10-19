@@ -501,7 +501,6 @@
   "editor.assignLoop.keyGrid.identity.guardValue.emit": "The mark appears anyway",
   "editor.assignLoop.keyGrid.identity.guardValue.swallow": "Nothing happens — there is no letter for the mark to sit on",
   "editor.assignLoop.keyGrid.identity.historyLabel": "How this key got its form",
-  "editor.assignLoop.keyGrid.identity.historyNone": "No identity decisions recorded for this key.",
   "editor.assignLoop.keyGrid.identity.hostsLabel": "Checked against the {hosts} keyboard",
   "editor.assignLoop.keyGrid.identity.hostsLabelPlural": "Checked against the {hosts} keyboards",
   "editor.assignLoop.keyGrid.identity.production.conditionLabel": "When",

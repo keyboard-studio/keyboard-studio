@@ -580,13 +580,59 @@ export async function driveConvenienceStep(
  * if that is ALSO gated away — the carve gallery itself), rather than trusting
  * a fixed-timeout absence read to mean "the S0 gate skipped this".
  */
+/**
+ * Spec 104 FR-013: the marks series now ends at the guard station
+ * ("A mark with no letter before it"), and its Continue is DISABLED until
+ * the question is answered — a pick, a prior answer, or the Track 2 seed
+ * presented for confirmation. A walk that simply clicks marks-continue
+ * through the series stalls there forever.
+ *
+ * This helper answers ONLY the genuinely-unanswered case: when the station
+ * is showing with neither option selected, it selects `behaviour`. A seed
+ * or prior answer already selected is left exactly as it stands (on the
+ * adapt track the seed is the imported keyboard's own behaviour, and
+ * overriding it would change what the walk is adapting). The default,
+ * "swallow", is the guarded behaviour the pre-104 product minted by
+ * default (spec 063's combining-mark guard), so the legacy walks that pass
+ * through here keep the downstream minting behaviour they were written
+ * against. Walks that care about the answer itself (spec 104's own e2e)
+ * assert the station explicitly and pass their behaviour.
+ *
+ * Returns true when the guard station was present (answered or already
+ * answered), false when it never rendered.
+ */
+export async function answerGuardStationIfPresent(
+  page: Page,
+  behaviour: "swallow" | "emit" = "swallow",
+): Promise<boolean> {
+  const station = page.getByTestId("guard-station");
+  if (!(await station.isVisible().catch(() => false))) return false;
+  const swallow = page.getByTestId("guard-option-swallow");
+  const emit = page.getByTestId("guard-option-emit");
+  if ((await swallow.count()) === 0 || (await emit.count()) === 0) {
+    // The read-only "prior answer" form (a confirmed specification is
+    // shown, not re-asked) — Continue is already unblocked.
+    return true;
+  }
+  const anySelected =
+    (await swallow.isChecked().catch(() => false)) ||
+    (await emit.isChecked().catch(() => false));
+  if (!anySelected) {
+    await page.getByTestId(`guard-option-${behaviour}`).check();
+  }
+  return true;
+}
+
 export async function driveMarksSeries(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("marks-continue");
   const nextLandmarks = [
     page.getByTestId("convenience-continue"),
     page.getByTestId("carve-gallery"),
   ];
-  for (let i = 0; i < 6; i++) {
+  // 8 iterations, not the pre-104 6: the series gained a station (spec
+  // 104's guard station is always last), and a station count at the old
+  // budget's edge must still complete.
+  for (let i = 0; i < 8; i++) {
     const timeout = i === 0 ? 20_000 : 5_000;
     await Promise.race([
       continueBtn.waitFor({ state: "visible", timeout }),
@@ -596,6 +642,11 @@ export async function driveMarksSeries(page: Page): Promise<void> {
       // direct visibility check below.
     });
     if (!(await continueBtn.isVisible().catch(() => false))) return; // skipped, or just completed
+    // Spec 104 FR-013: if this station is the guard station and it is
+    // unanswered, marks-continue is disabled and the click below would
+    // wait on actionability until the test timeout. Answer it first
+    // (seed/prior-respecting — see answerGuardStationIfPresent).
+    await answerGuardStationIfPresent(page);
     await continueBtn.click();
   }
 }
@@ -939,15 +990,18 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  * Phase F has several questions (welcome paragraph, usage tips, credits, contact).
  * This helper:
  *   1. Fills the welcome paragraph
- *   2. Fills the first usage tip
- *   3. Leaves the HISTORY proposal (pf_history_entry, spec 080 US5) undecided
+ *   2. Advances past pf_font_guidance (Phase F revision, #2182) — a core-flow
+ *      question spliced between the welcome paragraph and the first usage
+ *      tip; optional, left blank ("common system fonts are sufficient")
+ *   3. Fills the first usage tip
+ *   4. Leaves the HISTORY proposal (pf_history_entry, spec 080 US5) undecided
  *      and advances past it — optional, so Next is enabled with no answer
- *   4. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
+ *   5. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
  *      revision's required Yes/No gate, which unconditionally follows
  *      pf_history_entry) — the minimal path every existing walk wants,
  *      rather than opening the optional documentation battery
- *   5. Advances through remaining optional questions in a bounded loop
- *   6. Detects arrival at #output (phase boundary)
+ *   6. Advances through remaining optional questions in a bounded loop
+ *   7. Detects arrival at #output (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -960,6 +1014,23 @@ export async function driveHelpPhase(
 ): Promise<void> {
   await page.locator("#pf_welcome_paragraph").fill(welcomeText);
   await surveyAdvance(page).click();
+
+  // pf_font_guidance (#2182) sits in the core flow between the welcome
+  // paragraph and pf_usage_tip_1 — a walk that waits for the usage-tip
+  // field here stalls until the test timeout (the golden-walk capture's
+  // 1200s death on run 39159050050). Optional and blank is a complete
+  // answer, so advance straight past it. The visibility wait is bounded
+  // and conditional because these helpers are also copied onto base code
+  // for the golden-walk baseline capture, where the question may predate
+  // or postdate the helper.
+  const fontGuidance = page.locator("#pf_font_guidance");
+  const fontGuidanceShown = await fontGuidance
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (fontGuidanceShown) {
+    await surveyAdvance(page).click();
+  }
 
   await page.locator("#pf_usage_tip_1").fill(usageTipText);
   await surveyAdvance(page).click();
