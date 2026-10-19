@@ -9,8 +9,8 @@
 // CarveDecisionRenderer precedent).
 //
 // The store reads below mirror AddPhysicalAdapter's (the live
-// manifest path): the gallery needs the selected base keyboard, the
-// placement priors, and the marks worklist self-sourced (FR-007).
+// manifest path): the gallery needs the selected base keyboard and the
+// placement priors self-sourced (FR-007).
 
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import type { PhysicalLayoutValue } from "./physicalLayoutValue.ts";
@@ -24,14 +24,12 @@ export function PhysicalLayoutDecisionRenderer({
 }: DecisionRendererProps<PhysicalLayoutValue>) {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const placementMap = usePlacementPriors();
-  const marksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
 
   return (
     <MechanismGallery
       selectedStartKeyboard={startKeyboard}
       onComplete={() => onChange(currentPhysicalLayoutValue())}
       {...(placementMap ? { placementMap } : {})}
-      {...(marksWorklist !== undefined ? { worklist: marksWorklist } : {})}
     />
   );
 }

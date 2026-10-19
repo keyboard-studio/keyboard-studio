@@ -77,7 +77,6 @@ import type {
   MechanismAssignment,
   MechanismRef,
   PlacementMap,
-  PlacementWorklist,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
 import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
@@ -123,6 +122,7 @@ import {
 } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
+import { usePlacementInventory } from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
@@ -1535,16 +1535,6 @@ export interface MechanismGalleryProps {
    * No kbgen data => no row; gallery behaves exactly as today.
    */
   placementMap?: PlacementMap;
-  /**
-   * Optional marks-series placement worklist (spec 071, FR-020 — the
-   * placementMap seam pattern). When supplied, composed units covered by a
-   * PRODUCTIVE mark key (a `markUnits` entry: base key + mark key reach them)
-   * are dropped from the walk — the mark itself is walked instead (it is in
-   * the inventory via the marks store). Own-letter units keep their whole-unit
-   * walk entries. Absent (or empty — a skipped series) ⇒ the existing flat
-   * `lettersToAdd` behavior, unchanged.
-   */
-  worklist?: PlacementWorklist;
 }
 
 export function MechanismGallery({
@@ -1552,7 +1542,6 @@ export function MechanismGallery({
   onComplete,
   onBack,
   placementMap,
-  worklist,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
   // Narrow-viewport branch (mobile adaptation, Phase 4): the
@@ -1638,6 +1627,15 @@ export function MechanismGallery({
     producedSet: sessionProducedSet,
     rawProducedSet: sharedRawProducedSet,
   } = useInventoryDiff();
+
+  // The placement walk set (issue #2293): the marks series' answers,
+  // derived ONCE upstream (hooks/usePlacementInventory.ts) — worklist
+  // units + the non-alphabet inventory, or the flat inventory itself when
+  // there is nothing to filter by. The walk below intersects the flat
+  // diff with this set; coverage (session.confirmedInventory via
+  // useInventoryDiff's producedSet and the SHOW-ALL `inventory` below) is
+  // untouched — composed forms remain must-produce, just not walked.
+  const placementInventory = usePlacementInventory();
 
   // Collated display order (spec 047 FR-007's default-ICU comparator, reused
   // — not reinvented; see survey/collation.ts): puts a lowercase letter
@@ -1734,19 +1732,25 @@ export function MechanismGallery({
   // second time per render.
   const baseProducedSet = sharedRawProducedSet;
 
-  // Spec 071 worklist filter (FR-020): a composed unit whose marks are ALL
-  // productive mark keys is reachable via base key + mark key — it needs no
-  // whole-unit placement of its own, so it leaves the walk. Everything else
-  // (plain bases, own-letter units, the productive marks themselves) keeps its
-  // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
+  // Placement-set filter (issue #2293, superseding the spec 071 FR-020
+  // render-time filter that lived here): the walk is the flat diff
+  // (`inventoryLettersToAdd`) intersected with the upstream placement set
+  // (`usePlacementInventory` — derived once from the marks series'
+  // answers, shared with TouchGallery). A composed unit whose mark is a
+  // productive mark key is not in the placement set, so it leaves the
+  // walk (reachable via base key + mark key); a lone mark whose treatment
+  // is `composed` is likewise absent (the mirror case the old filter
+  // missed). Promoted combinations ARE in the set and keep their walk
+  // entries. With no worklist (or an empty one) the placement set IS the
+  // flat inventory, so this is identity — the pre-#2293 behavior.
   //
-  // The worklist-filtered result is then collated (same `collateInventory`
-  // helper as `inventory` above) before being returned — this is the list
+  // The filtered result is then collated (same `collateInventory` helper
+  // as `inventory` above) before being returned — this is the list
   // usePositionalCharNav's `list` walks and the "first uncovered" default
   // below reads, so sorting it puts a lowercase letter immediately before
   // its uppercase counterpart in the Back/Next walk too. The SET of
-  // characters (the coverage/gate denominator, criterion 18.6) is never
-  // widened or narrowed by this — only its order changes.
+  // characters the coverage/gate denominates over (criterion 18.6) is
+  // never widened or narrowed by this — that stays the flat inventory.
   //
   // `nfcDedup([], inventoryLettersToAdd)` — same duplicate-walk-entry fix as
   // `inventory` above: `inventoryLettersToAdd` (from useInventoryDiff.ts)
@@ -1759,18 +1763,10 @@ export function MechanismGallery({
   // matching `touchLettersToAdd`.
   const lettersToAdd = useMemo(() => {
     const deduped = nfcDedup([], inventoryLettersToAdd);
-    let filtered = deduped;
-    if (worklist !== undefined && worklist.markUnits.length > 0) {
-      const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
-      filtered = deduped.filter((c) => {
-        const units = [...c.normalize("NFD")];
-        if (units.length < 2) return true;
-        const marks = units.slice(1);
-        return !marks.every((m) => productiveMarks.has(m));
-      });
-    }
+    const placementSet = new Set(placementInventory.map((c) => c.normalize("NFC")));
+    const filtered = deduped.filter((c) => placementSet.has(c.normalize("NFC")));
     return collateInventory(filtered, loanwordSet);
-  }, [inventoryLettersToAdd, worklist, loanwordSet]);
+  }, [inventoryLettersToAdd, placementInventory, loanwordSet]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
