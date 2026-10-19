@@ -525,8 +525,10 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
 
   // Own-key resolution needs only class/mark treatment (never `inputOrder`
   // itself), so it can be computed before the input-order answer below.
-  // Kept as the list (not a bare predicate): S4 states the S2 outcome back to
-  // the author and needs the marks themselves (#1762 / spec 052 FR-022).
+  // Kept as the list (not a bare predicate): the input-order evidence key is
+  // keyed over exactly these marks. (#2297 removed S4's former use of this
+  // list — the output-form station no longer states the treatment outcome
+  // back, because its suggestion must not derive from treatment.)
   const ownKeyMarks = gate.alphabet.marks.filter(
     (mark) =>
       treatmentFor(
@@ -538,11 +540,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   );
 
   const hasOwnKeyMark = ownKeyMarks.length > 0;
-
-  const outputFormProposal = useMemo(
-    () => resolveOutputFormProposal(posture, hasOwnKeyMark),
-    [posture, hasOwnKeyMark],
-  );
 
   // S2 — input order. Prefilled from the base keyboard's own behavior when
   // available (detectMarkInputOrderFromImport seeds session.axes.markInputOrder).
@@ -583,21 +580,25 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         .join(","),
     [posture],
   );
+  // #2297: the output-form SUGGESTION derives from the input order alone —
+  // never from treatment, never from the posture table. The saved answer is
+  // reconciled against the posture evidence key only, so neither an order
+  // change nor a treatment change can move a confirmed composition answer;
+  // and there is no clamp: ready-made stays a legal answer even when some
+  // pair has no ready-made form (those pairs fall back to base plus mark
+  // automatically — the old #1762 clamp implemented the FR-014 forcing
+  // #2297 removes).
+  const outputFormProposal = useMemo(
+    () => resolveOutputFormProposal(posture, inputOrder),
+    [posture, inputOrder],
+  );
   const outputFormKey = marksOutputFormKey(postureId);
   const outputFormView = reconcile(
     savedAnswers["marks_output_form.form"],
     outputFormKey,
     outputFormProposal.form,
   );
-  // #1762: a ready-made override must not survive into row 1 (no ready-made
-  // form exists for some pair). Evidence-key changes usually re-seed via
-  // reconcile; this clamp covers the same-key case where the override would
-  // otherwise stick on a screen that no longer offers the undo button.
-  const outputForm = (
-    outputFormProposal.readyMadeUnavailable && outputFormView.value === "ready-made"
-      ? "base-plus-mark"
-      : outputFormView.value
-  ) as OutputForm;
+  const outputForm = outputFormView.value as OutputForm;
 
   function handleOutputFormChange(next: OutputForm): void {
     saveAnswer(STEP_ID, "marks_output_form.form", {
@@ -1363,7 +1364,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           proposal={outputFormProposal}
           value={outputForm}
           onChange={handleOutputFormChange}
-          ownKeyMarks={ownKeyMarks}
+          inputOrder={inputOrder}
         />
       )}
 

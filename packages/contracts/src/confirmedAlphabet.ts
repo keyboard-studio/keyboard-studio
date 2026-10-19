@@ -83,8 +83,13 @@ export interface BlockedCombination {
 }
 
 /**
- * The S4 whole-keyboard output-form decision (spec 071, FR-013..FR-016):
- * ready-made single (precomposed) characters vs base-plus-mark sequences.
+ * The S4 whole-keyboard output-form decision (issue #2297; scope ruling
+ * 2026-10-19, #2297 comment 6277630830): ONE keyboard-wide composition
+ * policy — ready-made single (precomposed, NFC) characters vs base-plus-mark
+ * (NFD) sequences. Never per-mark/per-class/per-combination: under
+ * "ready-made", a combination with no precomposed form emits base plus mark
+ * automatically (Unicode necessity, not a mixture). Recorded separately
+ * from input order and from placement treatment, which are #2293's axes.
  * Canonical home for the union — the engine's `output-form-policy.ts` (which
  * owns the decision LOGIC, not the type) re-exports this rather than
  * declaring a divergent copy, since engine depends on contracts and contracts
