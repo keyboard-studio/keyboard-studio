@@ -16,7 +16,7 @@
 //
 //   - the live path: AddPhysicalAdapter / AddTouchAdapter call them
 //     from their onComplete wrappers, after recording;
-//   - the replay path: survey/journey-runner.ts calls them in place
+//   - the replay path: test/journey-runner.ts calls them in place
 //     of its former applyStepCompletion("mechanisms" / "touch", …)
 //     calls, which reached the same effects through the reducer.
 

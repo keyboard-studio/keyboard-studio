@@ -19,7 +19,7 @@ carries conditional productions rather than pretending to one output:
   source: "rule" | "u-decode" | "k-fallback" | "emulation" | "none" | "unclassified",
   contextConditional: boolean,
   ruleRefs: nodeId[]        // bindings of any role (see the rule arm)
-  fallbackCertain: boolean  // false for caps-state K_ (§5) and for presumptive u-decode
+  fallbackCertain: boolean  // false only for presumptive u-decode (caps-state K_ is certain since T022, §5)
 }
 ```
 
@@ -47,12 +47,12 @@ carries conditional productions rather than pretending to one output:
   flagged `LisVirtualKey=false` precisely so `nomatch` sees them) or any
   rule binds the U_ id in any role: then `fallbackCertain: false`.
 - `k-fallback`: the id is a `K_` id, no producing rule binds it in this
-  state, the modifier state is state-0 or SHIFT, and the keystroke's
-  Lstate is not CAPITAL. Output is the US base character for that key
-  from KMW's base tables. In any other modifier state the production
-  is `none`. A caps-state K_ key with no binding rule returns
-  `output: unknown, source: "k-fallback", fallbackCertain: false` (§5);
-  no consumer may premise a criterion, choice, or repair on it.
+  state, and the modifier state is state-0 or SHIFT. Output is the US
+  base character for that key from KMW's base tables. In any other
+  modifier state the production is `none`. The keystroke's Lstate is
+  irrelevant to this arm: in caps state the fallback fires with the
+  same output the modifier state gives without caps (settled by the
+  T022 probe, §5), and the record is `fallbackCertain: true`.
 - `emulation`: engine-defined special-function K_ ids (K_BKSP, K_ENTER,
   K_TAB, K_LOPT, K_ROPT, numpad keys) produce through KMW's special
   emulation / command handling / numpad arm, not through rules or the
@@ -159,13 +159,28 @@ For a removed character, the resolver enumerates every producing occurrence
 For a ruled U_ key both halves are mandatory: key-only removal leaves
 orphaned rules; rule-only removal revives production via the U_ decode.
 
-## 5. The caps-state proviso
+## 5. Caps state and the K_ fallback (settled by T022)
 
-CAPITAL is an Lstate, not an Lmodifier. The engine evidence for the
-K_ fallback covers modifier states; whether it fires in caps state is
-unsettled. Until the probe task in tasks.md lands, the resolver returns
-`fallbackCertain: false` for caps-state K_ productions and no criterion,
-choice, or repair may be premised on a caps-state fallback value.
+CAPITAL is an Lstate, not an Lmodifier — and the K_ fallback does not
+inspect it. KMW's `DefaultOutputRules.forBaseKeys` gates on
+`Lmodifiers` alone, so the fallback fires in caps state exactly as it
+fires in the same modifier state without caps: state 0 → the unshifted
+US base character, SHIFT → the shifted character, any other modifier
+state → none.
+
+Settled empirically (T022 probe, 2026-10-18; fixture `caps_probe`,
+taps pinned in `tapSimulation.test.ts`): an unmatched K_Q on a caps
+layer types `q`; on a caps+SHIFT layer, `Q`. A `[CAPS K_B]` /
+`[NCAPS K_B]` witness pair in the same fixture proves the CAPITAL
+Lstate genuinely engaged during those taps, so the verdict is not an
+artefact of caps state never being presented.
+
+Consequence: there is no caps proviso. The resolver returns the
+ordinary k-fallback record for caps-state K_ keys, with
+`fallbackCertain: true`; criteria, choices, and repairs may premise
+on caps-state fallback values like any other. (Before the probe, this
+section barred that: the resolver returned `output: unknown,
+fallbackCertain: false` for caps-state K_.)
 
 ## 6. Author copy (normative strings, en; fr via the catalogue, FR-026)
 

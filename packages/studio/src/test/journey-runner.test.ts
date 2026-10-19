@@ -1,18 +1,18 @@
 // journey-runner.test.ts — spec 032 FR-011/SC-001/SC-004.
 //
-// Replays every journey in the shared corpus (__fixtures__/journeyCorpus.ts)
+// Replays every journey in the shared corpus (../survey/__fixtures__/journeyCorpus.ts)
 // once via describe.each and asserts its expected_outcomes. Runs via
 // `pnpm --filter @keyboard-studio/studio test` (and therefore `pnpm test`), per FR-011.
 
 import { describe, it, expect } from "vitest";
-import { parseJourneyFixture } from "./journeyFixture.ts";
+import { parseJourneyFixture } from "../survey/journeyFixture.ts";
 import { replayJourney } from "./journey-runner.ts";
 import {
   JOURNEY_CORPUS_RAW,
   loadJourney,
   loadJourneyCorpus,
   type JourneyCorpusName,
-} from "./__fixtures__/journeyCorpus.ts";
+} from "../survey/__fixtures__/journeyCorpus.ts";
 
 describe("journeyFixture parsing", () => {
   it("parses every corpus fixture without throwing, with unique journey_ids", () => {
@@ -142,7 +142,7 @@ describe("replayJourney — backtrack-journey unsupported revisit", () => {
 describe("SC-004 — no regression in existing SurveyRunner routing primitives", () => {
   it("re-exports evalCondition/resolveNext/advanceThrough unchanged from SurveyRunner.tsx", async () => {
     const runnerModule = await import("./journey-runner.ts");
-    const surveyRunnerModule = await import("./SurveyRunner.tsx");
+    const surveyRunnerModule = await import("../survey/SurveyRunner.tsx");
     expect(runnerModule.evalCondition).toBe(surveyRunnerModule.evalCondition);
     expect(runnerModule.resolveNext).toBe(surveyRunnerModule.resolveNext);
     expect(runnerModule.advanceThrough).toBe(surveyRunnerModule.advanceThrough);

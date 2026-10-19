@@ -16,7 +16,7 @@ One record per (key occurrence × layer-state) from `resolveTouchProduction()`.
 | `source` | enum | `rule` \| `u-decode` \| `k-fallback` \| `emulation` \| `none` \| `unclassified` |
 | `contextConditional` | boolean | true when producing bindings carry incompatible context conditions; consumers must handle the set, never collapse it |
 | `ruleRefs` | nodeId[] | ALL bindings of the id in this state, any role; `source: "rule"` additionally requires ≥1 producing binding among them |
-| `fallbackCertain` | boolean | false in exactly two cases: caps-state K_ with no binding rule (`output: unknown`), and presumptive `u-decode` where a `nomatch` group exists or any rule binds the id |
+| `fallbackCertain` | boolean | false in exactly one case: presumptive `u-decode` where a `nomatch` group exists or any rule binds the id. (Caps-state K_ was the second case until the T022 probe settled it — the fallback fires in caps state, contracts §5.) |
 
 Invariants:
 - `source: "unclassified"` (imported id outside K_/T_/U_) — no criterion,

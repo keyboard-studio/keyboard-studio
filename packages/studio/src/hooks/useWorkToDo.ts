@@ -138,11 +138,17 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
     [punctuationInventoryAnswer, punctuationInventory, startKeyboard],
   );
 
-  // TODO(079-US3): invisibles/convenience never have a `reproposed` answer to
-  // flag — see survey/invisiblesFlags.ts and survey/convenience/
-  // convenienceFlags.ts for why (their per-answer keys are either "still
-  // offered" or "no longer offered", never "offered under different
-  // evidence") — so there is nothing for either to contribute here.
+  // spec 079 US3: invisibles/convenience never have a `reproposed` answer
+  // to flag, so neither contributes here. Invisibles: the step writes each
+  // candidate's decision directly into the invisibles-inventory decision
+  // value (no draft/confirm split, no per-answer evidence key to reconcile),
+  // and its candidate set is self-healing — `carriedOver` always re-offers
+  // every character the author has ever decided, so a decided candidate is
+  // "newly offered" or unchanged, never stale. Convenience: a candidate's
+  // `offeredKey` is either the current `offered|<primary>` key or `null`
+  // (no longer offered; the saved answer is inert) — there is no third
+  // "still offered under a stale key" state for `reconcile()` to classify
+  // as `reproposed`.
 
   const notAsked = useMemo<Record<StepId, NotAskedGateInput>>(() => {
     const out: Record<StepId, NotAskedGateInput> = {};

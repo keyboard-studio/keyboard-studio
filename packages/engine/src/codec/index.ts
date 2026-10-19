@@ -24,14 +24,9 @@ export type { OpaqueReason } from "./opaque-reasons.js";
 
 export { computeSha256Hex } from "./hash.js";
 
-// Full import pipeline (parse → recognize → Layer A′ fidelity → emit →
-// ImportReport). The studio's live import path runs the fidelity stage from
-// this orchestrator's composition (see validator/index-import-fidelity.js);
-// the orchestrator itself is the composition for Node-side importers.
-export { importKeyboard, buildImportReport } from "./import-keyboard.js";
-export type {
-  ImportKeyboardResult,
-  BuildImportReportParams,
-} from "./import-keyboard.js";
+// The full import pipeline (parse → recognize → Layer A′ fidelity → emit)
+// is composed by the caller: the studio's live import path runs the
+// fidelity stages inline (see validator/index-import-fidelity.js). There
+// is no engine-side orchestrator.
 
 export { normaliseForComparison } from "./normalise-ir.js";

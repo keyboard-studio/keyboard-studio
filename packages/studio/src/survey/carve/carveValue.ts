@@ -69,11 +69,10 @@ const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family
  * covers every overlay component that can be non-trivial at carve
  * completion and feeds the applied view — the four removal sets, the
  * dispositions, the card. The one remaining overlay field,
- * `carveTouchKeepInert`, has no live writer (its only UI,
- * TouchKeepInertControl, is an unmounted stub for a future surface),
- * so it is always empty in the live flow; if that surface ever
- * mounts, this value needs a field for it (named in the spec's
- * downstream handoff, D-090-31).
+ * `carveTouchKeepInert`, has no live writer, so it is always empty
+ * in the live flow; if a surface ever mounts a writer for it, this
+ * value needs a field for it (named in the spec's downstream
+ * handoff, D-090-31).
  */
 export function carvedLayoutValueFromOverlay(
   overlay: CarveOverlaySnapshot,

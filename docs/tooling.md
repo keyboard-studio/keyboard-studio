@@ -218,6 +218,7 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - km-triage-app: `pnpm run test:km-triage` (`node:test`, not vitest; the glob is quoted so Node
   expands it — Node 22 does not accept a bare directory argument to `--test`)
 - supportability-scanner: `pnpm run test:supportability-scanner`
+- corpus-eval: `pnpm run test:corpus-eval` (typecheck + tests; §7.5.1 corpus evaluation — it imports engine/contracts `src/` by relative path, so this is what catches a rename in the codec/recognizer/strategy-selector it composes)
 
 ### Corpus-gated tests
 
@@ -315,6 +316,11 @@ Live and passing:
 
 - [carve.spec.ts](../packages/studio/e2e/carve.spec.ts)
 - [copy-edit.spec.ts](../packages/studio/e2e/copy-edit.spec.ts)
+- [touch-key-identity.spec.ts](../packages/studio/e2e/touch-key-identity.spec.ts) — spec 104
+  T023: guard-station creation walk, Cameroon copy parity + basic_kbdus repair list,
+  adapt-with-repair (OSK-verified), Track 2 choice + FR-017 decline suppression. Added
+  to the CI `e2e` job's desktop filter list by the spec 104 close-out; its first lane
+  run is the passing verdict.
 - [touch-derivation-us1.spec.ts](../packages/studio/e2e/touch-derivation-us1.spec.ts) — spec 035
   US1, bambara import-and-adapt walk
 - [touch-derivation-us2.spec.ts](../packages/studio/e2e/touch-derivation-us2.spec.ts) — spec 035

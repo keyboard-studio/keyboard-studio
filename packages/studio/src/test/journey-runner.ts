@@ -76,7 +76,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
 import { selectStrategy, deriveCarveNeededSet } from "@keyboard-studio/engine";
-import { computeConvenienceGate } from "./convenience/convenienceGate.ts";
+import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
@@ -95,8 +95,8 @@ import { useWorkingCopyStore, bindManifest } from "../stores/workingCopyStore.ts
 import { instantiateFromExistingWithIdentitySeed } from "../lib/confirmRebase.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
-import { evalCondition as _evalCondition, resolveNext, advanceThrough } from "./SurveyRunner.tsx";
-import type { FlowQuestion, SurveyContext } from "./types.ts";
+import { evalCondition as _evalCondition, resolveNext, advanceThrough } from "../survey/SurveyRunner.tsx";
+import type { FlowQuestion, SurveyContext } from "../survey/types.ts";
 import {
   type JourneyFixture,
   type JourneyEvent,
@@ -106,13 +106,13 @@ import {
   type ReplayResult,
   isEditorActionEvent,
   isSurveyAnswerEvent,
-} from "./journeyFixture.ts";
+} from "../survey/journeyFixture.ts";
 
-// Re-exported so callers (journey-runner.test.ts, journeyCoverage.ts) can
+// Re-exported so callers (journey-runner.test.ts) can
 // import evalCondition from one place if they need it; keeps the "drives
 // SurveyRunner's exported pure functions" contract visible from this module.
 export { _evalCondition as evalCondition, resolveNext, advanceThrough };
-export type { ReplayResult } from "./journeyFixture.ts";
+export type { ReplayResult } from "../survey/journeyFixture.ts";
 
 // ---------------------------------------------------------------------------
 // Manifest step <-> live modular flow (steps/flowSources.ts, "live" entries

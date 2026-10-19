@@ -5,18 +5,15 @@
 // with them — a universal before/after demo ("type here, watch what happens"),
 // the rule list, and the rule builder.
 //
-// Three regions compose here; two are sibling-owned mount points that render
-// honest placeholders until workstreams 3 (rule list) and 4 (rule builder)
-// register their components:
-//   - DemoPane (this workstream, Track A) — per-keystroke simulation against
-//     the already-compiled artifact; reads rulesDemoArtifactStore, never
+// The regions compose here:
+//   - DemoPane (Track A) — per-keystroke simulation against the
+//     already-compiled artifact; reads rulesDemoArtifactStore, never
 //     compiles.
-//   - RuleListMount — workstream 3's KmRuleView + classifier, or an IR-text
-//     placeholder.
-//   - GuardSuggestions (this workstream, FR-020/FR-022) — intent-gated
-//     guard-suggestion cards (missing guards + over-broad guards), rendered
-//     only after the author signals intent; never on step entry.
-//   - RuleBuilderMount — workstream 4's builder panel, or a placeholder.
+//   - RuleListMount — the FR-018 family-card list.
+//   - GuardSuggestions (FR-020/FR-022) — intent-gated guard-suggestion
+//     cards (missing guards + over-broad guards), rendered only after the
+//     author signals intent; never on step entry.
+//   - RuleBuilderMount — the Track B rule-builder panel.
 //
 // The step itself persists nothing (the demo is a read-only view of the
 // compiled working copy; the sibling builder owns its own answers), so

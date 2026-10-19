@@ -15,12 +15,14 @@ treated as corpus-wide.
 
 ## Headline
 
+**Candidate refusal rate: 12.4%** — 87 of 700 genuine severance candidates refused (default policy).
+- Of the candidate refusals, completed once opaque fragments were acknowledged: 87
+
+Context (all requests, including cases that never needed severance):
 - K_-linked touch keys attempted: 745
 - Transplants completed: 613 (82.3%)
 - Transplants refused (default policy): 132 (17.7%)
 - Emulation-class keys among the refusals (K_BKSP/K_ENTER/K_LOPT — refused by design, never severance candidates): 45
-- Refusal rate over genuine severance candidates (700 keys): 87 refused (12.4%)
-- Of the candidate refusals, completed once opaque fragments were acknowledged: 87
 
 ## Refusal causes (binding, behind the opaque gate where it applied)
 

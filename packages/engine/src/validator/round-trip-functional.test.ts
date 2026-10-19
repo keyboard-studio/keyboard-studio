@@ -12,10 +12,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createVirtualFS } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
-import { importKeyboard } from "../codec/import-keyboard.js";
 import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
 import {
@@ -61,13 +59,4 @@ describe("functional I2 — real compile + simulate harness", () => {
     expect(errors[0]?.message).toContain("[K_A]");
   }, 60_000);
 
-  it("importKeyboard with the harness reports no RoundTripDivergence for a clean import", async () => {
-    const vfs = createVirtualFS();
-    const { report, findings } = await importKeyboard(kmnText, "roundtrip_simple", vfs, {
-      compileFn: compile,
-      simulateFn: simulate,
-    });
-    expect(report.status).not.toBe("RoundTripDivergence");
-    expect(findings.some((f) => f.code === ROUND_TRIP_DIVERGENCE_CODE)).toBe(false);
-  }, 60_000);
 });

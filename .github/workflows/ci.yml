@@ -593,8 +593,8 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright (boot-smoke + copy-edit + spec 088 live gate)
-        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload
+      - name: Playwright (boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks)
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity
 
       # Mobile adaptation, Phase 6 lane split: the mobile project (Pixel 7)
       # runs only the mobile-* specs (playwright.config.ts testMatch), as its
