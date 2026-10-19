@@ -749,6 +749,29 @@ describe("StudioShell — first-visit landing gate", () => {
     expect(screen.queryByTestId("compare-screen-root")).toBeNull();
   });
 
+  it("routes the welcome screen's Privacy link to the privacy notice, not the survey", async () => {
+    window.location.hash = "";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+
+    // WelcomeScreen is stubbed here, so drive PrivacyLink's own sequence
+    // (PrivacyScreen.test pins it): mark the visit, then set #privacy. The
+    // hash must parse to the privacy route — an unparsed token falls through
+    // to the (now "survey") landing route and opens the identity step instead.
+    await act(async () => {
+      markVisited();
+      window.location.hash = "#privacy";
+      window.dispatchEvent(new Event("hashchange"));
+    });
+
+    expect(screen.getByTestId("privacy-screen")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
   it("lifts the gate on a live hashchange once the newcomer leaves welcome (no remount)", async () => {
     window.location.hash = "#survey";
     localStorage.clear(); // pristine browser: never visited, no draft
