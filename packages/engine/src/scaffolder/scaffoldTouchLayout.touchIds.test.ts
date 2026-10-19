@@ -6,9 +6,11 @@
  * re-minted as U_ longpresses/extras (audit gap 4): T_0300's guarded grave
  * became an UNGUARDED U_0300 longpress on K_E (the diablock guard silently
  * lost), and no T_ key appeared anywhere. The scaffold now places the
- * ruled T_ ids as keys on the layers their rules belong to, with rule
- * linkage intact — proven by tap simulation against the compiled fixture
- * (the guard still swallows the mark after a space).
+ * ruled T_ ids on the layers their rules belong to, with rule linkage
+ * intact — proven by tap simulation against the compiled fixture (the guard
+ * still swallows the mark after a space). They ride the space bar's
+ * longpress, never extra rows: a scaffolded layer holds only the skeleton's
+ * rows of physical keys.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -20,7 +22,7 @@ import { parse as parseKmn } from "../codec/index.js";
 import { parseTouchLayout, emitTouchLayout } from "../codec/parse-touch.js";
 import { compile } from "../compiler/index.js";
 import { TouchTapSession } from "../simulator/tapSimulation.js";
-import { scaffoldTouchLayout } from "./scaffoldTouchLayout.js";
+import { scaffoldTouchLayout, scaffoldTouchLayoutWithDiagnostics } from "./scaffoldTouchLayout.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = resolve(here, "../pattern-apply/__fixtures__/touch-id/sil_cameroon_qwerty");
@@ -54,16 +56,25 @@ function mainKey(layout: TouchLayoutIR, platformId: string, layerId: string, key
   return layer?.rows.flatMap((r) => r.keys).find((k) => k.id === keyId);
 }
 
+function spaceSubkey(layout: TouchLayoutIR, platformId: string, layerId: string, keyId: string) {
+  return (mainKey(layout, platformId, layerId, "K_SPACE")?.sk ?? []).find((k) => k.id === keyId);
+}
+
 describe("scaffoldTouchLayout — spec 104 T019 ruled T_ identity (Case A: no touch layout)", () => {
   const layout = scaffoldTouchLayout(cameroonIr(false));
 
-  it("places the ruled T_ ids as keys on the layers their rules belong to", () => {
-    expect(mainKey(layout, "phone", "default", "T_0300")?.text).toBe("̀");
-    expect(mainKey(layout, "phone", "default", "T_030D")?.text).toBe("̍");
-    expect(mainKey(layout, "phone", "default", "T_002E")?.text).toBe(".");
+  it("places the ruled T_ ids on the space-bar longpress of the layers their rules belong to", () => {
+    expect(spaceSubkey(layout, "phone", "default", "T_0300")?.text).toBe("̀");
+    expect(spaceSubkey(layout, "phone", "default", "T_030D")?.text).toBe("̍");
+    expect(spaceSubkey(layout, "phone", "default", "T_002E")?.text).toBe(".");
     // T_030D carries a SHIFT rule form; T_0300 does not.
-    expect(mainKey(layout, "phone", "shift", "T_030D")?.text).toBe("̍");
-    expect(mainKey(layout, "phone", "shift", "T_0300")).toBeUndefined();
+    expect(spaceSubkey(layout, "phone", "shift", "T_030D")?.text).toBe("̍");
+    expect(spaceSubkey(layout, "phone", "shift", "T_0300")).toBeUndefined();
+  });
+
+  it("adds no rows: no T_ key sits on a row of its own", () => {
+    const rowKeys = allKeys(layout).map(({ key }) => key.id);
+    expect(rowKeys.filter((id) => id.startsWith("T_0"))).toEqual([]);
   });
 
   it("never re-mints a ruled T_ character under a new U_ id (no U_0300/U_030D longpress spill)", () => {
@@ -77,6 +88,23 @@ describe("scaffoldTouchLayout — spec 104 T019 ruled T_ identity (Case A: no to
   });
 });
 
+describe("scaffoldTouchLayout — tablet reseed from desktop with ruled T_ keys", () => {
+  const { layout } = scaffoldTouchLayoutWithDiagnostics(cameroonIr(false), "tablet");
+  const platform = layout.platforms.find((p) => p.id === "tablet")!;
+
+  it("keeps every layer to its five rows of physical keys and emits no symbols layer", () => {
+    expect(platform.layers.map((l) => l.id)).not.toContain("numeric");
+    for (const layer of platform.layers) {
+      expect(layer.rows, `layer ${layer.id}`).toHaveLength(5);
+    }
+  });
+
+  it("still places the ruled T_ ids, on the space-bar longpress", () => {
+    expect(spaceSubkey(layout, "tablet", "default", "T_0300")?.text).toBe("̀");
+    expect(spaceSubkey(layout, "tablet", "shift", "T_030D")?.text).toBe("̍");
+  });
+});
+
 describe("scaffoldTouchLayout — spec 104 T019 phone-from-tablet reseed (Case B: tablet-only layout)", () => {
   const layout = scaffoldTouchLayout(cameroonIr(true));
 
@@ -86,9 +114,9 @@ describe("scaffoldTouchLayout — spec 104 T019 phone-from-tablet reseed (Case B
   });
 
   it("the synthesized phone platform places the ruled T_ ids with their linkage", () => {
-    expect(mainKey(layout, "phone", "default", "T_0300")?.text).toBe("̀");
-    expect(mainKey(layout, "phone", "default", "T_030D")?.text).toBe("̍");
-    expect(mainKey(layout, "phone", "default", "T_002E")?.text).toBe(".");
+    expect(spaceSubkey(layout, "phone", "default", "T_0300")?.text).toBe("̀");
+    expect(spaceSubkey(layout, "phone", "default", "T_030D")?.text).toBe("̍");
+    expect(spaceSubkey(layout, "phone", "default", "T_002E")?.text).toBe(".");
   });
 });
 
@@ -133,17 +161,17 @@ describe("scaffoldTouchLayout — spec 104 T019 tap proof (production preserved,
   }, 120_000);
 
   it("Case A scaffold: the T_ keys produce through their rules, diablock guard included", () => {
-    expect(caseA.tap("default", "T_0300", "a").buffer).toBe("à");
+    expect(caseA.tapSubkey("default", "K_SPACE", "T_0300", "a").buffer).toBe("à");
     // The guard survived scaffolding: after a space the mark is swallowed.
     // (The pre-fix U_0300 longpress spill produced the mark unguarded.)
-    expect(caseA.tap("default", "T_0300", " ").buffer).toBe(" ");
-    expect(caseA.tap("default", "T_002E").buffer).toBe(".");
-    expect(caseA.tap("shift", "T_030D").buffer).toBe("̍");
+    expect(caseA.tapSubkey("default", "K_SPACE", "T_0300", " ").buffer).toBe(" ");
+    expect(caseA.tapSubkey("default", "K_SPACE", "T_002E").buffer).toBe(".");
+    expect(caseA.tapSubkey("shift", "K_SPACE", "T_030D").buffer).toBe("̍");
   });
 
   it("Case B phone reseed: the phone platform's T_ keys produce identically", () => {
-    expect(caseB.tap("default", "T_0300", "a").buffer).toBe("à");
-    expect(caseB.tap("default", "T_0300", " ").buffer).toBe(" ");
-    expect(caseB.tap("default", "T_002E").buffer).toBe(".");
+    expect(caseB.tapSubkey("default", "K_SPACE", "T_0300", "a").buffer).toBe("à");
+    expect(caseB.tapSubkey("default", "K_SPACE", "T_0300", " ").buffer).toBe(" ");
+    expect(caseB.tapSubkey("default", "K_SPACE", "T_002E").buffer).toBe(".");
   });
 });
