@@ -122,7 +122,10 @@ import {
 } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
-import { usePlacementInventory } from "../../hooks/usePlacementInventory.ts";
+import {
+  usePlacementInventory,
+  useTreatmentFilteredChars,
+} from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
@@ -2412,16 +2415,29 @@ export function MechanismGallery({
   // chip through it would be a no-op — deliberately, since Back/Next/Skip
   // must never step onto a char outside lettersToAdd's walk order. This
   // sibling handler is the one CharScrollStrip actually calls: it jumps to
-  // ANY character in the full `inventory` (in or out of lettersToAdd) purely
-  // for inspection, without touching the positional walk state. A no-op
+  // a character in the full `inventory` (in or out of lettersToAdd) for
+  // inspection, without touching the positional walk state. A no-op
   // when `char` isn't in `inventory` at all (defense-in-depth — every chip
   // CharScrollStrip renders is itself drawn from `inventory`).
+  //
+  // One class of inventory member is NOT selectable (issue #2293): a
+  // character the marks treatment answer filtered out of placement — a
+  // composed form whose mark is a productive own-key mark, or a lone
+  // mark under `composed` treatment (`useTreatmentFilteredChars`). The
+  // strip still renders it (coverage is denominated over the flat
+  // inventory), and its producer badge still reports how it is produced,
+  // but opening the placement pane for it would ask the author to place
+  // a character the treatment answer already decided how to type —
+  // placement follows the treatment answer, so selection stops here.
+  // Arrow-key cycling shares this handler, so it is gated identically.
+  const treatmentFilteredChars = useTreatmentFilteredChars();
   const handleSelectDisplayChar = useCallback(
     (char: string) => {
       if (!inventory.includes(char)) return;
+      if (treatmentFilteredChars.has(char.normalize("NFC"))) return;
       setCurrentChar(char);
     },
-    [inventory, setCurrentChar],
+    [inventory, treatmentFilteredChars, setCurrentChar],
   );
 
   // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the

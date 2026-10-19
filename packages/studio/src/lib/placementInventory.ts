@@ -110,3 +110,40 @@ export function derivePlacementInventory(
 
   return out;
 }
+
+/**
+ * The characters the marks treatment answer removed from placement
+ * (issue #2293): every attested composed form and every lone mark the
+ * alphabet claims that is NOT in the placement set — a composed form
+ * whose mark is a productive own-key mark, or (the mirror case) a lone
+ * mark whose treatment is `composed`. The galleries' SHOW-ALL strip
+ * still renders these characters (the coverage denominator is the flat
+ * inventory, criterion 18.6), but they are not placement units:
+ * selecting one must not open the placement pane, because placement
+ * follows the treatment answer, not whichever chip the author taps.
+ * Empty whenever the placement derivation falls back to the flat
+ * inventory (no/empty worklist, no alphabet), so pre-marks and
+ * pre-046 sessions keep the unfiltered selection behaviour.
+ */
+export function deriveTreatmentFilteredChars(
+  confirmedInventory: readonly string[],
+  alphabet: ConfirmedAlphabet | undefined,
+  worklist: PlacementWorklist | undefined,
+): Set<string> {
+  const out = new Set<string>();
+  if (alphabet === undefined) return out;
+  const placement = new Set(
+    derivePlacementInventory(confirmedInventory, alphabet, worklist).map((c) =>
+      c.normalize("NFC"),
+    ),
+  );
+  for (const stack of alphabet.attestedStacks) {
+    const form = (stack.base + stack.marks.join("")).normalize("NFC");
+    if (!placement.has(form)) out.add(form);
+  }
+  for (const mark of alphabet.marks) {
+    const m = mark.normalize("NFC");
+    if (!placement.has(m)) out.add(m);
+  }
+  return out;
+}

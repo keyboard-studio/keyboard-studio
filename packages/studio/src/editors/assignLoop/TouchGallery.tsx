@@ -174,7 +174,10 @@ import {
 } from "../../lib/touchEmission.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
-import { usePlacementInventory } from "../../hooks/usePlacementInventory.ts";
+import {
+  usePlacementInventory,
+  useTreatmentFilteredChars,
+} from "../../hooks/usePlacementInventory.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
   useWorkingCopyStore,
@@ -4724,17 +4727,27 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // own handleSelectChar is gated on `list` (touchLettersToAdd), so clicking
   // an already-detected chip through it would be a no-op — deliberately,
   // since Back/Next/Skip must never step onto a char outside the walk order.
-  // This sibling handler jumps to ANY character in the full `inventory` (in
-  // or out of touchLettersToAdd) purely for inspection, without touching the
+  // This sibling handler jumps to a character in the full `inventory` (in
+  // or out of touchLettersToAdd) for inspection, without touching the
   // positional walk state. A no-op when `char` isn't in `inventory` at all
   // (defense-in-depth — every chip CharScrollStrip renders is itself drawn
   // from `inventory`).
+  //
+  // Mirroring MechanismGallery (issue #2293): a character the marks
+  // treatment answer filtered out of placement — a composed form whose
+  // mark is a productive own-key mark, or a lone mark under `composed`
+  // treatment (`useTreatmentFilteredChars`) — stays visible on the
+  // strip for coverage but is NOT selectable into the placement pane:
+  // placement follows the treatment answer, not the tapped chip.
+  // Arrow-key cycling shares this handler, so it is gated identically.
+  const treatmentFilteredChars = useTreatmentFilteredChars();
   const handleSelectDisplayChar = useCallback(
     (char: string) => {
       if (!inventory.includes(char)) return;
+      if (treatmentFilteredChars.has(char.normalize("NFC"))) return;
       setCurrentChar(char);
     },
-    [inventory, setCurrentChar],
+    [inventory, treatmentFilteredChars, setCurrentChar],
   );
 
   // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
