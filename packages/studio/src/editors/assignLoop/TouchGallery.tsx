@@ -174,6 +174,7 @@ import {
 } from "../../lib/touchEmission.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
+import { usePlacementInventory } from "../../hooks/usePlacementInventory.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
   useWorkingCopyStore,
@@ -1889,6 +1890,26 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // beside the currentChar-sync effect) so detectedChars/touchLettersToAdd
   // below, which also need it, can be declared before that effect.
   const inventoryKey = inventory.join("\0");
+
+  // The placement walk set (issue #2293): the marks series' answers,
+  // derived ONCE upstream (hooks/usePlacementInventory.ts) and shared with
+  // MechanismGallery. `inventory` above stays the full flat list — the
+  // SHOW-ALL strip, the coverage calls (detectedChars, the FR-008 gate,
+  // keyGridProgress) and the badge signals all keep denominating over it,
+  // so composed forms remain must-produce (credited by base+mark
+  // production via the coverage wrapper's composability augmentation).
+  // Only the WALK (touchLettersToAdd below) reads this filtered set: a
+  // composed form whose mark is a productive mark key, or a lone mark
+  // whose treatment is `composed`, is not a placement unit and is never a
+  // walk stop. Identity (the flat inventory) when there is no worklist to
+  // filter by. Collated with the same helper as `inventory` so the walk
+  // order matches the strip's display order.
+  const placementInventoryRaw = usePlacementInventory();
+  const placementInventory = useMemo(
+    () => collateInventory(nfcDedup([], placementInventoryRaw), loanwordSet),
+    [placementInventoryRaw, loanwordSet],
+  );
+  const placementInventoryKey = placementInventory.join("\0");
 
   // The touch key <-> rule join (spec 063 FR-005/FR-007). Threaded into ALL
   // THREE coverage call sites in this component — `detectedChars`, the FR-008
@@ -4342,7 +4363,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return targets;
   }, [desktopAssignments]);
 
-  // The walk list — inventory MINUS the characters that are BOTH detected
+  // The walk list — the PLACEMENT inventory (issue #2293: the upstream
+  // set derived from the marks series' answers — see `placementInventory`
+  // above; a composed form under a productive mark key, or a lone mark
+  // under `composed` treatment, is not in it and is never a walk stop)
+  // MINUS the characters that are BOTH detected
   // (reachable on the seed touch layout) AND have no actionable suggestion
   // left to review, mirroring MechanismGallery's lettersToAdd (which excludes
   // alreadyProduced from the walk entirely rather than stepping through it
@@ -4387,7 +4412,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // partition them to the end afterwards so they stay last.
     return loanwordsLast(
       lowercaseFirst(
-        inventory.filter(
+        placementInventory.filter(
           (c) =>
             !detectedChars.has(c) ||
             desktopSuggestionTargets.has(c) ||
@@ -4396,14 +4421,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       ),
       loanwordSet,
     );
-    // inventoryKey/unplacedCharsKey/returnedToWorklistKey are the stable
-    // primitive proxies for `inventory`/`keyGridProgress.unplacedChars`/
-    // `returnedToWorklistChars` — same precedent as detectedChars above.
+    // placementInventoryKey/unplacedCharsKey/returnedToWorklistKey are the
+    // stable primitive proxies for `placementInventory`/
+    // `keyGridProgress.unplacedChars`/`returnedToWorklistChars` — same
+    // precedent as detectedChars above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     detectedChars,
     desktopSuggestionTargets,
-    inventoryKey,
+    placementInventoryKey,
     unplacedCharsKey,
     returnedToWorklistKey,
     loanwordSet,
