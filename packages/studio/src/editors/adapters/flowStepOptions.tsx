@@ -236,10 +236,13 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
           return recordedKeyboardId;
         }
 
+        // The per-mount ref is empty when the runner remounted onto this
+        // question (a draft replay never re-commits the display name), so the
+        // recorded display-name decision stands in for it.
         const committedName =
           deps.displayNameRef.current !== ""
             ? deps.displayNameRef.current
-            : defaultDisplayName;
+            : recordedDisplayName ?? defaultDisplayName;
 
         // Author edited the display name away from the identity default —
         // re-derive from their edit when the slug keeps most of the letters.
