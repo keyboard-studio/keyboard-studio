@@ -16,6 +16,8 @@ const VALID: readonly Location[] = [
   { route: "output" },
   { route: "flowmap" },
   { route: "trail" },
+  { route: "criteria" },
+  { route: "privacy" },
   { route: "profile" },
   { route: "survey", step: "identity" },
   { route: "survey", step: "choose_base" },
