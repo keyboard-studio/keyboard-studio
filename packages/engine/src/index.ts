@@ -557,6 +557,7 @@ export {
   resolveOutputFormProposal,
   hasDecidablePairs,
   normalizationFormForOutputForm,
+  outputStringForStack,
 } from "./marks/output-form-policy.js";
 export type {
   OutputForm,
