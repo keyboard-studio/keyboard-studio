@@ -613,9 +613,19 @@ export function SurveyRunner({
     // A resumed entry gets back the proposal its saved answer was pre-filled
     // with, so a default the author kept still saves as one after a remount.
     const proposals = peekAnswerProposals(walkStepId);
+    // A replay stops on the first required question with no answer — the
+    // question the author has not reached a value for yet. A fresh `advance()`
+    // push would seed it, so the replay must too: without this a saved draft
+    // (a tab switch, a reload) brought it back blank instead of pre-filled,
+    // e.g. project_keyboard_id losing its slug of the display name.
+    const lastIndex = (resumed?.length ?? 0) - 1;
     const stack =
-      resumed?.map((e) => {
+      resumed?.map((e, i) => {
         const proposal = proposals[e.questionId];
+        if (i === lastIndex && !hasValue(e.value)) {
+          const seed = proposal ?? callerProposal(e.questionId);
+          if (seed !== undefined) return { ...e, value: seed.value, proposal: seed };
+        }
         return proposal !== undefined ? { ...e, proposal } : e;
       }) ??
       [
