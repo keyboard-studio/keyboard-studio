@@ -555,6 +555,26 @@ describe("T028 convenience-gate reproduction (union)", () => {
           .findByTestId("marks-continue", {}, { timeout: 5_000 })
           .catch(() => null);
         if (cont === null) break;
+        // Spec 104 FR-013: the series ends at the guard station, whose
+        // Continue stays DISABLED until the station is answered
+        // (MarksSeriesStep: `currentStation === "marks_guard" &&
+        // guardChoice === undefined`). Clicking marks-continue there is
+        // a no-op, so the walk stalled until findByTestId timed out —
+        // the same harness bug the e2e driver had (f6bce325, which added
+        // answerGuardStationIfPresent to e2e/helpers/surveyFlow.ts; this
+        // harness has its own driver and needs the same answer). Answer
+        // ONLY the genuinely-unanswered case, with "swallow" — the
+        // pre-104 default the e2e helper also uses, so downstream
+        // minting behaviour is unchanged. A seed/prior answer already
+        // selected is left as it stands, and the read-only prior form
+        // (no radio options rendered) is already unblocked.
+        if (screen.queryByTestId("guard-station") !== null) {
+          const swallow = screen.queryByTestId("guard-option-swallow") as HTMLInputElement | null;
+          const emit = screen.queryByTestId("guard-option-emit") as HTMLInputElement | null;
+          if (swallow !== null && emit !== null && !swallow.checked && !emit.checked) {
+            fireEvent.click(swallow);
+          }
+        }
         fireEvent.click(cont);
       }
       await dumpGateState("post-marks");

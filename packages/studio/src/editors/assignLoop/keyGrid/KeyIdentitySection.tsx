@@ -181,12 +181,17 @@ export function KeyIdentitySection({ info, onRelink }: KeyIdentitySectionProps) 
       </span>
       {recordedDecision !== undefined && (
         <span style={PANEL_HINT_STYLE}>
-          {i18n._(
-            recordedDecision.hostSet.length > 1
-              ? "editor.assignLoop.keyGrid.identity.hostsLabelPlural"
-              : "editor.assignLoop.keyGrid.identity.hostsLabel",
-            { hosts: recordedDecision.hostSet.join(", ") },
-          )}
+          {/* The ternary sits OUTSIDE i18n._ on purpose: Lingui's extractor
+              only sees a direct string-literal first argument, so an
+              i18n._(cond ? idA : idB) call is invisible to messages:extract
+              and its ids get pruned as "stale" by i18n-catalog-lint. */}
+          {recordedDecision.hostSet.length > 1
+            ? i18n._("editor.assignLoop.keyGrid.identity.hostsLabelPlural", {
+                hosts: recordedDecision.hostSet.join(", "),
+              })
+            : i18n._("editor.assignLoop.keyGrid.identity.hostsLabel", {
+                hosts: recordedDecision.hostSet.join(", "),
+              })}
         </span>
       )}
 
@@ -239,11 +244,11 @@ export function KeyIdentitySection({ info, onRelink }: KeyIdentitySectionProps) 
             {i18n._("editor.assignLoop.keyGrid.identity.guardLabel")}
           </span>
           <span style={PANEL_SPAN_STYLE}>
-            {i18n._(
-              info.guard.behaviour === "emit"
-                ? "editor.assignLoop.keyGrid.identity.guardValue.emit"
-                : "editor.assignLoop.keyGrid.identity.guardValue.swallow",
-            )}
+            {/* Ternary outside i18n._ — see the hostsLabel note above:
+                the extractor cannot see ids chosen inside the call. */}
+            {info.guard.behaviour === "emit"
+              ? i18n._("editor.assignLoop.keyGrid.identity.guardValue.emit")
+              : i18n._("editor.assignLoop.keyGrid.identity.guardValue.swallow")}
           </span>
           {info.guard.origin === "seeded-from-import" && (
             <span style={PANEL_HINT_STYLE}>
