@@ -515,7 +515,8 @@ describe("buildTouchLayoutJson — Case A (router → IR path, undefined)", () =
     // Exactly the tablet platform survives (mirrors scaffoldTouchLayout.test.ts's
     // tablet canonical-shape assertion for an IR with no AltGr mappings).
     expect(Object.keys(JSON.parse(result.json!) as Record<string, unknown>)).toEqual(["tablet"]);
-    expect(parsed.tablet.layer.map((l) => l.id)).toEqual(["default", "shift", "numeric"]);
+    // A reseed emits no symbols layer.
+    expect(parsed.tablet.layer.map((l) => l.id)).toEqual(["default", "shift"]);
   });
 });
 

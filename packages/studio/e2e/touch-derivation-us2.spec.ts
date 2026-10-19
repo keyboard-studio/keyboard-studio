@@ -510,16 +510,16 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     // tablet skeleton landed, and every assertion under them stopped running.
     expect(Object.keys(touchJson), "reseed emits exactly one tablet platform").toEqual(["tablet"]);
 
-    // default + shift + numeric layers present. The "rightalt" secondary layer
-    // is also expected here — pid_piaroa's surviving RALT-modified rules put
-    // it there (see the fixture-choice rationale above), and it is where the
-    // survivor character below lives; its presence does not contradict
-    // SC-002's "default + shift + numeric" wording, which names the
-    // always-present trio, not an exhaustive layer list.
+    // default + shift layers present, and no symbols layer: a reseed emits
+    // only layers of physical keys. The "rightalt" secondary layer is also
+    // expected here — pid_piaroa's surviving RALT-modified rules put it there
+    // (see the fixture-choice rationale above), and it is where the survivor
+    // character below lives.
     const layerIds = touchJson.tablet?.layer?.map((l) => l.id) ?? [];
-    for (const requiredLayer of ["default", "shift", "numeric"]) {
+    for (const requiredLayer of ["default", "shift"]) {
       expect(layerIds, `expected a "${requiredLayer}" layer`).toContain(requiredLayer);
     }
+    expect(layerIds, "a reseed emits no symbols layer").not.toContain("numeric");
     expect(layerIds, 'surviving RALT rules must produce a "rightalt" layer').toContain("rightalt");
 
     // NOTE: no "<=10 keys per row" assertion here any more. That was
