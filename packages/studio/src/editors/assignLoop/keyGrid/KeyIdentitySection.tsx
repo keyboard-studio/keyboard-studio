@@ -46,9 +46,9 @@ import type { KeyIdentityViewModel, KeyProductionRow } from "./keyIdentityViewMo
 const SMALL_BUTTON_STYLE: React.CSSProperties = {
   padding: "2px 8px",
   fontSize: 11,
-  border: "1px solid var(--app-border)",
+  border: "1px solid var(--border, #ccc)",
   borderRadius: 4,
-  background: "var(--app-surface)",
+  background: "var(--surface, #fff)",
   cursor: "pointer",
 };
 
@@ -59,7 +59,7 @@ const TABLE_STYLE: React.CSSProperties = {
 };
 
 const CELL_STYLE: React.CSSProperties = {
-  borderTop: "1px solid var(--app-border)",
+  borderTop: "1px solid var(--border, #ddd)",
   padding: "2px 4px",
   textAlign: "left",
   verticalAlign: "top",
@@ -180,13 +180,12 @@ export function KeyIdentitySection({ info, onRelink }: KeyIdentitySectionProps) 
       </span>
       {recordedDecision !== undefined && (
         <span style={PANEL_HINT_STYLE}>
-          {recordedDecision.hostSet.length > 1
-            ? i18n._("editor.assignLoop.keyGrid.identity.hostsLabelPlural", {
-                hosts: recordedDecision.hostSet.join(", "),
-              })
-            : i18n._("editor.assignLoop.keyGrid.identity.hostsLabel", {
-                hosts: recordedDecision.hostSet.join(", "),
-              })}
+          {i18n._(
+            recordedDecision.hostSet.length > 1
+              ? "editor.assignLoop.keyGrid.identity.hostsLabelPlural"
+              : "editor.assignLoop.keyGrid.identity.hostsLabel",
+            { hosts: recordedDecision.hostSet.join(", ") },
+          )}
         </span>
       )}
 
@@ -239,9 +238,11 @@ export function KeyIdentitySection({ info, onRelink }: KeyIdentitySectionProps) 
             {i18n._("editor.assignLoop.keyGrid.identity.guardLabel")}
           </span>
           <span style={PANEL_SPAN_STYLE}>
-            {info.guard.behaviour === "emit"
-              ? i18n._("editor.assignLoop.keyGrid.identity.guardValue.emit")
-              : i18n._("editor.assignLoop.keyGrid.identity.guardValue.swallow")}
+            {i18n._(
+              info.guard.behaviour === "emit"
+                ? "editor.assignLoop.keyGrid.identity.guardValue.emit"
+                : "editor.assignLoop.keyGrid.identity.guardValue.swallow",
+            )}
           </span>
           {info.guard.origin === "seeded-from-import" && (
             <span style={PANEL_HINT_STYLE}>
