@@ -21,7 +21,10 @@ import {
 } from "@keyboard-studio/contracts";
 import { buildPlacementWorklist, makeMarkTreatmentAnswer } from "@keyboard-studio/engine";
 import type { MarkClass } from "@keyboard-studio/engine";
-import { derivePlacementInventory } from "./placementInventory.ts";
+import {
+  derivePlacementInventory,
+  deriveTreatmentFilteredChars,
+} from "./placementInventory.ts";
 
 const GRAVE = "̀"; // U+0300
 const CIRC = "̂"; // U+0302
@@ -205,5 +208,69 @@ describe("derivePlacementInventory — fallbacks and edge cases", () => {
     const placement = derivePlacementInventory(flat, alphabet, worklist);
     expect(placement).toEqual(["a", "q", "à", "q̀"]);
     expect(placement).not.toContain(GRAVE);
+  });
+});
+
+describe("deriveTreatmentFilteredChars — the strip-selection gate (issue #2293)", () => {
+  it("own-key treatment: every attested composed form is filtered, no mark or base is", () => {
+    const alphabet = bafutAlphabet();
+    const flat = bafutInventory(alphabet);
+    const filtered = deriveTreatmentFilteredChars(flat, alphabet, bafutWorklist("own-key"));
+    expect(new Set(filtered)).toEqual(new Set(BAFUT_COMPOSED));
+    for (const mark of [GRAVE, CIRC, CARON]) expect(filtered.has(mark)).toBe(false);
+    for (const base of BAFUT_BASES) expect(filtered.has(base)).toBe(false);
+    expect(filtered.has(NON_ALPHABET)).toBe(false);
+  });
+
+  it("composed treatment: the lone marks are filtered, composed forms are not", () => {
+    const alphabet = bafutAlphabet();
+    const flat = bafutInventory(alphabet);
+    const filtered = deriveTreatmentFilteredChars(flat, alphabet, bafutWorklist("composed"));
+    expect(new Set(filtered)).toEqual(new Set([GRAVE, CIRC, CARON]));
+    for (const form of BAFUT_COMPOSED) expect(filtered.has(form)).toBe(false);
+  });
+
+  it("mixed treatment: own-key classes' forms and the composed class's lone mark are filtered", () => {
+    const alphabet = bafutAlphabet();
+    const answer = {
+      ...makeMarkTreatmentAnswer("postfix"),
+      classTreatment: {
+        "above-1": "own-key" as const,
+        "above-2": "own-key" as const,
+        "above-3": "composed" as const,
+      },
+      promoted: [] as string[],
+    };
+    const worklist = buildPlacementWorklist({
+      alphabet,
+      classes: BAFUT_CLASSES,
+      attachments: attestedOnlyAttachments(alphabet),
+      treatment: answer,
+      prefills: [],
+    });
+    const filtered = deriveTreatmentFilteredChars(bafutInventory(alphabet), alphabet, worklist);
+    const caronForms = new Set(
+      BAFUT_STACKS.filter(([, m]) => m === CARON).map(([b, m]) => (b + m).normalize("NFC")),
+    );
+    // Own-key classes (grave, circumflex): their composed forms are
+    // filtered. Composed class (caron): its forms are placement units,
+    // its lone mark is filtered instead.
+    const expected = new Set([
+      ...BAFUT_COMPOSED.filter((f) => !caronForms.has(f)),
+      CARON,
+    ]);
+    expect(new Set(filtered)).toEqual(expected);
+  });
+
+  it("fallbacks are empty: no worklist, empty worklist, no alphabet", () => {
+    const alphabet = bafutAlphabet();
+    const flat = bafutInventory(alphabet);
+    expect(deriveTreatmentFilteredChars(flat, alphabet, undefined).size).toBe(0);
+    expect(
+      deriveTreatmentFilteredChars(flat, alphabet, makeEmptyPlacementWorklist()).size,
+    ).toBe(0);
+    expect(
+      deriveTreatmentFilteredChars(flat, undefined, bafutWorklist("own-key")).size,
+    ).toBe(0);
   });
 });
