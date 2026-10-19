@@ -16,7 +16,7 @@ warm 7.20 ms / cold 9.58 ms, `rebuildPerf.measure` procedure).
 - [X] T005 Research assembled: reconciled vocabulary, per-surface verdicts, assumption deltas vs the D1 scan, in-flight + envelope-slice classifications → research.md
 - [X] T006 Registry: decisions/derivedSurfaceRegistry.ts — 11 surfaces, every EDITOR-AUTHORED/UNCLASSIFIED member covered, statuses per research
 - [X] T007 Gate: decisions/derivedEquivalence.test.ts — census (130 members, exact), coverage, replay (survey path), draft-load (bypass form, real APIs) arms + planted-violation self-test; 14/14 green on dev d9e3d63a, studio tsc clean
-- [ ] T008 PR to dev: ruling, phase map, Phase 0 evidence, LOC deltas, gate results. Do NOT merge.
+- [X] T008 PR to dev: PR #2292 (ruling, phase map, Phase 0 evidence, LOC deltas, gate results). NOT merged — Matthew's call.
 
 ## Phase 1 — Starting point as replay input ⚡
 
