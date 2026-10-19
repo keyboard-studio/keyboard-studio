@@ -526,14 +526,22 @@ jobs:
           GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' && (inputs.checkout_ref == 'main' || inputs.checkout_ref == 'refs/heads/main' || (inputs.checkout_ref == '' && github.ref == 'refs/heads/main')) && secrets.GITHUB_TOKEN) || '' }}
           SPEC_TRACE_REPO: ${{ (github.event_name != 'pull_request' && (inputs.checkout_ref == 'main' || inputs.checkout_ref == 'refs/heads/main' || (inputs.checkout_ref == '' && github.ref == 'refs/heads/main')) && github.repository) || '' }}
 
-  # Playwright e2e — the lane that carries the spec 034 authoring-walk proof
-  # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while it beds in:
-  # `continue-on-error` keeps a red run from failing the workflow, and this
-  # job is not a required check. Starts with boot-smoke + copy-edit only;
-  # widen the spec list (or drop the filter) as specs prove stable in CI, and
-  # make it blocking once it is.
-  e2e:
-    name: e2e (Playwright, non-blocking)
+  # Playwright e2e — the lanes that carry the spec 034 authoring-walk proof
+  # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while they bed
+  # in: `continue-on-error` keeps a red run from failing the workflow, and
+  # these jobs are not required checks.
+  #
+  # Split into three parallel jobs 2026-10-18 (option A, owner ruling):
+  # the single 60-minute job was over capacity — on run 39134517399 the
+  # desktop step alone took 44m22s, the mobile step was skipped behind its
+  # failure, and the golden-walk capture was cancelled at the job cap so
+  # its verify never ran. Each lane now gets its own 60-minute envelope
+  # and its own verdict. The shared setup block repeats per job (GitHub
+  # Actions has no step-level reuse); it costs a few minutes of setup per
+  # lane and buys independent, parallel results.
+
+  e2e-desktop:
+    name: e2e desktop (Playwright, non-blocking)
     needs: changes
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -550,6 +558,7 @@ jobs:
       # Same pinned corpus as the build job: the dev server's local-keyboards
       # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
       # base keyboards the walks open from it.
+
       - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
         uses: actions/checkout@v4
         with:
@@ -586,6 +595,7 @@ jobs:
       # imports the workspace packages through their built dist/. Build only
       # studio's dependencies (`studio^...`) — studio itself is served from
       # source, and its production build + postbuild catalog are not needed.
+
       - name: Build studio's workspace dependencies
         run: pnpm --filter "@keyboard-studio/studio^..." build
 
@@ -596,13 +606,224 @@ jobs:
       - name: Playwright (boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks)
         run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity
 
+      - name: Summarize Playwright results
+        if: always()
+        working-directory: packages/studio
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require("node:fs");
+          const file = "test-results/results.json";
+          if (!fs.existsSync(file)) { console.log("### e2e desktop\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          const r = JSON.parse(fs.readFileSync(file, "utf8"));
+          const s = r.stats ?? {};
+          console.log(`### e2e desktop: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          const rows = [];
+          const walk = (suite, trail) => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
+              if (t.status === "expected" || t.status === "skipped") continue;
+              const last = t.results?.[t.results.length - 1];
+              const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
+              const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
+              const title = [...trail, spec.title].join(" > ");
+              rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
+              const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
+              const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+              console.error(`::error title=${esc(`e2e desktop ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+            }
+            for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
+          };
+          for (const suite of r.suites ?? []) walk(suite, [suite.title]);
+          if (rows.length) console.log(["", "| status | test | first line of each error |", "|---|---|---|", ...rows].join("\n"));
+          EOF
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-desktop
+          path: |
+            packages/studio/playwright-report/
+            packages/studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+
+  e2e-mobile:
+    name: e2e mobile (Playwright, non-blocking)
+    needs: changes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      # Same pinned corpus as the build job: the dev server's local-keyboards
+      # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
+      # base keyboards the walks open from it.
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      # The dev server (playwright.config.ts webServer: `pnpm dev` = vite)
+      # imports the workspace packages through their built dist/. Build only
+      # studio's dependencies (`studio^...`) — studio itself is served from
+      # source, and its production build + postbuild catalog are not needed.
+
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Install Playwright Chromium
+        working-directory: packages/studio
+        run: npx playwright install --with-deps chromium
+
       # Mobile adaptation, Phase 6 lane split: the mobile project (Pixel 7)
       # runs only the mobile-* specs (playwright.config.ts testMatch), as its
       # own step so a mobile failure is distinguishable from a desktop one.
       # Non-blocking while the specs bed in, matching this job's posture.
+
       - name: Playwright (mobile specs, non-blocking)
         continue-on-error: true
         run: pnpm --filter @keyboard-studio/studio test:e2e --project=mobile
+
+      - name: Summarize Playwright results
+        if: always()
+        working-directory: packages/studio
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require("node:fs");
+          const file = "test-results/results.json";
+          if (!fs.existsSync(file)) { console.log("### e2e mobile\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          const r = JSON.parse(fs.readFileSync(file, "utf8"));
+          const s = r.stats ?? {};
+          console.log(`### e2e mobile: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          const rows = [];
+          const walk = (suite, trail) => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
+              if (t.status === "expected" || t.status === "skipped") continue;
+              const last = t.results?.[t.results.length - 1];
+              const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
+              const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
+              const title = [...trail, spec.title].join(" > ");
+              rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
+              const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
+              const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+              console.error(`::error title=${esc(`e2e mobile ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+            }
+            for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
+          };
+          for (const suite of r.suites ?? []) walk(suite, [suite.title]);
+          if (rows.length) console.log(["", "| status | test | first line of each error |", "|---|---|---|", ...rows].join("\n"));
+          EOF
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-mobile
+          path: |
+            packages/studio/playwright-report/
+            packages/studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+
+  e2e-golden:
+    name: e2e golden-walk (Playwright, non-blocking)
+    needs: changes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      # Same pinned corpus as the build job: the dev server's local-keyboards
+      # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
+      # base keyboards the walks open from it.
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      # The dev server (playwright.config.ts webServer: `pnpm dev` = vite)
+      # imports the workspace packages through their built dist/. Build only
+      # studio's dependencies (`studio^...`) — studio itself is served from
+      # source, and its production build + postbuild catalog are not needed.
+
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Install Playwright Chromium
+        working-directory: packages/studio
+        run: npx playwright install --with-deps chromium
 
       # Spec 089 SC-001 golden walk (owner ruling 2026-10-06: store-level
       # gates in the sandbox; live captures run in CI). The baseline zip is
@@ -613,6 +834,7 @@ jobs:
       # the captured zip is committed to the branch (from the
       # golden-walk-baseline artifact below), this step skips and the
       # verify step compares against the committed baseline.
+
       - name: Golden-walk baseline capture (from PR base, if uncommitted)
         if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
         uses: actions/checkout@v4
@@ -645,9 +867,6 @@ jobs:
           path: packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip
           if-no-files-found: ignore
 
-      # (The golden-walk verify step sits at the very end of this job, so
-      # its results.json does not displace the main lane's summary below.)
-
       # One-screen result table on the run page: counts plus each failing
       # test's first line per error, from the json reporter (CI-only, see
       # playwright.config.ts). It also emits one `::error` annotation per
@@ -655,6 +874,15 @@ jobs:
       # because the `github` reporter's per-test annotations did not surface
       # on the check run in practice — annotations are readable from the PR's
       # Checks tab without access to the job log.
+
+      # Spec 089 SC-001, verify mode: fails loudly when the baseline is
+      # missing (never a vacuous pass). Runs before the summary step so
+      # the summary reports the verify run's results.json (the capture
+      # step writes its own results under .golden-base/).
+      - name: Playwright (spec 089 golden walk, verify)
+        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
+        run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk
+
       - name: Summarize Playwright results
         if: always()
         working-directory: packages/studio
@@ -662,10 +890,10 @@ jobs:
           node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
           const fs = require("node:fs");
           const file = "test-results/results.json";
-          if (!fs.existsSync(file)) { console.log("### e2e\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          if (!fs.existsSync(file)) { console.log("### e2e golden-walk\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
           const r = JSON.parse(fs.readFileSync(file, "utf8"));
           const s = r.stats ?? {};
-          console.log(`### e2e: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          console.log(`### e2e golden-walk: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
           const rows = [];
           const walk = (suite, trail) => {
             for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
@@ -677,7 +905,7 @@ jobs:
               rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
               const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
               const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
-              console.error(`::error title=${esc(`e2e ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+              console.error(`::error title=${esc(`e2e golden-walk ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
             }
             for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
           };
@@ -689,16 +917,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-golden
           path: |
             packages/studio/playwright-report/
             packages/studio/test-results/
           retention-days: 14
           if-no-files-found: ignore
 
-      # Spec 089 SC-001, verify mode: fails loudly when the baseline is
-      # missing (never a vacuous pass). Last in the job so its
-      # results.json does not displace the main lane's summary above.
-      - name: Playwright (spec 089 golden walk, verify)
-        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
-        run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk
