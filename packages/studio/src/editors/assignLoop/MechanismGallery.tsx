@@ -109,7 +109,6 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   collectModifierTokensInUse,
-  parseKeySpec,
   collectCharContributors,
   sliceContributorDescriptors,
   collectCompositionMethod,
@@ -158,10 +157,12 @@ import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { useDisplacementProposal } from "./useDisplacementProposal.ts";
 import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
 import {
+  assignmentSlotKeys,
   buildSlotOccupancy,
   displacedFor,
   isProducedOnOtherSlot,
   isStillNeeded,
+  mechanismSlotEntries,
   orthographyTier,
   slotKeyFor,
 } from "../../survey/slotOccupancy.ts";
@@ -2149,6 +2150,12 @@ export function MechanismGallery({
       ? pendingCompanion.baseAssignment
       : null;
 
+  /** The base assignment the pending displacement proposal was raised for
+   *  (#2300 — the remove handlers below dismiss it proactively when that
+   *  assignment goes away, exactly like the companion's). */
+  const pendingDisplacementBase: MechanismAssignment | null =
+    pendingDisplacement?.baseAssignment ?? null;
+
   // Working IR used to plan shift-layer assignments — prefer the carve
   // working IR (ir), falling back to startIr before the carve step has run.
   // Null when the working copy has not been instantiated yet (e.g. a bare
@@ -2191,6 +2198,12 @@ export function MechanismGallery({
    * Raise the demotion proposal when the assignment just recorded took a
    * slot whose incumbent glyph is a DIFFERENT character that is still
    * needed and not otherwise produced after this assignment (#2300 G3).
+   * The slot(s) checked are derived from the RECORDED assignment itself
+   * (`assignmentSlotKeys` — the same parsers the occupancy overlay uses),
+   * never from the candidate or picker tokens that produced it: the two
+   * can differ (Cycle 4 P1-2 — a case-pair-inherited S-01 candidate
+   * carries ["SHIFT"], while the S-01 accept writes a bare `[vkey]`
+   * rule, so the displaced incumbent lives on the BARE slot).
    * Reads the PRE-apply ledger: at handler time `slotOccupancy` /
    * `sessionAssignments` are still the render-time values the assignment
    * was appended to, so the incumbent named here is the glyph the new
@@ -2198,47 +2211,39 @@ export function MechanismGallery({
    * the key; this only proposes the incumbent's new home.
    */
   const maybeRaiseDisplacement = useCallback(
-    (
-      assignment: MechanismAssignment,
-      slot: { vkey: string; modifiers: readonly string[] } | null,
-    ) => {
-      if (slot === null || currentChar === null) return;
+    (assignment: MechanismAssignment) => {
+      if (currentChar === null) return;
+      for (const slot of assignmentSlotKeys(assignment)) {
       const displaced = displacedFor(
         slotOccupancy,
         slot.vkey,
         slot.modifiers,
         currentChar,
       );
-      if (displaced === null) return;
-      if (!isStillNeeded(displaced.char, needSets)) return;
-      const takenSlotKey = slotKeyFor(slot.vkey, slot.modifiers);
+      if (displaced === null) continue;
+      if (!isStillNeeded(displaced.char, needSets)) continue;
+      const takenSlotKey = slot.key;
       // Still reachable elsewhere → nothing is lost, so no proposal.
       // "Elsewhere" means another SLOT (the ledger check), or a recorded
       // assignment for the displaced glyph that does not live on the slot
       // just taken — an assignment ON this slot is the very occupancy
       // being displaced, not another production. Non-slot mechanisms
       // (deadkey / sequence) always count as another production.
-      if (isProducedOnOtherSlot(slotOccupancy, displaced.char, takenSlotKey)) return;
+      if (isProducedOnOtherSlot(slotOccupancy, displaced.char, takenSlotKey)) continue;
       const producedElsewhereByAssignment = sessionAssignments.some((a) => {
         if (a.target !== displaced.char.normalize("NFC")) return false;
         return a.mechanisms.some((m) => {
-          if (m.patternId === PATTERN_RALT) {
-            const parsed = parseKeySpec(m.slotValues?.["altgrKeyList"] ?? "");
-            return parsed === null || slotKeyFor(parsed.vkey, parsed.tokens) !== takenSlotKey;
-          }
-          if (m.patternId === PATTERN_SWAP) {
-            const lines = (m.slotValues?.["kmnRules"] ?? "")
-              .split(/\r?\n/)
-              .filter((l) => l.trim().length > 0);
-            return lines.some((line) => {
-              const parsed = parseKeySpec(line);
-              return parsed === null || slotKeyFor(parsed.vkey, parsed.tokens) !== takenSlotKey;
-            });
+          if (m.patternId === PATTERN_RALT || m.patternId === PATTERN_SWAP) {
+            // Parsed through the same helper as the overlay. A parse
+            // failure yields NO slot entries and so counts as NOT
+            // produced elsewhere (Cycle 4 P2-c): a spurious proposal is
+            // author-dismissable; a suppressed one is a silent loss.
+            return mechanismSlotEntries(m).some((e) => e.key !== takenSlotKey);
           }
           return true;
         });
       });
-      if (producedElsewhereByAssignment) return;
+      if (producedElsewhereByAssignment) continue;
       // Demotion rank: RAlt on the SAME key first; deadkey only when the
       // RAlt slot is taken or IS the slot just taken.
       const raltSlotKey = slotKeyFor(slot.vkey, ["RALT"]);
@@ -2250,6 +2255,11 @@ export function MechanismGallery({
       // frequency data exists, so tier decides): both core → neither by
       // default; core incumbent + non-core incoming → the INCOMING char
       // loses the primary slot; otherwise the incumbent is demoted.
+      // Note: "demote-incoming" cannot fire from today's walk — every
+      // selectable currentChar is a confirmed-inventory member, so
+      // incomingTier is never "convenience" here. The direction is
+      // fully wired for a future surface that places non-inventory
+      // characters (follow-up #6 in the Cycle 2 report owns it).
       const displacedTier = orthographyTier(displaced.char, needSets);
       const incomingTier = orthographyTier(currentChar, needSets);
       const direction =
@@ -2273,6 +2283,9 @@ export function MechanismGallery({
               a.mechanisms.some((m) => m.patternId === PATTERN_RALT),
           ),
       });
+      // One proposal per apply: the hook holds a single pending proposal.
+      return;
+      }
     },
     [currentChar, slotOccupancy, needSets, sessionAssignments, proposeDisplacement],
   );
@@ -2692,13 +2705,11 @@ export function MechanismGallery({
     // AFTER recordAssignments below, once `assignment` is the exact object
     // the proposal must reference (FR-008 identity guard).
     let raltCompanionModifiers: ModifierToken[] | null = null;
-    // The physical slot this accept takes (#2300 displacement check) —
-    // set by the S-01 / S-08 branches; S-02 takes no slot (a deadkey
-    // composes on top of a base keystroke and shadows nothing).
-    let appliedSlot: { vkey: string; modifiers: readonly string[] } | null =
-      null;
+    // The #2300 displacement check derives the taken slot(s) from the
+    // recorded assignment itself (see maybeRaiseDisplacement) — S-02
+    // takes no slot (a deadkey composes on top of a base keystroke and
+    // shadows nothing) and yields no slot entries there.
     if (entry.strategyId === "S-01") {
-      appliedSlot = { vkey, modifiers: entry.topCandidate.modifiers };
       const cp =
         currentChar
           .codePointAt(0)
@@ -2766,7 +2777,6 @@ export function MechanismGallery({
         ],
         source: "user",
       };
-      appliedSlot = { vkey, modifiers: tokens };
       // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm)
       // for the RAlt-layer counterpart, raised right after the author accepts
       // THIS suggestion — the flow the user actually takes, rather than
@@ -2883,7 +2893,7 @@ export function MechanismGallery({
     markSuggestionEntryDismissed(currentChar, entry.strategyId);
     // #2300 G3: if this accept shadowed a still-needed glyph, propose its
     // demotion (never blocks the accept — it already happened).
-    maybeRaiseDisplacement(assignment, appliedSlot);
+    maybeRaiseDisplacement(assignment);
     if (raltCompanionModifiers !== null) {
       proposeCompanion({
         mechanism: "ralt-layer",
@@ -3044,11 +3054,10 @@ export function MechanismGallery({
     // SequenceBuilderPanel), so the guard above already returned.
 
     let assignment: MechanismAssignment;
-    // The physical slot this apply takes (#2300 displacement check) — set
-    // by the swap branches; the deadkey branch takes no slot (a deadkey
-    // composes on top of a base keystroke and shadows nothing).
-    let appliedSlot: { vkey: string; modifiers: readonly string[] } | null =
-      null;
+    // The #2300 displacement check derives the taken slot(s) from the
+    // recorded assignment itself (see maybeRaiseDisplacement) — the
+    // deadkey branch takes no slot (a deadkey composes on top of a base
+    // keystroke and shadows nothing) and yields no slot entries there.
 
     if (method === "deadkey") {
       const base = resolveCharInput(
@@ -3147,7 +3156,6 @@ export function MechanismGallery({
         const kmnRules = buildStartRuleLines(resolvedSwapVkey, currentChar, {
           capsHandling,
         }).join("\n");
-        appliedSlot = { vkey: resolvedSwapVkey, modifiers: [] };
         assignment = {
           scope: "individual",
           target: currentChar,
@@ -3233,7 +3241,6 @@ export function MechanismGallery({
         const kmnRules = buildShiftRuleLines(resolvedSwapVkey, currentChar, {
           capsHandling,
         }).join("\n");
-        appliedSlot = { vkey: resolvedSwapVkey, modifiers: ["SHIFT"] };
         assignment = {
           scope: "individual",
           target: currentChar,
@@ -3290,7 +3297,6 @@ export function MechanismGallery({
         // defect: a future pass could special-case chosenTokens === ["RALT"]
         // specifically, but that is a narrower rule than exists today for any
         // other manual-apply companion.
-        appliedSlot = { vkey: resolvedSwapVkey, modifiers: chosenTokens };
         assignment = {
           scope: "individual",
           target: currentChar,
@@ -3313,7 +3319,7 @@ export function MechanismGallery({
     recordAssignments([...sessionAssignments, assignment]);
     // #2300 G3: if this apply shadowed a still-needed glyph, propose its
     // demotion (never blocks the apply — it already happened).
-    maybeRaiseDisplacement(assignment, appliedSlot);
+    maybeRaiseDisplacement(assignment);
     resetMethodState();
   }, [
     currentChar,
@@ -3804,12 +3810,23 @@ export function MechanismGallery({
       ) {
         clearCompanion();
       }
+      // Same proactive dismissal for a pending displacement proposal
+      // (Cycle 4 P2-d): its confirm-time includes() guard is the backstop,
+      // not a reason to leave the banner standing over a removed base.
+      if (
+        pendingDisplacementBase !== null &&
+        !next.includes(pendingDisplacementBase)
+      ) {
+        clearDisplacement();
+      }
     },
     [
       sessionAssignments,
       recordAssignments,
       pendingCompanionBase,
       clearCompanion,
+      pendingDisplacementBase,
+      clearDisplacement,
     ],
   );
 
@@ -3847,12 +3864,21 @@ export function MechanismGallery({
       ) {
         clearCompanion();
       }
+      // Same for a pending displacement proposal (Cycle 4 P2-d).
+      if (
+        pendingDisplacementBase !== null &&
+        !next.includes(pendingDisplacementBase)
+      ) {
+        clearDisplacement();
+      }
     },
     [
       sessionAssignments,
       recordAssignments,
       pendingCompanionBase,
       clearCompanion,
+      pendingDisplacementBase,
+      clearDisplacement,
     ],
   );
 

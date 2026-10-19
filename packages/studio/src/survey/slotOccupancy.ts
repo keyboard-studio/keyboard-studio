@@ -113,9 +113,15 @@ export function buildSlotOccupancy(
       for (const rule of group.rules) {
         if (isDeadkeyOnlyOutput(rule.output)) continue;
         if (contextHasDirectBackspace(rule.context)) continue;
-        const vkeys = rule.context.filter((el) => el.kind === "vkey");
-        if (vkeys.length !== 1) continue;
-        const vkeyEl = vkeys[0];
+        // Exactly ONE context element, and it must be the vkey (Cycle 4
+        // P1-1): a context that pairs the vkey with anything else — a
+        // deadkey (deadkey-composition `[deadkey, K_E] → é`), an any() /
+        // store element, a context() element — is not keyed to the plain
+        // slot: a plain assignment on that slot does not shadow it, so
+        // naming its output as the slot's incumbent would invent a
+        // phantom displacement.
+        if (rule.context.length !== 1) continue;
+        const vkeyEl = rule.context[0];
         if (vkeyEl === undefined || vkeyEl.kind !== "vkey") continue;
         const glyphs = new Set<string>();
         collectFromElements(rule.output, storeMap, glyphs, false);
@@ -137,17 +143,8 @@ export function buildSlotOccupancy(
   for (const assignment of assignments) {
     if (assignment.modality !== "physical") continue;
     for (const mech of assignment.mechanisms) {
-      if (mech.patternId === "simple_swap" || mech.strategyId === "S-01") {
-        overlaySwapMechanism(occupancy, mech.slotValues?.["kmnRules"]);
-      } else if (
-        mech.patternId === "modifier_as_layer_switch" ||
-        mech.strategyId === "S-08"
-      ) {
-        overlayRaltMechanism(
-          occupancy,
-          mech.slotValues?.["altgrKeyList"],
-          mech.slotValues?.["altgrOutputList"],
-        );
+      for (const entry of mechanismSlotEntries(mech)) {
+        occupancy.set(entry.key, { char: entry.char, source: "session" });
       }
       // S-02 / S-03: not slot occupants (see module doc).
     }
@@ -156,58 +153,112 @@ export function buildSlotOccupancy(
   return occupancy;
 }
 
-/**
- * Overlay one S-01 mechanism from its recorded kmnRules text. Each line is
- * `+ [MODS K_X] > U+XXXX` (buildStartRuleLines / buildShiftRuleLines /
- * buildCasePairRuleLines all emit this shape, one line per plane — which
- * is what makes a CAPS quad land on its four distinct slots). If ANY line
- * cannot be keyed exactly, the whole mechanism is skipped rather than
- * partially overlaid.
- */
-function overlaySwapMechanism(
-  occupancy: Map<string, SlotOccupant>,
-  kmnRules: string | undefined,
-): void {
-  if (kmnRules === undefined || kmnRules === "") return;
-  const lines = kmnRules
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-  if (lines.length === 0) return;
-  const parsedLines: { key: string; char: string }[] = [];
-  for (const line of lines) {
-    const parsed = parseKeySpec(line);
-    if (parsed === null) return;
-    const outMatch = />\s*U\+([0-9A-Fa-f]{4,6})/.exec(line);
-    if (outMatch === null || outMatch[1] === undefined) return;
-    const cp = parseInt(outMatch[1], 16);
-    if (Number.isNaN(cp)) return;
-    parsedLines.push({
-      key: slotKeyFor(parsed.vkey, parsed.tokens),
-      char: String.fromCodePoint(cp).normalize("NFC"),
-    });
-  }
-  for (const { key, char } of parsedLines) {
-    occupancy.set(key, { char, source: "session" });
-  }
+// ---------------------------------------------------------------------------
+// Recorded-assignment slot parsing — ONE source of truth for "which slot
+// did this mechanism actually write?"
+//
+// The overlay above and the gallery's displacement check (Cycle 4 P1-2)
+// both parse the RECORDED assignment through these helpers. Deriving a
+// written slot from anything else — the suggestion candidate's raw
+// modifiers, the author's chosen combo tokens — can name a different
+// slot than the one the recorded rule took (a case-pair-inherited S-01
+// candidate carries ["SHIFT"], while the S-01 accept writes a bare
+// `[vkey]` rule). Parse failure yields NO entries: an unkeyable
+// mechanism claims no slot, rather than a guessed one.
+// ---------------------------------------------------------------------------
+
+/** One slot a recorded mechanism writes, with the glyph it writes there. */
+export interface MechanismSlotEntry {
+  /** Slot identity, per {@link slotKeyFor}. */
+  key: string;
+  vkey: string;
+  modifiers: string[];
+  /** The glyph the mechanism writes on this slot (NFC). */
+  char: string;
 }
 
-/** Overlay one S-08 mechanism from its altgrKeyList / altgrOutputList slots. */
-function overlayRaltMechanism(
-  occupancy: Map<string, SlotOccupant>,
-  altgrKeyList: string | undefined,
-  altgrOutputList: string | undefined,
-): void {
-  if (altgrKeyList === undefined || altgrOutputList === undefined) return;
-  const parsed = parseKeySpec(altgrKeyList);
-  if (parsed === null) return;
-  const out = altgrOutputList.normalize("NFC");
-  // Only a single-glyph output names an incumbent (module doc).
-  if ([...out].length !== 1) return;
-  occupancy.set(slotKeyFor(parsed.vkey, parsed.tokens), {
-    char: out,
-    source: "session",
-  });
+type MechanismLike = MechanismAssignment["mechanisms"][number];
+
+function isSwapMechanism(mech: MechanismLike): boolean {
+  return mech.patternId === "simple_swap" || mech.strategyId === "S-01";
+}
+
+function isRaltMechanism(mech: MechanismLike): boolean {
+  return (
+    mech.patternId === "modifier_as_layer_switch" || mech.strategyId === "S-08"
+  );
+}
+
+/**
+ * The slots ONE recorded mechanism writes, parsed from its slotValues.
+ * S-01: each kmnRules line is `+ [MODS K_X] > U+XXXX`
+ * (buildStartRuleLines / buildShiftRuleLines / buildCasePairRuleLines all
+ * emit this shape, one line per plane — which is what makes a CAPS quad
+ * land on its four distinct slots). If ANY line cannot be keyed exactly,
+ * the whole mechanism yields nothing rather than a partial answer.
+ * S-08: the altgrKeyList spec, when its output is a single glyph.
+ * Every other mechanism (S-02 / S-03 / opaque) writes no single slot.
+ */
+export function mechanismSlotEntries(
+  mech: MechanismLike,
+): MechanismSlotEntry[] {
+  if (isSwapMechanism(mech)) {
+    const kmnRules = mech.slotValues?.["kmnRules"];
+    if (kmnRules === undefined || kmnRules === "") return [];
+    const lines = kmnRules
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    if (lines.length === 0) return [];
+    const entries: MechanismSlotEntry[] = [];
+    for (const line of lines) {
+      const parsed = parseKeySpec(line);
+      if (parsed === null) return [];
+      const outMatch = />\s*U\+([0-9A-Fa-f]{4,6})/.exec(line);
+      if (outMatch === null || outMatch[1] === undefined) return [];
+      const cp = parseInt(outMatch[1], 16);
+      if (Number.isNaN(cp)) return [];
+      entries.push({
+        key: slotKeyFor(parsed.vkey, parsed.tokens),
+        vkey: parsed.vkey,
+        modifiers: [...parsed.tokens],
+        char: String.fromCodePoint(cp).normalize("NFC"),
+      });
+    }
+    return entries;
+  }
+  if (isRaltMechanism(mech)) {
+    const altgrKeyList = mech.slotValues?.["altgrKeyList"];
+    const altgrOutputList = mech.slotValues?.["altgrOutputList"];
+    if (altgrKeyList === undefined || altgrOutputList === undefined) return [];
+    const parsed = parseKeySpec(altgrKeyList);
+    if (parsed === null) return [];
+    const out = altgrOutputList.normalize("NFC");
+    // Only a single-glyph output names an incumbent (module doc).
+    if ([...out].length !== 1) return [];
+    return [
+      {
+        key: slotKeyFor(parsed.vkey, parsed.tokens),
+        vkey: parsed.vkey,
+        modifiers: [...parsed.tokens],
+        char: out,
+      },
+    ];
+  }
+  return [];
+}
+
+/**
+ * Every slot a RECORDED assignment writes, across its mechanisms — the
+ * displacement check's input (Cycle 4 P1-2). Derived exclusively from
+ * the recorded slotValues via {@link mechanismSlotEntries}, never from
+ * the candidate or picker state that produced the assignment.
+ */
+export function assignmentSlotKeys(
+  assignment: MechanismAssignment,
+): MechanismSlotEntry[] {
+  if (assignment.modality !== "physical") return [];
+  return assignment.mechanisms.flatMap((mech) => mechanismSlotEntries(mech));
 }
 
 // ---------------------------------------------------------------------------

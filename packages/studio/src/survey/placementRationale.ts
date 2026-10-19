@@ -93,7 +93,7 @@
 //     data model does not carry them independently, and fabricating the
 //     missing channels would be inventing evidence.
 //   - Deadkey / store-index candidates consume no physical slot, so they
-//     score occupied 15 ("displaces nothing") and spare 4 (the unverified
+//     score occupied 20 ("displaces nothing") and spare 4 (the unverified
 //     tier — hole availability is not the question for a deadkey), and
 //     they never raise G2.
 //   - Shift-pair "synthesized/inherited" is approximated by mechanism:
@@ -101,6 +101,14 @@
 //     direct entries in candidate shape (they ARE direct candidates with
 //     SHIFT added), so they score the direct 10; only non-direct
 //     mechanisms score the synthesized 5.
+//   - Shift-pair is NOT APPLICABLE to a character with no distinct case
+//     counterpart (caseless — digits, punctuation, symbols, uncased
+//     letters): there is no pair to keep together, so the factor awards
+//     0 points and is flagged `notApplicable` in the breakdown rather
+//     than inflating every direct candidate by a flat 10 (Cycle 4 P2-b).
+//     Case-paired characters are scored exactly as before. The casing
+//     source is the engine's `caseCounterpart` (the ONLY casing source,
+//     spec 074 FR-002 — the same helper placementSeeds.ts uses).
 //   - Key labels in rationale lines come from the small local labeler
 //     below (vkey name → keycap glyph), not the gallery's KeyCap
 //     convention module — this module stays dependency-light and pure;
@@ -109,6 +117,7 @@
 //     OUT of scope for this PR and is not implemented here.
 
 import type { PlacementCandidate } from "@keyboard-studio/contracts";
+import { caseCounterpart } from "@keyboard-studio/engine";
 import {
   classifySlot,
   orthographyTier,
@@ -186,6 +195,12 @@ export interface RationaleFactor {
   max: number;
   /** Plain-words label for the factor at the awarded tier. */
   label: string;
+  /**
+   * True when the factor does not apply to this character at all
+   * (shift-pair for a caseless character — Cycle 4 P2-b): the factor
+   * awards 0 and must not be read as a failed test, just an absent one.
+   */
+  notApplicable?: true;
 }
 
 export interface DemotionPlan {
@@ -430,15 +445,24 @@ export function scoreCandidate(
       : null;
 
   // --- shift-pair consistency (10) -----------------------------------------
-  const shiftPairPoints = candidate.mechanism === "direct" ? 10 : 5;
+  // Not applicable when the character has no distinct case counterpart
+  // (Cycle 4 P2-b): no pair exists to keep together, so 0 points, flagged.
+  const hasCasePair = caseCounterpart(char) !== null;
+  const shiftPairPoints = !hasCasePair
+    ? 0
+    : candidate.mechanism === "direct"
+      ? 10
+      : 5;
   const shiftPair: RationaleFactor = {
     id: "shiftPair",
     points: shiftPairPoints,
     max: PLACEMENT_WEIGHTS.shiftPair,
-    label:
-      shiftPairPoints === 10
+    label: !hasCasePair
+      ? "No case pair — this character has no upper/lower-case partner"
+      : shiftPairPoints === 10
         ? "Upper and lower case stay on one key"
         : "Case pair is built for you",
+    ...(hasCasePair ? {} : { notApplicable: true as const }),
   };
 
   const factors = [corpus, phonetic, visual, spare, occupied, shiftPair];

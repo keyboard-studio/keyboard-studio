@@ -309,6 +309,169 @@ describe("MechanismGallery — both-core displacement (steer 2)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cycle 4 P1-2: the displacement check reads the RECORDED assignment, not
+// the candidate's raw modifiers. A case-pair-inherited S-01 candidate for
+// Ɔ carries ["SHIFT"] (placementSeeds' shiftEntryForUppercase), but the
+// S-01 accept writes a BARE [K_QUOTE] rule — so the glyph displaced is
+// the bare slot's ' (not the SHIFT slot's "). The banner must name ',
+// and confirming must demote ' — never ".
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — displacement slot comes from the recorded assignment (Cycle 4 P1-2)", () => {
+  it("accepting an inherited SHIFT-carrying S-01 suggestion names the BARE slot's incumbent", async () => {
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "r-quote",
+          context: [{ kind: "vkey", name: "K_QUOTE", modifiers: [] }],
+          output: [{ kind: "char", value: "'" }],
+        },
+        {
+          nodeId: "r-quote-shift",
+          context: [{ kind: "vkey", name: "K_QUOTE", modifiers: ["SHIFT"] }],
+          output: [{ kind: "char", value: '"' }],
+        },
+      ],
+    };
+    // Only the LOWERCASE ɔ has a candidate; Ɔ inherits it with SHIFT added.
+    const map: PlacementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+0254", // ɔ
+          candidates: [
+            {
+              vkey: "K_QUOTE",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 5,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    });
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+    seedInventory(["ɔ", "Ɔ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={map} />,
+        { withStepNav: true },
+      );
+    });
+
+    await selectChar("char-scroll-chip-0186", "Ɔ");
+    await acceptSuggestion();
+
+    // The recorded rule took the BARE slot: the banner names its
+    // incumbent ' — and the SHIFT slot's " is never mentioned as displaced.
+    await waitFor(() => {
+      expect(displacementBanner().textContent).toMatch(/took the .* key from '/);
+    });
+    fireEvent.click(
+      within(displacementBanner()).getByRole("button", { name: /Move ' to AltGr/i }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("note", { name: /Displaced character proposal/i }),
+      ).toBeNull();
+    });
+    const demotion = getPhaseCPhysicalAssignments().find((a) => a.target === "'");
+    expect(demotion?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+    expect(
+      getPhaseCPhysicalAssignments().find((a) => a.target === '"'),
+    ).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cycle 4 P1-3: the deadkey demotion fallback at gallery level. When the
+// displaced glyph's RAlt slot on its key is already taken, the demotion
+// falls back to a deadkey; confirming must record a PATTERN_DEADKEY
+// assignment whose base/trigger shape produces the displaced glyph
+// (trigger + the glyph as its own base letter → the glyph).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — deadkey demotion fallback (Cycle 4 P1-3)", () => {
+  it("displacing ' with its AltGr slot taken proposes a deadkey demotion, and confirming records a reachable S-02 shape", async () => {
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "r-quote",
+          context: [{ kind: "vkey", name: "K_QUOTE", modifiers: [] }],
+          output: [{ kind: "char", value: "'" }],
+        },
+        {
+          nodeId: "r-quote-ralt",
+          context: [{ kind: "vkey", name: "K_QUOTE", modifiers: ["RALT"] }],
+          output: [{ kind: "char", value: "’" }],
+        },
+      ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+    seedInventory(["ə", "ʔ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={placementMap} />,
+        { withStepNav: true },
+      );
+    });
+
+    await selectChar("char-scroll-chip-0259", "ə");
+    await acceptSuggestion();
+
+    await waitFor(() => {
+      expect(displacementBanner().textContent).toMatch(/AltGr spot is taken/);
+    });
+    expect(displacementBanner().textContent).toMatch(/behind a deadkey/);
+    fireEvent.click(
+      within(displacementBanner()).getByRole("button", {
+        name: /Move ' behind a deadkey/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("note", { name: /Displaced character proposal/i }),
+      ).toBeNull();
+    });
+    const demotion = getPhaseCPhysicalAssignments().find((a) => a.target === "'");
+    expect(demotion).toBeDefined();
+    const mech = demotion?.mechanisms[0];
+    expect(mech?.patternId).toBe("deadkey_single_tap");
+    expect(mech?.strategyId).toBe("S-02");
+    // The reachable shape (buildDeadkeyAssignment): trigger + base letter
+    // produces the accented form — here the demoted glyph is its own base
+    // letter, so trigger + ' types ' again.
+    expect(mech?.slotValues?.["baseLetters"]).toBe("'");
+    expect(mech?.slotValues?.["accentedForms"]).toBe("'");
+    expect(mech?.slotValues?.["triggerKey"]).toBe("K_COLON");
+    expect(mech?.slotValues?.["deadkeyName"]).toEqual(expect.any(String));
+    expect(mech?.slotValues?.["deadkeyName"]).not.toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Banner-level: the convenience-inversion direction (steer 2). A
 // convenience character can never be the gallery's currentChar (selection
 // derives from the confirmed inventory), so the inverted proposal is

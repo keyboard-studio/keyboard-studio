@@ -159,6 +159,34 @@ describe("scoreCandidate — demotion direction by orthography tier (steer 2)", 
   });
 });
 
+describe("scoreCandidate — shift-pair factor is n/a for caseless characters (Cycle 4 P2-b)", () => {
+  const directOnSpare: PlacementCandidate = {
+    vkey: "K_X",
+    modifiers: [],
+    mechanism: "direct",
+    priorSource: "manual",
+    priorCount: 0,
+    confidence: 0.9,
+  };
+
+  it("awards 0 shift-pair points, flagged notApplicable, for a caseless char (ʔ)", () => {
+    const scored = scoreCandidate(directOnSpare, "ʔ", ctx({}));
+    const sp = factor(scored, "shiftPair");
+    expect(sp?.points).toBe(0);
+    expect(sp?.notApplicable).toBe(true);
+    // spare 15 + occupied 20, and nothing else — no flat +10 inflation.
+    expect(scored.total).toBe(35);
+  });
+
+  it("keeps the direct 10 for a case-paired char (ŋ), unflagged", () => {
+    const scored = scoreCandidate(directOnSpare, "ŋ", ctx({}));
+    const sp = factor(scored, "shiftPair");
+    expect(sp?.points).toBe(10);
+    expect(sp?.notApplicable).toBeUndefined();
+    expect(scored.total).toBe(45);
+  });
+});
+
 describe("generalCategoryClass", () => {
   it("classifies by Unicode general category", () => {
     expect(generalCategoryClass("Ñ")).toBe("letter");
