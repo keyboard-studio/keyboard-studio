@@ -125,6 +125,67 @@ export function derivePlacementInventory(
  * inventory (no/empty worklist, no alphabet), so pre-marks and
  * pre-046 sessions keep the unfiltered selection behaviour.
  */
+/**
+ * The lone marks whose production obligation is discharged through their
+ * composed combinations — the mirror image of the composed-form credit
+ * (issue #2293's ruling, applied to the coverage gate by the fix for the
+ * 2026-10-19 main-CI gallery cluster).
+ *
+ * A mark whose treatment is `composed` is NOT a placement unit (see
+ * {@link derivePlacementInventory}): the author never gives it a key of
+ * its own, on desktop or on touch — the keyboard produces it only as
+ * part of its composed combinations. It stays in the flat inventory (the
+ * criterion-18.6 production denominator), so a coverage gate that simply
+ * asks "is this inventory character produced?" can never be satisfied
+ * for it: no placement exists that could produce it, and the galleries'
+ * walks (correctly) never offer one. That mismatch trapped every
+ * composed-treatment session at the Output gate from #2294 on: the walk
+ * believed it had finished every character, the gate still demanded the
+ * mark (verified live: basic_kbdfr + é — lettersToAdd [U+0301], gate
+ * blocked with zero possible assignments).
+ *
+ * The credit: a non-placement mark is credited when EVERY attested
+ * combination containing it composes (NFC) to a form in `coveredSet`
+ * — the caller's own production truth for the modality being gated
+ * (desktop: the session-aware produced set; touch: the layout's covered
+ * set). A mark with NO attested combinations is never credited on
+ * vacuous truth: nothing attests that its combinations are produced.
+ * A mark that IS a placement unit (an own-key mark unit) is never
+ * credited either — it has a real placement obligation of its own.
+ *
+ * Pure, like the rest of this module: the caller supplies the covered
+ * set, so desktop and touch each credit against their own coverage
+ * without this function knowing about either modality.
+ */
+export function treatmentCreditedMarks(
+  alphabet: ConfirmedAlphabet | undefined,
+  worklist: PlacementWorklist | undefined,
+  coveredSet: ReadonlySet<string>,
+): Set<string> {
+  const out = new Set<string>();
+  if (alphabet === undefined || !hasWorklistContent(worklist)) return out;
+
+  const covered = new Set<string>();
+  for (const c of coveredSet) covered.add(c.normalize("NFC"));
+
+  const markUnits = new Set(worklist.markUnits.map((u) => u.mark.normalize("NFC")));
+
+  for (const rawMark of alphabet.marks) {
+    const mark = rawMark.normalize("NFC");
+    if (markUnits.has(mark)) continue; // a placement unit — must be placed, not credited
+    const forms: string[] = [];
+    for (const stack of alphabet.attestedStacks) {
+      if (stack.marks.some((m) => m.normalize("NFC") === mark)) {
+        forms.push((stack.base + stack.marks.join("")).normalize("NFC"));
+      }
+    }
+    if (forms.length > 0 && forms.every((f) => covered.has(f))) {
+      out.add(mark);
+    }
+  }
+  return out;
+}
+
 export function deriveTreatmentFilteredChars(
   confirmedInventory: readonly string[],
   alphabet: ConfirmedAlphabet | undefined,
