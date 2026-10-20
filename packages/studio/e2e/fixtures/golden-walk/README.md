@@ -27,16 +27,22 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   ruling of 2026-10-07 ("Accept store-level gates; run live captures in
   CI"), this store-level walk is the accepted in-sandbox gate for SC-001.
   It is labelled exactly that — it is not a live-app capture.
-- **Live capture: PENDING — runs in CI.** The implementation sandbox's
-  Chromium refuses every localhost navigation with
-  `net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` (the same block spec
-  088 hit for SC-001), so no live capture exists yet and no baseline zip
-  is committed. The CI e2e lane (`.github/workflows/ci.yml`, landed with
-  the restack) captures the baseline from the PR's base ref while no zip
-  is committed, uploads it as the `golden-walk-baseline` artifact, and
-  verifies against the committed baseline thereafter. Whoever commits
-  the captured zip records here: the base commit it was captured on, the
-  capture date, and the CI run id.
+- **Bootstrap attempts**: capture-on-base could not succeed while main
+  itself carried the coverage-gate bug fixed by PR #2309 (merged
+  2026-10-20, merge commit `df9435c6`): the base-side walk trapped at
+  the touch step for the full capture cap on every attempt (PR #2309's
+  golden lane, runs `39350014613` / `39356073494`). With main fixed,
+  this PR captures from base `df9435c6`; the captured zip is committed
+  here with its run id recorded below.
+- **Live capture: RECORDED — 2026-10-19 (America/Chicago).** The CI
+  e2e lane (`.github/workflows/ci.yml`) captured the baseline from
+  PR #2311's base ref — `main` at
+  `df9435c60e226cff1df2a55abf6de560532be57f` (includes PR #2309, which
+  fixed main's CI) — in CI run `39369408951`, and uploaded it as the
+  `golden-walk-baseline` artifact. The captured `basic-kbdfr-copy.zip`
+  is committed here from that artifact (verified on commit: valid zip,
+  contains the keyboard package sources, incl. `source/test.kmn`).
+  The lane verifies against this committed baseline thereafter.
   - The CI capture step previously passed `VITE_KM_MUTATE_SEAM=1`; the
     pin has been dropped on this branch (`a4c0db8a`). Since T021 that
     variable is inert (nothing reads it; the seam is unconditional), so
