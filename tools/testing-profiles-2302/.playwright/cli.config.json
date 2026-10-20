@@ -1,8 +1,6 @@
 {
   "browser": {
     "browserName": "chromium",
-    "launchOptions": {
-      "executablePath": "/home/hatch/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome"
-    }
+    "launchOptions": {}
   }
 }

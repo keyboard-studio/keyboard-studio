@@ -2036,7 +2036,8 @@
     },
     "round2": {
       "status": "BLOCKED",
-      "furthest": "not-attempted"
+      "reason": "attempt completed in lane C2 (07:17:50-07:23:32): phase 1 clean, marks series stalled after the attachment station (only attachment recorded; rules not rendered; gallery open). The evidence directory was subsequently wiped by a duplicate run that was killed mid-phase-1 by a service restart before any commit; status and furthest point are from the walk log and the contemporaneous evidence reads.",
+      "furthest": "mechanisms-stuck-at-attachment"
     },
     "round3": {
       "status": "PASS",
