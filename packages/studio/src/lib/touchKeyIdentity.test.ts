@@ -195,6 +195,81 @@ describe("deriveRepairRows", () => {
     const rows = deriveRepairRows({ ir: irOf(kmn), layout: layoutOf(), records: null });
     expect(rows.map((r) => r.keyId)).toEqual(["T_0300"]);
   });
+
+  /** layoutOf() with the convert-to-u repair applied: T_0031 → U_0031. */
+  function layoutAfterConvert(): TouchLayoutIR {
+    const layout = layoutOf();
+    for (const platform of layout.platforms) {
+      for (const layer of platform.layers) {
+        for (const row of layer.rows) {
+          for (const key of row.keys) {
+            if (key.id === "T_0031") key.id = "U_0031";
+          }
+        }
+      }
+    }
+    return layout;
+  }
+
+  function repairRecord(outcome: "applied" | "declined"): TouchKeyIdentityRecords {
+    return recordsWith({
+      repairProposals: [
+        {
+          recordId: "repair:tablet:default:T_0031:1",
+          keyRef: "tablet:default:T_0031",
+          defaultAction: "convert-to-u",
+          options: ["convert-to-u", "mint-and-rule", "blank"],
+          outcome,
+          recordedAt: 1760000000000,
+          supersedes: null,
+        },
+      ],
+    });
+  }
+
+  it("an applied repair's row stays visible-and-answered after the rename resolves the finding", () => {
+    // The rename removes T_0031 from findDeadTouchKeys; the row must be
+    // re-derived from the record so the recorded outcome still renders
+    // (FR-017's visible-and-answered contract).
+    const rows = deriveRepairRows({
+      ir: irOf(),
+      layout: layoutAfterConvert(),
+      records: repairRecord("applied"),
+    });
+    const answered = rows.find((r) => r.keyId === "T_0031");
+    expect(answered).toBeDefined();
+    expect(answered!.keyRef).toBe("tablet:default:T_0031");
+    expect(answered!.layerId).toBe("default");
+    expect(answered!.layerIds).toEqual(["default", "symbol"]);
+    expect(answered!.defaultAction).toBe("convert-to-u");
+    expect(repairOutcomeFor(repairRecord("applied"), answered!.keyRef)?.outcome).toBe("applied");
+  });
+
+  it("a declined repair keeps exactly one row — the live finding's, not a synthesized duplicate", () => {
+    const rows = deriveRepairRows({
+      ir: irOf(),
+      layout: layoutOf(),
+      records: repairRecord("declined"),
+    });
+    expect(rows.filter((r) => r.keyId === "T_0031")).toHaveLength(1);
+  });
+
+  it("an answered record for a key deleted from the layout derives no row", () => {
+    const layout = layoutAfterConvert();
+    for (const platform of layout.platforms) {
+      for (const layer of platform.layers) {
+        for (const row of layer.rows) {
+          row.keys = row.keys.filter((k) => k.id !== "U_0031");
+        }
+      }
+    }
+    const rows = deriveRepairRows({
+      ir: irOf(),
+      layout,
+      records: repairRecord("applied"),
+    });
+    expect(rows.map((r) => r.keyId)).not.toContain("T_0031");
+  });
 });
 
 describe("repair application", () => {

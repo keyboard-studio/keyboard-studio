@@ -522,8 +522,20 @@ export interface UseKeyEditGuardsResult {
    *
    * Call it FIRST: there is no point warning about a lost character for an edit
    * that is about to be refused.
+   *
+   * `ruleIndexOverride` judges the op against a rule index other than the
+   * current IR's. A commit that carries its own rule synthesis in the SAME
+   * commit (AssignPanel's guard station: the op mints a `T_` id and
+   * `result.nextIr` carries that id's rules — spec 104 FR-013) must be judged
+   * against the POST-commit index: the op and its rules land atomically, so
+   * judging the bare op against the pre-commit index evaluates a state that
+   * never exists and hard-refuses every guarded mint as a dead key
+   * (`would-create-dead-key`). Callers without a bundled IR omit it.
    */
-  readonly checkRejections: (op: PendingKeyEditOperation) => readonly KeyEditRejectionNotice[];
+  readonly checkRejections: (
+    op: PendingKeyEditOperation,
+    ruleIndexOverride?: TouchKeyRuleIndex,
+  ) => readonly KeyEditRejectionNotice[];
 }
 
 const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
@@ -606,8 +618,11 @@ export function useKeyEditGuards({
   );
 
   const checkRejections = useCallback(
-    (op: PendingKeyEditOperation): readonly KeyEditRejectionNotice[] => {
-      const verdict = checkKeyEditRejections(layout, op, ruleIndex);
+    (
+      op: PendingKeyEditOperation,
+      ruleIndexOverride?: TouchKeyRuleIndex,
+    ): readonly KeyEditRejectionNotice[] => {
+      const verdict = checkKeyEditRejections(layout, op, ruleIndexOverride ?? ruleIndex);
       if (verdict.ok) return [];
       return verdict.rejections.map((rejection) => ({
         reason: rejection.reason,
