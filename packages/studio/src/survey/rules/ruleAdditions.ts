@@ -15,10 +15,11 @@
 //
 // This module is the shared seam that closes that gap. The three rules-step
 // sources stamp everything they mint with `rulesStepAdded: true` (contracts:
-// `IRRule.rulesStepAdded`, `IRStore.rulesStepAdded`); nothing else in the
-// studio sets that marker. `deriveRuleAdditions` collects the marked nodes
-// that are absent from the base IR, and `spliceRuleAdditions` merges them
-// into a base-derived IR in working-IR order before the projection emits.
+// `IRRule.rulesStepAdded`, `IRStore.rulesStepAdded`). One further stamper
+// exists by design: the spec-104 key-identity commit composition (hazard 2
+// below). `deriveRuleAdditions` collects the marked nodes that are absent
+// from the base IR, and `spliceRuleAdditions` merges them into a
+// base-derived IR in working-IR order before the projection emits.
 //
 // Two hazards this design deliberately avoids:
 //
@@ -30,6 +31,16 @@
 //     for the touch re-propagation flow (spec-014). Those carry no marker
 //     and stay out of this seam; they reach the artifact through the
 //     touch-propagation projection, not through step 1.
+//     Exception (spec 104): when touch synthesis is composed with a
+//     severance transplant by the key-identity commit
+//     (`mergeSeveranceWithSynthesis`), the composed delta — standing
+//     clones, synthesized rules, minted guard store — IS stamped with the
+//     marker and travels this seam. That composition has no overlay replay
+//     path (projection step 1.7b's rename fix-up is for pure renames and
+//     skips renames whose target the additions bind), so the hazard above
+//     does not arise for it; before the stamp existed, its rules never
+//     reached the artifact at all and the fix-up rewrote the source key's
+//     producing rule onto the minted id instead (walk 1's OSK "&").
 //
 // Ordering matters: KMN uses first-match semantics, so a Narrow exception
 // must stay immediately BEFORE its guard, and synthesized guards keep the
