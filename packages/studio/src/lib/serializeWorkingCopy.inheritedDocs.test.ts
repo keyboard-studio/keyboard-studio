@@ -135,4 +135,23 @@ describe("Track 1 carries none of the original prose (spec 102 FR-032)", () => {
       expect(page).toContain("<h2>Typing Guide</h2>");
     }
   });
+
+  it("ignores start-page prose a copy's store still holds, rendering the fresh pages", async () => {
+    // A view-only artifact run (the Compare screen) or a re-pick at the
+    // starting-keyboard step can refill the prose slices after the copy
+    // scaffold cleared them. The projection must not trust the slices alone.
+    const store = useWorkingCopyStore.getState();
+    store.instantiateFromStart(basicKbdus, { vfs: fixtureVfs(), ir: DEADKEY_RIGHT_ALT_FIXTURE.ir });
+    store.setStartWelcomeHtmText(ORIGINAL_WELCOME);
+    store.setStartHelpPhpText(ORIGINAL_HELP);
+    const { welcome, help } = await project();
+
+    for (const page of [welcome, help]) {
+      expect(page).not.toContain("Original");
+      expect(page).not.toContain(DOC_GENERATED_START);
+      expect(page).toContain("<h2>Typing Guide</h2>");
+    }
+    expect(welcome).toContain("<title>Start Using ");
+    expect(countOf(welcome, "<h1")).toBe(1);
+  });
 });

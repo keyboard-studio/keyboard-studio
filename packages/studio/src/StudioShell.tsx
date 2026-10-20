@@ -1228,6 +1228,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     {
       analyseContextTolerance: true,
       runRoundTripCheck: true,
+      startDocs: "by-branch",
     },
   );
   // spec 078 FR-005a: the recorded decision is applied by its own effect,

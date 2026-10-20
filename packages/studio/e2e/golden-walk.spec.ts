@@ -74,6 +74,7 @@ import {
   acceptProjectName,
   confirmPrefill,
   buildOneCharacterList,
+  driveDeadkeysStep,
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
@@ -139,8 +140,12 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   // failure surfaced 20 minutes later as driveHelpPhase's fill waiting
   // on #pf_welcome_paragraph. Diagnosed from a locally retained
   // error-context snapshot showing the app still on Deadkeys at the cap.
-  await page.getByTestId("deadkeys-continue").waitFor({ state: "visible", timeout: 30_000 });
-  await page.getByTestId("deadkeys-continue").click();
+  // The deadkeys half goes through driveDeadkeysStep (the race-hardened
+  // helper copy-edit / decision-log use — it races deadkeys-continue
+  // against rules-continue) rather than a plain wait here, so this walk
+  // carries on if a future gate ever completes deadkeys without a
+  // screen instead of parking on the wait.
+  await driveDeadkeysStep(page);
   await page.getByTestId("rules-continue").waitFor({ state: "visible", timeout: 30_000 });
   await page.getByTestId("rules-continue").click();
 

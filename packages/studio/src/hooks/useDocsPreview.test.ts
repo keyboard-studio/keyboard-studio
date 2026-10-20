@@ -70,6 +70,18 @@ describe("useDocsPreview", () => {
     expect(result.current.welcomeHtm).toContain("Revised answer.");
     expect(result.current.welcomeHtm).not.toContain("First answer.");
   });
+
+  it("ignores start-page prose a copy's store still holds (spec 102 FR-032)", () => {
+    instantiate();
+    useWorkingCopyStore.getState().setStartWelcomeHtmText("<html><body><p>Original welcome prose.</p></body></html>");
+    useWorkingCopyStore.getState().setStartHelpPhpText("<?php require_once('header.php'); ?>\n<p>Original help prose.</p>");
+
+    const { result } = renderHook(() => useDocsPreview());
+
+    expect(result.current.welcomeHtm).not.toContain("Original");
+    expect(result.current.helpPhp).not.toContain("Original");
+    expect(result.current.welcomeHtm).toContain(`<title>Start Using ${basicKbdus.displayName}</title>`);
+  });
 });
 
 // spec 102 US2: the derived sections ride the same memoised derivation (D3).
