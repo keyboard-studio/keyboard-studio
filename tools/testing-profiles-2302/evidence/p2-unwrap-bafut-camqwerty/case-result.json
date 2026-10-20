@@ -1,0 +1,110 @@
+{
+  "case": {
+    "id": "p2-unwrap-bafut-camqwerty",
+    "profile": 2,
+    "backspace": "unwrap",
+    "backspaceOnDiagonal": false,
+    "inputOrder": "prefix",
+    "outputForm": "ready-made",
+    "lang": "bafut",
+    "base": "sil_cameroon_qwerty",
+    "english": "Bafut",
+    "autonym": "Bafut",
+    "code": "bfd",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "startedAt": "2026-10-19T23:31:54.603Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        },
+        {
+          "name": "pick-base",
+          "ok": true,
+          "via": "card"
+        },
+        {
+          "name": "track-copy",
+          "ok": true
+        },
+        {
+          "name": "attribution",
+          "ok": true
+        },
+        {
+          "name": "project-name",
+          "ok": true
+        },
+        {
+          "name": "prefill",
+          "ok": true
+        },
+        {
+          "name": "charlist-continue",
+          "ok": true
+        },
+        {
+          "name": "alphabet-screen",
+          "ok": true
+        }
+      ],
+      "errors": [],
+      "prefillExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm the basics\n\nBased on your script and chosen keyboard, here is what we will assume. You can edit the language or script here, confirm to continue, or go back to change a choice.\n\nLanguage\nBafutEdit\nScript\nLatnBCP47 script subtag (§5)Edit\nScripts included\nLatn, GrekGrek may not be needed for your language\nScript class (A2)\nalphabeticderived from script\nRouting group (§9)\nqwerty-qwertzderived from script\nStarting keyboard\nCameroon QWERTY (sil_cameroon_qwerty)your chosen starting keyboard\n\nSpare keys (A7), the full BCP47 tag, display name, and copyright are confirmed later from your starting keyboard and the documentation step.\n\nCameroon QWERTY\nDesktop OSK\nMobile KB\nLoading your keyboard...\nGetting the files that describe your keyboard...\n← Back\nConfirm and continue\nProject: Bafut",
+      "exemplars": {
+        "present": true,
+        "checked": true
+      },
+      "discoveryCheckedId": "discovery_method-exemplars",
+      "alphabetHeading": "Confirm your alphabet",
+      "alphabetExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (30)\n\nDashed characters were proposed for you (from SLDR (machine-generated — please check)). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\nɨ\nU+0268\nx\nj\nU+006A\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nɔ\nU+0254\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\nꞌ\nU+A78C\nx\n◌̀\nU+0300\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (6)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\np P\nU+0070\n+\nq Q\nU+0071\n+\nv V\nU+0076\n+\nx X\nU+0078\n+\nʼ\nU+02BC\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\nNewer exemplar data\n\nThe characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.\n\nCheck for newer exemplar data for this language\nHow your alphabet breaks down\n\nLetters (27)\n\nLetters that stand on their own.\n\nShow uppercase letters\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nɨ\nU+0268\nj\nU+006A\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nw\nU+0077\ny\nU+0079\nz\nU+007A\nꞌ\nU+A78C\n\nMarks (3)\n\nAccents and other marks that attach to a letter.\n\n◌̀\nU+0300\n◌̂\nU+0302\n◌̌\nU+030C\nnew\nCharacter map\n\nBrowse and click to toggle characters into your alphabet — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\n−\n100%\n+\nLoading the character map…\nBack\nContinue (57 characters)\nProject: Bafut",
+      "charlistDoneEnabled": true
+    },
+    "2": {
+      "phase": 2,
+      "stations": [],
+      "errors": [
+        "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done')\n    - locator resolved to <button type=\"button\" data-testid=\"charlist-done\" class=\"ks-focus-ring ks-hit-target ks-press\">Continue (57 characters)</button>\n  - attempting click action\n    - waiting for element to be visible, enabled and stable\n"
+      ],
+      "bodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (30)\n\nDashed characters were proposed for you (from SLDR (machine-generated — please check)). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\nɨ\nU+0268\nx\nj\nU+006A\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nɔ\nU+0254\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\nꞌ\nU+A78C\nx\n◌̀\nU+0300\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (6)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\np P\nU+0070\n+\nq Q\nU+0071\n+\nv V\nU+0076\n+\nx X\nU+0078\n+\nʼ\nU+02BC\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\nNewer exemplar data\n\nThe characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.\n\nCheck for newer exemplar data for this language\nHow your alphabet breaks down\n\nLetters (27)\n\nLetters that stand on their own.\n\nShow uppercase letters\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nɨ\nU+0268\nj\nU+006A\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nw\nU+0077\ny\nU+0079\nz\nU+007A\nꞌ\nU+A78C\n\nMarks (3)\n\nAccents and other marks that attach to a letter.\n\n◌̀\nU+0300\n◌̂\nU+0302\n◌̌\nU+030C\nnew\nCharacter map\n\nBrowse and click to toggle characters into your alphabet — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\nShow only blocks my keyboard uses\n−\n100%\n+\n114 characters can't be previewed in the selected font\nBasic Latin\n0\nU+0030\n+\n1\nU+0031\n+\n2\nU+0032\n+\n3\nU+0033\n+\n4\nU+0034\n+\n5\nU+0035\n+\n6\nU+0036\n+\n7\nU+0037\n+\n8\nU+0038\n+\n9\nU+0039\n+\na\nU+0061\n[x]\nb\nU+0062\n[x]\nc\nU+0063\n+\nd\nU+0064\n[x]\ne\nU+0065\n[x]\nf\nU+0066\n[x]\ng\nU+0067\n[x]\nh\nU+0068\n[x]\ni\nU+006"
+    },
+    "3": {
+      "phase": 3,
+      "chars": [],
+      "errors": [],
+      "overwrite": null,
+      "emptyDiff": false,
+      "completed": false,
+      "endReason": "gallery-never-opened",
+      "overwriteAttempted": false,
+      "endText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (30)\n\nDashed characters were proposed for you (from SLDR (machine-generated — please check)). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\nɨ\nU+0268\nx\nj\nU+006A\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nɔ\nU+0254\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\nꞌ\nU+A78C\nx\n◌̀\nU+0300\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (6)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\np P\nU+0070\n+\nq Q\nU+0071\n+\nv V\nU+0076\n+\nx X\nU+0078\n+\nʼ\nU+02BC\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct ",
+      "reachedTouchSeed": false
+    }
+  },
+  "finishedAt": "2026-10-19T23:37:53.220Z"
+}

@@ -1,0 +1,56 @@
+{
+  "case": {
+    "id": "p1-whole-bafut-kbdus",
+    "profile": 1,
+    "backspace": "whole",
+    "backspaceOnDiagonal": false,
+    "inputOrder": "postfix",
+    "outputForm": "base-plus-mark",
+    "lang": "bafut",
+    "base": "basic_kbdus",
+    "english": "Bafut",
+    "autonym": "Bafut",
+    "code": "bfd",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "startedAt": "2026-10-20T00:00:04.378Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        }
+      ],
+      "errors": [
+        "page.waitForTimeout: Page crashed"
+      ],
+      "failedAt": "base-picker",
+      "bodyExcerpt": ""
+    }
+  },
+  "finishedAt": "2026-10-20T00:04:37.750Z"
+}

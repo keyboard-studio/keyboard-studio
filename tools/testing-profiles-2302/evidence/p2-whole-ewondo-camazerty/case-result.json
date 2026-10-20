@@ -1,0 +1,61 @@
+{
+  "case": {
+    "id": "p2-whole-ewondo-camazerty",
+    "profile": 2,
+    "backspace": "whole",
+    "backspaceOnDiagonal": true,
+    "inputOrder": "prefix",
+    "outputForm": "ready-made",
+    "lang": "ewondo",
+    "base": "sil_cameroon_azerty",
+    "english": "Ewondo",
+    "autonym": "Ewondo",
+    "code": "ewo",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "startedAt": "2026-10-20T00:10:06.435Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        },
+        {
+          "name": "pick-base",
+          "ok": true,
+          "via": "card"
+        }
+      ],
+      "errors": [
+        "locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
+      ],
+      "failedAt": "pick-base",
+      "bodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nNo keyboard yet\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncurrent step\nC\nCharacters\nnot yet reached\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nChoose a starting keyboard\n\nBased on your language and chosen script, here are the closest starting points. Search above or pick a suggestion below.\n\nSearch in:\nSuggested\nAll keyboards\nSEARCH KEYBOARDS\nImport readiness:\nEditable — small formatting differences after import\nWhat does import readiness mean?\n\nSuggested for you:\n\nCameroon AZERTY (sil_cameroon_azerty)\nAlready supports your language\nCameroon QWERTY (sil_cameroon_qwerty)\nAlready supports your language\nEuroLatin (SIL) (sil_euro_latin)\nRelated: Xhosa, same script\nakan (akan)\nRelated: Akan, same script\nBambara (bambara)\nMatches your script\nFrench Basic (basic_kbdfr)\nMatches your script\nGerman Basic (basic_kbdgr)\nMatches your script\nIPA (SIL) (sil_ipa)\nMatches your script\nNias (nias)\nMatches your script\nPiaroa (pid_piaroa)\nMatches your script\nUnited Kingdom Basic (basic_kbduk)\nMatches your script\nUnited States-International Basic (basic_kbdusx)\nMatches your script\nUS Basic (basic_kbdus)\nStart blank (US QWERTY)\nCameroon AZERTY\nDesktop OSK\nMobile KB\n← Back\nChoose this keyboard"
+    }
+  },
+  "finishedAt": "2026-10-20T00:13:14.860Z"
+}
