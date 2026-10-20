@@ -1,0 +1,773 @@
+[
+  {
+    "id": "p1-whole-bafut-camqwerty",
+    "profile": 1,
+    "backspace": "whole",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:start"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p1-unwrap-bafut-camqwerty",
+    "profile": 1,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "open"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p2-whole-bafut-camqwerty",
+    "profile": 2,
+    "backspace": "whole",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "mechanisms-stuck-at-?"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p2-unwrap-bafut-camqwerty",
+    "profile": 2,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "mechanisms-open"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p3-whole-bafut-camqwerty",
+    "profile": 3,
+    "backspace": "whole",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:start"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p3-unwrap-bafut-camqwerty",
+    "profile": 3,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:base-picker"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p4-whole-bafut-camqwerty",
+    "profile": 4,
+    "backspace": "whole",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:track-copy"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p4-unwrap-bafut-camqwerty",
+    "profile": 4,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_qwerty",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:base-picker"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p1-whole-ewondo-camazerty",
+    "profile": 1,
+    "backspace": "whole",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:pick-base"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p1-unwrap-ewondo-camazerty",
+    "profile": 1,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:pick-base"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p2-whole-ewondo-camazerty",
+    "profile": 2,
+    "backspace": "whole",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:pick-base"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p2-unwrap-ewondo-camazerty",
+    "profile": 2,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p3-whole-ewondo-camazerty",
+    "profile": 3,
+    "backspace": "whole",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p3-unwrap-ewondo-camazerty",
+    "profile": 3,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p4-whole-ewondo-camazerty",
+    "profile": 4,
+    "backspace": "whole",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:pick-base"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p4-unwrap-ewondo-camazerty",
+    "profile": 4,
+    "backspace": "unwrap",
+    "base": "sil_cameroon_azerty",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p1-whole-bafut-kbdus",
+    "profile": 1,
+    "backspace": "whole",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:base-picker"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p1-unwrap-bafut-kbdus",
+    "profile": 1,
+    "backspace": "unwrap",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "PASS",
+      "furthest": "mechanisms-complete"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p2-whole-bafut-kbdus",
+    "profile": 2,
+    "backspace": "whole",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p2-unwrap-bafut-kbdus",
+    "profile": 2,
+    "backspace": "unwrap",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "PASS",
+      "reason": "",
+      "furthest": "mechanisms-complete",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)à — U+00E0 (one character)Backspace clears the wh",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "peel",
+        "clicked": "peel",
+        "checkedAfter": "peel",
+        "checkedSticky": "peel",
+        "previewText": "What backspace does, one press at a time:\n\nà\n⌫\na\n⌫\n(empty)",
+        "previewPresses": 2,
+        "previewMatchesAnswer": true
+      },
+      "rulesMentionsBackspace": true,
+      "rulesBkspHits": [
+        "When a character from the “generated_marks_unwrap_from” store precedes Backspace, the rule emits the corresponding character from the “generated_marks_unwrap_to” store.",
+        "any(generated_marks_unwrap_from) + [K_BKSP] > index(generated_marks_unwrap_to, 1) c generated: stepwise backspace unwrap (marks series)",
+        "When a character from the “generated_marks_unwrap_from” store precedes Backspace, the rule emits the corresponding character from the “generated_marks_unwrap_to” store."
+      ],
+      "galleryChars": 23,
+      "overwrite": {
+        "char": "ŋ",
+        "key": "K_X",
+        "ok": true,
+        "keySelected": true,
+        "applyDisabled": false,
+        "displacement": null
+      },
+      "errors": []
+    }
+  },
+  {
+    "id": "p3-whole-bafut-kbdus",
+    "profile": 3,
+    "backspace": "whole",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p3-unwrap-bafut-kbdus",
+    "profile": 3,
+    "backspace": "unwrap",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "phase1-failed:track-copy"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+      "inputOrderClicked": "postfix",
+      "proposalForm": "Send the letter and its mark as separate characters(suggested)à — U+0061 + U+0300 (separate characters)Backspace clears",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "peel",
+        "clicked": "peel",
+        "checkedAfter": "peel",
+        "checkedSticky": "peel",
+        "previewText": "What backspace does, one press at a time:\n\nà\n⌫\na\n⌫\n(empty)",
+        "previewPresses": 2,
+        "previewMatchesAnswer": true
+      },
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p4-whole-bafut-kbdus",
+    "profile": 4,
+    "backspace": "whole",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "PASS",
+      "reason": "",
+      "furthest": "mechanisms-complete",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)à — U+00E0 (one character)Backspace clears the wh",
+      "selectedForm": "base-plus-mark",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "peel",
+        "expectedRecommended": "peel",
+        "proposalFollowsForm": true,
+        "defaultChecked": "peel",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": "whole-stack",
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\nà\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesMentionsBackspace": true,
+      "rulesBkspHits": [
+        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+      ],
+      "galleryChars": 23,
+      "overwrite": {
+        "char": "ŋ",
+        "key": "K_X",
+        "ok": true,
+        "keySelected": true,
+        "applyDisabled": false,
+        "displacement": null
+      },
+      "errors": []
+    }
+  },
+  {
+    "id": "p4-unwrap-bafut-kbdus",
+    "profile": 4,
+    "backspace": "unwrap",
+    "base": "basic_kbdus",
+    "lang": "bafut",
+    "round1": {
+      "status": "PASS",
+      "furthest": "mechanisms-complete"
+    },
+    "round2": {
+      "status": "NOT-ATTEMPTED",
+      "reason": "",
+      "furthest": "not-attempted"
+    }
+  },
+  {
+    "id": "p1-whole-ewondo-kbdfr",
+    "profile": 1,
+    "backspace": "whole",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "open"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+      "inputOrderClicked": "postfix",
+      "proposalForm": "Send the letter and its mark as separate characters(suggested)á — U+0061 + U+0301 (separate characters)Backspace clears",
+      "selectedForm": "base-plus-mark",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "peel",
+        "expectedRecommended": "peel",
+        "proposalFollowsForm": true,
+        "defaultChecked": "peel",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": "whole-stack",
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p1-unwrap-ewondo-kbdfr",
+    "profile": 1,
+    "backspace": "unwrap",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "mechanisms-stuck-at-?"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p2-whole-ewondo-kbdfr",
+    "profile": 2,
+    "backspace": "whole",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "PASS",
+      "reason": "",
+      "furthest": "mechanisms-complete",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)á — U+00E1 (one character)Backspace clears the wh",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": null,
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
+      "galleryChars": 14,
+      "overwrite": {
+        "char": "ŋ",
+        "key": "K_X",
+        "ok": true,
+        "keySelected": true,
+        "applyDisabled": false,
+        "displacement": null
+      },
+      "errors": []
+    }
+  },
+  {
+    "id": "p2-unwrap-ewondo-kbdfr",
+    "profile": 2,
+    "backspace": "unwrap",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "rules"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)á — U+00E1 (one character)Backspace clears the wh",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "peel",
+        "clicked": "peel",
+        "checkedAfter": "peel",
+        "checkedSticky": "peel",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)",
+        "previewPresses": 2,
+        "previewMatchesAnswer": true
+      },
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p3-whole-ewondo-kbdfr",
+    "profile": 3,
+    "backspace": "whole",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "BLOCKED",
+      "furthest": "mechanisms-stuck-at-?"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+      "inputOrderClicked": "postfix",
+      "proposalForm": "Send the letter and its mark as separate characters(suggested)á — U+0061 + U+0301 (separate characters)Backspace clears",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": null,
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p3-unwrap-ewondo-kbdfr",
+    "profile": 3,
+    "backspace": "unwrap",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=phase1-failed:pick-base; errors: locator.waitFor: Target crashed \nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n",
+      "furthest": "phase1-failed:pick-base",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesMentionsBackspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 0,
+      "overwrite": null,
+      "errors": [
+        "locator.waitFor: Target crashed \nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
+      ]
+    }
+  },
+  {
+    "id": "p4-whole-ewondo-kbdfr",
+    "profile": 4,
+    "backspace": "whole",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
+    }
+  },
+  {
+    "id": "p4-unwrap-ewondo-kbdfr",
+    "profile": 4,
+    "backspace": "unwrap",
+    "base": "basic_kbdfr",
+    "lang": "ewondo",
+    "round1": {
+      "status": "NOT-ATTEMPTED"
+    },
+    "round2": {
+      "status": "BLOCKED",
+      "reason": "attempt completed in lane C2 (07:17:50-07:23:32): phase 1 clean, marks series stalled after the attachment station (only attachment recorded; rules not rendered; gallery open). The evidence directory was subsequently wiped by a duplicate run that was killed mid-phase-1 by a service restart before any commit; status and furthest point are from the walk log and the contemporaneous evidence reads.",
+      "furthest": "mechanisms-stuck-at-attachment"
+    }
+  }
+]
