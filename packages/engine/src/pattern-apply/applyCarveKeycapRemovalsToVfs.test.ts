@@ -27,6 +27,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
 import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { parse } from "../codec/parse.js";
+import { makeSlotId } from "./slotId.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -804,5 +805,66 @@ describe("applyCarveKeycapRemovalsToVfs — resolver matching (spec 104 T009)", 
     const defaultKeys = data.tablet.layer[0].row[0].key as { id: string }[];
     expect(defaultKeys.some((k) => k.id === "T_carved_T_0300")).toBe(true);
     expect(defaultKeys.some((k) => k.id === "T_0300")).toBe(false);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — emulation keys survive a carve", () => {
+  // The Cameroon backspace idiom: a context rule on K_BKSP strips a mark,
+  // emitting the base it leaves behind. Carving that base must not take the
+  // backspace key out of the touch layout.
+  const kmn = [
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "store(composed) 'ḉ'",
+    "store(comp-dia) 'ç'",
+    "any(composed) + [K_BKSP] > index(comp-dia,1)",
+    "+ [K_C] > 'ç'",
+    "+ [K_A] > 'a'",
+    "",
+  ].join("\n");
+  const layout = {
+    tablet: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "K_A", text: "a" },
+                { id: "K_C", text: "ç" },
+                { id: "K_BKSP", text: "*BkSp*", sp: 1, width: 150 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("keeps K_BKSP when a character its context rule emits is carved", () => {
+    const ir = parse(kmn, "test").ir;
+    const carvedRule = ir.groups
+      .flatMap((g) => g.rules)
+      .find((r) => r.context.some((el) => el.kind === "vkey" && el.name === "K_C"));
+    expect(carvedRule).toBeDefined();
+
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: JSON.stringify(layout) },
+    ]);
+    // The comp-dia slot goes with it, or the backspace rule keeps ç alive.
+    const compDia = ir.stores.find((s) => s.name === "comp-dia");
+    expect(compDia).toBeDefined();
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: [carvedRule!.nodeId],
+      slotIds: [makeSlotId(compDia!.nodeId, 0)],
+    }));
+
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const ids = (data.tablet.layer[0].row[0].key as { id: string }[]).map((k) => k.id);
+    expect(ids).not.toContain("K_C");
+    expect(ids).toContain("K_BKSP");
+    expect(ids).toContain("K_A");
   });
 });
