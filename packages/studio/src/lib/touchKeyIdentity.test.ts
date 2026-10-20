@@ -18,7 +18,13 @@ import {
   findDeadTouchKeys,
   buildTouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
-import { ensureTouchKeyRule, parseKmn } from "@keyboard-studio/engine";
+import {
+  applyGuardSynthesis,
+  ensureTouchKeyRule,
+  parseKmn,
+  planGuardSynthesis,
+} from "@keyboard-studio/engine";
+import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import type { TouchKeyIdentityRecords } from "../stores/workingCopyStore.ts";
 import { EMPTY_TOUCH_KEY_IDENTITY } from "../stores/workingCopyStore.ts";
 import {
@@ -662,6 +668,70 @@ group(main) using keys
     expect(target.get("")).toBeUndefined();
     // The shift clone stands.
     expect(target.get("SHIFT")).toEqual(["!"]);
+  });
+
+  it("stamps the composed delta (clones, guard pair, guard store) for the projection's additions seam", () => {
+    const ir = irOf(MERGE_KMN);
+    const plan = planInlineSeverance({
+      ir,
+      layout: mergeLayout(),
+      platformId: "tablet",
+      anchorLayerId: "default",
+      sourceId: "K_1",
+      targetId: "T_0301",
+      track: "copy",
+    });
+    expect(plan.speculative.record.outcome).toBe("completed");
+
+    // The panel's guard synthesis for the same edit (walk 1's shape).
+    const index = buildTouchKeyRuleIndex(ir);
+    const gplan = planGuardSynthesis(ir, index, "T_0301", [], "́", {
+      repertoire: [" ", "1", "."],
+      opaqueAcknowledged: true,
+    });
+    expect(gplan.ok).toBe(true);
+    if (!gplan.ok) return;
+    const applied = applyGuardSynthesis(ir, index, gplan, "T_0301", "́", {
+      opaqueAcknowledged: true,
+    });
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+
+    const merged = mergeSeveranceWithSynthesis({
+      plan: plan.speculative,
+      baseIr: ir,
+      nextIr: applied.ir,
+      anchorLayerId: "default",
+    });
+
+    const baseRuleIds = new Set(ir.groups.flatMap((g) => g.rules.map((r) => r.nodeId)));
+    const baseStoreIds = new Set(ir.stores.map((s) => s.nodeId));
+    // Every rule the composition added over the base carries the marker —
+    // the standing SHIFT clone and the synthesized guard + producing rules.
+    const addedRules = merged.groups.flatMap((g) =>
+      g.rules.filter((r) => !baseRuleIds.has(r.nodeId)),
+    );
+    expect(addedRules.length).toBeGreaterThan(0);
+    for (const r of addedRules) expect(r.rulesStepAdded).toBe(true);
+    // Base rules are never stamped.
+    for (const g of merged.groups) {
+      for (const r of g.rules) {
+        if (baseRuleIds.has(r.nodeId)) expect(r.rulesStepAdded).toBeUndefined();
+      }
+    }
+    // The minted guard store is stamped too, so it splices in beside its rule.
+    const addedStores = merged.stores.filter((s) => !baseStoreIds.has(s.nodeId));
+    expect(addedStores.length).toBe(1);
+    expect(addedStores[0]?.rulesStepAdded).toBe(true);
+
+    // And the seam actually collects the composition: guard + producing +
+    // the standing clone are all additions over the base.
+    const additions = deriveRuleAdditions(merged, ir);
+    const addedIds = new Set(additions.groups.flatMap((g) => g.added.map((r) => r.nodeId)));
+    for (const r of addedRules) expect(addedIds.has(r.nodeId)).toBe(true);
+    expect(additions.stores.map((s) => s.nodeId)).toEqual(
+      addedStores.map((s) => s.nodeId),
+    );
   });
 });
 
