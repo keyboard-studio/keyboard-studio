@@ -207,12 +207,25 @@ async function driveMarksSeriesExpectingGuard(page: Page): Promise<void> {
  * assign overlay never touches the IR, so the FR-017 fingerprint the
  * declined choice was pinned against is exactly what it was.
  */
+/**
+ * The locator for one grid CELL by its address suffix. It MUST carry the
+ * `key-grid-cell-` prefix (the touch-mode-toggle.spec.ts convention): every
+ * cell is preceded in the DOM by its left-padding spacer,
+ * `key-grid-pad-<address>`, whose testid ends with the same address — an
+ * unscoped suffix locator's `.first()` therefore resolves to the aria-hidden
+ * pad span, the click selects nothing and focuses nothing, and a following
+ * F2 goes nowhere (the failure this walk shipped with).
+ */
+function cellByAddressSuffix(page: Page, suffix: string) {
+  return page.locator(`[data-testid^="key-grid-cell-"][data-testid$="${suffix}"]`).first();
+}
+
 async function renameKeyViaCommandMenu(
   page: Page,
   cellTestIdSuffix: string,
   newId: string,
 ): Promise<void> {
-  const cell = page.locator(`[data-testid$="${cellTestIdSuffix}"]`).first();
+  const cell = cellByAddressSuffix(page, cellTestIdSuffix);
   await cell.click();
   await cell.click({ button: "right" });
   await expect(page.getByTestId("key-grid-command-menu")).toBeVisible({
@@ -288,7 +301,7 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
     // default layer — QS-5's own worked example) to the combining mark.
     await page.getByTestId("touch-mode-tab-key").click();
     await expect(page.getByTestId("key-grid")).toBeVisible({ timeout: 15_000 });
-    await page.locator('[data-testid$=":default:K_1"]').first().click();
+    await cellByAddressSuffix(page, ":default:K_1").click();
 
     await page.keyboard.press("F2");
     const charField = page.getByLabel("Character or code point");
@@ -497,7 +510,7 @@ test.describe("spec 104 walk 4: Track 2 identity choice and decline suppression"
     const decisionRows = page.getByTestId("touch-key-decision-row");
 
     // --- The triggering edit: redefine K_A to ɛ on the Adapt track.
-    await page.locator('[data-testid$=":default:K_A"]').first().click();
+    await cellByAddressSuffix(page, ":default:K_A").click();
     await assignCharToSelectedKey(page, "U+025B");
 
     // FR-018: the commit is held; the choice is decided inline, with the
@@ -522,7 +535,7 @@ test.describe("spec 104 walk 4: Track 2 identity choice and decline suppression"
     // U_025B as authored) and re-trigger the IDENTICAL edit. The
     // standing keep answer commits it without re-presenting the choice.
     await renameKeyViaCommandMenu(page, ":default:U_025B", "K_A");
-    await page.locator('[data-testid$=":default:K_A"]').first().click();
+    await cellByAddressSuffix(page, ":default:K_A").click();
     await assignCharToSelectedKey(page, "U+025B");
     // The commit landing (AssignPanel's field reset) with the choice
     // never appearing is the suppression signal; give any erroneous
@@ -537,7 +550,7 @@ test.describe("spec 104 walk 4: Track 2 identity choice and decline suppression"
     // for a different character (a different target id). The choice is
     // presented fresh — and accepting it severs, with the line shown.
     await renameKeyViaCommandMenu(page, ":default:U_025B", "K_A");
-    await page.locator('[data-testid$=":default:K_A"]').first().click();
+    await cellByAddressSuffix(page, ":default:K_A").click();
     await assignCharToSelectedKey(page, "U+00F8");
     await expect(choice).toBeVisible({ timeout: 15_000 });
     await choice.getByRole("radio", { name: /Put this key on its own/ }).check();
