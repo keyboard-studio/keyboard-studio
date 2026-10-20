@@ -326,8 +326,8 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
     await expect(charField).toHaveValue("");
 
     // The live preview: the redefined key exists under its T_ id, and
-    // the recorded guard is real KMW behaviour — a lone mark is
-    // swallowed; after a letter, the mark lands.
+    // the recorded guard is real KMW behaviour — a mark at the start of
+    // a word (after a space) is swallowed; after a letter, it lands.
     await page.getByTestId("touch-mode-tab-character").click();
     const oskFrame = page.frameLocator(OSK_FRAME_SELECTOR);
     await expect
@@ -337,8 +337,19 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
       })
       .toBe(true);
     const oskTarget = oskFrame.locator("#osk-target");
+    // Start-of-word probe = after a space (ruling 2026-10-20, spec 104
+    // Clarifications Session 2026-10-20): the guard idiom
+    // (any(generated_touch_guard) + [T_0301] > context) can only match a
+    // character that exists — a space, a number, punctuation — and Keyman
+    // has no beginning-of-context primitive, so a tap at a truly EMPTY
+    // context is not swallowed by any keyboard built on the idiom,
+    // including the shipped sil_cameroon_qwerty. That is why SC-002's
+    // context probes are letter/space/deadkey and omit empty. The space
+    // tap below is the canonical start-of-word case the guard question
+    // names; the mark tap after it must leave the field at just " ".
+    await clickOskKeyById(oskFrame, "K_SPACE");
     await clickOskKeyById(oskFrame, "T_0301");
-    await expect(oskTarget).toHaveValue("");
+    await expect(oskTarget).toHaveValue(" ");
     await clickOskKeyById(oskFrame, "K_E");
     await expect(oskTarget).not.toHaveValue("");
     await clickOskKeyById(oskFrame, "T_0301");

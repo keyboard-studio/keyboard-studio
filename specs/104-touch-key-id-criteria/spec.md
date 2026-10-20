@@ -12,6 +12,10 @@
 
 ## Clarifications
 
+### Session 2026-10-20
+
+- Q: Does the guard question's "at the start of a word" include a tap at a truly EMPTY context (empty field, nothing typed yet)? → A (Matthew's directive to resolve main CI, lead ruling recorded 2026-10-20): No. "Start of a word" means the guard idiom's reachable cases — the ones the question itself lists: right after a space, a number, or punctuation. The spec'd mechanism (FR-013, the Cameroon idiom `any(guardstore) + [T] > context` plus a plain producing rule) can only match a character that exists; Keyman has no beginning-of-context primitive, and the shipped sil_cameroon_qwerty keyboards behave the same way at empty context. SC-002 already scopes its context probes to letter/space/deadkey for this reason. Walk 1's start-of-word probe is therefore the after-a-space tap. Giving STUDIO-MINTED guards an additional empty-context arm (letter-gated production) remains possible as a future amendment of this spec; it is NOT adopted here, because minted and transplanted guards would diverge at empty context and the parity fixtures and synthesis dedupe contract would need rework.
+
 ### Session 2026-10-17
 
 - Q: Are T_ keys a workaround studio should normalise away on import? → A: No (Matthew). A T_ key is a deliberate, first-class idiom: a touch-only key definition, used whenever the author wants to overwrite an entire key and all its modifier states with something different. Once a character is being redefined, continuing to link the touch key to a physical K_ key does not make sense.
