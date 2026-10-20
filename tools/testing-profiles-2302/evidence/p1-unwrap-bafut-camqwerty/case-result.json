@@ -1,0 +1,6 @@
+{
+  "id": "p1-unwrap-bafut-camqwerty",
+  "reconstructedFromLogs": false,
+  "note": "Attempted twice. Attempt 1 (lane B, 23:29 UTC) reached the attribution step and failed at track-copy when a survey-advance click threw on post-click navigation wait (verified live at the time; body excerpt showed Author & copyright screen). A later queue start cleaned the evidence dir and the environment died before any phase completed, so no phase files survive.",
+  "phases": {}
+}

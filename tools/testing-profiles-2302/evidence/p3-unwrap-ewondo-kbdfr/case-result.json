@@ -1,0 +1,63 @@
+{
+  "case": {
+    "id": "p3-unwrap-ewondo-kbdfr",
+    "profile": 3,
+    "backspace": "unwrap",
+    "backspaceOnDiagonal": false,
+    "inputOrder": "postfix",
+    "outputForm": "ready-made",
+    "lang": "ewondo",
+    "base": "basic_kbdfr",
+    "english": "Ewondo",
+    "autonym": "Ewondo",
+    "code": "ewo",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "round": 2,
+  "build": "ed251e1b (origin/main, PR #2312 merged)",
+  "startedAt": "2026-10-20T06:32:39.806Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        },
+        {
+          "name": "pick-base",
+          "ok": true,
+          "via": "card"
+        }
+      ],
+      "errors": [
+        "locator.waitFor: Target crashed \nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
+      ],
+      "failedAt": "pick-base",
+      "bodyExcerpt": ""
+    }
+  },
+  "finishedAt": "2026-10-20T06:36:11.089Z"
+}
