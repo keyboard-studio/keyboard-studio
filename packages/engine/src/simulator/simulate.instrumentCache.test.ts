@@ -75,15 +75,19 @@ describe("simulate() — instrumented-script cache (#2313)", () => {
   });
 
   it("keeps both scripts correct when two compiled keyboards alternate (round-trip pattern)", () => {
+    // Warm BOTH scripts inside this test, so it is self-contained and
+    // passes standalone / under shuffling — not only after the test above.
+    simulate(deadkey, [key("K_QUOTE"), key("K_A")]);
+    simulate(firedrule, [key("K_A")]);
     const before = instrumentSpy.mock.calls.length;
     const dk1 = simulate(deadkey, [key("K_QUOTE"), key("K_A")]);
     const fr1 = simulate(firedrule, [key("K_F")]);
     const dk2 = simulate(deadkey, [key("K_QUOTE"), key("K_E")]);
     const fr2 = simulate(firedrule, [key("K_A")]);
-    // At most one NEW instrumentation across the four calls (deadkey_acute's
-    // first use); the firedrule script is already warm from the test above,
-    // and alternation must not evict-and-reinstrument either script.
-    expect(instrumentSpy.mock.calls.length - before).toBeLessThanOrEqual(1);
+    // No NEW instrumentation across the four calls: both scripts were
+    // warmed by the warm-up calls in this test, and alternation must not
+    // evict-and-reinstrument either script.
+    expect(instrumentSpy.mock.calls.length - before).toBe(0);
     expect(dk1.finalOutput).toBe("á");
     expect(dk2.finalOutput).toBe("é");
     expect(fr1.trace[0]!.firedRule).toMatchObject({ group: "second", ruleIndex: 0 });
