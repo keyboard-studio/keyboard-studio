@@ -80,7 +80,12 @@ md += "Driver: playwright-cli (named session per case) + run-code phase snippets
 md += "Status counts: " + Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ") + " of " + rows.length + ".\n\n";
 md += "| Case | Profile | Backspace | Base | Status | Furthest | Evidence |\n|---|---|---|---|---|---|---|\n";
 for (const r of rows) {
-  md += `| ${r.id} | P${r.c.profile} (${r.c.inputOrder}/${r.c.outputForm === "ready-made" ? "NFC" : "NFD"}) | ${r.c.backspace}${r.c.backspaceOnDiagonal ? "" : " (off-diag)"} | ${r.c.base} | ${r.status} | ${r.ev ? r.ev.furthest : "not-attempted"} | [evidence/${r.id}/](evidence/${r.id}/) |\n`;
+  // Round-1 evidence is stored as flat files (round1/evidence/<id>.case-result.json),
+  // not directories — link the flat file when it exists, render — otherwise.
+  const evCell = existsSync(path.join(root, "round1", "evidence", `${r.id}.case-result.json`))
+    ? `[evidence/${r.id}.case-result.json](evidence/${r.id}.case-result.json)`
+    : "—";
+  md += `| ${r.id} | P${r.c.profile} (${r.c.inputOrder}/${r.c.outputForm === "ready-made" ? "NFC" : "NFD"}) | ${r.c.backspace}${r.c.backspaceOnDiagonal ? "" : " (off-diag)"} | ${r.c.base} | ${r.status} | ${r.ev ? r.ev.furthest : "not-attempted"} | ${evCell} |\n`;
 }
 md += "\nPer-case detail lives in `results.json` and each case's `evidence/<id>/case-result.json` (phase JSON + CLI snapshots + logs).\n";
 writeFileSync(path.join(root, "results.md"), md);
