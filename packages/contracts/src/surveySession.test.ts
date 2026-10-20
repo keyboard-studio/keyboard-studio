@@ -362,6 +362,7 @@ describe("mergePhaseResults() — alphabet + marksWorklist (spec 071)", () => {
     expect("alphabet" in session).toBe(false);
     expect("marksWorklist" in session).toBe(false);
     expect("marksOutputForm" in session).toBe(false);
+    expect("marksBackspace" in session).toBe(false);
   });
 
   it("merges alphabets store-wise across phases, deduped, first-appearance order", () => {
@@ -519,6 +520,17 @@ describe("mergePhaseResults() — alphabet + marksWorklist (spec 071)", () => {
     ];
     const session = mergePhaseResults({}, phases);
     expect(session.marksOutputForm).toBe("base-plus-mark");
+  });
+
+  it("marksBackspace is last-wins across phases, independent of marksOutputForm (#2302)", () => {
+    const phases: SurveyPhaseResult[] = [
+      { phase: "B", answers: [], marksOutputForm: "ready-made", marksBackspace: "whole-stack" },
+      { phase: "C", answers: [], marksBackspace: "peel" },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.marksBackspace).toBe("peel");
+    // A later phase carrying no backspace answer does not clear an earlier one.
+    expect(session.marksOutputForm).toBe("ready-made");
   });
 });
 

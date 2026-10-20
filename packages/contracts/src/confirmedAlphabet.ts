@@ -98,6 +98,27 @@ export interface BlockedCombination {
 export type OutputForm = "ready-made" | "base-plus-mark";
 
 /**
+ * The S4 backspace decision (issue #2302; spec 071 amendment 2026-10-19):
+ * what one backspace press does to a marked letter, recorded as its OWN
+ * whole-keyboard answer alongside {@link OutputForm} — interrelated with
+ * composition (the proposal follows it) yet independent (either behaviour
+ * is choosable under either form; the off-pairings are realised by
+ * generated rules, "extra code" in Matthew's model):
+ *
+ * - `"peel"` — backspace removes one mark at a time, stepping the letter
+ *   down to its plain base before clearing it. Native under
+ *   `"base-plus-mark"` output; generated (stepwise unwrap rules) under
+ *   `"ready-made"`.
+ * - `"whole-stack"` — backspace clears the letter and all its marks in one
+ *   press. Native under `"ready-made"` output; generated (whole-stack
+ *   deletion rules) under `"base-plus-mark"`.
+ *
+ * Canonical home is here, beside `OutputForm`, for the same reason: the
+ * engine's policy module owns the decision LOGIC, not the type.
+ */
+export type BackspaceBehaviour = "peel" | "whole-stack";
+
+/**
  * The classification the marks series hands the mechanism gallery: every
  * relevant unit in exactly one group. Empty on a skipped series (no marks).
  */

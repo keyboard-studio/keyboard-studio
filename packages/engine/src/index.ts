@@ -555,11 +555,15 @@ export type {
 } from "./marks/attachment-proposals.js";
 export {
   resolveOutputFormProposal,
+  resolveBackspaceProposal,
+  nativeBackspaceBehaviour,
   hasDecidablePairs,
   normalizationFormForOutputForm,
   outputStringForStack,
 } from "./marks/output-form-policy.js";
 export type {
+  BackspaceBehaviour,
+  BackspaceProposal,
   OutputForm,
   OutputFormProposal,
 } from "./marks/output-form-policy.js";
@@ -619,6 +623,7 @@ export {
   MARKS_GUARD_GROUP,
   MARKS_UNWRAP_FROM_STORE,
   MARKS_UNWRAP_TO_STORE,
+  MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 

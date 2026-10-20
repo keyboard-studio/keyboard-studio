@@ -38,6 +38,54 @@
 - FR-022 (mark-normalization uniformity validator, `KM_LINT_MARK_NORMALIZATION_UNIFORM`, criteria row 18.13) was retired 2026-07-23. It is absent from `packages/engine/src/validator/`; catalog stays without it (mentioned only in criteria-summary.md history).
 - Retired ids `pb_accent_marks_gate`, `pb_diacritic_select`, `pb_mark_style`, `pb_capitals_marks`, `pb_stacking_marks` no longer appear in flow or registry code; they remain only as prose in some `content/facets/**` files and `content/journeys/bafut-end-to-end.yaml`, which are stale text.
 
+## Amendment 2026-10-19 — backspace is its own axis (issue #2302)
+
+Directed by Matthew (2026-10-19): "Input order, output composition, and
+backspace are all interrelated, yet independent. Consistent options:
+Letter+Affix → NFD → Backspace Peel; Affix/deadkey → NFC → Backspace
+Stack. However, Keyman can mix and match with extra code."
+
+This continues the archived spec's numbering. It supersedes the reading
+under which backspace behaviour was a mere consequence of the FR-013
+output-form answer (the framing PR #2298, for issue #2297, left in
+place): the behaviour is now a recorded answer in its own right.
+
+- **FR-027**: The system MUST record a whole-keyboard backspace answer
+  (`peel` — one mark at a time — or `whole-stack` — the letter and all
+  its marks in one press) alongside the output-form answer, as its own
+  survey answer (`marks_output_form.backspace`), phase-result field
+  (`marksBackspace`), and session field. It is an author answer:
+  prefilled by proposal, confirmable, overridable.
+- **FR-028**: The backspace proposal MUST follow the chosen output form
+  — base-plus-mark proposes `peel`, ready-made proposes `whole-stack`
+  (the consistent pairings) — and MUST be presented as a suggestion at
+  the output-form station, under its own heading ("What should backspace
+  do to an accented letter?", the #1791 wording), with either behaviour
+  choosable under either form. Changing the composition answer
+  re-proposes the backspace answer (spec 079 evidence semantics).
+- **FR-029**: The produced keyboard MUST realise the recorded pairing:
+  base-plus-mark + `peel` and ready-made + `whole-stack` are native (no
+  generated rules); ready-made + `peel` generates the stepwise unwrap
+  (US8's machinery, now gated on the answer rather than firing on the
+  form alone); base-plus-mark + `whole-stack` generates whole-stack
+  deletion rules — one per reachable attested stack and each emitted
+  prefix, longest first, output `nul` — the R7 family this AS-BUILT
+  flagged as net-new IR rule generation. Plain base letters are never
+  given a backspace rule.
+- **FR-030**: The station's backspace preview (FR-017's consequence
+  demo) MUST be derived from the recorded backspace answer applied to
+  the chosen form's emitted text, never from the form alone. (Before
+  this amendment the preview stated ready-made backspace as whole-letter
+  clear while the always-on unwrap generation made produced keyboards
+  peel — the contradiction the #2302 walk surfaced.)
+
+Behaviour change on landing: an author who takes the defaults now gets
+the consistent pairing — under ready-made that means produced keyboards
+STOP peeling by default (before this amendment the unwrap fired
+unconditionally). Keyboards already generated are unaffected until
+regenerated. Completions recorded before the answer existed apply with
+the historical default (`peel`).
+
 ## Follow-ups and open issues
 - Stale references to the retired question ids: content/facets/orth/diacritic-density.yaml, content/facets/orth/mark-composition-posture.yaml, content/facets/source/caps-handling.yaml, content/facets/source/encoding.yaml, content/facets/source/normalization-posture.yaml, content/journeys/bafut-end-to-end.yaml (for km-doc / content team).
 - Per-class mental-model grouping heuristics are calibration work; thresholds are named constants.

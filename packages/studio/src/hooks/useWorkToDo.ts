@@ -123,6 +123,7 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
       treatmentPrefills,
       multiMarkStacks,
       postureId,
+      outputForm: marksStepAnswers?.answers["marks_output_form.form"]?.value as string | undefined,
       savedAnswers: marksStepAnswers?.answers ?? EMPTY_ANSWERS,
       lastRecorded: marksStepAnswers?.lastRecorded ?? EMPTY_LAST_RECORDED,
     });
@@ -267,6 +268,7 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
       treatmentPrefills,
       multiMarkStacks,
       postureId,
+      outputForm: marksStepAnswers?.answers["marks_output_form.form"]?.value as string | undefined,
       savedAnswers: marksStepAnswers?.answers ?? EMPTY_ANSWERS,
       lastRecorded: marksStepAnswers?.lastRecorded ?? EMPTY_LAST_RECORDED,
     });

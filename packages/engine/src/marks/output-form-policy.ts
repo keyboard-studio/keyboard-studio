@@ -28,13 +28,17 @@
 // same reason.)
 
 import type { PosturePair } from "./nfc-posture-of-inventory.js";
-import type { MarkInputOrder, OutputForm } from "@keyboard-studio/contracts";
+import type {
+  BackspaceBehaviour,
+  MarkInputOrder,
+  OutputForm,
+} from "@keyboard-studio/contracts";
 import type { CharNormalizationForm } from "../character-discovery/suggestMissing.js";
 
 // Canonical declaration lives in contracts (confirmedAlphabet.ts) — engine
 // re-exports rather than declaring a divergent copy (contracts is the
 // dependency root and cannot import engine's type back).
-export type { OutputForm };
+export type { BackspaceBehaviour, OutputForm };
 
 /**
  * Maps the chosen whole-keyboard output form to the Unicode normalization
@@ -140,4 +144,60 @@ export function resolveOutputFormProposal(
  */
 export function hasDecidablePairs(posture: PosturePair[]): boolean {
   return posture.length > 0;
+}
+
+export interface BackspaceProposal {
+  /** The suggested behaviour — a proposal (Art. X), never a silent derivation. */
+  behaviour: BackspaceBehaviour;
+  /** Plain-language reason shown with the proposal (consequence-led, no jargon). */
+  explanation: string;
+}
+
+/**
+ * Resolve the backspace SUGGESTION from the author's CHOSEN output form
+ * (issue #2302; Matthew's model, 2026-10-19: input order, output
+ * composition and backspace are "all interrelated, yet independent").
+ *
+ * The consistent pairings are the proposal: base-plus-mark output pairs
+ * with `peel` (the letter and its marks are separate characters, so a
+ * press can take one mark off), ready-made output pairs with
+ * `whole-stack` (the letter is one character, so a press naturally clears
+ * it whole). The proposal FOLLOWS the composition answer — it is derived
+ * from nothing else — and it is a suggestion only: the author may
+ * override to the other behaviour under either form, and the off-pairings
+ * are realised by generated rules (the stepwise unwrap under ready-made;
+ * whole-stack deletion under base-plus-mark — pattern-apply/mark-guards).
+ */
+export function resolveBackspaceProposal(outputForm: OutputForm): BackspaceProposal {
+  if (outputForm === "base-plus-mark") {
+    return {
+      behaviour: "peel",
+      explanation:
+        "Your keyboard sends the letter and its mark as separate characters, " +
+        "so a backspace press can take the mark off first — we suggest " +
+        "backspace removes one mark at a time. You can choose the whole " +
+        "letter at once instead: your keyboard can add the extra rules " +
+        "that clear a letter and all its marks in a single press.",
+    };
+  }
+  return {
+    behaviour: "whole-stack",
+    explanation:
+      "Your keyboard sends each accented letter as one single character, " +
+      "so backspace naturally removes the whole letter at once — we " +
+      "suggest it does exactly that. You can choose one mark at a time " +
+      "instead: your keyboard can add the extra rules that step a letter " +
+      "down mark by mark before clearing it.",
+  };
+}
+
+/**
+ * The behaviour a form produces with NO generated rules at all — what
+ * backspace does to the emitted text by construction. `peel` under
+ * base-plus-mark (one emitted code point per press), `whole-stack` under
+ * ready-made (the single emitted character clears whole). The other
+ * pairing under each form is the one generation must supply.
+ */
+export function nativeBackspaceBehaviour(outputForm: OutputForm): BackspaceBehaviour {
+  return outputForm === "base-plus-mark" ? "peel" : "whole-stack";
 }

@@ -27,6 +27,7 @@ import type { ReproposalReason, SavedAnswer } from "../../steps/answerTypes.ts";
 import {
   hasChar,
   marksAttachmentKey,
+  marksBackspaceKey,
   marksClassTreatmentKey,
   marksMarkTreatmentKey,
   marksOutputFormKey,
@@ -123,6 +124,14 @@ export interface MarksFlagInput {
   readonly treatmentPrefills: readonly MarkTreatmentPrefill[];
   readonly multiMarkStacks: readonly AttestedStack[];
   readonly postureId: string;
+  /**
+   * The current output-form value the backspace answer's evidence key is
+   * derived from (#2302: its proposal follows the chosen form). Optional —
+   * a caller that cannot determine the current form (a badge computation
+   * with no recorded form answer and no completed session value) skips
+   * the backspace flag rather than guessing a key.
+   */
+  readonly outputForm?: string | undefined;
   readonly savedAnswers: Readonly<Record<string, SavedAnswer>>;
   /** `stepAnswers.lastRecorded` — which screens have had at least one Next. */
   readonly lastRecorded: Readonly<Record<string, string>>;
@@ -241,6 +250,17 @@ export function deriveMarksFlags(input: MarksFlagInput): FlaggedMarksAnswer[] {
   {
     const answerId = "marks_output_form.form";
     const key = marksOutputFormKey(postureId);
+    considerFlag(out, answerId, "marks_output_form", savedAnswers[answerId], key, lastRecorded, () => ({
+      code: "evidence-added",
+      subject: "the marks in your alphabet",
+      sourceStepId: SOURCE_STEP_ID,
+    }));
+  }
+
+  // --- backspace (#2302: its evidence is the chosen form + posture) ---
+  if (input.outputForm !== undefined) {
+    const answerId = "marks_output_form.backspace";
+    const key = marksBackspaceKey(input.outputForm, postureId);
     considerFlag(out, answerId, "marks_output_form", savedAnswers[answerId], key, lastRecorded, () => ({
       code: "evidence-added",
       subject: "the marks in your alphabet",

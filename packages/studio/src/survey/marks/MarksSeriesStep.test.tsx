@@ -11,6 +11,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import type { ConfirmedAlphabet, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { computeMarksGate } from "./MarksSeriesStep.tsx";
+import { backspaceStepsForBehaviour } from "./OutputFormStation.tsx";
 import { MarksStepHost } from "./MarksStepHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
@@ -509,8 +510,10 @@ describe("MarksSeriesStep — S4 output-form station (#2297)", () => {
     reachOutputForm();
     const station = screen.getByTestId("marks-output-form");
     expect(station.textContent).toContain("what should your keyboard send");
-    // Always an open choice: two radios, however the posture table looks.
-    expect(station.querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    // Always an open choice: two composition radios, however the posture
+    // table looks. (The station also carries the backspace question's two
+    // radios — scoped by name, those are asserted in the #2302 describe.)
+    expect(station.querySelectorAll('input[name="marks-output-form"]')).toHaveLength(2);
     // The author's own combination, both ways: é as one character vs e + mark.
     expect(screen.getByTestId("output-form-codepoints-ready-made").textContent).toContain("U+00E9");
     expect(screen.getByTestId("output-form-codepoints-base-plus-mark").textContent).toContain("U+0065");
@@ -537,13 +540,18 @@ describe("MarksSeriesStep — S4 output-form station (#2297)", () => {
     );
   });
 
-  it("shows the step-by-step backspace preview for BOTH options (consequence, not typing demo)", () => {
+  it("shows ONE step-by-step backspace preview, in the backspace question (consequence, not typing demo)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
-    expect(screen.getAllByTestId("backspace-preview")).toHaveLength(2);
+    // #2302: the preview keys off the recorded backspace answer, so there
+    // is exactly one — under the backspace question, not one per
+    // composition option (the per-option pair stated each form's NATIVE
+    // behaviour as if it were the behaviour, which was the contradiction).
+    expect(screen.getAllByTestId("backspace-preview")).toHaveLength(1);
+    expect(screen.getByTestId("marks-backspace").contains(screen.getByTestId("backspace-preview"))).toBe(true);
   });
 
   it("ready-made stays choosable when a pair has no ready-made form — the fallback is a note, not a ban", () => {
@@ -552,8 +560,10 @@ describe("MarksSeriesStep — S4 output-form station (#2297)", () => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
-    // Two radios even here: the retired FR-014 forcing offered none.
-    expect(screen.getByTestId("marks-output-form").querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    // Two composition radios even here: the retired FR-014 forcing offered none.
+    expect(
+      screen.getByTestId("marks-output-form").querySelectorAll('input[name="marks-output-form"]'),
+    ).toHaveLength(2);
     fireEvent.click(
       screen.getByLabelText(/Send each accented letter as one single ready-made character/),
     );
@@ -1024,14 +1034,14 @@ describe("MarksSeriesStep — S4 open choice (#2297)", () => {
     });
     reachStation("marks-output-form");
     const station = screen.getByTestId("marks-output-form");
-    const radios = station.querySelectorAll('input[type="radio"]');
+    const radios = station.querySelectorAll('input[name="marks-output-form"]');
     expect(radios).toHaveLength(2);
     // Suggested (base-plus-mark, from the postfix order) listed first + tagged.
     expect(station.textContent).toContain("(suggested)");
     const labels = station.querySelectorAll("label");
     expect(labels[0]?.textContent).toContain("Send the letter and its mark as separate characters");
-    // Both options carry a backspace preview.
-    expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(2);
+    // One backspace preview (#2302), under the backspace question.
+    expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(1);
     // SC-005 holds on the open-choice rendering too.
     expect(station.textContent).not.toMatch(/unicode/i);
     expect(station.textContent).not.toMatch(/normali[sz]/i);
@@ -1098,7 +1108,7 @@ describe("MarksSeriesStep — S4 open choice (#2297)", () => {
 
     // Still an open choice with ready-made among the radios (not a notice).
     const station = screen.getByTestId("marks-output-form");
-    expect(station.querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    expect(station.querySelectorAll('input[name="marks-output-form"]')).toHaveLength(2);
     // Choose ready-made again: it sticks, and the fallback is a note.
     fireEvent.click(
       screen.getByLabelText(/Send each accented letter as one single ready-made character/),
@@ -1111,6 +1121,133 @@ describe("MarksSeriesStep — S4 open choice (#2297)", () => {
     expect(screen.getByTestId("output-form-fallback-note").textContent).toContain(
       "no single ready-made character",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S4 backspace question (#2302: its own axis — interrelated with
+// composition, yet independent; the suggestion follows composition)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — S4 backspace question (#2302)", () => {
+  it("backspaceStepsForBehaviour: the sequence is the ANSWER's, under either form", () => {
+    const pair = { stack: { base: "e", marks: [ACUTE] }, hasReadyMadeForm: true };
+    // Peel steps the letter down mark by mark under BOTH forms.
+    expect(backspaceStepsForBehaviour(pair, "ready-made", "peel")).toEqual(["é", "e", ""]);
+    expect(backspaceStepsForBehaviour(pair, "base-plus-mark", "peel")).toEqual(["é", "e", ""]);
+    // Whole-stack clears the emitted letter in one press under BOTH forms.
+    expect(backspaceStepsForBehaviour(pair, "ready-made", "whole-stack")).toEqual(["é", ""]);
+    expect(backspaceStepsForBehaviour(pair, "base-plus-mark", "whole-stack")).toEqual(["é", ""]);
+  });
+
+  function reachOutputForm(): void {
+    fireEvent.click(screen.getByTestId("marks-continue")); // past S1
+  }
+
+  function backspaceRadio(label: RegExp): HTMLInputElement {
+    return screen.getByLabelText(label) as HTMLInputElement;
+  }
+
+  /** ⌫ separators in the preview = steps − 1: peel of é shows 2, whole-stack 1. */
+  function previewSeparators(): number {
+    return (screen.getByTestId("backspace-preview").textContent?.match(/⌫/g) ?? []).length;
+  }
+
+  it("asks the backspace question as its own headed question, in the as-was (#1791) wording", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    const backspaceSection = screen.getByTestId("marks-backspace");
+    expect(backspaceSection.textContent).toContain("What should backspace do to an accented letter?");
+    expect(backspaceSection.textContent).toContain(
+      "Backspace removes one mark at a time (letter and mark kept separate)",
+    );
+    expect(backspaceSection.textContent).toContain(
+      "Backspace removes the whole letter at once (one ready-made unit)",
+    );
+    // SC-005 holds for the backspace question too.
+    expect(backspaceSection.textContent).not.toMatch(/unicode/i);
+    expect(backspaceSection.textContent).not.toMatch(/normali[sz]/i);
+  });
+
+  it("suggests the behaviour that FOLLOWS the composition answer, tagged and listed first", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    // Default composition is base-plus-mark (postfix suggestion), so the
+    // backspace suggestion is peel.
+    const peel = backspaceRadio(/Backspace removes one mark at a time/);
+    expect(peel.checked).toBe(true);
+    const backspaceLabels = screen.getByTestId("marks-backspace").querySelectorAll("label");
+    expect(backspaceLabels[0]?.textContent).toContain("Backspace removes one mark at a time");
+    expect(backspaceLabels[0]?.textContent).toContain("recommended");
+    // Follow: change the composition answer and the (unsaved) backspace
+    // answer follows it to whole-stack.
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    expect(backspaceRadio(/Backspace removes the whole letter at once/).checked).toBe(true);
+    expect(backspaceRadio(/Backspace removes one mark at a time/).checked).toBe(false);
+  });
+
+  it("the preview keys off the BACKSPACE answer, not the form — the override peels under ready-made", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    // base-plus-mark + peel (the follow pairing): é → e → (empty).
+    expect(previewSeparators()).toBe(2);
+    // Switch composition to ready-made; backspace follows to whole-stack:
+    // é → (empty) in one press.
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    expect(previewSeparators()).toBe(1);
+    // OVERRIDE backspace to peel under the ready-made form: the preview
+    // peels again — before #2302 this state was unrepresentable and the
+    // preview (derived from the form) would have kept claiming one press.
+    fireEvent.click(screen.getByLabelText(/Backspace removes one mark at a time/));
+    expect(backspaceRadio(/Backspace removes one mark at a time/).checked).toBe(true);
+    expect(previewSeparators()).toBe(2);
+  });
+
+  it("records the backspace answer on the phase result and in the answers, independently of the form", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    // Composition: ready-made (override of the postfix suggestion).
+    // Backspace: peel (override of the follow suggestion).
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    fireEvent.click(screen.getByLabelText(/Backspace removes one mark at a time/));
+    // Walk the remaining stations to completion (the guard station, when
+    // it renders, needs its option picked before Continue completes).
+    for (let i = 0; i < 8 && onComplete.mock.calls.length === 0; i++) {
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
+      const next = screen.queryByTestId("marks-continue");
+      if (next === null) break;
+      fireEvent.click(next);
+    }
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(result.marksOutputForm).toBe("ready-made");
+    expect(result.marksBackspace).toBe("peel");
+    expect(result.answers).toContainEqual({
+      questionId: "marks.marks_output_form.backspace",
+      answerType: "select",
+      value: "peel",
+    });
   });
 });
 
@@ -1340,6 +1477,8 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     expect(outputScreen).toBe("marks_output_form");
     expect(outputAnswers).toEqual([
       { questionId: "marks.marks_output_form.form", answerType: "select", value: expect.any(String) },
+      // #2302: the backspace answer rides the same station's record.
+      { questionId: "marks.marks_output_form.backspace", answerType: "select", value: expect.any(String) },
     ]);
 
     // S5 Next — stacking is no longer final (spec 104's guard station

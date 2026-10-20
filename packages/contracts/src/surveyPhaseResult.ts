@@ -4,7 +4,12 @@ import type { AnswerType } from "./pattern";
 import type { DiscoveryAxisVector } from "./axes";
 import type { KeyboardIdentity } from "./keyboardIdentity";
 import type { MechanismAssignment } from "./assignmentMap";
-import type { ConfirmedAlphabet, OutputForm, PlacementWorklist } from "./confirmedAlphabet";
+import type {
+  BackspaceBehaviour,
+  ConfirmedAlphabet,
+  OutputForm,
+  PlacementWorklist,
+} from "./confirmedAlphabet";
 
 /**
  * Survey phase identifiers per spec §8.
@@ -142,6 +147,18 @@ export interface SurveyPhaseResult {
    * output-form station has been confirmed.
    */
   marksOutputForm?: OutputForm;
+  /**
+   * The S4 backspace decision (issue #2302): "peel" (one mark at a time) or
+   * "whole-stack" (the letter and all its marks in one press), recorded as
+   * its own answer alongside {@link SurveyPhaseResult.marksOutputForm} —
+   * interrelated with composition yet independent of it (either behaviour
+   * is choosable under either form). **Additive** — last phase carrying
+   * one wins in {@link mergePhaseResults} (mirrors `marksOutputForm`).
+   * `undefined` for phases that do not run the series, for a series
+   * completed before this answer existed, or before the output-form
+   * station has been confirmed.
+   */
+  marksBackspace?: BackspaceBehaviour;
   /**
    * Base-keyboard characters the author chose to KEEP even though the
    * orthography does not use them — the loanword / email-address / web-address

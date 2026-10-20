@@ -39,6 +39,7 @@ import type { AxisFill, AxisFillSource } from "./axisFill";
 import type {
   AttachmentState,
   AttestedStack,
+  BackspaceBehaviour,
   BlockedCombination,
   ConfirmedAlphabet,
   DeclaredRole,
@@ -641,6 +642,11 @@ export const PlacementWorklistSchema = z.object({
 // SurveyPhaseResult/SurveySession as `marksOutputForm`.
 export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
 
+// The S4 backspace decision (issue #2302; spec 071 amendment 2026-10-19):
+// its own axis alongside the output form. Carried on
+// SurveyPhaseResult/SurveySession as `marksBackspace`.
+export const BackspaceBehaviourSchema = z.enum(["peel", "whole-stack"]);
+
 // The context-tolerance station's decision (spec 078). Carried on
 // SurveyPhaseResult/SurveySession as `marksContextTolerance`.
 export const MarksContextToleranceDecisionSchema = z.object({
@@ -1058,6 +1064,9 @@ type _PlacementWorklistGuard = Expect<
   AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
 >;
 type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
+type _BackspaceBehaviourGuard = Expect<
+  AssignableTo<z.infer<typeof BackspaceBehaviourSchema>, BackspaceBehaviour>
+>;
 type _MarksContextToleranceDecisionGuard = Expect<
   AssignableTo<z.infer<typeof MarksContextToleranceDecisionSchema>, MarksContextToleranceDecision>
 >;
