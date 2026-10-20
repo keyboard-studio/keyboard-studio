@@ -1,0 +1,213 @@
+### Page
+- Page URL: http://localhost:5273/
+- Page Title: Keyboard Studio
+- Console: 35 errors, 13 warnings
+### Snapshot
+```yaml
+- generic [ref=f1e3]:
+  - link "Skip to step navigation" [ref=f1e4] [cursor=pointer]:
+    - /url: "#step-navigation"
+  - navigation "Studio navigation" [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: Keyboard Studio
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9]: Keyboard
+        - button "Keyboard Ewondo" [ref=f1e106] [cursor=pointer]:
+          - generic "Ewondo" [ref=f1e107]
+          - generic [aria-hidden] [ref=f1e15]: ▾
+    - generic [ref=f1e16]:
+      - link "Studio" [ref=f1e17] [cursor=pointer]:
+        - /url: "#survey"
+      - link "Compare" [ref=f1e18] [cursor=pointer]:
+        - /url: "#preview"
+      - link "Output" [ref=f1e19] [cursor=pointer]:
+        - /url: "#output"
+      - link "Decisions" [ref=f1e20] [cursor=pointer]:
+        - /url: "#trail"
+      - link "Criteria" [ref=f1e21] [cursor=pointer]:
+        - /url: "#criteria"
+      - link "Flow Map" [ref=f1e22] [cursor=pointer]:
+        - /url: "#flowmap"
+    - generic [ref=f1e23]:
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]: Font for characters
+        - button "Font for characters" [ref=f1e27] [cursor=pointer]:
+          - generic [ref=f1e28]: Noto Sans
+          - generic [aria-hidden] [ref=f1e29]: ▾
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]: Language
+        - button "Language" [ref=f1e33] [cursor=pointer]:
+          - generic [ref=f1e34]: English
+          - generic [aria-hidden] [ref=f1e35]: ▾
+      - generic [ref=f1e36]:
+        - generic [ref=f1e37]: Theme
+        - button "Theme" [ref=f1e38] [cursor=pointer]:
+          - generic [ref=f1e41]: Navy
+      - button "Sign in" [ref=f1e43] [cursor=pointer]
+      - 'button "Reset: start this keyboard over" [ref=f1e45] [cursor=pointer]': Reset
+  - navigation "Survey phase progress" [ref=f1e46]:
+    - list [ref=f1e47]:
+      - listitem [ref=f1e48]:
+        - generic [ref=f1e49]:
+          - generic [ref=f1e50]: A
+          - generic [ref=f1e51]: Survey
+          - generic [ref=f1e52]: completed
+      - listitem [ref=f1e54]:
+        - generic [ref=f1e55]:
+          - generic [ref=f1e56]: B
+          - generic [ref=f1e57]: Starting keyboard
+          - generic [ref=f1e58]: completed
+      - listitem [ref=f1e60]:
+        - generic [ref=f1e61]:
+          - generic [ref=f1e62]: C
+          - generic [ref=f1e63]: Characters
+          - generic [ref=f1e64]: completed
+      - listitem [ref=f1e66]:
+        - generic [ref=f1e67]:
+          - generic [ref=f1e68]: D
+          - generic [ref=f1e69]: Discard
+          - generic [ref=f1e70]: completed
+      - listitem [ref=f1e72]:
+        - generic [ref=f1e73]:
+          - generic [ref=f1e74]: E
+          - generic [ref=f1e75]: Enable
+          - generic [ref=f1e76]: current step
+      - listitem [ref=f1e78]:
+        - generic [ref=f1e79]:
+          - generic [ref=f1e80]: F
+          - generic [ref=f1e81]: Finalize
+          - generic [ref=f1e82]: not yet reached
+  - generic [ref=f1e3741]:
+    - heading "Choose your touch layout starting point" [level=1] [ref=f1e3742]
+    - paragraph [ref=f1e3743]: This choice seeds the mobile/touch layout. Individual characters can still be reviewed and adjusted afterward in the Touch Layout step.
+    - generic [ref=f1e3744]:
+      - generic [ref=f1e3746]:
+        - button "Import & adapt Keep the starting keyboard's shipped touch layout and carry your desktop work onto it." [pressed] [ref=f1e3747] [cursor=pointer]:
+          - generic [ref=f1e3748]: Import & adapt
+          - generic [ref=f1e3749]: Keep the starting keyboard's shipped touch layout and carry your desktop work onto it.
+        - button "Reseed from desktop Derive a fresh tablet layout from your desktop key assignments. Choosing this discards the starting keyboard's shipped phone/desktop touch platforms — only a tablet layout is produced." [ref=f1e3750] [cursor=pointer]:
+          - generic [ref=f1e3751]: Reseed from desktop
+          - generic [ref=f1e3752]: Derive a fresh tablet layout from your desktop key assignments. Choosing this discards the starting keyboard's shipped phone/desktop touch platforms — only a tablet layout is produced.
+      - generic [ref=f1e3754]:
+        - paragraph [ref=f1e3755]: Starting touch layout
+        - paragraph [ref=f1e3756]: "Ships: tablet (showing \"tablet\" default layer)"
+        - iframe [active] [ref=f1e3759]:
+          - generic [ref=f6e1]:
+            - textbox "Pick a keyboard, then type here..." [active] [ref=f6e2]
+            - generic [ref=f6e3]: "active: ewondo"
+            - generic [ref=f6e9]:
+              - generic [ref=f6e10]:
+                - generic [ref=f6e11]: ◌̀
+                - generic [ref=f6e13]: ◌̄
+                - generic [ref=f6e15]: ◌́
+                - generic [ref=f6e17]: ◌̌
+                - generic [ref=f6e19]: ◌̂
+                - generic [ref=f6e21]: ◌̃
+                - generic [ref=f6e23]: ◌̈
+                - generic [ref=f6e25]: ◌̧
+                - generic [ref=f6e28]:
+                  - text: "-"
+                  - generic [ref=f6e29]: •
+                - generic [ref=f6e30]: "!"
+                - generic [ref=f6e32]: 
+              - generic [ref=f6e34]:
+                - generic [ref=f6e36]:
+                  - text: a
+                  - generic [ref=f6e37]: •
+                - generic [ref=f6e38]: z
+                - generic [ref=f6e41]:
+                  - text: e
+                  - generic [ref=f6e42]: •
+                - generic [ref=f6e43]: r
+                - generic [ref=f6e46]:
+                  - text: t
+                  - generic [ref=f6e47]: •
+                - generic [ref=f6e49]:
+                  - text: "y"
+                  - generic [ref=f6e50]: •
+                - generic [ref=f6e52]:
+                  - text: u
+                  - generic [ref=f6e53]: •
+                - generic [ref=f6e55]:
+                  - text: i
+                  - generic [ref=f6e56]: •
+                - generic [ref=f6e58]:
+                  - text: o
+                  - generic [ref=f6e59]: •
+                - generic [ref=f6e61]:
+                  - text: p
+                  - generic [ref=f6e62]: •
+                - generic [ref=f6e63]: "'"
+              - generic [ref=f6e65]:
+                - generic [ref=f6e66]: q
+                - generic [ref=f6e68]: s
+                - generic [ref=f6e71]:
+                  - text: d
+                  - generic [ref=f6e72]: •
+                - generic [ref=f6e74]:
+                  - text: f
+                  - generic [ref=f6e75]: •
+                - generic [ref=f6e77]:
+                  - text: g
+                  - generic [ref=f6e78]: •
+                - generic [ref=f6e80]:
+                  - text: h
+                  - generic [ref=f6e81]: •
+                - generic [ref=f6e82]: j
+                - generic [ref=f6e84]: k
+                - generic [ref=f6e86]: l
+                - generic [ref=f6e88]: m
+                - generic [ref=f6e90]: "@"
+              - generic [ref=f6e92]:
+                - generic [ref=f6e93]: 
+                - generic [ref=f6e96]:
+                  - text: w
+                  - generic [ref=f6e97]: •
+                - generic [ref=f6e98]: x
+                - generic [ref=f6e100]: c
+                - generic [ref=f6e103]:
+                  - text: v
+                  - generic [ref=f6e104]: •
+                - generic [ref=f6e106]:
+                  - text: b
+                  - generic [ref=f6e107]: •
+                - generic [ref=f6e109]:
+                  - text: "n"
+                  - generic [ref=f6e110]: •
+                - generic [ref=f6e111]: "?"
+                - generic [ref=f6e113]: ","
+                - generic [ref=f6e115]: .
+                - generic [ref=f6e117]: 
+              - generic [ref=f6e119]:
+                - generic [ref=f6e120]: 
+                - generic [ref=f6e122]: 
+                - generic [ref=f6e124]: ewo - ewondo
+                - generic [ref=f6e126]: əŋɔ
+                - generic [ref=f6e128]: 
+        - paragraph [ref=f1e3760]: "[WARN] this layout has no phone platform."
+  - contentinfo "Project and progress" [ref=f1e101]:
+    - group "Step navigation" [ref=f1e3761]:
+      - button "Back to mechanisms" [ref=f1e3762] [cursor=pointer]: ← Back
+      - button "Confirm" [ref=f1e3763] [cursor=pointer]
+    - generic "Ewondo" [ref=f1e3680]: "Project: Ewondo"
+    - generic [ref=f1e3764]:
+      - button "Identity — completed" [ref=f1e3765] [cursor=pointer]
+      - button "Keyboard layout — completed" [ref=f1e3766] [cursor=pointer]
+      - button "Choose a starting keyboard — completed" [ref=f1e3767] [cursor=pointer]
+      - button "Copy or adapt — completed" [ref=f1e3768] [cursor=pointer]
+      - button "Author & copyright — partly answered" [ref=f1e3769] [cursor=pointer]
+      - button "Project name — completed" [ref=f1e3770] [cursor=pointer]
+      - button "Characters — completed" [ref=f1e3771] [cursor=pointer]
+      - button "Accents & marks — partly answered" [ref=f1e3772] [cursor=pointer]
+      - button "Punctuation — completed" [ref=f1e3773] [cursor=pointer]
+      - button "Invisible characters — completed" [ref=f1e3774] [cursor=pointer]
+      - button "Convenience letters — completed" [ref=f1e3775] [cursor=pointer]
+      - button "Carve — completed" [ref=f1e3776] [cursor=pointer]
+      - button "Deadkeys — completed" [ref=f1e3777] [cursor=pointer]
+      - button "Rules — completed" [ref=f1e3778] [cursor=pointer]
+      - 'button "Mechanisms — no answer yet — work waiting: 2 warnings to review" [ref=f1e3779] [cursor=pointer]'
+      - button "Touch seed — you are here" [ref=f1e3781]
+      - button "Touch layout — not yet reached" [ref=f1e3782] [cursor=pointer]
+      - button "Help & credits — not yet reached" [ref=f1e3783] [cursor=pointer]
+    - status
+```

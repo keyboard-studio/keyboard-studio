@@ -1,0 +1,115 @@
+### Page
+- Page URL: http://localhost:5273/
+- Page Title: Keyboard Studio
+- Console: 32 errors, 6 warnings
+### Snapshot
+```yaml
+- generic [ref=f1e3]:
+  - link "Skip to step navigation" [ref=f1e4] [cursor=pointer]:
+    - /url: "#step-navigation"
+  - navigation "Studio navigation" [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: Keyboard Studio
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9]: Keyboard
+        - button "Keyboard Ewondo" [ref=f1e106] [cursor=pointer]:
+          - generic "Ewondo" [ref=f1e107]
+          - generic [aria-hidden] [ref=f1e15]: ▾
+    - generic [ref=f1e16]:
+      - link "Studio" [ref=f1e17] [cursor=pointer]:
+        - /url: "#survey"
+      - link "Compare" [ref=f1e18] [cursor=pointer]:
+        - /url: "#preview"
+      - link "Output" [disabled] [ref=f1e19] [cursor=pointer]:
+        - /url: "#output"
+      - link "Decisions" [ref=f1e20] [cursor=pointer]:
+        - /url: "#trail"
+      - link "Criteria" [ref=f1e21] [cursor=pointer]:
+        - /url: "#criteria"
+      - link "Flow Map" [ref=f1e22] [cursor=pointer]:
+        - /url: "#flowmap"
+    - generic [ref=f1e23]:
+      - button "37 characters still need review – resume in the Mechanism Gallery" [ref=f1e2214] [cursor=pointer]
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]: Font for characters
+        - button "Font for characters" [ref=f1e27] [cursor=pointer]:
+          - generic [ref=f1e28]: Noto Sans
+          - generic [aria-hidden] [ref=f1e29]: ▾
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]: Language
+        - button "Language" [ref=f1e33] [cursor=pointer]:
+          - generic [ref=f1e34]: English
+          - generic [aria-hidden] [ref=f1e35]: ▾
+      - generic [ref=f1e36]:
+        - generic [ref=f1e37]: Theme
+        - button "Theme" [ref=f1e38] [cursor=pointer]:
+          - generic [ref=f1e41]: Navy
+      - button "Sign in" [ref=f1e43] [cursor=pointer]
+      - 'button "Reset: start this keyboard over" [ref=f1e45] [cursor=pointer]': Reset
+  - navigation "Survey phase progress" [ref=f1e46]:
+    - list [ref=f1e47]:
+      - listitem [ref=f1e48]:
+        - generic [ref=f1e49]:
+          - generic [ref=f1e50]: A
+          - generic [ref=f1e51]: Survey
+          - generic [ref=f1e52]: completed
+      - listitem [ref=f1e54]:
+        - generic [ref=f1e55]:
+          - generic [ref=f1e56]: B
+          - generic [ref=f1e57]: Starting keyboard
+          - generic [ref=f1e58]: completed
+      - listitem [ref=f1e60]:
+        - generic [ref=f1e61]:
+          - generic [ref=f1e62]: C
+          - generic [ref=f1e63]: Characters
+          - generic [ref=f1e64]: completed
+      - listitem [ref=f1e66]:
+        - generic [ref=f1e67]:
+          - generic [ref=f1e68]: D
+          - generic [ref=f1e69]: Discard
+          - generic [ref=f1e70]: completed
+      - listitem [ref=f1e72]:
+        - generic [ref=f1e73]:
+          - generic [ref=f1e74]: E
+          - generic [ref=f1e75]: Enable
+          - generic [ref=f1e76]: current step
+      - listitem [ref=f1e78]:
+        - generic [ref=f1e79]:
+          - generic [ref=f1e80]: F
+          - generic [ref=f1e81]: Finalize
+          - generic [ref=f1e82]: not yet reached
+  - generic [ref=f1e2218]:
+    - paragraph [ref=f1e2219]: Getting started · Desktop
+    - heading "Welcome to the Mechanism Gallery" [level=1] [ref=f1e2220]
+    - paragraph [ref=f1e2221]: This is where you build your keyboard. For each character your language needs that the starting keyboard doesn’t already have, you’ll choose how to type it on a desktop keyboard.
+    - list [ref=f1e2222]:
+      - listitem [ref=f1e2223]: You’ll go character by character through the list from your survey.
+      - listitem [ref=f1e2224]: Pick a method — use a dead key, swap a key, or use AltGr — or mark a character for later review if you’d rather come back to it.
+      - listitem [ref=f1e2225]: Need several keystrokes for one character? Pick “Type a sequence” and a small builder opens right here, in place of the preview.
+      - listitem [ref=f1e2226]: Phones and tablets come later, in the Touch gallery.
+  - contentinfo "Project and progress" [ref=f1e101]:
+    - group "Step navigation" [ref=f1e2227]:
+      - button "← Back" [ref=f1e2228] [cursor=pointer]
+      - button "Start the mechanism gallery" [ref=f1e2229] [cursor=pointer]: Get started →
+    - generic "Ewondo" [ref=f1e2190]: "Project: Ewondo"
+    - generic [ref=f1e2230]:
+      - button "Identity — completed" [ref=f1e2231] [cursor=pointer]
+      - button "Keyboard layout — completed" [ref=f1e2232] [cursor=pointer]
+      - button "Choose a starting keyboard — completed" [ref=f1e2233] [cursor=pointer]
+      - button "Copy or adapt — completed" [ref=f1e2234] [cursor=pointer]
+      - button "Author & copyright — partly answered" [ref=f1e2235] [cursor=pointer]
+      - button "Project name — completed" [ref=f1e2236] [cursor=pointer]
+      - button "Characters — completed" [ref=f1e2237] [cursor=pointer]
+      - button "Accents & marks — partly answered" [ref=f1e2238] [cursor=pointer]
+      - button "Punctuation — completed" [ref=f1e2239] [cursor=pointer]
+      - button "Invisible characters — completed" [ref=f1e2240] [cursor=pointer]
+      - button "Convenience letters — completed" [ref=f1e2241] [cursor=pointer]
+      - button "Carve — completed" [ref=f1e2242] [cursor=pointer]
+      - button "Deadkeys — completed" [ref=f1e2243] [cursor=pointer]
+      - button "Rules — completed" [ref=f1e2244] [cursor=pointer]
+      - 'button "Mechanisms — you are here — work waiting: assign a key — work waiting: 2 warnings to review" [ref=f1e2245]'
+      - button "Touch seed — not yet reached" [ref=f1e2247] [cursor=pointer]
+      - button "Touch layout — not yet reached" [ref=f1e2248] [cursor=pointer]
+      - button "Help & credits — not yet reached" [ref=f1e2249] [cursor=pointer]
+    - status
+```

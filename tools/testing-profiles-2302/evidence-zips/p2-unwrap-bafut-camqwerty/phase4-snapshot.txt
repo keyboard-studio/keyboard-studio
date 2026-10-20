@@ -1,0 +1,208 @@
+### Page
+- Page URL: http://localhost:5273/#output
+- Page Title: Keyboard Studio
+- Console: 35 errors, 10 warnings
+### Snapshot
+```yaml
+- generic [ref=f1e3]:
+  - link "Skip to step navigation" [ref=f1e4] [cursor=pointer]:
+    - /url: "#step-navigation"
+  - navigation "Studio navigation" [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: Keyboard Studio
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9]: Keyboard
+        - button "Keyboard Bafut" [ref=f1e106] [cursor=pointer]:
+          - generic "Bafut" [ref=f1e107]
+          - generic [aria-hidden] [ref=f1e15]: ▾
+    - generic [ref=f1e16]:
+      - link "Studio" [ref=f1e17] [cursor=pointer]:
+        - /url: "#survey"
+      - link "Compare" [ref=f1e18] [cursor=pointer]:
+        - /url: "#preview"
+      - link "Output" [ref=f1e19] [cursor=pointer]:
+        - /url: "#output"
+      - link "Decisions" [ref=f1e20] [cursor=pointer]:
+        - /url: "#trail"
+      - link "Criteria" [ref=f1e21] [cursor=pointer]:
+        - /url: "#criteria"
+      - link "Flow Map" [ref=f1e22] [cursor=pointer]:
+        - /url: "#flowmap"
+    - generic [ref=f1e23]:
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]: Font for characters
+        - button "Font for characters" [ref=f1e27] [cursor=pointer]:
+          - generic [ref=f1e28]: Noto Sans
+          - generic [aria-hidden] [ref=f1e29]: ▾
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]: Language
+        - button "Language" [ref=f1e33] [cursor=pointer]:
+          - generic [ref=f1e34]: English
+          - generic [aria-hidden] [ref=f1e35]: ▾
+      - generic [ref=f1e36]:
+        - generic [ref=f1e37]: Theme
+        - button "Theme" [ref=f1e38] [cursor=pointer]:
+          - generic [ref=f1e41]: Navy
+      - button "Sign in" [ref=f1e43] [cursor=pointer]
+  - generic [ref=f1e3562]:
+    - region "Keyboard details pane" [ref=f1e3563]:
+      - heading "Your keyboard" [level=1] [ref=f1e3564]
+      - paragraph [ref=f1e3565]: Check the details below, then download or submit your keyboard from the right.
+      - generic [ref=f1e3566]:
+        - heading "Built from" [level=2] [ref=f1e3567]
+        - generic [ref=f1e3568]:
+          - generic [ref=f1e3569]:
+            - term [ref=f1e3570]: Name
+            - definition [ref=f1e3571]: Cameroon QWERTY
+          - generic [ref=f1e3572]:
+            - term [ref=f1e3573]: Starting keyboard ID
+            - definition [ref=f1e3574]: sil_cameroon_qwerty
+          - generic [ref=f1e3575]:
+            - term [ref=f1e3576]: Script
+            - definition [ref=f1e3577]: Latn
+      - button "Change starting keyboard" [ref=f1e3578] [cursor=pointer]
+      - region "Name your keyboard" [ref=f1e3579]:
+        - generic [ref=f1e3581]:
+          - generic [ref=f1e3582]: Display name
+          - textbox "Display name" [ref=f1e3583]:
+            - /placeholder: e.g. Hausa (SIL)
+            - text: Bafut
+          - generic [ref=f1e3584]: Shown on the spacebar in the on-screen keyboard.
+        - generic [ref=f1e3585]:
+          - generic [ref=f1e3586]: Keyboard ID
+          - textbox "Keyboard ID" [ref=f1e3587]:
+            - /placeholder: e.g. ha_sil
+            - text: bafut
+          - generic [ref=f1e3588]: 1–255 chars; no spaces, parens, brackets, or commas. Used as the zip filename.
+      - 'button "Advanced: view source" [ref=f1e3590] [cursor=pointer]'
+    - separator "Resize panes" [ref=f1e3591]
+    - region "Output pane" [ref=f1e3592]:
+      - heading "Output" [level=2] [ref=f1e3593]
+      - paragraph [ref=f1e3594]: Review your finished keyboard and the checks below, then download it to install or submit it for publication.
+      - region "Revise a section" [ref=f1e3595]:
+        - button "Revise a section" [ref=f1e3596] [cursor=pointer]
+        - status
+      - button "Download keyboard bafut as an installable Keyman package" [ref=f1e3597] [cursor=pointer]: Download keyboard (.kmp)
+      - paragraph [ref=f1e3598]: Install it by double-clicking the downloaded file. Works with Keyman on Windows, macOS, Linux, Android, and iOS.
+      - button "Download keyboard bafut as zip" [ref=f1e3599] [cursor=pointer]: Download source .zip
+      - paragraph [ref=f1e3600]: The keyboard's source files, for editing in Keyman Developer or contributing upstream.
+      - region "Test builds" [ref=f1e3601]:
+        - button "Make a test build" [ref=f1e3602] [cursor=pointer]
+        - generic [ref=f1e3603]: Make test build 1, version 0.1, and download it
+        - paragraph [ref=f1e3604]: An installable package labelled with its build number, to share with testers before you publish.
+        - status
+      - status
+      - region "Documentation notes" [ref=f1e3605]:
+        - button "2 documentation notes Show notes" [ref=f1e3607] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e3608]: ▸
+          - generic [aria-hidden] [ref=f1e3609]: ⚠
+          - text: 2 documentation notes
+          - generic [ref=f1e3610]: Show notes
+      - region "Documentation that ships" [ref=f1e3611]:
+        - 'button "Documentation: 5 of six files still ship placeholder text." [expanded] [ref=f1e3612] [cursor=pointer]':
+          - generic [aria-hidden] [ref=f1e3613]: v
+        - list "Documentation files" [ref=f1e3615]:
+          - listitem [ref=f1e3616]:
+            - generic [ref=f1e3617]:
+              - text: Package README
+              - code [ref=f1e3618]: README.md
+            - generic [ref=f1e3619]:
+              - generic [ref=f1e3620]: derived
+              - generic [ref=f1e3621]: placeholder
+              - button "Go to Help & Tips to fill in Package README" [ref=f1e3622] [cursor=pointer]: Go to Help & Tips
+          - listitem [ref=f1e3623]:
+            - generic [ref=f1e3624]:
+              - text: Version history
+              - code [ref=f1e3625]: HISTORY.md
+            - generic [ref=f1e3626]:
+              - generic [ref=f1e3627]: derived
+              - generic [ref=f1e3628]: placeholder
+              - button "Go to Help & Tips to fill in Version history" [ref=f1e3629] [cursor=pointer]: Go to Help & Tips
+          - listitem [ref=f1e3630]:
+            - generic [ref=f1e3631]:
+              - text: License
+              - code [ref=f1e3632]: LICENSE.md
+            - generic [ref=f1e3633]: derived
+          - listitem [ref=f1e3635]:
+            - generic [ref=f1e3636]:
+              - text: Package details page
+              - code [ref=f1e3637]: source/readme.htm
+            - generic [ref=f1e3638]:
+              - generic [ref=f1e3639]: derived
+              - generic [ref=f1e3640]: placeholder
+              - button "Go to Help & Tips to fill in Package details page" [ref=f1e3641] [cursor=pointer]: Go to Help & Tips
+          - listitem [ref=f1e3642]:
+            - generic [ref=f1e3643]:
+              - text: Welcome page
+              - code [ref=f1e3644]: source/welcome/welcome.htm
+            - generic [ref=f1e3645]:
+              - generic [ref=f1e3646]: derived
+              - generic [ref=f1e3647]: placeholder
+              - button "Go to Help & Tips to fill in Welcome page" [ref=f1e3648] [cursor=pointer]: Go to Help & Tips
+            - radiogroup "Layout images" [ref=f1e3649]:
+              - generic [ref=f1e3650] [cursor=pointer]:
+                - radio "Keep starting keyboard images" [checked] [ref=f1e3651]
+                - text: Keep starting keyboard images
+              - generic [ref=f1e3652] [cursor=pointer]:
+                - radio "Regenerate layout charts" [ref=f1e3653]
+                - text: Regenerate layout charts
+          - listitem [ref=f1e3654]:
+            - generic [ref=f1e3655]:
+              - text: Online help page
+              - code [ref=f1e3656]: source/help/bafut.php
+            - generic [ref=f1e3657]:
+              - generic [ref=f1e3658]: derived
+              - generic [ref=f1e3659]: placeholder
+              - button "Go to Help & Tips to fill in Online help page" [ref=f1e3660] [cursor=pointer]: Go to Help & Tips
+      - region "Criteria summary" [ref=f1e3661]:
+        - generic [ref=f1e3662]: Criteria
+        - paragraph [ref=f1e3663]: 105 of 149 criteria resolved
+        - button "View criteria" [ref=f1e3664] [cursor=pointer]
+      - region "Submit to community repository" [ref=f1e3665]:
+        - paragraph [ref=f1e3667]: Provide your name and email for attribution, confirm the copyright statement, and submit. We handle the technical side.
+        - generic [ref=f1e3668]:
+          - generic [ref=f1e3669]: Your name (for attribution)
+          - textbox "Your name (for attribution)" [ref=f1e3670]:
+            - /placeholder: Your name
+        - generic [ref=f1e3671]:
+          - generic [ref=f1e3672]: Email address (for attribution)
+          - textbox "Email address (for attribution)" [ref=f1e3673]:
+            - /placeholder: you@example.com
+        - generic [ref=f1e3674]:
+          - checkbox "I confirm I am the copyright holder or am authorized to submit this keyboard to the community repository." [ref=f1e3675] [cursor=pointer]
+          - generic [ref=f1e3676] [cursor=pointer]: I confirm I am the copyright holder or am authorized to submit this keyboard to the community repository.
+        - generic [ref=f1e3677]:
+          - generic [ref=f1e3678]: Pull request description (generated from your checks — you can edit it)
+          - textbox "Pull request description (generated from your checks — you can edit it)" [ref=f1e3679]: "### Green — checks passed - [x] 1.1-no-files-outside-keyboard-folder: No files modified outside the keyboard's own folder - [x] 1.2-keyboard-under-release-or-experimental: Keyboard folder lives under `release/` or `experimental/` - [x] 1.3-keyboard-under-organizing-folder: Keyboard sits under an alphabetic or org-code organizing subfolder, not at the root of `release/`/`experimental/` - [x] 1.4-no-source-files-at-repo-root: No source files placed at the repository root - [x] 1.5-keyboard-id-not-already-used: The keyboard ID (folder name) is not already used in `experimental/`, `legacy/`, or `release/` - [x] 1.6-id-does-not-contain-keyboard: Keyboard ID, folder name, and display name do not contain the word \"keyboard\" - [x] 1.7-no-keyboard-info-file: No `keyboard.info` file in the keyboard folder - [x] 1.8-no-duplicate-docs-subfolder: No `docs/` or similar subfolder containing duplicate HISTORY/README/INSTALL files - [x] 1.9-no-duplicate-source-files: No duplicate copies of the same source file inside the keyboard folder - [x] 1.10-kpj-current-format: `.kpj` file uses the current/newest project-file format — the Options-based form declared by the `<Options><Version>` format marker (per the upstream .kpj schema, the marker is implicit in the legacy Files-driven form and required from format 2.0 onward). Covers newly scaffolded keyboards only; an adapted keyboard's imported `.kpj` is carried forward by the scaffolder, not regenerated — see 1.10b for that path. - [x] 1.10b-kpj-format-adapted: Adapted keyboard's `.kpj` file is in the current project-file form — it carries the `<Options><Version>` format marker — rather than the legacy Files-driven form (no marker; the format version is the implicit classical one). The loader reads an imported `.kpj` as-is and never regenerates it, so this is the only check covering a stale format on the adaptation path - [x] 1.11-no-kpj-user-committed: No `.kpj.user` file committed - [x] 1.12-no-build-folder-committed: No `build/` folder contents committed - [x] 1.13-no-stray-scratch-files: No stray scratch or test files in the keyboard folder - [x] 2.3-version-numeric-dot-separated: Version number is dot-separated and entirely numeric (SemVer or CalVer) - [x] 2.4-no-leading-zero-in-version-component: No version component has a leading zero - [x] 2.5-no-v-prefix-or-labels: Version has no `v` prefix and no non-numeric labels - [x] 2.7-kpj-version-not-bumped: The `.kpj` file's `<Version>` field has not been bumped relative to the base keyboard it was adapted from (it's the file-format version, not keyboard version) - [x] 3.1-history-file-exists: `HISTORY.md` file exists - [x] 3.3-history-recent-change-at-top: Most recent change entry is at the top of the file - [x] 3.4-history-cumulative: HISTORY.md is cumulative — prior entries are preserved, not overwritten - [x] 3.5-history-entry-format: Each entry follows `<version> (<YYYY-MM-DD>)` format underlined with hyphens and bullet items - [x] 3.6-history-version-matches-kmn: Top HISTORY.md entry version matches the version in the `.kmn` file - [x] 3.7-history-bullets-no-deleted-files: HISTORY.md bullets do not reference files that no longer exist in the keyboard - [x] 4.1-copyright-present-with-year: Copyright statement is present with year(s) - [x] 4.5-copyright-syntax-exact: Copyright line follows exact syntax: `Copyright (C) <year> <holder>` - [x] 4.6-copyright-year-not-in-kmn-or-kps: Copyright year is not embedded in the `.kmn` or `.kps` copyright strings - [x] 4.7-copyright-holder-consistent-across-files: Copyright holder name is identical across `LICENSE.md`, `.kmn`, `.kps`, `README.md`, and `HISTORY.md` - [x] 5.2-no-version-in-readme-or-docs: No version number embedded in README.md, readme.htm, welcome.htm, or help .php - [x] 5.3-no-copyright-in-readme-or-docs: No copyright year/statement in README.md, readme.htm, or welcome.htm - [x] 5.5-readme-keyman-home-link: README.md includes link to `https://keyman.com/keyboards/<file_name>` - [x] 5.6-readme-help-link: README.md includes link to `http://help.keyman.com/keyboard/<file_name>` - [x] 5.7-readme-targets-match-kmn: Targets listed in README.md match those in the `.kmn` - [x] 6.1-readme-htm-exists: `readme.htm` exists in `source/` - [x] 6.3-welcome-htm-exists: `welcome.htm` exists in `source/` - [x] 6.6-welcome-htm-lang-attribute: `<html lang=\"...\">` attribute in `welcome.htm` matches the keyboard's primary BCP47 tag - [x] 7.1-kmn-version-matches-history: `.kmn` version matches `HISTORY.md` top entry - [x] 7.2-targets-any-alone: `.kmn` targets line uses `any` alone, not combined with individual platform names - [x] 7.3-targets-no-unsupported-mobile: `.kmn` targets do not include `mobile` unless a touch layout exists - [x] 7.5-ralt-usealtgr-tag: If keyboard uses RALT, the `.kvks` includes the `usealtgr` tag - [x] 7.6-compiles-no-errors-no-warnings: Keyboard compiles with no errors and no warnings (source review pass; stricter than 7.21 which checks errors only) - [x] 7.7a-display-name-no-underscores-lint: Keyboard display name contains no literal underscore characters (mechanical half of 7.7; the readability judgment stays with 7.7) - [x] 7.9-bitmap-not-template-placeholder: `store(&BITMAP)` references the actual keyboard `.ico`, not a placeholder like `qaa.ico` - [x] 7.10-kmn-stores-balanced-syntax: All `.kmn` string-literal stores have balanced quotes and valid syntax - [x] 7.11-author-in-kps-not-kmn: Author name belongs in the `.kps`, not in a `.kmn` Author store - [x] 7.12-pua-in-experimental: If keyboard uses PUA codepoints, it is in `experimental/` (source review pass; see also 13.1 which checks the same condition from the encoding/script angle) - [x] 7.14-pua-font-displaymap: If keyboard ships a PUA-encoded font, `.kmn` includes `store(&DISPLAYMAP)` path - [x] 7.16-kvks-not-blank: The `.kvks` on-screen keyboard layout is populated, not blank - [x] 7.19-identical-phone-tablet-deduplicated: If both phone and tablet touch layouts are identical, removal of one was requested - [x] 7.20-same-font-phone-tablet: Same font is selected for phone and tablet layouts - [x] 7.21-compiles-no-errors: Keyboard compiles with no errors (build-output context; errors only, not warnings — see 7.6 for the stricter source-review check) - [x] 8.1-kps-includes-kmx: Compiled `.kmx` is listed in the `.kps` package - [x] 8.2-kps-includes-kvk: Compiled `.kvk` is listed in the `.kps` package - [x] 8.3-kps-includes-js-if-mobile: Compiled `.js` is listed if a mobile layout exists - [x] 8.4-kps-includes-license-md: `LICENSE.md` is listed in the `.kps` package - [x] 8.5-kps-includes-readme-htm: `readme.htm` is listed in the `.kps` package - [x] 8.6-kps-includes-welcome-and-graphics: `welcome.htm` and associated graphics are listed in the `.kps` package - [x] 8.8-kps-no-php-file: No `.php` help file listed in the `.kps` package - [x] 8.9-kps-no-help-folder-files: No files from the `help/` folder listed in the `.kps` package - [x] 8.10-kps-no-uncompiled-sources: No uncompiled sources (.kmn, .ico, .kvks, .keyman-touch-layout, .kps) listed in the `.kps` - [x] 8.11-kps-no-displaymap-json: No font display-map `.json` files listed in the `.kps` - [x] 8.12-kps-no-industry-fonts: No industry fonts (Arial, Times, Tahoma, etc.) in the package - [x] 9.6-no-woff-fonts: No `.woff` or web-only font formats in keyboard packages - [x] 10.1-kps-font-selected: Font is selected in the `.kps` Keyboards tab if a font is included in Files - [x] 10.2-kps-language-tags-selected: Language tag(s) are selected in the `.kps` Keyboards tab - [x] 10.6-kps-numeric-region-flagged: If the language tag includes numeric regional codes, it is flagged for special review - [x] 10.7-kps-details-files-selected: `readme.htm`, `welcome.htm`, and `LICENSE.md` are selected in the `.kps` Details tab License field - [x] 10.8-kps-follow-keyboard-version: \"Follow keyboard version\" is selected in the `.kps` Details tab - [x] 10.9-kps-description-nonempty: Description field is present and non-empty in the `.kps` - [x] 11.1-php-exists-with-header: `<name>.php` file exists and has the proper PHP header - [x] 11.2-php-osk-all-layers: If using OSK syntax, all desktop and mobile layers are listed in `data-states` (complementary to 11.6 — see that entry for the direction split) - [x] 11.3-php-style-inside-header: All style information is inside the PHP header, not outside it - [x] 11.4-php-no-closing-body-html: `.php` does not contain closing `</body>` or `</html>` tags - [x] 11.5-php-htm-html-wellformed: HTML in `welcome.htm` and `.php` is well-formed — balanced tags, proper headings, no unclosed elements (in-browser check via DOMParser) - [x] 11.6-php-osk-data-states-all-layers: `.php` `data-states` attribute lists every layer defined in the `.kmn` and touch layout (complementary to 11.2: 11.2 catches layers missing from `data-states` — under-documentation; 11.6 catches `data-states` values naming layers that don't exist — phantom layers) - [x] 11.9-php-htm-body-parity: `welcome.htm` and `.php` body content are identical after stripping headers and normalizing whitespace - [x] 11.10-php-htm-style-parity: CSS in `welcome.htm` and `.php` are identical modulo non-rendering whitespace - [x] 12.2-no-iso-639-5-codes: No ISO 639-5 collective language codes used - [x] 12.3-no-numeric-region-unless-contrastive: No numeric regional codes unless explicitly contrastive - [x] 12.4-no-001-region: Region code `001` is never used in BCP47 tags - [x] 13.1-pua-keyboard-in-experimental: PUA codepoint use means keyboard is in `experimental/` (encoding/script context; see also 7.12 which checks the same condition during source review) - [x] 13.4-no-math-latin-lookalikes: No mathematical Latin look-alike characters (U+1D400-U+1D7FF) in keyboard output - [x] 18.1-longpress-within-limit: No touch long-press menu offers more than 8 options (warning), and none exceeds the hard cap of 10 - [x] 18.2-touch-rows-within-range: Touch layout uses 4-5 rows on phone and 5 rows on tablet - [x] 18.3-keys-per-row-within-range: Touch layout uses at most 10 keys per row on phone and 13 on tablet - [x] 18.4-control-keys-stable-across-layers: Backspace, Enter, and other control keys do not move or resize across touch layers - [x] 18.5-layer-switch-toggles-back: Every layer-switch key has a corresponding key that toggles back to the previous layer - [x] 18.7-mandated-currency-present: The locale's mandated currency symbol (from CLDR) is reachable on the keyboard - [x] 19.1-import-attribution-in-pr-body: When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block (adapted-from path, commit SHA, round-trip status, opaque feature inventory). Auto-enforced by the output service at PR submission time. - [x] 19.2-import-attribution-in-history-md: When a keyboard was adapted from a release/ keyboard, HISTORY.md must contain an 'Adapted from <sourcePath>' bullet under the 1.0 entry. Auto-enforced by the scaffolder at emit time (D14, mandatory carrier). ### Yellow — advisory, please review - [ ] 3.2-history-header-sensible: HISTORY.md header is sensible - [ ] 4.2-copyright-year-range-if-multiyear: If updated across multiple years, copyright uses a year range - [ ] 4.4-org-legal-name-current: If an organization is named, its current legal name is used - [ ] 4.8-year-range-starts-at-original: If a year range is used, it starts at the original year and extends to the current year - [ ] 5.1-readme-good-header: README.md has a good header - [ ] 5.4-readme-description-sensible: README.md description makes sense - [ ] 6.2-readme-htm-short: `readme.htm` content is short — just a brief description - [ ] 6.4-welcome-htm-describes-usage: `welcome.htm` describes how to use the keyboard - [ ] 6.5-welcome-htm-no-install-instructions: `welcome.htm` does not include instructions for installing Keyman — references help URLs instead - [ ] 6.7-welcome-htm-not-political: `welcome.htm` content is not political or self-promoting - [ ] 7.7-display-name-no-underscores: Keyboard display name is a readable phrase that describes the keyboard (judgment half; the mechanical underscore check is 7.7a) - [ ] 7.8-rtl-flag-matches-script: RTL flag in `.kmn`/`.kps` matches the script's actual writing direction - [ ] 7.13-pua-documentation: If keyboard uses PUA codepoints, documentation explicitly states characters/script are not in Unicode - [ ] 7.15-osk-reviewed: OSK has been reviewed for rules, output characters, and layout consistency - [ ] 7.17-osk-font-selected: If a special font is needed for output characters, an appropriate font is selected in the OSK - [ ] 7.18-touch-layout-reviewed: Touch layout reviewed for layers, output, and fingering - [ ] 8.13-kps-targets-match-compiled: Targets declared in `.kmn` match compiled files listed in the `.kps` (not yet checkable) - [ ] 9.3-font-license-genuinely-open: Font license text/spirit is genuinely Open, not just labeled \"freeware\" - [ ] 9.4-shared-font-in-shared-folder: If a font is used by more than one keyboard, it lives under `shared/fonts` (not yet checkable) - [ ] 9.7-pua-font-submitted-to-skeyman: If an experimental keyboard ships a PUA font, the font has been submitted to `s.keyman.com` - [ ] 10.3-kps-tags-minimal: Language tags are minimal — no unnecessary script/region subtags - [ ] 10.4-kps-unusual-tag-flagged: If the tag is new or unusual, it is flagged for possible submission to langtags/Ethnologue - [ ] 10.5-kps-conlang-flagged: If keyboard is for a constructed language, it is flagged for special review - [ ] 10.10-kps-description-meaningful: Description is meaningful (becomes the keyboard home page content) - [ ] 10.11-kps-no-spelling-errors: No spelling errors in user-facing `.kps` text fields (Description, Author name, WebSite text) - [ ] 12.1-bcp47-tag-correct: BCP47 tag is correct for the language and script - [ ] 12.5-script-mismatch-flagged: If a language uses a different script than what langtags currently records, the mismatch is flagged - [ ] 13.2-pua-notices-in-docs: PUA codepoint use means explicit PUA notices appear in readme.htm, welcome.htm, .php, and .kps description - [ ] 13.3-no-unencoded-script-codepoint-reuse: Keyboard does not reuse existing codepoints for unencoded scripts; if it does, warnings are in place - [ ] 13.5-math-latin-not-spoofing: If math-Latin or other Latin look-alikes are present, the use case does not look like spoofing - [ ] 18.8-character-set-is-minimal: The character set was kept focused - extra characters were resisted and each addition was deliberate - [ ] 18.9-rare-chars-discoverable: Rare characters are findable without experimentation, not buried on deep long-press menus alone - [ ] 18.10-frequent-chars-reachable: Frequently used characters sit on easy-to-reach positions consistent with the script's structure ### Red — manual action required - [ ] The copyright holder named in LICENSE.md is the author or a legal entity the author is authorized to represent - [ ] 7.4-modifier-names-consistent: Modifier key names consistent across `.kmn`, `.kvks`, and `.keyman-touch-layout` (not met) - [ ] 8.7-kps-includes-required-fonts: All required fonts referenced by the `.kmn` and touch layout are listed in the `.kps` (family-level presence check; full typeface — Bold/Italic — completeness is best-effort, not mechanically guaranteed) (not met) - [ ] 9.1-font-license-nonempty: Every bundled font has a non-empty license field in the `.kps` - [ ] 9.2-font-license-open-identifier: Font license identifier matches a known Open license (OFL, GPL, MIT, Apache, CC-BY, etc.) - [ ] I have verified the shared font path points to the current shared/fonts location in keymanapp/keyboards, not a deprecated duplicate. - [ ] 11.7-php-pagename-format: `.php` `pagename` follows the standard help-site format (not met) - [ ] 11.8-php-osk-image-constrained: OSK graphics either use Keyman-generated form or custom images have width constraints (not met) - [ ] If a script mismatch was flagged, I have opened an issue at github.com/silnrsi/langtags documenting the mismatch. - [ ] If this is a patch to another author's keyboard, the original author was consulted and has approved the change before this PR was opened - [ ] I have resolved all PR comments before triggering a TeamCity build. - [ ] For a first-time contributor: this PR has been pulled locally and the build verified clean before triggering TeamCity - [ ] Any issues the TeamCity build caught that local review missed have been fed back to the author. - [ ] 18.6-inventory-fully-covered: Every character in the confirmed linguist inventory is produced by some reachable input sequence in the draft keyboard (not met) - [ ] This layout has been tested with target users - good on paper does not equal good in practice - [ ] This keyboard complies with any legislated or accessibility requirements for its target locale — if you are unsure whether requirements apply, check before submitting. - [ ] Copyright attestation: I confirm I am the copyright holder or am authorized to submit on behalf of the copyright holder."
+        - paragraph [ref=f1e3680]: Submitting publishes your keyboard as a public pull request. Your name and email address become part of that submission, and once it is merged they are part of the repository’s permanent public history — they cannot be removed from it later.
+        - button "Fill in your name, email, and copyright confirmation to submit" [disabled] [ref=f1e3681]: Submit to community repository
+      - region "Submit your keyboard" [ref=f1e3682]:
+        - paragraph [ref=f1e3684]: Sign up to submit your keyboard to the community repository. We handle the technical side — you just choose how to sign in.
+        - button "Sign up with GitHub" [ref=f1e3685] [cursor=pointer]
+        - button "Sign up with Google" [ref=f1e3688] [cursor=pointer]
+        - paragraph [ref=f1e3694]:
+          - text: "How we handle your data:"
+          - button "Privacy" [ref=f1e3695] [cursor=pointer]
+  - contentinfo "Project and progress" [ref=f1e101]:
+    - generic "Bafut" [ref=f1e3463]: "Project: Bafut"
+    - generic [ref=f1e3696]:
+      - button "Identity — completed" [ref=f1e3697] [cursor=pointer]
+      - button "Keyboard layout — completed" [ref=f1e3698] [cursor=pointer]
+      - button "Choose a starting keyboard — completed" [ref=f1e3699] [cursor=pointer]
+      - button "Copy or adapt — completed" [ref=f1e3700] [cursor=pointer]
+      - button "Author & copyright — partly answered" [ref=f1e3701] [cursor=pointer]
+      - button "Project name — completed" [ref=f1e3702] [cursor=pointer]
+      - button "Characters — completed" [ref=f1e3703] [cursor=pointer]
+      - button "Accents & marks — partly answered" [ref=f1e3704] [cursor=pointer]
+      - button "Punctuation — completed" [ref=f1e3705] [cursor=pointer]
+      - button "Invisible characters — completed" [ref=f1e3706] [cursor=pointer]
+      - button "Convenience letters — completed" [ref=f1e3707] [cursor=pointer]
+      - button "Carve — completed" [ref=f1e3708] [cursor=pointer]
+      - button "Deadkeys — completed" [ref=f1e3709] [cursor=pointer]
+      - button "Rules — completed" [ref=f1e3710] [cursor=pointer]
+      - button "Mechanisms — completed" [ref=f1e3711] [cursor=pointer]
+      - button "Touch seed — completed" [ref=f1e3712] [cursor=pointer]
+      - button "Touch layout — you are here" [ref=f1e3713]
+      - button "Help & credits — not yet reached" [ref=f1e3714] [cursor=pointer]
+    - status
+```

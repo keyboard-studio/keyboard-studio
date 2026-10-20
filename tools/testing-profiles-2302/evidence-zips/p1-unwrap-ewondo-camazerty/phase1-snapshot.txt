@@ -1,0 +1,3548 @@
+### Page
+- Page URL: http://localhost:5273/
+- Page Title: Keyboard Studio
+- Console: 16 errors, 5 warnings
+### Snapshot
+```yaml
+- generic [ref=f1e3]:
+  - link "Skip to step navigation" [ref=f1e4] [cursor=pointer]:
+    - /url: "#step-navigation"
+  - navigation "Studio navigation" [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]: Keyboard Studio
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9]: Keyboard
+        - button "Keyboard Ewondo" [ref=f1e106] [cursor=pointer]:
+          - generic "Ewondo" [ref=f1e107]
+          - generic [aria-hidden] [ref=f1e15]: ▾
+    - generic [ref=f1e16]:
+      - link "Studio" [ref=f1e17] [cursor=pointer]:
+        - /url: "#survey"
+      - link "Compare" [ref=f1e18] [cursor=pointer]:
+        - /url: "#preview"
+      - link "Output" [ref=f1e19] [cursor=pointer]:
+        - /url: "#output"
+      - link "Decisions" [ref=f1e20] [cursor=pointer]:
+        - /url: "#trail"
+      - link "Criteria" [ref=f1e21] [cursor=pointer]:
+        - /url: "#criteria"
+      - link "Flow Map" [ref=f1e22] [cursor=pointer]:
+        - /url: "#flowmap"
+    - generic [ref=f1e23]:
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]: Font for characters
+        - button "Font for characters" [ref=f1e27] [cursor=pointer]:
+          - generic [ref=f1e28]: Noto Sans
+          - generic [aria-hidden] [ref=f1e29]: ▾
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]: Language
+        - button "Language" [ref=f1e33] [cursor=pointer]:
+          - generic [ref=f1e34]: English
+          - generic [aria-hidden] [ref=f1e35]: ▾
+      - generic [ref=f1e36]:
+        - generic [ref=f1e37]: Theme
+        - button "Theme" [ref=f1e38] [cursor=pointer]:
+          - generic [ref=f1e41]: Navy
+      - button "Sign in" [ref=f1e43] [cursor=pointer]
+      - 'button "Reset: start this keyboard over" [ref=f1e45] [cursor=pointer]': Reset
+  - navigation "Survey phase progress" [ref=f1e46]:
+    - list [ref=f1e47]:
+      - listitem [ref=f1e48]:
+        - generic [ref=f1e49]:
+          - generic [ref=f1e50]: A
+          - generic [ref=f1e51]: Survey
+          - generic [ref=f1e52]: completed
+      - listitem [ref=f1e54]:
+        - generic [ref=f1e55]:
+          - generic [ref=f1e56]: B
+          - generic [ref=f1e57]: Starting keyboard
+          - generic [ref=f1e58]: completed
+      - listitem [ref=f1e60]:
+        - generic [ref=f1e61]:
+          - generic [ref=f1e62]: C
+          - generic [ref=f1e63]: Characters
+          - generic [ref=f1e64]: current step
+      - listitem [ref=f1e66]:
+        - generic [ref=f1e67]:
+          - generic [ref=f1e68]: D
+          - generic [ref=f1e69]: Discard
+          - generic [ref=f1e70]: not yet reached
+      - listitem [ref=f1e72]:
+        - generic [ref=f1e73]:
+          - generic [ref=f1e74]: E
+          - generic [ref=f1e75]: Enable
+          - generic [ref=f1e76]: not yet reached
+      - listitem [ref=f1e78]:
+        - generic [ref=f1e79]:
+          - generic [ref=f1e80]: F
+          - generic [ref=f1e81]: Finalize
+          - generic [ref=f1e82]: not yet reached
+  - generic [ref=f1e84]:
+    - region "Survey questions" [ref=f1e85]:
+      - status
+      - generic [ref=f1e108]:
+        - heading "Confirm your alphabet" [level=2] [ref=f1e109]
+        - generic [ref=f1e110]:
+          - paragraph [ref=f1e111]:
+            - text: Add
+            - strong [ref=f1e112]: your whole alphabet
+            - text: "on this page — every character your language uses, not just the special ones. Type them in below, like this:"
+          - paragraph [ref=f1e113]: a b c d e ɛ ŋ ɔ …
+        - region "List your letters" [ref=f1e114]:
+          - heading "List your letters" [level=3] [ref=f1e115]
+          - paragraph [ref=f1e116]: "Type the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add."
+          - generic [ref=f1e117]:
+            - generic [ref=f1e118]:
+              - textbox "Character to add" [ref=f1e119]:
+                - /placeholder: Type your alphabet (a b c …)
+              - button "+ Add" [disabled] [ref=f1e120]
+            - generic [ref=f1e121]:
+              - paragraph [ref=f1e122]: Your alphabet (52)
+              - paragraph [ref=f1e123]: Dashed characters were proposed for you (from CLDR 48.2.0). Remove any that are wrong.
+              - generic [ref=f1e124] [cursor=pointer]:
+                - checkbox "Show uppercase letters" [ref=f1e125]
+                - text: Show uppercase letters
+              - textbox "Filter your alphabet" [ref=f1e127]:
+                - /placeholder: Filter by character, code point (U+…), or base letter
+              - group "Accumulated characters — click to remove" [ref=f1e128]:
+                - button "Remove a (U+0061), proposed from CLDR 48.2.0" [ref=f1e129] [cursor=pointer]:
+                  - generic [ref=f1e130]: a
+                  - generic [ref=f1e131]: U+0061
+                  - generic [ref=f1e132]: x
+                - button "Remove á (U+00E1), proposed from CLDR 48.2.0" [ref=f1e133] [cursor=pointer]:
+                  - generic [ref=f1e134]: á
+                  - generic [ref=f1e135]: U+00E1
+                  - generic [ref=f1e136]: x
+                - button "Remove à (U+00E0), proposed from CLDR 48.2.0" [ref=f1e137] [cursor=pointer]:
+                  - generic [ref=f1e138]: à
+                  - generic [ref=f1e139]: U+00E0
+                  - generic [ref=f1e140]: x
+                - button "Remove â (U+00E2), proposed from CLDR 48.2.0" [ref=f1e141] [cursor=pointer]:
+                  - generic [ref=f1e142]: â
+                  - generic [ref=f1e143]: U+00E2
+                  - generic [ref=f1e144]: x
+                - button "Remove ǎ (U+01CE), proposed from CLDR 48.2.0" [ref=f1e145] [cursor=pointer]:
+                  - generic [ref=f1e146]: ǎ
+                  - generic [ref=f1e147]: U+01CE
+                  - generic [ref=f1e148]: x
+                - button "Remove b (U+0062), proposed from CLDR 48.2.0" [ref=f1e149] [cursor=pointer]:
+                  - generic [ref=f1e150]: b
+                  - generic [ref=f1e151]: U+0062
+                  - generic [ref=f1e152]: x
+                - button "Remove d (U+0064), proposed from CLDR 48.2.0" [ref=f1e153] [cursor=pointer]:
+                  - generic [ref=f1e154]: d
+                  - generic [ref=f1e155]: U+0064
+                  - generic [ref=f1e156]: x
+                - button "Remove e (U+0065), proposed from CLDR 48.2.0" [ref=f1e157] [cursor=pointer]:
+                  - generic [ref=f1e158]: e
+                  - generic [ref=f1e159]: U+0065
+                  - generic [ref=f1e160]: x
+                - button "Remove é (U+00E9), proposed from CLDR 48.2.0" [ref=f1e161] [cursor=pointer]:
+                  - generic [ref=f1e162]: é
+                  - generic [ref=f1e163]: U+00E9
+                  - generic [ref=f1e164]: x
+                - button "Remove è (U+00E8), proposed from CLDR 48.2.0" [ref=f1e165] [cursor=pointer]:
+                  - generic [ref=f1e166]: è
+                  - generic [ref=f1e167]: U+00E8
+                  - generic [ref=f1e168]: x
+                - button "Remove ê (U+00EA), proposed from CLDR 48.2.0" [ref=f1e169] [cursor=pointer]:
+                  - generic [ref=f1e170]: ê
+                  - generic [ref=f1e171]: U+00EA
+                  - generic [ref=f1e172]: x
+                - button "Remove ě (U+011B), proposed from CLDR 48.2.0" [ref=f1e173] [cursor=pointer]:
+                  - generic [ref=f1e174]: ě
+                  - generic [ref=f1e175]: U+011B
+                  - generic [ref=f1e176]: x
+                - button "Remove ə (U+0259), proposed from CLDR 48.2.0" [ref=f1e177] [cursor=pointer]:
+                  - generic [ref=f1e178]: ə
+                  - generic [ref=f1e179]: U+0259
+                  - generic [ref=f1e180]: x
+                - button "Remove ɛ (U+025B), proposed from CLDR 48.2.0" [ref=f1e181] [cursor=pointer]:
+                  - generic [ref=f1e182]: ɛ
+                  - generic [ref=f1e183]: U+025B
+                  - generic [ref=f1e184]: x
+                - button "Remove f (U+0066), proposed from CLDR 48.2.0" [ref=f1e185] [cursor=pointer]:
+                  - generic [ref=f1e186]: f
+                  - generic [ref=f1e187]: U+0066
+                  - generic [ref=f1e188]: x
+                - button "Remove g (U+0067), proposed from CLDR 48.2.0" [ref=f1e189] [cursor=pointer]:
+                  - generic [ref=f1e190]: g
+                  - generic [ref=f1e191]: U+0067
+                  - generic [ref=f1e192]: x
+                - button "Remove h (U+0068), proposed from CLDR 48.2.0" [ref=f1e193] [cursor=pointer]:
+                  - generic [ref=f1e194]: h
+                  - generic [ref=f1e195]: U+0068
+                  - generic [ref=f1e196]: x
+                - button "Remove i (U+0069), proposed from CLDR 48.2.0" [ref=f1e197] [cursor=pointer]:
+                  - generic [ref=f1e198]: i
+                  - generic [ref=f1e199]: U+0069
+                  - generic [ref=f1e200]: x
+                - button "Remove í (U+00ED), proposed from CLDR 48.2.0" [ref=f1e201] [cursor=pointer]:
+                  - generic [ref=f1e202]: í
+                  - generic [ref=f1e203]: U+00ED
+                  - generic [ref=f1e204]: x
+                - button "Remove ì (U+00EC), proposed from CLDR 48.2.0" [ref=f1e205] [cursor=pointer]:
+                  - generic [ref=f1e206]: ì
+                  - generic [ref=f1e207]: U+00EC
+                  - generic [ref=f1e208]: x
+                - button "Remove î (U+00EE), proposed from CLDR 48.2.0" [ref=f1e209] [cursor=pointer]:
+                  - generic [ref=f1e210]: î
+                  - generic [ref=f1e211]: U+00EE
+                  - generic [ref=f1e212]: x
+                - button "Remove ǐ (U+01D0), proposed from CLDR 48.2.0" [ref=f1e213] [cursor=pointer]:
+                  - generic [ref=f1e214]: ǐ
+                  - generic [ref=f1e215]: U+01D0
+                  - generic [ref=f1e216]: x
+                - button "Remove k (U+006B), proposed from CLDR 48.2.0" [ref=f1e217] [cursor=pointer]:
+                  - generic [ref=f1e218]: k
+                  - generic [ref=f1e219]: U+006B
+                  - generic [ref=f1e220]: x
+                - button "Remove l (U+006C), proposed from CLDR 48.2.0" [ref=f1e221] [cursor=pointer]:
+                  - generic [ref=f1e222]: l
+                  - generic [ref=f1e223]: U+006C
+                  - generic [ref=f1e224]: x
+                - button "Remove m (U+006D), proposed from CLDR 48.2.0" [ref=f1e225] [cursor=pointer]:
+                  - generic [ref=f1e226]: m
+                  - generic [ref=f1e227]: U+006D
+                  - generic [ref=f1e228]: x
+                - button "Remove n (U+006E), proposed from CLDR 48.2.0" [ref=f1e229] [cursor=pointer]:
+                  - generic [ref=f1e230]: "n"
+                  - generic [ref=f1e231]: U+006E
+                  - generic [ref=f1e232]: x
+                - button "Remove ń (U+0144), proposed from CLDR 48.2.0" [ref=f1e233] [cursor=pointer]:
+                  - generic [ref=f1e234]: ń
+                  - generic [ref=f1e235]: U+0144
+                  - generic [ref=f1e236]: x
+                - button "Remove ǹ (U+01F9), proposed from CLDR 48.2.0" [ref=f1e237] [cursor=pointer]:
+                  - generic [ref=f1e238]: ǹ
+                  - generic [ref=f1e239]: U+01F9
+                  - generic [ref=f1e240]: x
+                - button "Remove ŋ (U+014B), proposed from CLDR 48.2.0" [ref=f1e241] [cursor=pointer]:
+                  - generic [ref=f1e242]: ŋ
+                  - generic [ref=f1e243]: U+014B
+                  - generic [ref=f1e244]: x
+                - button "Remove o (U+006F), proposed from CLDR 48.2.0" [ref=f1e245] [cursor=pointer]:
+                  - generic [ref=f1e246]: o
+                  - generic [ref=f1e247]: U+006F
+                  - generic [ref=f1e248]: x
+                - button "Remove ó (U+00F3), proposed from CLDR 48.2.0" [ref=f1e249] [cursor=pointer]:
+                  - generic [ref=f1e250]: ó
+                  - generic [ref=f1e251]: U+00F3
+                  - generic [ref=f1e252]: x
+                - button "Remove ò (U+00F2), proposed from CLDR 48.2.0" [ref=f1e253] [cursor=pointer]:
+                  - generic [ref=f1e254]: ò
+                  - generic [ref=f1e255]: U+00F2
+                  - generic [ref=f1e256]: x
+                - button "Remove ô (U+00F4), proposed from CLDR 48.2.0" [ref=f1e257] [cursor=pointer]:
+                  - generic [ref=f1e258]: ô
+                  - generic [ref=f1e259]: U+00F4
+                  - generic [ref=f1e260]: x
+                - button "Remove ǒ (U+01D2), proposed from CLDR 48.2.0" [ref=f1e261] [cursor=pointer]:
+                  - generic [ref=f1e262]: ǒ
+                  - generic [ref=f1e263]: U+01D2
+                  - generic [ref=f1e264]: x
+                - button "Remove ɔ (U+0254), proposed from CLDR 48.2.0" [ref=f1e265] [cursor=pointer]:
+                  - generic [ref=f1e266]: ɔ
+                  - generic [ref=f1e267]: U+0254
+                  - generic [ref=f1e268]: x
+                - button "Remove p (U+0070), proposed from CLDR 48.2.0" [ref=f1e269] [cursor=pointer]:
+                  - generic [ref=f1e270]: p
+                  - generic [ref=f1e271]: U+0070
+                  - generic [ref=f1e272]: x
+                - button "Remove r (U+0072), proposed from CLDR 48.2.0" [ref=f1e273] [cursor=pointer]:
+                  - generic [ref=f1e274]: r
+                  - generic [ref=f1e275]: U+0072
+                  - generic [ref=f1e276]: x
+                - button "Remove s (U+0073), proposed from CLDR 48.2.0" [ref=f1e277] [cursor=pointer]:
+                  - generic [ref=f1e278]: s
+                  - generic [ref=f1e279]: U+0073
+                  - generic [ref=f1e280]: x
+                - button "Remove t (U+0074), proposed from CLDR 48.2.0" [ref=f1e281] [cursor=pointer]:
+                  - generic [ref=f1e282]: t
+                  - generic [ref=f1e283]: U+0074
+                  - generic [ref=f1e284]: x
+                - button "Remove u (U+0075), proposed from CLDR 48.2.0" [ref=f1e285] [cursor=pointer]:
+                  - generic [ref=f1e286]: u
+                  - generic [ref=f1e287]: U+0075
+                  - generic [ref=f1e288]: x
+                - button "Remove ú (U+00FA), proposed from CLDR 48.2.0" [ref=f1e289] [cursor=pointer]:
+                  - generic [ref=f1e290]: ú
+                  - generic [ref=f1e291]: U+00FA
+                  - generic [ref=f1e292]: x
+                - button "Remove ù (U+00F9), proposed from CLDR 48.2.0" [ref=f1e293] [cursor=pointer]:
+                  - generic [ref=f1e294]: ù
+                  - generic [ref=f1e295]: U+00F9
+                  - generic [ref=f1e296]: x
+                - button "Remove û (U+00FB), proposed from CLDR 48.2.0" [ref=f1e297] [cursor=pointer]:
+                  - generic [ref=f1e298]: û
+                  - generic [ref=f1e299]: U+00FB
+                  - generic [ref=f1e300]: x
+                - button "Remove ǔ (U+01D4), proposed from CLDR 48.2.0" [ref=f1e301] [cursor=pointer]:
+                  - generic [ref=f1e302]: ǔ
+                  - generic [ref=f1e303]: U+01D4
+                  - generic [ref=f1e304]: x
+                - button "Remove v (U+0076), proposed from CLDR 48.2.0" [ref=f1e305] [cursor=pointer]:
+                  - generic [ref=f1e306]: v
+                  - generic [ref=f1e307]: U+0076
+                  - generic [ref=f1e308]: x
+                - button "Remove w (U+0077), proposed from CLDR 48.2.0" [ref=f1e309] [cursor=pointer]:
+                  - generic [ref=f1e310]: w
+                  - generic [ref=f1e311]: U+0077
+                  - generic [ref=f1e312]: x
+                - button "Remove y (U+0079), proposed from CLDR 48.2.0" [ref=f1e313] [cursor=pointer]:
+                  - generic [ref=f1e314]: "y"
+                  - generic [ref=f1e315]: U+0079
+                  - generic [ref=f1e316]: x
+                - button "Remove z (U+007A), proposed from CLDR 48.2.0" [ref=f1e317] [cursor=pointer]:
+                  - generic [ref=f1e318]: z
+                  - generic [ref=f1e319]: U+007A
+                  - generic [ref=f1e320]: x
+                - button "Remove ̀ (U+0300)" [ref=f1e321] [cursor=pointer]:
+                  - generic [ref=f1e322]: ◌̀
+                  - generic [ref=f1e323]: U+0300
+                  - generic [ref=f1e324]: x
+                - button "Remove ́ (U+0301)" [ref=f1e325] [cursor=pointer]:
+                  - generic [ref=f1e326]: ◌́
+                  - generic [ref=f1e327]: U+0301
+                  - generic [ref=f1e328]: x
+                - button "Remove ̂ (U+0302)" [ref=f1e329] [cursor=pointer]:
+                  - generic [ref=f1e330]: ◌̂
+                  - generic [ref=f1e331]: U+0302
+                  - generic [ref=f1e332]: x
+                - button "Remove ̌ (U+030C)" [ref=f1e333] [cursor=pointer]:
+                  - generic [ref=f1e334]: ◌̌
+                  - generic [ref=f1e335]: U+030C
+                  - generic [ref=f1e336]: x
+        - region [ref=f1e337]:
+          - generic [ref=f1e338]:
+            - heading "Loanword letters (4)" [level=3] [ref=f1e339]
+            - button "Add all loanword letters" [ref=f1e340] [cursor=pointer]
+          - paragraph [ref=f1e341]: Your language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.
+          - generic [ref=f1e342]:
+            - button "c C (U+0063)" [ref=f1e343] [cursor=pointer]:
+              - generic [ref=f1e344]: c C
+              - generic [ref=f1e345]: U+0063
+              - generic [ref=f1e346]: +
+            - button "j J (U+006A)" [ref=f1e347] [cursor=pointer]:
+              - generic [ref=f1e348]: j J
+              - generic [ref=f1e349]: U+006A
+              - generic [ref=f1e350]: +
+            - button "q Q (U+0071)" [ref=f1e351] [cursor=pointer]:
+              - generic [ref=f1e352]: q Q
+              - generic [ref=f1e353]: U+0071
+              - generic [ref=f1e354]: +
+            - button "x X (U+0078)" [ref=f1e355] [cursor=pointer]:
+              - generic [ref=f1e356]: x X
+              - generic [ref=f1e357]: U+0078
+              - generic [ref=f1e358]: +
+        - region "Let us find them in a sample" [ref=f1e359]:
+          - heading "Let us find them in a sample" [level=3] [ref=f1e360]
+          - paragraph [ref=f1e361]: Paste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.
+          - textbox "Text sample" [ref=f1e362]:
+            - /placeholder: Paste a paragraph of your language here…
+          - generic [ref=f1e363]:
+            - button "Preview these characters" [ref=f1e364] [cursor=pointer]
+            - generic [ref=f1e365]:
+              - text: or upload a .txt file
+              - button "Upload a text sample file" [ref=f1e366]
+        - region "Check for newer exemplar data" [ref=f1e367]:
+          - heading "Newer exemplar data" [level=3] [ref=f1e368]
+          - paragraph [ref=f1e369]: The characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.
+          - button "Check for newer exemplar data for this language" [ref=f1e371] [cursor=pointer]
+        - region "How your alphabet breaks down" [ref=f1e372]:
+          - heading "How your alphabet breaks down" [level=3] [ref=f1e373]
+          - generic [ref=f1e374]:
+            - paragraph [ref=f1e375]: Letters (26)
+            - paragraph [ref=f1e376]: Letters that stand on their own.
+            - generic [ref=f1e377] [cursor=pointer]:
+              - checkbox "Show uppercase letters" [ref=f1e378]
+              - text: Show uppercase letters
+            - generic [ref=f1e379]:
+              - generic "a (U+0061)" [ref=f1e380]:
+                - generic [ref=f1e381]: a
+                - generic [ref=f1e382]: U+0061
+              - generic "b (U+0062)" [ref=f1e383]:
+                - generic [ref=f1e384]: b
+                - generic [ref=f1e385]: U+0062
+              - generic "d (U+0064)" [ref=f1e386]:
+                - generic [ref=f1e387]: d
+                - generic [ref=f1e388]: U+0064
+              - generic "e (U+0065)" [ref=f1e389]:
+                - generic [ref=f1e390]: e
+                - generic [ref=f1e391]: U+0065
+              - generic "ə (U+0259)" [ref=f1e392]:
+                - generic [ref=f1e393]: ə
+                - generic [ref=f1e394]: U+0259
+              - generic "ɛ (U+025B)" [ref=f1e395]:
+                - generic [ref=f1e396]: ɛ
+                - generic [ref=f1e397]: U+025B
+              - generic "f (U+0066)" [ref=f1e398]:
+                - generic [ref=f1e399]: f
+                - generic [ref=f1e400]: U+0066
+              - generic "g (U+0067)" [ref=f1e401]:
+                - generic [ref=f1e402]: g
+                - generic [ref=f1e403]: U+0067
+              - generic "h (U+0068)" [ref=f1e404]:
+                - generic [ref=f1e405]: h
+                - generic [ref=f1e406]: U+0068
+              - generic "i (U+0069)" [ref=f1e407]:
+                - generic [ref=f1e408]: i
+                - generic [ref=f1e409]: U+0069
+              - generic "k (U+006B)" [ref=f1e410]:
+                - generic [ref=f1e411]: k
+                - generic [ref=f1e412]: U+006B
+              - generic "l (U+006C)" [ref=f1e413]:
+                - generic [ref=f1e414]: l
+                - generic [ref=f1e415]: U+006C
+              - generic "m (U+006D)" [ref=f1e416]:
+                - generic [ref=f1e417]: m
+                - generic [ref=f1e418]: U+006D
+              - generic "n (U+006E)" [ref=f1e419]:
+                - generic [ref=f1e420]: "n"
+                - generic [ref=f1e421]: U+006E
+              - generic "ŋ (U+014B)" [ref=f1e422]:
+                - generic [ref=f1e423]: ŋ
+                - generic [ref=f1e424]: U+014B
+              - generic "o (U+006F)" [ref=f1e425]:
+                - generic [ref=f1e426]: o
+                - generic [ref=f1e427]: U+006F
+              - generic "ɔ (U+0254)" [ref=f1e428]:
+                - generic [ref=f1e429]: ɔ
+                - generic [ref=f1e430]: U+0254
+              - generic "p (U+0070)" [ref=f1e431]:
+                - generic [ref=f1e432]: p
+                - generic [ref=f1e433]: U+0070
+              - generic "r (U+0072)" [ref=f1e434]:
+                - generic [ref=f1e435]: r
+                - generic [ref=f1e436]: U+0072
+              - generic "s (U+0073)" [ref=f1e437]:
+                - generic [ref=f1e438]: s
+                - generic [ref=f1e439]: U+0073
+              - generic "t (U+0074)" [ref=f1e440]:
+                - generic [ref=f1e441]: t
+                - generic [ref=f1e442]: U+0074
+              - generic "u (U+0075)" [ref=f1e443]:
+                - generic [ref=f1e444]: u
+                - generic [ref=f1e445]: U+0075
+              - generic "v (U+0076)" [ref=f1e446]:
+                - generic [ref=f1e447]: v
+                - generic [ref=f1e448]: U+0076
+              - generic "w (U+0077)" [ref=f1e449]:
+                - generic [ref=f1e450]: w
+                - generic [ref=f1e451]: U+0077
+              - generic "y (U+0079)" [ref=f1e452]:
+                - generic [ref=f1e453]: "y"
+                - generic [ref=f1e454]: U+0079
+              - generic "z (U+007A)" [ref=f1e455]:
+                - generic [ref=f1e456]: z
+                - generic [ref=f1e457]: U+007A
+          - generic [ref=f1e458]:
+            - paragraph [ref=f1e459]: Marks (4)
+            - paragraph [ref=f1e460]: Accents and other marks that attach to a letter.
+            - generic [ref=f1e461]:
+              - generic "◌̀ (U+0300)" [ref=f1e462]:
+                - generic [ref=f1e463]: ◌̀
+                - generic [ref=f1e464]: U+0300
+              - generic "◌́ (U+0301)" [ref=f1e465]:
+                - generic [ref=f1e466]: ◌́
+                - generic [ref=f1e467]: U+0301
+              - generic "◌̂ (U+0302)" [ref=f1e468]:
+                - generic [ref=f1e469]: ◌̂
+                - generic [ref=f1e470]: U+0302
+              - generic "◌̌ (U+030C)" [ref=f1e471]:
+                - generic [ref=f1e472]: ◌̌
+                - generic [ref=f1e473]: U+030C
+          - generic [ref=f1e474]:
+            - paragraph [ref=f1e475]: Accented letters (44)
+            - paragraph [ref=f1e476]: Letter-plus-mark combinations your language uses.
+            - generic [ref=f1e477]:
+              - generic "á (U+00E1)" [ref=f1e478]:
+                - generic [ref=f1e479]: á
+                - generic [ref=f1e480]: U+00E1
+              - generic "Á (U+00C1)" [ref=f1e481]:
+                - generic [ref=f1e482]: Á
+                - generic [ref=f1e483]: U+00C1
+              - generic "à (U+00E0)" [ref=f1e484]:
+                - generic [ref=f1e485]: à
+                - generic [ref=f1e486]: U+00E0
+              - generic "À (U+00C0)" [ref=f1e487]:
+                - generic [ref=f1e488]: À
+                - generic [ref=f1e489]: U+00C0
+              - generic "â (U+00E2)" [ref=f1e490]:
+                - generic [ref=f1e491]: â
+                - generic [ref=f1e492]: U+00E2
+              - generic "Â (U+00C2)" [ref=f1e493]:
+                - generic [ref=f1e494]: Â
+                - generic [ref=f1e495]: U+00C2
+              - generic "ǎ (U+01CE)" [ref=f1e496]:
+                - generic [ref=f1e497]: ǎ
+                - generic [ref=f1e498]: U+01CE
+              - generic "Ǎ (U+01CD)" [ref=f1e499]:
+                - generic [ref=f1e500]: Ǎ
+                - generic [ref=f1e501]: U+01CD
+              - generic "é (U+00E9)" [ref=f1e502]:
+                - generic [ref=f1e503]: é
+                - generic [ref=f1e504]: U+00E9
+              - generic "É (U+00C9)" [ref=f1e505]:
+                - generic [ref=f1e506]: É
+                - generic [ref=f1e507]: U+00C9
+              - generic "è (U+00E8)" [ref=f1e508]:
+                - generic [ref=f1e509]: è
+                - generic [ref=f1e510]: U+00E8
+              - generic "È (U+00C8)" [ref=f1e511]:
+                - generic [ref=f1e512]: È
+                - generic [ref=f1e513]: U+00C8
+              - generic "ê (U+00EA)" [ref=f1e514]:
+                - generic [ref=f1e515]: ê
+                - generic [ref=f1e516]: U+00EA
+              - generic "Ê (U+00CA)" [ref=f1e517]:
+                - generic [ref=f1e518]: Ê
+                - generic [ref=f1e519]: U+00CA
+              - generic "ě (U+011B)" [ref=f1e520]:
+                - generic [ref=f1e521]: ě
+                - generic [ref=f1e522]: U+011B
+              - generic "Ě (U+011A)" [ref=f1e523]:
+                - generic [ref=f1e524]: Ě
+                - generic [ref=f1e525]: U+011A
+              - generic "í (U+00ED)" [ref=f1e526]:
+                - generic [ref=f1e527]: í
+                - generic [ref=f1e528]: U+00ED
+              - generic "Í (U+00CD)" [ref=f1e529]:
+                - generic [ref=f1e530]: Í
+                - generic [ref=f1e531]: U+00CD
+              - generic "ì (U+00EC)" [ref=f1e532]:
+                - generic [ref=f1e533]: ì
+                - generic [ref=f1e534]: U+00EC
+              - generic "Ì (U+00CC)" [ref=f1e535]:
+                - generic [ref=f1e536]: Ì
+                - generic [ref=f1e537]: U+00CC
+              - generic "î (U+00EE)" [ref=f1e538]:
+                - generic [ref=f1e539]: î
+                - generic [ref=f1e540]: U+00EE
+              - generic "Î (U+00CE)" [ref=f1e541]:
+                - generic [ref=f1e542]: Î
+                - generic [ref=f1e543]: U+00CE
+              - generic "ǐ (U+01D0)" [ref=f1e544]:
+                - generic [ref=f1e545]: ǐ
+                - generic [ref=f1e546]: U+01D0
+              - generic "Ǐ (U+01CF)" [ref=f1e547]:
+                - generic [ref=f1e548]: Ǐ
+                - generic [ref=f1e549]: U+01CF
+              - generic "ń (U+0144)" [ref=f1e550]:
+                - generic [ref=f1e551]: ń
+                - generic [ref=f1e552]: U+0144
+              - generic "Ń (U+0143)" [ref=f1e553]:
+                - generic [ref=f1e554]: Ń
+                - generic [ref=f1e555]: U+0143
+              - generic "ǹ (U+01F9)" [ref=f1e556]:
+                - generic [ref=f1e557]: ǹ
+                - generic [ref=f1e558]: U+01F9
+              - generic "Ǹ (U+01F8)" [ref=f1e559]:
+                - generic [ref=f1e560]: Ǹ
+                - generic [ref=f1e561]: U+01F8
+              - generic "ó (U+00F3)" [ref=f1e562]:
+                - generic [ref=f1e563]: ó
+                - generic [ref=f1e564]: U+00F3
+              - generic "Ó (U+00D3)" [ref=f1e565]:
+                - generic [ref=f1e566]: Ó
+                - generic [ref=f1e567]: U+00D3
+              - generic "ò (U+00F2)" [ref=f1e568]:
+                - generic [ref=f1e569]: ò
+                - generic [ref=f1e570]: U+00F2
+              - generic "Ò (U+00D2)" [ref=f1e571]:
+                - generic [ref=f1e572]: Ò
+                - generic [ref=f1e573]: U+00D2
+              - generic "ô (U+00F4)" [ref=f1e574]:
+                - generic [ref=f1e575]: ô
+                - generic [ref=f1e576]: U+00F4
+              - generic "Ô (U+00D4)" [ref=f1e577]:
+                - generic [ref=f1e578]: Ô
+                - generic [ref=f1e579]: U+00D4
+              - generic "ǒ (U+01D2)" [ref=f1e580]:
+                - generic [ref=f1e581]: ǒ
+                - generic [ref=f1e582]: U+01D2
+              - generic "Ǒ (U+01D1)" [ref=f1e583]:
+                - generic [ref=f1e584]: Ǒ
+                - generic [ref=f1e585]: U+01D1
+              - generic "ú (U+00FA)" [ref=f1e586]:
+                - generic [ref=f1e587]: ú
+                - generic [ref=f1e588]: U+00FA
+              - generic "Ú (U+00DA)" [ref=f1e589]:
+                - generic [ref=f1e590]: Ú
+                - generic [ref=f1e591]: U+00DA
+              - generic "ù (U+00F9)" [ref=f1e592]:
+                - generic [ref=f1e593]: ù
+                - generic [ref=f1e594]: U+00F9
+              - generic "Ù (U+00D9)" [ref=f1e595]:
+                - generic [ref=f1e596]: Ù
+                - generic [ref=f1e597]: U+00D9
+              - generic "û (U+00FB)" [ref=f1e598]:
+                - generic [ref=f1e599]: û
+                - generic [ref=f1e600]: U+00FB
+              - generic "Û (U+00DB)" [ref=f1e601]:
+                - generic [ref=f1e602]: Û
+                - generic [ref=f1e603]: U+00DB
+              - generic "ǔ (U+01D4)" [ref=f1e604]:
+                - generic [ref=f1e605]: ǔ
+                - generic [ref=f1e606]: U+01D4
+              - generic "Ǔ (U+01D3)" [ref=f1e607]:
+                - generic [ref=f1e608]: Ǔ
+                - generic [ref=f1e609]: U+01D3
+    - separator "Resize panes" [ref=f1e610]
+    - region "Character map" [ref=f1e611]:
+      - generic [ref=f1e613]:
+        - heading "Character map" [level=2] [ref=f1e614]
+        - paragraph [ref=f1e615]: Browse and click to toggle characters into your alphabet — the same list you're building on the left.
+        - paragraph [ref=f1e616]: Characters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.
+        - generic [ref=f1e617]:
+          - generic [ref=f1e618]:
+            - generic [ref=f1e619]: Add any character by code point
+            - textbox "Add a character by Unicode code point" [ref=f1e620]:
+              - /placeholder: U+1E900
+          - button "Add" [disabled] [ref=f1e621]
+        - generic [ref=f1e622]:
+          - textbox "Search the character map" [ref=f1e623]:
+            - /placeholder: Search characters
+          - button "Search filters" [ref=f1e625] [cursor=pointer]:
+            - text: Search filters
+            - generic [aria-hidden] [ref=f1e626]: ▾
+        - generic [ref=f1e627]:
+          - generic [ref=f1e628]:
+            - checkbox "Show only blocks my keyboard uses" [checked] [ref=f1e629]
+            - text: Show only blocks my keyboard uses
+          - group "Zoom the character map" [ref=f1e630]:
+            - button "Zoom out" [ref=f1e631] [cursor=pointer]: −
+            - generic [ref=f1e632]: 100%
+            - button "Zoom in" [ref=f1e633] [cursor=pointer]: +
+        - generic [ref=f1e635]: 114 characters can't be previewed in the selected font
+        - generic [ref=f1e636]:
+          - region "Basic Latin characters" [ref=f1e637]:
+            - generic [ref=f1e638]:
+              - heading "Basic Latin" [level=3] [ref=f1e639]
+              - button "Hide Basic Latin" [expanded] [ref=f1e640] [cursor=pointer]
+            - group "Basic Latin characters — click to toggle" [ref=f1e643]:
+              - button "Add 0 (U+0030) — from your starting keyboard" [ref=f1e644] [cursor=pointer]:
+                - generic [ref=f1e645]: "0"
+                - generic [ref=f1e646]: U+0030
+                - generic [ref=f1e647]: +
+              - button "Add 1 (U+0031) — from your starting keyboard" [ref=f1e648] [cursor=pointer]:
+                - generic [ref=f1e649]: "1"
+                - generic [ref=f1e650]: U+0031
+                - generic [ref=f1e651]: +
+              - button "Add 2 (U+0032) — from your starting keyboard" [ref=f1e652] [cursor=pointer]:
+                - generic [ref=f1e653]: "2"
+                - generic [ref=f1e654]: U+0032
+                - generic [ref=f1e655]: +
+              - button "Add 3 (U+0033) — from your starting keyboard" [ref=f1e656] [cursor=pointer]:
+                - generic [ref=f1e657]: "3"
+                - generic [ref=f1e658]: U+0033
+                - generic [ref=f1e659]: +
+              - button "Add 4 (U+0034) — from your starting keyboard" [ref=f1e660] [cursor=pointer]:
+                - generic [ref=f1e661]: "4"
+                - generic [ref=f1e662]: U+0034
+                - generic [ref=f1e663]: +
+              - button "Add 5 (U+0035) — from your starting keyboard" [ref=f1e664] [cursor=pointer]:
+                - generic [ref=f1e665]: "5"
+                - generic [ref=f1e666]: U+0035
+                - generic [ref=f1e667]: +
+              - button "Add 6 (U+0036) — from your starting keyboard" [ref=f1e668] [cursor=pointer]:
+                - generic [ref=f1e669]: "6"
+                - generic [ref=f1e670]: U+0036
+                - generic [ref=f1e671]: +
+              - button "Add 7 (U+0037) — from your starting keyboard" [ref=f1e672] [cursor=pointer]:
+                - generic [ref=f1e673]: "7"
+                - generic [ref=f1e674]: U+0037
+                - generic [ref=f1e675]: +
+              - button "Add 8 (U+0038) — from your starting keyboard" [ref=f1e676] [cursor=pointer]:
+                - generic [ref=f1e677]: "8"
+                - generic [ref=f1e678]: U+0038
+                - generic [ref=f1e679]: +
+              - button "Add 9 (U+0039) — from your starting keyboard" [ref=f1e680] [cursor=pointer]:
+                - generic [ref=f1e681]: "9"
+                - generic [ref=f1e682]: U+0039
+                - generic [ref=f1e683]: +
+              - button "Remove a (U+0061)" [pressed] [ref=f1e684] [cursor=pointer]:
+                - generic [ref=f1e685]: a
+                - generic [ref=f1e686]: U+0061
+                - generic [ref=f1e687]: "[x]"
+              - button "Remove b (U+0062)" [pressed] [ref=f1e688] [cursor=pointer]:
+                - generic [ref=f1e689]: b
+                - generic [ref=f1e690]: U+0062
+                - generic [ref=f1e691]: "[x]"
+              - button "Add c (U+0063) — from your starting keyboard" [ref=f1e692] [cursor=pointer]:
+                - generic [ref=f1e693]: c
+                - generic [ref=f1e694]: U+0063
+                - generic [ref=f1e695]: +
+              - button "Remove d (U+0064)" [pressed] [ref=f1e696] [cursor=pointer]:
+                - generic [ref=f1e697]: d
+                - generic [ref=f1e698]: U+0064
+                - generic [ref=f1e699]: "[x]"
+              - button "Remove e (U+0065)" [pressed] [ref=f1e700] [cursor=pointer]:
+                - generic [ref=f1e701]: e
+                - generic [ref=f1e702]: U+0065
+                - generic [ref=f1e703]: "[x]"
+              - button "Remove f (U+0066)" [pressed] [ref=f1e704] [cursor=pointer]:
+                - generic [ref=f1e705]: f
+                - generic [ref=f1e706]: U+0066
+                - generic [ref=f1e707]: "[x]"
+              - button "Remove g (U+0067)" [pressed] [ref=f1e708] [cursor=pointer]:
+                - generic [ref=f1e709]: g
+                - generic [ref=f1e710]: U+0067
+                - generic [ref=f1e711]: "[x]"
+              - button "Remove h (U+0068)" [pressed] [ref=f1e712] [cursor=pointer]:
+                - generic [ref=f1e713]: h
+                - generic [ref=f1e714]: U+0068
+                - generic [ref=f1e715]: "[x]"
+              - button "Remove i (U+0069)" [pressed] [ref=f1e716] [cursor=pointer]:
+                - generic [ref=f1e717]: i
+                - generic [ref=f1e718]: U+0069
+                - generic [ref=f1e719]: "[x]"
+              - button "Add j (U+006A) — from your starting keyboard" [ref=f1e720] [cursor=pointer]:
+                - generic [ref=f1e721]: j
+                - generic [ref=f1e722]: U+006A
+                - generic [ref=f1e723]: +
+              - button "Remove k (U+006B)" [pressed] [ref=f1e724] [cursor=pointer]:
+                - generic [ref=f1e725]: k
+                - generic [ref=f1e726]: U+006B
+                - generic [ref=f1e727]: "[x]"
+              - button "Remove l (U+006C)" [pressed] [ref=f1e728] [cursor=pointer]:
+                - generic [ref=f1e729]: l
+                - generic [ref=f1e730]: U+006C
+                - generic [ref=f1e731]: "[x]"
+              - button "Remove m (U+006D)" [pressed] [ref=f1e732] [cursor=pointer]:
+                - generic [ref=f1e733]: m
+                - generic [ref=f1e734]: U+006D
+                - generic [ref=f1e735]: "[x]"
+              - button "Remove n (U+006E)" [pressed] [ref=f1e736] [cursor=pointer]:
+                - generic [ref=f1e737]: "n"
+                - generic [ref=f1e738]: U+006E
+                - generic [ref=f1e739]: "[x]"
+              - button "Remove o (U+006F)" [pressed] [ref=f1e740] [cursor=pointer]:
+                - generic [ref=f1e741]: o
+                - generic [ref=f1e742]: U+006F
+                - generic [ref=f1e743]: "[x]"
+              - button "Remove p (U+0070)" [pressed] [ref=f1e744] [cursor=pointer]:
+                - generic [ref=f1e745]: p
+                - generic [ref=f1e746]: U+0070
+                - generic [ref=f1e747]: "[x]"
+              - button "Add q (U+0071) — from your starting keyboard" [ref=f1e748] [cursor=pointer]:
+                - generic [ref=f1e749]: q
+                - generic [ref=f1e750]: U+0071
+                - generic [ref=f1e751]: +
+              - button "Remove r (U+0072)" [pressed] [ref=f1e752] [cursor=pointer]:
+                - generic [ref=f1e753]: r
+                - generic [ref=f1e754]: U+0072
+                - generic [ref=f1e755]: "[x]"
+              - button "Remove s (U+0073)" [pressed] [ref=f1e756] [cursor=pointer]:
+                - generic [ref=f1e757]: s
+                - generic [ref=f1e758]: U+0073
+                - generic [ref=f1e759]: "[x]"
+              - button "Remove t (U+0074)" [pressed] [ref=f1e760] [cursor=pointer]:
+                - generic [ref=f1e761]: t
+                - generic [ref=f1e762]: U+0074
+                - generic [ref=f1e763]: "[x]"
+              - button "Remove u (U+0075)" [pressed] [ref=f1e764] [cursor=pointer]:
+                - generic [ref=f1e765]: u
+                - generic [ref=f1e766]: U+0075
+                - generic [ref=f1e767]: "[x]"
+              - button "Remove v (U+0076)" [pressed] [ref=f1e768] [cursor=pointer]:
+                - generic [ref=f1e769]: v
+                - generic [ref=f1e770]: U+0076
+                - generic [ref=f1e771]: "[x]"
+              - button "Remove w (U+0077)" [pressed] [ref=f1e772] [cursor=pointer]:
+                - generic [ref=f1e773]: w
+                - generic [ref=f1e774]: U+0077
+                - generic [ref=f1e775]: "[x]"
+              - button "Add x (U+0078) — from your starting keyboard" [ref=f1e776] [cursor=pointer]:
+                - generic [ref=f1e777]: x
+                - generic [ref=f1e778]: U+0078
+                - generic [ref=f1e779]: +
+              - button "Remove y (U+0079)" [pressed] [ref=f1e780] [cursor=pointer]:
+                - generic [ref=f1e781]: "y"
+                - generic [ref=f1e782]: U+0079
+                - generic [ref=f1e783]: "[x]"
+              - button "Remove z (U+007A)" [pressed] [ref=f1e784] [cursor=pointer]:
+                - generic [ref=f1e785]: z
+                - generic [ref=f1e786]: U+007A
+                - generic [ref=f1e787]: "[x]"
+          - region "Latin-1 Supplement characters" [ref=f1e788]:
+            - generic [ref=f1e789]:
+              - heading "Latin-1 Supplement" [level=3] [ref=f1e790]
+              - button "Hide Latin-1 Supplement" [expanded] [ref=f1e791] [cursor=pointer]
+            - group "Latin-1 Supplement characters — click to toggle" [ref=f1e794]:
+              - button "Add ª (U+00AA)" [ref=f1e795] [cursor=pointer]:
+                - generic [ref=f1e796]: ª
+                - generic [ref=f1e797]: U+00AA
+                - generic [ref=f1e798]: +
+              - button "Add º (U+00BA)" [ref=f1e799] [cursor=pointer]:
+                - generic [ref=f1e800]: º
+                - generic [ref=f1e801]: U+00BA
+                - generic [ref=f1e802]: +
+              - button "Add ß (U+00DF)" [ref=f1e803] [cursor=pointer]:
+                - generic [ref=f1e804]: ß
+                - generic [ref=f1e805]: U+00DF
+                - generic [ref=f1e806]: +
+              - button "Remove à (U+00E0)" [pressed] [ref=f1e807] [cursor=pointer]:
+                - generic [ref=f1e808]: à
+                - generic [ref=f1e809]: U+00E0
+                - generic [ref=f1e810]: "[x]"
+              - button "Remove á (U+00E1)" [pressed] [ref=f1e811] [cursor=pointer]:
+                - generic [ref=f1e812]: á
+                - generic [ref=f1e813]: U+00E1
+                - generic [ref=f1e814]: "[x]"
+              - button "Remove â (U+00E2)" [pressed] [ref=f1e815] [cursor=pointer]:
+                - generic [ref=f1e816]: â
+                - generic [ref=f1e817]: U+00E2
+                - generic [ref=f1e818]: "[x]"
+              - button "Add ã (U+00E3) — from your starting keyboard" [ref=f1e819] [cursor=pointer]:
+                - generic [ref=f1e820]: ã
+                - generic [ref=f1e821]: U+00E3
+                - generic [ref=f1e822]: +
+              - button "Add ä (U+00E4) — from your starting keyboard" [ref=f1e823] [cursor=pointer]:
+                - generic [ref=f1e824]: ä
+                - generic [ref=f1e825]: U+00E4
+                - generic [ref=f1e826]: +
+              - button "Add å (U+00E5)" [ref=f1e827] [cursor=pointer]:
+                - generic [ref=f1e828]: å
+                - generic [ref=f1e829]: U+00E5
+                - generic [ref=f1e830]: +
+              - button "Add æ (U+00E6) — from your starting keyboard" [ref=f1e831] [cursor=pointer]:
+                - generic [ref=f1e832]: æ
+                - generic [ref=f1e833]: U+00E6
+                - generic [ref=f1e834]: +
+              - button "Add ç (U+00E7) — from your starting keyboard" [ref=f1e835] [cursor=pointer]:
+                - generic [ref=f1e836]: ç
+                - generic [ref=f1e837]: U+00E7
+                - generic [ref=f1e838]: +
+              - button "Remove è (U+00E8)" [pressed] [ref=f1e839] [cursor=pointer]:
+                - generic [ref=f1e840]: è
+                - generic [ref=f1e841]: U+00E8
+                - generic [ref=f1e842]: "[x]"
+              - button "Remove é (U+00E9)" [pressed] [ref=f1e843] [cursor=pointer]:
+                - generic [ref=f1e844]: é
+                - generic [ref=f1e845]: U+00E9
+                - generic [ref=f1e846]: "[x]"
+              - button "Remove ê (U+00EA)" [pressed] [ref=f1e847] [cursor=pointer]:
+                - generic [ref=f1e848]: ê
+                - generic [ref=f1e849]: U+00EA
+                - generic [ref=f1e850]: "[x]"
+              - button "Add ë (U+00EB) — from your starting keyboard" [ref=f1e851] [cursor=pointer]:
+                - generic [ref=f1e852]: ë
+                - generic [ref=f1e853]: U+00EB
+                - generic [ref=f1e854]: +
+              - button "Remove ì (U+00EC)" [pressed] [ref=f1e855] [cursor=pointer]:
+                - generic [ref=f1e856]: ì
+                - generic [ref=f1e857]: U+00EC
+                - generic [ref=f1e858]: "[x]"
+              - button "Remove í (U+00ED)" [pressed] [ref=f1e859] [cursor=pointer]:
+                - generic [ref=f1e860]: í
+                - generic [ref=f1e861]: U+00ED
+                - generic [ref=f1e862]: "[x]"
+              - button "Remove î (U+00EE)" [pressed] [ref=f1e863] [cursor=pointer]:
+                - generic [ref=f1e864]: î
+                - generic [ref=f1e865]: U+00EE
+                - generic [ref=f1e866]: "[x]"
+              - button "Add ï (U+00EF) — from your starting keyboard" [ref=f1e867] [cursor=pointer]:
+                - generic [ref=f1e868]: ï
+                - generic [ref=f1e869]: U+00EF
+                - generic [ref=f1e870]: +
+              - button "Add ð (U+00F0)" [ref=f1e871] [cursor=pointer]:
+                - generic [ref=f1e872]: ð
+                - generic [ref=f1e873]: U+00F0
+                - generic [ref=f1e874]: +
+              - button "Add ñ (U+00F1) — from your starting keyboard" [ref=f1e875] [cursor=pointer]:
+                - generic [ref=f1e876]: ñ
+                - generic [ref=f1e877]: U+00F1
+                - generic [ref=f1e878]: +
+              - button "Remove ò (U+00F2)" [pressed] [ref=f1e879] [cursor=pointer]:
+                - generic [ref=f1e880]: ò
+                - generic [ref=f1e881]: U+00F2
+                - generic [ref=f1e882]: "[x]"
+              - button "Remove ó (U+00F3)" [pressed] [ref=f1e883] [cursor=pointer]:
+                - generic [ref=f1e884]: ó
+                - generic [ref=f1e885]: U+00F3
+                - generic [ref=f1e886]: "[x]"
+              - button "Remove ô (U+00F4)" [pressed] [ref=f1e887] [cursor=pointer]:
+                - generic [ref=f1e888]: ô
+                - generic [ref=f1e889]: U+00F4
+                - generic [ref=f1e890]: "[x]"
+              - button "Add õ (U+00F5) — from your starting keyboard" [ref=f1e891] [cursor=pointer]:
+                - generic [ref=f1e892]: õ
+                - generic [ref=f1e893]: U+00F5
+                - generic [ref=f1e894]: +
+              - button "Add ö (U+00F6) — from your starting keyboard" [ref=f1e895] [cursor=pointer]:
+                - generic [ref=f1e896]: ö
+                - generic [ref=f1e897]: U+00F6
+                - generic [ref=f1e898]: +
+              - button "Add ø (U+00F8) — from your starting keyboard" [ref=f1e899] [cursor=pointer]:
+                - generic [ref=f1e900]: ø
+                - generic [ref=f1e901]: U+00F8
+                - generic [ref=f1e902]: +
+              - button "Remove ù (U+00F9)" [pressed] [ref=f1e903] [cursor=pointer]:
+                - generic [ref=f1e904]: ù
+                - generic [ref=f1e905]: U+00F9
+                - generic [ref=f1e906]: "[x]"
+              - button "Remove ú (U+00FA)" [pressed] [ref=f1e907] [cursor=pointer]:
+                - generic [ref=f1e908]: ú
+                - generic [ref=f1e909]: U+00FA
+                - generic [ref=f1e910]: "[x]"
+              - button "Remove û (U+00FB)" [pressed] [ref=f1e911] [cursor=pointer]:
+                - generic [ref=f1e912]: û
+                - generic [ref=f1e913]: U+00FB
+                - generic [ref=f1e914]: "[x]"
+              - button "Add ü (U+00FC) — from your starting keyboard" [ref=f1e915] [cursor=pointer]:
+                - generic [ref=f1e916]: ü
+                - generic [ref=f1e917]: U+00FC
+                - generic [ref=f1e918]: +
+              - button "Add ý (U+00FD)" [ref=f1e919] [cursor=pointer]:
+                - generic [ref=f1e920]: ý
+                - generic [ref=f1e921]: U+00FD
+                - generic [ref=f1e922]: +
+              - button "Add þ (U+00FE)" [ref=f1e923] [cursor=pointer]:
+                - generic [ref=f1e924]: þ
+                - generic [ref=f1e925]: U+00FE
+                - generic [ref=f1e926]: +
+              - button "Add ÿ (U+00FF) — from your starting keyboard" [ref=f1e927] [cursor=pointer]:
+                - generic [ref=f1e928]: ÿ
+                - generic [ref=f1e929]: U+00FF
+                - generic [ref=f1e930]: +
+          - region "Latin Extended-A characters" [ref=f1e931]:
+            - generic [ref=f1e932]:
+              - heading "Latin Extended-A" [level=3] [ref=f1e933]
+              - button "Hide Latin Extended-A" [expanded] [ref=f1e934] [cursor=pointer]
+            - group "Latin Extended-A characters — click to toggle" [ref=f1e937]:
+              - button "Add ā (U+0101)" [ref=f1e938] [cursor=pointer]:
+                - generic [ref=f1e939]: ā
+                - generic [ref=f1e940]: U+0101
+                - generic [ref=f1e941]: +
+              - button "Add ă (U+0103)" [ref=f1e942] [cursor=pointer]:
+                - generic [ref=f1e943]: ă
+                - generic [ref=f1e944]: U+0103
+                - generic [ref=f1e945]: +
+              - button "Add ą (U+0105)" [ref=f1e946] [cursor=pointer]:
+                - generic [ref=f1e947]: ą
+                - generic [ref=f1e948]: U+0105
+                - generic [ref=f1e949]: +
+              - button "Add ć (U+0107)" [ref=f1e950] [cursor=pointer]:
+                - generic [ref=f1e951]: ć
+                - generic [ref=f1e952]: U+0107
+                - generic [ref=f1e953]: +
+              - button "Add ĉ (U+0109)" [ref=f1e954] [cursor=pointer]:
+                - generic [ref=f1e955]: ĉ
+                - generic [ref=f1e956]: U+0109
+                - generic [ref=f1e957]: +
+              - button "Add ċ (U+010B)" [ref=f1e958] [cursor=pointer]:
+                - generic [ref=f1e959]: ċ
+                - generic [ref=f1e960]: U+010B
+                - generic [ref=f1e961]: +
+              - button "Add č (U+010D)" [ref=f1e962] [cursor=pointer]:
+                - generic [ref=f1e963]: č
+                - generic [ref=f1e964]: U+010D
+                - generic [ref=f1e965]: +
+              - button "Add ď (U+010F)" [ref=f1e966] [cursor=pointer]:
+                - generic [ref=f1e967]: ď
+                - generic [ref=f1e968]: U+010F
+                - generic [ref=f1e969]: +
+              - button "Add đ (U+0111)" [ref=f1e970] [cursor=pointer]:
+                - generic [ref=f1e971]: đ
+                - generic [ref=f1e972]: U+0111
+                - generic [ref=f1e973]: +
+              - button "Add ē (U+0113)" [ref=f1e974] [cursor=pointer]:
+                - generic [ref=f1e975]: ē
+                - generic [ref=f1e976]: U+0113
+                - generic [ref=f1e977]: +
+              - button "Add ĕ (U+0115)" [ref=f1e978] [cursor=pointer]:
+                - generic [ref=f1e979]: ĕ
+                - generic [ref=f1e980]: U+0115
+                - generic [ref=f1e981]: +
+              - button "Add ė (U+0117)" [ref=f1e982] [cursor=pointer]:
+                - generic [ref=f1e983]: ė
+                - generic [ref=f1e984]: U+0117
+                - generic [ref=f1e985]: +
+              - button "Add ę (U+0119)" [ref=f1e986] [cursor=pointer]:
+                - generic [ref=f1e987]: ę
+                - generic [ref=f1e988]: U+0119
+                - generic [ref=f1e989]: +
+              - button "Remove ě (U+011B)" [pressed] [ref=f1e990] [cursor=pointer]:
+                - generic [ref=f1e991]: ě
+                - generic [ref=f1e992]: U+011B
+                - generic [ref=f1e993]: "[x]"
+              - button "Add ĝ (U+011D)" [ref=f1e994] [cursor=pointer]:
+                - generic [ref=f1e995]: ĝ
+                - generic [ref=f1e996]: U+011D
+                - generic [ref=f1e997]: +
+              - button "Add ğ (U+011F)" [ref=f1e998] [cursor=pointer]:
+                - generic [ref=f1e999]: ğ
+                - generic [ref=f1e1000]: U+011F
+                - generic [ref=f1e1001]: +
+              - button "Add ġ (U+0121)" [ref=f1e1002] [cursor=pointer]:
+                - generic [ref=f1e1003]: ġ
+                - generic [ref=f1e1004]: U+0121
+                - generic [ref=f1e1005]: +
+              - button "Add ģ (U+0123)" [ref=f1e1006] [cursor=pointer]:
+                - generic [ref=f1e1007]: ģ
+                - generic [ref=f1e1008]: U+0123
+                - generic [ref=f1e1009]: +
+              - button "Add ĥ (U+0125)" [ref=f1e1010] [cursor=pointer]:
+                - generic [ref=f1e1011]: ĥ
+                - generic [ref=f1e1012]: U+0125
+                - generic [ref=f1e1013]: +
+              - button "Add ħ (U+0127)" [ref=f1e1014] [cursor=pointer]:
+                - generic [ref=f1e1015]: ħ
+                - generic [ref=f1e1016]: U+0127
+                - generic [ref=f1e1017]: +
+              - button "Add ĩ (U+0129)" [ref=f1e1018] [cursor=pointer]:
+                - generic [ref=f1e1019]: ĩ
+                - generic [ref=f1e1020]: U+0129
+                - generic [ref=f1e1021]: +
+              - button "Add ī (U+012B)" [ref=f1e1022] [cursor=pointer]:
+                - generic [ref=f1e1023]: ī
+                - generic [ref=f1e1024]: U+012B
+                - generic [ref=f1e1025]: +
+              - button "Add ĭ (U+012D)" [ref=f1e1026] [cursor=pointer]:
+                - generic [ref=f1e1027]: ĭ
+                - generic [ref=f1e1028]: U+012D
+                - generic [ref=f1e1029]: +
+              - button "Add į (U+012F)" [ref=f1e1030] [cursor=pointer]:
+                - generic [ref=f1e1031]: į
+                - generic [ref=f1e1032]: U+012F
+                - generic [ref=f1e1033]: +
+              - button "Add İ (U+0130)" [ref=f1e1034] [cursor=pointer]:
+                - generic [ref=f1e1035]: İ
+                - generic [ref=f1e1036]: U+0130
+                - generic [ref=f1e1037]: +
+              - button "Add ı (U+0131)" [ref=f1e1038] [cursor=pointer]:
+                - generic [ref=f1e1039]: ı
+                - generic [ref=f1e1040]: U+0131
+                - generic [ref=f1e1041]: +
+              - button "Add ĳ (U+0133)" [ref=f1e1042] [cursor=pointer]:
+                - generic [ref=f1e1043]: ĳ
+                - generic [ref=f1e1044]: U+0133
+                - generic [ref=f1e1045]: +
+              - button "Add ĵ (U+0135)" [ref=f1e1046] [cursor=pointer]:
+                - generic [ref=f1e1047]: ĵ
+                - generic [ref=f1e1048]: U+0135
+                - generic [ref=f1e1049]: +
+              - button "Add ķ (U+0137)" [ref=f1e1050] [cursor=pointer]:
+                - generic [ref=f1e1051]: ķ
+                - generic [ref=f1e1052]: U+0137
+                - generic [ref=f1e1053]: +
+              - button "Add ĸ (U+0138)" [ref=f1e1054] [cursor=pointer]:
+                - generic [ref=f1e1055]: ĸ
+                - generic [ref=f1e1056]: U+0138
+                - generic [ref=f1e1057]: +
+              - button "Add ĺ (U+013A)" [ref=f1e1058] [cursor=pointer]:
+                - generic [ref=f1e1059]: ĺ
+                - generic [ref=f1e1060]: U+013A
+                - generic [ref=f1e1061]: +
+              - button "Add ļ (U+013C)" [ref=f1e1062] [cursor=pointer]:
+                - generic [ref=f1e1063]: ļ
+                - generic [ref=f1e1064]: U+013C
+                - generic [ref=f1e1065]: +
+              - button "Add ľ (U+013E)" [ref=f1e1066] [cursor=pointer]:
+                - generic [ref=f1e1067]: ľ
+                - generic [ref=f1e1068]: U+013E
+                - generic [ref=f1e1069]: +
+              - button "Add ŀ (U+0140)" [ref=f1e1070] [cursor=pointer]:
+                - generic [ref=f1e1071]: ŀ
+                - generic [ref=f1e1072]: U+0140
+                - generic [ref=f1e1073]: +
+              - button "Add ł (U+0142)" [ref=f1e1074] [cursor=pointer]:
+                - generic [ref=f1e1075]: ł
+                - generic [ref=f1e1076]: U+0142
+                - generic [ref=f1e1077]: +
+              - button "Remove ń (U+0144)" [pressed] [ref=f1e1078] [cursor=pointer]:
+                - generic [ref=f1e1079]: ń
+                - generic [ref=f1e1080]: U+0144
+                - generic [ref=f1e1081]: "[x]"
+              - button "Add ņ (U+0146)" [ref=f1e1082] [cursor=pointer]:
+                - generic [ref=f1e1083]: ņ
+                - generic [ref=f1e1084]: U+0146
+                - generic [ref=f1e1085]: +
+              - button "Add ň (U+0148)" [ref=f1e1086] [cursor=pointer]:
+                - generic [ref=f1e1087]: ň
+                - generic [ref=f1e1088]: U+0148
+                - generic [ref=f1e1089]: +
+              - button "Add ŉ (U+0149)" [ref=f1e1090] [cursor=pointer]:
+                - generic [ref=f1e1091]: ŉ
+                - generic [ref=f1e1092]: U+0149
+                - generic [ref=f1e1093]: +
+              - button "Remove ŋ (U+014B)" [pressed] [ref=f1e1094] [cursor=pointer]:
+                - generic [ref=f1e1095]: ŋ
+                - generic [ref=f1e1096]: U+014B
+                - generic [ref=f1e1097]: "[x]"
+              - button "Add ō (U+014D)" [ref=f1e1098] [cursor=pointer]:
+                - generic [ref=f1e1099]: ō
+                - generic [ref=f1e1100]: U+014D
+                - generic [ref=f1e1101]: +
+              - button "Add ŏ (U+014F)" [ref=f1e1102] [cursor=pointer]:
+                - generic [ref=f1e1103]: ŏ
+                - generic [ref=f1e1104]: U+014F
+                - generic [ref=f1e1105]: +
+              - button "Add ő (U+0151)" [ref=f1e1106] [cursor=pointer]:
+                - generic [ref=f1e1107]: ő
+                - generic [ref=f1e1108]: U+0151
+                - generic [ref=f1e1109]: +
+              - button "Add œ (U+0153) — from your starting keyboard" [ref=f1e1110] [cursor=pointer]:
+                - generic [ref=f1e1111]: œ
+                - generic [ref=f1e1112]: U+0153
+                - generic [ref=f1e1113]: +
+              - button "Add ŕ (U+0155)" [ref=f1e1114] [cursor=pointer]:
+                - generic [ref=f1e1115]: ŕ
+                - generic [ref=f1e1116]: U+0155
+                - generic [ref=f1e1117]: +
+              - button "Add ŗ (U+0157)" [ref=f1e1118] [cursor=pointer]:
+                - generic [ref=f1e1119]: ŗ
+                - generic [ref=f1e1120]: U+0157
+                - generic [ref=f1e1121]: +
+              - button "Add ř (U+0159)" [ref=f1e1122] [cursor=pointer]:
+                - generic [ref=f1e1123]: ř
+                - generic [ref=f1e1124]: U+0159
+                - generic [ref=f1e1125]: +
+              - button "Add ś (U+015B)" [ref=f1e1126] [cursor=pointer]:
+                - generic [ref=f1e1127]: ś
+                - generic [ref=f1e1128]: U+015B
+                - generic [ref=f1e1129]: +
+              - button "Add ŝ (U+015D)" [ref=f1e1130] [cursor=pointer]:
+                - generic [ref=f1e1131]: ŝ
+                - generic [ref=f1e1132]: U+015D
+                - generic [ref=f1e1133]: +
+              - button "Add ş (U+015F)" [ref=f1e1134] [cursor=pointer]:
+                - generic [ref=f1e1135]: ş
+                - generic [ref=f1e1136]: U+015F
+                - generic [ref=f1e1137]: +
+              - button "Add š (U+0161)" [ref=f1e1138] [cursor=pointer]:
+                - generic [ref=f1e1139]: š
+                - generic [ref=f1e1140]: U+0161
+                - generic [ref=f1e1141]: +
+              - button "Add ţ (U+0163)" [ref=f1e1142] [cursor=pointer]:
+                - generic [ref=f1e1143]: ţ
+                - generic [ref=f1e1144]: U+0163
+                - generic [ref=f1e1145]: +
+              - button "Add ť (U+0165)" [ref=f1e1146] [cursor=pointer]:
+                - generic [ref=f1e1147]: ť
+                - generic [ref=f1e1148]: U+0165
+                - generic [ref=f1e1149]: +
+              - button "Add ŧ (U+0167)" [ref=f1e1150] [cursor=pointer]:
+                - generic [ref=f1e1151]: ŧ
+                - generic [ref=f1e1152]: U+0167
+                - generic [ref=f1e1153]: +
+              - button "Add ũ (U+0169)" [ref=f1e1154] [cursor=pointer]:
+                - generic [ref=f1e1155]: ũ
+                - generic [ref=f1e1156]: U+0169
+                - generic [ref=f1e1157]: +
+              - button "Add ū (U+016B) — from your starting keyboard" [ref=f1e1158] [cursor=pointer]:
+                - generic [ref=f1e1159]: ū
+                - generic [ref=f1e1160]: U+016B
+                - generic [ref=f1e1161]: +
+              - button "Add ŭ (U+016D)" [ref=f1e1162] [cursor=pointer]:
+                - generic [ref=f1e1163]: ŭ
+                - generic [ref=f1e1164]: U+016D
+                - generic [ref=f1e1165]: +
+              - button "Add ů (U+016F)" [ref=f1e1166] [cursor=pointer]:
+                - generic [ref=f1e1167]: ů
+                - generic [ref=f1e1168]: U+016F
+                - generic [ref=f1e1169]: +
+              - button "Add ű (U+0171)" [ref=f1e1170] [cursor=pointer]:
+                - generic [ref=f1e1171]: ű
+                - generic [ref=f1e1172]: U+0171
+                - generic [ref=f1e1173]: +
+              - button "Add ų (U+0173)" [ref=f1e1174] [cursor=pointer]:
+                - generic [ref=f1e1175]: ų
+                - generic [ref=f1e1176]: U+0173
+                - generic [ref=f1e1177]: +
+              - button "Add ŵ (U+0175)" [ref=f1e1178] [cursor=pointer]:
+                - generic [ref=f1e1179]: ŵ
+                - generic [ref=f1e1180]: U+0175
+                - generic [ref=f1e1181]: +
+              - button "Add ŷ (U+0177)" [ref=f1e1182] [cursor=pointer]:
+                - generic [ref=f1e1183]: ŷ
+                - generic [ref=f1e1184]: U+0177
+                - generic [ref=f1e1185]: +
+              - button "Add ź (U+017A)" [ref=f1e1186] [cursor=pointer]:
+                - generic [ref=f1e1187]: ź
+                - generic [ref=f1e1188]: U+017A
+                - generic [ref=f1e1189]: +
+              - button "Add ż (U+017C)" [ref=f1e1190] [cursor=pointer]:
+                - generic [ref=f1e1191]: ż
+                - generic [ref=f1e1192]: U+017C
+                - generic [ref=f1e1193]: +
+              - button "Add ž (U+017E)" [ref=f1e1194] [cursor=pointer]:
+                - generic [ref=f1e1195]: ž
+                - generic [ref=f1e1196]: U+017E
+                - generic [ref=f1e1197]: +
+              - button "Add ſ (U+017F)" [ref=f1e1198] [cursor=pointer]:
+                - generic [ref=f1e1199]: ſ
+                - generic [ref=f1e1200]: U+017F
+                - generic [ref=f1e1201]: +
+          - region "Latin Extended-B characters" [ref=f1e1202]:
+            - generic [ref=f1e1203]:
+              - heading "Latin Extended-B" [level=3] [ref=f1e1204]
+              - button "Hide Latin Extended-B" [expanded] [ref=f1e1205] [cursor=pointer]
+            - group "Latin Extended-B characters — click to toggle" [ref=f1e1208]:
+              - button "Add ƀ (U+0180)" [ref=f1e1209] [cursor=pointer]:
+                - generic [ref=f1e1210]: ƀ
+                - generic [ref=f1e1211]: U+0180
+                - generic [ref=f1e1212]: +
+              - button "Add ƃ (U+0183)" [ref=f1e1213] [cursor=pointer]:
+                - generic [ref=f1e1214]: ƃ
+                - generic [ref=f1e1215]: U+0183
+                - generic [ref=f1e1216]: +
+              - button "Add ƅ (U+0185)" [ref=f1e1217] [cursor=pointer]:
+                - generic [ref=f1e1218]: ƅ
+                - generic [ref=f1e1219]: U+0185
+                - generic [ref=f1e1220]: +
+              - button "Add ƈ (U+0188)" [ref=f1e1221] [cursor=pointer]:
+                - generic [ref=f1e1222]: ƈ
+                - generic [ref=f1e1223]: U+0188
+                - generic [ref=f1e1224]: +
+              - button "Add ƌ (U+018C)" [ref=f1e1225] [cursor=pointer]:
+                - generic [ref=f1e1226]: ƌ
+                - generic [ref=f1e1227]: U+018C
+                - generic [ref=f1e1228]: +
+              - button "Add ƍ (U+018D)" [ref=f1e1229] [cursor=pointer]:
+                - generic [ref=f1e1230]: ƍ
+                - generic [ref=f1e1231]: U+018D
+                - generic [ref=f1e1232]: +
+              - button "Add ƒ (U+0192)" [ref=f1e1233] [cursor=pointer]:
+                - generic [ref=f1e1234]: ƒ
+                - generic [ref=f1e1235]: U+0192
+                - generic [ref=f1e1236]: +
+              - button "Add ƕ (U+0195)" [ref=f1e1237] [cursor=pointer]:
+                - generic [ref=f1e1238]: ƕ
+                - generic [ref=f1e1239]: U+0195
+                - generic [ref=f1e1240]: +
+              - button "Add ƙ (U+0199)" [ref=f1e1241] [cursor=pointer]:
+                - generic [ref=f1e1242]: ƙ
+                - generic [ref=f1e1243]: U+0199
+                - generic [ref=f1e1244]: +
+              - button "Add ƚ (U+019A)" [ref=f1e1245] [cursor=pointer]:
+                - generic [ref=f1e1246]: ƚ
+                - generic [ref=f1e1247]: U+019A
+                - generic [ref=f1e1248]: +
+              - button "Add ƛ (U+019B)" [ref=f1e1249] [cursor=pointer]:
+                - generic [ref=f1e1250]: ƛ
+                - generic [ref=f1e1251]: U+019B
+                - generic [ref=f1e1252]: +
+              - button "Add ƞ (U+019E)" [ref=f1e1253] [cursor=pointer]:
+                - generic [ref=f1e1254]: ƞ
+                - generic [ref=f1e1255]: U+019E
+                - generic [ref=f1e1256]: +
+              - button "Add ơ (U+01A1)" [ref=f1e1257] [cursor=pointer]:
+                - generic [ref=f1e1258]: ơ
+                - generic [ref=f1e1259]: U+01A1
+                - generic [ref=f1e1260]: +
+              - button "Add ƣ (U+01A3)" [ref=f1e1261] [cursor=pointer]:
+                - generic [ref=f1e1262]: ƣ
+                - generic [ref=f1e1263]: U+01A3
+                - generic [ref=f1e1264]: +
+              - button "Add ƥ (U+01A5)" [ref=f1e1265] [cursor=pointer]:
+                - generic [ref=f1e1266]: ƥ
+                - generic [ref=f1e1267]: U+01A5
+                - generic [ref=f1e1268]: +
+              - button "Add ƨ (U+01A8)" [ref=f1e1269] [cursor=pointer]:
+                - generic [ref=f1e1270]: ƨ
+                - generic [ref=f1e1271]: U+01A8
+                - generic [ref=f1e1272]: +
+              - button "Add ƪ (U+01AA)" [ref=f1e1273] [cursor=pointer]:
+                - generic [ref=f1e1274]: ƪ
+                - generic [ref=f1e1275]: U+01AA
+                - generic [ref=f1e1276]: +
+              - button "Add ƫ (U+01AB)" [ref=f1e1277] [cursor=pointer]:
+                - generic [ref=f1e1278]: ƫ
+                - generic [ref=f1e1279]: U+01AB
+                - generic [ref=f1e1280]: +
+              - button "Add ƭ (U+01AD)" [ref=f1e1281] [cursor=pointer]:
+                - generic [ref=f1e1282]: ƭ
+                - generic [ref=f1e1283]: U+01AD
+                - generic [ref=f1e1284]: +
+              - button "Add ư (U+01B0)" [ref=f1e1285] [cursor=pointer]:
+                - generic [ref=f1e1286]: ư
+                - generic [ref=f1e1287]: U+01B0
+                - generic [ref=f1e1288]: +
+              - button "Add ƴ (U+01B4) — from your starting keyboard" [ref=f1e1289] [cursor=pointer]:
+                - generic [ref=f1e1290]: ƴ
+                - generic [ref=f1e1291]: U+01B4
+                - generic [ref=f1e1292]: +
+              - button "Add ƶ (U+01B6)" [ref=f1e1293] [cursor=pointer]:
+                - generic [ref=f1e1294]: ƶ
+                - generic [ref=f1e1295]: U+01B6
+                - generic [ref=f1e1296]: +
+              - button "Add ƹ (U+01B9)" [ref=f1e1297] [cursor=pointer]:
+                - generic [ref=f1e1298]: ƹ
+                - generic [ref=f1e1299]: U+01B9
+                - generic [ref=f1e1300]: +
+              - button "Add ƺ (U+01BA)" [ref=f1e1301] [cursor=pointer]:
+                - generic [ref=f1e1302]: ƺ
+                - generic [ref=f1e1303]: U+01BA
+                - generic [ref=f1e1304]: +
+              - button "Add ƻ (U+01BB)" [ref=f1e1305] [cursor=pointer]:
+                - generic [ref=f1e1306]: ƻ
+                - generic [ref=f1e1307]: U+01BB
+                - generic [ref=f1e1308]: +
+              - button "Add ƽ (U+01BD)" [ref=f1e1309] [cursor=pointer]:
+                - generic [ref=f1e1310]: ƽ
+                - generic [ref=f1e1311]: U+01BD
+                - generic [ref=f1e1312]: +
+              - button "Add ƾ (U+01BE)" [ref=f1e1313] [cursor=pointer]:
+                - generic [ref=f1e1314]: ƾ
+                - generic [ref=f1e1315]: U+01BE
+                - generic [ref=f1e1316]: +
+              - button "Add ƿ (U+01BF)" [ref=f1e1317] [cursor=pointer]:
+                - generic [ref=f1e1318]: ƿ
+                - generic [ref=f1e1319]: U+01BF
+                - generic [ref=f1e1320]: +
+              - button "Add ǀ (U+01C0)" [ref=f1e1321] [cursor=pointer]:
+                - generic [ref=f1e1322]: ǀ
+                - generic [ref=f1e1323]: U+01C0
+                - generic [ref=f1e1324]: +
+              - button "Add ǁ (U+01C1)" [ref=f1e1325] [cursor=pointer]:
+                - generic [ref=f1e1326]: ǁ
+                - generic [ref=f1e1327]: U+01C1
+                - generic [ref=f1e1328]: +
+              - button "Add ǂ (U+01C2)" [ref=f1e1329] [cursor=pointer]:
+                - generic [ref=f1e1330]: ǂ
+                - generic [ref=f1e1331]: U+01C2
+                - generic [ref=f1e1332]: +
+              - button "Add ǃ (U+01C3)" [ref=f1e1333] [cursor=pointer]:
+                - generic [ref=f1e1334]: ǃ
+                - generic [ref=f1e1335]: U+01C3
+                - generic [ref=f1e1336]: +
+              - button "Add ǅ (U+01C5)" [ref=f1e1337] [cursor=pointer]:
+                - generic [ref=f1e1338]: ǅ
+                - generic [ref=f1e1339]: U+01C5
+                - generic [ref=f1e1340]: +
+              - button "Add ǆ (U+01C6)" [ref=f1e1341] [cursor=pointer]:
+                - generic [ref=f1e1342]: ǆ
+                - generic [ref=f1e1343]: U+01C6
+                - generic [ref=f1e1344]: +
+              - button "Add ǈ (U+01C8)" [ref=f1e1345] [cursor=pointer]:
+                - generic [ref=f1e1346]: ǈ
+                - generic [ref=f1e1347]: U+01C8
+                - generic [ref=f1e1348]: +
+              - button "Add ǉ (U+01C9)" [ref=f1e1349] [cursor=pointer]:
+                - generic [ref=f1e1350]: ǉ
+                - generic [ref=f1e1351]: U+01C9
+                - generic [ref=f1e1352]: +
+              - button "Add ǋ (U+01CB)" [ref=f1e1353] [cursor=pointer]:
+                - generic [ref=f1e1354]: ǋ
+                - generic [ref=f1e1355]: U+01CB
+                - generic [ref=f1e1356]: +
+              - button "Add ǌ (U+01CC)" [ref=f1e1357] [cursor=pointer]:
+                - generic [ref=f1e1358]: ǌ
+                - generic [ref=f1e1359]: U+01CC
+                - generic [ref=f1e1360]: +
+              - button "Remove ǎ (U+01CE)" [pressed] [ref=f1e1361] [cursor=pointer]:
+                - generic [ref=f1e1362]: ǎ
+                - generic [ref=f1e1363]: U+01CE
+                - generic [ref=f1e1364]: "[x]"
+              - button "Remove ǐ (U+01D0)" [pressed] [ref=f1e1365] [cursor=pointer]:
+                - generic [ref=f1e1366]: ǐ
+                - generic [ref=f1e1367]: U+01D0
+                - generic [ref=f1e1368]: "[x]"
+              - button "Remove ǒ (U+01D2)" [pressed] [ref=f1e1369] [cursor=pointer]:
+                - generic [ref=f1e1370]: ǒ
+                - generic [ref=f1e1371]: U+01D2
+                - generic [ref=f1e1372]: "[x]"
+              - button "Remove ǔ (U+01D4)" [pressed] [ref=f1e1373] [cursor=pointer]:
+                - generic [ref=f1e1374]: ǔ
+                - generic [ref=f1e1375]: U+01D4
+                - generic [ref=f1e1376]: "[x]"
+              - button "Add ǖ (U+01D6)" [ref=f1e1377] [cursor=pointer]:
+                - generic [ref=f1e1378]: ǖ
+                - generic [ref=f1e1379]: U+01D6
+                - generic [ref=f1e1380]: +
+              - button "Add ǘ (U+01D8)" [ref=f1e1381] [cursor=pointer]:
+                - generic [ref=f1e1382]: ǘ
+                - generic [ref=f1e1383]: U+01D8
+                - generic [ref=f1e1384]: +
+              - button "Add ǚ (U+01DA)" [ref=f1e1385] [cursor=pointer]:
+                - generic [ref=f1e1386]: ǚ
+                - generic [ref=f1e1387]: U+01DA
+                - generic [ref=f1e1388]: +
+              - button "Add ǜ (U+01DC)" [ref=f1e1389] [cursor=pointer]:
+                - generic [ref=f1e1390]: ǜ
+                - generic [ref=f1e1391]: U+01DC
+                - generic [ref=f1e1392]: +
+              - button "Add ǝ (U+01DD)" [ref=f1e1393] [cursor=pointer]:
+                - generic [ref=f1e1394]: ǝ
+                - generic [ref=f1e1395]: U+01DD
+                - generic [ref=f1e1396]: +
+              - button "Add ǟ (U+01DF)" [ref=f1e1397] [cursor=pointer]:
+                - generic [ref=f1e1398]: ǟ
+                - generic [ref=f1e1399]: U+01DF
+                - generic [ref=f1e1400]: +
+              - button "Add ǡ (U+01E1)" [ref=f1e1401] [cursor=pointer]:
+                - generic [ref=f1e1402]: ǡ
+                - generic [ref=f1e1403]: U+01E1
+                - generic [ref=f1e1404]: +
+              - button "Add ǣ (U+01E3)" [ref=f1e1405] [cursor=pointer]:
+                - generic [ref=f1e1406]: ǣ
+                - generic [ref=f1e1407]: U+01E3
+                - generic [ref=f1e1408]: +
+              - button "Add ǥ (U+01E5)" [ref=f1e1409] [cursor=pointer]:
+                - generic [ref=f1e1410]: ǥ
+                - generic [ref=f1e1411]: U+01E5
+                - generic [ref=f1e1412]: +
+              - button "Add ǧ (U+01E7)" [ref=f1e1413] [cursor=pointer]:
+                - generic [ref=f1e1414]: ǧ
+                - generic [ref=f1e1415]: U+01E7
+                - generic [ref=f1e1416]: +
+              - button "Add ǩ (U+01E9)" [ref=f1e1417] [cursor=pointer]:
+                - generic [ref=f1e1418]: ǩ
+                - generic [ref=f1e1419]: U+01E9
+                - generic [ref=f1e1420]: +
+              - button "Add ǫ (U+01EB)" [ref=f1e1421] [cursor=pointer]:
+                - generic [ref=f1e1422]: ǫ
+                - generic [ref=f1e1423]: U+01EB
+                - generic [ref=f1e1424]: +
+              - button "Add ǭ (U+01ED)" [ref=f1e1425] [cursor=pointer]:
+                - generic [ref=f1e1426]: ǭ
+                - generic [ref=f1e1427]: U+01ED
+                - generic [ref=f1e1428]: +
+              - button "Add ǯ (U+01EF)" [ref=f1e1429] [cursor=pointer]:
+                - generic [ref=f1e1430]: ǯ
+                - generic [ref=f1e1431]: U+01EF
+                - generic [ref=f1e1432]: +
+              - button "Add ǰ (U+01F0)" [ref=f1e1433] [cursor=pointer]:
+                - generic [ref=f1e1434]: ǰ
+                - generic [ref=f1e1435]: U+01F0
+                - generic [ref=f1e1436]: +
+              - button "Add ǲ (U+01F2)" [ref=f1e1437] [cursor=pointer]:
+                - generic [ref=f1e1438]: ǲ
+                - generic [ref=f1e1439]: U+01F2
+                - generic [ref=f1e1440]: +
+              - button "Add ǳ (U+01F3)" [ref=f1e1441] [cursor=pointer]:
+                - generic [ref=f1e1442]: ǳ
+                - generic [ref=f1e1443]: U+01F3
+                - generic [ref=f1e1444]: +
+              - button "Add ǵ (U+01F5)" [ref=f1e1445] [cursor=pointer]:
+                - generic [ref=f1e1446]: ǵ
+                - generic [ref=f1e1447]: U+01F5
+                - generic [ref=f1e1448]: +
+              - button "Remove ǹ (U+01F9)" [pressed] [ref=f1e1449] [cursor=pointer]:
+                - generic [ref=f1e1450]: ǹ
+                - generic [ref=f1e1451]: U+01F9
+                - generic [ref=f1e1452]: "[x]"
+              - button "Add ǻ (U+01FB)" [ref=f1e1453] [cursor=pointer]:
+                - generic [ref=f1e1454]: ǻ
+                - generic [ref=f1e1455]: U+01FB
+                - generic [ref=f1e1456]: +
+              - button "Add ǽ (U+01FD)" [ref=f1e1457] [cursor=pointer]:
+                - generic [ref=f1e1458]: ǽ
+                - generic [ref=f1e1459]: U+01FD
+                - generic [ref=f1e1460]: +
+              - button "Add ǿ (U+01FF)" [ref=f1e1461] [cursor=pointer]:
+                - generic [ref=f1e1462]: ǿ
+                - generic [ref=f1e1463]: U+01FF
+                - generic [ref=f1e1464]: +
+              - button "Add ȁ (U+0201)" [ref=f1e1465] [cursor=pointer]:
+                - generic [ref=f1e1466]: ȁ
+                - generic [ref=f1e1467]: U+0201
+                - generic [ref=f1e1468]: +
+              - button "Add ȃ (U+0203)" [ref=f1e1469] [cursor=pointer]:
+                - generic [ref=f1e1470]: ȃ
+                - generic [ref=f1e1471]: U+0203
+                - generic [ref=f1e1472]: +
+              - button "Add ȅ (U+0205)" [ref=f1e1473] [cursor=pointer]:
+                - generic [ref=f1e1474]: ȅ
+                - generic [ref=f1e1475]: U+0205
+                - generic [ref=f1e1476]: +
+              - button "Add ȇ (U+0207)" [ref=f1e1477] [cursor=pointer]:
+                - generic [ref=f1e1478]: ȇ
+                - generic [ref=f1e1479]: U+0207
+                - generic [ref=f1e1480]: +
+              - button "Add ȉ (U+0209)" [ref=f1e1481] [cursor=pointer]:
+                - generic [ref=f1e1482]: ȉ
+                - generic [ref=f1e1483]: U+0209
+                - generic [ref=f1e1484]: +
+              - button "Add ȋ (U+020B)" [ref=f1e1485] [cursor=pointer]:
+                - generic [ref=f1e1486]: ȋ
+                - generic [ref=f1e1487]: U+020B
+                - generic [ref=f1e1488]: +
+              - button "Add ȍ (U+020D)" [ref=f1e1489] [cursor=pointer]:
+                - generic [ref=f1e1490]: ȍ
+                - generic [ref=f1e1491]: U+020D
+                - generic [ref=f1e1492]: +
+              - button "Add ȏ (U+020F)" [ref=f1e1493] [cursor=pointer]:
+                - generic [ref=f1e1494]: ȏ
+                - generic [ref=f1e1495]: U+020F
+                - generic [ref=f1e1496]: +
+              - button "Add ȑ (U+0211)" [ref=f1e1497] [cursor=pointer]:
+                - generic [ref=f1e1498]: ȑ
+                - generic [ref=f1e1499]: U+0211
+                - generic [ref=f1e1500]: +
+              - button "Add ȓ (U+0213)" [ref=f1e1501] [cursor=pointer]:
+                - generic [ref=f1e1502]: ȓ
+                - generic [ref=f1e1503]: U+0213
+                - generic [ref=f1e1504]: +
+              - button "Add ȕ (U+0215)" [ref=f1e1505] [cursor=pointer]:
+                - generic [ref=f1e1506]: ȕ
+                - generic [ref=f1e1507]: U+0215
+                - generic [ref=f1e1508]: +
+              - button "Add ȗ (U+0217)" [ref=f1e1509] [cursor=pointer]:
+                - generic [ref=f1e1510]: ȗ
+                - generic [ref=f1e1511]: U+0217
+                - generic [ref=f1e1512]: +
+              - button "Add ș (U+0219)" [ref=f1e1513] [cursor=pointer]:
+                - generic [ref=f1e1514]: ș
+                - generic [ref=f1e1515]: U+0219
+                - generic [ref=f1e1516]: +
+              - button "Add ț (U+021B)" [ref=f1e1517] [cursor=pointer]:
+                - generic [ref=f1e1518]: ț
+                - generic [ref=f1e1519]: U+021B
+                - generic [ref=f1e1520]: +
+              - button "Add ȝ (U+021D)" [ref=f1e1521] [cursor=pointer]:
+                - generic [ref=f1e1522]: ȝ
+                - generic [ref=f1e1523]: U+021D
+                - generic [ref=f1e1524]: +
+              - button "Add ȟ (U+021F)" [ref=f1e1525] [cursor=pointer]:
+                - generic [ref=f1e1526]: ȟ
+                - generic [ref=f1e1527]: U+021F
+                - generic [ref=f1e1528]: +
+              - button "Add ȡ (U+0221)" [ref=f1e1529] [cursor=pointer]:
+                - generic [ref=f1e1530]: ȡ
+                - generic [ref=f1e1531]: U+0221
+                - generic [ref=f1e1532]: +
+              - button "Add ȣ (U+0223)" [ref=f1e1533] [cursor=pointer]:
+                - generic [ref=f1e1534]: ȣ
+                - generic [ref=f1e1535]: U+0223
+                - generic [ref=f1e1536]: +
+              - button "Add ȥ (U+0225)" [ref=f1e1537] [cursor=pointer]:
+                - generic [ref=f1e1538]: ȥ
+                - generic [ref=f1e1539]: U+0225
+                - generic [ref=f1e1540]: +
+              - button "Add ȧ (U+0227)" [ref=f1e1541] [cursor=pointer]:
+                - generic [ref=f1e1542]: ȧ
+                - generic [ref=f1e1543]: U+0227
+                - generic [ref=f1e1544]: +
+              - button "Add ȩ (U+0229)" [ref=f1e1545] [cursor=pointer]:
+                - generic [ref=f1e1546]: ȩ
+                - generic [ref=f1e1547]: U+0229
+                - generic [ref=f1e1548]: +
+              - button "Add ȫ (U+022B)" [ref=f1e1549] [cursor=pointer]:
+                - generic [ref=f1e1550]: ȫ
+                - generic [ref=f1e1551]: U+022B
+                - generic [ref=f1e1552]: +
+              - button "Add ȭ (U+022D)" [ref=f1e1553] [cursor=pointer]:
+                - generic [ref=f1e1554]: ȭ
+                - generic [ref=f1e1555]: U+022D
+                - generic [ref=f1e1556]: +
+              - button "Add ȯ (U+022F)" [ref=f1e1557] [cursor=pointer]:
+                - generic [ref=f1e1558]: ȯ
+                - generic [ref=f1e1559]: U+022F
+                - generic [ref=f1e1560]: +
+              - button "Add ȱ (U+0231)" [ref=f1e1561] [cursor=pointer]:
+                - generic [ref=f1e1562]: ȱ
+                - generic [ref=f1e1563]: U+0231
+                - generic [ref=f1e1564]: +
+              - button "Add ȳ (U+0233)" [ref=f1e1565] [cursor=pointer]:
+                - generic [ref=f1e1566]: ȳ
+                - generic [ref=f1e1567]: U+0233
+                - generic [ref=f1e1568]: +
+              - button "Add ȴ (U+0234)" [ref=f1e1569] [cursor=pointer]:
+                - generic [ref=f1e1570]: ȴ
+                - generic [ref=f1e1571]: U+0234
+                - generic [ref=f1e1572]: +
+              - button "Add ȵ (U+0235)" [ref=f1e1573] [cursor=pointer]:
+                - generic [ref=f1e1574]: ȵ
+                - generic [ref=f1e1575]: U+0235
+                - generic [ref=f1e1576]: +
+              - button "Add ȶ (U+0236)" [ref=f1e1577] [cursor=pointer]:
+                - generic [ref=f1e1578]: ȶ
+                - generic [ref=f1e1579]: U+0236
+                - generic [ref=f1e1580]: +
+              - button "Add ȷ (U+0237)" [ref=f1e1581] [cursor=pointer]:
+                - generic [ref=f1e1582]: ȷ
+                - generic [ref=f1e1583]: U+0237
+                - generic [ref=f1e1584]: +
+              - button "Add ȸ (U+0238)" [ref=f1e1585] [cursor=pointer]:
+                - generic [ref=f1e1586]: ȸ
+                - generic [ref=f1e1587]: U+0238
+                - generic [ref=f1e1588]: +
+              - button "Add ȹ (U+0239)" [ref=f1e1589] [cursor=pointer]:
+                - generic [ref=f1e1590]: ȹ
+                - generic [ref=f1e1591]: U+0239
+                - generic [ref=f1e1592]: +
+              - button "Add ȼ (U+023C)" [ref=f1e1593] [cursor=pointer]:
+                - generic [ref=f1e1594]: ȼ
+                - generic [ref=f1e1595]: U+023C
+                - generic [ref=f1e1596]: +
+              - button "Add ȿ (U+023F)" [ref=f1e1597] [cursor=pointer]:
+                - generic [ref=f1e1598]: ȿ
+                - generic [ref=f1e1599]: U+023F
+                - generic [ref=f1e1600]: +
+              - button "Add ɀ (U+0240)" [ref=f1e1601] [cursor=pointer]:
+                - generic [ref=f1e1602]: ɀ
+                - generic [ref=f1e1603]: U+0240
+                - generic [ref=f1e1604]: +
+              - button "Add ɂ (U+0242)" [ref=f1e1605] [cursor=pointer]:
+                - generic [ref=f1e1606]: ɂ
+                - generic [ref=f1e1607]: U+0242
+                - generic [ref=f1e1608]: +
+              - button "Add ɇ (U+0247)" [ref=f1e1609] [cursor=pointer]:
+                - generic [ref=f1e1610]: ɇ
+                - generic [ref=f1e1611]: U+0247
+                - generic [ref=f1e1612]: +
+              - button "Add ɉ (U+0249)" [ref=f1e1613] [cursor=pointer]:
+                - generic [ref=f1e1614]: ɉ
+                - generic [ref=f1e1615]: U+0249
+                - generic [ref=f1e1616]: +
+              - button "Add ɋ (U+024B)" [ref=f1e1617] [cursor=pointer]:
+                - generic [ref=f1e1618]: ɋ
+                - generic [ref=f1e1619]: U+024B
+                - generic [ref=f1e1620]: +
+              - button "Add ɍ (U+024D)" [ref=f1e1621] [cursor=pointer]:
+                - generic [ref=f1e1622]: ɍ
+                - generic [ref=f1e1623]: U+024D
+                - generic [ref=f1e1624]: +
+              - button "Add ɏ (U+024F)" [ref=f1e1625] [cursor=pointer]:
+                - generic [ref=f1e1626]: ɏ
+                - generic [ref=f1e1627]: U+024F
+                - generic [ref=f1e1628]: +
+          - region "IPA Extensions characters" [ref=f1e1629]:
+            - generic [ref=f1e1630]:
+              - heading "IPA Extensions" [level=3] [ref=f1e1631]
+              - button "Hide IPA Extensions" [expanded] [ref=f1e1632] [cursor=pointer]
+            - group "IPA Extensions characters — click to toggle" [ref=f1e1635]:
+              - button "Add ɐ (U+0250)" [ref=f1e1636] [cursor=pointer]:
+                - generic [ref=f1e1637]: ɐ
+                - generic [ref=f1e1638]: U+0250
+                - generic [ref=f1e1639]: +
+              - button "Add ɑ (U+0251)" [ref=f1e1640] [cursor=pointer]:
+                - generic [ref=f1e1641]: ɑ
+                - generic [ref=f1e1642]: U+0251
+                - generic [ref=f1e1643]: +
+              - button "Add ɒ (U+0252)" [ref=f1e1644] [cursor=pointer]:
+                - generic [ref=f1e1645]: ɒ
+                - generic [ref=f1e1646]: U+0252
+                - generic [ref=f1e1647]: +
+              - button "Add ɓ (U+0253) — from your starting keyboard" [ref=f1e1648] [cursor=pointer]:
+                - generic [ref=f1e1649]: ɓ
+                - generic [ref=f1e1650]: U+0253
+                - generic [ref=f1e1651]: +
+              - button "Remove ɔ (U+0254)" [pressed] [ref=f1e1652] [cursor=pointer]:
+                - generic [ref=f1e1653]: ɔ
+                - generic [ref=f1e1654]: U+0254
+                - generic [ref=f1e1655]: "[x]"
+              - button "Add ɕ (U+0255)" [ref=f1e1656] [cursor=pointer]:
+                - generic [ref=f1e1657]: ɕ
+                - generic [ref=f1e1658]: U+0255
+                - generic [ref=f1e1659]: +
+              - button "Add ɖ (U+0256)" [ref=f1e1660] [cursor=pointer]:
+                - generic [ref=f1e1661]: ɖ
+                - generic [ref=f1e1662]: U+0256
+                - generic [ref=f1e1663]: +
+              - button "Add ɗ (U+0257) — from your starting keyboard" [ref=f1e1664] [cursor=pointer]:
+                - generic [ref=f1e1665]: ɗ
+                - generic [ref=f1e1666]: U+0257
+                - generic [ref=f1e1667]: +
+              - button "Add ɘ (U+0258)" [ref=f1e1668] [cursor=pointer]:
+                - generic [ref=f1e1669]: ɘ
+                - generic [ref=f1e1670]: U+0258
+                - generic [ref=f1e1671]: +
+              - button "Remove ə (U+0259)" [pressed] [ref=f1e1672] [cursor=pointer]:
+                - generic [ref=f1e1673]: ə
+                - generic [ref=f1e1674]: U+0259
+                - generic [ref=f1e1675]: "[x]"
+              - button "Add ɚ (U+025A)" [ref=f1e1676] [cursor=pointer]:
+                - generic [ref=f1e1677]: ɚ
+                - generic [ref=f1e1678]: U+025A
+                - generic [ref=f1e1679]: +
+              - button "Remove ɛ (U+025B)" [pressed] [ref=f1e1680] [cursor=pointer]:
+                - generic [ref=f1e1681]: ɛ
+                - generic [ref=f1e1682]: U+025B
+                - generic [ref=f1e1683]: "[x]"
+              - button "Add ɜ (U+025C)" [ref=f1e1684] [cursor=pointer]:
+                - generic [ref=f1e1685]: ɜ
+                - generic [ref=f1e1686]: U+025C
+                - generic [ref=f1e1687]: +
+              - button "Add ɝ (U+025D)" [ref=f1e1688] [cursor=pointer]:
+                - generic [ref=f1e1689]: ɝ
+                - generic [ref=f1e1690]: U+025D
+                - generic [ref=f1e1691]: +
+              - button "Add ɞ (U+025E)" [ref=f1e1692] [cursor=pointer]:
+                - generic [ref=f1e1693]: ɞ
+                - generic [ref=f1e1694]: U+025E
+                - generic [ref=f1e1695]: +
+              - button "Add ɟ (U+025F)" [ref=f1e1696] [cursor=pointer]:
+                - generic [ref=f1e1697]: ɟ
+                - generic [ref=f1e1698]: U+025F
+                - generic [ref=f1e1699]: +
+              - button "Add ɠ (U+0260)" [ref=f1e1700] [cursor=pointer]:
+                - generic [ref=f1e1701]: ɠ
+                - generic [ref=f1e1702]: U+0260
+                - generic [ref=f1e1703]: +
+              - button "Add ɡ (U+0261)" [ref=f1e1704] [cursor=pointer]:
+                - generic [ref=f1e1705]: ɡ
+                - generic [ref=f1e1706]: U+0261
+                - generic [ref=f1e1707]: +
+              - button "Add ɢ (U+0262)" [ref=f1e1708] [cursor=pointer]:
+                - generic [ref=f1e1709]: ɢ
+                - generic [ref=f1e1710]: U+0262
+                - generic [ref=f1e1711]: +
+              - button "Add ɣ (U+0263)" [ref=f1e1712] [cursor=pointer]:
+                - generic [ref=f1e1713]: ɣ
+                - generic [ref=f1e1714]: U+0263
+                - generic [ref=f1e1715]: +
+              - button "Add ɤ (U+0264)" [ref=f1e1716] [cursor=pointer]:
+                - generic [ref=f1e1717]: ɤ
+                - generic [ref=f1e1718]: U+0264
+                - generic [ref=f1e1719]: +
+              - button "Add ɥ (U+0265)" [ref=f1e1720] [cursor=pointer]:
+                - generic [ref=f1e1721]: ɥ
+                - generic [ref=f1e1722]: U+0265
+                - generic [ref=f1e1723]: +
+              - button "Add ɦ (U+0266)" [ref=f1e1724] [cursor=pointer]:
+                - generic [ref=f1e1725]: ɦ
+                - generic [ref=f1e1726]: U+0266
+                - generic [ref=f1e1727]: +
+              - button "Add ɧ (U+0267)" [ref=f1e1728] [cursor=pointer]:
+                - generic [ref=f1e1729]: ɧ
+                - generic [ref=f1e1730]: U+0267
+                - generic [ref=f1e1731]: +
+              - button "Add ɨ (U+0268) — from your starting keyboard" [ref=f1e1732] [cursor=pointer]:
+                - generic [ref=f1e1733]: ɨ
+                - generic [ref=f1e1734]: U+0268
+                - generic [ref=f1e1735]: +
+              - button "Add ɩ (U+0269)" [ref=f1e1736] [cursor=pointer]:
+                - generic [ref=f1e1737]: ɩ
+                - generic [ref=f1e1738]: U+0269
+                - generic [ref=f1e1739]: +
+              - button "Add ɪ (U+026A)" [ref=f1e1740] [cursor=pointer]:
+                - generic [ref=f1e1741]: ɪ
+                - generic [ref=f1e1742]: U+026A
+                - generic [ref=f1e1743]: +
+              - button "Add ɫ (U+026B)" [ref=f1e1744] [cursor=pointer]:
+                - generic [ref=f1e1745]: ɫ
+                - generic [ref=f1e1746]: U+026B
+                - generic [ref=f1e1747]: +
+              - button "Add ɬ (U+026C)" [ref=f1e1748] [cursor=pointer]:
+                - generic [ref=f1e1749]: ɬ
+                - generic [ref=f1e1750]: U+026C
+                - generic [ref=f1e1751]: +
+              - button "Add ɭ (U+026D)" [ref=f1e1752] [cursor=pointer]:
+                - generic [ref=f1e1753]: ɭ
+                - generic [ref=f1e1754]: U+026D
+                - generic [ref=f1e1755]: +
+              - button "Add ɮ (U+026E)" [ref=f1e1756] [cursor=pointer]:
+                - generic [ref=f1e1757]: ɮ
+                - generic [ref=f1e1758]: U+026E
+                - generic [ref=f1e1759]: +
+              - button "Add ɯ (U+026F)" [ref=f1e1760] [cursor=pointer]:
+                - generic [ref=f1e1761]: ɯ
+                - generic [ref=f1e1762]: U+026F
+                - generic [ref=f1e1763]: +
+              - button "Add ɰ (U+0270)" [ref=f1e1764] [cursor=pointer]:
+                - generic [ref=f1e1765]: ɰ
+                - generic [ref=f1e1766]: U+0270
+                - generic [ref=f1e1767]: +
+              - button "Add ɱ (U+0271)" [ref=f1e1768] [cursor=pointer]:
+                - generic [ref=f1e1769]: ɱ
+                - generic [ref=f1e1770]: U+0271
+                - generic [ref=f1e1771]: +
+              - button "Add ɲ (U+0272)" [ref=f1e1772] [cursor=pointer]:
+                - generic [ref=f1e1773]: ɲ
+                - generic [ref=f1e1774]: U+0272
+                - generic [ref=f1e1775]: +
+              - button "Add ɳ (U+0273)" [ref=f1e1776] [cursor=pointer]:
+                - generic [ref=f1e1777]: ɳ
+                - generic [ref=f1e1778]: U+0273
+                - generic [ref=f1e1779]: +
+              - button "Add ɴ (U+0274)" [ref=f1e1780] [cursor=pointer]:
+                - generic [ref=f1e1781]: ɴ
+                - generic [ref=f1e1782]: U+0274
+                - generic [ref=f1e1783]: +
+              - button "Add ɵ (U+0275)" [ref=f1e1784] [cursor=pointer]:
+                - generic [ref=f1e1785]: ɵ
+                - generic [ref=f1e1786]: U+0275
+                - generic [ref=f1e1787]: +
+              - button "Add ɶ (U+0276)" [ref=f1e1788] [cursor=pointer]:
+                - generic [ref=f1e1789]: ɶ
+                - generic [ref=f1e1790]: U+0276
+                - generic [ref=f1e1791]: +
+              - button "Add ɷ (U+0277)" [ref=f1e1792] [cursor=pointer]:
+                - generic [ref=f1e1793]: ɷ
+                - generic [ref=f1e1794]: U+0277
+                - generic [ref=f1e1795]: +
+              - button "Add ɸ (U+0278)" [ref=f1e1796] [cursor=pointer]:
+                - generic [ref=f1e1797]: ɸ
+                - generic [ref=f1e1798]: U+0278
+                - generic [ref=f1e1799]: +
+              - button "Add ɹ (U+0279)" [ref=f1e1800] [cursor=pointer]:
+                - generic [ref=f1e1801]: ɹ
+                - generic [ref=f1e1802]: U+0279
+                - generic [ref=f1e1803]: +
+              - button "Add ɺ (U+027A)" [ref=f1e1804] [cursor=pointer]:
+                - generic [ref=f1e1805]: ɺ
+                - generic [ref=f1e1806]: U+027A
+                - generic [ref=f1e1807]: +
+              - button "Add ɻ (U+027B)" [ref=f1e1808] [cursor=pointer]:
+                - generic [ref=f1e1809]: ɻ
+                - generic [ref=f1e1810]: U+027B
+                - generic [ref=f1e1811]: +
+              - button "Add ɼ (U+027C)" [ref=f1e1812] [cursor=pointer]:
+                - generic [ref=f1e1813]: ɼ
+                - generic [ref=f1e1814]: U+027C
+                - generic [ref=f1e1815]: +
+              - button "Add ɽ (U+027D)" [ref=f1e1816] [cursor=pointer]:
+                - generic [ref=f1e1817]: ɽ
+                - generic [ref=f1e1818]: U+027D
+                - generic [ref=f1e1819]: +
+              - button "Add ɾ (U+027E)" [ref=f1e1820] [cursor=pointer]:
+                - generic [ref=f1e1821]: ɾ
+                - generic [ref=f1e1822]: U+027E
+                - generic [ref=f1e1823]: +
+              - button "Add ɿ (U+027F)" [ref=f1e1824] [cursor=pointer]:
+                - generic [ref=f1e1825]: ɿ
+                - generic [ref=f1e1826]: U+027F
+                - generic [ref=f1e1827]: +
+              - button "Add ʀ (U+0280)" [ref=f1e1828] [cursor=pointer]:
+                - generic [ref=f1e1829]: ʀ
+                - generic [ref=f1e1830]: U+0280
+                - generic [ref=f1e1831]: +
+              - button "Add ʁ (U+0281)" [ref=f1e1832] [cursor=pointer]:
+                - generic [ref=f1e1833]: ʁ
+                - generic [ref=f1e1834]: U+0281
+                - generic [ref=f1e1835]: +
+              - button "Add ʂ (U+0282)" [ref=f1e1836] [cursor=pointer]:
+                - generic [ref=f1e1837]: ʂ
+                - generic [ref=f1e1838]: U+0282
+                - generic [ref=f1e1839]: +
+              - button "Add ʃ (U+0283)" [ref=f1e1840] [cursor=pointer]:
+                - generic [ref=f1e1841]: ʃ
+                - generic [ref=f1e1842]: U+0283
+                - generic [ref=f1e1843]: +
+              - button "Add ʄ (U+0284)" [ref=f1e1844] [cursor=pointer]:
+                - generic [ref=f1e1845]: ʄ
+                - generic [ref=f1e1846]: U+0284
+                - generic [ref=f1e1847]: +
+              - button "Add ʅ (U+0285)" [ref=f1e1848] [cursor=pointer]:
+                - generic [ref=f1e1849]: ʅ
+                - generic [ref=f1e1850]: U+0285
+                - generic [ref=f1e1851]: +
+              - button "Add ʆ (U+0286)" [ref=f1e1852] [cursor=pointer]:
+                - generic [ref=f1e1853]: ʆ
+                - generic [ref=f1e1854]: U+0286
+                - generic [ref=f1e1855]: +
+              - button "Add ʇ (U+0287)" [ref=f1e1856] [cursor=pointer]:
+                - generic [ref=f1e1857]: ʇ
+                - generic [ref=f1e1858]: U+0287
+                - generic [ref=f1e1859]: +
+              - button "Add ʈ (U+0288)" [ref=f1e1860] [cursor=pointer]:
+                - generic [ref=f1e1861]: ʈ
+                - generic [ref=f1e1862]: U+0288
+                - generic [ref=f1e1863]: +
+              - button "Add ʉ (U+0289) — from your starting keyboard" [ref=f1e1864] [cursor=pointer]:
+                - generic [ref=f1e1865]: ʉ
+                - generic [ref=f1e1866]: U+0289
+                - generic [ref=f1e1867]: +
+              - button "Add ʊ (U+028A)" [ref=f1e1868] [cursor=pointer]:
+                - generic [ref=f1e1869]: ʊ
+                - generic [ref=f1e1870]: U+028A
+                - generic [ref=f1e1871]: +
+              - button "Add ʋ (U+028B)" [ref=f1e1872] [cursor=pointer]:
+                - generic [ref=f1e1873]: ʋ
+                - generic [ref=f1e1874]: U+028B
+                - generic [ref=f1e1875]: +
+              - button "Add ʌ (U+028C)" [ref=f1e1876] [cursor=pointer]:
+                - generic [ref=f1e1877]: ʌ
+                - generic [ref=f1e1878]: U+028C
+                - generic [ref=f1e1879]: +
+              - button "Add ʍ (U+028D)" [ref=f1e1880] [cursor=pointer]:
+                - generic [ref=f1e1881]: ʍ
+                - generic [ref=f1e1882]: U+028D
+                - generic [ref=f1e1883]: +
+              - button "Add ʎ (U+028E)" [ref=f1e1884] [cursor=pointer]:
+                - generic [ref=f1e1885]: ʎ
+                - generic [ref=f1e1886]: U+028E
+                - generic [ref=f1e1887]: +
+              - button "Add ʏ (U+028F)" [ref=f1e1888] [cursor=pointer]:
+                - generic [ref=f1e1889]: ʏ
+                - generic [ref=f1e1890]: U+028F
+                - generic [ref=f1e1891]: +
+              - button "Add ʐ (U+0290)" [ref=f1e1892] [cursor=pointer]:
+                - generic [ref=f1e1893]: ʐ
+                - generic [ref=f1e1894]: U+0290
+                - generic [ref=f1e1895]: +
+              - button "Add ʑ (U+0291)" [ref=f1e1896] [cursor=pointer]:
+                - generic [ref=f1e1897]: ʑ
+                - generic [ref=f1e1898]: U+0291
+                - generic [ref=f1e1899]: +
+              - button "Add ʒ (U+0292)" [ref=f1e1900] [cursor=pointer]:
+                - generic [ref=f1e1901]: ʒ
+                - generic [ref=f1e1902]: U+0292
+                - generic [ref=f1e1903]: +
+              - button "Add ʓ (U+0293)" [ref=f1e1904] [cursor=pointer]:
+                - generic [ref=f1e1905]: ʓ
+                - generic [ref=f1e1906]: U+0293
+                - generic [ref=f1e1907]: +
+              - button "Add ʔ (U+0294)" [ref=f1e1908] [cursor=pointer]:
+                - generic [ref=f1e1909]: ʔ
+                - generic [ref=f1e1910]: U+0294
+                - generic [ref=f1e1911]: +
+              - button "Add ʕ (U+0295)" [ref=f1e1912] [cursor=pointer]:
+                - generic [ref=f1e1913]: ʕ
+                - generic [ref=f1e1914]: U+0295
+                - generic [ref=f1e1915]: +
+              - button "Add ʖ (U+0296)" [ref=f1e1916] [cursor=pointer]:
+                - generic [ref=f1e1917]: ʖ
+                - generic [ref=f1e1918]: U+0296
+                - generic [ref=f1e1919]: +
+              - button "Add ʗ (U+0297)" [ref=f1e1920] [cursor=pointer]:
+                - generic [ref=f1e1921]: ʗ
+                - generic [ref=f1e1922]: U+0297
+                - generic [ref=f1e1923]: +
+              - button "Add ʘ (U+0298)" [ref=f1e1924] [cursor=pointer]:
+                - generic [ref=f1e1925]: ʘ
+                - generic [ref=f1e1926]: U+0298
+                - generic [ref=f1e1927]: +
+              - button "Add ʙ (U+0299)" [ref=f1e1928] [cursor=pointer]:
+                - generic [ref=f1e1929]: ʙ
+                - generic [ref=f1e1930]: U+0299
+                - generic [ref=f1e1931]: +
+              - button "Add ʚ (U+029A)" [ref=f1e1932] [cursor=pointer]:
+                - generic [ref=f1e1933]: ʚ
+                - generic [ref=f1e1934]: U+029A
+                - generic [ref=f1e1935]: +
+              - button "Add ʛ (U+029B)" [ref=f1e1936] [cursor=pointer]:
+                - generic [ref=f1e1937]: ʛ
+                - generic [ref=f1e1938]: U+029B
+                - generic [ref=f1e1939]: +
+              - button "Add ʜ (U+029C)" [ref=f1e1940] [cursor=pointer]:
+                - generic [ref=f1e1941]: ʜ
+                - generic [ref=f1e1942]: U+029C
+                - generic [ref=f1e1943]: +
+              - button "Add ʝ (U+029D)" [ref=f1e1944] [cursor=pointer]:
+                - generic [ref=f1e1945]: ʝ
+                - generic [ref=f1e1946]: U+029D
+                - generic [ref=f1e1947]: +
+              - button "Add ʞ (U+029E)" [ref=f1e1948] [cursor=pointer]:
+                - generic [ref=f1e1949]: ʞ
+                - generic [ref=f1e1950]: U+029E
+                - generic [ref=f1e1951]: +
+              - button "Add ʟ (U+029F)" [ref=f1e1952] [cursor=pointer]:
+                - generic [ref=f1e1953]: ʟ
+                - generic [ref=f1e1954]: U+029F
+                - generic [ref=f1e1955]: +
+              - button "Add ʠ (U+02A0)" [ref=f1e1956] [cursor=pointer]:
+                - generic [ref=f1e1957]: ʠ
+                - generic [ref=f1e1958]: U+02A0
+                - generic [ref=f1e1959]: +
+              - button "Add ʡ (U+02A1)" [ref=f1e1960] [cursor=pointer]:
+                - generic [ref=f1e1961]: ʡ
+                - generic [ref=f1e1962]: U+02A1
+                - generic [ref=f1e1963]: +
+              - button "Add ʢ (U+02A2)" [ref=f1e1964] [cursor=pointer]:
+                - generic [ref=f1e1965]: ʢ
+                - generic [ref=f1e1966]: U+02A2
+                - generic [ref=f1e1967]: +
+              - button "Add ʣ (U+02A3)" [ref=f1e1968] [cursor=pointer]:
+                - generic [ref=f1e1969]: ʣ
+                - generic [ref=f1e1970]: U+02A3
+                - generic [ref=f1e1971]: +
+              - button "Add ʤ (U+02A4)" [ref=f1e1972] [cursor=pointer]:
+                - generic [ref=f1e1973]: ʤ
+                - generic [ref=f1e1974]: U+02A4
+                - generic [ref=f1e1975]: +
+              - button "Add ʥ (U+02A5)" [ref=f1e1976] [cursor=pointer]:
+                - generic [ref=f1e1977]: ʥ
+                - generic [ref=f1e1978]: U+02A5
+                - generic [ref=f1e1979]: +
+              - button "Add ʦ (U+02A6)" [ref=f1e1980] [cursor=pointer]:
+                - generic [ref=f1e1981]: ʦ
+                - generic [ref=f1e1982]: U+02A6
+                - generic [ref=f1e1983]: +
+              - button "Add ʧ (U+02A7)" [ref=f1e1984] [cursor=pointer]:
+                - generic [ref=f1e1985]: ʧ
+                - generic [ref=f1e1986]: U+02A7
+                - generic [ref=f1e1987]: +
+              - button "Add ʨ (U+02A8)" [ref=f1e1988] [cursor=pointer]:
+                - generic [ref=f1e1989]: ʨ
+                - generic [ref=f1e1990]: U+02A8
+                - generic [ref=f1e1991]: +
+              - button "Add ʩ (U+02A9)" [ref=f1e1992] [cursor=pointer]:
+                - generic [ref=f1e1993]: ʩ
+                - generic [ref=f1e1994]: U+02A9
+                - generic [ref=f1e1995]: +
+              - button "Add ʪ (U+02AA)" [ref=f1e1996] [cursor=pointer]:
+                - generic [ref=f1e1997]: ʪ
+                - generic [ref=f1e1998]: U+02AA
+                - generic [ref=f1e1999]: +
+              - button "Add ʫ (U+02AB)" [ref=f1e2000] [cursor=pointer]:
+                - generic [ref=f1e2001]: ʫ
+                - generic [ref=f1e2002]: U+02AB
+                - generic [ref=f1e2003]: +
+              - button "Add ʬ (U+02AC)" [ref=f1e2004] [cursor=pointer]:
+                - generic [ref=f1e2005]: ʬ
+                - generic [ref=f1e2006]: U+02AC
+                - generic [ref=f1e2007]: +
+              - button "Add ʭ (U+02AD)" [ref=f1e2008] [cursor=pointer]:
+                - generic [ref=f1e2009]: ʭ
+                - generic [ref=f1e2010]: U+02AD
+                - generic [ref=f1e2011]: +
+              - button "Add ʮ (U+02AE)" [ref=f1e2012] [cursor=pointer]:
+                - generic [ref=f1e2013]: ʮ
+                - generic [ref=f1e2014]: U+02AE
+                - generic [ref=f1e2015]: +
+              - button "Add ʯ (U+02AF)" [ref=f1e2016] [cursor=pointer]:
+                - generic [ref=f1e2017]: ʯ
+                - generic [ref=f1e2018]: U+02AF
+                - generic [ref=f1e2019]: +
+          - region "Spacing Modifier Letters characters" [ref=f1e2020]:
+            - generic [ref=f1e2021]:
+              - heading "Spacing Modifier Letters" [level=3] [ref=f1e2022]
+              - button "Hide Spacing Modifier Letters" [expanded] [ref=f1e2023] [cursor=pointer]
+            - group "Spacing Modifier Letters characters — click to toggle" [ref=f1e2026]:
+              - button "Add ʰ (U+02B0)" [ref=f1e2027] [cursor=pointer]:
+                - generic [ref=f1e2028]: ʰ
+                - generic [ref=f1e2029]: U+02B0
+                - generic [ref=f1e2030]: +
+              - button "Add ʱ (U+02B1)" [ref=f1e2031] [cursor=pointer]:
+                - generic [ref=f1e2032]: ʱ
+                - generic [ref=f1e2033]: U+02B1
+                - generic [ref=f1e2034]: +
+              - button "Add ʲ (U+02B2)" [ref=f1e2035] [cursor=pointer]:
+                - generic [ref=f1e2036]: ʲ
+                - generic [ref=f1e2037]: U+02B2
+                - generic [ref=f1e2038]: +
+              - button "Add ʳ (U+02B3)" [ref=f1e2039] [cursor=pointer]:
+                - generic [ref=f1e2040]: ʳ
+                - generic [ref=f1e2041]: U+02B3
+                - generic [ref=f1e2042]: +
+              - button "Add ʴ (U+02B4)" [ref=f1e2043] [cursor=pointer]:
+                - generic [ref=f1e2044]: ʴ
+                - generic [ref=f1e2045]: U+02B4
+                - generic [ref=f1e2046]: +
+              - button "Add ʵ (U+02B5)" [ref=f1e2047] [cursor=pointer]:
+                - generic [ref=f1e2048]: ʵ
+                - generic [ref=f1e2049]: U+02B5
+                - generic [ref=f1e2050]: +
+              - button "Add ʶ (U+02B6)" [ref=f1e2051] [cursor=pointer]:
+                - generic [ref=f1e2052]: ʶ
+                - generic [ref=f1e2053]: U+02B6
+                - generic [ref=f1e2054]: +
+              - button "Add ʷ (U+02B7)" [ref=f1e2055] [cursor=pointer]:
+                - generic [ref=f1e2056]: ʷ
+                - generic [ref=f1e2057]: U+02B7
+                - generic [ref=f1e2058]: +
+              - button "Add ʸ (U+02B8)" [ref=f1e2059] [cursor=pointer]:
+                - generic [ref=f1e2060]: ʸ
+                - generic [ref=f1e2061]: U+02B8
+                - generic [ref=f1e2062]: +
+              - button "Add ʺ (U+02BA)" [ref=f1e2063] [cursor=pointer]:
+                - generic [ref=f1e2064]: ʺ
+                - generic [ref=f1e2065]: U+02BA
+                - generic [ref=f1e2066]: +
+              - button "Add ʻ (U+02BB)" [ref=f1e2067] [cursor=pointer]:
+                - generic [ref=f1e2068]: ʻ
+                - generic [ref=f1e2069]: U+02BB
+                - generic [ref=f1e2070]: +
+              - button "Add ʼ (U+02BC) — from your starting keyboard" [ref=f1e2071] [cursor=pointer]:
+                - generic [ref=f1e2072]: ʼ
+                - generic [ref=f1e2073]: U+02BC
+                - generic [ref=f1e2074]: +
+              - button "Add ʽ (U+02BD)" [ref=f1e2075] [cursor=pointer]:
+                - generic [ref=f1e2076]: ʽ
+                - generic [ref=f1e2077]: U+02BD
+                - generic [ref=f1e2078]: +
+              - button "Add ʾ (U+02BE)" [ref=f1e2079] [cursor=pointer]:
+                - generic [ref=f1e2080]: ʾ
+                - generic [ref=f1e2081]: U+02BE
+                - generic [ref=f1e2082]: +
+              - button "Add ʿ (U+02BF)" [ref=f1e2083] [cursor=pointer]:
+                - generic [ref=f1e2084]: ʿ
+                - generic [ref=f1e2085]: U+02BF
+                - generic [ref=f1e2086]: +
+              - button "Add ˀ (U+02C0)" [ref=f1e2087] [cursor=pointer]:
+                - generic [ref=f1e2088]: ˀ
+                - generic [ref=f1e2089]: U+02C0
+                - generic [ref=f1e2090]: +
+              - button "Add ˁ (U+02C1)" [ref=f1e2091] [cursor=pointer]:
+                - generic [ref=f1e2092]: ˁ
+                - generic [ref=f1e2093]: U+02C1
+                - generic [ref=f1e2094]: +
+              - button "Add ˆ (U+02C6) — from your starting keyboard" [ref=f1e2095] [cursor=pointer]:
+                - generic [ref=f1e2096]: ˆ
+                - generic [ref=f1e2097]: U+02C6
+                - generic [ref=f1e2098]: +
+              - button "Add ˇ (U+02C7)" [ref=f1e2099] [cursor=pointer]:
+                - generic [ref=f1e2100]: ˇ
+                - generic [ref=f1e2101]: U+02C7
+                - generic [ref=f1e2102]: +
+              - button "Add ˈ (U+02C8) — from your starting keyboard" [ref=f1e2103] [cursor=pointer]:
+                - generic [ref=f1e2104]: ˈ
+                - generic [ref=f1e2105]: U+02C8
+                - generic [ref=f1e2106]: +
+              - button "Add ˉ (U+02C9) — from your starting keyboard" [ref=f1e2107] [cursor=pointer]:
+                - generic [ref=f1e2108]: ˉ
+                - generic [ref=f1e2109]: U+02C9
+                - generic [ref=f1e2110]: +
+              - button "Add ˊ (U+02CA) — from your starting keyboard" [ref=f1e2111] [cursor=pointer]:
+                - generic [ref=f1e2112]: ˊ
+                - generic [ref=f1e2113]: U+02CA
+                - generic [ref=f1e2114]: +
+              - button "Add ˋ (U+02CB) — from your starting keyboard" [ref=f1e2115] [cursor=pointer]:
+                - generic [ref=f1e2116]: ˋ
+                - generic [ref=f1e2117]: U+02CB
+                - generic [ref=f1e2118]: +
+              - button "Add ˌ (U+02CC)" [ref=f1e2119] [cursor=pointer]:
+                - generic [ref=f1e2120]: ˌ
+                - generic [ref=f1e2121]: U+02CC
+                - generic [ref=f1e2122]: +
+              - button "Add ˍ (U+02CD)" [ref=f1e2123] [cursor=pointer]:
+                - generic [ref=f1e2124]: ˍ
+                - generic [ref=f1e2125]: U+02CD
+                - generic [ref=f1e2126]: +
+              - button "Add ˎ (U+02CE)" [ref=f1e2127] [cursor=pointer]:
+                - generic [ref=f1e2128]: ˎ
+                - generic [ref=f1e2129]: U+02CE
+                - generic [ref=f1e2130]: +
+              - button "Add ˏ (U+02CF)" [ref=f1e2131] [cursor=pointer]:
+                - generic [ref=f1e2132]: ˏ
+                - generic [ref=f1e2133]: U+02CF
+                - generic [ref=f1e2134]: +
+              - button "Add ː (U+02D0)" [ref=f1e2135] [cursor=pointer]:
+                - generic [ref=f1e2136]: ː
+                - generic [ref=f1e2137]: U+02D0
+                - generic [ref=f1e2138]: +
+              - button "Add ˑ (U+02D1)" [ref=f1e2139] [cursor=pointer]:
+                - generic [ref=f1e2140]: ˑ
+                - generic [ref=f1e2141]: U+02D1
+                - generic [ref=f1e2142]: +
+              - button "Add ˠ (U+02E0)" [ref=f1e2143] [cursor=pointer]:
+                - generic [ref=f1e2144]: ˠ
+                - generic [ref=f1e2145]: U+02E0
+                - generic [ref=f1e2146]: +
+              - button "Add ˡ (U+02E1)" [ref=f1e2147] [cursor=pointer]:
+                - generic [ref=f1e2148]: ˡ
+                - generic [ref=f1e2149]: U+02E1
+                - generic [ref=f1e2150]: +
+              - button "Add ˢ (U+02E2)" [ref=f1e2151] [cursor=pointer]:
+                - generic [ref=f1e2152]: ˢ
+                - generic [ref=f1e2153]: U+02E2
+                - generic [ref=f1e2154]: +
+              - button "Add ˣ (U+02E3)" [ref=f1e2155] [cursor=pointer]:
+                - generic [ref=f1e2156]: ˣ
+                - generic [ref=f1e2157]: U+02E3
+                - generic [ref=f1e2158]: +
+              - button "Add ˤ (U+02E4)" [ref=f1e2159] [cursor=pointer]:
+                - generic [ref=f1e2160]: ˤ
+                - generic [ref=f1e2161]: U+02E4
+                - generic [ref=f1e2162]: +
+              - button "Add ˬ (U+02EC)" [ref=f1e2163] [cursor=pointer]:
+                - generic [ref=f1e2164]: ˬ
+                - generic [ref=f1e2165]: U+02EC
+                - generic [ref=f1e2166]: +
+              - button "Add ˮ (U+02EE)" [ref=f1e2167] [cursor=pointer]:
+                - generic [ref=f1e2168]: ˮ
+                - generic [ref=f1e2169]: U+02EE
+                - generic [ref=f1e2170]: +
+          - region "Combining Diacritical Marks characters" [ref=f1e2171]:
+            - generic [ref=f1e2172]:
+              - heading "Combining Diacritical Marks" [level=3] [ref=f1e2173]
+              - button "Hide Combining Diacritical Marks" [expanded] [ref=f1e2174] [cursor=pointer]
+            - group "Combining Diacritical Marks characters — click to toggle" [ref=f1e2177]:
+              - button "Remove ̀ (U+0300)" [pressed] [ref=f1e2178] [cursor=pointer]:
+                - generic [ref=f1e2179]: ◌̀
+                - generic [ref=f1e2180]: U+0300
+                - generic [ref=f1e2181]: "[x]"
+              - button "Remove ́ (U+0301)" [pressed] [ref=f1e2182] [cursor=pointer]:
+                - generic [ref=f1e2183]: ◌́
+                - generic [ref=f1e2184]: U+0301
+                - generic [ref=f1e2185]: "[x]"
+              - button "Remove ̂ (U+0302)" [pressed] [ref=f1e2186] [cursor=pointer]:
+                - generic [ref=f1e2187]: ◌̂
+                - generic [ref=f1e2188]: U+0302
+                - generic [ref=f1e2189]: "[x]"
+              - button "Add ̃ (U+0303) — from your starting keyboard" [ref=f1e2190] [cursor=pointer]:
+                - generic [ref=f1e2191]: ◌̃
+                - generic [ref=f1e2192]: U+0303
+                - generic [ref=f1e2193]: +
+              - button "Add ̄ (U+0304) — from your starting keyboard" [ref=f1e2194] [cursor=pointer]:
+                - generic [ref=f1e2195]: ◌̄
+                - generic [ref=f1e2196]: U+0304
+                - generic [ref=f1e2197]: +
+              - button "Add ̅ (U+0305)" [ref=f1e2198] [cursor=pointer]:
+                - generic [ref=f1e2199]: ◌̅
+                - generic [ref=f1e2200]: U+0305
+                - generic [ref=f1e2201]: +
+              - button "Add ̆ (U+0306)" [ref=f1e2202] [cursor=pointer]:
+                - generic [ref=f1e2203]: ◌̆
+                - generic [ref=f1e2204]: U+0306
+                - generic [ref=f1e2205]: +
+              - button "Add ̇ (U+0307)" [ref=f1e2206] [cursor=pointer]:
+                - generic [ref=f1e2207]: ◌̇
+                - generic [ref=f1e2208]: U+0307
+                - generic [ref=f1e2209]: +
+              - button "Add ̈ (U+0308) — from your starting keyboard" [ref=f1e2210] [cursor=pointer]:
+                - generic [ref=f1e2211]: ◌̈
+                - generic [ref=f1e2212]: U+0308
+                - generic [ref=f1e2213]: +
+              - button "Add ̉ (U+0309)" [ref=f1e2214] [cursor=pointer]:
+                - generic [ref=f1e2215]: ◌̉
+                - generic [ref=f1e2216]: U+0309
+                - generic [ref=f1e2217]: +
+              - button "Add ̊ (U+030A)" [ref=f1e2218] [cursor=pointer]:
+                - generic [ref=f1e2219]: ◌̊
+                - generic [ref=f1e2220]: U+030A
+                - generic [ref=f1e2221]: +
+              - button "Add ̋ (U+030B)" [ref=f1e2222] [cursor=pointer]:
+                - generic [ref=f1e2223]: ◌̋
+                - generic [ref=f1e2224]: U+030B
+                - generic [ref=f1e2225]: +
+              - button "Remove ̌ (U+030C)" [pressed] [ref=f1e2226] [cursor=pointer]:
+                - generic [ref=f1e2227]: ◌̌
+                - generic [ref=f1e2228]: U+030C
+                - generic [ref=f1e2229]: "[x]"
+              - button "Add ̍ (U+030D) — from your starting keyboard" [ref=f1e2230] [cursor=pointer]:
+                - generic [ref=f1e2231]: ◌̍
+                - generic [ref=f1e2232]: U+030D
+                - generic [ref=f1e2233]: +
+              - button "Add ̎ (U+030E)" [ref=f1e2234] [cursor=pointer]:
+                - generic [ref=f1e2235]: ◌̎
+                - generic [ref=f1e2236]: U+030E
+                - generic [ref=f1e2237]: +
+              - button "Add ̐ (U+0310)" [ref=f1e2238] [cursor=pointer]:
+                - generic [ref=f1e2239]: ◌̐
+                - generic [ref=f1e2240]: U+0310
+                - generic [ref=f1e2241]: +
+              - button "Add ̑ (U+0311)" [ref=f1e2242] [cursor=pointer]:
+                - generic [ref=f1e2243]: ◌̑
+                - generic [ref=f1e2244]: U+0311
+                - generic [ref=f1e2245]: +
+              - button "Add ̓ (U+0313)" [ref=f1e2246] [cursor=pointer]:
+                - generic [ref=f1e2247]: ◌̓
+                - generic [ref=f1e2248]: U+0313
+                - generic [ref=f1e2249]: +
+              - button "Add ̣ (U+0323) — from your starting keyboard" [ref=f1e2250] [cursor=pointer]:
+                - generic [ref=f1e2251]: ◌̣
+                - generic [ref=f1e2252]: U+0323
+                - generic [ref=f1e2253]: +
+              - button "Add ̤ (U+0324)" [ref=f1e2254] [cursor=pointer]:
+                - generic [ref=f1e2255]: ◌̤
+                - generic [ref=f1e2256]: U+0324
+                - generic [ref=f1e2257]: +
+              - button "Add ̥ (U+0325)" [ref=f1e2258] [cursor=pointer]:
+                - generic [ref=f1e2259]: ◌̥
+                - generic [ref=f1e2260]: U+0325
+                - generic [ref=f1e2261]: +
+              - button "Add ̭ (U+032D)" [ref=f1e2262] [cursor=pointer]:
+                - generic [ref=f1e2263]: ◌̭
+                - generic [ref=f1e2264]: U+032D
+                - generic [ref=f1e2265]: +
+              - button "Add ̮ (U+032E)" [ref=f1e2266] [cursor=pointer]:
+                - generic [ref=f1e2267]: ◌̮
+                - generic [ref=f1e2268]: U+032E
+                - generic [ref=f1e2269]: +
+              - button "Add ̰ (U+0330) — from your starting keyboard" [ref=f1e2270] [cursor=pointer]:
+                - generic [ref=f1e2271]: ◌̰
+                - generic [ref=f1e2272]: U+0330
+                - generic [ref=f1e2273]: +
+              - button "Add ̱ (U+0331)" [ref=f1e2274] [cursor=pointer]:
+                - generic [ref=f1e2275]: ◌̱
+                - generic [ref=f1e2276]: U+0331
+                - generic [ref=f1e2277]: +
+              - button "Add ͘ (U+0358)" [ref=f1e2278] [cursor=pointer]:
+                - generic [ref=f1e2279]: ◌͘
+                - generic [ref=f1e2280]: U+0358
+                - generic [ref=f1e2281]: +
+              - button "Add ͞ (U+035E)" [ref=f1e2282] [cursor=pointer]:
+                - generic [ref=f1e2283]: ◌͞
+                - generic [ref=f1e2284]: U+035E
+                - generic [ref=f1e2285]: +
+              - button "Add ͣ (U+0363)" [ref=f1e2286] [cursor=pointer]:
+                - generic [ref=f1e2287]: ◌ͣ
+                - generic [ref=f1e2288]: U+0363
+                - generic [ref=f1e2289]: +
+              - button "Add ͤ (U+0364)" [ref=f1e2290] [cursor=pointer]:
+                - generic [ref=f1e2291]: ◌ͤ
+                - generic [ref=f1e2292]: U+0364
+                - generic [ref=f1e2293]: +
+              - button "Add ͥ (U+0365)" [ref=f1e2294] [cursor=pointer]:
+                - generic [ref=f1e2295]: ◌ͥ
+                - generic [ref=f1e2296]: U+0365
+                - generic [ref=f1e2297]: +
+              - button "Add ͦ (U+0366)" [ref=f1e2298] [cursor=pointer]:
+                - generic [ref=f1e2299]: ◌ͦ
+                - generic [ref=f1e2300]: U+0366
+                - generic [ref=f1e2301]: +
+              - button "Add ͧ (U+0367)" [ref=f1e2302] [cursor=pointer]:
+                - generic [ref=f1e2303]: ◌ͧ
+                - generic [ref=f1e2304]: U+0367
+                - generic [ref=f1e2305]: +
+              - button "Add ͨ (U+0368)" [ref=f1e2306] [cursor=pointer]:
+                - generic [ref=f1e2307]: ◌ͨ
+                - generic [ref=f1e2308]: U+0368
+                - generic [ref=f1e2309]: +
+              - button "Add ͩ (U+0369)" [ref=f1e2310] [cursor=pointer]:
+                - generic [ref=f1e2311]: ◌ͩ
+                - generic [ref=f1e2312]: U+0369
+                - generic [ref=f1e2313]: +
+              - button "Add ͪ (U+036A)" [ref=f1e2314] [cursor=pointer]:
+                - generic [ref=f1e2315]: ◌ͪ
+                - generic [ref=f1e2316]: U+036A
+                - generic [ref=f1e2317]: +
+              - button "Add ͫ (U+036B)" [ref=f1e2318] [cursor=pointer]:
+                - generic [ref=f1e2319]: ◌ͫ
+                - generic [ref=f1e2320]: U+036B
+                - generic [ref=f1e2321]: +
+              - button "Add ͬ (U+036C)" [ref=f1e2322] [cursor=pointer]:
+                - generic [ref=f1e2323]: ◌ͬ
+                - generic [ref=f1e2324]: U+036C
+                - generic [ref=f1e2325]: +
+              - button "Add ͭ (U+036D)" [ref=f1e2326] [cursor=pointer]:
+                - generic [ref=f1e2327]: ◌ͭ
+                - generic [ref=f1e2328]: U+036D
+                - generic [ref=f1e2329]: +
+              - button "Add ͮ (U+036E)" [ref=f1e2330] [cursor=pointer]:
+                - generic [ref=f1e2331]: ◌ͮ
+                - generic [ref=f1e2332]: U+036E
+                - generic [ref=f1e2333]: +
+              - button "Add ͯ (U+036F)" [ref=f1e2334] [cursor=pointer]:
+                - generic [ref=f1e2335]: ◌ͯ
+                - generic [ref=f1e2336]: U+036F
+                - generic [ref=f1e2337]: +
+          - region "Latin Extended Additional characters" [ref=f1e2338]:
+            - generic [ref=f1e2339]:
+              - heading "Latin Extended Additional" [level=3] [ref=f1e2340]
+              - button "Hide Latin Extended Additional" [expanded] [ref=f1e2341] [cursor=pointer]
+            - group "Latin Extended Additional characters — click to toggle" [ref=f1e2344]:
+              - button "Add ḁ (U+1E01)" [ref=f1e2345] [cursor=pointer]:
+                - generic [ref=f1e2346]: ḁ
+                - generic [ref=f1e2347]: U+1E01
+                - generic [ref=f1e2348]: +
+              - button "Add ḃ (U+1E03)" [ref=f1e2349] [cursor=pointer]:
+                - generic [ref=f1e2350]: ḃ
+                - generic [ref=f1e2351]: U+1E03
+                - generic [ref=f1e2352]: +
+              - button "Add ḅ (U+1E05)" [ref=f1e2353] [cursor=pointer]:
+                - generic [ref=f1e2354]: ḅ
+                - generic [ref=f1e2355]: U+1E05
+                - generic [ref=f1e2356]: +
+              - button "Add ḇ (U+1E07)" [ref=f1e2357] [cursor=pointer]:
+                - generic [ref=f1e2358]: ḇ
+                - generic [ref=f1e2359]: U+1E07
+                - generic [ref=f1e2360]: +
+              - button "Add ḉ (U+1E09)" [ref=f1e2361] [cursor=pointer]:
+                - generic [ref=f1e2362]: ḉ
+                - generic [ref=f1e2363]: U+1E09
+                - generic [ref=f1e2364]: +
+              - button "Add ḋ (U+1E0B)" [ref=f1e2365] [cursor=pointer]:
+                - generic [ref=f1e2366]: ḋ
+                - generic [ref=f1e2367]: U+1E0B
+                - generic [ref=f1e2368]: +
+              - button "Add ḍ (U+1E0D)" [ref=f1e2369] [cursor=pointer]:
+                - generic [ref=f1e2370]: ḍ
+                - generic [ref=f1e2371]: U+1E0D
+                - generic [ref=f1e2372]: +
+              - button "Add ḏ (U+1E0F)" [ref=f1e2373] [cursor=pointer]:
+                - generic [ref=f1e2374]: ḏ
+                - generic [ref=f1e2375]: U+1E0F
+                - generic [ref=f1e2376]: +
+              - button "Add ḑ (U+1E11)" [ref=f1e2377] [cursor=pointer]:
+                - generic [ref=f1e2378]: ḑ
+                - generic [ref=f1e2379]: U+1E11
+                - generic [ref=f1e2380]: +
+              - button "Add ḓ (U+1E13)" [ref=f1e2381] [cursor=pointer]:
+                - generic [ref=f1e2382]: ḓ
+                - generic [ref=f1e2383]: U+1E13
+                - generic [ref=f1e2384]: +
+              - button "Add ḕ (U+1E15)" [ref=f1e2385] [cursor=pointer]:
+                - generic [ref=f1e2386]: ḕ
+                - generic [ref=f1e2387]: U+1E15
+                - generic [ref=f1e2388]: +
+              - button "Add ḗ (U+1E17)" [ref=f1e2389] [cursor=pointer]:
+                - generic [ref=f1e2390]: ḗ
+                - generic [ref=f1e2391]: U+1E17
+                - generic [ref=f1e2392]: +
+              - button "Add ḙ (U+1E19)" [ref=f1e2393] [cursor=pointer]:
+                - generic [ref=f1e2394]: ḙ
+                - generic [ref=f1e2395]: U+1E19
+                - generic [ref=f1e2396]: +
+              - button "Add ḛ (U+1E1B)" [ref=f1e2397] [cursor=pointer]:
+                - generic [ref=f1e2398]: ḛ
+                - generic [ref=f1e2399]: U+1E1B
+                - generic [ref=f1e2400]: +
+              - button "Add ḝ (U+1E1D)" [ref=f1e2401] [cursor=pointer]:
+                - generic [ref=f1e2402]: ḝ
+                - generic [ref=f1e2403]: U+1E1D
+                - generic [ref=f1e2404]: +
+              - button "Add ḟ (U+1E1F)" [ref=f1e2405] [cursor=pointer]:
+                - generic [ref=f1e2406]: ḟ
+                - generic [ref=f1e2407]: U+1E1F
+                - generic [ref=f1e2408]: +
+              - button "Add ḡ (U+1E21)" [ref=f1e2409] [cursor=pointer]:
+                - generic [ref=f1e2410]: ḡ
+                - generic [ref=f1e2411]: U+1E21
+                - generic [ref=f1e2412]: +
+              - button "Add ḣ (U+1E23)" [ref=f1e2413] [cursor=pointer]:
+                - generic [ref=f1e2414]: ḣ
+                - generic [ref=f1e2415]: U+1E23
+                - generic [ref=f1e2416]: +
+              - button "Add ḥ (U+1E25)" [ref=f1e2417] [cursor=pointer]:
+                - generic [ref=f1e2418]: ḥ
+                - generic [ref=f1e2419]: U+1E25
+                - generic [ref=f1e2420]: +
+              - button "Add ḧ (U+1E27)" [ref=f1e2421] [cursor=pointer]:
+                - generic [ref=f1e2422]: ḧ
+                - generic [ref=f1e2423]: U+1E27
+                - generic [ref=f1e2424]: +
+              - button "Add ḩ (U+1E29)" [ref=f1e2425] [cursor=pointer]:
+                - generic [ref=f1e2426]: ḩ
+                - generic [ref=f1e2427]: U+1E29
+                - generic [ref=f1e2428]: +
+              - button "Add ḫ (U+1E2B)" [ref=f1e2429] [cursor=pointer]:
+                - generic [ref=f1e2430]: ḫ
+                - generic [ref=f1e2431]: U+1E2B
+                - generic [ref=f1e2432]: +
+              - button "Add ḭ (U+1E2D)" [ref=f1e2433] [cursor=pointer]:
+                - generic [ref=f1e2434]: ḭ
+                - generic [ref=f1e2435]: U+1E2D
+                - generic [ref=f1e2436]: +
+              - button "Add ḯ (U+1E2F)" [ref=f1e2437] [cursor=pointer]:
+                - generic [ref=f1e2438]: ḯ
+                - generic [ref=f1e2439]: U+1E2F
+                - generic [ref=f1e2440]: +
+              - button "Add ḱ (U+1E31)" [ref=f1e2441] [cursor=pointer]:
+                - generic [ref=f1e2442]: ḱ
+                - generic [ref=f1e2443]: U+1E31
+                - generic [ref=f1e2444]: +
+              - button "Add ḳ (U+1E33)" [ref=f1e2445] [cursor=pointer]:
+                - generic [ref=f1e2446]: ḳ
+                - generic [ref=f1e2447]: U+1E33
+                - generic [ref=f1e2448]: +
+              - button "Add ḵ (U+1E35)" [ref=f1e2449] [cursor=pointer]:
+                - generic [ref=f1e2450]: ḵ
+                - generic [ref=f1e2451]: U+1E35
+                - generic [ref=f1e2452]: +
+              - button "Add ḷ (U+1E37) — from your starting keyboard" [ref=f1e2453] [cursor=pointer]:
+                - generic [ref=f1e2454]: ḷ
+                - generic [ref=f1e2455]: U+1E37
+                - generic [ref=f1e2456]: +
+              - button "Add ḹ (U+1E39)" [ref=f1e2457] [cursor=pointer]:
+                - generic [ref=f1e2458]: ḹ
+                - generic [ref=f1e2459]: U+1E39
+                - generic [ref=f1e2460]: +
+              - button "Add ḻ (U+1E3B)" [ref=f1e2461] [cursor=pointer]:
+                - generic [ref=f1e2462]: ḻ
+                - generic [ref=f1e2463]: U+1E3B
+                - generic [ref=f1e2464]: +
+              - button "Add ḽ (U+1E3D)" [ref=f1e2465] [cursor=pointer]:
+                - generic [ref=f1e2466]: ḽ
+                - generic [ref=f1e2467]: U+1E3D
+                - generic [ref=f1e2468]: +
+              - button "Add ḿ (U+1E3F)" [ref=f1e2469] [cursor=pointer]:
+                - generic [ref=f1e2470]: ḿ
+                - generic [ref=f1e2471]: U+1E3F
+                - generic [ref=f1e2472]: +
+              - button "Add ṁ (U+1E41)" [ref=f1e2473] [cursor=pointer]:
+                - generic [ref=f1e2474]: ṁ
+                - generic [ref=f1e2475]: U+1E41
+                - generic [ref=f1e2476]: +
+              - button "Add ṃ (U+1E43)" [ref=f1e2477] [cursor=pointer]:
+                - generic [ref=f1e2478]: ṃ
+                - generic [ref=f1e2479]: U+1E43
+                - generic [ref=f1e2480]: +
+              - button "Add ṅ (U+1E45)" [ref=f1e2481] [cursor=pointer]:
+                - generic [ref=f1e2482]: ṅ
+                - generic [ref=f1e2483]: U+1E45
+                - generic [ref=f1e2484]: +
+              - button "Add ṇ (U+1E47)" [ref=f1e2485] [cursor=pointer]:
+                - generic [ref=f1e2486]: ṇ
+                - generic [ref=f1e2487]: U+1E47
+                - generic [ref=f1e2488]: +
+              - button "Add ṉ (U+1E49)" [ref=f1e2489] [cursor=pointer]:
+                - generic [ref=f1e2490]: ṉ
+                - generic [ref=f1e2491]: U+1E49
+                - generic [ref=f1e2492]: +
+              - button "Add ṋ (U+1E4B)" [ref=f1e2493] [cursor=pointer]:
+                - generic [ref=f1e2494]: ṋ
+                - generic [ref=f1e2495]: U+1E4B
+                - generic [ref=f1e2496]: +
+              - button "Add ṍ (U+1E4D)" [ref=f1e2497] [cursor=pointer]:
+                - generic [ref=f1e2498]: ṍ
+                - generic [ref=f1e2499]: U+1E4D
+                - generic [ref=f1e2500]: +
+              - button "Add ṏ (U+1E4F)" [ref=f1e2501] [cursor=pointer]:
+                - generic [ref=f1e2502]: ṏ
+                - generic [ref=f1e2503]: U+1E4F
+                - generic [ref=f1e2504]: +
+              - button "Add ṑ (U+1E51)" [ref=f1e2505] [cursor=pointer]:
+                - generic [ref=f1e2506]: ṑ
+                - generic [ref=f1e2507]: U+1E51
+                - generic [ref=f1e2508]: +
+              - button "Add ṓ (U+1E53)" [ref=f1e2509] [cursor=pointer]:
+                - generic [ref=f1e2510]: ṓ
+                - generic [ref=f1e2511]: U+1E53
+                - generic [ref=f1e2512]: +
+              - button "Add ṕ (U+1E55)" [ref=f1e2513] [cursor=pointer]:
+                - generic [ref=f1e2514]: ṕ
+                - generic [ref=f1e2515]: U+1E55
+                - generic [ref=f1e2516]: +
+              - button "Add ṗ (U+1E57)" [ref=f1e2517] [cursor=pointer]:
+                - generic [ref=f1e2518]: ṗ
+                - generic [ref=f1e2519]: U+1E57
+                - generic [ref=f1e2520]: +
+              - button "Add ṙ (U+1E59)" [ref=f1e2521] [cursor=pointer]:
+                - generic [ref=f1e2522]: ṙ
+                - generic [ref=f1e2523]: U+1E59
+                - generic [ref=f1e2524]: +
+              - button "Add ṛ (U+1E5B) — from your starting keyboard" [ref=f1e2525] [cursor=pointer]:
+                - generic [ref=f1e2526]: ṛ
+                - generic [ref=f1e2527]: U+1E5B
+                - generic [ref=f1e2528]: +
+              - button "Add ṝ (U+1E5D)" [ref=f1e2529] [cursor=pointer]:
+                - generic [ref=f1e2530]: ṝ
+                - generic [ref=f1e2531]: U+1E5D
+                - generic [ref=f1e2532]: +
+              - button "Add ṟ (U+1E5F)" [ref=f1e2533] [cursor=pointer]:
+                - generic [ref=f1e2534]: ṟ
+                - generic [ref=f1e2535]: U+1E5F
+                - generic [ref=f1e2536]: +
+              - button "Add ṡ (U+1E61)" [ref=f1e2537] [cursor=pointer]:
+                - generic [ref=f1e2538]: ṡ
+                - generic [ref=f1e2539]: U+1E61
+                - generic [ref=f1e2540]: +
+              - button "Add ṣ (U+1E63)" [ref=f1e2541] [cursor=pointer]:
+                - generic [ref=f1e2542]: ṣ
+                - generic [ref=f1e2543]: U+1E63
+                - generic [ref=f1e2544]: +
+              - button "Add ṥ (U+1E65)" [ref=f1e2545] [cursor=pointer]:
+                - generic [ref=f1e2546]: ṥ
+                - generic [ref=f1e2547]: U+1E65
+                - generic [ref=f1e2548]: +
+              - button "Add ṧ (U+1E67)" [ref=f1e2549] [cursor=pointer]:
+                - generic [ref=f1e2550]: ṧ
+                - generic [ref=f1e2551]: U+1E67
+                - generic [ref=f1e2552]: +
+              - button "Add ṩ (U+1E69)" [ref=f1e2553] [cursor=pointer]:
+                - generic [ref=f1e2554]: ṩ
+                - generic [ref=f1e2555]: U+1E69
+                - generic [ref=f1e2556]: +
+              - button "Add ṫ (U+1E6B)" [ref=f1e2557] [cursor=pointer]:
+                - generic [ref=f1e2558]: ṫ
+                - generic [ref=f1e2559]: U+1E6B
+                - generic [ref=f1e2560]: +
+              - button "Add ṭ (U+1E6D)" [ref=f1e2561] [cursor=pointer]:
+                - generic [ref=f1e2562]: ṭ
+                - generic [ref=f1e2563]: U+1E6D
+                - generic [ref=f1e2564]: +
+              - button "Add ṯ (U+1E6F)" [ref=f1e2565] [cursor=pointer]:
+                - generic [ref=f1e2566]: ṯ
+                - generic [ref=f1e2567]: U+1E6F
+                - generic [ref=f1e2568]: +
+              - button "Add ṱ (U+1E71)" [ref=f1e2569] [cursor=pointer]:
+                - generic [ref=f1e2570]: ṱ
+                - generic [ref=f1e2571]: U+1E71
+                - generic [ref=f1e2572]: +
+              - button "Add ṳ (U+1E73)" [ref=f1e2573] [cursor=pointer]:
+                - generic [ref=f1e2574]: ṳ
+                - generic [ref=f1e2575]: U+1E73
+                - generic [ref=f1e2576]: +
+              - button "Add ṵ (U+1E75)" [ref=f1e2577] [cursor=pointer]:
+                - generic [ref=f1e2578]: ṵ
+                - generic [ref=f1e2579]: U+1E75
+                - generic [ref=f1e2580]: +
+              - button "Add ṷ (U+1E77)" [ref=f1e2581] [cursor=pointer]:
+                - generic [ref=f1e2582]: ṷ
+                - generic [ref=f1e2583]: U+1E77
+                - generic [ref=f1e2584]: +
+              - button "Add ṹ (U+1E79)" [ref=f1e2585] [cursor=pointer]:
+                - generic [ref=f1e2586]: ṹ
+                - generic [ref=f1e2587]: U+1E79
+                - generic [ref=f1e2588]: +
+              - button "Add ṻ (U+1E7B)" [ref=f1e2589] [cursor=pointer]:
+                - generic [ref=f1e2590]: ṻ
+                - generic [ref=f1e2591]: U+1E7B
+                - generic [ref=f1e2592]: +
+              - button "Add ṽ (U+1E7D)" [ref=f1e2593] [cursor=pointer]:
+                - generic [ref=f1e2594]: ṽ
+                - generic [ref=f1e2595]: U+1E7D
+                - generic [ref=f1e2596]: +
+              - button "Add ṿ (U+1E7F)" [ref=f1e2597] [cursor=pointer]:
+                - generic [ref=f1e2598]: ṿ
+                - generic [ref=f1e2599]: U+1E7F
+                - generic [ref=f1e2600]: +
+              - button "Add ẁ (U+1E81)" [ref=f1e2601] [cursor=pointer]:
+                - generic [ref=f1e2602]: ẁ
+                - generic [ref=f1e2603]: U+1E81
+                - generic [ref=f1e2604]: +
+              - button "Add ẃ (U+1E83)" [ref=f1e2605] [cursor=pointer]:
+                - generic [ref=f1e2606]: ẃ
+                - generic [ref=f1e2607]: U+1E83
+                - generic [ref=f1e2608]: +
+              - button "Add ẅ (U+1E85) — from your starting keyboard" [ref=f1e2609] [cursor=pointer]:
+                - generic [ref=f1e2610]: ẅ
+                - generic [ref=f1e2611]: U+1E85
+                - generic [ref=f1e2612]: +
+              - button "Add ẇ (U+1E87)" [ref=f1e2613] [cursor=pointer]:
+                - generic [ref=f1e2614]: ẇ
+                - generic [ref=f1e2615]: U+1E87
+                - generic [ref=f1e2616]: +
+              - button "Add ẉ (U+1E89)" [ref=f1e2617] [cursor=pointer]:
+                - generic [ref=f1e2618]: ẉ
+                - generic [ref=f1e2619]: U+1E89
+                - generic [ref=f1e2620]: +
+              - button "Add ẋ (U+1E8B)" [ref=f1e2621] [cursor=pointer]:
+                - generic [ref=f1e2622]: ẋ
+                - generic [ref=f1e2623]: U+1E8B
+                - generic [ref=f1e2624]: +
+              - button "Add ẍ (U+1E8D)" [ref=f1e2625] [cursor=pointer]:
+                - generic [ref=f1e2626]: ẍ
+                - generic [ref=f1e2627]: U+1E8D
+                - generic [ref=f1e2628]: +
+              - button "Add ẏ (U+1E8F)" [ref=f1e2629] [cursor=pointer]:
+                - generic [ref=f1e2630]: ẏ
+                - generic [ref=f1e2631]: U+1E8F
+                - generic [ref=f1e2632]: +
+              - button "Add ẑ (U+1E91)" [ref=f1e2633] [cursor=pointer]:
+                - generic [ref=f1e2634]: ẑ
+                - generic [ref=f1e2635]: U+1E91
+                - generic [ref=f1e2636]: +
+              - button "Add ẓ (U+1E93)" [ref=f1e2637] [cursor=pointer]:
+                - generic [ref=f1e2638]: ẓ
+                - generic [ref=f1e2639]: U+1E93
+                - generic [ref=f1e2640]: +
+              - button "Add ẕ (U+1E95)" [ref=f1e2641] [cursor=pointer]:
+                - generic [ref=f1e2642]: ẕ
+                - generic [ref=f1e2643]: U+1E95
+                - generic [ref=f1e2644]: +
+              - button "Add ẖ (U+1E96)" [ref=f1e2645] [cursor=pointer]:
+                - generic [ref=f1e2646]: ẖ
+                - generic [ref=f1e2647]: U+1E96
+                - generic [ref=f1e2648]: +
+              - button "Add ẗ (U+1E97)" [ref=f1e2649] [cursor=pointer]:
+                - generic [ref=f1e2650]: ẗ
+                - generic [ref=f1e2651]: U+1E97
+                - generic [ref=f1e2652]: +
+              - button "Add ẘ (U+1E98)" [ref=f1e2653] [cursor=pointer]:
+                - generic [ref=f1e2654]: ẘ
+                - generic [ref=f1e2655]: U+1E98
+                - generic [ref=f1e2656]: +
+              - button "Add ẙ (U+1E99)" [ref=f1e2657] [cursor=pointer]:
+                - generic [ref=f1e2658]: ẙ
+                - generic [ref=f1e2659]: U+1E99
+                - generic [ref=f1e2660]: +
+              - button "Add ẚ (U+1E9A)" [ref=f1e2661] [cursor=pointer]:
+                - generic [ref=f1e2662]: ẚ
+                - generic [ref=f1e2663]: U+1E9A
+                - generic [ref=f1e2664]: +
+              - button "Add ẛ (U+1E9B)" [ref=f1e2665] [cursor=pointer]:
+                - generic [ref=f1e2666]: ẛ
+                - generic [ref=f1e2667]: U+1E9B
+                - generic [ref=f1e2668]: +
+              - button "Add ẜ (U+1E9C)" [ref=f1e2669] [cursor=pointer]:
+                - generic [ref=f1e2671]: U+1E9C
+                - generic [ref=f1e2672]: +
+              - button "Add ẝ (U+1E9D)" [ref=f1e2673] [cursor=pointer]:
+                - generic [ref=f1e2675]: U+1E9D
+                - generic [ref=f1e2676]: +
+              - button "Add ẟ (U+1E9F)" [ref=f1e2677] [cursor=pointer]:
+                - generic [ref=f1e2679]: U+1E9F
+                - generic [ref=f1e2680]: +
+              - button "Add ạ (U+1EA1) — from your starting keyboard" [ref=f1e2681] [cursor=pointer]:
+                - generic [ref=f1e2682]: ạ
+                - generic [ref=f1e2683]: U+1EA1
+                - generic [ref=f1e2684]: +
+              - button "Add ả (U+1EA3)" [ref=f1e2685] [cursor=pointer]:
+                - generic [ref=f1e2686]: ả
+                - generic [ref=f1e2687]: U+1EA3
+                - generic [ref=f1e2688]: +
+              - button "Add ấ (U+1EA5)" [ref=f1e2689] [cursor=pointer]:
+                - generic [ref=f1e2690]: ấ
+                - generic [ref=f1e2691]: U+1EA5
+                - generic [ref=f1e2692]: +
+              - button "Add ầ (U+1EA7)" [ref=f1e2693] [cursor=pointer]:
+                - generic [ref=f1e2694]: ầ
+                - generic [ref=f1e2695]: U+1EA7
+                - generic [ref=f1e2696]: +
+              - button "Add ẩ (U+1EA9)" [ref=f1e2697] [cursor=pointer]:
+                - generic [ref=f1e2698]: ẩ
+                - generic [ref=f1e2699]: U+1EA9
+                - generic [ref=f1e2700]: +
+              - button "Add ẫ (U+1EAB)" [ref=f1e2701] [cursor=pointer]:
+                - generic [ref=f1e2702]: ẫ
+                - generic [ref=f1e2703]: U+1EAB
+                - generic [ref=f1e2704]: +
+              - button "Add ậ (U+1EAD)" [ref=f1e2705] [cursor=pointer]:
+                - generic [ref=f1e2706]: ậ
+                - generic [ref=f1e2707]: U+1EAD
+                - generic [ref=f1e2708]: +
+              - button "Add ắ (U+1EAF)" [ref=f1e2709] [cursor=pointer]:
+                - generic [ref=f1e2710]: ắ
+                - generic [ref=f1e2711]: U+1EAF
+                - generic [ref=f1e2712]: +
+              - button "Add ằ (U+1EB1)" [ref=f1e2713] [cursor=pointer]:
+                - generic [ref=f1e2714]: ằ
+                - generic [ref=f1e2715]: U+1EB1
+                - generic [ref=f1e2716]: +
+              - button "Add ẳ (U+1EB3)" [ref=f1e2717] [cursor=pointer]:
+                - generic [ref=f1e2718]: ẳ
+                - generic [ref=f1e2719]: U+1EB3
+                - generic [ref=f1e2720]: +
+              - button "Add ẵ (U+1EB5)" [ref=f1e2721] [cursor=pointer]:
+                - generic [ref=f1e2722]: ẵ
+                - generic [ref=f1e2723]: U+1EB5
+                - generic [ref=f1e2724]: +
+              - button "Add ặ (U+1EB7)" [ref=f1e2725] [cursor=pointer]:
+                - generic [ref=f1e2726]: ặ
+                - generic [ref=f1e2727]: U+1EB7
+                - generic [ref=f1e2728]: +
+              - button "Add ẹ (U+1EB9) — from your starting keyboard" [ref=f1e2729] [cursor=pointer]:
+                - generic [ref=f1e2730]: ẹ
+                - generic [ref=f1e2731]: U+1EB9
+                - generic [ref=f1e2732]: +
+              - button "Add ẻ (U+1EBB)" [ref=f1e2733] [cursor=pointer]:
+                - generic [ref=f1e2734]: ẻ
+                - generic [ref=f1e2735]: U+1EBB
+                - generic [ref=f1e2736]: +
+              - button "Add ẽ (U+1EBD)" [ref=f1e2737] [cursor=pointer]:
+                - generic [ref=f1e2738]: ẽ
+                - generic [ref=f1e2739]: U+1EBD
+                - generic [ref=f1e2740]: +
+              - button "Add ế (U+1EBF)" [ref=f1e2741] [cursor=pointer]:
+                - generic [ref=f1e2742]: ế
+                - generic [ref=f1e2743]: U+1EBF
+                - generic [ref=f1e2744]: +
+              - button "Add ề (U+1EC1)" [ref=f1e2745] [cursor=pointer]:
+                - generic [ref=f1e2746]: ề
+                - generic [ref=f1e2747]: U+1EC1
+                - generic [ref=f1e2748]: +
+              - button "Add ể (U+1EC3)" [ref=f1e2749] [cursor=pointer]:
+                - generic [ref=f1e2750]: ể
+                - generic [ref=f1e2751]: U+1EC3
+                - generic [ref=f1e2752]: +
+              - button "Add ễ (U+1EC5)" [ref=f1e2753] [cursor=pointer]:
+                - generic [ref=f1e2754]: ễ
+                - generic [ref=f1e2755]: U+1EC5
+                - generic [ref=f1e2756]: +
+              - button "Add ệ (U+1EC7)" [ref=f1e2757] [cursor=pointer]:
+                - generic [ref=f1e2758]: ệ
+                - generic [ref=f1e2759]: U+1EC7
+                - generic [ref=f1e2760]: +
+              - button "Add ỉ (U+1EC9)" [ref=f1e2761] [cursor=pointer]:
+                - generic [ref=f1e2762]: ỉ
+                - generic [ref=f1e2763]: U+1EC9
+                - generic [ref=f1e2764]: +
+              - button "Add ị (U+1ECB)" [ref=f1e2765] [cursor=pointer]:
+                - generic [ref=f1e2766]: ị
+                - generic [ref=f1e2767]: U+1ECB
+                - generic [ref=f1e2768]: +
+              - button "Add ọ (U+1ECD) — from your starting keyboard" [ref=f1e2769] [cursor=pointer]:
+                - generic [ref=f1e2770]: ọ
+                - generic [ref=f1e2771]: U+1ECD
+                - generic [ref=f1e2772]: +
+              - button "Add ỏ (U+1ECF)" [ref=f1e2773] [cursor=pointer]:
+                - generic [ref=f1e2774]: ỏ
+                - generic [ref=f1e2775]: U+1ECF
+                - generic [ref=f1e2776]: +
+              - button "Add ố (U+1ED1)" [ref=f1e2777] [cursor=pointer]:
+                - generic [ref=f1e2778]: ố
+                - generic [ref=f1e2779]: U+1ED1
+                - generic [ref=f1e2780]: +
+              - button "Add ồ (U+1ED3)" [ref=f1e2781] [cursor=pointer]:
+                - generic [ref=f1e2782]: ồ
+                - generic [ref=f1e2783]: U+1ED3
+                - generic [ref=f1e2784]: +
+              - button "Add ổ (U+1ED5)" [ref=f1e2785] [cursor=pointer]:
+                - generic [ref=f1e2786]: ổ
+                - generic [ref=f1e2787]: U+1ED5
+                - generic [ref=f1e2788]: +
+              - button "Add ỗ (U+1ED7)" [ref=f1e2789] [cursor=pointer]:
+                - generic [ref=f1e2790]: ỗ
+                - generic [ref=f1e2791]: U+1ED7
+                - generic [ref=f1e2792]: +
+              - button "Add ộ (U+1ED9)" [ref=f1e2793] [cursor=pointer]:
+                - generic [ref=f1e2794]: ộ
+                - generic [ref=f1e2795]: U+1ED9
+                - generic [ref=f1e2796]: +
+              - button "Add ớ (U+1EDB)" [ref=f1e2797] [cursor=pointer]:
+                - generic [ref=f1e2798]: ớ
+                - generic [ref=f1e2799]: U+1EDB
+                - generic [ref=f1e2800]: +
+              - button "Add ờ (U+1EDD)" [ref=f1e2801] [cursor=pointer]:
+                - generic [ref=f1e2802]: ờ
+                - generic [ref=f1e2803]: U+1EDD
+                - generic [ref=f1e2804]: +
+              - button "Add ở (U+1EDF)" [ref=f1e2805] [cursor=pointer]:
+                - generic [ref=f1e2806]: ở
+                - generic [ref=f1e2807]: U+1EDF
+                - generic [ref=f1e2808]: +
+              - button "Add ỡ (U+1EE1)" [ref=f1e2809] [cursor=pointer]:
+                - generic [ref=f1e2810]: ỡ
+                - generic [ref=f1e2811]: U+1EE1
+                - generic [ref=f1e2812]: +
+              - button "Add ợ (U+1EE3)" [ref=f1e2813] [cursor=pointer]:
+                - generic [ref=f1e2814]: ợ
+                - generic [ref=f1e2815]: U+1EE3
+                - generic [ref=f1e2816]: +
+              - button "Add ụ (U+1EE5)" [ref=f1e2817] [cursor=pointer]:
+                - generic [ref=f1e2818]: ụ
+                - generic [ref=f1e2819]: U+1EE5
+                - generic [ref=f1e2820]: +
+              - button "Add ủ (U+1EE7)" [ref=f1e2821] [cursor=pointer]:
+                - generic [ref=f1e2822]: ủ
+                - generic [ref=f1e2823]: U+1EE7
+                - generic [ref=f1e2824]: +
+              - button "Add ứ (U+1EE9)" [ref=f1e2825] [cursor=pointer]:
+                - generic [ref=f1e2826]: ứ
+                - generic [ref=f1e2827]: U+1EE9
+                - generic [ref=f1e2828]: +
+              - button "Add ừ (U+1EEB)" [ref=f1e2829] [cursor=pointer]:
+                - generic [ref=f1e2830]: ừ
+                - generic [ref=f1e2831]: U+1EEB
+                - generic [ref=f1e2832]: +
+              - button "Add ử (U+1EED)" [ref=f1e2833] [cursor=pointer]:
+                - generic [ref=f1e2834]: ử
+                - generic [ref=f1e2835]: U+1EED
+                - generic [ref=f1e2836]: +
+              - button "Add ữ (U+1EEF)" [ref=f1e2837] [cursor=pointer]:
+                - generic [ref=f1e2838]: ữ
+                - generic [ref=f1e2839]: U+1EEF
+                - generic [ref=f1e2840]: +
+              - button "Add ự (U+1EF1)" [ref=f1e2841] [cursor=pointer]:
+                - generic [ref=f1e2842]: ự
+                - generic [ref=f1e2843]: U+1EF1
+                - generic [ref=f1e2844]: +
+              - button "Add ỳ (U+1EF3)" [ref=f1e2845] [cursor=pointer]:
+                - generic [ref=f1e2846]: ỳ
+                - generic [ref=f1e2847]: U+1EF3
+                - generic [ref=f1e2848]: +
+              - button "Add ỵ (U+1EF5)" [ref=f1e2849] [cursor=pointer]:
+                - generic [ref=f1e2850]: ỵ
+                - generic [ref=f1e2851]: U+1EF5
+                - generic [ref=f1e2852]: +
+              - button "Add ỷ (U+1EF7)" [ref=f1e2853] [cursor=pointer]:
+                - generic [ref=f1e2854]: ỷ
+                - generic [ref=f1e2855]: U+1EF7
+                - generic [ref=f1e2856]: +
+              - button "Add ỹ (U+1EF9)" [ref=f1e2857] [cursor=pointer]:
+                - generic [ref=f1e2858]: ỹ
+                - generic [ref=f1e2859]: U+1EF9
+                - generic [ref=f1e2860]: +
+              - button "Add ỻ (U+1EFB)" [ref=f1e2861] [cursor=pointer]:
+                - generic [ref=f1e2863]: U+1EFB
+                - generic [ref=f1e2864]: +
+              - button "Add ỽ (U+1EFD)" [ref=f1e2865] [cursor=pointer]:
+                - generic [ref=f1e2867]: U+1EFD
+                - generic [ref=f1e2868]: +
+              - button "Add ỿ (U+1EFF)" [ref=f1e2869] [cursor=pointer]:
+                - generic [ref=f1e2871]: U+1EFF
+                - generic [ref=f1e2872]: +
+          - region "Latin Extended-C characters" [ref=f1e2873]:
+            - generic [ref=f1e2874]:
+              - heading "Latin Extended-C" [level=3] [ref=f1e2875]
+              - button "Hide Latin Extended-C" [expanded] [ref=f1e2876] [cursor=pointer]
+            - group "Latin Extended-C characters — click to toggle" [ref=f1e2879]:
+              - button "Add ⱡ (U+2C61)" [ref=f1e2880] [cursor=pointer]:
+                - generic [ref=f1e2881]: ⱡ
+                - generic [ref=f1e2882]: U+2C61
+                - generic [ref=f1e2883]: +
+              - button "Add ⱥ (U+2C65)" [ref=f1e2884] [cursor=pointer]:
+                - generic [ref=f1e2885]: ⱥ
+                - generic [ref=f1e2886]: U+2C65
+                - generic [ref=f1e2887]: +
+              - button "Add ⱦ (U+2C66)" [ref=f1e2888] [cursor=pointer]:
+                - generic [ref=f1e2889]: ⱦ
+                - generic [ref=f1e2890]: U+2C66
+                - generic [ref=f1e2891]: +
+              - button "Add ⱨ (U+2C68)" [ref=f1e2892] [cursor=pointer]:
+                - generic [ref=f1e2893]: ⱨ
+                - generic [ref=f1e2894]: U+2C68
+                - generic [ref=f1e2895]: +
+              - button "Add ⱪ (U+2C6A)" [ref=f1e2896] [cursor=pointer]:
+                - generic [ref=f1e2897]: ⱪ
+                - generic [ref=f1e2898]: U+2C6A
+                - generic [ref=f1e2899]: +
+              - button "Add ⱬ (U+2C6C)" [ref=f1e2900] [cursor=pointer]:
+                - generic [ref=f1e2901]: ⱬ
+                - generic [ref=f1e2902]: U+2C6C
+                - generic [ref=f1e2903]: +
+              - button "Add ⱱ (U+2C71)" [ref=f1e2904] [cursor=pointer]:
+                - generic [ref=f1e2905]: ⱱ
+                - generic [ref=f1e2906]: U+2C71
+                - generic [ref=f1e2907]: +
+              - button "Add ⱳ (U+2C73)" [ref=f1e2908] [cursor=pointer]:
+                - generic [ref=f1e2909]: ⱳ
+                - generic [ref=f1e2910]: U+2C73
+                - generic [ref=f1e2911]: +
+              - button "Add ⱴ (U+2C74)" [ref=f1e2912] [cursor=pointer]:
+                - generic [ref=f1e2913]: ⱴ
+                - generic [ref=f1e2914]: U+2C74
+                - generic [ref=f1e2915]: +
+              - button "Add ⱶ (U+2C76)" [ref=f1e2916] [cursor=pointer]:
+                - generic [ref=f1e2917]: ⱶ
+                - generic [ref=f1e2918]: U+2C76
+                - generic [ref=f1e2919]: +
+              - button "Add ⱷ (U+2C77)" [ref=f1e2920] [cursor=pointer]:
+                - generic [ref=f1e2921]: ⱷ
+                - generic [ref=f1e2922]: U+2C77
+                - generic [ref=f1e2923]: +
+              - button "Add ⱸ (U+2C78)" [ref=f1e2924] [cursor=pointer]:
+                - generic [ref=f1e2926]: U+2C78
+                - generic [ref=f1e2927]: +
+              - button "Add ⱹ (U+2C79)" [ref=f1e2928] [cursor=pointer]:
+                - generic [ref=f1e2930]: U+2C79
+                - generic [ref=f1e2931]: +
+              - button "Add ⱺ (U+2C7A)" [ref=f1e2932] [cursor=pointer]:
+                - generic [ref=f1e2934]: U+2C7A
+                - generic [ref=f1e2935]: +
+              - button "Add ⱻ (U+2C7B)" [ref=f1e2936] [cursor=pointer]:
+                - generic [ref=f1e2938]: U+2C7B
+                - generic [ref=f1e2939]: +
+              - button "Add ⱼ (U+2C7C)" [ref=f1e2940] [cursor=pointer]:
+                - generic [ref=f1e2942]: U+2C7C
+                - generic [ref=f1e2943]: +
+              - button "Add ⱽ (U+2C7D)" [ref=f1e2944] [cursor=pointer]:
+                - generic [ref=f1e2946]: U+2C7D
+                - generic [ref=f1e2947]: +
+          - region "Latin Extended-D characters" [ref=f1e2948]:
+            - generic [ref=f1e2949]:
+              - heading "Latin Extended-D" [level=3] [ref=f1e2950]
+              - button "Hide Latin Extended-D" [expanded] [ref=f1e2951] [cursor=pointer]
+            - group "Latin Extended-D characters — click to toggle" [ref=f1e2954]:
+              - button "Add ꜣ (U+A723)" [ref=f1e2955] [cursor=pointer]:
+                - generic [ref=f1e2957]: U+A723
+                - generic [ref=f1e2958]: +
+              - button "Add ꜥ (U+A725)" [ref=f1e2959] [cursor=pointer]:
+                - generic [ref=f1e2961]: U+A725
+                - generic [ref=f1e2962]: +
+              - button "Add ꜧ (U+A727)" [ref=f1e2963] [cursor=pointer]:
+                - generic [ref=f1e2965]: U+A727
+                - generic [ref=f1e2966]: +
+              - button "Add ꜩ (U+A729)" [ref=f1e2967] [cursor=pointer]:
+                - generic [ref=f1e2969]: U+A729
+                - generic [ref=f1e2970]: +
+              - button "Add ꜫ (U+A72B)" [ref=f1e2971] [cursor=pointer]:
+                - generic [ref=f1e2973]: U+A72B
+                - generic [ref=f1e2974]: +
+              - button "Add ꜭ (U+A72D)" [ref=f1e2975] [cursor=pointer]:
+                - generic [ref=f1e2977]: U+A72D
+                - generic [ref=f1e2978]: +
+              - button "Add ꜯ (U+A72F)" [ref=f1e2979] [cursor=pointer]:
+                - generic [ref=f1e2981]: U+A72F
+                - generic [ref=f1e2982]: +
+              - button "Add ꜰ (U+A730)" [ref=f1e2983] [cursor=pointer]:
+                - generic [ref=f1e2985]: U+A730
+                - generic [ref=f1e2986]: +
+              - button "Add ꜱ (U+A731)" [ref=f1e2987] [cursor=pointer]:
+                - generic [ref=f1e2989]: U+A731
+                - generic [ref=f1e2990]: +
+              - button "Add ꜳ (U+A733)" [ref=f1e2991] [cursor=pointer]:
+                - generic [ref=f1e2993]: U+A733
+                - generic [ref=f1e2994]: +
+              - button "Add ꜵ (U+A735)" [ref=f1e2995] [cursor=pointer]:
+                - generic [ref=f1e2997]: U+A735
+                - generic [ref=f1e2998]: +
+              - button "Add ꜷ (U+A737)" [ref=f1e2999] [cursor=pointer]:
+                - generic [ref=f1e3001]: U+A737
+                - generic [ref=f1e3002]: +
+              - button "Add ꜹ (U+A739)" [ref=f1e3003] [cursor=pointer]:
+                - generic [ref=f1e3005]: U+A739
+                - generic [ref=f1e3006]: +
+              - button "Add ꜻ (U+A73B)" [ref=f1e3007] [cursor=pointer]:
+                - generic [ref=f1e3009]: U+A73B
+                - generic [ref=f1e3010]: +
+              - button "Add ꜽ (U+A73D)" [ref=f1e3011] [cursor=pointer]:
+                - generic [ref=f1e3013]: U+A73D
+                - generic [ref=f1e3014]: +
+              - button "Add ꜿ (U+A73F)" [ref=f1e3015] [cursor=pointer]:
+                - generic [ref=f1e3017]: U+A73F
+                - generic [ref=f1e3018]: +
+              - button "Add ꝁ (U+A741)" [ref=f1e3019] [cursor=pointer]:
+                - generic [ref=f1e3021]: U+A741
+                - generic [ref=f1e3022]: +
+              - button "Add ꝃ (U+A743)" [ref=f1e3023] [cursor=pointer]:
+                - generic [ref=f1e3025]: U+A743
+                - generic [ref=f1e3026]: +
+              - button "Add ꝅ (U+A745)" [ref=f1e3027] [cursor=pointer]:
+                - generic [ref=f1e3029]: U+A745
+                - generic [ref=f1e3030]: +
+              - button "Add ꝇ (U+A747)" [ref=f1e3031] [cursor=pointer]:
+                - generic [ref=f1e3033]: U+A747
+                - generic [ref=f1e3034]: +
+              - button "Add ꝉ (U+A749)" [ref=f1e3035] [cursor=pointer]:
+                - generic [ref=f1e3037]: U+A749
+                - generic [ref=f1e3038]: +
+              - button "Add ꝋ (U+A74B)" [ref=f1e3039] [cursor=pointer]:
+                - generic [ref=f1e3041]: U+A74B
+                - generic [ref=f1e3042]: +
+              - button "Add ꝍ (U+A74D)" [ref=f1e3043] [cursor=pointer]:
+                - generic [ref=f1e3045]: U+A74D
+                - generic [ref=f1e3046]: +
+              - button "Add ꝏ (U+A74F)" [ref=f1e3047] [cursor=pointer]:
+                - generic [ref=f1e3049]: U+A74F
+                - generic [ref=f1e3050]: +
+              - button "Add ꝑ (U+A751)" [ref=f1e3051] [cursor=pointer]:
+                - generic [ref=f1e3053]: U+A751
+                - generic [ref=f1e3054]: +
+              - button "Add ꝓ (U+A753)" [ref=f1e3055] [cursor=pointer]:
+                - generic [ref=f1e3057]: U+A753
+                - generic [ref=f1e3058]: +
+              - button "Add ꝕ (U+A755)" [ref=f1e3059] [cursor=pointer]:
+                - generic [ref=f1e3061]: U+A755
+                - generic [ref=f1e3062]: +
+              - button "Add ꝗ (U+A757)" [ref=f1e3063] [cursor=pointer]:
+                - generic [ref=f1e3065]: U+A757
+                - generic [ref=f1e3066]: +
+              - button "Add ꝙ (U+A759)" [ref=f1e3067] [cursor=pointer]:
+                - generic [ref=f1e3069]: U+A759
+                - generic [ref=f1e3070]: +
+              - button "Add ꝛ (U+A75B)" [ref=f1e3071] [cursor=pointer]:
+                - generic [ref=f1e3073]: U+A75B
+                - generic [ref=f1e3074]: +
+              - button "Add ꝝ (U+A75D)" [ref=f1e3075] [cursor=pointer]:
+                - generic [ref=f1e3077]: U+A75D
+                - generic [ref=f1e3078]: +
+              - button "Add ꝟ (U+A75F)" [ref=f1e3079] [cursor=pointer]:
+                - generic [ref=f1e3081]: U+A75F
+                - generic [ref=f1e3082]: +
+              - button "Add ꝡ (U+A761)" [ref=f1e3083] [cursor=pointer]:
+                - generic [ref=f1e3085]: U+A761
+                - generic [ref=f1e3086]: +
+              - button "Add ꝣ (U+A763)" [ref=f1e3087] [cursor=pointer]:
+                - generic [ref=f1e3089]: U+A763
+                - generic [ref=f1e3090]: +
+              - button "Add ꝥ (U+A765)" [ref=f1e3091] [cursor=pointer]:
+                - generic [ref=f1e3093]: U+A765
+                - generic [ref=f1e3094]: +
+              - button "Add ꝧ (U+A767)" [ref=f1e3095] [cursor=pointer]:
+                - generic [ref=f1e3097]: U+A767
+                - generic [ref=f1e3098]: +
+              - button "Add ꝩ (U+A769)" [ref=f1e3099] [cursor=pointer]:
+                - generic [ref=f1e3101]: U+A769
+                - generic [ref=f1e3102]: +
+              - button "Add ꝫ (U+A76B)" [ref=f1e3103] [cursor=pointer]:
+                - generic [ref=f1e3105]: U+A76B
+                - generic [ref=f1e3106]: +
+              - button "Add ꝭ (U+A76D)" [ref=f1e3107] [cursor=pointer]:
+                - generic [ref=f1e3109]: U+A76D
+                - generic [ref=f1e3110]: +
+              - button "Add ꝯ (U+A76F)" [ref=f1e3111] [cursor=pointer]:
+                - generic [ref=f1e3113]: U+A76F
+                - generic [ref=f1e3114]: +
+              - button "Add ꝰ (U+A770)" [ref=f1e3115] [cursor=pointer]:
+                - generic [ref=f1e3117]: U+A770
+                - generic [ref=f1e3118]: +
+              - button "Add ꝱ (U+A771)" [ref=f1e3119] [cursor=pointer]:
+                - generic [ref=f1e3121]: U+A771
+                - generic [ref=f1e3122]: +
+              - button "Add ꝲ (U+A772)" [ref=f1e3123] [cursor=pointer]:
+                - generic [ref=f1e3125]: U+A772
+                - generic [ref=f1e3126]: +
+              - button "Add ꝳ (U+A773)" [ref=f1e3127] [cursor=pointer]:
+                - generic [ref=f1e3129]: U+A773
+                - generic [ref=f1e3130]: +
+              - button "Add ꝴ (U+A774)" [ref=f1e3131] [cursor=pointer]:
+                - generic [ref=f1e3133]: U+A774
+                - generic [ref=f1e3134]: +
+              - button "Add ꝵ (U+A775)" [ref=f1e3135] [cursor=pointer]:
+                - generic [ref=f1e3137]: U+A775
+                - generic [ref=f1e3138]: +
+              - button "Add ꝶ (U+A776)" [ref=f1e3139] [cursor=pointer]:
+                - generic [ref=f1e3141]: U+A776
+                - generic [ref=f1e3142]: +
+              - button "Add ꝷ (U+A777)" [ref=f1e3143] [cursor=pointer]:
+                - generic [ref=f1e3145]: U+A777
+                - generic [ref=f1e3146]: +
+              - button "Add ꝸ (U+A778)" [ref=f1e3147] [cursor=pointer]:
+                - generic [ref=f1e3149]: U+A778
+                - generic [ref=f1e3150]: +
+              - button "Add ꝺ (U+A77A)" [ref=f1e3151] [cursor=pointer]:
+                - generic [ref=f1e3153]: U+A77A
+                - generic [ref=f1e3154]: +
+              - button "Add ꝼ (U+A77C)" [ref=f1e3155] [cursor=pointer]:
+                - generic [ref=f1e3157]: U+A77C
+                - generic [ref=f1e3158]: +
+              - button "Add ꝿ (U+A77F)" [ref=f1e3159] [cursor=pointer]:
+                - generic [ref=f1e3161]: U+A77F
+                - generic [ref=f1e3162]: +
+              - button "Add ꞁ (U+A781)" [ref=f1e3163] [cursor=pointer]:
+                - generic [ref=f1e3165]: U+A781
+                - generic [ref=f1e3166]: +
+              - button "Add ꞃ (U+A783)" [ref=f1e3167] [cursor=pointer]:
+                - generic [ref=f1e3169]: U+A783
+                - generic [ref=f1e3170]: +
+              - button "Add ꞅ (U+A785)" [ref=f1e3171] [cursor=pointer]:
+                - generic [ref=f1e3173]: U+A785
+                - generic [ref=f1e3174]: +
+              - button "Add ꞇ (U+A787)" [ref=f1e3175] [cursor=pointer]:
+                - generic [ref=f1e3177]: U+A787
+                - generic [ref=f1e3178]: +
+              - button "Add ꞌ (U+A78C) — from your starting keyboard" [ref=f1e3179] [cursor=pointer]:
+                - generic [ref=f1e3180]: ꞌ
+                - generic [ref=f1e3181]: U+A78C
+                - generic [ref=f1e3182]: +
+              - button "Add ꞎ (U+A78E)" [ref=f1e3183] [cursor=pointer]:
+                - generic [ref=f1e3185]: U+A78E
+                - generic [ref=f1e3186]: +
+              - button "Add ꞏ (U+A78F)" [ref=f1e3187] [cursor=pointer]:
+                - generic [ref=f1e3189]: U+A78F
+                - generic [ref=f1e3190]: +
+              - button "Add ꞑ (U+A791)" [ref=f1e3191] [cursor=pointer]:
+                - generic [ref=f1e3193]: U+A791
+                - generic [ref=f1e3194]: +
+              - button "Add ꞓ (U+A793)" [ref=f1e3195] [cursor=pointer]:
+                - generic [ref=f1e3197]: U+A793
+                - generic [ref=f1e3198]: +
+              - button "Add ꞔ (U+A794)" [ref=f1e3199] [cursor=pointer]:
+                - generic [ref=f1e3201]: U+A794
+                - generic [ref=f1e3202]: +
+              - button "Add ꞕ (U+A795)" [ref=f1e3203] [cursor=pointer]:
+                - generic [ref=f1e3205]: U+A795
+                - generic [ref=f1e3206]: +
+              - button "Add ꞗ (U+A797)" [ref=f1e3207] [cursor=pointer]:
+                - generic [ref=f1e3209]: U+A797
+                - generic [ref=f1e3210]: +
+              - button "Add ꞙ (U+A799)" [ref=f1e3211] [cursor=pointer]:
+                - generic [ref=f1e3213]: U+A799
+                - generic [ref=f1e3214]: +
+              - button "Add ꞛ (U+A79B)" [ref=f1e3215] [cursor=pointer]:
+                - generic [ref=f1e3217]: U+A79B
+                - generic [ref=f1e3218]: +
+              - button "Add ꞝ (U+A79D)" [ref=f1e3219] [cursor=pointer]:
+                - generic [ref=f1e3221]: U+A79D
+                - generic [ref=f1e3222]: +
+              - button "Add ꞟ (U+A79F)" [ref=f1e3223] [cursor=pointer]:
+                - generic [ref=f1e3225]: U+A79F
+                - generic [ref=f1e3226]: +
+              - button "Add ꞡ (U+A7A1)" [ref=f1e3227] [cursor=pointer]:
+                - generic [ref=f1e3229]: U+A7A1
+                - generic [ref=f1e3230]: +
+              - button "Add ꞣ (U+A7A3)" [ref=f1e3231] [cursor=pointer]:
+                - generic [ref=f1e3233]: U+A7A3
+                - generic [ref=f1e3234]: +
+              - button "Add ꞥ (U+A7A5)" [ref=f1e3235] [cursor=pointer]:
+                - generic [ref=f1e3237]: U+A7A5
+                - generic [ref=f1e3238]: +
+              - button "Add ꞧ (U+A7A7)" [ref=f1e3239] [cursor=pointer]:
+                - generic [ref=f1e3241]: U+A7A7
+                - generic [ref=f1e3242]: +
+              - button "Add ꞩ (U+A7A9)" [ref=f1e3243] [cursor=pointer]:
+                - generic [ref=f1e3245]: U+A7A9
+                - generic [ref=f1e3246]: +
+              - button "Add ꞯ (U+A7AF)" [ref=f1e3247] [cursor=pointer]:
+                - generic [ref=f1e3249]: U+A7AF
+                - generic [ref=f1e3250]: +
+              - button "Add ꞵ (U+A7B5)" [ref=f1e3251] [cursor=pointer]:
+                - generic [ref=f1e3253]: U+A7B5
+                - generic [ref=f1e3254]: +
+              - button "Add ꞷ (U+A7B7)" [ref=f1e3255] [cursor=pointer]:
+                - generic [ref=f1e3257]: U+A7B7
+                - generic [ref=f1e3258]: +
+              - button "Add ꞹ (U+A7B9)" [ref=f1e3259] [cursor=pointer]:
+                - generic [ref=f1e3261]: U+A7B9
+                - generic [ref=f1e3262]: +
+              - button "Add ꞻ (U+A7BB)" [ref=f1e3263] [cursor=pointer]:
+                - generic [ref=f1e3265]: U+A7BB
+                - generic [ref=f1e3266]: +
+              - button "Add ꞽ (U+A7BD)" [ref=f1e3267] [cursor=pointer]:
+                - generic [ref=f1e3269]: U+A7BD
+                - generic [ref=f1e3270]: +
+              - button "Add ꞿ (U+A7BF)" [ref=f1e3271] [cursor=pointer]:
+                - generic [ref=f1e3273]: U+A7BF
+                - generic [ref=f1e3274]: +
+              - button "Add ꟁ (U+A7C1)" [ref=f1e3275] [cursor=pointer]:
+                - generic [ref=f1e3276]: ꟁ
+                - generic [ref=f1e3277]: U+A7C1
+                - generic [ref=f1e3278]: +
+              - button "Add ꟃ (U+A7C3)" [ref=f1e3279] [cursor=pointer]:
+                - generic [ref=f1e3281]: U+A7C3
+                - generic [ref=f1e3282]: +
+              - button "Add ꟈ (U+A7C8)" [ref=f1e3283] [cursor=pointer]:
+                - generic [ref=f1e3285]: U+A7C8
+                - generic [ref=f1e3286]: +
+              - button "Add ꟊ (U+A7CA)" [ref=f1e3287] [cursor=pointer]:
+                - generic [ref=f1e3289]: U+A7CA
+                - generic [ref=f1e3290]: +
+              - button "Add ꟍ (U+A7CD)" [ref=f1e3291] [cursor=pointer]:
+                - generic [ref=f1e3292]: ꟍ
+                - generic [ref=f1e3293]: U+A7CD
+                - generic [ref=f1e3294]: +
+              - button "Add ꟏ (U+A7CF)" [ref=f1e3295] [cursor=pointer]:
+                - generic [ref=f1e3296]: ꟏
+                - generic [ref=f1e3297]: U+A7CF
+                - generic [ref=f1e3298]: +
+              - button "Add ꟑ (U+A7D1)" [ref=f1e3299] [cursor=pointer]:
+                - generic [ref=f1e3300]: ꟑ
+                - generic [ref=f1e3301]: U+A7D1
+                - generic [ref=f1e3302]: +
+              - button "Add ꟓ (U+A7D3)" [ref=f1e3303] [cursor=pointer]:
+                - generic [ref=f1e3304]: ꟓ
+                - generic [ref=f1e3305]: U+A7D3
+                - generic [ref=f1e3306]: +
+              - button "Add ꟕ (U+A7D5)" [ref=f1e3307] [cursor=pointer]:
+                - generic [ref=f1e3308]: ꟕ
+                - generic [ref=f1e3309]: U+A7D5
+                - generic [ref=f1e3310]: +
+              - button "Add ꟗ (U+A7D7)" [ref=f1e3311] [cursor=pointer]:
+                - generic [ref=f1e3312]: ꟗ
+                - generic [ref=f1e3313]: U+A7D7
+                - generic [ref=f1e3314]: +
+              - button "Add ꟙ (U+A7D9)" [ref=f1e3315] [cursor=pointer]:
+                - generic [ref=f1e3316]: ꟙ
+                - generic [ref=f1e3317]: U+A7D9
+                - generic [ref=f1e3318]: +
+              - button "Add ꟛ (U+A7DB)" [ref=f1e3319] [cursor=pointer]:
+                - generic [ref=f1e3320]: ꟛ
+                - generic [ref=f1e3321]: U+A7DB
+                - generic [ref=f1e3322]: +
+              - button "Add ꟱ (U+A7F1)" [ref=f1e3323] [cursor=pointer]:
+                - generic [ref=f1e3324]: ꟱
+                - generic [ref=f1e3325]: U+A7F1
+                - generic [ref=f1e3326]: +
+              - button "Add ꟲ (U+A7F2)" [ref=f1e3327] [cursor=pointer]:
+                - generic [ref=f1e3328]: ꟲ
+                - generic [ref=f1e3329]: U+A7F2
+                - generic [ref=f1e3330]: +
+              - button "Add ꟳ (U+A7F3)" [ref=f1e3331] [cursor=pointer]:
+                - generic [ref=f1e3332]: ꟳ
+                - generic [ref=f1e3333]: U+A7F3
+                - generic [ref=f1e3334]: +
+              - button "Add ꟴ (U+A7F4)" [ref=f1e3335] [cursor=pointer]:
+                - generic [ref=f1e3336]: ꟴ
+                - generic [ref=f1e3337]: U+A7F4
+                - generic [ref=f1e3338]: +
+              - button "Add ꟶ (U+A7F6)" [ref=f1e3339] [cursor=pointer]:
+                - generic [ref=f1e3341]: U+A7F6
+                - generic [ref=f1e3342]: +
+              - button "Add ꟷ (U+A7F7)" [ref=f1e3343] [cursor=pointer]:
+                - generic [ref=f1e3345]: U+A7F7
+                - generic [ref=f1e3346]: +
+              - button "Add ꟸ (U+A7F8)" [ref=f1e3347] [cursor=pointer]:
+                - generic [ref=f1e3349]: U+A7F8
+                - generic [ref=f1e3350]: +
+              - button "Add ꟹ (U+A7F9)" [ref=f1e3351] [cursor=pointer]:
+                - generic [ref=f1e3353]: U+A7F9
+                - generic [ref=f1e3354]: +
+              - button "Add ꟺ (U+A7FA)" [ref=f1e3355] [cursor=pointer]:
+                - generic [ref=f1e3357]: U+A7FA
+                - generic [ref=f1e3358]: +
+              - button "Add ꟻ (U+A7FB)" [ref=f1e3359] [cursor=pointer]:
+                - generic [ref=f1e3361]: U+A7FB
+                - generic [ref=f1e3362]: +
+              - button "Add ꟼ (U+A7FC)" [ref=f1e3363] [cursor=pointer]:
+                - generic [ref=f1e3365]: U+A7FC
+                - generic [ref=f1e3366]: +
+              - button "Add ꟽ (U+A7FD)" [ref=f1e3367] [cursor=pointer]:
+                - generic [ref=f1e3369]: U+A7FD
+                - generic [ref=f1e3370]: +
+              - button "Add ꟾ (U+A7FE)" [ref=f1e3371] [cursor=pointer]:
+                - generic [ref=f1e3373]: U+A7FE
+                - generic [ref=f1e3374]: +
+              - button "Add ꟿ (U+A7FF)" [ref=f1e3375] [cursor=pointer]:
+                - generic [ref=f1e3377]: U+A7FF
+                - generic [ref=f1e3378]: +
+          - region "Alphabetic Presentation Forms characters" [ref=f1e3379]:
+            - generic [ref=f1e3380]:
+              - heading "Alphabetic Presentation Forms" [level=3] [ref=f1e3381]
+              - button "Hide Alphabetic Presentation Forms" [expanded] [ref=f1e3382] [cursor=pointer]
+            - group "Alphabetic Presentation Forms characters — click to toggle" [ref=f1e3385]:
+              - button "Add ﬀ (U+FB00) — from your starting keyboard" [ref=f1e3386] [cursor=pointer]:
+                - generic [ref=f1e3388]: U+FB00
+                - generic [ref=f1e3389]: +
+              - button "Add ﬁ (U+FB01)" [ref=f1e3390] [cursor=pointer]:
+                - generic [ref=f1e3392]: U+FB01
+                - generic [ref=f1e3393]: +
+              - button "Add ﬂ (U+FB02)" [ref=f1e3394] [cursor=pointer]:
+                - generic [ref=f1e3396]: U+FB02
+                - generic [ref=f1e3397]: +
+              - button "Add ﬃ (U+FB03)" [ref=f1e3398] [cursor=pointer]:
+                - generic [ref=f1e3400]: U+FB03
+                - generic [ref=f1e3401]: +
+              - button "Add ﬄ (U+FB04)" [ref=f1e3402] [cursor=pointer]:
+                - generic [ref=f1e3404]: U+FB04
+                - generic [ref=f1e3405]: +
+              - button "Add ﬅ (U+FB05)" [ref=f1e3406] [cursor=pointer]:
+                - generic [ref=f1e3408]: U+FB05
+                - generic [ref=f1e3409]: +
+              - button "Add ﬆ (U+FB06)" [ref=f1e3410] [cursor=pointer]:
+                - generic [ref=f1e3412]: U+FB06
+                - generic [ref=f1e3413]: +
+          - region "Greek and Coptic characters" [ref=f1e3414]:
+            - generic [ref=f1e3415]:
+              - heading "Greek and Coptic" [level=3] [ref=f1e3416]
+              - button "Hide Greek and Coptic" [expanded] [ref=f1e3417] [cursor=pointer]
+            - group "Greek and Coptic characters — click to toggle" [ref=f1e3420]:
+              - button "Add ͱ (U+0371)" [ref=f1e3421] [cursor=pointer]:
+                - generic [ref=f1e3423]: U+0371
+                - generic [ref=f1e3424]: +
+              - button "Add ͳ (U+0373)" [ref=f1e3425] [cursor=pointer]:
+                - generic [ref=f1e3427]: U+0373
+                - generic [ref=f1e3428]: +
+              - button "Add ͷ (U+0377)" [ref=f1e3429] [cursor=pointer]:
+                - generic [ref=f1e3431]: U+0377
+                - generic [ref=f1e3432]: +
+              - button "Add ͺ (U+037A)" [ref=f1e3433] [cursor=pointer]:
+                - generic [ref=f1e3434]: ͺ
+                - generic [ref=f1e3435]: U+037A
+                - generic [ref=f1e3436]: +
+              - button "Add ͻ (U+037B)" [ref=f1e3437] [cursor=pointer]:
+                - generic [ref=f1e3438]: ͻ
+                - generic [ref=f1e3439]: U+037B
+                - generic [ref=f1e3440]: +
+              - button "Add ͼ (U+037C)" [ref=f1e3441] [cursor=pointer]:
+                - generic [ref=f1e3442]: ͼ
+                - generic [ref=f1e3443]: U+037C
+                - generic [ref=f1e3444]: +
+              - button "Add ͽ (U+037D)" [ref=f1e3445] [cursor=pointer]:
+                - generic [ref=f1e3446]: ͽ
+                - generic [ref=f1e3447]: U+037D
+                - generic [ref=f1e3448]: +
+              - button "Add ΐ (U+0390)" [ref=f1e3449] [cursor=pointer]:
+                - generic [ref=f1e3450]: ΐ
+                - generic [ref=f1e3451]: U+0390
+                - generic [ref=f1e3452]: +
+              - button "Add ά (U+03AC)" [ref=f1e3453] [cursor=pointer]:
+                - generic [ref=f1e3454]: ά
+                - generic [ref=f1e3455]: U+03AC
+                - generic [ref=f1e3456]: +
+              - button "Add έ (U+03AD)" [ref=f1e3457] [cursor=pointer]:
+                - generic [ref=f1e3458]: έ
+                - generic [ref=f1e3459]: U+03AD
+                - generic [ref=f1e3460]: +
+              - button "Add ή (U+03AE)" [ref=f1e3461] [cursor=pointer]:
+                - generic [ref=f1e3462]: ή
+                - generic [ref=f1e3463]: U+03AE
+                - generic [ref=f1e3464]: +
+              - button "Add ί (U+03AF)" [ref=f1e3465] [cursor=pointer]:
+                - generic [ref=f1e3466]: ί
+                - generic [ref=f1e3467]: U+03AF
+                - generic [ref=f1e3468]: +
+              - button "Add ΰ (U+03B0)" [ref=f1e3469] [cursor=pointer]:
+                - generic [ref=f1e3470]: ΰ
+                - generic [ref=f1e3471]: U+03B0
+                - generic [ref=f1e3472]: +
+              - button "Add α (U+03B1) — from your starting keyboard" [ref=f1e3473] [cursor=pointer]:
+                - generic [ref=f1e3474]: α
+                - generic [ref=f1e3475]: U+03B1
+                - generic [ref=f1e3476]: +
+              - button "Add β (U+03B2)" [ref=f1e3477] [cursor=pointer]:
+                - generic [ref=f1e3478]: β
+                - generic [ref=f1e3479]: U+03B2
+                - generic [ref=f1e3480]: +
+              - button "Add γ (U+03B3)" [ref=f1e3481] [cursor=pointer]:
+                - generic [ref=f1e3482]: γ
+                - generic [ref=f1e3483]: U+03B3
+                - generic [ref=f1e3484]: +
+              - button "Add δ (U+03B4)" [ref=f1e3485] [cursor=pointer]:
+                - generic [ref=f1e3486]: δ
+                - generic [ref=f1e3487]: U+03B4
+                - generic [ref=f1e3488]: +
+              - button "Add ε (U+03B5)" [ref=f1e3489] [cursor=pointer]:
+                - generic [ref=f1e3490]: ε
+                - generic [ref=f1e3491]: U+03B5
+                - generic [ref=f1e3492]: +
+              - button "Add ζ (U+03B6)" [ref=f1e3493] [cursor=pointer]:
+                - generic [ref=f1e3494]: ζ
+                - generic [ref=f1e3495]: U+03B6
+                - generic [ref=f1e3496]: +
+              - button "Add η (U+03B7)" [ref=f1e3497] [cursor=pointer]:
+                - generic [ref=f1e3498]: η
+                - generic [ref=f1e3499]: U+03B7
+                - generic [ref=f1e3500]: +
+              - button "Add θ (U+03B8)" [ref=f1e3501] [cursor=pointer]:
+                - generic [ref=f1e3502]: θ
+                - generic [ref=f1e3503]: U+03B8
+                - generic [ref=f1e3504]: +
+              - button "Add ι (U+03B9)" [ref=f1e3505] [cursor=pointer]:
+                - generic [ref=f1e3506]: ι
+                - generic [ref=f1e3507]: U+03B9
+                - generic [ref=f1e3508]: +
+              - button "Add κ (U+03BA)" [ref=f1e3509] [cursor=pointer]:
+                - generic [ref=f1e3510]: κ
+                - generic [ref=f1e3511]: U+03BA
+                - generic [ref=f1e3512]: +
+              - button "Add λ (U+03BB)" [ref=f1e3513] [cursor=pointer]:
+                - generic [ref=f1e3514]: λ
+                - generic [ref=f1e3515]: U+03BB
+                - generic [ref=f1e3516]: +
+              - button "Add μ (U+03BC)" [ref=f1e3517] [cursor=pointer]:
+                - generic [ref=f1e3518]: μ
+                - generic [ref=f1e3519]: U+03BC
+                - generic [ref=f1e3520]: +
+              - button "Add ν (U+03BD)" [ref=f1e3521] [cursor=pointer]:
+                - generic [ref=f1e3522]: ν
+                - generic [ref=f1e3523]: U+03BD
+                - generic [ref=f1e3524]: +
+              - button "Add ξ (U+03BE)" [ref=f1e3525] [cursor=pointer]:
+                - generic [ref=f1e3526]: ξ
+                - generic [ref=f1e3527]: U+03BE
+                - generic [ref=f1e3528]: +
+              - button "Add ο (U+03BF)" [ref=f1e3529] [cursor=pointer]:
+                - generic [ref=f1e3530]: ο
+                - generic [ref=f1e3531]: U+03BF
+                - generic [ref=f1e3532]: +
+              - button "Add π (U+03C0)" [ref=f1e3533] [cursor=pointer]:
+                - generic [ref=f1e3534]: π
+                - generic [ref=f1e3535]: U+03C0
+                - generic [ref=f1e3536]: +
+              - button "Add ρ (U+03C1)" [ref=f1e3537] [cursor=pointer]:
+                - generic [ref=f1e3538]: ρ
+                - generic [ref=f1e3539]: U+03C1
+                - generic [ref=f1e3540]: +
+              - button "Add ς (U+03C2)" [ref=f1e3541] [cursor=pointer]:
+                - generic [ref=f1e3542]: ς
+                - generic [ref=f1e3543]: U+03C2
+                - generic [ref=f1e3544]: +
+              - button "Add σ (U+03C3)" [ref=f1e3545] [cursor=pointer]:
+                - generic [ref=f1e3546]: σ
+                - generic [ref=f1e3547]: U+03C3
+                - generic [ref=f1e3548]: +
+              - button "Add τ (U+03C4)" [ref=f1e3549] [cursor=pointer]:
+                - generic [ref=f1e3550]: τ
+                - generic [ref=f1e3551]: U+03C4
+                - generic [ref=f1e3552]: +
+              - button "Add υ (U+03C5)" [ref=f1e3553] [cursor=pointer]:
+                - generic [ref=f1e3554]: υ
+                - generic [ref=f1e3555]: U+03C5
+                - generic [ref=f1e3556]: +
+              - button "Add φ (U+03C6)" [ref=f1e3557] [cursor=pointer]:
+                - generic [ref=f1e3558]: φ
+                - generic [ref=f1e3559]: U+03C6
+                - generic [ref=f1e3560]: +
+              - button "Add χ (U+03C7)" [ref=f1e3561] [cursor=pointer]:
+                - generic [ref=f1e3562]: χ
+                - generic [ref=f1e3563]: U+03C7
+                - generic [ref=f1e3564]: +
+              - button "Add ψ (U+03C8)" [ref=f1e3565] [cursor=pointer]:
+                - generic [ref=f1e3566]: ψ
+                - generic [ref=f1e3567]: U+03C8
+                - generic [ref=f1e3568]: +
+              - button "Add ω (U+03C9)" [ref=f1e3569] [cursor=pointer]:
+                - generic [ref=f1e3570]: ω
+                - generic [ref=f1e3571]: U+03C9
+                - generic [ref=f1e3572]: +
+              - button "Add ϊ (U+03CA)" [ref=f1e3573] [cursor=pointer]:
+                - generic [ref=f1e3574]: ϊ
+                - generic [ref=f1e3575]: U+03CA
+                - generic [ref=f1e3576]: +
+              - button "Add ϋ (U+03CB)" [ref=f1e3577] [cursor=pointer]:
+                - generic [ref=f1e3578]: ϋ
+                - generic [ref=f1e3579]: U+03CB
+                - generic [ref=f1e3580]: +
+              - button "Add ό (U+03CC)" [ref=f1e3581] [cursor=pointer]:
+                - generic [ref=f1e3582]: ό
+                - generic [ref=f1e3583]: U+03CC
+                - generic [ref=f1e3584]: +
+              - button "Add ύ (U+03CD)" [ref=f1e3585] [cursor=pointer]:
+                - generic [ref=f1e3586]: ύ
+                - generic [ref=f1e3587]: U+03CD
+                - generic [ref=f1e3588]: +
+              - button "Add ώ (U+03CE)" [ref=f1e3589] [cursor=pointer]:
+                - generic [ref=f1e3590]: ώ
+                - generic [ref=f1e3591]: U+03CE
+                - generic [ref=f1e3592]: +
+              - button "Add ϐ (U+03D0)" [ref=f1e3593] [cursor=pointer]:
+                - generic [ref=f1e3594]: ϐ
+                - generic [ref=f1e3595]: U+03D0
+                - generic [ref=f1e3596]: +
+              - button "Add ϑ (U+03D1)" [ref=f1e3597] [cursor=pointer]:
+                - generic [ref=f1e3598]: ϑ
+                - generic [ref=f1e3599]: U+03D1
+                - generic [ref=f1e3600]: +
+              - button "Add ϒ (U+03D2)" [ref=f1e3601] [cursor=pointer]:
+                - generic [ref=f1e3602]: ϒ
+                - generic [ref=f1e3603]: U+03D2
+                - generic [ref=f1e3604]: +
+              - button "Add ϓ (U+03D3)" [ref=f1e3605] [cursor=pointer]:
+                - generic [ref=f1e3606]: ϓ
+                - generic [ref=f1e3607]: U+03D3
+                - generic [ref=f1e3608]: +
+              - button "Add ϔ (U+03D4)" [ref=f1e3609] [cursor=pointer]:
+                - generic [ref=f1e3610]: ϔ
+                - generic [ref=f1e3611]: U+03D4
+                - generic [ref=f1e3612]: +
+              - button "Add ϕ (U+03D5)" [ref=f1e3613] [cursor=pointer]:
+                - generic [ref=f1e3614]: ϕ
+                - generic [ref=f1e3615]: U+03D5
+                - generic [ref=f1e3616]: +
+              - button "Add ϖ (U+03D6)" [ref=f1e3617] [cursor=pointer]:
+                - generic [ref=f1e3618]: ϖ
+                - generic [ref=f1e3619]: U+03D6
+                - generic [ref=f1e3620]: +
+              - button "Add ϗ (U+03D7)" [ref=f1e3621] [cursor=pointer]:
+                - generic [ref=f1e3622]: ϗ
+                - generic [ref=f1e3623]: U+03D7
+                - generic [ref=f1e3624]: +
+              - button "Add ϙ (U+03D9)" [ref=f1e3625] [cursor=pointer]:
+                - generic [ref=f1e3626]: ϙ
+                - generic [ref=f1e3627]: U+03D9
+                - generic [ref=f1e3628]: +
+              - button "Add ϛ (U+03DB)" [ref=f1e3629] [cursor=pointer]:
+                - generic [ref=f1e3630]: ϛ
+                - generic [ref=f1e3631]: U+03DB
+                - generic [ref=f1e3632]: +
+              - button "Add ϝ (U+03DD)" [ref=f1e3633] [cursor=pointer]:
+                - generic [ref=f1e3634]: ϝ
+                - generic [ref=f1e3635]: U+03DD
+                - generic [ref=f1e3636]: +
+              - button "Add ϟ (U+03DF)" [ref=f1e3637] [cursor=pointer]:
+                - generic [ref=f1e3638]: ϟ
+                - generic [ref=f1e3639]: U+03DF
+                - generic [ref=f1e3640]: +
+              - button "Add ϡ (U+03E1)" [ref=f1e3641] [cursor=pointer]:
+                - generic [ref=f1e3642]: ϡ
+                - generic [ref=f1e3643]: U+03E1
+                - generic [ref=f1e3644]: +
+              - button "Add ϰ (U+03F0)" [ref=f1e3645] [cursor=pointer]:
+                - generic [ref=f1e3646]: ϰ
+                - generic [ref=f1e3647]: U+03F0
+                - generic [ref=f1e3648]: +
+              - button "Add ϱ (U+03F1)" [ref=f1e3649] [cursor=pointer]:
+                - generic [ref=f1e3650]: ϱ
+                - generic [ref=f1e3651]: U+03F1
+                - generic [ref=f1e3652]: +
+              - button "Add ϲ (U+03F2)" [ref=f1e3653] [cursor=pointer]:
+                - generic [ref=f1e3654]: ϲ
+                - generic [ref=f1e3655]: U+03F2
+                - generic [ref=f1e3656]: +
+              - button "Add ϳ (U+03F3)" [ref=f1e3657] [cursor=pointer]:
+                - generic [ref=f1e3658]: ϳ
+                - generic [ref=f1e3659]: U+03F3
+                - generic [ref=f1e3660]: +
+              - button "Add ϵ (U+03F5)" [ref=f1e3661] [cursor=pointer]:
+                - generic [ref=f1e3662]: ϵ
+                - generic [ref=f1e3663]: U+03F5
+                - generic [ref=f1e3664]: +
+              - button "Add ϸ (U+03F8)" [ref=f1e3665] [cursor=pointer]:
+                - generic [ref=f1e3666]: ϸ
+                - generic [ref=f1e3667]: U+03F8
+                - generic [ref=f1e3668]: +
+              - button "Add ϻ (U+03FB)" [ref=f1e3669] [cursor=pointer]:
+                - generic [ref=f1e3670]: ϻ
+                - generic [ref=f1e3671]: U+03FB
+                - generic [ref=f1e3672]: +
+              - button "Add ϼ (U+03FC)" [ref=f1e3673] [cursor=pointer]:
+                - generic [ref=f1e3674]: ϼ
+                - generic [ref=f1e3675]: U+03FC
+                - generic [ref=f1e3676]: +
+  - contentinfo "Project and progress" [ref=f1e101]:
+    - group "Step navigation" [ref=f1e3677]:
+      - button "Back" [ref=f1e3678] [cursor=pointer]
+      - button "Continue (100 characters)" [active] [ref=f1e3679] [cursor=pointer]
+    - generic "Ewondo" [ref=f1e3680]: "Project: Ewondo"
+    - generic [ref=f1e3681]:
+      - button "Identity — completed" [ref=f1e3682] [cursor=pointer]
+      - button "Keyboard layout — completed" [ref=f1e3683] [cursor=pointer]
+      - button "Choose a starting keyboard — completed" [ref=f1e3684] [cursor=pointer]
+      - button "Copy or adapt — completed" [ref=f1e3685] [cursor=pointer]
+      - button "Author & copyright — partly answered" [ref=f1e3686] [cursor=pointer]
+      - button "Project name — completed" [ref=f1e3687] [cursor=pointer]
+      - button "Characters — 1 of 3 — completed" [ref=f1e3688] [cursor=pointer]
+      - button "Characters — 2 of 3 — completed" [ref=f1e3689] [cursor=pointer]
+      - button "Characters — 3 of 3 — you are here" [ref=f1e3690]
+      - button "Accents & marks — not yet reached" [ref=f1e3691] [cursor=pointer]
+      - button "Punctuation — not yet reached" [ref=f1e3692] [cursor=pointer]
+      - button "Invisible characters — not yet reached" [ref=f1e3693] [cursor=pointer]
+      - button "Convenience letters — not yet reached" [ref=f1e3694] [cursor=pointer]
+      - button "Carve — not yet reached" [ref=f1e3695] [cursor=pointer]
+      - button "Deadkeys — not yet reached" [ref=f1e3696] [cursor=pointer]
+      - button "Rules — not yet reached" [ref=f1e3697] [cursor=pointer]
+      - 'button "Mechanisms — not yet reached — work waiting: warnings to review" [ref=f1e3698] [cursor=pointer]'
+      - button "Touch seed — not yet reached" [ref=f1e3700] [cursor=pointer]
+      - button "Touch layout — not yet reached" [ref=f1e3701] [cursor=pointer]
+      - button "Help & credits — not yet reached" [ref=f1e3702] [cursor=pointer]
+    - status
+```
