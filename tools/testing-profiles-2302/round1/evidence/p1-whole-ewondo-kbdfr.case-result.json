@@ -1,0 +1,6 @@
+{
+  "id": "p1-whole-ewondo-kbdfr",
+  "reconstructedFromLogs": false,
+  "note": "Attempted (lane B2, ~00:02 UTC): session opened and phase 1 script generated, then the dev server died (HTTP 000) before phase 1 produced output. Only 00-open.log, 01-goto.log and phase1.js survive.",
+  "phases": {}
+}

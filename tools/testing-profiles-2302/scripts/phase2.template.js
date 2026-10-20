@@ -138,7 +138,54 @@ async page => {
           return t.includes("ready-made") ? "ready-made" : (t.includes("separate characters") ? "base-plus-mark" : t.slice(0, 80));
         }).catch(() => null);
         rec.fallbackNote = await page.getByTestId("output-form-fallback-note").innerText().catch(() => null);
-        rec.textAfter = (await s.innerText().catch(() => "")).slice(0, 1500);
+        // --- #2302 round 2: the backspace question (PR #2312, marks-backspace) ---
+        const bk = { present: false };
+        const bs = page.getByTestId("marks-backspace");
+        if (await vis(bs, 4000)) {
+          bk.present = true;
+          bk.heading = await bs.locator("h3").first().innerText().catch(() => null);
+          bk.sectionText = (await bs.innerText().catch(() => "")).slice(0, 2000);
+          const readBk = () => page.evaluate(() => {
+            const sec = document.querySelector('[data-testid="marks-backspace"]');
+            if (!sec) return { recommended: null, checked: null };
+            const beh = (txt) => txt.includes("one mark at a time") ? "peel" : (txt.includes("whole letter at once") ? "whole-stack" : null);
+            let recommended = null, checked = null;
+            for (const lab of sec.querySelectorAll("label")) {
+              const t = lab.textContent || "";
+              if (/recommended/.test(t)) recommended = beh(t);
+              const inp = lab.querySelector('input[name="marks-backspace"]');
+              if (inp && inp.checked) checked = beh(t);
+            }
+            return { recommended, checked };
+          }).catch(() => ({ recommended: null, checked: null }));
+          // Read AFTER the form selection above: the backspace proposal must follow the chosen composition.
+          const st1 = await readBk();
+          bk.recommended = st1.recommended;
+          bk.checkedAfterForm = st1.checked;
+          bk.expectedRecommended = P.outputForm === "ready-made" ? "whole-stack" : "peel";
+          bk.proposalFollowsForm = bk.recommended === bk.expectedRecommended;
+          bk.defaultCheckedFollowsProposal = st1.checked !== null && st1.checked === st1.recommended;
+          // Select the case's target behaviour when it differs — the override.
+          const wantBk = P.backspace === "whole" ? "whole-stack" : "peel";
+          bk.target = wantBk;
+          bk.clicked = null;
+          if (st1.checked !== wantBk) {
+            const labText = wantBk === "peel" ? /one mark at a time/ : /whole letter at once/;
+            const lab = bs.locator("label", { hasText: labText }).first();
+            if (await vis(lab, 3000)) { await lab.click(); bk.clicked = wantBk; await page.waitForTimeout(500); }
+          }
+          const st2 = await readBk();
+          bk.checkedAfter = st2.checked;
+          await page.waitForTimeout(600);
+          const st3 = await readBk();
+          bk.checkedSticky = st3.checked;
+          bk.previewText = await bs.locator('[data-testid="backspace-preview"]').innerText().catch(() => null);
+          bk.previewPresses = bk.previewText ? (bk.previewText.match(/⌫/g) || []).length : null;
+          // Whole-stack preview = exactly one press; peel = two or more (one per mark + clear).
+          bk.previewMatchesAnswer = bk.previewPresses === null ? null : (bk.checkedAfter === "whole-stack" ? bk.previewPresses === 1 : bk.previewPresses >= 2);
+        }
+        rec.backspace = bk;
+        rec.textAfter = (await s.innerText().catch(() => "")).slice(0, 2500);
       }
       if (which === "guard") {
         rec.text = (await page.getByTestId("guard-station").innerText().catch(() => "")).slice(0, 1000);
@@ -214,6 +261,8 @@ async page => {
       const rt = await bodyText();
       out.rulesText = rt.slice(0, 3000);
       out.rulesMentionsBackspace = /backspace/i.test(rt);
+      // Round 2: any generated backspace rules visible at the rules step?
+      out.rulesBkspHits = rt.split("\n").filter(l => /bksp|backspace/i.test(l)).slice(0, 10);
       await rc.click(); out.rules = "continued";
     } else out.rules = "not-rendered";
     out.endBodyExcerpt = (await bodyText()).slice(0, 1500);
