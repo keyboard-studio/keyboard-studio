@@ -45,3 +45,33 @@ The #2300 build this walk exercised deviated from the following texts. Full log 
 2. **Repro F2/F3 on a quiet machine in a headed browser** (Cameroon preview-prep arming; post-output-form Continue stall) and file whichever reproduces; the evidence snapshots in `results.json` are the starting points.
 3. **Re-run the 12 not-attempted + the blocked basic-base cases** with the committed harness on a warm server to complete the basic-base quadrant before drawing product conclusions from it.
 4. **Amend §7.6 and the `placementMap.ts` comment** (items 1–2 above) so the texts stop under-describing shipped behaviour.
+
+---
+
+# Completion addendum — round 2 (2026-10-20, lead)
+
+Round 2 ran the same harness against `origin/main` `ed251e1b` (PR #2312 merged — backspace as its own axis; PR #2303 is not on main and its absence was not treated as a regression). Full two-round table: `results.md` on this branch. **Round-2 counts: PASS 3 · FAIL 0 · BLOCKED 10 · NOT-ATTEMPTED 19** (cumulative completed passes across both rounds: 5).
+
+## The round's question is answered: the backspace axis works
+
+In 7 completed output-form (S4) visits on the basic bases, the restored question behaved exactly as designed:
+
+- The question renders in its own terms, below the composition question, every time.
+- The proposal followed composition **7/7** (NFD → peel, NFC → whole-stack), and the pre-selected default always matched the proposal.
+- Overrides stuck **5/5**, read back at the station and after advancing — including the off-diagonal pairings.
+- The preview was keyed to the backspace answer **7/7** (whole-stack: "à ⌫ (empty)"; peel: "à ⌫ a ⌫ (empty)").
+- Generated behaviour matched the answer in all 3 cases that reached the rules step: NFC+peel emitted the `generated_marks_unwrap_from/to` BKSP rule; **NFD+whole emitted 10 whole-stack rules** ("generated: whole-stack backspace (marks series)") — the new generator working in the wild; on-diagonal NFC+whole emitted none (native).
+
+Complete round-2 PASSes: P2×unwrap (basic_kbdus), P4×whole (basic_kbdus), P2×whole (basic_kbdfr) — two of the three are off-diagonal cells that could not exist before PR #2312. Four more cases completed S4 with correct backspace records and blocked later.
+
+## The dominant block is now a filed defect, not a walk observation
+
+9 of 13 round-2 attempts stalled the same way as round 1's F3: a marks station's Continue pressed, answers recorded, no next station within patience (attachment ×5, guard ×2, stacking ×1, output-form ×1). Across two rounds it reproduces cross-language, cross-base (Cameroon included), cross-build, parallel and serial, warm and cold — load-independent in every dimension the walk could vary. Per Matthew's directive ("file and fix — the goal is to get these e2e walks working"), this is filed as its own issue with both rounds' evidence and a fix is in flight; the remaining blocked and not-attempted cells re-walk once it lands.
+
+## Cameroon wall: did not reproduce
+
+On a warm, idle, single-lane server, `sil_cameroon_qwerty` phase 1 completed cleanly in ~73 s (round 1's "Preparing preview…" wall absent); the case then hit the same series stall as the basic bases. Conclusion: the round-1 wall was a load/environment artefact of that run, not a product defect — it is **not** being filed. `sil_cameroon_azerty` was not attempted in round 2 (time-box); its round-1 evidence stands untested under warm conditions.
+
+## What remains
+
+19 not-attempted cells (mostly the Cameroon AZERTY quadrant and stall-blocked retries) belong to a future round of this manual instrument, after the stall fix lands. Nothing about them is unknown-by-design any longer: the axis they exist to test is proven.
