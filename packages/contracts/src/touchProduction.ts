@@ -363,10 +363,11 @@ function irMapsFor(ir: KeyboardIR): ResolverIrMaps {
  * Resolve what one key occurrence produces in one layer-state.
  *
  * Evaluation order (contracts §1): rules first for every family (a rule may
- * name K_, T_, or U_ ids alike) — then the layer switch the key itself
- * carries — then each family's fallback: U_ decode, the state-0/SHIFT US
- * base table for K_, emulation for the special-function K_ ids, and nothing
- * for T_.
+ * name K_, T_, or U_ ids alike) — then each family's fallback: U_ decode,
+ * the state-0/SHIFT US base table for K_ — then the layer switch the key
+ * itself carries (which rides alongside a rule or fallback production
+ * when one exists, and is the whole record when nothing produces),
+ * emulation for the special-function K_ ids, and nothing for T_.
  */
 export function resolveTouchProduction(
   inputs: ResolveTouchProductionInputs,
@@ -470,17 +471,77 @@ export function resolveTouchProduction(
     };
   }
 
-  // 2. The key's own layer switch, when nothing produces.
+  // 2. U_ decode — a presumption, not a certainty, when a nomatch rule
+  // exists or any rule binds the id in any role or state (§1). The layer
+  // switch rides ALONGSIDE the decode, exactly as it rides alongside a
+  // rule's output in step 1: a U_ key with `nextlayer` types its decoded
+  // character and then switches. (This arm must run before the
+  // layer-switch-only arm below — when the switch preempted the decode,
+  // every rule-free U_ key carrying a layer return resolved `none`, and
+  // the dead-key scan read working keys as dead.)
+  if (family === "U_") {
+    const decoded = decodeUnicodeKeyId(key.id.toUpperCase());
+    if (decoded !== undefined) {
+      const hasNomatch = (ir.groups ?? []).some((g) => g.rules.some((r) => r.matchKind === "nomatch"));
+      const presumptive = hasNomatch || allBindings.length > 0;
+      return {
+        productions: [
+          ...(layerSwitch !== undefined ? [layerSwitch] : []),
+          { output: { kind: "text", text: decoded } },
+        ],
+        source: "u-decode",
+        contextConditional: false,
+        ruleRefs,
+        fallbackCertain: !presumptive,
+      };
+    }
+  }
+
+  // 3. K_ fallback: the US base table, state 0 / SHIFT only. CAPITAL is an
+  // Lstate, not a modifier, and the fallback does not inspect it (T022
+  // probe, contracts §5): KMW's forBaseKeys gates on Lmodifiers alone, so
+  // a caps-state key falls back exactly as the same modifier state does
+  // without caps — state 0 gives the unshifted char, SHIFT the shifted
+  // char, any other modifier state gives none. `state.caps` therefore
+  // plays no part in this arm. The layer switch rides alongside, as in
+  // the U_ arm above. Emulation ids are NOT settled here — they keep
+  // their own arm below, exactly as before.
+  if (family === "K_" && !isEmulationKeyId(key.id)) {
+    const words = normalizeWords(state.modifiers);
+    const isState0 = words.length === 0;
+    const isShiftOnly = words.length === 1 && words[0] === "SHIFT";
+    if (isState0 || isShiftOnly) {
+      const tableKey = isShiftOnly ? `S+${key.id.toUpperCase()}` : key.id.toUpperCase();
+      const base = US_BASE_LAYOUT.get(tableKey);
+      if (base !== undefined) {
+        return {
+          productions: [
+            ...(layerSwitch !== undefined ? [layerSwitch] : []),
+            { output: { kind: "text", text: base } },
+          ],
+          source: "k-fallback",
+          contextConditional: false,
+          ruleRefs,
+          fallbackCertain: true,
+        };
+      }
+    }
+  }
+
+  // 4. The key's own layer switch, when nothing produces. This is the
+  // T_ dead-key shape (a switch entry and source `none`), the T_CAM
+  // shape, and the spacer/emulation-with-nextlayer shapes — all
+  // unchanged from before the fallback arms above were hoisted.
   if (layerSwitch !== undefined) {
     return { ...noneRecord(ruleRefs), productions: [layerSwitch] };
   }
 
-  // 3. Spacer/blank class: inert by construction.
+  // 5. Spacer/blank class: inert by construction.
   if (isSpacerKeyClass(key.sp)) {
     return noneRecord(ruleRefs);
   }
 
-  // 4. Emulation: engine-defined special-function K_ ids.
+  // 6. Emulation: engine-defined special-function K_ ids.
   if (family === "K_" && isEmulationKeyId(key.id)) {
     return {
       productions: [],
@@ -491,51 +552,10 @@ export function resolveTouchProduction(
     };
   }
 
-  // 5. U_ decode — a presumption, not a certainty, when a nomatch rule
-  // exists or any rule binds the id in any role or state (§1).
-  if (family === "U_") {
-    const decoded = decodeUnicodeKeyId(key.id.toUpperCase());
-    if (decoded === undefined) return noneRecord(ruleRefs);
-    const hasNomatch = (ir.groups ?? []).some((g) => g.rules.some((r) => r.matchKind === "nomatch"));
-    const presumptive = hasNomatch || allBindings.length > 0;
-    return {
-      productions: [{ output: { kind: "text", text: decoded } }],
-      source: "u-decode",
-      contextConditional: false,
-      ruleRefs,
-      fallbackCertain: !presumptive,
-    };
-  }
-
-  // 6. K_ fallback: the US base table, state 0 / SHIFT only. CAPITAL is an
-  // Lstate, not a modifier, and the fallback does not inspect it (T022
-  // probe, contracts §5): KMW's forBaseKeys gates on Lmodifiers alone, so
-  // a caps-state key falls back exactly as the same modifier state does
-  // without caps — state 0 gives the unshifted char, SHIFT the shifted
-  // char, any other modifier state gives none. `state.caps` therefore
-  // plays no part in this arm.
-  if (family === "K_") {
-    const words = normalizeWords(state.modifiers);
-    const isState0 = words.length === 0;
-    const isShiftOnly = words.length === 1 && words[0] === "SHIFT";
-    if (isState0 || isShiftOnly) {
-      const tableKey = isShiftOnly ? `S+${key.id.toUpperCase()}` : key.id.toUpperCase();
-      const base = US_BASE_LAYOUT.get(tableKey);
-      if (base !== undefined) {
-        return {
-          productions: [{ output: { kind: "text", text: base } }],
-          source: "k-fallback",
-          contextConditional: false,
-          ruleRefs,
-          fallbackCertain: true,
-        };
-      }
-    }
-    return noneRecord(ruleRefs);
-  }
-
-  // 7. T_ has no fallback at all: no production-bearing rule, no production.
-  // For a producing-class key this record IS the FR-009/FR-023 dead-key
+  // 7. No fallback applies: a U_ id that does not decode, a K_ id in a
+  // state with no base-table entry, and every T_ id (T_ has no fallback
+  // at all: no production-bearing rule, no production). For a
+  // producing-class T_ key this record IS the FR-009/FR-023 dead-key
   // finding — there is no second definition of dead.
   return noneRecord(ruleRefs);
 }

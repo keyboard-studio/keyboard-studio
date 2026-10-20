@@ -327,6 +327,34 @@ describe("resolveTouchProduction — none / layerSwitch / emulation / unclassifi
     ]);
   });
 
+  it("U_ decode + layer-switch key carries both productions — the switch does not preempt the decode", () => {
+    // The basic_* symbol-layer idiom in U_ form: type the character,
+    // return to the default layer. Before the arm reorder this resolved
+    // `none` with only the switch entry, and the dead-key scan read a
+    // working key as dead.
+    const p = resolve(makeTestIR([]), touchKey({ id: "U_0021", nextlayer: "default" }));
+    expect(p.source).toBe("u-decode");
+    expect(p.productions).toEqual([
+      { output: { kind: "layerSwitch", layerId: "default" } },
+      { output: { kind: "text", text: "!" } },
+    ]);
+  });
+
+  it("K_ fallback + layer-switch key carries both productions under one record", () => {
+    const p = resolve(makeTestIR([]), touchKey({ id: "K_1", nextlayer: "default" }));
+    expect(p.source).toBe("k-fallback");
+    expect(p.productions).toEqual([
+      { output: { kind: "layerSwitch", layerId: "default" } },
+      { output: { kind: "text", text: "1" } },
+    ]);
+  });
+
+  it("rule-free producing T_ key with a layer return is still none — the basic_* dead-key shape", () => {
+    const p = resolve(makeTestIR([]), touchKey({ id: "T_0031", nextlayer: "default" }));
+    expect(p.source).toBe("none");
+    expect(p.productions).toEqual([{ output: { kind: "layerSwitch", layerId: "default" } }]);
+  });
+
   it("spacer-class key is none", () => {
     const p = resolve(makeTestIR([]), touchKey({ id: "T_BLANK", sp: 10 }));
     expect(p.source).toBe("none");

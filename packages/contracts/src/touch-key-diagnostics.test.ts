@@ -563,6 +563,48 @@ describe("findDeadTouchKeys — resolver verdicts (spec 104 T006)", () => {
     expect(findDeadTouchKeys(joined(oneLayer(key("U_00E9", { text: "é" }))))).toEqual([]);
   });
 
+  it("VERDICT CHANGE (spec 104 FR-006/FR-028): a producing T_ key carrying a post-output layer return is dead — the basic_* symbol shape", () => {
+    // basic_kbdus's symbol layer: `T_0031` "1" with `nextlayer: "default"`
+    // (type the digit, return to the default layer). The layer return is
+    // a property of the key, not its job: with no rule the tap types
+    // nothing, and this keyboard is FR-028's named dead-T_ repair
+    // fixture. The pre-104 blanket `nextlayer` exemption (spec 058) hid
+    // exactly this family — every rule-free producing T_ key in the
+    // basic_* layouts — while protecting no attested switch-only key
+    // (those carry sp 1/2, a *frame* label, or a sentinel id, all gated
+    // above).
+    const layout = touchLayout({
+      layers: [
+        {
+          id: "symbol",
+          keys: [key("T_0031", { text: "1", nextlayer: "default" })],
+        },
+        { id: "default", keys: [key("K_A", { text: "a" })] },
+      ],
+    });
+    const findings = findDeadTouchKeys(joined(layout));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe("TOUCH_KEY_NO_RULE");
+    expect(findings[0]?.fields.keyId).toBe("T_0031");
+    expect(findings[0]?.fields.layerId).toBe("symbol");
+  });
+
+  it("PARITY with the verdict change: a U_ key carrying a layer return still self-produces — not dead", () => {
+    // The resolver's decode arm runs before its layer-switch arm, so a
+    // rule-free U_ key with `nextlayer` resolves u-decode (it types its
+    // character, then switches) — the scan must not read it as dead.
+    const layout = touchLayout({
+      layers: [
+        {
+          id: "symbol",
+          keys: [key("U_0021", { text: "!", nextlayer: "default" })],
+        },
+        { id: "default", keys: [key("K_A", { text: "a" })] },
+      ],
+    });
+    expect(findDeadTouchKeys(joined(layout))).toEqual([]);
+  });
+
   it("spec 104 guardrail: an unclassified imported id is never reported dead", () => {
     // Outside the K_/T_/U_ families (the resolver's `unclassified` source):
     // no criterion may read it as dead. It earns TOUCH_KEY_UNIDENTIFIED
