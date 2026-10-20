@@ -413,9 +413,52 @@
       "status": "NOT-ATTEMPTED"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
+      "status": "PASS",
       "reason": "",
-      "furthest": "not-attempted"
+      "furthest": "mechanisms-complete",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)à — U+00E0 (one character)Backspace clears the wh",
+      "selectedForm": "base-plus-mark",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "peel",
+        "expectedRecommended": "peel",
+        "proposalFollowsForm": true,
+        "defaultChecked": "peel",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": "whole-stack",
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\nà\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesMentionsBackspace": true,
+      "rulesBkspHits": [
+        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+      ],
+      "galleryChars": 23,
+      "overwrite": {
+        "char": "ŋ",
+        "key": "K_X",
+        "ok": true,
+        "keySelected": true,
+        "applyDisabled": false,
+        "displacement": null
+      },
+      "errors": []
     }
   },
   {
@@ -446,32 +489,18 @@
     },
     "round2": {
       "status": "BLOCKED",
-      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done') to be visible\n",
       "furthest": "mechanisms-stuck-at-?",
-      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
-      "inputOrderClicked": "postfix",
-      "proposalForm": "Send the letter and its mark as separate characters(suggested)á — U+0061 + U+0301 (separate characters)Backspace clears",
-      "selectedForm": "base-plus-mark",
-      "backspace": {
-        "present": true,
-        "heading": "What should backspace do to an accented letter?",
-        "recommended": "peel",
-        "expectedRecommended": "peel",
-        "proposalFollowsForm": true,
-        "defaultChecked": "peel",
-        "defaultFollowsProposal": true,
-        "target": "whole-stack",
-        "clicked": "whole-stack",
-        "checkedAfter": "whole-stack",
-        "checkedSticky": "whole-stack",
-        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
-        "previewPresses": 1,
-        "previewMatchesAnswer": true
-      },
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
       "rulesBkspHits": [],
       "galleryChars": 1,
       "overwrite": null,
       "errors": [
+        "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done') to be visible\n",
         "no apply button at guard 0"
       ]
     }
@@ -519,19 +548,33 @@
     },
     "round2": {
       "status": "BLOCKED",
-      "reason": "furthest=phase1-failed:track-copy; errors: locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('#il_author_name') to be visible\n",
-      "furthest": "phase1-failed:track-copy",
-      "inputOrderSelected": null,
-      "inputOrderClicked": null,
-      "proposalForm": null,
-      "selectedForm": null,
-      "backspace": null,
-      "rulesMentionsBackspace": null,
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)á — U+00E1 (one character)Backspace clears the wh",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "peel",
+        "clicked": "peel",
+        "checkedAfter": "peel",
+        "checkedSticky": "peel",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)",
+        "previewPresses": 2,
+        "previewMatchesAnswer": true
+      },
       "rulesBkspHits": [],
-      "galleryChars": 0,
+      "galleryChars": 1,
       "overwrite": null,
       "errors": [
-        "locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('#il_author_name') to be visible\n"
+        "no apply button at guard 0"
       ]
     }
   },
@@ -562,7 +605,7 @@
     },
     "round2": {
       "status": "BLOCKED",
-      "reason": "furthest=phase1-failed:pick-base; errors: locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n",
+      "reason": "furthest=phase1-failed:pick-base; errors: locator.waitFor: Target crashed \nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n",
       "furthest": "phase1-failed:pick-base",
       "inputOrderSelected": null,
       "inputOrderClicked": null,
@@ -574,7 +617,7 @@
       "galleryChars": 0,
       "overwrite": null,
       "errors": [
-        "locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
+        "locator.waitFor: Target crashed \nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
       ]
     }
   },
@@ -588,9 +631,20 @@
       "status": "NOT-ATTEMPTED"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
-      "reason": "",
-      "furthest": "not-attempted"
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
     }
   },
   {

@@ -17,7 +17,7 @@
   },
   "round": 2,
   "build": "ed251e1b (origin/main, PR #2312 merged)",
-  "startedAt": "2026-10-20T05:55:40.757Z",
+  "startedAt": "2026-10-20T06:27:09.532Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -77,12 +77,12 @@
         }
       ],
       "errors": [],
-      "prefillExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm the basics\n\nBased on your script and chosen keyboard, here is what we will assume. You can edit the language or script here, confirm to continue, or go back to change a choice.\n\nLanguage\nBafutEdit\nScript\nLatnBCP47 script subtag (§5)Edit\nScripts included\nLatn\nScript class (A2)\nalphabeticderived from script\nRouting group (§9)\nqwerty-qwertzderived from script\nStarting keyboard\nUS Basic (basic_kbdus)your chosen starting keyboard\n\nSpare keys (A7), the full BCP47 tag, display name, and copyright are confirmed later from your starting keyboard and the documentation step.\n\nUS Basic\nDesktop OSK\nMobile KB\n← Back\nConfirm and continue\nProject: Bafut",
+      "prefillExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm the basics\n\nBased on your script and chosen keyboard, here is what we will assume. You can edit the language or script here, confirm to continue, or go back to change a choice.\n\nLanguage\nBafutEdit\nScript\nLatnBCP47 script subtag (§5)Edit\nScripts included\nLatn\nScript class (A2)\nalphabeticderived from script\nRouting group (§9)\nqwerty-qwertzderived from script\nStarting keyboard\nUS Basic (basic_kbdus)your chosen starting keyboard\n\nSpare keys (A7), the full BCP47 tag, display name, and copyright are confirmed later from your starting keyboard and the documentation step.\n\nUS Basic\nDesktop OSK\nMobile KB\nLoading your keyboard...\nGetting the files that describe your keyboard...\n← Back\nConfirm and continue\nProject: Bafut",
       "exemplars": {
         "present": false,
         "checked": false
       },
-      "discoveryCheckedId": "discovery_method-build-list",
+      "discoveryCheckedId": null,
       "alphabetHeading": null,
       "alphabetExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nCharacter discovery\n\nHow would you like to add the alphabet Bafut uses?\n\nBoth methods feed the same final alphabet. The first method lets you type your whole alphabet directly.\n\nDiscovery method\nStart from the alphabet we already have for this language — you can change anything\n\nfrom SLDR (machine-generated — please check) 30 characters\n\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nɨ\nU+0268\nj\nU+006A\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nw\nU+0077\ny\nU+0079\nz\nU+007A\nꞌ\nU+A78C\n◌̀\nU+0300\n◌̂\nU+0302\n◌̌\nU+030C\nAdd your whole alphabet — type every character your language uses\nStep by step — I will answer the questions below\nUS Basic\nDesktop OSK\nMobile KB\nBack\nContinue\nProject: Bafut",
       "charlistDoneEnabled": null
@@ -114,5 +114,5 @@
       "reachedTouchSeed": false
     }
   },
-  "finishedAt": "2026-10-20T06:02:20.931Z"
+  "finishedAt": "2026-10-20T06:32:24.975Z"
 }

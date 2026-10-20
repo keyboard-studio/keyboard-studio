@@ -17,7 +17,7 @@
   },
   "round": 2,
   "build": "ed251e1b (origin/main, PR #2312 merged)",
-  "startedAt": "2026-10-20T06:04:03.340Z",
+  "startedAt": "2026-10-20T06:32:39.806Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -53,11 +53,11 @@
         }
       ],
       "errors": [
-        "locator.waitFor: Timeout 60000ms exceeded.\nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
+        "locator.waitFor: Target crashed \nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
       ],
       "failedAt": "pick-base",
-      "bodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nNo keyboard yet\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncurrent step\nC\nCharacters\nnot yet reached\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nChoose a starting keyboard\n\nBased on your language and chosen script, here are the closest starting points. Search above or pick a suggestion below.\n\nSearch in:\nSuggested\nAll keyboards\nSEARCH KEYBOARDS\nImport readiness:\nEditable — small formatting differences after import\nWhat does import readiness mean?\n\nSuggested for you:\n\nCameroon AZERTY (sil_cameroon_azerty)\nAlready supports your language\nCameroon QWERTY (sil_cameroon_qwerty)\nAlready supports your language\nEuroLatin (SIL) (sil_euro_latin)\nRelated: Xhosa, same script\nakan (akan)\nRelated: Akan, same script\nBambara (bambara)\nMatches your script\nFrench Basic (basic_kbdfr)\nMatches your script\nGerman Basic (basic_kbdgr)\nMatches your script\nIPA (SIL) (sil_ipa)\nMatches your script\nNias (nias)\nMatches your script\nPiaroa (pid_piaroa)\nMatches your script\nUnited Kingdom Basic (basic_kbduk)\nMatches your script\nUnited States-International Basic (basic_kbdusx)\nMatches your script\nUS Basic (basic_kbdus)\nStart blank (US QWERTY)\nFrench Basic\nDesktop OSK\nMobile KB\n← Back\nChoose this keyboard"
+      "bodyExcerpt": ""
     }
   },
-  "finishedAt": "2026-10-20T06:08:47.782Z"
+  "finishedAt": "2026-10-20T06:36:11.089Z"
 }
