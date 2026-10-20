@@ -430,6 +430,63 @@ export interface KeyboardArtifactOptions {
    * lighter T011 walks passed (#2249).
    */
   runRoundTripCheck?: boolean;
+  /**
+   * Whether this instance's full runs write the starting point's
+   * documentation slices (welcome/help prose, README/HISTORY, welcome images,
+   * doc stylesheets, baseline doc findings) into the working-copy store.
+   * Those slices are session state, so only an instance that instantiates the
+   * working copy may write them:
+   *
+   * - `"by-branch"` — StudioShell's main walk: the scaffold branch writes the
+   *   copy's slices (images, no prose), the open-base branch the adaptation's.
+   * - `"copy-on-switch"` — Output/Criteria (usePreviewArtifact), which only
+   *   ever instantiate a Track 1 copy: copy slices, and only when the run is
+   *   for a different keyboard than the working copy already started from.
+   *
+   * Absent, nothing is written. The galleries and Compare compile the same
+   * base for their own screen; when they wrote, a re-preview of a copy's
+   * starting keyboard refilled the prose slices the copy had cleared (and a
+   * gallery's identity-derived scaffold spec cleared an adaptation's).
+   */
+  startDocs?: "by-branch" | "copy-on-switch";
+}
+
+type WorkingCopyActions = ReturnType<typeof useWorkingCopyStore.getState>;
+
+/**
+ * spec 080 R9 / FR-007: a Track 1 copy inherits the base's welcome IMAGES
+ * (carried into its own welcome folder) and nothing of its prose. The prose
+ * slices are cleared explicitly rather than assumed null —
+ * instantiateFromStart does not touch them, so a prior adapt session's texts
+ * would otherwise survive into this copy and merge.
+ */
+function applyCopyStartDocs(
+  wc: WorkingCopyActions,
+  docs: {
+    images: Parameters<WorkingCopyActions["setStartWelcomeImages"]>[0];
+    convention: Parameters<WorkingCopyActions["setStartWelcomeConvention"]>[0];
+    helpForExtraction: string | null;
+  },
+): void {
+  wc.setStartWelcomeImages(docs.images);
+  wc.setStartWelcomeConvention(docs.convention);
+  wc.setStartWelcomeHtmText(null);
+  wc.setStartHelpPhpText(null);
+  // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): the
+  // base's help text is retained in the EXTRACTION-ONLY slice at
+  // the same moment the prose slice is nulled — the extractor may
+  // offer its Troubleshooting lines as suggestions, but the text
+  // itself never becomes prose (startHelpPhpText stays null, so
+  // every render/serialize path behaves exactly as FR-007 asks).
+  wc.setBaseHelpPhpTextForExtraction(docs.helpForExtraction);
+  wc.setStartReadmeMdText(null);
+  wc.setStartHistoryMdText(null);
+  // Issue #2139: a copy's pages are fresh renders — the base's page
+  // stylesheets do not govern them, so the slice clears with the prose.
+  wc.setStartDocCssTexts(null);
+  // spec 080 FR-020: a copy inherits no prose, so nothing can be an
+  // upstream finding — an EMPTY baseline (computed), not null (pending).
+  wc.setBaselineDocFindings([]);
 }
 
 export interface KeyboardArtifactResult {
@@ -483,6 +540,10 @@ export function useKeyboardArtifact(
   // restart a compile.
   const runRoundTripRef = useRef(options?.runRoundTripCheck === true);
   runRoundTripRef.current = options?.runRoundTripCheck === true;
+  // Same read-at-launch discipline: which instance owns the start docs is a
+  // mount-time fact.
+  const startDocsRef = useRef(options?.startDocs);
+  startDocsRef.current = options?.startDocs;
 
   /**
    * Records a crash breadcrumb on every Stage transition (spec 060 FR-045).
@@ -1078,6 +1139,14 @@ export function useKeyboardArtifact(
     fontFaceFamilyRef.current = null;
     revokeBlobUrls(prevKeyboardCssBlobUrls);
 
+    // Decided before the fetch, while the store still holds the working copy
+    // this run would replace — see KeyboardArtifactOptions.startDocs.
+    const startDocsMode = startDocsRef.current;
+    const writesStartDocs =
+      startDocsMode === "by-branch" ||
+      (startDocsMode === "copy-on-switch" &&
+        useWorkingCopyStore.getState().startKeyboard?.id !== kb.id);
+
     try {
       if (scaffoldSpec != null) {
         // Scaffold path — new keyboard authoring. Routes through
@@ -1106,32 +1175,13 @@ export function useKeyboardArtifact(
         // same holders. It completes a missing LICENSE.md, and the loader never
         // writes the base's into the VFS, so this is its only source.
         wc.setStartLicenseText(result.startLicenseText ?? null);
-        // spec 080 R9 / FR-007: a Track 1 copy inherits the base's welcome
-        // IMAGES (carried into its own welcome folder) and nothing of its
-        // prose. The prose slices are cleared explicitly rather than assumed
-        // null — instantiateFromStart does not touch them, so a prior adapt
-        // session's texts would otherwise survive into this copy and merge.
-        wc.setStartWelcomeImages(result.startWelcomeImages ?? null);
-        wc.setStartWelcomeConvention(result.startWelcomeConvention ?? null);
-        wc.setStartWelcomeHtmText(null);
-        wc.setStartHelpPhpText(null);
-        // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): the
-        // base's help text is retained in the EXTRACTION-ONLY slice at
-        // the same moment the prose slice is nulled — the extractor may
-        // offer its Troubleshooting lines as suggestions, but the text
-        // itself never becomes prose (startHelpPhpText stays null, so
-        // every render/serialize path behaves exactly as FR-007 asks).
-        wc.setBaseHelpPhpTextForExtraction(
-          result.baseHelpPhpTextForExtraction ?? null,
-        );
-        wc.setStartReadmeMdText(null);
-        wc.setStartHistoryMdText(null);
-        // Issue #2139: a copy's pages are fresh renders — the base's page
-        // stylesheets do not govern them, so the slice clears with the prose.
-        wc.setStartDocCssTexts(null);
-        // spec 080 FR-020: a copy inherits no prose, so nothing can be an
-        // upstream finding — an EMPTY baseline (computed), not null (pending).
-        wc.setBaselineDocFindings([]);
+        if (writesStartDocs) {
+          applyCopyStartDocs(wc, {
+            images: result.startWelcomeImages ?? null,
+            convention: result.startWelcomeConvention ?? null,
+            helpForExtraction: result.baseHelpPhpTextForExtraction ?? null,
+          });
+        }
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.
@@ -1151,64 +1201,74 @@ export function useKeyboardArtifact(
           FETCH_TIMEOUT_MS,
           "Loading keyboard source",
         );
-        // spec 061 FR-013: retain the base's own welcome.htm/help.php verbatim
-        // so the Track 2 output-projection merge has something to preserve.
-        // Track 1 (scaffold branch above) never sets these — a brand-new
-        // keyboard has no prior docs of its own to merge with (research D-05).
         const wc = useWorkingCopyStore.getState();
-        wc.setStartWelcomeHtmText(fetchResult.startWelcomeHtmText ?? null);
-        wc.setStartHelpPhpText(fetchResult.startHelpPhpText ?? null);
-        // Issue #2206: the extraction-only slice is a Track 1 (copy)
-        // retention — on this open-base/adapt path the base's
-        // troubleshooting section already ships inside the inherited
-        // prose, and the ruling authorises no extraction here. Cleared
-        // explicitly so a prior copy session's text cannot survive into
-        // an adapt session (the same hazard the Track 1 clearing above
-        // guards against, in reverse).
-        wc.setBaseHelpPhpTextForExtraction(null);
-        // spec 080 FR-006: the rest of the base's documentation bundle — README
-        // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
-        // images and which convention the base used (data-model §6).
-        wc.setStartReadmeMdText(fetchResult.startReadmeMdText ?? null);
-        wc.setStartHistoryMdText(fetchResult.startHistoryMdText ?? null);
-        wc.setStartWelcomeImages(fetchResult.startWelcomeImages ?? null);
-        wc.setStartWelcomeConvention(fetchResult.startWelcomeConvention ?? null);
-        // Issue #2139: the base's welcome/help stylesheet texts, so the live
-        // 11.8 check and the baseline below judge images against kb.css.
-        wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
-        // spec 080 FR-020 (research R8): run the documentation checks ONCE
-        // over the base's own files as fetched. A later finding on a still-
-        // inherited member whose code appears here is the base's, not the
-        // author's, and renders muted instead of counting against them.
-        {
-          const baselineKmnPath = findKmnPath(vfs);
-          const baselineTouchPath = findTouchLayoutPath(vfs);
-          wc.setBaselineDocFindings(
-            computeBaselineDocFindings({
-              keyboardId: kb.id,
-              displayName: kb.displayName,
-              kmnText: baselineKmnPath ? (readVfsText(vfs, baselineKmnPath) ?? null) : null,
-              kpsText: readVfsText(vfs, `source/${kb.id}.kps`) ?? null,
-              kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
-              touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
-              // Issue #2139: the baseline judges the base's images against the
-              // same kb.css texts the live check uses (FR-020 consistency).
-              ...(fetchResult.startDocCssTexts !== undefined
-                ? { cssTexts: fetchResult.startDocCssTexts.map((entry) => entry.text) }
-                : {}),
-              base: {
-                welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
-                helpPhpText: fetchResult.startHelpPhpText ?? null,
-                readmeMdText: fetchResult.startReadmeMdText ?? null,
-                historyMdText: fetchResult.startHistoryMdText ?? null,
-                // The base LICENSE is never written into the VFS (loader FR-011)
-                // and the adapt track's shipped LICENSE.md is generated with no
-                // invented holder, so the base's notice has no current
-                // counterpart to compare against — it is not part of the baseline.
-                licenseText: null,
-              },
-            }),
-          );
+        if (writesStartDocs && startDocsMode === "copy-on-switch") {
+          // Output/Criteria's picker instantiates a Track 1 copy from this
+          // fetch: the copy's slices, exactly as the scaffold branch writes.
+          applyCopyStartDocs(wc, {
+            images: fetchResult.startWelcomeImages ?? null,
+            convention: fetchResult.startWelcomeConvention ?? null,
+            helpForExtraction: fetchResult.startHelpPhpText ?? null,
+          });
+        } else if (writesStartDocs) {
+          // spec 061 FR-013: retain the base's own welcome.htm/help.php verbatim
+          // so the Track 2 output-projection merge has something to preserve.
+          // Track 1 (scaffold branch above) never sets these — a brand-new
+          // keyboard has no prior docs of its own to merge with (research D-05).
+          wc.setStartWelcomeHtmText(fetchResult.startWelcomeHtmText ?? null);
+          wc.setStartHelpPhpText(fetchResult.startHelpPhpText ?? null);
+          // Issue #2206: the extraction-only slice is a Track 1 (copy)
+          // retention — on this open-base/adapt path the base's
+          // troubleshooting section already ships inside the inherited
+          // prose, and the ruling authorises no extraction here. Cleared
+          // explicitly so a prior copy session's text cannot survive into
+          // an adapt session (the same hazard the Track 1 clearing above
+          // guards against, in reverse).
+          wc.setBaseHelpPhpTextForExtraction(null);
+          // spec 080 FR-006: the rest of the base's documentation bundle — README
+          // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
+          // images and which convention the base used (data-model §6).
+          wc.setStartReadmeMdText(fetchResult.startReadmeMdText ?? null);
+          wc.setStartHistoryMdText(fetchResult.startHistoryMdText ?? null);
+          wc.setStartWelcomeImages(fetchResult.startWelcomeImages ?? null);
+          wc.setStartWelcomeConvention(fetchResult.startWelcomeConvention ?? null);
+          // Issue #2139: the base's welcome/help stylesheet texts, so the live
+          // 11.8 check and the baseline below judge images against kb.css.
+          wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
+          // spec 080 FR-020 (research R8): run the documentation checks ONCE
+          // over the base's own files as fetched. A later finding on a still-
+          // inherited member whose code appears here is the base's, not the
+          // author's, and renders muted instead of counting against them.
+          {
+            const baselineKmnPath = findKmnPath(vfs);
+            const baselineTouchPath = findTouchLayoutPath(vfs);
+            wc.setBaselineDocFindings(
+              computeBaselineDocFindings({
+                keyboardId: kb.id,
+                displayName: kb.displayName,
+                kmnText: baselineKmnPath ? (readVfsText(vfs, baselineKmnPath) ?? null) : null,
+                kpsText: readVfsText(vfs, `source/${kb.id}.kps`) ?? null,
+                kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
+                touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
+                // Issue #2139: the baseline judges the base's images against the
+                // same kb.css texts the live check uses (FR-020 consistency).
+                ...(fetchResult.startDocCssTexts !== undefined
+                  ? { cssTexts: fetchResult.startDocCssTexts.map((entry) => entry.text) }
+                  : {}),
+                base: {
+                  welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
+                  helpPhpText: fetchResult.startHelpPhpText ?? null,
+                  readmeMdText: fetchResult.startReadmeMdText ?? null,
+                  historyMdText: fetchResult.startHistoryMdText ?? null,
+                  // The base LICENSE is never written into the VFS (loader FR-011)
+                  // and the adapt track's shipped LICENSE.md is generated with no
+                  // invented holder, so the base's notice has no current
+                  // counterpart to compare against — it is not part of the baseline.
+                  licenseText: null,
+                },
+              }),
+            );
+          }
         }
         // Build a blob URL for the OSK font so the frame can inject an
         // @font-face rule before the keyboard JS executes. Stored in refs so

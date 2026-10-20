@@ -37,8 +37,15 @@ export function useDocsPreview(): DocsPreview {
   const identity = useWorkingCopyStore((s) => s.identity);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const startIr = useWorkingCopyStore((s) => s.startIr);
-  const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
-  const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
+  // spec 102 FR-032: the start prose is inherited on an adaptation only. The
+  // slices are session state another screen's artifact run can refill, so a
+  // copy is guarded by its track, never by the slices being null.
+  const startWelcomeHtmText = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.startWelcomeHtmText : null,
+  );
+  const startHelpPhpText = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.startHelpPhpText : null,
+  );
   // spec 102 US2: the derived sections come from the working-copy IR as built.
   const workingIr = useWorkingCopyStore((s) => s.ir);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
