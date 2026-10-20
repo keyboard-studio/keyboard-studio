@@ -21,3 +21,24 @@ Profiles:
 - Fallback letters were offered and kept as proposed wherever reached: Bafut/basic_kbdus c p q v x; Ewondo/basic_kbdfr c j q x.
 
 Standing (Matthew's rulings, 2026-10-19): this matrix is a manual/periodic instrument, NOT an automatic-CI gate — no workflow, e2e-suite or test-script wiring. Harness, scripts and results are committed as the work goes to branch `km/2302-testing-profiles-walk` under `tools/testing-profiles-2302/`; the repo copy carries results.md/results.json and per-case case-result.json — bulky raw snapshots and phase logs stay only in the notes copy.
+
+## ROUND 2 — 2026-10-20, vs main `ed251e1b` (PR #2312 merged; PR #2303 not in this tree)
+
+Coverage: 32 cases — PASS 3, FAIL 0, BLOCKED 10, NOT-ATTEMPTED 19 (13 attempted). PASSes completed end to end: P2×unwrap (Bafut/kbdus), P4×whole (Bafut/kbdus), P2×whole (Ewondo/kbdfr).
+
+Backspace question (#2312) in the wild — observed in 7 completed output-form visits:
+
+- The section renders in its own terms in every visit ("What should backspace do to an accented letter?"), below the composition question, and the proposal followed the composition in all 7 (NFD → "removes one mark at a time"; NFC → "removes the whole letter at once"); the pre-selected default matched the proposal in all 7.
+- Overrides stuck in all 5 cases that took one (read back at the station and after advancing).
+- The preview matched the backspace answer, not the composition, in all 7: whole-stack showed "à ⌫ (empty)" (1 press), peel showed "à ⌫ a ⌫ (empty)" (2 presses) — including off-diagonal pairings.
+- Per-combo verdicts (S4 record; completion where reached): P1×whole — proposal peel, override to whole, preview matched; blocked later (guard stall). P2×unwrap — complete PASS, override stuck. P3×unwrap — proposal whole, override to peel, preview matched; blocked later (post-output-form stall, attempt 3). P4×whole — complete PASS, override stuck. P2×whole — complete PASS on the on-diagonal default. P3×whole — on-diagonal default confirmed, preview matched; blocked later (stacking stall). P1×unwrap, P4×unwrap — not re-attempted on kbdus (round-1 PASSes stand); kbdfr attempts stalled pre-output-form.
+
+Generated behaviour, where the rules step was reached (3 cases):
+
+- NFC + peel (P2×unwrap/kbdus): the rules step listed `any(generated_marks_unwrap_from) + [K_BKSP] > index(generated_marks_unwrap_to, 1)`.
+- NFD + whole (P4×whole/kbdus): 10 generated rules of the form `U+0041 U+0300 + [K_BKSP] > nul`, commented "generated: whole-stack backspace (marks series)".
+- On-diagonal P2×whole/kbdfr reached the rules step with no backspace-generated rules, consistent with native behaviour needing no extra code.
+
+Dominant block — marks-series advance stalls: in 9 of 13 attempted cases the series stopped advancing after a station's Continue (attachment ×5 incl. 2 serial re-runs of one case, guard ×2, stacking ×1, output-form ×1); the gallery then never opened. Stalls occurred on both languages, both basic bases and the Cameroon base, in parallel and serial lanes, warm and cold; three series completed end to end. Round 1 saw the same shape in 4 cases on the dev build. Remaining blocks: one renderer crash in phase 1 (P3×unwrap/kbdfr), one phase-2 entry timeout (P1×whole/kbdfr attempt 2; its attempt-1 record stands as the case evidence), two attempts lost when environment restarts killed the dev server and lanes.
+
+Cameroon wall verdict: on a warm, idle, single-lane server, sil_cameroon_qwerty phase 1 completed cleanly in ~73 s — base picked by card, preview armed within normal waits, alphabet reached, no errors; the round-1 "Preparing preview…" wall did not reproduce under these conditions. That case then stalled after attachment like the basic-base cases. sil_cameroon_azerty was not attempted (time-box); its round-1 wall evidence stands untested under warm/idle conditions. p4-unwrap-ewondo-kbdfr's evidence directory was wiped by a duplicate run killed before commit; its status comes from the walk log and contemporaneous reads (harness/round2-overrides.json).

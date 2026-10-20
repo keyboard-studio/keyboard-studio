@@ -15,7 +15,9 @@
     "overwriteKey": "K_X",
     "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
   },
-  "startedAt": "2026-10-20T00:37:26.640Z",
+  "round": 2,
+  "build": "ed251e1b (origin/main, PR #2312 merged)",
+  "startedAt": "2026-10-20T07:11:08.272Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -101,18 +103,34 @@
         },
         {
           "station": "output-form",
-          "textBefore": "When a letter with a mark is written, what should your keyboard send?\n\nFrom the previous question — you type the letter first, then its mark.\n\nYou type the letter first and then its mark, so we suggest your keyboard sends the letter and the mark as separate characters, in the order they were typed. You can choose single ready-made characters instead — when the mark is typed, your keyboard can replace the letter with the single character.\n\nSend the letter and its mark as separate characters\n(suggested)\ná — U+0061 + U+0301 (separate characters)\nBackspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.\n\nWhat backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)\nSend each accented letter as one single ready-made character\ná — U+00E1 (one character)\nBackspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.\n\nWhat backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+          "textBefore": "When a letter with a mark is written, what should your keyboard send?\n\nFrom the previous question — you type the letter first, then its mark.\n\nYou type the letter first and then its mark, so we suggest your keyboard sends the letter and the mark as separate characters, in the order they were typed. You can choose single ready-made characters instead — when the mark is typed, your keyboard can replace the letter with the single character.\n\nSend the letter and its mark as separate characters\n(suggested)\ná — U+0061 + U+0301 (separate characters)\nBackspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.\nSend each accented letter as one single ready-made character\ná — U+00E1 (one character)\nBackspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.\nWhat should backspace do to an accented letter?\n\nYour keyboard sends the letter and its mark as separate characters, so a backspace press can take the mark off first — we suggest backspace removes one mark at a time. You can choose the whole letter at once instead: your keyboard can add the extra rules that clear a letter and all its marks in a single press.\n\nBackspace removes one mark at a time (letter and mark kept separate)\nrecommended\nBackspace removes the whole letter at once (one ready-made unit)\n\nWhat backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)",
           "premise": "From the previous question — you type the letter first, then its mark.",
           "previews": [
-            "What backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)",
-            "What backspace does, one press at a time:\n\ná\n⌫\n(empty)"
+            "What backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)"
           ],
           "proposalForm": "Send the letter and its mark as separate characters(suggested)á — U+0061 + U+0301 (separate characters)Backspace clears",
           "otherControls": [],
           "formClicked": "ready-made",
           "selectedForm": "ready-made",
           "fallbackNote": null,
-          "textAfter": "When a letter with a mark is written, what should your keyboard send?\n\nFrom the previous question — you type the letter first, then its mark.\n\nYou type the letter first and then its mark, so we suggest your keyboard sends the letter and the mark as separate characters, in the order they were typed. You can choose single ready-made characters instead — when the mark is typed, your keyboard can replace the letter with the single character.\n\nSend the letter and its mark as separate characters\n(suggested)\ná — U+0061 + U+0301 (separate characters)\nBackspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.\n\nWhat backspace does, one press at a time:\n\ná\n⌫\na\n⌫\n(empty)\nSend each accented letter as one single ready-made character\ná — U+00E1 (one character)\nBackspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.\n\nWhat backspace does, one press at a time:\n\ná\n⌫\n(empty)"
+          "backspace": {
+            "present": true,
+            "heading": "What should backspace do to an accented letter?",
+            "sectionText": "What should backspace do to an accented letter?\n\nYour keyboard sends each accented letter as one single character, so backspace naturally removes the whole letter at once — we suggest it does exactly that. You can choose one mark at a time instead: your keyboard can add the extra rules that step a letter down mark by mark before clearing it.\n\nBackspace removes the whole letter at once (one ready-made unit)\nrecommended\nBackspace removes one mark at a time (letter and mark kept separate)\n\nWhat backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+            "recommended": "whole-stack",
+            "checkedAfterForm": "whole-stack",
+            "expectedRecommended": "whole-stack",
+            "proposalFollowsForm": true,
+            "defaultCheckedFollowsProposal": true,
+            "target": "whole-stack",
+            "clicked": null,
+            "checkedAfter": "whole-stack",
+            "checkedSticky": "whole-stack",
+            "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+            "previewPresses": 1,
+            "previewMatchesAnswer": true
+          },
+          "textAfter": "When a letter with a mark is written, what should your keyboard send?\n\nFrom the previous question — you type the letter first, then its mark.\n\nYou type the letter first and then its mark, so we suggest your keyboard sends the letter and the mark as separate characters, in the order they were typed. You can choose single ready-made characters instead — when the mark is typed, your keyboard can replace the letter with the single character.\n\nSend the letter and its mark as separate characters\n(suggested)\ná — U+0061 + U+0301 (separate characters)\nBackspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.\nSend each accented letter as one single ready-made character\ná — U+00E1 (one character)\nBackspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.\nWhat should backspace do to an accented letter?\n\nYour keyboard sends each accented letter as one single character, so backspace naturally removes the whole letter at once — we suggest it does exactly that. You can choose one mark at a time instead: your keyboard can add the extra rules that step a letter down mark by mark before clearing it.\n\nBackspace removes the whole letter at once (one ready-made unit)\nrecommended\nBackspace removes one mark at a time (letter and mark kept separate)\n\nWhat backspace does, one press at a time:\n\ná\n⌫\n(empty)"
         },
         {
           "station": "stacking"
@@ -151,5 +169,5 @@
       "reachedTouchSeed": false
     }
   },
-  "finishedAt": "2026-10-20T00:45:12.842Z"
+  "finishedAt": "2026-10-20T07:17:43.216Z"
 }

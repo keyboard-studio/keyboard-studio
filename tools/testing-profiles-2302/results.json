@@ -58,9 +58,20 @@
       "furthest": "mechanisms-open"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
-      "reason": "",
-      "furthest": "not-attempted"
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
     }
   },
   {
@@ -387,18 +398,32 @@
     },
     "round2": {
       "status": "BLOCKED",
-      "reason": "furthest=mechanisms-stuck-at-?; errors: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done') to be visible\n",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
       "furthest": "mechanisms-stuck-at-?",
-      "inputOrderSelected": null,
-      "inputOrderClicked": null,
-      "proposalForm": null,
-      "selectedForm": null,
-      "backspace": null,
+      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+      "inputOrderClicked": "postfix",
+      "proposalForm": "Send the letter and its mark as separate characters(suggested)à — U+0061 + U+0300 (separate characters)Backspace clears",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "peel",
+        "clicked": "peel",
+        "checkedAfter": "peel",
+        "checkedSticky": "peel",
+        "previewText": "What backspace does, one press at a time:\n\nà\n⌫\na\n⌫\n(empty)",
+        "previewPresses": 2,
+        "previewMatchesAnswer": true
+      },
       "rulesBkspHits": [],
       "galleryChars": 1,
       "overwrite": null,
       "errors": [
-        "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done') to be visible\n",
         "no apply button at guard 0"
       ]
     }
@@ -489,18 +514,32 @@
     },
     "round2": {
       "status": "BLOCKED",
-      "reason": "furthest=mechanisms-stuck-at-?; errors: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done') to be visible\n",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
       "furthest": "mechanisms-stuck-at-?",
-      "inputOrderSelected": null,
-      "inputOrderClicked": null,
-      "proposalForm": null,
-      "selectedForm": null,
-      "backspace": null,
+      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+      "inputOrderClicked": "postfix",
+      "proposalForm": "Send the letter and its mark as separate characters(suggested)á — U+0061 + U+0301 (separate characters)Backspace clears",
+      "selectedForm": "base-plus-mark",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "peel",
+        "expectedRecommended": "peel",
+        "proposalFollowsForm": true,
+        "defaultChecked": "peel",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": "whole-stack",
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
       "rulesBkspHits": [],
       "galleryChars": 1,
       "overwrite": null,
       "errors": [
-        "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByTestId('charlist-done') to be visible\n",
         "no apply button at guard 0"
       ]
     }
@@ -516,9 +555,20 @@
       "furthest": "mechanisms-stuck-at-?"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
-      "reason": "",
-      "furthest": "not-attempted"
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": null,
+      "inputOrderClicked": null,
+      "proposalForm": null,
+      "selectedForm": null,
+      "backspace": null,
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
     }
   },
   {
@@ -531,9 +581,41 @@
       "status": "NOT-ATTEMPTED"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
+      "status": "PASS",
       "reason": "",
-      "furthest": "not-attempted"
+      "furthest": "mechanisms-complete",
+      "inputOrderSelected": "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
+      "inputOrderClicked": "prefix",
+      "proposalForm": "Send each accented letter as one single ready-made character(suggested)á — U+00E1 (one character)Backspace clears the wh",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": null,
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
+      "galleryChars": 14,
+      "overwrite": {
+        "char": "ŋ",
+        "key": "K_X",
+        "ok": true,
+        "keySelected": true,
+        "applyDisabled": false,
+        "displacement": null
+      },
+      "errors": []
     }
   },
   {
@@ -589,9 +671,35 @@
       "furthest": "mechanisms-stuck-at-?"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
-      "reason": "",
-      "furthest": "not-attempted"
+      "status": "BLOCKED",
+      "reason": "furthest=mechanisms-stuck-at-?; errors: no apply button at guard 0",
+      "furthest": "mechanisms-stuck-at-?",
+      "inputOrderSelected": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+      "inputOrderClicked": "postfix",
+      "proposalForm": "Send the letter and its mark as separate characters(suggested)á — U+0061 + U+0301 (separate characters)Backspace clears",
+      "selectedForm": "ready-made",
+      "backspace": {
+        "present": true,
+        "heading": "What should backspace do to an accented letter?",
+        "recommended": "whole-stack",
+        "expectedRecommended": "whole-stack",
+        "proposalFollowsForm": true,
+        "defaultChecked": "whole-stack",
+        "defaultFollowsProposal": true,
+        "target": "whole-stack",
+        "clicked": null,
+        "checkedAfter": "whole-stack",
+        "checkedSticky": "whole-stack",
+        "previewText": "What backspace does, one press at a time:\n\ná\n⌫\n(empty)",
+        "previewPresses": 1,
+        "previewMatchesAnswer": true
+      },
+      "rulesBkspHits": [],
+      "galleryChars": 1,
+      "overwrite": null,
+      "errors": [
+        "no apply button at guard 0"
+      ]
     }
   },
   {
@@ -657,8 +765,7 @@
       "status": "NOT-ATTEMPTED"
     },
     "round2": {
-      "status": "NOT-ATTEMPTED",
-      "reason": "",
+      "status": "BLOCKED",
       "furthest": "not-attempted"
     }
   }
