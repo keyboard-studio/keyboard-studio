@@ -154,6 +154,23 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import { useDisplacementProposal } from "./useDisplacementProposal.ts";
+import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
+import {
+  assignmentSlotKeys,
+  buildSlotOccupancy,
+  displacedFor,
+  isProducedOnOtherSlot,
+  isStillNeeded,
+  mechanismSlotEntries,
+  orthographyTier,
+  slotKeyFor,
+} from "../../survey/slotOccupancy.ts";
+import {
+  buildRationaleLine,
+  scoreCandidate,
+  type ScoredCandidate,
+} from "../../survey/placementRationale.ts";
 import { isGatedAccentCompositionCandidate } from "./siblingAccents.ts";
 import {
   appendNotDeletableSuffix,
@@ -2114,12 +2131,30 @@ export function MechanismGallery({
     clear: clearCompanion,
   } = useCasePairCompanion();
 
+  // Demotion proposal for a displaced glyph (#2300, gate G3) — its own
+  // state slot, exactly like SiblingAccent's: one Apply can raise BOTH a
+  // case-pair companion and a displacement proposal, and the two banners
+  // co-render rather than fighting over a shared slot. The hook never
+  // records; the confirm handler below records the demotion assignment.
+  const {
+    proposal: pendingDisplacement,
+    propose: proposeDisplacement,
+    dismiss: dismissDisplacement,
+    clear: clearDisplacement,
+  } = useDisplacementProposal();
+
   /** The base assignment a proposal was raised for, when it has one (physical
    *  and combo do; touch tracks a mechanism ref instead). */
   const pendingCompanionBase: MechanismAssignment | null =
     pendingCompanion !== null && pendingCompanion.mechanism !== "touch"
       ? pendingCompanion.baseAssignment
       : null;
+
+  /** The base assignment the pending displacement proposal was raised for
+   *  (#2300 — the remove handlers below dismiss it proactively when that
+   *  assignment goes away, exactly like the companion's). */
+  const pendingDisplacementBase: MechanismAssignment | null =
+    pendingDisplacement?.baseAssignment ?? null;
 
   // Working IR used to plan shift-layer assignments — prefer the carve
   // working IR (ir), falling back to startIr before the carve step has run.
@@ -2138,6 +2173,121 @@ export function MechanismGallery({
   const shiftLayerAllowed = useMemo(
     () => workingIr !== null && !isMnemonicLayout(workingIr),
     [workingIr],
+  );
+
+  // -- #2300 occupancy ledger ---------------------------------------------
+  // Per-key slot → incumbent ledger over the working IR + this session's
+  // assignments (survey/slotOccupancy.ts). Feeds BOTH the weighted
+  // suggestion rationale (placementRationale.ts — the consumption layer
+  // that orders the chips; the producer order in contracts is untouched)
+  // and the displacement check on the apply paths below. Memoized on the
+  // same inputs the ledger is built from.
+  const slotOccupancy = useMemo(
+    () => buildSlotOccupancy(workingIr, sessionAssignments),
+    [workingIr, sessionAssignments],
+  );
+  const needSets = useMemo(
+    () => ({
+      confirmedInventory: new Set(rawInventory.map((c) => c.normalize("NFC"))),
+      baseProducedSet,
+    }),
+    [rawInventory, baseProducedSet],
+  );
+
+  /**
+   * Raise the demotion proposal when the assignment just recorded took a
+   * slot whose incumbent glyph is a DIFFERENT character that is still
+   * needed and not otherwise produced after this assignment (#2300 G3).
+   * The slot(s) checked are derived from the RECORDED assignment itself
+   * (`assignmentSlotKeys` — the same parsers the occupancy overlay uses),
+   * never from the candidate or picker tokens that produced it: the two
+   * can differ (Cycle 4 P1-2 — a case-pair-inherited S-01 candidate
+   * carries ["SHIFT"], while the S-01 accept writes a bare `[vkey]`
+   * rule, so the displaced incumbent lives on the BARE slot).
+   * Reads the PRE-apply ledger: at handler time `slotOccupancy` /
+   * `sessionAssignments` are still the render-time values the assignment
+   * was appended to, so the incumbent named here is the glyph the new
+   * assignment shadows. Never blocks the apply itself — the author chose
+   * the key; this only proposes the incumbent's new home.
+   */
+  const maybeRaiseDisplacement = useCallback(
+    (assignment: MechanismAssignment) => {
+      if (currentChar === null) return;
+      for (const slot of assignmentSlotKeys(assignment)) {
+      const displaced = displacedFor(
+        slotOccupancy,
+        slot.vkey,
+        slot.modifiers,
+        currentChar,
+      );
+      if (displaced === null) continue;
+      if (!isStillNeeded(displaced.char, needSets)) continue;
+      const takenSlotKey = slot.key;
+      // Still reachable elsewhere → nothing is lost, so no proposal.
+      // "Elsewhere" means another SLOT (the ledger check), or a recorded
+      // assignment for the displaced glyph that does not live on the slot
+      // just taken — an assignment ON this slot is the very occupancy
+      // being displaced, not another production. Non-slot mechanisms
+      // (deadkey / sequence) always count as another production.
+      if (isProducedOnOtherSlot(slotOccupancy, displaced.char, takenSlotKey)) continue;
+      const producedElsewhereByAssignment = sessionAssignments.some((a) => {
+        if (a.target !== displaced.char.normalize("NFC")) return false;
+        return a.mechanisms.some((m) => {
+          if (m.patternId === PATTERN_RALT || m.patternId === PATTERN_SWAP) {
+            // Parsed through the same helper as the overlay. A parse
+            // failure yields NO slot entries and so counts as NOT
+            // produced elsewhere (Cycle 4 P2-c): a spurious proposal is
+            // author-dismissable; a suppressed one is a silent loss.
+            return mechanismSlotEntries(m).some((e) => e.key !== takenSlotKey);
+          }
+          return true;
+        });
+      });
+      if (producedElsewhereByAssignment) continue;
+      // Demotion rank: RAlt on the SAME key first; deadkey only when the
+      // RAlt slot is taken or IS the slot just taken.
+      const raltSlotKey = slotKeyFor(slot.vkey, ["RALT"]);
+      const demotionMethod: "ralt" | "deadkey" =
+        raltSlotKey !== takenSlotKey && !slotOccupancy.has(raltSlotKey)
+          ? "ralt"
+          : "deadkey";
+      // WHO gets demoted follows the orthography tier (steer 2 — no
+      // frequency data exists, so tier decides): both core → neither by
+      // default; core incumbent + non-core incoming → the INCOMING char
+      // loses the primary slot; otherwise the incumbent is demoted.
+      // Note: "demote-incoming" cannot fire from today's walk — every
+      // selectable currentChar is a confirmed-inventory member, so
+      // incomingTier is never "convenience" here. The direction is
+      // fully wired for a future surface that places non-inventory
+      // characters (follow-up #6 in the Cycle 2 report owns it).
+      const displacedTier = orthographyTier(displaced.char, needSets);
+      const incomingTier = orthographyTier(currentChar, needSets);
+      const direction =
+        displacedTier === "core" && incomingTier === "core"
+          ? ("both-core" as const)
+          : displacedTier === "core"
+            ? ("demote-incoming" as const)
+            : ("demote-incumbent" as const);
+      proposeDisplacement({
+        displacedChar: displaced.char,
+        incomingChar: currentChar,
+        vkey: slot.vkey,
+        modifiers: [...slot.modifiers],
+        demotionMethod,
+        direction,
+        baseAssignment: assignment,
+        alreadyDemoted: () =>
+          sessionAssignments.some(
+            (a) =>
+              a.target === displaced.char.normalize("NFC") &&
+              a.mechanisms.some((m) => m.patternId === PATTERN_RALT),
+          ),
+      });
+      // One proposal per apply: the hook holds a single pending proposal.
+      return;
+      }
+    },
+    [currentChar, slotOccupancy, needSets, sessionAssignments, proposeDisplacement],
   );
 
   // S-08 layer-combo picker: the modifier tokens already used elsewhere in
@@ -2287,6 +2437,39 @@ export function MechanismGallery({
               ),
           ),
     [suggestions, currentChar, recordedSuggestionStrategyIds, dismissedSuggestionEntries],
+  );
+
+  // -- #2300 weighted rationale -------------------------------------------
+  // Score every ranked suggestion against the occupancy ledger and order
+  // the VISIBLE chips by score. This is the studio consumption layer the
+  // lead ruling scopes the weights to: `getRankedSuggestionsForChar` and
+  // the contracts producer order are untouched — only the chips' display
+  // order and their rationale lines derive from the score.
+  const suggestionScores = useMemo(() => {
+    const scores = new Map<PlacementSeedEntry, ScoredCandidate>();
+    if (currentChar !== null) {
+      for (const entry of suggestions) {
+        scores.set(
+          entry,
+          scoreCandidate(entry.topCandidate, currentChar, {
+            occupancy: slotOccupancy,
+            ...needSets,
+            occupancyVerified: workingIr !== null,
+          }),
+        );
+      }
+    }
+    return scores;
+  }, [suggestions, currentChar, slotOccupancy, needSets, workingIr]);
+
+  const orderedVisibleSuggestions = useMemo(
+    () =>
+      [...visibleSuggestions].sort(
+        (a, b) =>
+          (suggestionScores.get(b)?.total ?? 0) -
+          (suggestionScores.get(a)?.total ?? 0),
+      ),
+    [visibleSuggestions, suggestionScores],
   );
 
   // Whether currentChar already has at least one recorded (non-sequence)
@@ -2485,6 +2668,7 @@ export function MechanismGallery({
   // whenever currentChar changes.
   useEffect(() => {
     clearCompanion();
+    clearDisplacement();
     resetMethodState();
     // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
     // reasoning (also used by TouchGallery's longpress suggestion memo).
@@ -2498,7 +2682,7 @@ export function MechanismGallery({
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
       setMethod("deadkey");
     }
-  }, [currentChar, resetMethodState, clearCompanion, axes.scriptClass]);
+  }, [currentChar, resetMethodState, clearCompanion, clearDisplacement, axes.scriptClass]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
@@ -2521,6 +2705,10 @@ export function MechanismGallery({
     // AFTER recordAssignments below, once `assignment` is the exact object
     // the proposal must reference (FR-008 identity guard).
     let raltCompanionModifiers: ModifierToken[] | null = null;
+    // The #2300 displacement check derives the taken slot(s) from the
+    // recorded assignment itself (see maybeRaiseDisplacement) — S-02
+    // takes no slot (a deadkey composes on top of a base keystroke and
+    // shadows nothing) and yields no slot entries there.
     if (entry.strategyId === "S-01") {
       const cp =
         currentChar
@@ -2703,6 +2891,9 @@ export function MechanismGallery({
     // a DIFFERENT strategyId is untouched. Marking it dismissed here too is
     // redundant-but-harmless belt-and-braces (it never needs to reappear).
     markSuggestionEntryDismissed(currentChar, entry.strategyId);
+    // #2300 G3: if this accept shadowed a still-needed glyph, propose its
+    // demotion (never blocks the accept — it already happened).
+    maybeRaiseDisplacement(assignment);
     if (raltCompanionModifiers !== null) {
       proposeCompanion({
         mechanism: "ralt-layer",
@@ -2741,6 +2932,7 @@ export function MechanismGallery({
     resetMethodState,
     markSuggestionEntryDismissed,
     proposeCompanion,
+    maybeRaiseDisplacement,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2862,6 +3054,10 @@ export function MechanismGallery({
     // SequenceBuilderPanel), so the guard above already returned.
 
     let assignment: MechanismAssignment;
+    // The #2300 displacement check derives the taken slot(s) from the
+    // recorded assignment itself (see maybeRaiseDisplacement) — the
+    // deadkey branch takes no slot (a deadkey composes on top of a base
+    // keystroke and shadows nothing) and yields no slot entries there.
 
     if (method === "deadkey") {
       const base = resolveCharInput(
@@ -3121,6 +3317,9 @@ export function MechanismGallery({
     }
 
     recordAssignments([...sessionAssignments, assignment]);
+    // #2300 G3: if this apply shadowed a still-needed glyph, propose its
+    // demotion (never blocks the apply — it already happened).
+    maybeRaiseDisplacement(assignment);
     resetMethodState();
   }, [
     currentChar,
@@ -3139,6 +3338,7 @@ export function MechanismGallery({
     sessionAssignments,
     resetMethodState,
     deadkeyBaseLetterResolveOptions,
+    maybeRaiseDisplacement,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -3395,6 +3595,158 @@ export function MechanismGallery({
     confirmComboCompanion,
   ]);
 
+  // ---------------------------------------------------------------------------
+  // Displacement (demotion) — confirm handler (#2300, gate G3)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build the demotion assignment for `targetChar` under the pending
+   * proposal: an S-08 RAlt assignment on the SAME key (rank 1), or — only
+   * when the RAlt slot was taken/unavailable at propose time — an S-02
+   * deadkey assignment built through the shared buildDeadkeyAssignment /
+   * resolveS02DeadkeyIdentity seam (the demoted glyph is its own base
+   * letter: trigger + its old key's letter produces it again). Returns
+   * null when the shape cannot be built (unresolvable trigger / combo).
+   */
+  const buildDemotionAssignment = useCallback(
+    (targetChar: string): MechanismAssignment | null => {
+      if (pendingDisplacement === null) return null;
+      if (pendingDisplacement.demotionMethod === "ralt") {
+        let altgrKeyList: string;
+        try {
+          altgrKeyList = comboToKeySpec(
+            canonicalizeCombo(["RALT"]),
+            pendingDisplacement.vkey,
+          );
+        } catch {
+          return null;
+        }
+        return {
+          scope: "individual",
+          target: targetChar,
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_RALT,
+              strategyId: "S-08",
+              slotValues: {
+                altgrKeyList,
+                altgrOutputList: targetChar,
+              },
+            },
+          ],
+          source: "user",
+        };
+      }
+      const triggerResolution = resolveKeyPickerSelection(
+        triggerKey,
+        triggerKeyCustomChar,
+        TRIGGER_KEY_RESOLVE_OPTIONS,
+      );
+      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
+      if (resolvedTriggerVkey === null) return null;
+      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
+        triggerKey,
+        triggerResolution,
+        workingIr,
+        sessionAssignments,
+      });
+      return buildDeadkeyAssignment({
+        currentChar: targetChar,
+        baseLetter: targetChar,
+        triggerVkey: resolvedTriggerVkey,
+        deadkeyName,
+        accentChar,
+      });
+    },
+    [
+      pendingDisplacement,
+      triggerKey,
+      triggerKeyCustomChar,
+      workingIr,
+      sessionAssignments,
+    ],
+  );
+
+  /**
+   * Confirm the demotion proposal. Direction (orthography tier, steer 2):
+   *   - demote-incumbent: record the demotion for the displaced glyph.
+   *   - demote-incoming: the convenience character loses the primary slot
+   *     — record the demotion for the INCOMING character and REMOVE its
+   *     primary-slot assignment, so the core character's primary is
+   *     never shadowed.
+   * Stale-proposal guard mirrors the companion's (FR-008): the displacing
+   * assignment must still be present by reference, or the proposal is
+   * dismissed and nothing is recorded. (The both-core proposal never
+   * reaches this handler — its confirm is "Keep both", a dismissal; its
+   * demotion override is handleBothCoreDemoteOverride below.)
+   */
+  const handleDisplacementConfirm = useCallback(() => {
+    if (pendingDisplacement === null) return;
+    if (!sessionAssignments.includes(pendingDisplacement.baseAssignment)) {
+      clearDisplacement();
+      return;
+    }
+    if (pendingDisplacement.direction === "demote-incoming") {
+      const demotionAssignment = buildDemotionAssignment(
+        pendingDisplacement.incomingChar,
+      );
+      if (demotionAssignment === null) {
+        clearDisplacement();
+        return;
+      }
+      const withoutPrimary = sessionAssignments.filter(
+        (a) => a !== pendingDisplacement.baseAssignment,
+      );
+      recordAssignments([...withoutPrimary, demotionAssignment]);
+      clearDisplacement();
+      return;
+    }
+    const demotionAssignment = buildDemotionAssignment(
+      pendingDisplacement.displacedChar,
+    );
+    if (demotionAssignment === null) {
+      clearDisplacement();
+      return;
+    }
+    recordAssignments([...sessionAssignments, demotionAssignment]);
+    clearDisplacement();
+  }, [
+    pendingDisplacement,
+    sessionAssignments,
+    recordAssignments,
+    clearDisplacement,
+    buildDemotionAssignment,
+  ]);
+
+  /**
+   * Both-core explicit author override: the author chose to demote the
+   * displaced core glyph anyway (the banner's non-default choice). This
+   * is never the default button — the default keeps both primaries.
+   */
+  const handleBothCoreDemoteOverride = useCallback(() => {
+    if (pendingDisplacement === null) return;
+    if (!sessionAssignments.includes(pendingDisplacement.baseAssignment)) {
+      clearDisplacement();
+      return;
+    }
+    const demotionAssignment = buildDemotionAssignment(
+      pendingDisplacement.displacedChar,
+    );
+    if (demotionAssignment === null) {
+      clearDisplacement();
+      return;
+    }
+    recordAssignments([...sessionAssignments, demotionAssignment]);
+    clearDisplacement();
+  }, [
+    pendingDisplacement,
+    sessionAssignments,
+    recordAssignments,
+    clearDisplacement,
+    buildDemotionAssignment,
+  ]);
+
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
   // dimension — see excludeSequenceMechanisms above).
@@ -3458,12 +3810,23 @@ export function MechanismGallery({
       ) {
         clearCompanion();
       }
+      // Same proactive dismissal for a pending displacement proposal
+      // (Cycle 4 P2-d): its confirm-time includes() guard is the backstop,
+      // not a reason to leave the banner standing over a removed base.
+      if (
+        pendingDisplacementBase !== null &&
+        !next.includes(pendingDisplacementBase)
+      ) {
+        clearDisplacement();
+      }
     },
     [
       sessionAssignments,
       recordAssignments,
       pendingCompanionBase,
       clearCompanion,
+      pendingDisplacementBase,
+      clearDisplacement,
     ],
   );
 
@@ -3501,12 +3864,21 @@ export function MechanismGallery({
       ) {
         clearCompanion();
       }
+      // Same for a pending displacement proposal (Cycle 4 P2-d).
+      if (
+        pendingDisplacementBase !== null &&
+        !next.includes(pendingDisplacementBase)
+      ) {
+        clearDisplacement();
+      }
     },
     [
       sessionAssignments,
       recordAssignments,
       pendingCompanionBase,
       clearCompanion,
+      pendingDisplacementBase,
+      clearDisplacement,
     ],
   );
 
@@ -4368,7 +4740,7 @@ export function MechanismGallery({
                   gap: 10,
                 }}
               >
-                {visibleSuggestions.map((entry) => {
+                {orderedVisibleSuggestions.map((entry) => {
                   // Keycap convention (physical-key-naming ambiguity fix): the
                   // physical key is named by its unshifted, lowercase glyph and
                   // boxed as a keycap, with the word "key" in the surrounding
@@ -4400,6 +4772,18 @@ export function MechanismGallery({
                     entry.topCandidate,
                     communityContext,
                   );
+                  // Issue #2300: the weighted rationale line — why this
+                  // slot, in plain words, with the cost and its demotion
+                  // named when the slot is occupied (gate G2 chips carry
+                  // the trade-off wording from buildRationaleLine itself).
+                  // Display only, like provenance: the score ordered the
+                  // chips (orderedVisibleSuggestions) but accept/deny
+                  // behaviour is unchanged.
+                  const scored = suggestionScores.get(entry);
+                  const rationaleText =
+                    scored !== undefined && currentChar !== null
+                      ? buildRationaleLine(scored, currentChar)
+                      : null;
                   let provenanceText: string | null = null;
                   if (provenance !== null) {
                     if (provenance.kind === "corpus-community") {
@@ -4534,6 +4918,22 @@ export function MechanismGallery({
                           {provenanceText}
                         </p>
                       )}
+                      {rationaleText !== null && (
+                        <p
+                          data-testid="suggestion-rationale"
+                          style={{
+                            margin: 0,
+                            fontSize: 11,
+                            color: GREEN_CHIP_TEXT,
+                            fontFamily: FONT,
+                            // A gated (G2) chip is a trade-off, not a clean
+                            // suggestion — its line carries the emphasis.
+                            fontWeight: scored?.gated === "G2" ? 600 : 400,
+                          }}
+                        >
+                          {rationaleText}
+                        </p>
+                      )}
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
                           type="button"
@@ -4636,6 +5036,31 @@ export function MechanismGallery({
                 proposal={pendingCompanion}
                 onConfirm={handleCompanionConfirm}
                 onDismiss={dismissCompanion}
+              />
+            )}
+
+            {/* Displacement (demotion) proposal — propose-then-confirm,
+                  never a silent loss (#2300, gate G3). Its own state slot:
+                  it can co-render with the case-pair companion above when
+                  one Apply raised both. */}
+            {pendingDisplacement !== null && (
+              <DisplacementProposalBanner
+                proposal={pendingDisplacement}
+                // Both-core: the DEFAULT action keeps both primaries (a
+                // recorded dismissal — no demotion is picked without
+                // frequency data); demoting the displaced glyph is the
+                // explicit override on the other button. Every other
+                // direction confirms the demotion / dismisses as usual.
+                onConfirm={
+                  pendingDisplacement.direction === "both-core"
+                    ? dismissDisplacement
+                    : handleDisplacementConfirm
+                }
+                onDismiss={
+                  pendingDisplacement.direction === "both-core"
+                    ? handleBothCoreDemoteOverride
+                    : dismissDisplacement
+                }
               />
             )}
 
