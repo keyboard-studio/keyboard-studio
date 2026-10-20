@@ -108,6 +108,46 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
     expect(row.textContent).toContain("Fixed with the recommended repair.");
   });
 
+  it("the answered row survives a re-render with the post-repair layout (the finding has resolved)", () => {
+    // Regression: deriveRepairRows used to build rows ONLY from live
+    // findings, so the moment the rename landed and the parent re-rendered
+    // with the repaired layout, the row — and its "Fixed…" outcome line —
+    // vanished. The row is re-derived from the recorded proposal instead.
+    const { rerender } = render(
+      <TouchKeyIdentityList
+        ir={irOf()}
+        layout={layoutOf()}
+        onCommitOps={() => {}}
+        onInstallIr={() => {}}
+      />,
+    );
+    const row = screen.getAllByTestId("touch-key-repair-row")[0]!;
+    fireEvent.click(within(row).getByText("Apply fix"));
+
+    const repaired = layoutOf();
+    for (const platform of repaired.platforms) {
+      for (const layer of platform.layers) {
+        for (const r of layer.rows) {
+          for (const key of r.keys) {
+            if (key.id === "T_0031") key.id = "U_0031";
+          }
+        }
+      }
+    }
+    rerender(
+      <TouchKeyIdentityList
+        ir={irOf()}
+        layout={repaired}
+        onCommitOps={() => {}}
+        onInstallIr={() => {}}
+      />,
+    );
+    const rowsAfter = screen.getAllByTestId("touch-key-repair-row");
+    const answered = rowsAfter.find((r) => r.textContent?.includes("T_0031"));
+    expect(answered).toBeDefined();
+    expect(answered!.textContent).toContain("Fixed with the recommended repair.");
+  });
+
   it("declining records 'declined', applies NOTHING, and the row stays answered (SC-004 at the UI seam)", () => {
     const onCommitOps = vi.fn();
     const onInstallIr = vi.fn();

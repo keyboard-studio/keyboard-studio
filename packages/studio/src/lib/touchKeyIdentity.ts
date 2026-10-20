@@ -317,7 +317,6 @@ export function deriveRepairRows(args: {
 }): DeadKeyRepairRow[] {
   const ruleIndex: TouchKeyRuleIndex = buildTouchKeyRuleIndex(args.ir);
   const findings = findDeadTouchKeys({ ir: args.ir, layout: args.layout, ruleIndex });
-  if (findings.length === 0) return [];
 
   // Every occurrence of every key id, in walk order, with overlay addresses,
   // plus each id's first main-key keycap text (the FR-009 evidence source).
@@ -408,6 +407,54 @@ export function deriveRepairRows(args: {
       occurrences,
       defaultAction,
       options,
+    });
+  }
+
+  // Answered rows whose finding has RESOLVED stay visible-and-answered
+  // (FR-017's row contract; the list component renders the recorded outcome
+  // against the row). A successful repair removes the key from
+  // `findDeadTouchKeys` — convert renames it, mint gives it a rule, blank
+  // makes it a spacer — so a findings-only derivation deletes the row at the
+  // exact moment the author answers it, and the recorded outcome has
+  // nothing left to render against. Re-derive those rows from the records
+  // (which is why records are an input at all). A declined record keeps its
+  // live finding row above, so it never reaches here; a record whose key
+  // has left the layout entirely (deleted, not repaired) stays buried.
+  const liveRefs = new Set(rows.map((r) => r.keyRef));
+  const latestByRef = new Map<string, RepairProposal>();
+  for (const proposal of liveRecords(recordsOrEmpty(args.records).repairProposals)) {
+    latestByRef.set(proposal.keyRef, proposal);
+  }
+  for (const proposal of latestByRef.values()) {
+    if (liveRefs.has(proposal.keyRef)) continue;
+    if (proposal.outcome === "unvisited") continue;
+    const parts = parseTouchKeyAddress(proposal.keyRef);
+    if (parts === undefined || parts.sub !== undefined) continue;
+    const keyId = parts.keyId;
+    const suffix = /^T_([0-9A-Fa-f]{4,6})$/.exec(keyId)?.[1];
+    const convertToId = suffix !== undefined ? `U_${suffix.toUpperCase()}` : undefined;
+    const liveId = occurrencesById.has(keyId)
+      ? keyId
+      : convertToId !== undefined && occurrencesById.has(convertToId)
+        ? convertToId
+        : undefined;
+    if (liveId === undefined) continue;
+    const occurrences = occurrencesById.get(liveId) ?? [];
+    const keycapText = keycapById.get(liveId) ?? "";
+    const keycapChar = keycapText !== "" ? stripDottedCircle(keycapText) : undefined;
+    rows.push({
+      keyRef: proposal.keyRef,
+      keyId,
+      platformId: parts.platform,
+      layerId: parts.layerId,
+      layerIds: [...new Set(occurrences.map((o) => o.layerId))],
+      keycapText,
+      evidenceChar:
+        keycapChar ?? (convertToId !== undefined ? decodeUnicodeKeyId(convertToId) : undefined),
+      convertToId,
+      occurrences,
+      defaultAction: proposal.defaultAction,
+      options: proposal.options,
     });
   }
   return rows;
