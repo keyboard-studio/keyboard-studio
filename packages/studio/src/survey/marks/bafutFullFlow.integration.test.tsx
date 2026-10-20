@@ -28,6 +28,8 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { ActiveStepNav } from "../../test/ActiveStepNav.tsx";
@@ -163,12 +165,19 @@ function resetAllStores(): void {
   resetInventoryDecisions();
 }
 
+// Corpus .kmn read from the sibling ../keyboards checkout, resolved
+// relative to this file like every other corpus-reading test in the repo
+// (see test/sc004Harness.ts; this file sits one directory deeper, hence
+// one more "..") — never a $HOME-relative dev-machine path, which exists
+// only on machines that mirror that layout and ENOENTs in CI.
+const BASIC_KBDUS_KMN = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../../../keyboards/release/basic/basic_kbdus/source/basic_kbdus.kmn",
+);
+
 function seedStartAndIdentity(deps: ReducerDeps): void {
   bindManifest(manifest);
-  const kmnText = readFileSync(
-    `${process.env.HOME}/workspace/keyboards/release/basic/basic_kbdus/source/basic_kbdus.kmn`,
-    "utf8",
-  );
+  const kmnText = readFileSync(BASIC_KBDUS_KMN, "utf8");
   const { ir } = parseKmn(kmnText, "basic_kbdus");
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: kmnText, isBinary: false },

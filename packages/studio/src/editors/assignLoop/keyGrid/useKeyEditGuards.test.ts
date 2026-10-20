@@ -30,7 +30,16 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, renderHook } from "@testing-library/react";
-import { touchKeyAddress } from "@keyboard-studio/engine";
+import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
+import {
+  makeTouchKeyRuleJoinFixture,
+  TOUCH_JOIN_IDS,
+} from "@keyboard-studio/contracts/fixtures";
+import {
+  applyGuardSynthesis,
+  planGuardSynthesis,
+  touchKeyAddress,
+} from "@keyboard-studio/engine";
 import {
   useWorkingCopyStore,
   type PendingKeyEditOperation,
@@ -487,5 +496,50 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
     const { result } = renderHook(() => useKeyEditGuards({ layout }));
 
     expect(result.current.checkOperation(SUPPRESS_K_E)).toEqual([]);
+  });
+});
+
+describe("checkRejections with a bundled-IR commit (spec 104 FR-013 guard station)", () => {
+  afterEach(() => cleanup());
+
+  it("a guarded T_ mint is refused against the pre-commit index and admitted against the commit's own nextIr index", () => {
+    // The AssignPanel guard-station shape: the op renames a key to a fresh
+    // T_ id and carries NO output of its own — the mark's rules arrive in
+    // the same commit's `nextIr` (guard synthesis). Judging the bare op
+    // against the pre-commit index sees a producing T_ key with no binding
+    // and hard-refuses it as a dead key; the commit as a whole is sound.
+    const ir = makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true });
+    const layout = ir.touchLayout!;
+    const preIndex = buildTouchKeyRuleIndex(ir);
+
+    const plan = planGuardSynthesis(ir, preIndex, "T_0342", [], "\u0342", {
+      repertoire: [" ", ".", ","],
+      opaqueAcknowledged: true,
+    });
+    expect(plan.ok).toBe(true);
+    const applied = applyGuardSynthesis(ir, preIndex, plan, "T_0342", "\u0342", {
+      opaqueAcknowledged: true,
+    });
+    expect(applied.ok).toBe(true);
+    const postIndex = buildTouchKeyRuleIndex(applied.ir);
+
+    const op: PendingKeyEditOperation = {
+      kind: "set",
+      address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.dead),
+      fields: { id: "T_0342", text: "◌͂" },
+    };
+
+    const { result } = renderHook(() =>
+      useKeyEditGuards({ layout, ruleIndex: preIndex, ir }),
+    );
+
+    // Pre-commit index (the old behaviour): hard refusal — this is what
+    // silently swallowed every guarded assignment on the Copy track.
+    const refused = result.current.checkRejections(op);
+    expect(refused.map((r) => r.reason)).toContain("would-create-dead-key");
+    expect(refused.find((r) => r.reason === "would-create-dead-key")!.blocking).toBe(true);
+
+    // The commit's own post-commit index: admitted.
+    expect(result.current.checkRejections(op, postIndex)).toEqual([]);
   });
 });

@@ -122,24 +122,32 @@ function extractWorkingCopyMembers(): string[] {
 const rec = (partial: Partial<Decision> & { id: DecisionId }): Decision =>
   ({ value: undefined, provenance: "asked", ...partial }) as Decision;
 
-const RECORDED_IDS: readonly DecisionId[] = [
+// The proven decision set, as one table: RECORDED_IDS is the canonical
+// list of ids recordProvenDecisions() records, and RECORDED_VALUES carries
+// each id's value — a single source of truth, so the recorded set can
+// never drift from the list that names it.
+const RECORDED_IDS = [
   "author-name",
   "authoring-track",
   "copyright-holder",
   "project-keyboard-id",
   "project-display-name",
   "help-welcome-paragraph",
-];
+] as const satisfies readonly DecisionId[];
+
+const RECORDED_VALUES: Readonly<Record<(typeof RECORDED_IDS)[number], string>> = {
+  "author-name": "Test Author",
+  "authoring-track": "copy",
+  "copyright-holder": "Test Author",
+  "project-keyboard-id": "testish_new",
+  "project-display-name": "Testish New",
+  "help-welcome-paragraph": "Welcome to the keyboard.",
+};
 
 function recordProvenDecisions(): void {
-  useDecisionStore.getState().recordAll([
-    rec({ id: "author-name", value: "Test Author", provenance: "asked" }),
-    rec({ id: "authoring-track", value: "copy", provenance: "asked" }),
-    rec({ id: "copyright-holder", value: "Test Author", provenance: "asked" }),
-    rec({ id: "project-keyboard-id", value: "testish_new", provenance: "asked" }),
-    rec({ id: "project-display-name", value: "Testish New", provenance: "asked" }),
-    rec({ id: "help-welcome-paragraph", value: "Welcome to the keyboard.", provenance: "asked" }),
-  ]);
+  useDecisionStore.getState().recordAll(
+    RECORDED_IDS.map((id) => rec({ id, value: RECORDED_VALUES[id], provenance: "asked" })),
+  );
 }
 
 interface DerivedCapture {
