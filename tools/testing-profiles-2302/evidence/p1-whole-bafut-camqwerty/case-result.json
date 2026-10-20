@@ -15,17 +15,193 @@
     "overwriteKey": "K_X",
     "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
   },
-  "startedAt": "2026-10-20T00:05:47.506Z",
+  "round": 3,
+  "build": "2698f774 (origin/main — #2300 + #2312 + #2316, dev promoted)",
+  "startedAt": "2026-10-20T14:28:27.978Z",
   "phases": {
     "1": {
       "phase": 1,
-      "steps": [],
-      "errors": [
-        "page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('#il_language_english') to be visible\n"
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        },
+        {
+          "name": "pick-base",
+          "ok": true,
+          "via": "card"
+        },
+        {
+          "name": "track-copy",
+          "ok": true
+        },
+        {
+          "name": "attribution",
+          "ok": true
+        },
+        {
+          "name": "project-name",
+          "ok": true
+        },
+        {
+          "name": "prefill",
+          "ok": true
+        },
+        {
+          "name": "charlist-continue",
+          "ok": true
+        },
+        {
+          "name": "alphabet-screen",
+          "ok": true
+        }
       ],
-      "failedAt": "start",
-      "bodyExcerpt": "Skip to step navigation\nKeyboard Studio\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nWelcome to Keyboard Studio\n\nBuild a working Keyman keyboard for your language, in your browser. No .kmn code, no toolchain to install.\n\nEvery language deserves a keyboard its speakers can actually type on. You know your language’s sounds, spelling, and characters — Studio handles the rest. Answer questions in plain language, confirm the layouts we propose, and leave with a finished, validated keyboard package.\n\nDescribe your writing system. Which characters you need, and how they behave — tone marks, diacritics, clusters, alternate forms.\n\nConfirm what we propose. Studio picks a proven approach and a close-matching existing keyboard as a starting point, then shows you real keys to try. Change anything you don’t like.\n\nShip it. Every edit is compiled and checked as you go. Download a package, or submit it to the Keyman keyboards repository as a pull request.\n\nSign in to keep your work. A keyboard takes more than one sitting. Signing in saves yours to your account, so you can close the tab, switch computers, and pick up where you left off — and it’s how you submit a finished keyboard to the Keyman repository.\n\nSign in with GitHub\nSign in with Google\nContinue as guest\n\nYour work is saved in this browser only. Clearing your browsing data, or moving to another computer, loses it. You can sign in at any time and we’ll bring your work with you.\n\nHow we handle your data: Privacy"
+      "errors": [],
+      "prefillExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm the basics\n\nBased on your script and chosen keyboard, here is what we will assume. You can edit the language or script here, confirm to continue, or go back to change a choice.\n\nLanguage\nBafutEdit\nScript\nLatnBCP47 script subtag (§5)Edit\nScripts included\nLatn, GrekGrek may not be needed for your language\nScript class (A2)\nalphabeticderived from script\nRouting group (§9)\nqwerty-qwertzderived from script\nStarting keyboard\nCameroon QWERTY (sil_cameroon_qwerty)your chosen starting keyboard\n\nSpare keys (A7), the full BCP47 tag, display name, and copyright are confirmed later from your starting keyboard and the documentation step.\n\nCameroon QWERTY\nDesktop OSK\nMobile KB\n← Back\nConfirm and continue\nProject: Bafut",
+      "exemplars": {
+        "present": true,
+        "checked": true
+      },
+      "discoveryCheckedId": "discovery_method-exemplars",
+      "alphabetHeading": "Confirm your alphabet",
+      "alphabetExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (30)\n\nDashed characters were proposed for you (from SLDR (machine-generated — please check)). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\nɨ\nU+0268\nx\nj\nU+006A\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nɔ\nU+0254\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\nꞌ\nU+A78C\nx\n◌̀\nU+0300\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (6)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\np P\nU+0070\n+\nq Q\nU+0071\n+\nv V\nU+0076\n+\nx X\nU+0078\n+\nʼ\nU+02BC\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\nNewer exemplar data\n\nThe characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.\n\nCheck for newer exemplar data for this language\nHow your alphabet breaks down\n\nLetters (27)\n\nLetters that stand on their own.\n\nShow uppercase letters\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nɨ\nU+0268\nj\nU+006A\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nw\nU+0077\ny\nU+0079\nz\nU+007A\nꞌ\nU+A78C\n\nMarks (3)\n\nAccents and other marks that attach to a letter.\n\n◌̀\nU+0300\n◌̂\nU+0302\n◌̌\nU+030C\nnew\nCharacter map\n\nBrowse and click to toggle characters into your alphabet — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\nShow only blocks my keyboard uses\n−\n100%\n+\n114 characters can't be previewed in the selected font\nBasic Latin\n0\nU+0030\n+\n1\nU+0031\n+\n2\nU+0032\n+\n3\nU+0033\n+\n4\nU+0034\n+\n5\nU+0035\n+\n6\nU+0036\n+\n7\nU+0037\n+\n8\nU+0038\n+\n9\nU+0039\n+\na\nU+0061\n[x]\nb\nU+0062\n[x]\nc\nU+0063\n+\nd\nU+0064\n[x]\ne\nU+0065\n[x]\nf\nU+0066\n[x]\ng\nU+0067\n[x]\nh\nU+0068\n[x]\ni\nU+0069\n[x]\nj\nU+006A\n[x]\nk\nU+006B\n[x]\nl\nU+006C\n[x]\nm\nU+006D\n[x]\nn\nU+006E\n[x]\no\nU+006F\n[x]\np\nU+0070\n+\nq\nU+0071\n+\nr\nU+0072\n[x]\ns\nU+0073\n[x]\nt\nU+0074\n[x]\nu\nU+0075\n[x]\nv\nU+0076\n+\nw\nU+0077\n[x]\nx\nU+0078\n+\ny\nU+0079\n[x]\nz\nU+007A\n[x]\nLatin-1 Supplement\nª\nU+00AA\n+\nº\nU+00BA\n+\nß\nU+00DF\n+\nà\nU+00E0\n+\ná\nU+00E1\n+\nâ\nU+00E2\n+\nã\nU+00E3\n+\nä\nU+00E4\n+\nå\nU+00E5\n+\næ\nU+00E6\n+\nç\nU+00E7\n+\nè\nU+00E8\n+\né\nU+00E9\n+\nê\nU+00EA\n+\në\nU+00EB\n+\nì\nU+00EC\n+\ní\nU+00ED\n+\nî\nU+00EE\n+\nï\nU+00EF\n+\nð\nU+00F0\n+\nñ\nU+00F1\n+\nò\nU+00F2\n+\nó\nU+00F3\n+\nô\nU+00F4\n+\nõ\nU+00F5\n+\nö\nU+00F6\n+\nø\nU+00F8\n+\nù\nU+00F9\n+\nú\nU+00FA\n+\nû\nU+00FB\n+\nü\nU+00FC\n+\ný\nU+00FD\n+\nþ\nU+00FE\n+\nÿ\nU+00FF\n+\nLatin Extended-A\nā\nU+0101\n+\nă\nU+0103\n+\ną\nU+0105\n+\nć\nU+0107\n+\nĉ\nU+0109\n+\nċ\nU+010B\n+\nč\nU+010D\n+\nď\nU+010F\n+\nđ\nU+0111\n+\nē\nU+0113\n+\nĕ\nU+0115\n+\nė\nU+0117\n+\nę\nU+0119\n+\ně\nU+011B\n+\nĝ\nU+011D\n+\nğ\nU+011F\n+\nġ\nU+0121\n+\nģ\nU+0123\n+\nĥ\nU+0125\n+\nħ\nU+0127\n+\nĩ\nU+0129\n+\nī\nU+012B\n+\nĭ\nU+012D\n+\nį\nU+012F\n+\nİ\nU+0130\n+\nı\nU+0131\n+\nĳ\nU+0133\n+\nĵ\nU+0135\n+\nķ\nU+0137\n+\nĸ\nU+0138\n+\nĺ\nU+013A\n+\nļ\nU+013C\n+\nľ\nU+013E\n+\nŀ\nU+0140\n+\nł\nU+0142\n+\nń\nU+0144\n+\nņ\nU+0146\n+\nň\nU+0148\n+\nŉ\nU+0149\n+\nŋ\nU+014B\n[x]\nō\nU+014D\n+\nŏ\nU+014F\n+\nő\nU+0151\n+\nœ\nU+0153\n+\nŕ\nU+0155\n+\nŗ\nU+0157\n+\nř\nU+0159\n+\nś\nU+015B\n+\nŝ\nU+015D\n+\nş\nU+015F\n+\nš\nU+0161\n+\nţ\nU+0163\n+\nť\nU+0165\n+\nŧ\nU+0167\n+\nũ\nU+0169\n+\nū\nU+016B\n+\nŭ\nU+016D\n+\nů\nU+016F\n+\nű\nU+0171\n+\nų\nU+0173\n+\nŵ\nU+0175\n+\nŷ\nU+0177\n+\nź\nU+017A\n+\nż\nU+017C\n+\nž\nU+017E\n+\nſ\nU+017F\n+\nLatin Extended-B\nƀ\nU+0180\n+\nƃ\nU+0183\n+\nƅ\nU+0185\n+\nƈ\nU+0188\n+\nƌ\nU+018C\n+\nƍ\nU+018D\n+\nƒ\nU+0192\n+\nƕ\nU+0195\n+\nƙ\nU+0199\n+\nƚ\nU+019A\n+\nƛ\nU+019B\n+\nƞ\nU+019E\n+\nơ\nU+01A1\n+\nƣ\nU+01A3\n+\nƥ\nU+01A5\n+\nƨ\nU+01A8\n+\nƪ\nU+01AA\n+\nƫ\nU+01AB\n+\nƭ\nU+01AD\n+\nư\nU+01B0\n+\nƴ\nU+01B4\n+\nƶ\nU+01B6\n+\nƹ\nU+01B9\n+\nƺ\nU+01BA\n+\nƻ\nU+01BB\n+\nƽ\nU+01BD\n+\nƾ\nU+01BE\n+\nƿ\nU+01BF\n+\nǀ\nU+01C0\n+\nǁ\nU+01C1\n+\nǂ\nU+01C2\n+\nǃ\nU+01C3\n+\nǅ\nU+01C5\n+\nǆ\nU+01C6\n+\nǈ\nU+01C8\n+\nǉ\nU+01C9\n+\nǋ\nU+01CB\n+\nǌ\nU+01CC\n+\nǎ\nU+01CE\n+\nǐ\nU+01D0\n+\nǒ\nU+01D2\n+\nǔ\nU+01D4\n+\nǖ\nU+01D6\n+\nǘ\nU+01D8\n+\nǚ\nU+01DA\n+\nǜ\nU+01DC\n+\nǝ\nU+01DD\n+\nǟ\nU+01DF\n+\nǡ\nU+01E1\n+\nǣ\nU+01E3\n+\nǥ\nU+01E5\n+\nǧ\nU+01E7\n+\nǩ\nU+01E9\n+\nǫ\nU+01EB\n+\nǭ\nU+01ED\n+\nǯ\nU+01EF\n+\nǰ\nU+01F0\n+",
+      "charlistDoneEnabled": true
+    },
+    "2": {
+      "phase": 2,
+      "stations": [
+        {
+          "station": "attachment",
+          "text": "Which letters take each mark?\n\n◌̀ (U+0300)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nà\nb̀\nd̀\nè\nɛ̀\nsuggested\nə̀\nf̀\ng̀\nh̀\nì\nɨ̀\nj̀\nk̀\nl̀\nm̀\nǹ\nŋ̀\nsuggested\nò\nɔ̀\nsuggested\nr̀\ns̀\nt̀\nù\nẁ\nỳ\nz̀\nꞌ̀\n\n◌̂ (U+0302)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nâ\nb̂\nd̂\nê\nɛ̂\nə̂\nf̂\nĝ\nĥ\nî\nɨ̂\nsuggested\nĵ\nk̂\nl̂\nm̂\nn̂\nŋ̂\nô\nɔ̂\nr̂\nŝ\nt̂\nû\nŵ\nŷ\nẑ\nꞌ̂\n\n◌̌ (U+030C)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nǎ\nb̌\nď\ně\nɛ̌\nə̌\nf̌\nǧ\nȟ\nǐ\nɨ̌\nǰ\nǩ\nľ\nm̌\nň\nŋ̌\nǒ\nɔ̌\nř\nš\nť\nǔ\nw̌\ny̌\nž\nꞌ̌\n\n◌́ (U+0301)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\ná\nb́\nd́\né\nɛ́\nə́\nf́\nǵ\nh́\ní\nɨ́\nsuggested\nj́\nḱ\nĺ\nḿ\nń\nŋ́\nsuggested\nó\nɔ́\nŕ\nś\nt́\nú\nẃ\ný\nź\nꞌ́\n\nCapital letters follow automatically — 27 capital/lowercase pairs in your alphabet carry the same marks."
+        },
+        {
+          "station": "treatment",
+          "textBefore": "How should your marks be typed?\n\nWe have suggested an answer for each group. Change any of them if it does not match how your community writes.\n\nMarks above the letter (group 1)\n\n◌̀ (U+0300), ◌̂ (U+0302), ◌́ (U+0301)\n\nThe mark gets a key of its own, and works with every character it attaches to (suggested)\n\nPress these to see what you would get.\n\na\n◌̀\n→\nStart over\nEach marked character gets a key of its own, and the mark has no key\n\nPress these to see what you would get.\n\na\nà\n→\nStart over\nOne of these marks is different\nAny of these that your community uses very often can also get a key of its own\n\nGiving 24 of these letters a key of its own needs more keys than the keyboard you started from has spare (0 free keys).\n\nà\nè\nə̀\nì\nɨ̀\nò\nù\nâ\nê\nɛ̂\nə̂\nî\nŋ̂\nô\nɔ̂\nû\ná\né\nɛ́\nə́\ní\nó\nɔ́\nú\n\nMarks above the letter (group 2)\n\n◌̌ (U+030C)\n\nThe mark gets a key of its own, and works with every character it attaches to (suggested)\n\nPress these to see what you would get.\n\na\n◌̌\n→\nStart over\nEach marked character gets a key of its own, and the mark has no key\n\nPress these to see what you would get.\n\na\nǎ\n→\nStart over\nAny of these that your community uses very often can also get a key of its own\n\nGiving 2 of these letters a key of its own needs more keys than the keyboard you started from has spare (0 free keys).\n\nǎ\ně\n\nWhen typing a letter with a diacritic, does the typist expect to press the diacritic key before the letter, or type the letter first and then the diacritic?\n\nFor example: pressing the diacritic key first and then the letter (like pressing a key for an acute accent and then a to get a-with-acute, or pressing an underdot key before s to get s-with-underdot), or typing the letter first and then a suffix key (like typing a and then a special key to add the diacritic after). There is no wrong answer -- this depends on what feels natural to your community and what existing keyboards already do.\n\nDiacritic key first, then the letter (the diacritic key is pressed before the base letter)\nLetter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+          "inputOrderClicked": "postfix",
+          "selectedOrder": "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
+          "textAfter": "How should your marks be typed?\n\nWe have suggested an answer for each group. Change any of them if it does not match how your community writes.\n\nMarks above the letter (group 1)\n\n◌̀ (U+0300), ◌̂ (U+0302), ◌́ (U+0301)\n\nThe mark gets a key of its own, and works with every character it attaches to (suggested)\n\nPress these to see what you would get.\n\na\n◌̀\n→\nStart over\nEach marked character gets a key of its own, and the mark has no key\n\nPress these to see what you would get.\n\na\nà\n→\nStart over\nOne of these marks is different\nAny of these that your community uses very often can also get a key of its own\n\nGiving 24 of these letters a key of its own needs more keys than the keyboard you started from has spare (0 free keys).\n\nà\nè\nə̀\nì\nɨ̀\nò\nù\nâ\nê\nɛ̂\nə̂\nî\nŋ̂\nô\nɔ̂\nû\ná\né\nɛ́\nə́\ní\nó\nɔ́\nú\n\nMarks above the letter (group 2)\n\n◌̌ (U+030C)\n\nThe mark gets a key of its own, and works with every character it attaches to (suggested)\n\nPress these to see what you would get.\n\na\n◌̌\n→\nStart over\nEach marked character gets a key of its own, and the mark has no key\n\nPress these to see what you would get.\n\na\nǎ\n→\nStart over\nAny of these that your community uses very often can also get a key of its own\n\nGiving 2 of "
+        },
+        {
+          "station": "output-form",
+          "textBefore": "When a letter with a mark is written, what should your keyboard send?\n\nFrom the previous question — you type the letter first, then its mark.\n\nYou type the letter first and then its mark, so we suggest your keyboard sends the letter and the mark as separate characters, in the order they were typed. You can choose single ready-made characters instead — when the mark is typed, your keyboard can replace the letter with the single character.\n\nSend the letter and its mark as separate characters\n(suggested)\nà — U+0061 + U+0300 (separate characters)\nBackspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.\nSend each accented letter as one single ready-made character\nà — U+00E0 (one character)\nBackspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.\nWhat should backspace do to an accented letter?\n\nYour keyboard sends the letter and its mark as separate characters, so a backspace press can take the mark off first — we suggest backspace removes one mark at a time. You can choose the whole letter at once instead: your keyboard can add the extra rules that clear a letter and all its marks in a single press.\n\nBackspace removes one mark at a time (letter and mark kept separate)\nrecommended\nBackspace removes the whole letter at once (one ready-made unit)\n\nWhat backspace does, one press at a time:\n\nà\n⌫\na\n⌫\n(empty)",
+          "premise": "From the previous question — you type the letter first, then its mark.",
+          "previews": [
+            "What backspace does, one press at a time:\n\nà\n⌫\na\n⌫\n(empty)"
+          ],
+          "proposalForm": "Send the letter and its mark as separate characters(suggested)à — U+0061 + U+0300 (separate characters)Backspace clears",
+          "otherControls": [],
+          "formClicked": "base-plus-mark",
+          "selectedForm": "base-plus-mark",
+          "fallbackNote": null,
+          "backspace": {
+            "present": true,
+            "heading": "What should backspace do to an accented letter?",
+            "sectionText": "What should backspace do to an accented letter?\n\nYour keyboard sends the letter and its mark as separate characters, so a backspace press can take the mark off first — we suggest backspace removes one mark at a time. You can choose the whole letter at once instead: your keyboard can add the extra rules that clear a letter and all its marks in a single press.\n\nBackspace removes one mark at a time (letter and mark kept separate)\nrecommended\nBackspace removes the whole letter at once (one ready-made unit)\n\nWhat backspace does, one press at a time:\n\nà\n⌫\na\n⌫\n(empty)",
+            "recommended": "peel",
+            "checkedAfterForm": "peel",
+            "expectedRecommended": "peel",
+            "proposalFollowsForm": true,
+            "defaultCheckedFollowsProposal": true,
+            "target": "whole-stack",
+            "clicked": "whole-stack",
+            "checkedAfter": "whole-stack",
+            "checkedSticky": "whole-stack",
+            "previewText": "What backspace does, one press at a time:\n\nà\n⌫\n(empty)",
+            "previewPresses": 1,
+            "previewMatchesAnswer": true
+          },
+          "textAfter": "When a letter with a mark is written, what should your keyboard send?\n\nFrom the previous question — you type the letter first, then its mark.\n\nYou type the letter first and then its mark, so we suggest your keyboard sends the letter and the mark as separate characters, in the order they were typed. You can choose single ready-made characters instead — when the mark is typed, your keyboard can replace the letter with the single character.\n\nSend the letter and its mark as separate characters\n(suggested)\nà — U+0061 + U+0300 (separate characters)\nBackspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.\nSend each accented letter as one single ready-made character\nà — U+00E0 (one character)\nBackspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.\nWhat should backspace do to an accented letter?\n\nYour keyboard sends the letter and its mark as separate characters, so a backspace press can take the mark off first — we suggest backspace removes one mark at a time. You can choose the whole letter at once instead: your keyboard can add the extra rules that clear a letter and all its marks in a single press.\n\nBackspace removes one mark at a time (letter and mark kept separate)\nrecommended\nBackspace removes the whole letter at once (one ready-made unit)\n\nWhat backspace does, one press at a time:\n\nà\n⌫\n(empty)"
+        },
+        {
+          "station": "stacking"
+        },
+        {
+          "station": "context-tolerance",
+          "text": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nAccents & marks\n\nYour alphabet includes 4 marks. Confirm how they attach to your letters before placing keys.\n\nLetters and diacritics written in a different form\n\nAdds 15 rules. None of your rules change.\n\nExamples of text it converts\nÀ → A◌̀\nU+00C0 LATIN CAPITAL LETTER A WITH GRAVE becomes U+0041 LATIN CAPITAL LETTER A, U+0300 COMBINING GRAVE ACCENT\nÁ → A◌́\nU+00C1 LATIN CAPITAL LETTER A WITH ACUTE becomes U+0041 LATIN CAPITAL LETTER A, U+0301 COMBINING ACUTE ACCENT\nÃ → A◌̃\nU+00C3 LATIN CAPITAL LETTER A WITH TILDE becomes U+0041 LATIN CAPITAL LETTER A, U+0303 COMBINING TILDE\nÄ → A◌̈\nU+00C4 LATIN CAPITAL LETTER A WITH DIAERESIS becomes U+0041 LATIN CAPITAL LETTER A, U+0308 COMBINING DIAERESIS\nÈ → E◌̀\nU+00C8 LATIN CAPITAL LETTER E WITH GRAVE becomes U+0045 LATIN CAPITAL LETTER E, U+0300 COMBINING GRAVE ACCENT\n\nWhen you type, pasted text next to the cursor is converted if it is a joined or separate form of a letter this keyboard can produce. Other pasted text is left as it is.\n\nAdd this stepLeave my keyboard as it is\nCameroon QWERTY\nDesktop OSK\nMobile KB\nBack\nContinue\nProject: Bafut",
+          "buttons": [
+            "Add this step",
+            "Leave my keyboard as it is"
+          ]
+        },
+        {
+          "station": "guard",
+          "text": "A mark with no letter before it\n\nWhat should happen when someone taps a tone mark at the start of a word, or right after a space, a number, or punctuation — the mark appears anyway, or nothing happens because there is no letter for it to sit on?\n\nThe mark appears anyway\nNothing happens — there is no letter for it to sit on",
+          "guardAnswered": "swallow"
+        }
+      ],
+      "errors": [],
+      "alphabetDone": true,
+      "textSample": {
+        "present": true,
+        "text": "Which letters do these marks go on?\n\nYour language's character list includes these marks — ◌̀ ◌̂ ◌̌ — but doesn't show which letters they attach to. Without examples, the next step can't pre-select any letter+mark pairs, and you'd have to tick every pair by hand. Paste a long passage below (a chapter of scripture, a story, or a news article — the longer the better, since rare pairs only show up in longer text) and we'll learn the pairings from it.\n\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\n\nIf you continue without a text sample, the attachment rows will start unchecked. An unchecked letter+mark pair won't be reachable by ordinary typing.\n\nBack\nContinue without a text sample",
+        "proposalText": "from your text sample 41 characters\n\ná\nU+00E1\nÁ\nU+00C1\nà\nU+00E0\nÀ\nU+00C0\nâ\nU+00E2\nÂ\nU+00C2\nǎ\nU+01CE\né\nU+00E9\nÉ\nU+00C9\nè\nU+00E8\nÈ\nU+00C8\nê\nU+00EA\nÊ\nU+00CA\ně\nU+011B\nə́\nU+0259[+́]\nə̀\nU+0259[+̀]\nə̂\nU+0259[+̂]\nɛ́\nU+025B[+́]\nɛ̂\nU+025B[+̂]\ní\nU+00ED\nÍ\nU+00CD\nì\nU+00EC\nÌ\nU+00CC\nî\nU+00EE\nÎ\nU+00CE\nɨ̀\nU+0268[+̀]\nŋ̂\nU+014B[+̂]\nó\nU+00F3\nÓ\nU+00D3\nò\nU+00F2\nÒ\nU+00D2\nô\nU+00F4\nÔ\nU+00D4\nɔ́\nU+0254[+́]\nɔ̂\nU+0254[+̂]\nú\nU+00FA\nÚ\nU+00DA\nù\nU+00F9\nÙ\nU+00D9\nû\nU+00FB\nÛ\nU+00DB\nAdd these to my alphabet\nCancel",
+        "action": "sample-confirmed"
+      },
+      "sawMarks": true,
+      "punctuationText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nChoose your punctuation\n\nAdd the punctuation your language uses — tick the suggested marks below, type any that are missing, or browse the character map on the right, like this:\n\n. , ; ! ? « » …\n\nType your punctuation\n\nType any punctuation marks that are missing (for example: ! ? « »), then press Enter or + Add.\n\n+ Add\n\nYour punctuation (35)\n\nEvery chosen mark is already on the starting keyboard.\n\nProposed from SLDR exemplars for Bafut — already chosen for you; click a mark to remove it.\n\n-\nU+002D\nstarting\nx\n,\nU+002C\nstarting\nx\n;\nU+003B\nstarting\nx\n:\nU+003A\nstarting\nx\n!\nU+0021\nstarting\nx\n?\nU+003F\nstarting\nx\n.\nU+002E\nstarting\nx\n‘\nU+2018\nstarting\nx\n’\nU+2019\nstarting\nx\n“\nU+201C\nstarting\nx\n”\nU+201D\nstarting\nx\n(\nU+0028\nstarting\nx\n)\nU+0029\nstarting\nx\n[\nU+005B\nstarting\nx\n]\nU+005D\nstarting\nx\n/\nU+002F\nstarting\nx\n\nAlready typed by your starting keyboard (Cameroon QWERTY) — proposed for you to keep; click a mark to remove it. Removing a mark here declares it unsupported, but the starting keyboard still types it until the discard step's punctuation rule changes.\n\n\"\nU+0022\nx\n#\nU+0023\nx\n%\nU+0025\nx\n&\nU+0026\nx\n'\nU+0027\nx\n*\nU+002A\nx\n@\nU+0040\nx\n\\\nU+005C\nx\n_\nU+005F\nx\n{\nU+007B\nx\n}\nU+007D\nx\n«\nU+00AB\nx\n»\nU+00BB\nx\n–\nU+2013\nx\n—\nU+2014\nx\n†\nU+2020\nx\n…\nU+2026\nx\n‹\nU+2039\nx\n›\nU+203A\nx\nCharacter map\n\nBrowse and click to toggle punctuation into your list — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\nShow only blocks my keyboard uses\n−\n100%\n+\n44 characters can't be previewed in the selected font\nBasic Latin\n!\nU+0021\n[x]\nU+0022\n[x]\n#\nU+0023\n[x]\n%\nU+0025\n[x]\n&\nU+0026\n[x]\n'\nU+0027\n[x]\n(\nU+0028\n[x]\n)\nU+0029\n[x]\n*\nU+002A\n[x]\n,\nU+002C\n[x]\n-\nU+002D\n[x]\n.\nU+002E\n[x]\n/\nU+002F\n[x]\n:\nU+003A\n[x]\n;\nU+003B\n[x]\n?\nU+003F\n[x]\n@\nU+0040\n[x]\n[\nU+005B\n[x]\n\\\nU+005C\n[x]\n]\nU+005D\n[x]\n_\nU+005F\n[x]\n{\nU+007B\n[x]\n}\nU+007D\n[x]\nLatin-1 Supplement — Punctuation & symbols\n¡\nU+00A1\n+\n§\nU+00A7\n+\n«\nU+00AB\n[x]\n¶\nU+00B6\n+\n·\nU+00B7\n+\n»\nU+00BB\n[x]\n¿\nU+00BF\n+\nPunctuation\nU+10FB\n+\n‘\nU+2018\n[x]\n’\nU+2019\n[x]\n“\nU+201C\n[x]\n”\nU+201D\n[x]\n⸗\n",
+      "punctuation": "done-as-proposed",
+      "invisibles": "continued",
+      "convenienceOffered": [
+        "Keep c C",
+        "Keep p P",
+        "Keep q Q",
+        "Keep v V",
+        "Keep x X"
+      ],
+      "convenienceText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nKeep these letters for convenience?\n\nYour alphabet doesn't use these 5 letters from the starting keyboard. Keeping them lets you type borrowed words, email addresses, and web addresses without switching keyboards.\n\nAnything you uncheck will be offered for removal on the next screen. Capital and small letters are kept together.\n\nc C\nU+0063\np P\nU+0070\nq Q\nU+0071\nv V\nU+0076\nx X\nU+0078\nKeep all\nKeep none\nCameroon QWERTY\nDesktop OSK\nMobile KB\nBack\nContinue, keeping 5 letters\nProject: Bafut",
+      "convenience": "kept-as-proposed",
+      "carveReached": true,
+      "carveText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncurrent step\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nEverything this keyboard can type\n\nEvery printable character your starting keyboard can produce, in one panel. Click any character to discard it — discarding applies straight away, and you can restore a character at any time.\n\n191 of 191 characters kept\n0 discarded · you can restore them at any time\nGROUP BY\nCategory\nSource\nNothing discarded\nCHARACTER DETAILS\n;\nU+003B\nCharacter U+003B\nHOW IT'S TYPED · 3 WAYS\nAltGr + ;\n;\nthen\n;\nthen\n;\nCOMES FROM\nDeadkey sequenceS-02\nIN YOUR ALPHABET\nYes\n\nIf you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.\n\nSuggested to discard\n(84)\nDiscard all 84\n\nYour starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. They are suggested to discard — click any character below to keep it instead. Discarding applies straight away, and you can restore a character at any time.\n\næ\nU+00E6\nSUGGESTED\nα\nU+03B1\nSUGGESTED\nɓ\nU+0253\nSUGGESTED\nɗ\nU+0257\nSUGGESTED\nʼ\nU+02BC\nSUGGESTED\nø\nU+00F8\nSUGGESTED\nœ\nU+0153\nSUGGESTED\nʉ\nU+0289\nSUGGESTED\nẅ\nU+1E85\nSUGGESTED\nƴ\nU+01B4\nSUGGESTED\nⱭ\nU+2C6D\nSUGGESTED\nẄ\nU+1E84\nSUGGESTED\n◌̄\nU+0304\nSUGGESTED\n◌̈\nU+0308\nSUGGESTED\n◌̧\nU+0327\nSUGGESTED\n◌̍\nU+030D\nSUGGESTED\n◌̰\nU+0330\nSUGGESTED\nç\nU+00E7\nSUGGESTED\nÇ\nU+00C7\nSUGGESTED\nạ\nU+1EA1\nSUGGESTED\nẹ\nU+1EB9\nSUGGESTED\nọ\nU+1ECD\nSUGGESTED\nẠ\nU+1EA0\nSUGGESTED\nẸ\nU+1EB8\nSUGGESTED\nỌ\nU+1ECC\nSUGGESTED\nū\nU+016B\nSUGGESTED\nŪ\nU+016A\nSUGGESTED\nḷ\nU+1E37\nSUGGESTED\nṛ\nU+1E5B\nSUGGESTED\nḶ\nU+1E36\nSUGGESTED\nṚ\nU+1E5A\nSUGGESTED\nﬀ\nU+FB00\nSUGGESTED\n \nU+00A0\nSUGGESTED\n◌",
+      "carve": "continued-discard-nothing",
+      "deadkeysText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncurrent step\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nDeadkeys\n\nA deadkey types nothing by itself — it changes what the next key produces. Review the deadkeys this keyboard already has, fix the ones that need repair, or define new ones.\n\nInventory\nDefine new deadkey\nDeadkeys — 2 in this keyboard\nDefine new deadkey\ndk(003b)legacy codepoint id\nTrigger K_COLON · 72 pairs · produces ; ’ ” ¼ ½ ¾ € × …\nPairs\nRename\nRetarget\nDelete\ndk(003d)legacy codepoint id\nTrigger K_EQUAL · 9 pairs · produces = ˉ ˈ ~ ˊ ˇ ¸ ˋ …\nPairs\nRename\nRetarget\nDelete\nEvery deadkey in the keyboard is listed here — including ones the studio didn't create.\n← Back\nContinue →\nProject: Bafut",
+      "deadkeys": "continued",
+      "rulesText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncompleted\nE\nEnable\ncurrent step\nF\nFinalize\nnot yet reached\nRules\n\nYour keyboard's rules decide what each keypress produces — which character it types, which combinations change it, and which keys stay silent. Try them below, review the rule list, and add rules of your own.\n\nTry the rules\n\nType below and watch what each keystroke does — the stored code points, the rendered result, and the rule that fired.\n\nType here, watch what happens\n\nCompiled with 1 warning(s): KM_HINT_KMCMP_3174405\n\nWhat would the host computer have typed?\n\nDo your typists expect a character on this key?\n\nHost layout\nUS\nUS International\nUK English\nAZERTY\nQWERTZ\nBlocked\n\nOur best guess from the keyboard's language tags — not sight of your typists' machines. On other layouts these keys may do something else entirely.\n\nAllow — the key always does something, but what it does varies by computer.\nBlock — the key does nothing on every computer, but it is a dead key if your typists expected a character there.\n\nHost layouts are approximate demo data for the blocking demonstration — not your operating system's real layout tables.\n\nRules in this keyboard\nany(word) + any(final) + key > indexed+indexed+char\n1 rule\nShow rules\n\nany(word) + any(final) + key > indexed+indexed+char\n\nWhen a character from the “word” store and a character from the “final” store precedes the key, the key produces its output.\n\nplatform('touch') any(word) any(final) + [K_SPACE] > index(word, 2) index(final, 3) U+0020 layer('shift')\nTest this group\nBundle as pack\nDisable group\nany(word) + \" \" + key > indexed+char+char\n1 rule\nShow rules\n\nany(word) + \" \" + key > indexed+char+char\n\nWhen a character from the “word” store and \" \" precedes the key, the key produces its output.\n\nplatform('touch') any(word) U+0020 + [K_SPACE] > index(word, 2) U+002E U+0020 layer('shift')\nTest this group\nBundle as pack\nDisable group\nComposed-character unwrap\n1 rule\nShow rules\n\nany(composed) + key > indexed\n\nWhen a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store.\n\nany(composed) + [K_BKSP] > index(comp-dia, 1)\nTest this group\nBundle as pack\nDisable group\nKey output\n199 rules\nShow rules\n\nkey > char\n\nEach key produces its assigned output — a character or a deadkey. All 199 rules in this family follow the same pattern.\n\n+ [K_SPACE] > U+0020\n+ [SHIFT K_SPACE] > U+0020\n+ [LCTRL K_SPACE] > U+00A0\n\n+196 more\n\nTest this group\nBundle as pack\nDisable group\nDead combinations\n21 rules\nShow rules\n\nkey > beep\n\nThe key beeps and produces nothing. All 21 rules in this family follow the same pattern. They differ only in the struck key.\n\n+ [SHIFT RALT K_1] > beep\n+ [SHIFT RALT K_2] > beep\n+ [SHIFT RALT K_3] > beep\n\n+18 more\n\nT",
+      "rulesMentionsBackspace": true,
+      "rulesBkspHits": [
+        "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store.",
+        "any(composed) + [K_BKSP] > index(comp-dia, 1)",
+        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+      ],
+      "rules": "continued",
+      "endBodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncompleted\nE\nEnable\ncurrent step\nF\nFinalize\nnot yet reached\n\nGETTING STARTED · DESKTOP\n\nWelcome to the Mechanism Gallery\n\nThis is where you build your keyboard. For each character your language needs that the starting keyboard doesn’t already have, you’ll choose how to type it on a desktop keyboard.\n\nYou’ll go character by character through the list from your survey.\nPick a method — use a dead key, swap a key, or use AltGr — or mark a character for later review if you’d rather come back to it.\nNeed several keystrokes for one character? Pick “Type a sequence” and a small builder opens right here, in place of the preview.\nPhones and tablets come later, in the Touch gallery.\n← Back\nGet started →\nProject: Bafut"
+    },
+    "3": {
+      "phase": 3,
+      "chars": [],
+      "errors": [],
+      "overwrite": null,
+      "splash": "dismissed",
+      "emptyDiff": true,
+      "completed": true,
+      "endText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nBafut\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncompleted\nE\nEnable\ncurrent step\nF\nFinalize\nnot yet reached\nChoose your touch layout starting point\n\nThis choice seeds the mobile/touch layout. Individual characters can still be reviewed and adjusted afterward in the Touch Layout step.\n\nImport & adapt\nKeep the starting keyboard's shipped touch layout and carry your desktop work onto it.\nReseed from desktop\nDerive a fresh tablet layout from your desktop key assignments. Choosing this discards the starting keyboard's shipped phone/desktop touch platforms — only a tablet layout is produced.\n\nSTARTING TOUCH LAYOUT\n\nShips: tablet (showing \"tablet\" default layer)\n\nLoading your keyboard...\nGetting the files that describe your keyboard...\n\n[WARN] this layout has no phone platform.\n\n← Back\nConfirm\nProject: Bafut"
     }
   },
-  "finishedAt": "2026-10-20T00:10:04.716Z"
+  "finishedAt": "2026-10-20T14:32:59.333Z"
 }
