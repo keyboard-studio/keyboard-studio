@@ -632,6 +632,10 @@ export function keyHasRuleBindings(
  *    no synthesis (the decode path), the anchor layer's own combo, where
  *    the decode must show through. Clones at every other combo stand —
  *    they are what "both halves keep typing" means (US1).
+ *
+ * The composed result's delta over `baseIr` (standing clones, synthesized
+ * rules, minted stores) is stamped `rulesStepAdded` before returning —
+ * see {@link stampComposedAdditions} for why the projection depends on it.
  */
 export function mergeSeveranceWithSynthesis(args: {
   readonly plan: SeverTouchKeyResult;
@@ -676,14 +680,17 @@ export function mergeSeveranceWithSynthesis(args: {
     }
   }
   if (nextIr === undefined) {
-    if (dropIds.size === 0) return plan.ir;
-    return {
-      ...plan.ir,
-      groups: plan.ir.groups.map((g) => ({
-        ...g,
-        rules: g.rules.filter((r) => !dropIds.has(r.nodeId)),
-      })),
-    };
+    if (dropIds.size === 0) return stampComposedAdditions(plan.ir, baseIr);
+    return stampComposedAdditions(
+      {
+        ...plan.ir,
+        groups: plan.ir.groups.map((g) => ({
+          ...g,
+          rules: g.rules.filter((r) => !dropIds.has(r.nodeId)),
+        })),
+      },
+      baseIr,
+    );
   }
 
   const baseGroups = new Map(baseIr.groups.map((g) => [g.nodeId, g]));
@@ -712,11 +719,68 @@ export function mergeSeveranceWithSynthesis(args: {
 
   const baseStoreIds = new Set(baseIr.stores.map((s) => s.nodeId));
   const addedStores = nextIr.stores.filter((s) => !baseStoreIds.has(s.nodeId));
-  return {
-    ...plan.ir,
-    groups,
-    stores: addedStores.length > 0 ? [...plan.ir.stores, ...addedStores] : plan.ir.stores,
-  };
+  return stampComposedAdditions(
+    {
+      ...plan.ir,
+      groups,
+      stores: addedStores.length > 0 ? [...plan.ir.stores, ...addedStores] : plan.ir.stores,
+    },
+    baseIr,
+  );
+}
+
+/**
+ * Stamp every rule/store the composition ADDED over the base IR with
+ * `rulesStepAdded` — the marker the VFS projection's additions seam
+ * (`deriveRuleAdditions` / `spliceRuleAdditions`, spec 082) collects.
+ *
+ * The working IR is never emitted into the preview or the download
+ * directly; the projection rebuilds the artifact from the base IR plus
+ * replayable overlays, and the additions seam is the only channel a
+ * working-IR rule reaches it through. Unstamped, the transplant's clones
+ * and the panel's synthesized guard/producing rules existed only in the
+ * editor's model: the compiled preview keyboard had no guard at all, and
+ * the sibling rename ops' mechanical rule fix-up (projection step 1.7b)
+ * rewrote the SOURCE key's producing rule onto the new id instead — a
+ * guarded T_0301 minted from K_1 typed K_1's "&" (walk 1's OSK failure).
+ *
+ * The double-projection hazard the seam's marker discipline guards
+ * against (spec 082: a rule replayed by its own overlay must not also be
+ * spliced) does not apply here: no overlay replays these rules — step
+ * 1.7b handles only pure renames, and it skips a rename whose target the
+ * additions already bind. Returns `merged` itself when nothing was added,
+ * so a no-op composition keeps its identity.
+ */
+function stampComposedAdditions(merged: KeyboardIR, baseIr: KeyboardIR): KeyboardIR {
+  const baseRuleIds = new Set<string>();
+  for (const g of baseIr.groups) {
+    for (const r of g.rules) baseRuleIds.add(r.nodeId);
+  }
+  const baseStoreIds = new Set(baseIr.stores.map((s) => s.nodeId));
+  let changed = false;
+  const groups = merged.groups.map((g) => {
+    let groupChanged = false;
+    const rules = g.rules.map((r) => {
+      if (!baseRuleIds.has(r.nodeId) && r.rulesStepAdded !== true) {
+        groupChanged = true;
+        return { ...r, rulesStepAdded: true as const };
+      }
+      return r;
+    });
+    if (groupChanged) {
+      changed = true;
+      return { ...g, rules };
+    }
+    return g;
+  });
+  const stores = merged.stores.map((s) => {
+    if (!baseStoreIds.has(s.nodeId) && s.rulesStepAdded !== true) {
+      changed = true;
+      return { ...s, rulesStepAdded: true as const };
+    }
+    return s;
+  });
+  return changed ? { ...merged, groups, stores } : merged;
 }
 
 /** The platform/layer parts of an overlay address, for severance requests. */
