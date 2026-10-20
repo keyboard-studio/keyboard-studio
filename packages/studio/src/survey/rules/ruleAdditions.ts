@@ -76,9 +76,9 @@ export type RuleSetValue = DerivedRuleAdditions;
 export interface DerivedRuleAdditions {
   groups: RuleAdditionGroup[];
   /**
-   * Marked stores absent from the base IR (pack install only — guard
-   * synthesis and Narrow never mint stores). Emitted alongside the rules
-   * that reference them.
+   * Marked stores absent from the base IR (pack install, and the spec-104
+   * severance composition's minted guard store). Emitted alongside the
+   * rules that reference them.
    */
   stores: IRStore[];
 }
