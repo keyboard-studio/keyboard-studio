@@ -137,6 +137,7 @@ import type {
   TouchMethodDescriptor,
   TouchKeyIdProposal,
 } from "@keyboard-studio/engine";
+import { summarizeInventory } from "@keyboard-studio/engine/kmAssist";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
@@ -1894,6 +1895,18 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // beside the currentChar-sync effect) so detectedChars/touchLettersToAdd
   // below, which also need it, can be declared before that effect.
   const inventoryKey = inventory.join("\0");
+  // The repertoire a freshly-minted guard store is drawn from (AssignPanel's
+  // `repertoire`): the confirmed inventory PLUS every character the working
+  // copy itself produces. The survey inventory alone holds letters, marks,
+  // punctuation and invisibles but never the space or the digits, so a guard
+  // minted from it alone could not swallow a mark after a space — the
+  // start-of-word case the guard question names. The keyboard's own outputs
+  // are still "the keyboard's own repertoire" (no hardcoded ASCII set);
+  // planGuardSynthesis drops the letters.
+  const guardRepertoire = useMemo(
+    () => (ir === null ? inventory : nfcDedup(inventory, summarizeInventory(ir).chars)),
+    [ir, inventory],
+  );
 
   // The placement walk set (issue #2293): the marks series' answers,
   // derived ONCE upstream (hooks/usePlacementInventory.ts) and shared with
@@ -7721,7 +7734,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                         {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
                         {...(guardSpecification !== undefined ? { guardSpecification } : {})}
                         onGuardAnswer={handleGuardAnswer}
-                        repertoire={inventory}
+                        repertoire={guardRepertoire}
                         onCommit={handleAssignPanelCommit}
                       />
                     ),
