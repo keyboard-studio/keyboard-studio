@@ -19,10 +19,22 @@
 
 set -u
 
-# Compute the changed files for this push. If HEAD^ is unavailable (shallow
-# checkout or the very first commit), git errors and we fall through to build.
-if ! changed="$(git diff --name-only HEAD^ HEAD 2>/dev/null)"; then
-  echo "vercel-ignore: cannot compute HEAD^..HEAD diff -> BUILD"
+# Compute the changed files for this push. Prefer the range from the
+# previous deployment's commit (VERCEL_GIT_PREVIOUS_SHA, set by Vercel for
+# the ignore command) so a docs-only final commit cannot cancel the preview
+# of a PR whose earlier commits changed code. Fall back to HEAD^..HEAD when
+# no usable previous SHA exists. If the diff cannot be computed (shallow
+# checkout or the very first commit), git errors and we fall through to
+# build.
+range="HEAD^..HEAD"
+if [ -n "${VERCEL_GIT_PREVIOUS_SHA:-}" ] \
+   && [ "${VERCEL_GIT_PREVIOUS_SHA}" != "$(git rev-parse HEAD 2>/dev/null)" ] \
+   && git cat-file -e "${VERCEL_GIT_PREVIOUS_SHA}^{commit}" 2>/dev/null; then
+  range="${VERCEL_GIT_PREVIOUS_SHA}..HEAD"
+fi
+# shellcheck disable=SC2086 # ${range} is one internally-built word, no user input
+if ! changed="$(git diff --name-only ${range} 2>/dev/null)"; then
+  echo "vercel-ignore: cannot compute ${range} diff -> BUILD"
   exit 1
 fi
 
