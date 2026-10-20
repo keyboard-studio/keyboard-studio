@@ -56,3 +56,5 @@ Backspace behaviour repeated round 2's pattern at full coverage: the question re
 Environment losses, disclosed: two service restarts killed the dev server and the running lane mid-case (p1-whole-ewondo-kbdfr attempt 1, p1-whole-bafut-camqwerty attempt 1); both cases were re-run clean and their committed evidence is the re-run. A pre-walk smoke attempt failed on an unbuilt workspace package in the fresh tree (environment setup, before any case ran); it is not counted anywhere in the table.
 
 **FINAL reconciled counts (32 cells): PASS 32 · FAIL 0 · BLOCKED 0 · NOT-ATTEMPTED 0.** Round-3 counts are identical: PASS 32 of 32.
+
+Keyboard package .zip files for these runs live on the throwaway branch `km/2302-walk-zips` under `tools/testing-profiles-2302/zips/` (index: `zips/INDEX.md` on that branch).
