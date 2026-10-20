@@ -16,6 +16,7 @@ import type {
   TouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
 import {
+  isEmulationKeyId,
   resolveTouchProduction,
   touchKeyStateFromLayerId,
 } from "@keyboard-studio/contracts";
@@ -168,12 +169,19 @@ export function productionMatchesRemovalSet(
  * against `removalSet` — the resolver half of {@link keyMatchesRemovalSet},
  * exported for the carve operation, which needs the same verdict per
  * occurrence without re-deriving the state plumbing.
+ *
+ * Emulation-class keys (K_BKSP, K_ENTER, …) never match. A context rule
+ * on one rewrites text rather than typing a character — Cameroon's
+ * `any(composed) + [K_BKSP] > index(comp-dia,1)` strips a mark — so its
+ * output entries are not that key's production of a character, and
+ * carving one of them must not remove the backspace key from the layout.
  */
 export function candidateMatchesViaProduction(
   candidate: { id?: string; sp?: number; nextlayer?: string },
   removalSet: ReadonlySet<string>,
   ctx: RemovalProductionContext,
 ): boolean {
+  if (candidate.id !== undefined && isEmulationKeyId(candidate.id)) return false;
   const key: TouchKeyIR = {
     nodeId: "",
     id: candidate.id ?? "",

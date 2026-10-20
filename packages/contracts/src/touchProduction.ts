@@ -306,7 +306,7 @@ const EMULATION_KEY_IDS: ReadonlySet<string> = new Set([
   "K_ROPT",
 ]);
 
-function isEmulationKeyId(id: string): boolean {
+export function isEmulationKeyId(id: string): boolean {
   const upper = id.toUpperCase();
   return EMULATION_KEY_IDS.has(upper) || upper.startsWith("K_NP");
 }
