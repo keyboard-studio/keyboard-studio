@@ -27,6 +27,13 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   ruling of 2026-10-07 ("Accept store-level gates; run live captures in
   CI"), this store-level walk is the accepted in-sandbox gate for SC-001.
   It is labelled exactly that — it is not a live-app capture.
+- **Bootstrap attempts**: capture-on-base could not succeed while main
+  itself carried the coverage-gate bug fixed by PR #2309 (merged
+  2026-10-20, merge commit `df9435c6`): the base-side walk trapped at
+  the touch step for the full capture cap on every attempt (PR #2309's
+  golden lane, runs `39350014613` / `39356073494`). With main fixed,
+  this PR captures from base `df9435c6`; the captured zip is committed
+  here with its run id recorded below.
 - **Live capture: PENDING — runs in CI.** The implementation sandbox's
   Chromium refuses every localhost navigation with
   `net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` (the same block spec
