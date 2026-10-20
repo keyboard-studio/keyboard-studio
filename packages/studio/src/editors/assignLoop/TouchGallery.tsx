@@ -178,6 +178,7 @@ import {
   usePlacementInventory,
   useTreatmentFilteredChars,
 } from "../../hooks/usePlacementInventory.ts";
+import { treatmentCreditedMarks } from "../../lib/placementInventory.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
   useWorkingCopyStore,
@@ -4553,9 +4554,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // as one shared memo — read by BOTH `handleContinue` and the proactive
   // button-disable below — so the two can never disagree about what counts
   // as uncovered.
+  const sessionAlphabet = useWorkingCopyStore((s) => s.session.alphabet);
+  const sessionMarksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
   const uncoveredTouchChars = useMemo<string[]>(() => {
     if (effectiveKeyModeLayout === null) return [];
-    return [
+    const uncovered = [
       ...touchCoverage(
         effectiveKeyModeLayout,
         inventory,
@@ -4563,7 +4566,31 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         desktopProducedSet,
       ).uncovered,
     ];
-  }, [effectiveKeyModeLayout, inventory, keyModeCoverageOptions, desktopProducedSet]);
+    // Composed-treatment mark credit (lib/placementInventory.ts's
+    // treatmentCreditedMarks — the same rule the shared coverage gate
+    // applies): a lone mark whose treatment is `composed` is not a
+    // placement unit, so this walk can never give it a touch mechanism;
+    // once every attested combination of it is reachable on the layout
+    // (the inventory-minus-uncovered covered set — touchCoverage has
+    // already folded desktopProducedSet in as its composability seed),
+    // the mark's touch obligation is discharged through those
+    // combinations and it must not keep the FR-008 gate closed.
+    if (sessionAlphabet === undefined || sessionMarksWorklist === undefined) return uncovered;
+    const uncoveredSet = new Set(uncovered.map((c) => c.normalize("NFC")));
+    const covered = new Set<string>(
+      inventory.filter((c) => !uncoveredSet.has(c.normalize("NFC"))),
+    );
+    const credited = treatmentCreditedMarks(sessionAlphabet, sessionMarksWorklist, covered);
+    if (credited.size === 0) return uncovered;
+    return uncovered.filter((c) => !credited.has(c.normalize("NFC")));
+  }, [
+    effectiveKeyModeLayout,
+    inventory,
+    keyModeCoverageOptions,
+    desktopProducedSet,
+    sessionAlphabet,
+    sessionMarksWorklist,
+  ]);
 
   // Bind this walk to the shared within-step position model — one footer dot per
   // character, and a jump into the middle of the walk lands. Declared AFTER the
