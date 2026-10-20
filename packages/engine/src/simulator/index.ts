@@ -26,6 +26,7 @@ import type { Pattern } from '@keyboard-studio/contracts';
 import { loadKeyboardInterface } from './keyboardLoader.js';
 import {
   instrumentFiredRuleTracking,
+  type InstrumentedScript,
   type FiredRuleHit,
 } from './firedRuleTracker.js';
 
@@ -56,6 +57,50 @@ const NO_OP_STORE_SERIALIZER = {
 /** Shared UTF-8 decoder — TextDecoder is stateless, so one instance can be reused
  * across all `extractJsSource` calls instead of allocating one per call. */
 const UTF8_DECODER = new TextDecoder('utf-8');
+
+// ---------------------------------------------------------------------------
+// Instrumented-script cache (#2313)
+// ---------------------------------------------------------------------------
+
+/**
+ * `instrumentFiredRuleTracking` is a pure function of the compiled script
+ * source, but it is NOT cheap: it regex-scans and brace-matches every group
+ * body in the script, so on a large base keyboard one call is a
+ * several-hundred-millisecond synchronous block. Corpus callers — above all
+ * the I2 functional round-trip (`checkRoundTrip`), which calls `simulate()`
+ * twice per corpus sequence over up to 100k sequences with the SAME two
+ * compiled scripts — re-paid that full cost on every keystroke sequence.
+ * In the browser host the round-trip runs on the main thread after the
+ * preview reaches `ready`, so the re-instrumentation saturated the thread
+ * for minutes after base selection and the authoring UI (marks series
+ * included) intermittently failed to respond — the #2302 walks stalled
+ * after Continue at whichever station they had reached.
+ *
+ * The result is immutable and shared read-only, so memoize it by script
+ * source. The bound is small on purpose: the round-trip alternates exactly
+ * two scripts, and a handful of entries covers every in-repo caller without
+ * pinning megabytes of script text indefinitely. LRU order is maintained by
+ * delete+set on hit.
+ */
+const INSTRUMENTED_SCRIPT_CACHE_LIMIT = 4;
+const instrumentedScriptCache = new Map<string, InstrumentedScript | null>();
+
+function instrumentScriptCached(scriptSrc: string): InstrumentedScript | null {
+  const cached = instrumentedScriptCache.get(scriptSrc);
+  if (cached !== undefined) {
+    // Refresh recency (a `null` entry is a real hit: uninstrumentable script).
+    instrumentedScriptCache.delete(scriptSrc);
+    instrumentedScriptCache.set(scriptSrc, cached);
+    return cached;
+  }
+  const instrumented = instrumentFiredRuleTracking(scriptSrc);
+  instrumentedScriptCache.set(scriptSrc, instrumented);
+  if (instrumentedScriptCache.size > INSTRUMENTED_SCRIPT_CACHE_LIMIT) {
+    const oldest = instrumentedScriptCache.keys().next().value;
+    if (oldest !== undefined) instrumentedScriptCache.delete(oldest);
+  }
+  return instrumented;
+}
 
 // ---------------------------------------------------------------------------
 // KeyEvent builder
@@ -218,7 +263,7 @@ export function simulate(
   // recorded during `processKeystroke` is the rule that fired for that step.
   // (With `use()` delegation the innermost rule's hit lands last.)
   let lastHit: FiredRuleHit | null = null;
-  const instrumented = instrumentFiredRuleTracking(scriptSrc);
+  const instrumented = instrumentScriptCached(scriptSrc);
 
   // Load the keyboard via the installed loader. The returned JSKeyboardInterface
   // already has activeKeyboard set (blueprint §3).
