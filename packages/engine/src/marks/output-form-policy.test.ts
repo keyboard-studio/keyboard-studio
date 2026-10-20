@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { PosturePair } from "./nfc-posture-of-inventory.js";
 import {
   hasDecidablePairs,
+  nativeBackspaceBehaviour,
   outputStringForStack,
+  resolveBackspaceProposal,
   resolveOutputFormProposal,
 } from "./output-form-policy.js";
 
@@ -113,5 +115,37 @@ describe("hasDecidablePairs (station render gate)", () => {
 
   it("true when at least one pair exists", () => {
     expect(hasDecidablePairs([pair(true)])).toBe(true);
+  });
+});
+
+describe("resolveBackspaceProposal (#2302: the suggestion follows the chosen composition)", () => {
+  it("base-plus-mark output proposes peel — the consistent pairing", () => {
+    expect(resolveBackspaceProposal("base-plus-mark").behaviour).toBe("peel");
+  });
+
+  it("ready-made output proposes whole-stack — the consistent pairing", () => {
+    expect(resolveBackspaceProposal("ready-made").behaviour).toBe("whole-stack");
+  });
+
+  it("the proposal is exactly the form's native behaviour under both forms", () => {
+    // "Follow composition" and "what the emitted text does with no
+    // generated rules" are the same statement; the override is the other
+    // member of the union under either form.
+    expect(resolveBackspaceProposal("base-plus-mark").behaviour).toBe(
+      nativeBackspaceBehaviour("base-plus-mark"),
+    );
+    expect(resolveBackspaceProposal("ready-made").behaviour).toBe(
+      nativeBackspaceBehaviour("ready-made"),
+    );
+    expect(nativeBackspaceBehaviour("base-plus-mark")).toBe("peel");
+    expect(nativeBackspaceBehaviour("ready-made")).toBe("whole-stack");
+  });
+
+  it("explanations name the override as choosable and stay SC-005 clean", () => {
+    for (const form of ["base-plus-mark", "ready-made"] as const) {
+      const { explanation } = resolveBackspaceProposal(form);
+      expect(explanation).toContain("You can choose");
+      expect(explanation).not.toMatch(/unicode|normalization/i);
+    }
   });
 });

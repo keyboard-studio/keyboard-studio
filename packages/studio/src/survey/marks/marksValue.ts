@@ -26,6 +26,8 @@
 // session.marksContextTolerance derivation stays for session consumers).
 
 import type {
+  AttestedStack,
+  BackspaceBehaviour,
   GuardSpecification,
   MarksContextToleranceDecision,
   PlacementWorklist,
@@ -62,6 +64,21 @@ export interface GuardReevaluationItem {
 export interface MarksCompletion {
   worklist: PlacementWorklist;
   outputForm: OutputForm;
+  /**
+   * The recorded backspace answer (#2302) the apply gates the backspace
+   * generation on, alongside `outputForm`. Optional: completions recorded
+   * before the answer existed carry none, and apply then uses the
+   * historical default (`"peel"` — the pre-#2302 always-unwrap behaviour
+   * under ready-made).
+   */
+  backspace?: BackspaceBehaviour;
+  /**
+   * The confirmed alphabet's attested stacks (#2302): the whole-stack
+   * generator's source table, carried in the payload because apply reads
+   * the payload, not the session. Optional for the same pre-#2302 reason;
+   * absent means no whole-stack rules can be derived.
+   */
+  stacks?: readonly AttestedStack[];
   /** R10: base-plus-mark chosen over a precomposed-form base (reducer parity). */
   migrationNeeded: boolean;
   /**

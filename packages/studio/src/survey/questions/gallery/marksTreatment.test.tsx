@@ -155,6 +155,49 @@ describe("marksTreatment apply — the mark guards (spec 071 FR-021)", () => {
     expect(JSON.stringify(reguarded.groups)).toBe(JSON.stringify(guarded.groups));
     expect(JSON.stringify(reguarded.stores)).toBe(JSON.stringify(guarded.stores));
   });
+
+  it("gates the backspace generation on the completion's recorded answer (#2302)", () => {
+    const readyMadeWorklist = {
+      ownLetterUnits: ["e", "é"],
+      markUnits: [],
+      blockedCombinations: [],
+    };
+    // ready-made + peel (override): the unwrap stores are generated.
+    const peeled = marksTreatment.apply(
+      completedValue({ outputForm: "ready-made", worklist: readyMadeWorklist, backspace: "peel" }),
+      makeContext(irWithRule("a")),
+    );
+    expect(peeled.ir?.stores?.some((s) => s.name === "generated_marks_unwrap_from")).toBe(true);
+    // ready-made + whole-stack (follow): native — no unwrap, no patch at all.
+    const stacked = marksTreatment.apply(
+      completedValue({ outputForm: "ready-made", worklist: readyMadeWorklist, backspace: "whole-stack" }),
+      makeContext(irWithRule("a")),
+    );
+    expect(stacked).toEqual({});
+    // base-plus-mark + whole-stack (override): whole-stack deletion rules
+    // are generated from the completion's stacks.
+    const whole = marksTreatment.apply(
+      completedValue({
+        outputForm: "base-plus-mark",
+        worklist: { ownLetterUnits: ["e"], markUnits: [], blockedCombinations: [] },
+        backspace: "whole-stack",
+        stacks: [{ base: "e", marks: [ACUTE] }],
+      }),
+      makeContext(irWithRule("a")),
+    );
+    const mainGroup = whole.ir?.groups?.find((g) => g.name === "main");
+    expect(
+      mainGroup?.rules.some((r) => r.nodeId.startsWith("gen-marks-wholestack-rule-")),
+    ).toBe(true);
+    // A completion recorded before the answer existed (no backspace
+    // field) keeps the historical behaviour: peel generation under
+    // ready-made.
+    const legacy = marksTreatment.apply(
+      completedValue({ outputForm: "ready-made", worklist: readyMadeWorklist }),
+      makeContext(irWithRule("a")),
+    );
+    expect(legacy.ir?.stores?.some((s) => s.name === "generated_marks_unwrap_from")).toBe(true);
+  });
 });
 
 describe("MarksStepHost — the R10 migration flag mirror", () => {

@@ -66,6 +66,7 @@ import {
   proposeAttachments,
   nfcPostureOfInventory,
   resolveOutputFormProposal,
+  resolveBackspaceProposal,
   hasDecidablePairs,
   computeMarkTreatmentPrefills,
   buildPlacementWorklist,
@@ -86,7 +87,7 @@ import {
   type OutputForm,
   type PromotedComposedCharacter,
 } from "@keyboard-studio/engine";
-import type { MarkInputOrder } from "@keyboard-studio/contracts";
+import type { BackspaceBehaviour, MarkInputOrder } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import {
@@ -107,6 +108,7 @@ import {
   marksMarkTreatmentKey,
   marksStackKey as marksStackEvidenceKey,
   marksOutputFormKey,
+  marksBackspaceKey,
   marksInputOrderKey,
   marksPromotedKey,
   marksStackingAllowedKey,
@@ -250,6 +252,7 @@ function seriesResult(
   computedAxes?: MarksComputedAxes,
   answers: SurveyAnswer[] = [],
   contextTolerance?: MarksContextToleranceDecision,
+  backspace?: BackspaceBehaviour,
 ): SurveyPhaseResult {
   return {
     phase: "C",
@@ -257,6 +260,7 @@ function seriesResult(
     ...(contextTolerance !== undefined ? { marksContextTolerance: contextTolerance } : {}),
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
+    ...(backspace !== undefined ? { marksBackspace: backspace } : {}),
     // spec 052 US4: the recorded treatment finally reaches strategy selection.
     // `computedAxes` is an existing additive optional field merged into
     // session.axes by mergePhaseResults — its OMISSION here was the defect, so
@@ -611,6 +615,40 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
+  // --- S4 backspace (#2302) ---
+  //
+  // Its own whole-keyboard answer at the same station, interrelated with
+  // the composition answer yet independent of it (Matthew's model,
+  // 2026-10-19). The SUGGESTION follows the chosen form — the consistent
+  // pairing (base-plus-mark ↔ peel, ready-made ↔ whole-stack) — and the
+  // author may override to the other behaviour; the engine generates the
+  // rules for the off-pairings at completion (pattern-apply/mark-guards).
+  // The evidence key carries the form, so changing the composition answer
+  // re-proposes the backspace answer against the new pairing (spec 079)
+  // rather than silently carrying the old confirmation across.
+  const backspaceProposal = useMemo(
+    () => resolveBackspaceProposal(outputForm),
+    [outputForm],
+  );
+  const backspaceKey = marksBackspaceKey(outputForm, postureId);
+  const backspaceView = reconcile(
+    savedAnswers["marks_output_form.backspace"],
+    backspaceKey,
+    backspaceProposal.behaviour,
+  );
+  const backspace = backspaceView.value as BackspaceBehaviour;
+
+  function handleBackspaceChange(next: BackspaceBehaviour): void {
+    saveAnswer(STEP_ID, "marks_output_form.backspace", {
+      value: next,
+      answerType: "select",
+      origin: next === backspaceProposal.behaviour ? "confirmed" : "overturned",
+      stage: "draft",
+      evidenceKey: backspaceKey,
+      screenId: "marks_output_form",
+    });
+  }
+
   // S5 — evidence: an attested >=2-mark stack, or two marks' reachable base
   // sets overlapping (FR-018). Confirmed list defaults to the attested stacks
   // (propose-then-confirm), never inferred from attachment rows (FR-019).
@@ -881,10 +919,11 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         treatmentPrefills,
         multiMarkStacks,
         postureId,
+        outputForm,
         savedAnswers,
         lastRecorded,
       }),
-    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, savedAnswers, lastRecorded],
+    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, outputForm, savedAnswers, lastRecorded],
   );
   const flaggedWorkItems = useMemo(
     () =>
@@ -1019,6 +1058,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       case "marks_output_form":
         return [
           { questionId: "marks.marks_output_form.form", answerType: "select", value: outputForm },
+          { questionId: "marks.marks_output_form.backspace", answerType: "select", value: backspace },
         ];
       case "marks_stacking": {
         const confirmedKeys = multiMarkStacks
@@ -1105,8 +1145,13 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     const guard = guardRecordForCommit(activeStation);
     const guardReevaluation =
       guard !== null && workingIr !== null ? findGuardReevaluationItems(workingIr, guard) : [];
-    recordValue(answers, { worklist, outputForm, migrationNeeded, guardReevaluation }, effectiveTolerance, guard);
-    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision));
+    recordValue(
+      answers,
+      { worklist, outputForm, backspace, stacks: gate.alphabet.attestedStacks, migrationNeeded, guardReevaluation },
+      effectiveTolerance,
+      guard,
+    );
+    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision, backspace));
   }
 
   /**
@@ -1241,6 +1286,14 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           evidenceKey: outputFormKey,
           screenId: "marks_output_form",
         });
+        saveAnswer(STEP_ID, "marks_output_form.backspace", {
+          value: backspace,
+          answerType: "select",
+          origin: backspace === backspaceProposal.behaviour ? "confirmed" : "overturned",
+          stage: "confirmed",
+          evidenceKey: backspaceKey,
+          screenId: "marks_output_form",
+        });
         break;
       case "marks_stacking":
         saveAnswer(STEP_ID, "marks_stacking.allowed", {
@@ -1365,6 +1418,9 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           value={outputForm}
           onChange={handleOutputFormChange}
           inputOrder={inputOrder}
+          backspaceProposal={backspaceProposal}
+          backspace={backspace}
+          onBackspaceChange={handleBackspaceChange}
         />
       )}
 

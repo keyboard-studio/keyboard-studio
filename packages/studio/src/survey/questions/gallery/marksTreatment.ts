@@ -58,7 +58,19 @@ const marksTreatment: GalleryModule<MarksTreatmentValue> = {
       (ctx.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined);
     if (effective === undefined || effective.completion === null || ctx.ir === null) return {};
     const completion = effective.completion;
-    const guarded = applyMarkGuards(ctx.ir, completion.worklist, completion.outputForm);
+    // #2302: the recorded backspace answer gates the generation (peel
+    // under ready-made generates the unwrap; whole-stack under
+    // base-plus-mark generates the deletion rules; the consistent
+    // pairings are native). A completion recorded before the answer
+    // existed carries none — the engine's default ("peel") reproduces
+    // the behaviour those keyboards were completed under.
+    const guarded = applyMarkGuards(
+      ctx.ir,
+      completion.worklist,
+      completion.outputForm,
+      completion.backspace ?? "peel",
+      completion.stacks ?? [],
+    );
     if (guarded.ir === ctx.ir) return {};
     const ir: Partial<KeyboardIR> = {};
     if (guarded.ir.groups !== ctx.ir.groups) ir.groups = guarded.ir.groups;

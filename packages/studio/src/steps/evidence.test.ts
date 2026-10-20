@@ -12,6 +12,7 @@ import {
   marksInputOrderKey,
   marksKey,
   marksMarkTreatmentKey,
+  marksBackspaceKey,
   marksOutputFormKey,
   marksPromotedKey,
   marksStackingAllowedKey,
@@ -209,6 +210,15 @@ describe("marksOutputFormKey", () => {
   it("is deterministic and depends on the posture id", () => {
     expect(marksOutputFormKey("nfc")).toBe(marksOutputFormKey("nfc"));
     expect(marksOutputFormKey("nfc")).not.toBe(marksOutputFormKey("nfd"));
+  });
+});
+
+describe("marksBackspaceKey (#2302)", () => {
+  it("is deterministic and depends on BOTH the form and the posture id", () => {
+    expect(marksBackspaceKey("ready-made", "p")).toBe(marksBackspaceKey("ready-made", "p"));
+    // The proposal follows the form, so a form change alone re-keys it.
+    expect(marksBackspaceKey("ready-made", "p")).not.toBe(marksBackspaceKey("base-plus-mark", "p"));
+    expect(marksBackspaceKey("ready-made", "p")).not.toBe(marksBackspaceKey("ready-made", "q"));
   });
 });
 
