@@ -12,6 +12,7 @@ import type {
   VirtualFS,
   KpsFontEntry,
   KpsStylesheetEntry,
+  PackageFontSet,
   WelcomeConvention,
   WelcomeFolderImage,
 } from "@keyboard-studio/contracts";
@@ -68,6 +69,13 @@ export interface FetchKeyboardSourceResult {
    * Empty array when no .kps was found or no font entries were present.
    */
   fonts: KpsFontEntry[];
+  /**
+   * The fonts the base `.kps` packages — files (fonts plus their licence and
+   * other companions, all written into the VFS) and its OSK/display font
+   * selections — for the generated descriptor to re-declare (issue #2308).
+   * Absent when the base packages no font, or none could be fetched.
+   */
+  packageFonts?: PackageFontSet;
   /**
    * Per-keyboard CSS stylesheets fetched from the keyboards tree and written
    * into the VFS. The studio injects these into the OSK iframe so the
@@ -295,6 +303,7 @@ export async function fetchKeyboardSourceToVfs(
   // The raw .kps is NOT written to the VFS (it references compiled artifacts
   // like ../build/*.kmx that must not leak into the VFS).
   const fonts: KpsFontEntry[] = [];
+  let packageFonts: PackageFontSet | undefined;
   const stylesheets: KpsStylesheetEntry[] = [];
   const kpsUrl = `${baseUrl}/source/${startKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
@@ -302,7 +311,10 @@ export async function fetchKeyboardSourceToVfs(
   // descriptor for `<WelcomeFile>` and the `welcome\…` `<Files>` entries.
   const kpsText = kpsResp.ok && kpsResp.text !== undefined ? kpsResp.text : undefined;
   if (kpsText !== undefined) {
-    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFontRefs(kpsText);
+    const fontRefs = parseKpsFontRefs(kpsText);
+    const { oskFonts, fileFonts, stylesheets: cssRefs } = fontRefs;
+    /** Raw `.kps` font reference -> the VFS key it was written to. */
+    const fetchedFontVfsPaths = new Map<string, string>();
 
     // Build a deduped map of rawPath -> isOskFont.
     const allRaw = new Map<string, boolean>();
@@ -367,7 +379,7 @@ export async function fetchKeyboardSourceToVfs(
             warn: `font '${ttfRelPath}' not fetched (${detail}) — skipped`,
           };
         }
-        return { ok: true as const, ttfRelPath, isOskFont, bytes: r.bytes };
+        return { ok: true as const, rawPath, ttfRelPath, isOskFont, bytes: r.bytes };
       }),
     );
 
@@ -395,7 +407,26 @@ export async function fetchKeyboardSourceToVfs(
         entry.family = kvksFamilyStr;
       }
       fonts.push(entry);
+      fetchedFontVfsPaths.set(fr.rawPath, vfsPath);
     }
+
+    // Issue #2308 (criteria 8/9/10): the fonts the base packages, re-declared
+    // by the generated descriptor. A font's companions — the licence, FONTLOG
+    // and README the base lists from the same shared folder — ship with it.
+    // Companions are taken only from a folder OUTSIDE the keyboard's own tree:
+    // a keyboard-local font sits in source/, where "same folder" would sweep
+    // in every other source member.
+    packageFonts = await collectPackageFonts({
+      kpsText,
+      kbPath: startKeyboard.path,
+      fetchedFontVfsPaths,
+      refs: { oskFont: fontRefs.oskFont, displayFont: fontRefs.displayFont },
+      proxyBase,
+      fetchImpl,
+      vfs,
+      warnings,
+      filesLoaded,
+    });
 
     // Fetch each per-keyboard CSS file in parallel. These live next to the .kps
     // in source/ and may use the same `..\..\..` traversal pattern as fonts;
@@ -525,6 +556,7 @@ export async function fetchKeyboardSourceToVfs(
     filesLoaded,
     warnings,
     fonts,
+    ...(packageFonts !== undefined ? { packageFonts } : {}),
     stylesheets,
     ...(startLicenseText !== undefined ? { startLicenseText } : {}),
     ...(startWelcomeHtmText !== undefined ? { startWelcomeHtmText } : {}),
@@ -555,6 +587,79 @@ function parseKpsWelcomeFile(kpsText: string): string | undefined {
  * applies with its `release/` prefix check, applied to both image loops so a
  * `.kps` entry or an `<img src>` cannot fetch outside the keyboard's folder.
  */
+/**
+ * The base's packaged fonts as a {@link PackageFontSet} (issue #2308).
+ *
+ * Walks the `.kps` `<Files>` in order: each font already fetched is listed
+ * under the VFS key it was written to, and every other member that sits in the
+ * same folder as a fetched font — when that folder is outside the keyboard's
+ * own tree — is fetched as a companion (licence, FONTLOG, README; criterion 9).
+ * A companion that cannot be fetched is skipped with a warning. A selected
+ * OSK/display font that `<Files>` omits is still listed, after the rest.
+ */
+async function collectPackageFonts(args: {
+  kpsText: string;
+  kbPath: string;
+  fetchedFontVfsPaths: ReadonlyMap<string, string>;
+  refs: { oskFont: string | undefined; displayFont: string | undefined };
+  proxyBase: string;
+  fetchImpl: FetchFn;
+  vfs: VirtualFS;
+  warnings: string[];
+  filesLoaded: string[];
+}): Promise<PackageFontSet | undefined> {
+  const { kpsText, kbPath, fetchedFontVfsPaths, refs, proxyBase, fetchImpl, vfs, warnings, filesLoaded } = args;
+  if (fetchedFontVfsPaths.size === 0) return undefined;
+
+  const ownTree = `${kbPath}/`;
+  const fontDirs = new Set<string>();
+  for (const vfsPath of fetchedFontVfsPaths.values()) {
+    const releasePath = `release/${vfsPath}`;
+    if (!releasePath.startsWith(ownTree)) fontDirs.add(pathUtils.dirname(releasePath));
+  }
+
+  const files: string[] = [];
+  const listed = new Set<string>();
+  const list = (vfsPath: string): void => {
+    if (listed.has(vfsPath)) return;
+    listed.add(vfsPath);
+    files.push(vfsPath);
+  };
+
+  for (const { name, fileType } of parseKpsFiles(kpsText)) {
+    const fetched = fetchedFontVfsPaths.get(name);
+    if (fetched !== undefined) {
+      list(fetched);
+      continue;
+    }
+    if (fileType === ".ttf" || fileType === ".otf" || fileType === ".css") continue;
+    const releasePath = resolveKpsFontPath(name, kbPath);
+    if (releasePath === null || !fontDirs.has(pathUtils.dirname(releasePath))) continue;
+    const vfsPath = releasePath.slice("release/".length);
+    if (listed.has(vfsPath)) continue;
+    const r = await getBytes(`${proxyBase}/${releasePath}`, fetchImpl);
+    if (!r.ok || r.bytes === undefined) {
+      const detail = r.networkError ? `network error: ${r.networkError}` : `HTTP ${r.status}`;
+      warnings.push(`font companion '${releasePath}' not fetched (${detail}) — skipped`);
+      continue;
+    }
+    vfs.set(vfsPath, r.bytes, true);
+    filesLoaded.push(vfsPath);
+    list(vfsPath);
+  }
+
+  const oskFont = refs.oskFont !== undefined ? fetchedFontVfsPaths.get(refs.oskFont) : undefined;
+  const displayFont = refs.displayFont !== undefined ? fetchedFontVfsPaths.get(refs.displayFont) : undefined;
+  if (oskFont !== undefined) list(oskFont);
+  if (displayFont !== undefined) list(displayFont);
+
+  return {
+    files,
+    ...(oskFont !== undefined ? { oskFont } : {}),
+    ...(displayFont !== undefined ? { displayFont } : {}),
+  };
+}
+
 function hasTraversal(rel: string): boolean {
   return rel.split("/").includes("..");
 }

@@ -70,6 +70,7 @@
 
 import type {
   KeyboardIR,
+  PackageFontSet,
   Pattern,
   VirtualFS,
 } from "@keyboard-studio/contracts";
@@ -250,6 +251,13 @@ export interface ProjectWorkingCopyVfsInput {
    * `projectWorkingCopyForOutput`) — so its descriptor lists the page alone.
    */
   welcomeFolderFiles?: readonly string[];
+  /**
+   * Issue #2308: the starting keyboard's packaged fonts, which step 3.6's
+   * descriptor declares (`<Files>` + OSK/display selection; criteria 8/9/10).
+   * Optional for the same reason as `welcomeFolderFiles`: the OSK preview
+   * builds no package, so only the output projection passes it.
+   */
+  packageFonts?: PackageFontSet;
   /**
    * The base keyboard's own display name — the value the `.kmn`'s existing
    * `store(&NAME)` already holds. Step 3 treats the overlay's display name as an
@@ -990,6 +998,7 @@ export function projectWorkingCopyVfs(
       // Warnings name the file the author will actually receive: step 4 renames
       // it, so the pre-rename (base) id must not appear in them.
       targetKeyboardId ?? keyboardId,
+      input.packageFonts,
     );
     warnings.push(...kpsResult.warnings);
   }

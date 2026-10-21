@@ -106,7 +106,24 @@ let _ctor: (new () => KmpCompilerLike) | null = null;
 let _down = false;
 let _downReason: string | null = null;
 
+/**
+ * Give kmc-package the Node `Buffer` it assumes. A package whose `.kps`
+ * selects an OSK/display font makes KmpCompiler read the font's family name
+ * (developer-utils `getFontFamilySync`, which calls `Buffer.from` and parses
+ * the font through Buffer methods) to stamp it into the `.kvk`. Browsers have
+ * no `Buffer`, so without this every font-selecting package fails to build
+ * (issue #2308). Installed only when absent — Node and the test runners keep
+ * their own — and loaded with kmc-package, so it stays out of the entry chunk.
+ */
+async function ensureBufferGlobal(): Promise<void> {
+  const g = globalThis as { Buffer?: unknown };
+  if (g.Buffer !== undefined) return;
+  const { Buffer } = await import("buffer");
+  g.Buffer ??= Buffer;
+}
+
 async function loadKmpCompiler(): Promise<{ KmpCompiler: new () => KmpCompilerLike }> {
+  await ensureBufferGlobal();
   // A genuine dynamic import, unlike the kmn bridge's (which is static in
   // disguise because its Emscripten glue must resolve a .wasm sibling). Here it
   // really does defer jszip + marked out of the studio's entry chunk until the

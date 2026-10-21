@@ -514,6 +514,7 @@ export async function projectWorkingCopyForOutput(
     identity: identityForProjection,
     touchLayoutJson,
     welcomeFolderFiles,
+    ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
     // spec 083: the committed deadkey lifecycle overlay, replayed at step
     // 1.8 so the download carries the same deadkey edits the preview does.
     deadkeyOps: state.deadkeyOverlay.ops,

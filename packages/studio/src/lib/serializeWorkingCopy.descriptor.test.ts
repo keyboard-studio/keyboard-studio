@@ -651,3 +651,61 @@ describe("delivered artifact — generated layout charts in <Files> (spec 079 FR
     expect(names.some((n) => /^welcome\\ks-layout-desktop-.*\.svg$/.test(n))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue #2308 — the starting keyboard's packaged fonts reach the descriptor
+// ---------------------------------------------------------------------------
+
+describe("delivered artifact — packaged fonts (issue #2308, criteria 8/9/10)", () => {
+  const FONT = "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf";
+  const OFL = "shared/fonts/sil/andika_subsets/OFL.txt";
+  const FONT_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";
+  const OFL_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\OFL.txt";
+
+  function expectFontsDeclared(kps: string): void {
+    const names = fileNames(kps);
+    expect(names).toContain(FONT_REF);
+    expect(names).toContain(OFL_REF);
+    expect(kps).toContain(`<OSKFont>${FONT_REF}</OSKFont>`);
+    expect(kps).toContain(`<DisplayFont>${FONT_REF}</DisplayFont>`);
+  }
+
+  it("adapt track: the generated descriptor lists the fonts and selects the OSK/display font", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setStartPackageFonts({ files: [FONT, OFL], oskFont: FONT, displayFont: FONT });
+
+    await serializeWorkingCopy();
+    expectFontsDeclared(descriptorText("basic_kbdus"));
+  });
+
+  it("copy track: a scaffolded descriptor that lacks the fonts has them added", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { vfs } = seedCopyTrack("en");
+    // What a copy scaffolded before the fix holds: the real writer's output,
+    // with a <Files> block but no fonts.
+    vfs.set(
+      "source/basic_kbdus.kps",
+      buildKpsContent("basic_kbdus", { displayName: "US English (Basic)", languageTag: "en" }, BASE_KMN),
+      false,
+    );
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setStartPackageFonts({ files: [FONT, OFL], oskFont: FONT, displayFont: FONT });
+
+    await serializeWorkingCopy();
+    expectFontsDeclared(descriptorText("basic_kbdus"));
+  });
+
+  it("declares no fonts when the starting keyboard packaged none", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setStartPackageFonts(null);
+
+    await serializeWorkingCopy();
+    const kps = descriptorText("basic_kbdus");
+    expect(kps).not.toContain("<OSKFont>");
+    expect(fileNames(kps).some((n) => n.includes("shared\\fonts"))).toBe(false);
+  });
+});

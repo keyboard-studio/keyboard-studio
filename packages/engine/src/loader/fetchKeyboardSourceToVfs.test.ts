@@ -767,3 +767,102 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
     expect(result.warnings.filter((w) => /README|HISTORY/.test(w))).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue #2308: the base's packaged fonts, for the generated descriptor
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — packaged fonts (issue #2308)", () => {
+  const SHARED = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets";
+  const kpsWithSharedFont = [
+    `<?xml version="1.0" encoding="utf-8"?>`,
+    `<Package>`,
+    `  <Files>`,
+    `    <File><Name>welcome\\welcome.htm</Name><FileType>.htm</FileType></File>`,
+    `    <File><Name>${SHARED}\\AndikaAfr-R.ttf</Name><FileType>.ttf</FileType></File>`,
+    `    <File><Name>${SHARED}\\OFL.txt</Name><FileType>.txt</FileType></File>`,
+    `    <File><Name>${SHARED}\\FONTLOG.txt</Name><FileType>.txt</FileType></File>`,
+    `    <File><Name>..\\LICENSE.md</Name><FileType>.md</FileType></File>`,
+    `  </Files>`,
+    `  <Keyboards><Keyboard>`,
+    `    <OSKFont>${SHARED}\\AndikaAfr-R.ttf</OSKFont>`,
+    `    <DisplayFont>${SHARED}\\AndikaAfr-R.ttf</DisplayFont>`,
+    `  </Keyboard></Keyboards>`,
+    `</Package>`,
+  ].join("\n");
+  const sharedUrl = (file: string) => `${PROXY}/release/shared/fonts/sil/andika_subsets/${file}`;
+  const FONT = "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf";
+  const OFL = "shared/fonts/sil/andika_subsets/OFL.txt";
+  const FONTLOG = "shared/fonts/sil/andika_subsets/FONTLOG.txt";
+
+  function baseResponses(kps: string) {
+    return {
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: true, status: 200, body: kps },
+      [sharedUrl("AndikaAfr-R.ttf")]: { ok: true, status: 200, body: new Uint8Array([0, 1, 0, 0]) },
+    };
+  }
+
+  it("lists the font and its same-folder companions in .kps order, fetches the companions, and keeps the selections", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      ...baseResponses(kpsWithSharedFont),
+      [sharedUrl("OFL.txt")]: { ok: true, status: 200, body: "SIL Open Font License" },
+      [sharedUrl("FONTLOG.txt")]: { ok: true, status: 200, body: "FONTLOG" },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    expect(result.packageFonts).toEqual({ files: [FONT, OFL, FONTLOG], oskFont: FONT, displayFont: FONT });
+    expect(vfs.get(OFL)).toBeDefined();
+    expect(vfs.get(FONTLOG)).toBeDefined();
+  });
+
+  it("skips a companion it cannot fetch, with a warning, and still lists the font", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      ...baseResponses(kpsWithSharedFont),
+      [sharedUrl("OFL.txt")]: { ok: true, status: 200, body: "SIL Open Font License" },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    expect(result.packageFonts?.files).toEqual([FONT, OFL]);
+    expect(result.warnings.some((w) => w.includes("FONTLOG.txt") && w.includes("not fetched"))).toBe(true);
+  });
+
+  it("takes no companions from the keyboard's own folder for a keyboard-local font", async () => {
+    const localKps = [
+      `<Package><Files>`,
+      `  <File><Name>MyFont.ttf</Name><FileType>.ttf</FileType></File>`,
+      `  <File><Name>readme.htm</Name><FileType>.htm</FileType></File>`,
+      `</Files></Package>`,
+    ].join("\n");
+    const vfs = createVirtualFS();
+    const { fetchImpl, calls } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: true, status: 200, body: localKps },
+      [sourceUrl(euroLatinKb, "MyFont.ttf")]: { ok: true, status: 200, body: new Uint8Array([0, 1, 0, 0]) },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    expect(result.packageFonts).toEqual({ files: ["sil/sil_euro_latin/source/MyFont.ttf"] });
+    expect(calls.some((u) => u.endsWith("/readme.htm"))).toBe(false);
+  });
+
+  it("returns no packaged fonts when the .kps packages none", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: {
+        ok: true,
+        status: 200,
+        body: "<Package><Files><File><Name>welcome.htm</Name><FileType>.htm</FileType></File></Files></Package>",
+      },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    expect(result.packageFonts).toBeUndefined();
+  });
+});
