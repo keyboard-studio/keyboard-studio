@@ -183,6 +183,25 @@ export function resolveKpsFontPath(rawPath: string, kbPath: string): string | nu
   if (!resolved.startsWith("release/")) return null;
   return resolved;
 }
+/**
+ * The VFS key for a file the `.kps` references, from its resolved
+ * `release/`-relative path.
+ *
+ * A file inside the keyboard's own `source/` folder is keyed like every other
+ * source member — `source/<rest>` — so the scaffolder's rename and the
+ * keyboard-root projection treat it as the keyboard's own. Anything else (a
+ * `shared/fonts` file, or a file in another folder) keeps its release-relative
+ * key, the same convention the package descriptor's `..\..\..\` references
+ * resolve to. Keying an own-folder file release-relative shipped it under the
+ * starting keyboard's id (`sil/<start id>/source/…`) beside the renamed copy.
+ */
+export function releasePathToVfsKey(releasePath: string, kbPath: string): string {
+  const ownSource = `${kbPath}/source/`;
+  return releasePath.startsWith(ownSource)
+    ? `source/${releasePath.slice(ownSource.length)}`
+    : releasePath.slice("release/".length);
+}
+
 const DEFAULT_OPTIONS: Required<CompilerOptions> = {
   compilerWarningsAsErrors: false,
   warnDeprecatedCode: true,
@@ -391,7 +410,7 @@ export async function fetchKeyboardSourceToVfs(
       // VFS path strips the leading "release/" so it sits alongside the
       // keyboard source tree root (mirrors how shared/ assets are addressed
       // relative to the keyboard root).
-      const vfsPath = fr.ttfRelPath.slice("release/".length);
+      const vfsPath = releasePathToVfsKey(fr.ttfRelPath, startKeyboard.path);
       // Font files are binary — flag them (see the sibling-asset write above for
       // what an unflagged byte payload costs downstream).
       vfs.set(vfsPath, fr.bytes, true);
@@ -460,9 +479,18 @@ export async function fetchKeyboardSourceToVfs(
         warnings.push(cr.warn);
         continue;
       }
-      const vfsPath = cr.cssRelPath.slice("release/".length);
-      vfs.set(vfsPath, cr.cssText);
-      filesLoaded.push(vfsPath);
+      // Keyed like the rest of the keyboard's source, so the
+      // scaffolder renames it with the keyboard instead of a second copy
+      // shipping under the starting keyboard's release path.
+      const vfsPath = releasePathToVfsKey(cr.cssRelPath, startKeyboard.path);
+      // A welcome/help page's stylesheet (kb.css) is documentation, not OSK
+      // styling: it reaches the package through the welcome-folder carry
+      // (adapt track only for non-images) and the
+      // startDocCssTexts fetch, never as a source member written here.
+      if (!/^source\/(welcome|help)\//i.test(vfsPath)) {
+        vfs.set(vfsPath, cr.cssText);
+        filesLoaded.push(vfsPath);
+      }
       stylesheets.push({
         vfsPath,
         cssRelPath: cr.cssRelPath,
@@ -613,9 +641,9 @@ async function collectPackageFonts(args: {
 
   const ownTree = `${kbPath}/`;
   const fontDirs = new Set<string>();
-  for (const vfsPath of fetchedFontVfsPaths.values()) {
-    const releasePath = `release/${vfsPath}`;
-    if (!releasePath.startsWith(ownTree)) fontDirs.add(pathUtils.dirname(releasePath));
+  for (const rawPath of fetchedFontVfsPaths.keys()) {
+    const releasePath = resolveKpsFontPath(rawPath, kbPath);
+    if (releasePath !== null && !releasePath.startsWith(ownTree)) fontDirs.add(pathUtils.dirname(releasePath));
   }
 
   const files: string[] = [];
@@ -635,7 +663,7 @@ async function collectPackageFonts(args: {
     if (fileType === ".ttf" || fileType === ".otf" || fileType === ".css") continue;
     const releasePath = resolveKpsFontPath(name, kbPath);
     if (releasePath === null || !fontDirs.has(pathUtils.dirname(releasePath))) continue;
-    const vfsPath = releasePath.slice("release/".length);
+    const vfsPath = releasePathToVfsKey(releasePath, kbPath);
     if (listed.has(vfsPath)) continue;
     const r = await getBytes(`${proxyBase}/${releasePath}`, fetchImpl);
     if (!r.ok || r.bytes === undefined) {

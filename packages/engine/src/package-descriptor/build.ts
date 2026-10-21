@@ -139,8 +139,12 @@ export function welcomeFolderKpsRef(fileName: string): string {
  * (criterion 8: fonts referenced from `shared/fonts`). The in-browser `.kmp`
  * build resolves it to the same VFS key, because the rootless path normaliser
  * drops the `..` segments that climb past the keyboard root.
+ *
+ * A keyboard-local font (keyed `source/…` by the loader) sits
+ * beside the `.kps`, so its reference is relative to `source/`.
  */
 export function packageFontKpsRef(vfsPath: string): string {
+  if (vfsPath.startsWith("source/")) return vfsPath.slice("source/".length).replace(/\//g, "\\");
   return `..\\..\\..\\${vfsPath.replace(/\//g, "\\")}`;
 }
 

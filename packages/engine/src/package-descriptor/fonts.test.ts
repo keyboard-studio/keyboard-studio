@@ -38,6 +38,14 @@ describe("packageFontKpsRef", () => {
     expect(resolveFilename("source/ewondo.kps", packageFontKpsRef(FONT))).toBe(FONT);
     expect(resolveFilename("source/ewondo.kps", packageFontKpsRef(OFL))).toBe(OFL);
   });
+
+  it("references a keyboard-local font beside the .kps", () => {
+    expect(packageFontKpsRef("source/MyFont.ttf")).toBe("MyFont.ttf");
+    expect(packageFontKpsRef("source/fonts/MyFont.ttf")).toBe("fonts\\MyFont.ttf");
+    expect(resolveFilename("source/ewondo.kps", packageFontKpsRef("source/fonts/MyFont.ttf"))).toBe(
+      "source/fonts/MyFont.ttf",
+    );
+  });
 });
 
 describe("buildKpsContent — packaged fonts (generate)", () => {

@@ -709,3 +709,57 @@ describe("delivered artifact — packaged fonts (criteria 8/9/10)", () => {
     expect(fileNames(kps).some((n) => n.includes("shared\\fonts"))).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A copy carries the base's welcome IMAGES, never its sub-pages
+// or stylesheets; an adaptation keeps its own welcome folder whole
+// ---------------------------------------------------------------------------
+
+describe("delivered artifact — welcome-folder carry by track", () => {
+  const FOLDER = [
+    { path: "welcome/layout.png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
+    { path: "welcome/qwerty-us-en.htm", bytes: new TextEncoder().encode("<html>sub-page</html>") },
+    { path: "welcome/kb.css", bytes: new TextEncoder().encode("body { margin: 0 }") },
+  ];
+
+  function deliveredWelcomeFiles(): string[] {
+    expect(deliveredVfs, "toZip must have been handed a VFS").not.toBeNull();
+    return deliveredVfs!.list("source/welcome/").map((p) => p.replace(/^source\/welcome\//, "")).sort();
+  }
+
+  it("copy track: ships and lists only the images", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { vfs } = seedCopyTrack("en");
+    // The real scaffolded descriptor, so the welcome files have a <Files> to join.
+    vfs.set(
+      "source/basic_kbdus.kps",
+      buildKpsContent("basic_kbdus", { displayName: "US English (Basic)", languageTag: "en" }, BASE_KMN),
+      false,
+    );
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+    useWorkingCopyStore.getState().setStartWelcomeImages(FOLDER);
+
+    await serializeWorkingCopy();
+
+    const shipped = deliveredWelcomeFiles();
+    expect(shipped).toContain("layout.png");
+    expect(shipped).not.toContain("qwerty-us-en.htm");
+    expect(shipped).not.toContain("kb.css");
+    const names = fileNames(descriptorText("basic_kbdus"));
+    expect(names).toContain("welcome\\layout.png");
+    expect(names.filter((n) => n.startsWith("welcome\\")).sort()).toEqual(["welcome\\layout.png", "welcome\\welcome.htm"]);
+  });
+
+  it("adapt track: ships the whole welcome folder its inherited pages link to", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+    useWorkingCopyStore.getState().setStartWelcomeImages(FOLDER);
+
+    await serializeWorkingCopy();
+
+    expect(deliveredWelcomeFiles()).toEqual(expect.arrayContaining(["layout.png", "qwerty-us-en.htm", "kb.css"]));
+  });
+});
