@@ -405,13 +405,13 @@ export function ensureTouchKeyRule(
 // T081 — guard synthesis (single combining mark): plan, then apply
 // ---------------------------------------------------------------------------
 
-/** True for a store this module can reuse as a guard: non-system, all `char` items, contains both a space and a digit, contains no letters (contract §6.1 — the `store(diablock)` shape). */
+/** True for a store this module can reuse as a guard: non-system, all `char` items, contains a literal space and a digit, contains no letters (contract §6.1 — the `store(diablock)` shape). */
 export function isGuardShapedStore(store: IRStore): boolean {
   if (store.isSystem) return false;
   if (store.items.length === 0) return false;
   if (!store.items.every((item) => item.kind === "char")) return false;
   const text = store.items.map((item) => (item as { kind: "char"; value: string }).value).join("");
-  return /\s/u.test(text) && /[0-9]/u.test(text) && !/\p{L}/u.test(text);
+  return text.includes(" ") && /[0-9]/u.test(text) && !/\p{L}/u.test(text);
 }
 
 /** First guard-shaped store in the IR, in declaration order, or `undefined` if none exists. */

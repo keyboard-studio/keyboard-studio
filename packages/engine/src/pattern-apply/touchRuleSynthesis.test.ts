@@ -43,6 +43,7 @@ import {
   renameTouchKeyRule,
   renameTouchKey,
   TOUCH_SYNTH_GUARD_STORE_NAME,
+  isGuardShapedStore,
 } from "./touchRuleSynthesis.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
@@ -156,6 +157,31 @@ describe("guard-store reuse vs mint", () => {
     expect(plan.storeSource).toBe("reuse");
     expect(plan.storeName).toBe(TOUCH_JOIN_STORES.guard);
     expect(plan.storeItems).toBeUndefined();
+  });
+
+  it("does not reuse a store with whitespace other than a literal space", () => {
+    const ir = withoutGuardStore(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    const tabOnlyStore = {
+      nodeId: "store#tab-only",
+      name: "tab_only",
+      items: [
+        { kind: "char" as const, value: "\t" },
+        { kind: "char" as const, value: "1" },
+      ],
+      isSystem: false,
+    };
+    const withTabOnlyStore = { ...ir, stores: [...ir.stores, tabOnlyStore] };
+    const idx = buildTouchKeyRuleIndex(withTabOnlyStore);
+
+    const plan = planGuardSynthesis(withTabOnlyStore, idx, "T_SPACE_MARK", [], "̈", {
+      repertoire: [" ", "1"],
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    expect(isGuardShapedStore(tabOnlyStore)).toBe(false);
+    expect(plan.storeSource).toBe("mint");
+    expect(plan.storeItems).toEqual([" ", "1"]);
   });
 
   it("mints a new store under generated_touch_* from the caller's OWN repertoire when nothing is reusable", () => {

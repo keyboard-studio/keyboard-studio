@@ -7721,7 +7721,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                         {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
                         {...(guardSpecification !== undefined ? { guardSpecification } : {})}
                         onGuardAnswer={handleGuardAnswer}
-                        repertoire={inventory}
+                        repertoire={[...inventory, " "]}
                         onCommit={handleAssignPanelCommit}
                       />
                     ),
