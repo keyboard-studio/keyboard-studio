@@ -653,10 +653,10 @@ describe("delivered artifact — generated layout charts in <Files> (spec 079 FR
 });
 
 // ---------------------------------------------------------------------------
-// Issue #2308 — the starting keyboard's packaged fonts reach the descriptor
+// The starting keyboard's packaged fonts reach the descriptor
 // ---------------------------------------------------------------------------
 
-describe("delivered artifact — packaged fonts (issue #2308, criteria 8/9/10)", () => {
+describe("delivered artifact — packaged fonts (criteria 8/9/10)", () => {
   const FONT = "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf";
   const OFL = "shared/fonts/sil/andika_subsets/OFL.txt";
   const FONT_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";

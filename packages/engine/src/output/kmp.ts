@@ -111,8 +111,8 @@ let _downReason: string | null = null;
  * selects an OSK/display font makes KmpCompiler read the font's family name
  * (developer-utils `getFontFamilySync`, which calls `Buffer.from` and parses
  * the font through Buffer methods) to stamp it into the `.kvk`. Browsers have
- * no `Buffer`, so without this every font-selecting package fails to build
- * (issue #2308). Installed only when absent — Node and the test runners keep
+ * no `Buffer`, so without this every font-selecting package fails to build.
+ * Installed only when absent — Node and the test runners keep
  * their own — and loaded with kmc-package, so it stays out of the entry chunk.
  */
 async function ensureBufferGlobal(): Promise<void> {

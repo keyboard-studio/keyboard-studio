@@ -490,7 +490,7 @@ export function generateStubs(
    */
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
   /**
-   * The base's packaged fonts (issue #2308), declared by the generated `.kps`:
+   * The base's packaged fonts, declared by the generated `.kps`:
    * listed in `<Files>` and selected as the OSK/display font (criteria 8/10).
    */
   packageFonts?: import("@keyboard-studio/contracts").PackageFontSet,
@@ -788,7 +788,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         vfs,
         warnings,
         fonts: loaderFonts,
-        // Issue #2308: handed back so the working copy keeps it — the output
+        // Handed back so the working copy keeps it — the output
         // projection re-declares these fonts if a descriptor lacks them.
         ...(packageFonts !== undefined ? { packageFonts } : {}),
         stylesheets: loaderStylesheets,

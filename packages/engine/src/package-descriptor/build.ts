@@ -186,7 +186,7 @@ export function normaliseWelcomeFolderFiles(welcomeFolderFiles: readonly string[
  *   the page — inherited base images and generated layout charts — as bare
  *   names relative to that folder (spec 080 FR-002/FR-006). Each is listed as
  *   `welcome\<name>`. The page itself is always listed and never needs passing.
- * @param fonts the starting keyboard's packaged fonts (issue #2308): each file
+ * @param fonts the starting keyboard's packaged fonts: each file
  *   is listed in `<Files>` and the OSK/display selections are declared on
  *   `<Keyboard>` (criteria 8 and 10).
  */

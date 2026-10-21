@@ -1,4 +1,4 @@
-// Issue #2308: the produced package re-declares the fonts its starting keyboard
+// The produced package re-declares the fonts its starting keyboard
 // packaged — every font file and its licence companions in `<Files>`, and the
 // OSK/display selections on `<Keyboard>` (criteria 8, 9, 10). Both paths: GENERATE
 // (adapt track, and the copy track's scaffolded descriptor) and PATCH (a

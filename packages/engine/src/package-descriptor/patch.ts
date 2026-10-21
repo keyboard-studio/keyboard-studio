@@ -33,7 +33,7 @@
 // rewrite is reported through `warnings`, never done silently. Nothing else in
 // those blocks is touched; do not widen this exception without a spec decision.
 //
-// THE SECOND SANCTIONED WRITE: THE STARTING KEYBOARD'S FONTS (issue #2308)
+// THE SECOND SANCTIONED WRITE: THE STARTING KEYBOARD'S FONTS
 //
 // Ruled 2026-10-20 (criteria 8/9/10): the produced package re-declares the fonts
 // the starting keyboard packaged — every font file and its companions in
@@ -106,7 +106,7 @@ const INFO_ELEMENT_RE = /(<Info>)([\s\S]*?)(<\/Info>)/;
  *   calls this under the PRE-rename id and renames the file afterwards, so it
  *   passes the author's id here: a warning naming `source/<base id>.kps` reads
  *   as the base's identity leaking into the output (spec 059 FR-003).
- * @param fonts the starting keyboard's packaged fonts (issue #2308). Declared
+ * @param fonts the starting keyboard's packaged fonts. Declared
  *   on generate; their missing entries and selections added on patch.
  *
  * Generating a missing descriptor is not reported. On the adapt track it is the
@@ -180,7 +180,7 @@ export function applyIdentityToKps(
       `[package-descriptor] could not list welcome-folder files in ${reportPath} (no <Files> block): ${migrated.unlisted.join(", ")}`,
     );
   }
-  // Issue #2308: the second sanctioned write — the starting keyboard's fonts.
+  // The second sanctioned write — the starting keyboard's fonts.
   const withFonts = ensurePackageFonts(migrated.text, fonts);
   for (const rewrite of withFonts.rewrites) {
     warnings.push(`[package-descriptor] declared font in ${reportPath}: ${rewrite}`);
@@ -293,7 +293,7 @@ function migrateWelcomePaths(
 }
 
 /**
- * The font declaration (issue #2308; see the module header). Pure.
+ * The font declaration (see the module header). Pure.
  *
  *   - Each font-set file not already in `<Files>` is appended, with the same
  *     entry shape the welcome migration and `buildKpsContent` use.

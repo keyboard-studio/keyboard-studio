@@ -41,7 +41,7 @@ interface EngineModule {
     startWelcomeConvention?: WelcomeConvention;
     // Issue #2139 — the base's welcome/help stylesheets (criterion 11.8).
     startDocCssTexts?: StartDocCssText[];
-    // Issue #2308 — the base's packaged fonts, for the package descriptor.
+    // The base's packaged fonts, for the package descriptor.
     packageFonts?: PackageFontSet;
   }>;
   init: () => Promise<void>;
@@ -482,7 +482,7 @@ function applyCopyStartDocs(
   // itself never becomes prose (startHelpPhpText stays null, so
   // every render/serialize path behaves exactly as FR-007 asks).
   wc.setBaseHelpPhpTextForExtraction(docs.helpForExtraction);
-  // Issue #2308: a copy re-declares the fonts its starting keyboard packaged.
+  // A copy re-declares the fonts its starting keyboard packaged.
   wc.setStartPackageFonts(docs.packageFonts);
   wc.setStartReadmeMdText(null);
   wc.setStartHistoryMdText(null);
@@ -1242,7 +1242,7 @@ export function useKeyboardArtifact(
           // Issue #2139: the base's welcome/help stylesheet texts, so the live
           // 11.8 check and the baseline below judge images against kb.css.
           wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
-          // Issue #2308: the fonts the adaptation's generated descriptor declares.
+          // The fonts the adaptation's generated descriptor declares.
           wc.setStartPackageFonts(fetchResult.packageFonts ?? null);
           // spec 080 FR-020 (research R8): run the documentation checks ONCE
           // over the base's own files as fetched. A later finding on a still-

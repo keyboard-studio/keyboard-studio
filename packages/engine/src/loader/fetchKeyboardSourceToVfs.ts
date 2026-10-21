@@ -72,7 +72,7 @@ export interface FetchKeyboardSourceResult {
   /**
    * The fonts the base `.kps` packages — files (fonts plus their licence and
    * other companions, all written into the VFS) and its OSK/display font
-   * selections — for the generated descriptor to re-declare (issue #2308).
+   * selections — for the generated descriptor to re-declare.
    * Absent when the base packages no font, or none could be fetched.
    */
   packageFonts?: PackageFontSet;
@@ -410,7 +410,7 @@ export async function fetchKeyboardSourceToVfs(
       fetchedFontVfsPaths.set(fr.rawPath, vfsPath);
     }
 
-    // Issue #2308 (criteria 8/9/10): the fonts the base packages, re-declared
+    // Criteria 8/9/10: the fonts the base packages, re-declared
     // by the generated descriptor. A font's companions — the licence, FONTLOG
     // and README the base lists from the same shared folder — ship with it.
     // Companions are taken only from a folder OUTSIDE the keyboard's own tree:
@@ -588,7 +588,7 @@ function parseKpsWelcomeFile(kpsText: string): string | undefined {
  * `.kps` entry or an `<img src>` cannot fetch outside the keyboard's folder.
  */
 /**
- * The base's packaged fonts as a {@link PackageFontSet} (issue #2308).
+ * The base's packaged fonts as a {@link PackageFontSet}.
  *
  * Walks the `.kps` `<Files>` in order: each font already fetched is listed
  * under the VFS key it was written to, and every other member that sits in the

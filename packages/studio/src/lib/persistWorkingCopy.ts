@@ -556,7 +556,7 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // restore with those entries dropped — a text whose stylesheet path is
     // unknown cannot be written back, so it is not guessed at.
     startDocCssTexts: normalizeStartDocCssTexts(snapshot.startDocCssTexts),
-    // Issue #2308: absent from a draft saved before the slice existed.
+    // Absent from a draft saved before the slice existed.
     startPackageFonts: snapshot.startPackageFonts ?? null,
     startWelcomeConvention: snapshot.startWelcomeConvention ?? null,
     startWelcomeImages: deserializeWelcomeImages(snapshot.startWelcomeImages),

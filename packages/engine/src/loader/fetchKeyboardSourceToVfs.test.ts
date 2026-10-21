@@ -769,10 +769,10 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
 });
 
 // ---------------------------------------------------------------------------
-// Issue #2308: the base's packaged fonts, for the generated descriptor
+// The base's packaged fonts, for the generated descriptor
 // ---------------------------------------------------------------------------
 
-describe("fetchKeyboardSourceToVfs — packaged fonts (issue #2308)", () => {
+describe("fetchKeyboardSourceToVfs — packaged fonts", () => {
   const SHARED = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets";
   const kpsWithSharedFont = [
     `<?xml version="1.0" encoding="utf-8"?>`,

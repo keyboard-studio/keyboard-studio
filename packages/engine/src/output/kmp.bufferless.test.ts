@@ -1,4 +1,4 @@
-// buildKmp() in a runtime with no `Buffer` — the browser (issue #2308).
+// buildKmp() in a runtime with no `Buffer` — the browser.
 //
 // A descriptor that selects an OSK/display font makes kmc-package read the
 // font's family name through developer-utils' `getFontFamilySync`, which calls
@@ -77,7 +77,7 @@ afterAll(() => {
   (globalThis as { Buffer?: unknown }).Buffer = savedBuffer;
 });
 
-describe("buildKmp() with no global Buffer (browser runtime, issue #2308)", () => {
+describe("buildKmp() with no global Buffer (browser runtime)", () => {
   it("packages a font-selecting descriptor without failing for want of Buffer", async () => {
     expect((globalThis as { Buffer?: unknown }).Buffer).toBeUndefined();
     const { buildKmp } = await import("./kmp.js");

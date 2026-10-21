@@ -252,7 +252,7 @@ export interface ProjectWorkingCopyVfsInput {
    */
   welcomeFolderFiles?: readonly string[];
   /**
-   * Issue #2308: the starting keyboard's packaged fonts, which step 3.6's
+   * The starting keyboard's packaged fonts, which step 3.6's
    * descriptor declares (`<Files>` + OSK/display selection; criteria 8/9/10).
    * Optional for the same reason as `welcomeFolderFiles`: the OSK preview
    * builds no package, so only the output projection passes it.

@@ -543,7 +543,7 @@ export interface WorkingCopyState {
    */
   startDocCssTexts: StartDocCssText[] | null;
   /**
-   * The starting keyboard's packaged fonts (issue #2308): font files and their
+   * The starting keyboard's packaged fonts: font files and their
    * licence companions (all written into the VFS by the loader) plus its
    * OSK/display selections, or null when it packages none. Set on BOTH tracks
    * by the instance that owns the start docs; read by the output projection,
@@ -1369,7 +1369,7 @@ export interface WorkingCopyState {
   /** Retain the base's welcome/help stylesheets (criterion 11.8, issue #2139). */
   setStartDocCssTexts: (texts: StartDocCssText[] | null) => void;
 
-  /** Retain the base's packaged fonts for the package descriptor (issue #2308). */
+  /** Retain the base's packaged fonts for the package descriptor. */
   setStartPackageFonts: (fonts: PackageFontSet | null) => void;
 
   /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */

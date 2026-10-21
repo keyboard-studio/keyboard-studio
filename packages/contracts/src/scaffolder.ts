@@ -98,8 +98,8 @@ export interface ScaffoldResult {
   /** OSK font entries forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   fonts: KpsFontEntry[];
   /**
-   * The base's packaged fonts forwarded from fetchKeyboardSourceToVfs (issue
-   * #2308): already declared in the scaffolded `.kps`, and kept by the working
+   * The base's packaged fonts forwarded from fetchKeyboardSourceToVfs:
+   * already declared in the scaffolded `.kps`, and kept by the working
    * copy so the output projection can re-declare any a descriptor lacks.
    */
   packageFonts?: PackageFontSet;
