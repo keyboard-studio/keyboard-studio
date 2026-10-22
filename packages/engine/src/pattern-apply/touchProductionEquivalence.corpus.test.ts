@@ -25,6 +25,20 @@
  *     address builders. This is also the "vice versa" flip direction: a
  *     ruled T_ producer legacy matching could not see MUST be enumerable
  *     now — arm 3 fails if it is not.
+ *     The expected side is judged with the shared removal definition
+ *     (`occurrenceMatchesRemovalSet`, the same helper enumeration's
+ *     matcher delegates to): an emulation-class occurrence (K_TAB,
+ *     K_ENTER, …) counts only its UNCONDITIONAL productions. A context
+ *     rule on a function key is a text-rewriting trigger, not a typing
+ *     method (PR #2319's BKSP carve ruling, generalised in the helper):
+ *     hakka/taigi's `phonetic + [K_TAB] > conversion` dictionaries and
+ *     galaxie_hebrew's `letter + [K_ENTER] > final-form` rules credit
+ *     Tab/Enter with thousands of conditional outputs that enumeration
+ *     rightly does not list, while ibono/obolo's bare
+ *     `+ [ALT K_ENTER] > U+000A` IS an unconditional production and must
+ *     be enumerated. (The gate's original expected side skipped only
+ *     K_BKSP — it predated the #2319 matcher change and the keyboards
+ *     that expose the rest of the emulation class.)
  *
  *   Arm 4 — THE FLIP POPULATION, enumerated. An id in the dead-key
  *     candidate scope that the resolver reports dead while it carries
@@ -103,7 +117,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
-import { productionMatchesRemovalSet } from "./touch-mechanism-shared.js";
+import { occurrenceMatchesRemovalSet } from "./touch-mechanism-shared.js";
 import {
   touchFlickAddress,
   touchKeyAddress,
@@ -391,7 +405,7 @@ describe.skipIf(!available)("spec 104 T021 — corpus resolver⇔consumer equiva
           const expected = new Set<string>();
           occurrences.forEach((o, i) => {
             if (o.key.id.toUpperCase() === "K_BKSP") return; // enumeration's defensive skip
-            if (productionMatchesRemovalSet(records[i]!, new Set([ch]))) expected.add(o.address);
+            if (occurrenceMatchesRemovalSet(o.key.id, records[i]!, new Set([ch]))) expected.add(o.address);
           });
           const actual = new Set(
             enumerateTouchMethodsForChar(layout, ch, { production: inputs }).map((d) => d.id),
