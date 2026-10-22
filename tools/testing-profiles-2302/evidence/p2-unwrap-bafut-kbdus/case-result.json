@@ -15,9 +15,9 @@
     "overwriteKey": "K_X",
     "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
   },
-  "round": 2,
-  "build": "ed251e1b (origin/main, PR #2312 merged)",
-  "startedAt": "2026-10-20T05:42:29.537Z",
+  "round": 3,
+  "build": "2698f774 (origin/main — #2300 + #2312 + #2316, dev promoted)",
+  "startedAt": "2026-10-20T15:35:20.695Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -188,33 +188,51 @@
         },
         {
           "char": "’",
-          "suggestion": "Suggested: Replace the ' key with '’'\n\nAttested by 21 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Replace the ' key with '’'\n\nAttested by 21 keyboards in the corpus.\n\n’ goes on the ' key — but ''' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ’ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one.\n\nAccept\nDeny",
+          "rationales": [
+            "’ goes on the ' key — but ''' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ’ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one."
+          ],
           "acceptButtons": [
             "Accept suggestion: replace the ' key with '’'"
           ],
           "action": "accepted-suggestion",
-          "displacement": null
+          "displacement": {
+            "context": "suggestion-accept-’",
+            "text": "’ and ' are both part of your alphabet, and both were headed for the ' key. Which one is typed more often would decide which keeps the key — and the studio has no frequency data, so neither is demoted. Keep both as primary characters and find ’ a different key, or demote ' yourself.\n\nKeep both\nDemote '",
+            "action": "keep-both"
+          }
         },
         {
           "char": "“",
-          "suggestion": "Suggested: Replace the [ key with '“'\n\nAttested by 16 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Replace the [ key with '“'\n\nAttested by 16 keyboards in the corpus.\n\n“ goes on Shift + the [ key — but '{' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find “ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one.\n\nAccept\nDeny",
+          "rationales": [
+            "“ goes on Shift + the [ key — but '{' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find “ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one."
+          ],
           "acceptButtons": [
             "Accept suggestion: replace the [ key with '“'"
           ],
           "action": "accepted-suggestion",
-          "displacement": null
+          "displacement": {
+            "context": "suggestion-accept-“",
+            "text": "“ and [ are both part of your alphabet, and both were headed for the [ key. Which one is typed more often would decide which keeps the key — and the studio has no frequency data, so neither is demoted. Keep both as primary characters and find “ a different key, or demote [ yourself.\n\nKeep both\nDemote [",
+            "action": "keep-both"
+          }
         },
         {
           "char": "”",
-          "suggestion": "Suggested: Replace the ] key with '”'\n\nAttested by 19 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Replace the ] key with '”'\n\nAttested by 19 keyboards in the corpus.\n\n” goes on Shift + the ] key — but '}' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ” a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one.\n\nAccept\nDeny",
+          "rationales": [
+            "” goes on Shift + the ] key — but '}' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ” a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one."
+          ],
           "acceptButtons": [
             "Accept suggestion: replace the ] key with '”'"
           ],
           "action": "accepted-suggestion",
-          "displacement": null
+          "displacement": {
+            "context": "suggestion-accept-”",
+            "text": "” and ] are both part of your alphabet, and both were headed for the ] key. Which one is typed more often would decide which keeps the key — and the studio has no frequency data, so neither is demoted. Keep both as primary characters and find ” a different key, or demote ] yourself.\n\nKeep both\nDemote ]",
+            "action": "keep-both"
+          }
         },
         {
           "char": "ǎ",
@@ -254,8 +272,10 @@
         },
         {
           "char": "ɛ",
-          "suggestion": "Suggested: Deadkey → 'e' for 'ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Deadkey → 'e' for 'ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ɛ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "ɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ɛ a different key — nothing is demoted unless you choose it."
+          ],
           "acceptButtons": [
             "Accept suggestion: deadkey via base letter 'e' for 'ɛ'"
           ],
@@ -264,8 +284,10 @@
         },
         {
           "char": "Ɛ",
-          "suggestion": "Suggested: Deadkey → 'E' for 'Ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Deadkey → 'E' for 'Ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nƐ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɛ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɛ a different key — nothing is demoted unless you choose it."
+          ],
           "acceptButtons": [
             "Accept suggestion: deadkey via base letter 'E' for 'Ɛ'"
           ],
@@ -274,8 +296,10 @@
         },
         {
           "char": "ɨ",
-          "suggestion": "Suggested: RAlt + i for 'ɨ'\n\nAttested by 3 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: RAlt + i for 'ɨ'\n\nAttested by 3 keyboards in the corpus.\n\nɨ goes on AltGr + the i key — mainly because 3 keyboards do this; also its upper and lower case stay together. Nothing you use had to move.\n\nAccept\nDeny",
+          "rationales": [
+            "ɨ goes on AltGr + the i key — mainly because 3 keyboards do this; also its upper and lower case stay together. Nothing you use had to move."
+          ],
           "acceptButtons": [
             "Accept suggestion: RAlt + i key for 'ɨ'"
           ],
@@ -284,8 +308,10 @@
         },
         {
           "char": "Ɨ",
-          "suggestion": "Suggested: Shift+RAlt + i for 'Ɨ'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Shift+RAlt + i for 'Ɨ'\n\nAttested by 2 keyboards in the corpus.\n\nƗ goes on Shift+AltGr + the i key — mainly because its upper and lower case stay together; also that layer was empty. Nothing you use had to move.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɨ goes on Shift+AltGr + the i key — mainly because its upper and lower case stay together; also that layer was empty. Nothing you use had to move."
+          ],
           "acceptButtons": [
             "Accept suggestion: Shift+RAlt + i key for 'Ɨ'"
           ],
@@ -310,8 +336,10 @@
         },
         {
           "char": "Ɔ",
-          "suggestion": "Suggested: Deadkey → 'O' for 'Ɔ'\n\nAttested by 3 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Deadkey → 'O' for 'Ɔ'\n\nAttested by 3 keyboards in the corpus.\n\nƆ goes on a deadkey — but 'o' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɔ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɔ goes on a deadkey — but 'o' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɔ a different key — nothing is demoted unless you choose it."
+          ],
           "acceptButtons": [
             "Accept suggestion: deadkey via base letter 'O' for 'Ɔ'"
           ],
@@ -332,13 +360,19 @@
         },
         {
           "char": "̀",
-          "suggestion": "Suggested: Replace the 5 key with '◌̀'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Replace the 5 key with '◌̀'\n\nAttested by 2 keyboards in the corpus.\n\ǹ goes on the 5 key — but '5' sits there now and you do use it, just rarely, so '5' moves to AltGr + the 5 key and will take one extra key each time. This is a weak match — the best available, not a strong one.\n\nAccept\nDeny",
+          "rationales": [
+            "̀ goes on the 5 key — but '5' sits there now and you do use it, just rarely, so '5' moves to AltGr + the 5 key and will take one extra key each time. This is a weak match — the best available, not a strong one."
+          ],
           "acceptButtons": [
             "Accept suggestion: replace the 5 key with '◌̀'"
           ],
           "action": "accepted-suggestion",
-          "displacement": null
+          "displacement": {
+            "context": "suggestion-accept-̀",
+            "text": "̀ took the 5 key from 5. Move 5 to AltGr + 5 so you can still type it? Leave it and 5 will no longer be typeable from that key.\n\nMove it\nLeave it",
+            "action": "confirm-move"
+          }
         },
         {
           "char": "́",
@@ -360,7 +394,11 @@
         "ok": true,
         "keySelected": true,
         "applyDisabled": false,
-        "displacement": null
+        "displacement": {
+          "context": "overwrite-ŋ-onto-K_X",
+          "text": "ŋ took the x key from x. Move x to AltGr + x so you can still type it? Leave it and x will no longer be typeable from that key.\n\nMove it\nLeave it",
+          "action": "confirm-move"
+        }
       },
       "splash": "dismissed",
       "emptyDiff": false,
@@ -371,5 +409,5 @@
       "reachedTouchSeed": true
     }
   },
-  "finishedAt": "2026-10-20T05:49:14.142Z"
+  "finishedAt": "2026-10-20T15:39:39.278Z"
 }

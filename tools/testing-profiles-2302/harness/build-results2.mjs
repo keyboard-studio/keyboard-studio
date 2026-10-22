@@ -115,10 +115,7 @@ for (const r of rows) {
     ? `proposed ${b.recommended}${b.proposalFollowsForm ? " ✓" : " ✗"}, answered ${b.checkedAfter}${b.clicked ? " (override)" : ""}, preview ${b.previewMatchesAnswer === null ? "n/o" : (b.previewMatchesAnswer ? "✓" : "✗")}`
     : (r.round2.status === "NOT-ATTEMPTED" || !b ? "—" : "not rendered");
   const c = cases.find(x => x.id === r.id);
-  const evCell = existsSync(path.join(root, "evidence", r.id, "case-result.json"))
-    ? `[evidence/${r.id}/](evidence/${r.id}/)`
-    : "—";
-  md += `| ${r.id} | P${r.profile} (${c.inputOrder}/${c.outputForm === "ready-made" ? "NFC" : "NFD"}) | ${r.backspace}${c.backspaceOnDiagonal ? "" : " (off-diag)"} | ${r.base} | ${r.round1.status} | ${r.round2.status} | ${r.round2.furthest} | ${bkCell} | ${evCell} |\n`;
+  md += `| ${r.id} | P${r.profile} (${c.inputOrder}/${c.outputForm === "ready-made" ? "NFC" : "NFD"}) | ${r.backspace}${c.backspaceOnDiagonal ? "" : " (off-diag)"} | ${r.base} | ${r.round1.status} | ${r.round2.status} | ${r.round2.furthest} | ${bkCell} | [evidence/${r.id}/](evidence/${r.id}/) |\n`;
 }
 md += "\nPer-case detail lives in `results.json` and each case's `evidence/<id>/case-result.json` (round 2; phase JSON + CLI snapshots + logs). Round-1 per-case results are under `round1/evidence/`.\n";
 writeFileSync(path.join(root, "results.md"), md);

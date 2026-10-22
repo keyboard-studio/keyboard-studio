@@ -15,9 +15,9 @@
     "overwriteKey": "K_X",
     "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
   },
-  "round": 2,
-  "build": "ed251e1b (origin/main, PR #2312 merged)",
-  "startedAt": "2026-10-20T07:04:27.498Z",
+  "round": 3,
+  "build": "2698f774 (origin/main — #2300 + #2312 + #2316, dev promoted)",
+  "startedAt": "2026-10-20T15:44:16.303Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -84,7 +84,7 @@
       },
       "discoveryCheckedId": "discovery_method-exemplars",
       "alphabetHeading": "Confirm your alphabet",
-      "alphabetExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (52)\n\nDashed characters were proposed for you (from CLDR 48.2.0). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\ná\nU+00E1\nx\nà\nU+00E0\nx\nâ\nU+00E2\nx\nǎ\nU+01CE\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\né\nU+00E9\nx\nè\nU+00E8\nx\nê\nU+00EA\nx\ně\nU+011B\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\ní\nU+00ED\nx\nì\nU+00EC\nx\nî\nU+00EE\nx\nǐ\nU+01D0\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nń\nU+0144\nx\nǹ\nU+01F9\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nó\nU+00F3\nx\nò\nU+00F2\nx\nô\nU+00F4\nx\nǒ\nU+01D2\nx\nɔ\nU+0254\nx\np\nU+0070\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nú\nU+00FA\nx\nù\nU+00F9\nx\nû\nU+00FB\nx\nǔ\nU+01D4\nx\nv\nU+0076\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\n◌̀\nU+0300\nx\n◌́\nU+0301\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (4)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\nj J\nU+006A\n+\nq Q\nU+0071\n+\nx X\nU+0078\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\nNewer exemplar data\n\nThe characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.\n\nCheck for newer exemplar data for this language\nHow your alphabet breaks down\n\nLetters (26)\n\nLetters that stand on their own.\n\nShow uppercase letters\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\np\nU+0070\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nv\nU+0076\nw\nU+0077\ny\nU+0079\nz\nU+007A\n\nMarks (4)\n\nAccents and other marks that attach to a letter.\n\n◌̀\nU+0300\n◌́\nU+0301\n◌̂\nU+0302\n◌̌\nU+030C\n\nAccented letters (44)\n\nLetter-plus-mark combinations your language uses.\n\ná\nU+00E1\nÁ\nU+00C1\nà\nU+00E0\nÀ\nU+00C0\nâ\nU+00E2\nÂ\nU+00C2\nǎ\nU+01CE\nǍ\nU+01CD\né\nU+00E9\nÉ\nU+00C9\nè\nU+00E8\nÈ\nU+00C8\nê\nU+00EA\nÊ\nU+00CA\ně\nU+011B\nĚ\nU+011A\ní\nU+00ED\nÍ\nU+00CD\nì\nU+00EC\nÌ\nU+00CC\nî\nU+00EE\nÎ\nU+00CE\nǐ\nU+01D0\nǏ\nU+01CF\nń\nU+0144\nŃ\nU+0143\nǹ\nU+01F9\nǸ\nU+01F8\nó\nU+00F3\nÓ\nU+00D3\nò\nU+00F2\nÒ\nU+00D2\nô\nU+00F4\nÔ\nU+00D4\nǒ\nU+01D2\nǑ\nU+01D1\nú\nU+00FA\nÚ\nU+00DA\nù\nU+00F9\nÙ\nU+00D9\nû\nU+00FB\nÛ\nU+00DB\nǔ\nU+01D4\nǓ\nU+01D3\nCharacter map\n\nBrowse and click to toggle characters into your alphabet — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\nShow only blocks my keyboard uses\n−\n100%\n+\nBasic Latin\n0\nU+0030\n+\n1\nU+0031\n+\n2\nU+0032\n+\n3\nU+0033\n+\n4\nU+0034\n+\n5\nU+0035\n+\n6\nU+0036\n+\n7\nU+0037\n+\n8\nU+0038\n+\n9\nU+0039\n+\na\nU+0061\n[x]\nb\nU+0062\n[x]\nc\nU+0063\n+\nd\nU+0064\n[x]\ne\nU+0065\n[x]\nf\nU+0066\n[x]\ng\nU+0067\n[x]\nh\nU+0068\n[x]\ni\nU+0069\n[x]\nj\nU+006A\n+\nk\nU+006B\n[x]\nl\nU+006C\n[x]\nm\nU+006D\n[x]\nn\nU+006E\n[x]\no\nU+006F\n[x]\np\nU+0070\n[x]\nq\nU+0071\n+\nr\nU+0072\n[x]\ns\nU+0073\n[x]\nt\nU+0074\n[x]\nu\nU+0075\n[x]\nv\nU+0076\n[x]\nw\nU+0077\n[x]\nx\nU+0078\n+\ny\nU+0079\n[x]\nz\nU+007A\n[x]\nLatin-1 Supplement\nª\nU+00AA\n+\nº\nU+00BA\n+\nß\nU+00DF\n+\nà\nU+00E0\n[x]\ná\nU+00E1\n[x]\nâ\nU+00E2\n[x]\nã\nU+00E3\n+\nä\nU+00E4\n+\nå\nU+00E5\n+\næ\nU+00E6\n+\nç\nU+00E7\n+\nè\nU+00E8\n[x]\né\nU+00E9\n[x]\nê\nU+00EA\n[x]\në\nU+00EB\n+\nì\nU+00EC\n[x]\ní\nU+00ED\n[x]\nî\nU+00EE\n[x]\nï\nU+00EF\n+\nð\nU+00F0\n+\nñ\nU+00F1\n+\nò\nU+00F2\n[x]\nó\nU+00F3\n[x]\nô\nU+00F4\n[x]\nõ\nU+00F5\n+\nö\nU+00F6\n+\nø\nU+00F8\n+\nù\nU+00F9\n[x]\nú\nU+00FA\n[x]\nû\nU+00FB\n[x]\nü\nU+00FC\n+\ný\nU+00FD\n+\nþ\nU+00FE\n+\nÿ\nU+00FF\n+\nLatin Extended-A\nā\nU+0101\n+\nă\nU+0103\n+\ną\nU+0105\n+\nć\nU+0107\n+\nĉ\nU+0109\n+\nċ\nU+010B\n+\nč\nU+010D\n+\nď\nU+010F\n+\nđ\nU+0111\n+\nē\nU+0113\n+\nĕ\nU+0115\n+\nė\nU+0117\n+\nę\nU+0119\n+\ně\nU+011B\n[x]\nĝ\nU+011D\n+\nğ\nU+011F\n+\nġ\nU+0121\n+\nģ\nU+0123\n+\nĥ\nU+0125\n+\nħ\nU+0127\n+\nĩ\nU+0129\n+\nī\nU+012B\n+\nĭ\nU+012D\n+\nį\nU+012F\n+\nİ\nU+0130\n+\nı\nU+0131\n+\nĳ\nU+0133\n+\nĵ\nU+0135\n+\nķ\nU+0137\n+\nĸ\nU+0138\n+\nĺ\nU+013A\n+\nļ\nU+013C\n+\nľ\nU+013E\n+\nŀ\nU+0140\n+\nł\nU+0142\n+\nń\nU+0144\n[x]\nņ\nU+0146\n+\nň\nU+0148\n+\nŉ\nU+0149\n+\nŋ\nU+014B\n[x]\nō\nU+014D\n+\nŏ\nU+014F\n+\nő\nU+0151\n+\nœ\nU+0153\n+\nŕ\nU+0155\n+\nŗ\nU+0157\n+\nř\nU+0159\n+\nś\nU+015B\n+\nŝ\nU+015D\n+\nş\nU+015F\n+\nš\nU+0161\n+\nţ\nU+0163\n+\nť\nU+0165\n+\nŧ\nU+0167\n+\nũ\nU+0169\n+\nū\nU+016B\n+\nŭ\nU+016D\n+\nů\nU+016F\n+\nű\nU+0171\n+\nų\nU+0173\n+\nŵ\nU+0175\n+\nŷ\nU+0177\n+\nź\nU+017A\n+\nż\nU+017C\n+\nž\nU+017E\n+\nſ\nU+017F\n+\nLa",
+      "alphabetExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (52)\n\nDashed characters were proposed for you (from CLDR 48.2.0). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\ná\nU+00E1\nx\nà\nU+00E0\nx\nâ\nU+00E2\nx\nǎ\nU+01CE\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\né\nU+00E9\nx\nè\nU+00E8\nx\nê\nU+00EA\nx\ně\nU+011B\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\ní\nU+00ED\nx\nì\nU+00EC\nx\nî\nU+00EE\nx\nǐ\nU+01D0\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nń\nU+0144\nx\nǹ\nU+01F9\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nó\nU+00F3\nx\nò\nU+00F2\nx\nô\nU+00F4\nx\nǒ\nU+01D2\nx\nɔ\nU+0254\nx\np\nU+0070\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nú\nU+00FA\nx\nù\nU+00F9\nx\nû\nU+00FB\nx\nǔ\nU+01D4\nx\nv\nU+0076\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\n◌̀\nU+0300\nx\n◌́\nU+0301\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (4)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\nj J\nU+006A\n+\nq Q\nU+0071\n+\nx X\nU+0078\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\nNewer exemplar data\n\nThe characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.\n\nCheck for newer exemplar data for this language\nHow your alphabet breaks down\n\nLetters (26)\n\nLetters that stand on their own.\n\nShow uppercase letters\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\np\nU+0070\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nv\nU+0076\nw\nU+0077\ny\nU+0079\nz\nU+007A\n\nMarks (4)\n\nAccents and other marks that attach to a letter.\n\n◌̀\nU+0300\n◌́\nU+0301\n◌̂\nU+0302\n◌̌\nU+030C\n\nAccented letters (44)\n\nLetter-plus-mark combinations your language uses.\n\ná\nU+00E1\nÁ\nU+00C1\nà\nU+00E0\nÀ\nU+00C0\nâ\nU+00E2\nÂ\nU+00C2\nǎ\nU+01CE\nǍ\nU+01CD\né\nU+00E9\nÉ\nU+00C9\nè\nU+00E8\nÈ\nU+00C8\nê\nU+00EA\nÊ\nU+00CA\ně\nU+011B\nĚ\nU+011A\ní\nU+00ED\nÍ\nU+00CD\nì\nU+00EC\nÌ\nU+00CC\nî\nU+00EE\nÎ\nU+00CE\nǐ\nU+01D0\nǏ\nU+01CF\nń\nU+0144\nŃ\nU+0143\nǹ\nU+01F9\nǸ\nU+01F8\nó\nU+00F3\nÓ\nU+00D3\nò\nU+00F2\nÒ\nU+00D2\nô\nU+00F4\nÔ\nU+00D4\nǒ\nU+01D2\nǑ\nU+01D1\nú\nU+00FA\nÚ\nU+00DA\nù\nU+00F9\nÙ\nU+00D9\nû\nU+00FB\nÛ\nU+00DB\nǔ\nU+01D4\nǓ\nU+01D3\nCharacter map\n\nBrowse and click to toggle characters into your alphabet — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\n−\n100%\n+\nLoading the character map…\nBack\nContinue (100 characters)\nProject: Ewondo",
       "charlistDoneEnabled": true
     },
     "2": {
@@ -198,8 +198,10 @@
         },
         {
           "char": "ɛ",
-          "suggestion": "Suggested: Deadkey → 'e' for 'ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Deadkey → 'e' for 'ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ɛ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "ɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ɛ a different key — nothing is demoted unless you choose it."
+          ],
           "acceptButtons": [
             "Accept suggestion: deadkey via base letter 'e' for 'ɛ'"
           ],
@@ -208,8 +210,10 @@
         },
         {
           "char": "Ɛ",
-          "suggestion": "Suggested: Deadkey → 'E' for 'Ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Deadkey → 'E' for 'Ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nƐ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɛ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɛ a different key — nothing is demoted unless you choose it."
+          ],
           "acceptButtons": [
             "Accept suggestion: deadkey via base letter 'E' for 'Ɛ'"
           ],
@@ -234,8 +238,10 @@
         },
         {
           "char": "Ɔ",
-          "suggestion": "Suggested: Deadkey → 'O' for 'Ɔ'\n\nAttested by 3 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Deadkey → 'O' for 'Ɔ'\n\nAttested by 3 keyboards in the corpus.\n\nƆ goes on a deadkey — but 'o' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɔ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɔ goes on a deadkey — but 'o' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɔ a different key — nothing is demoted unless you choose it."
+          ],
           "acceptButtons": [
             "Accept suggestion: deadkey via base letter 'O' for 'Ɔ'"
           ],
@@ -244,13 +250,19 @@
         },
         {
           "char": "̀",
-          "suggestion": "Suggested: Replace the 5 key with '◌̀'\n\nAttested by 2 keyboards in the corpus.\n\nAccept\nDeny",
-          "rationales": [],
+          "suggestion": "Suggested: Replace the 5 key with '◌̀'\n\nAttested by 2 keyboards in the corpus.\n\ǹ goes on the 5 key — but '(' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ̀ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one.\n\nAccept\nDeny",
+          "rationales": [
+            "̀ goes on the 5 key — but '(' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ̀ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one."
+          ],
           "acceptButtons": [
             "Accept suggestion: replace the 5 key with '◌̀'"
           ],
           "action": "accepted-suggestion",
-          "displacement": null
+          "displacement": {
+            "context": "suggestion-accept-̀",
+            "text": "̀ and ( are both part of your alphabet, and both were headed for the 5 key. Which one is typed more often would decide which keeps the key — and the studio has no frequency data, so neither is demoted. Keep both as primary characters and find ̀ a different key, or demote ( yourself.\n\nKeep both\nDemote (",
+            "action": "keep-both"
+          }
         },
         {
           "char": "́",
@@ -278,7 +290,11 @@
         "ok": true,
         "keySelected": true,
         "applyDisabled": false,
-        "displacement": null
+        "displacement": {
+          "context": "overwrite-ŋ-onto-K_X",
+          "text": "ŋ took the x key from x. Move x to AltGr + x so you can still type it? Leave it and x will no longer be typeable from that key.\n\nMove it\nLeave it",
+          "action": "confirm-move"
+        }
       },
       "splash": "dismissed",
       "emptyDiff": false,
@@ -289,5 +305,5 @@
       "reachedTouchSeed": true
     }
   },
-  "finishedAt": "2026-10-20T07:11:05.499Z"
+  "finishedAt": "2026-10-20T15:48:26.093Z"
 }

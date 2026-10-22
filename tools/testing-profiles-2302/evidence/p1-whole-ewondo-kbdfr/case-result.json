@@ -15,9 +15,9 @@
     "overwriteKey": "K_X",
     "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
   },
-  "round": 2,
-  "build": "ed251e1b (origin/main, PR #2312 merged)",
-  "startedAt": "2026-10-20T05:49:29.478Z",
+  "round": 3,
+  "build": "2698f774 (origin/main — #2300 + #2312 + #2316, dev promoted)",
+  "startedAt": "2026-10-20T13:41:48.366Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -147,32 +147,174 @@
         "present": false
       },
       "sawMarks": true,
-      "punctuation": "not-rendered",
-      "invisibles": "not-rendered",
-      "convenience": "skipped-or-not-rendered",
-      "carveReached": false,
-      "deadkeys": "not-rendered",
-      "rules": "not-rendered",
-      "endBodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n35 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nAccents & marks\n\nYour alphabet includes 4 marks. Confirm how they attach to your letters before placing keys.\n\nA mark with no letter before it\n\nWhat should happen when someone taps a tone mark at the start of a word, or right after a space, a number, or punctuation — the mark appears anyway, or nothing happens because there is no letter for it to sit on?\n\nThe mark appears anyway\nNothing happens — there is no letter for it to sit on\nFrench Basic\nDesktop OSK\nMobile KB\nBack\nContinue\nProject: Ewondo"
+      "punctuationText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n35 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nChoose your punctuation\n\nAdd the punctuation your language uses — tick the suggested marks below, type any that are missing, or browse the character map on the right, like this:\n\n. , ; ! ? « » …\n\nType your punctuation\n\nType any punctuation marks that are missing (for example: ! ? « »), then press Enter or + Add.\n\n+ Add\n\nYour punctuation (26)\n\n2 of these are not on the starting keyboard yet and will need a key.\n\nProposed from CLDR exemplars for Ewondo — already chosen for you; click a mark to remove it.\n\n-\nU+002D\nstarting\nx\n‐\nU+2010\nx\n‑\nU+2011\nx\n,\nU+002C\nstarting\nx\n;\nU+003B\nstarting\nx\n:\nU+003A\nstarting\nx\n!\nU+0021\nstarting\nx\n?\nU+003F\nstarting\nx\n.\nU+002E\nstarting\nx\n(\nU+0028\nstarting\nx\n)\nU+0029\nstarting\nx\n[\nU+005B\nstarting\nx\n]\nU+005D\nstarting\nx\n{\nU+007B\nstarting\nx\n}\nU+007D\nstarting\nx\n\nAlready typed by your starting keyboard (French Basic) — proposed for you to keep; click a mark to remove it. Removing a mark here declares it unsupported, but the starting keyboard still types it until the discard step's punctuation rule changes.\n\n\"\nU+0022\nx\n#\nU+0023\nx\n%\nU+0025\nx\n&\nU+0026\nx\n'\nU+0027\nx\n*\nU+002A\nx\n/\nU+002F\nx\n@\nU+0040\nx\n\\\nU+005C\nx\n_\nU+005F\nx\n§\nU+00A7\nx\nCharacter map\n\nBrowse and click to toggle punctuation into your list — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\nShow only blocks my keyboard uses\n−\n100%\n+\n4 characters can't be previewed in the selected font\nBasic Latin\n!\nU+0021\n[x]\nU+0022\n[x]\n#\nU+0023\n[x]\n%\nU+0025\n[x]\n&\nU+0026\n[x]\n'\nU+0027\n[x]\n(\nU+0028\n[x]\n)\nU+0029\n[x]\n*\nU+002A\n[x]\n,\nU+002C\n[x]\n-\nU+002D\n[x]\n.\nU+002E\n[x]\n/\nU+002F\n[x]\n:\nU+003A\n[x]\n;\nU+003B\n[x]\n?\nU+003F\n[x]\n@\nU+0040\n[x]\n[\nU+005B\n[x]\n\\\nU+005C\n[x]\n]\nU+005D\n[x]\n_\nU+005F\n[x]\n{\nU+007B\n[x]\n}\nU+007D\n[x]\nLatin-1 Supplement — Punctuation & symbols\n¡\nU+00A1\n+\n§\nU+00A7\n[x]\n«\nU+00AB\n+\n¶\nU+00B6\n+\n·\nU+00B7\n+\n»\nU+00BB\n+\n¿\nU+00BF\n+\nPunctuation\nU+10FB\n+\n‐\nU+2010\n[x]\n‑\nU+2011\n[x]\n⸗\nU+2E17\n+\nU+A92E\n+\nPunctuation — Punctuation & symbols\nU+205D\n+\nBack\nContinue",
+      "punctuation": "done-as-proposed",
+      "invisibles": "continued",
+      "convenienceOffered": [
+        "Keep c C",
+        "Keep j J",
+        "Keep q Q",
+        "Keep x X"
+      ],
+      "convenienceText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n37 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nKeep these letters for convenience?\n\nYour alphabet doesn't use these 4 letters from the starting keyboard. Keeping them lets you type borrowed words, email addresses, and web addresses without switching keyboards.\n\nAnything you uncheck will be offered for removal on the next screen. Capital and small letters are kept together.\n\nc C\nU+0063\nj J\nU+006A\nq Q\nU+0071\nx X\nU+0078\nKeep all\nKeep none\nFrench Basic\nDesktop OSK\nMobile KB\nBack\nContinue, keeping 4 letters\nProject: Ewondo",
+      "convenience": "kept-as-proposed",
+      "carveReached": true,
+      "carveText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n37 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncurrent step\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nEverything this keyboard can type\n\nEvery printable character your starting keyboard can produce, in one panel. Click any character to discard it — discarding applies straight away, and you can restore a character at any time.\n\n149 of 149 characters kept\n0 discarded · you can restore them at any time\nGROUP BY\nCategory\nSource\nNothing discarded\nCHARACTER DETAILS\n~\nU+007E\nCharacter U+007E\nHOW IT'S TYPED\nAltGr + 2\nthen\nCOMES FROM\nDeadkey sequenceS-02\nIN YOUR ALPHABET\nNo\n\nIf you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.\n\nSuggested to discard\n(19)\nDiscard all 19\n\nYour starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. They are suggested to discard — click any character below to keep it instead. Discarding applies straight away, and you can restore a character at any time.\n\nç\nU+00E7\nSUGGESTED\nµ\nU+00B5\nSUGGESTED\nã\nU+00E3\nSUGGESTED\nÃ\nU+00C3\nSUGGESTED\nñ\nU+00F1\nSUGGESTED\nÑ\nU+00D1\nSUGGESTED\nõ\nU+00F5\nSUGGESTED\nÕ\nU+00D5\nSUGGESTED\nä\nU+00E4\nSUGGESTED\nÄ\nU+00C4\nSUGGESTED\në\nU+00EB\nSUGGESTED\nË\nU+00CB\nSUGGESTED\nï\nU+00EF\nSUGGESTED\nÏ\nU+00CF\nSUGGESTED\nö\nU+00F6\nSUGGESTED\nÖ\nU+00D6\nSUGGESTED\nü\nU+00FC\nSUGGESTED\nÜ\nU+00DC\nSUGGESTED\nÿ\nU+00FF\nSUGGESTED\nBasic letters\n(52)\nDiscard all\n\nPlain A-Z letters, typed directly.\n\na\nU+0061\nYOURS\nA\nU+0041\nYOURS\nb\nU+0062\nYOURS\nB\nU+0042\nYOURS\nc\nU+0063\nC\nU+0043\nd\nU+0064\nYOURS\nD\nU+0044\nYOURS\ne\nU+0065\nYOURS\nE\nU+0045\nYOURS\nf\nU+0066\nYOURS\nF\nU+0",
+      "carve": "continued-discard-nothing",
+      "deadkeysText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n37 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncurrent step\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nDeadkeys\n\nA deadkey types nothing by itself — it changes what the next key produces. Review the deadkeys this keyboard already has, fix the ones that need repair, or define new ones.\n\nInventory\nDefine new deadkey\nDeadkeys — 4 in this keyboard\nDefine new deadkey\ndk(005e)imported\nTrigger K_LBRKT · 11 pairs · produces ^ â Â ê Ê î Î ô …\nPairs\nRename\nRetarget\nDelete\ndk(0060)imported\nTrigger K_7 · 11 pairs · produces ` à À è È ì Ì ò …\nPairs\nRename\nRetarget\nDelete\ndk(007e)imported\nTrigger K_2 · 7 pairs · produces ~ ã Ã ñ Ñ õ Õ\nPairs\nRename\nRetarget\nDelete\ndk(00a8)imported\nTrigger K_LBRKT · 12 pairs · produces ¨ ä Ä ë Ë ï Ï ö …\nPairs\nRename\nRetarget\nDelete\nEvery deadkey in the keyboard is listed here — including ones the studio didn't create.\n← Back\nContinue →\nProject: Ewondo",
+      "deadkeys": "continued",
+      "rulesText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n37 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncompleted\nE\nEnable\ncurrent step\nF\nFinalize\nnot yet reached\nRules\n\nYour keyboard's rules decide what each keypress produces — which character it types, which combinations change it, and which keys stay silent. Try them below, review the rule list, and add rules of your own.\n\nTry the rules\n\nType below and watch what each keystroke does — the stored code points, the rendered result, and the rule that fired.\n\nType here, watch what happens\n\nCompiled with 1 warning(s): KM_HINT_KMCMP_3174405\n\nWhat would the host computer have typed?\n\nDo your typists expect a character on this key?\n\nHost layout\nUS\nUS International\nUK English\nAZERTY\nQWERTZ\nBlocked\n\nOur best guess from the keyboard's language tags — not sight of your typists' machines. On other layouts these keys may do something else entirely.\n\nAllow — the key always does something, but what it does varies by computer.\nBlock — the key does nothing on every computer, but it is a dead key if your typists expected a character there.\n\nHost layouts are approximate demo data for the blocking demonstration — not your operating system's real layout tables.\n\nRules in this keyboard\nKey output\n105 rules\nShow rules\n\nkey > char\n\nEach key produces its assigned output — a character or a deadkey. All 105 rules in this family follow the same pattern.\n\n+ [K_SPACE] > U+0020\n+ [K_0] > U+00E0\n+ [SHIFT K_0] > U+0030\n\n+102 more\n\nTest this group\nBundle as pack\nDisable group\nKey output\n4 rules\nShow rules\n\nkey > deadkey\n\nEach key produces its assigned output — a character or a deadkey. All 4 rules in this family follow the same pattern.\n\n+ [RALT K_2] > dk(007e)\n+ [RALT K_7] > dk(0060)\n+ [K_LBRKT] > dk(005e)\n\n+1 more\n\nTest this group\nBundle as pack\nDisable group\n\"A\" + \"̀\" + key > nul\n1 rule\nShow rules\n\n\"A\" + \"̀\" + key > nul\n\nSwallows the key when \"A\" and \"̀\" precedes it — it produces nothing.\n\nU+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)\nTest this group\nBundle as pack\nDisable group\n\"A\" + \"́\" + key > nul\n1 rule\nShow rules\n\n\"A\" + \"́\" + key > nul\n\nSwallows the key when \"A\" and \"́\" precedes it — it produces nothing.\n\nU+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)\nTest this group\nBundle as pack\nDisable group\n\"A\" + \"̂\" + key > nul\n1 rule\nShow rules\n\n\"A\" + \"̂\" + key > nul\n\nSwallows the key when \"A\" and \"̂\" precedes it — it produces nothing.\n\nU+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)\nTest this group\nBundle as pack\nDisable group\n\"A\" + \"̌\" + key > nul\n1 rule\nShow rules\n\n\"A\" + \"̌\" + key > nul\n\nSwallows the key when \"A\" and \"̌\" precedes it — it produces nothing.\n\nU+0041 U+030C + [K_BKSP] > nul c generated: whol",
+      "rulesMentionsBackspace": true,
+      "rulesBkspHits": [
+        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
+        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+      ],
+      "rules": "continued",
+      "endBodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n37 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncompleted\nE\nEnable\ncurrent step\nF\nFinalize\nnot yet reached\n\nGETTING STARTED · DESKTOP\n\nWelcome to the Mechanism Gallery\n\nThis is where you build your keyboard. For each character your language needs that the starting keyboard doesn’t already have, you’ll choose how to type it on a desktop keyboard.\n\nYou’ll go character by character through the list from your survey.\nPick a method — use a dead key, swap a key, or use AltGr — or mark a character for later review if you’d rather come back to it.\nNeed several keystrokes for one character? Pick “Type a sequence” and a small builder opens right here, in place of the preview.\nPhones and tablets come later, in the Touch gallery.\n← Back\nGet started →\nProject: Ewondo"
     },
     "3": {
       "phase": 3,
       "chars": [
         {
-          "char": null,
+          "char": "‐",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "‑",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "ə",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "Ə",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "ɛ",
+          "suggestion": "Suggested: Deadkey → 'e' for 'ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ɛ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "ɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ɛ a different key — nothing is demoted unless you choose it."
+          ],
+          "acceptButtons": [
+            "Accept suggestion: deadkey via base letter 'e' for 'ɛ'"
+          ],
+          "action": "accepted-suggestion",
+          "displacement": null
+        },
+        {
+          "char": "Ɛ",
+          "suggestion": "Suggested: Deadkey → 'E' for 'Ɛ'\n\nAttested by 2 keyboards in the corpus.\n\nƐ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɛ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɛ goes on a deadkey — but 'e' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɛ a different key — nothing is demoted unless you choose it."
+          ],
+          "acceptButtons": [
+            "Accept suggestion: deadkey via base letter 'E' for 'Ɛ'"
+          ],
+          "action": "accepted-suggestion",
+          "displacement": null
+        },
+        {
+          "char": "ŋ",
           "suggestion": null
+        },
+        {
+          "char": "Ŋ",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "ɔ",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "Ɔ",
+          "suggestion": "Suggested: Deadkey → 'O' for 'Ɔ'\n\nAttested by 3 keyboards in the corpus.\n\nƆ goes on a deadkey — but 'o' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɔ a different key — nothing is demoted unless you choose it.\n\nAccept\nDeny",
+          "rationales": [
+            "Ɔ goes on a deadkey — but 'o' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find Ɔ a different key — nothing is demoted unless you choose it."
+          ],
+          "acceptButtons": [
+            "Accept suggestion: deadkey via base letter 'O' for 'Ɔ'"
+          ],
+          "action": "accepted-suggestion",
+          "displacement": null
+        },
+        {
+          "char": "̀",
+          "suggestion": "Suggested: Replace the 5 key with '◌̀'\n\nAttested by 2 keyboards in the corpus.\n\ǹ goes on the 5 key — but '(' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ̀ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one.\n\nAccept\nDeny",
+          "rationales": [
+            "̀ goes on the 5 key — but '(' is part of your alphabet too. Without frequency data, neither can be ranked above the other, so find ̀ a different key — nothing is demoted unless you choose it. This is a weak match — the best available, not a strong one."
+          ],
+          "acceptButtons": [
+            "Accept suggestion: replace the 5 key with '◌̀'"
+          ],
+          "action": "accepted-suggestion",
+          "displacement": {
+            "context": "suggestion-accept-̀",
+            "text": "̀ and ( are both part of your alphabet, and both were headed for the 5 key. Which one is typed more often would decide which keeps the key — and the studio has no frequency data, so neither is demoted. Keep both as primary characters and find ̀ a different key, or demote ( yourself.\n\nKeep both\nDemote (",
+            "action": "keep-both"
+          }
+        },
+        {
+          "char": "́",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "̂",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
+        },
+        {
+          "char": "̌",
+          "suggestion": null,
+          "action": "sequence-fallback",
+          "displacement": null
         }
       ],
-      "errors": [
-        "no apply button at guard 0"
-      ],
-      "overwrite": null,
+      "errors": [],
+      "overwrite": {
+        "char": "ŋ",
+        "key": "K_X",
+        "ok": true,
+        "keySelected": true,
+        "applyDisabled": false,
+        "displacement": {
+          "context": "overwrite-ŋ-onto-K_X",
+          "text": "ŋ took the x key from x. Move x to AltGr + x so you can still type it? Leave it and x will no longer be typeable from that key.\n\nMove it\nLeave it",
+          "action": "confirm-move"
+        }
+      },
+      "splash": "dismissed",
       "emptyDiff": false,
-      "completed": false,
-      "overwriteAttempted": false,
-      "endText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n35 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nAccents & marks\n\nYour alphabet includes 4 marks. Confirm how they attach to your letters before placing keys.\n\nA mark with no letter before it\n\nWhat should happen when someone taps a tone mark at the start of a word, or right after a space, a number, or punctuation — the mark appears anyway, or nothing happens because there is no letter for it to sit on?\n\nThe mark appears anyway\nNothing happens — there is no letter for it to sit on\nFrench Basic\nDesktop OSK\nMobile KB\nBack\nContinue\nProject: Ewondo",
-      "reachedTouchSeed": false
+      "completed": true,
+      "endReason": "forward-gone-after-chars",
+      "overwriteAttempted": true,
+      "endText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncompleted\nD\nDiscard\ncompleted\nE\nEnable\ncurrent step\nF\nFinalize\nnot yet reached\nChoose your touch layout starting point\n\nThis choice seeds the mobile/touch layout. Individual characters can still be reviewed and adjusted afterward in the Touch Layout step.\n\nImport & adapt\nKeep the starting keyboard's shipped touch layout and carry your desktop work onto it.\nReseed from desktop\nDerive a fresh tablet layout from your desktop key assignments. Choosing this discards the starting keyboard's shipped phone/desktop touch platforms — only a tablet layout is produced.\n\nSTARTING TOUCH LAYOUT\n\nShips: tablet (showing \"tablet\" default layer)\n\n[WARN] this layout has no phone platform.\n\n← Back\nConfirm\nProject: Ewondo",
+      "reachedTouchSeed": true
     }
   },
-  "finishedAt": "2026-10-20T05:58:18.862Z"
+  "finishedAt": "2026-10-20T13:46:26.063Z"
 }
