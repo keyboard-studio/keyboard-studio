@@ -489,6 +489,11 @@ export function generateStubs(
    * on why both emission paths share one implementation.
    */
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
+  /**
+   * The base's packaged fonts, declared by the generated `.kps`:
+   * listed in `<Files>` and selected as the OSK/display font (criteria 8/10).
+   */
+  packageFonts?: import("@keyboard-studio/contracts").PackageFontSet,
 ): void {
   const now = new Date();
   const yyyy = emitYear;
@@ -625,7 +630,7 @@ export function generateStubs(
         ? { authorEmail: attribution.authorEmail }
         : {}),
     };
-    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version), false);
+    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version, [], packageFonts), false);
   }
 }
 
@@ -690,6 +695,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       };
 
       let loaderFonts: import("@keyboard-studio/contracts").KpsFontEntry[] = [];
+      let packageFonts: import("@keyboard-studio/contracts").PackageFontSet | undefined;
       let loaderStylesheets: import("@keyboard-studio/contracts").KpsStylesheetEntry[] = [];
       try {
         const loaderOpts = {
@@ -698,6 +704,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         };
         const loaderResult = await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
         loaderFonts = loaderResult.fonts;
+        packageFonts = loaderResult.packageFonts;
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
         startLicenseText = loaderResult.startLicenseText;
@@ -764,6 +771,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         attribution,
         emitYear,
         inheritedHolders,
+        packageFonts,
       );
 
       // The base's icon came across with the rest of source/ (loader) and was
@@ -780,6 +788,9 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         vfs,
         warnings,
         fonts: loaderFonts,
+        // Handed back so the working copy keeps it — the output
+        // projection re-declares these fonts if a descriptor lacks them.
+        ...(packageFonts !== undefined ? { packageFonts } : {}),
         stylesheets: loaderStylesheets,
         attributionMissing,
         inheritedHolderCount: inheritedHolders.length,

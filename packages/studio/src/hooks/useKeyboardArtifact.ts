@@ -2,7 +2,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
 import { loadDemoSimulate } from "../components/rules/demoSimulation.ts";
@@ -41,6 +41,8 @@ interface EngineModule {
     startWelcomeConvention?: WelcomeConvention;
     // Issue #2139 — the base's welcome/help stylesheets (criterion 11.8).
     startDocCssTexts?: StartDocCssText[];
+    // The base's packaged fonts, for the package descriptor.
+    packageFonts?: PackageFontSet;
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
@@ -466,6 +468,7 @@ function applyCopyStartDocs(
     images: Parameters<WorkingCopyActions["setStartWelcomeImages"]>[0];
     convention: Parameters<WorkingCopyActions["setStartWelcomeConvention"]>[0];
     helpForExtraction: string | null;
+    packageFonts: PackageFontSet | null;
   },
 ): void {
   wc.setStartWelcomeImages(docs.images);
@@ -479,6 +482,8 @@ function applyCopyStartDocs(
   // itself never becomes prose (startHelpPhpText stays null, so
   // every render/serialize path behaves exactly as FR-007 asks).
   wc.setBaseHelpPhpTextForExtraction(docs.helpForExtraction);
+  // A copy re-declares the fonts its starting keyboard packaged.
+  wc.setStartPackageFonts(docs.packageFonts);
   wc.setStartReadmeMdText(null);
   wc.setStartHistoryMdText(null);
   // Issue #2139: a copy's pages are fresh renders — the base's page
@@ -1180,6 +1185,7 @@ export function useKeyboardArtifact(
             images: result.startWelcomeImages ?? null,
             convention: result.startWelcomeConvention ?? null,
             helpForExtraction: result.baseHelpPhpTextForExtraction ?? null,
+            packageFonts: result.packageFonts ?? null,
           });
         }
         vfsRef.current = result.vfs;
@@ -1209,6 +1215,7 @@ export function useKeyboardArtifact(
             images: fetchResult.startWelcomeImages ?? null,
             convention: fetchResult.startWelcomeConvention ?? null,
             helpForExtraction: fetchResult.startHelpPhpText ?? null,
+            packageFonts: fetchResult.packageFonts ?? null,
           });
         } else if (writesStartDocs) {
           // spec 061 FR-013: retain the base's own welcome.htm/help.php verbatim
@@ -1235,6 +1242,8 @@ export function useKeyboardArtifact(
           // Issue #2139: the base's welcome/help stylesheet texts, so the live
           // 11.8 check and the baseline below judge images against kb.css.
           wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
+          // The fonts the adaptation's generated descriptor declares.
+          wc.setStartPackageFonts(fetchResult.packageFonts ?? null);
           // spec 080 FR-020 (research R8): run the documentation checks ONCE
           // over the base's own files as fetched. A later finding on a still-
           // inherited member whose code appears here is the base's, not the

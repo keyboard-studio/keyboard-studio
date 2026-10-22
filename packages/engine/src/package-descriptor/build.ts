@@ -12,6 +12,7 @@
 // AUTHOR's identity. Declaring the base's language was the defect, not a feature
 // to preserve.
 
+import type { PackageFontSet } from "@keyboard-studio/contracts";
 import { escapeHtml } from "../shared/escapeHtml.js";
 
 /**
@@ -130,6 +131,41 @@ export function welcomeFolderKpsRef(fileName: string): string {
 }
 
 /**
+ * A packaged font file's `.kps` member reference from its VFS key
+ * (`shared/fonts/sil/x/Font.ttf` → `..\..\..\shared\fonts\sil\x\Font.ttf`).
+ *
+ * The VFS keeps fonts at their release-relative path, so the reference is the
+ * one a keymanapp/keyboards descriptor writes from `release/<group>/<id>/source/`
+ * (criterion 8: fonts referenced from `shared/fonts`). The in-browser `.kmp`
+ * build resolves it to the same VFS key, because the rootless path normaliser
+ * drops the `..` segments that climb past the keyboard root.
+ *
+ * A keyboard-local font (keyed `source/…` by the loader) sits
+ * beside the `.kps`, so its reference is relative to `source/`.
+ */
+export function packageFontKpsRef(vfsPath: string): string {
+  if (vfsPath.startsWith("source/")) return vfsPath.slice("source/".length).replace(/\//g, "\\");
+  return `..\\..\\..\\${vfsPath.replace(/\//g, "\\")}`;
+}
+
+/** `<File>` entries for a font set, in its order (the base `.kps` order). */
+function fontFileRefs(fonts: PackageFontSet | undefined): string[] {
+  return fonts?.files.map(packageFontKpsRef) ?? [];
+}
+
+/** The `<OSKFont>` / `<DisplayFont>` lines for `<Keyboard>`, indented, or `""`. */
+export function buildFontSelectionLines(fonts: PackageFontSet | undefined, indent = "      "): string {
+  let out = "";
+  if (fonts?.oskFont !== undefined) {
+    out += `${indent}<OSKFont>${escapeHtml(packageFontKpsRef(fonts.oskFont))}</OSKFont>\n`;
+  }
+  if (fonts?.displayFont !== undefined) {
+    out += `${indent}<DisplayFont>${escapeHtml(packageFontKpsRef(fonts.displayFont))}</DisplayFont>\n`;
+  }
+  return out;
+}
+
+/**
  * Normalise the caller's `welcomeFolderFiles` into distinct bare file names in
  * deterministic (caller) order: strips a `welcome/` or `welcome\` prefix if one
  * was passed, drops blanks, and drops the page itself (it is always listed
@@ -154,6 +190,9 @@ export function normaliseWelcomeFolderFiles(welcomeFolderFiles: readonly string[
  *   the page — inherited base images and generated layout charts — as bare
  *   names relative to that folder (spec 080 FR-002/FR-006). Each is listed as
  *   `welcome\<name>`. The page itself is always listed and never needs passing.
+ * @param fonts the starting keyboard's packaged fonts: each file
+ *   is listed in `<Files>` and the OSK/display selections are declared on
+ *   `<Keyboard>` (criteria 8 and 10).
  */
 export function buildKpsContent(
   keyboardId: string,
@@ -161,6 +200,7 @@ export function buildKpsContent(
   kmnText: string,
   version = "1.0",
   welcomeFolderFiles: readonly string[] = [],
+  fonts?: PackageFontSet,
 ): string {
   const targetTokens = parseTargetTokens(kmnText);
   const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
@@ -177,6 +217,7 @@ export function buildKpsContent(
     files.push(welcomeFolderKpsRef(name));
   }
   files.push("readme.htm");
+  files.push(...fontFileRefs(fonts));
   // LICENSE.md lives at the keyboard root, one level above this .kps's own
   // `source/` directory — like the `..\build\` artifacts, not like
   // welcome\welcome.htm/readme.htm, which sit alongside (or below) the .kps
@@ -207,6 +248,7 @@ export function buildKpsContent(
     `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${website}${buildAttributionBlock(identity)}  </Info>\n` +
     `  <Files>\n${fileEntries}\n  </Files>\n` +
     `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n` +
+    buildFontSelectionLines(fonts) +
     buildLanguagesBlock(identity) +
     `    </Keyboard>\n  </Keyboards>\n` +
     `</Package>\n`

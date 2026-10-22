@@ -42,6 +42,7 @@ import type {
   VirtualFS,
   WelcomeConvention,
   WelcomeFolderImage,
+  PackageFontSet,
   HistoryEntryState,
   ChartPreference,
   DocFixProposals,
@@ -541,6 +542,14 @@ export interface WorkingCopyState {
    * accepted stylesheet amendment back at the entry's own path.
    */
   startDocCssTexts: StartDocCssText[] | null;
+  /**
+   * The starting keyboard's packaged fonts: font files and their
+   * licence companions (all written into the VFS by the loader) plus its
+   * OSK/display selections, or null when it packages none. Set on BOTH tracks
+   * by the instance that owns the start docs; read by the output projection,
+   * which declares them in the package descriptor (criteria 8/9/10).
+   */
+  startPackageFonts: PackageFontSet | null;
   /**
    * The base's `source/welcome/` image files (spec 079 FR-006), or null when
    * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
@@ -1360,6 +1369,9 @@ export interface WorkingCopyState {
   /** Retain the base's welcome/help stylesheets (criterion 11.8, issue #2139). */
   setStartDocCssTexts: (texts: StartDocCssText[] | null) => void;
 
+  /** Retain the base's packaged fonts for the package descriptor. */
+  setStartPackageFonts: (fonts: PackageFontSet | null) => void;
+
   /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
   setStartWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
 
@@ -1737,6 +1749,7 @@ export type WorkingCopyData = Omit<
   | "setStartReadmeMdText"
   | "setStartHistoryMdText"
   | "setStartDocCssTexts"
+  | "setStartPackageFonts"
   | "setStartWelcomeImages"
   | "setStartWelcomeConvention"
   | "setHistoryEntryState"
@@ -1781,6 +1794,7 @@ const INITIAL_STATE: WorkingCopyData = {
   startReadmeMdText: null,
   startHistoryMdText: null,
   startDocCssTexts: null,
+  startPackageFonts: null,
   startWelcomeImages: null,
   startWelcomeConvention: null,
   startWelcomeImagesDropped: false,
@@ -2645,6 +2659,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setStartHistoryMdText: (text) => set({ startHistoryMdText: text }),
 
   setStartDocCssTexts: (texts) => set({ startDocCssTexts: texts }),
+  setStartPackageFonts: (fonts) => set({ startPackageFonts: fonts }),
 
   // A fresh carry supersedes any earlier "dropped on reload" state.
   setStartWelcomeImages: (images) =>

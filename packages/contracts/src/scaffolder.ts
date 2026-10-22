@@ -3,7 +3,7 @@
 import type { VirtualFS } from "./virtualFS";
 import type { StartKeyboard } from "./startKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
-import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
+import type { KpsFontEntry, KpsStylesheetEntry, PackageFontSet } from "./fontEntry";
 import type { Attribution } from "./attribution";
 import type { WelcomeConvention, WelcomeFolderImage } from "./doc-members";
 
@@ -97,6 +97,12 @@ export interface ScaffoldResult {
   warnings: string[];
   /** OSK font entries forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   fonts: KpsFontEntry[];
+  /**
+   * The base's packaged fonts forwarded from fetchKeyboardSourceToVfs:
+   * already declared in the scaffolded `.kps`, and kept by the working
+   * copy so the output projection can re-declare any a descriptor lacks.
+   */
+  packageFonts?: PackageFontSet;
   /** Per-keyboard CSS forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   stylesheets: KpsStylesheetEntry[];
   /**
