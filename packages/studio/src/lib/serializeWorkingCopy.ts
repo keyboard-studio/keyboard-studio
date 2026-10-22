@@ -474,8 +474,10 @@ export async function projectWorkingCopyForOutput(
   // Their bare names feed the descriptor's `<Files>` list (step 3.6, below)
   // and the fresh page's "Keyboard Layout" section (step 5c). Loader order is
   // kept: it is the base's own `.kps` order, and it is deterministic (SC-004).
-  const carriedImages = carriedWelcomeImages(startWelcomeImages);
-  const carriedImageNames = welcomeFolderFileNames(startWelcomeImages);
+  // A copy carries the welcome folder's images only — never its
+  // sub-pages or stylesheets, which are the base's prose and page styling.
+  const carriedImages = carriedWelcomeImages(startWelcomeImages, !isAdaptation);
+  const carriedImageNames = welcomeFolderFileNames(startWelcomeImages, !isAdaptation);
 
   // spec 079 FR-013..FR-015: one deterministic layout chart per (platform,
   // layer), generated from the MODEL (never the on-screen preview) unless the

@@ -35,7 +35,7 @@ export function useDocMemberStates(): DocMemberState[] {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
 
   return useMemo(() => {
-    const carriedNames = welcomeFolderFileNames(startWelcomeImages);
+    const carriedNames = welcomeFolderFileNames(startWelcomeImages, instantiationMode !== "adapt-existing");
     const missingInheritedImages =
       startWelcomeHtmText !== null ? missingInheritedImageRefs(startWelcomeHtmText, carriedNames) : [];
     const states = deriveDocMemberStates({
