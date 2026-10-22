@@ -165,23 +165,82 @@ export function productionMatchesRemovalSet(
 }
 
 /**
+ * Removal matching for ONE key occurrence, key-aware — the definition
+ * shared by {@link candidateMatchesViaProduction} (enumeration and the
+ * keycap-removal carve) and the T021 corpus gate's arm 3, so the two
+ * cannot drift on what "produces a removed character" means for a
+ * special-function key.
+ *
+ * Non-emulation keys: exactly {@link productionMatchesRemovalSet} —
+ * context-conditional productions included. A guarded T_ mark or a
+ * letter key with a context rule IS a method for typing its output;
+ * the record's conditions say when, not whether (contracts §1:
+ * consumers handle the production set, never collapse it).
+ *
+ * Emulation-class keys (K_BKSP, K_ENTER, K_TAB, K_LOPT, K_ROPT, numpad —
+ * contracts §1: frame-class, producing through KMW's emulation arm)
+ * match ONLY on an unconditional text entry: one carrying no condition,
+ * or the `"otherwise"` default a guard carve-out excepts from. A bare
+ * rule on such a key is its own production in that state — the corpus
+ * shape is ibono/obolo_chwerty's `+ [ALT K_ENTER] > U+000A`, where an
+ * alt-layer Enter tap types a newline and nothing else is meant by it.
+ *
+ * A context-conditional entry on an emulation key is never a removal
+ * production. Those rules are text-rewriting triggers fired BY the
+ * preceding text, not methods for typing their output: Cameroon's
+ * `any(composed) + [K_BKSP] > index(comp-dia,1)` strips a mark and
+ * re-emits the base it leaves behind (the PR #2319 carve harm — splicing
+ * K_BKSP out of every layer when that base was carved), galaxie_hebrew's
+ * `letter + [K_ENTER] > final-form` finalises the letter before Enter,
+ * and the hakka / taigi_viet_telex dictionaries' thousands of
+ * `phonetic + [K_TAB] > conversion` rules make Tab a commit key whose
+ * output belongs to the phonetic text typed before it. Crediting the
+ * function key with those outputs — per codepoint, thousands of
+ * characters for the dictionary keyboards — is the T021 arm3 drift:
+ * enumeration (correctly, per this rule) did not list them, while a
+ * record-only reading of the resolver did.
+ */
+export function occurrenceMatchesRemovalSet(
+  keyId: string | undefined,
+  record: TouchKeyProduction,
+  removalSet: ReadonlySet<string>,
+): boolean {
+  if (keyId === undefined || !isEmulationKeyId(keyId)) {
+    return productionMatchesRemovalSet(record, removalSet);
+  }
+  for (const entry of record.productions) {
+    if (entry.output.kind !== "text") continue;
+    if (entry.condition !== undefined && entry.condition !== "otherwise") continue;
+    const text = entry.output.text;
+    if (removalSet.has(text.normalize("NFC"))) return true;
+    if (entry.viaFallback !== true && record.source === "rule") {
+      for (const ch of text) {
+        if (removalSet.has(ch.normalize("NFC"))) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Resolve one candidate's production in its layer's state and test it
  * against `removalSet` — the resolver half of {@link keyMatchesRemovalSet},
  * exported for the carve operation, which needs the same verdict per
  * occurrence without re-deriving the state plumbing.
  *
- * Emulation-class keys (K_BKSP, K_ENTER, …) never match. A context rule
- * on one rewrites text rather than typing a character — Cameroon's
- * `any(composed) + [K_BKSP] > index(comp-dia,1)` strips a mark — so its
- * output entries are not that key's production of a character, and
- * carving one of them must not remove the backspace key from the layout.
+ * Emulation-class keys (K_BKSP, K_ENTER, …) match only on an
+ * unconditional production — see {@link occurrenceMatchesRemovalSet}:
+ * a context rule on one rewrites text rather than typing a character —
+ * Cameroon's `any(composed) + [K_BKSP] > index(comp-dia,1)` strips a
+ * mark — so its conditional output entries are not that key's
+ * production of a character, and carving one of them must not remove
+ * the backspace key from the layout.
  */
 export function candidateMatchesViaProduction(
   candidate: { id?: string; sp?: number; nextlayer?: string },
   removalSet: ReadonlySet<string>,
   ctx: RemovalProductionContext,
 ): boolean {
-  if (candidate.id !== undefined && isEmulationKeyId(candidate.id)) return false;
   const key: TouchKeyIR = {
     nodeId: "",
     id: candidate.id ?? "",
@@ -193,7 +252,7 @@ export function candidateMatchesViaProduction(
     key,
     touchKeyStateFromLayerId(ctx.layerId),
   );
-  return productionMatchesRemovalSet(record, removalSet);
+  return occurrenceMatchesRemovalSet(candidate.id, record, removalSet);
 }
 
 /**
@@ -205,7 +264,11 @@ export function candidateMatchesViaProduction(
  *
  *   - WITH a production context, matching is PRODUCTION ONLY: the
  *     candidate matches iff any of its per-state productions (from the
- *     FR-003 resolver) is in the set. This is the fix for audit gap 1 — a
+ *     FR-003 resolver) is in the set, judged by
+ *     {@link occurrenceMatchesRemovalSet} — for an emulation-class
+ *     candidate only an unconditional production counts, because a
+ *     context rule on a function key rewrites text rather than typing
+ *     a character. This is the fix for audit gap 1 — a
  *     ruled `T_` key whose keycap shows a dotted-circle label (`T_0300`,
  *     text `"◌̀"`) produces U+0300 entirely through its `.kmn` rules, and
  *     the text/output/U_-decode test below cannot see it; conversely a

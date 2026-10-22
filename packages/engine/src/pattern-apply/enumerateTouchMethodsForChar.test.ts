@@ -339,3 +339,35 @@ describe("enumerateTouchMethodsForChar — resolver mode (spec 104 T008)", () =>
     expect(result[0]!.id).toContain("T_0300");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Emulation-class keys (T021 arm3): context rules on function keys are
+// text-rewriting triggers, not typing methods; a bare rule on one is its
+// own production. Corpus shapes: hakka/taigi `phonetic + [K_TAB] >
+// conversion`; ibono/obolo `+ [ALT K_ENTER] > U+000A`.
+// ---------------------------------------------------------------------------
+
+describe("enumerateTouchMethodsForChar — emulation-class keys (spec 104, T021 arm3)", () => {
+  const emuKmn = [
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    '"x" + [K_TAB] > "y"',
+    "+ [ALT K_ENTER] > U+000A",
+    "",
+  ].join("\n");
+  const emuIr = parse(emuKmn, "emulation-fixture").ir;
+  const emuProduction = { ir: emuIr, ruleIndex: buildTouchKeyRuleIndex(emuIr) };
+  const emuLayout = makeLayout([touchKey({ id: "K_TAB", text: "*Tab*" })], {
+    extraPhoneLayer: { id: "alt", keys: [touchKey({ id: "K_ENTER", text: "*Enter*" })] },
+  });
+
+  it("does not enumerate K_TAB for the output of its context conversion rule", () => {
+    expect(enumerateTouchMethodsForChar(emuLayout, "y", { production: emuProduction })).toEqual([]);
+  });
+
+  it("enumerates K_ENTER for its bare-rule production (alt-layer newline)", () => {
+    const result = enumerateTouchMethodsForChar(emuLayout, "\n", { production: emuProduction });
+    expect(result.map((r) => r.id)).toEqual(["phone:alt:K_ENTER"]);
+  });
+});
