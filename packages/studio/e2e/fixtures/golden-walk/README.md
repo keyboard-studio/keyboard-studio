@@ -59,9 +59,11 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
 - The final restack onto 088's close has landed on this branch
   (`22288cc5`). A re-capture after any future restack updates this
   record.
-- The HISTORY proposal carries the capture date: a re-capture on a
-  different day legitimately differs in the HISTORY entry alone. Record
-  the capture date here on every capture so that diff is attributable.
+- The HISTORY proposal carries the walk's date in its top heading
+  (`## 1.0 (YYYY-MM-DD)`). The verify step masks that one date on both
+  sides, so the baseline holds on any day; every other byte of
+  `HISTORY.md` is still compared. Still record the capture date here on
+  every capture.
 - Verify mode fails loudly on a missing baseline rather than passing
   vacuously — do not soften that, and do not commit a fabricated
   baseline.

@@ -33,10 +33,14 @@
  * zip entries with the wall-clock time, so two archives of identical files
  * never share bytes. What SC-001 actually locks is the emitted FILES: the
  * entry-name set and every entry's uncompressed bytes must match the
- * baseline exactly, with ONE documented exception:
+ * baseline exactly, with TWO documented exceptions:
  *   - `.studio/decision-record.json` embeds `recordedAt` wall-clock
  *     timestamps by design (spec 053), so it is checked for presence and
  *     JSON parseability only, never byte-compared.
+ *   - `HISTORY.md`'s top entry heading carries the walk's date
+ *     (`## 1.0 (YYYY-MM-DD)`), so that one date is masked on both sides
+ *     before the byte comparison; the rest of the file is compared as is.
+ *     Unmasked, the baseline only matched on its capture day.
  * A mismatch fails with the differing entry names, so the spec delta that
  * changed the output is named, not inferred.
  *
@@ -53,8 +57,8 @@
  *   e2e/fixtures/golden-walk/basic-kbdfr-copy.zip
  * and the test passes trivially. Record the capture in
  * e2e/fixtures/golden-walk/README.md (base commit, date, environment) —
- * note the HISTORY proposal carries the capture date, so a re-capture on
- * a different day legitimately differs in that entry alone.
+ * the HISTORY proposal's capture date is masked by the comparison, so a
+ * re-capture on a different day does not differ in that entry.
  *
  * VERIFY (the default mode):
  *   npx playwright test \
@@ -90,6 +94,16 @@ const BASELINE_PATH = path.join(
 
 /** Entries checked for presence/shape only — see the header for why. */
 const NON_BYTE_COMPARED = new Set([".studio/decision-record.json"]);
+
+/** The top HISTORY.md entry heading's date — the walk's wall-clock day. */
+const HISTORY_TOP_DATE = /^(## \S+ )\(\d{4}-\d{2}-\d{2}\)/m;
+
+/** An entry's bytes as compared: HISTORY.md with its top date masked. */
+function comparableBytes(name: string, bytes: Uint8Array): Uint8Array {
+  if (name !== "HISTORY.md") return bytes;
+  const text = new TextDecoder().decode(bytes);
+  return new TextEncoder().encode(text.replace(HISTORY_TOP_DATE, "$1(DATE)"));
+}
 
 const CAPTURE = process.env["GOLDEN_WALK_CAPTURE"] === "1";
 
@@ -189,8 +203,8 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
       expect(() => JSON.parse(text) as unknown, `${name} must stay valid JSON`).not.toThrow();
       continue;
     }
-    const a = baselineEntries[name]!;
-    const b = walkedEntries[name]!;
+    const a = comparableBytes(name, baselineEntries[name]!);
+    const b = comparableBytes(name, walkedEntries[name]!);
     if (a.length !== b.length || !a.every((byte, i) => byte === b[i])) {
       differing.push(name);
     }
