@@ -37,6 +37,14 @@
  *   - `.studio/decision-record.json` embeds `recordedAt` wall-clock
  *     timestamps by design (spec 053), so it is checked for presence and
  *     JSON parseability only, never byte-compared.
+ *   - `HISTORY.md` and `LICENSE.md` ARE byte-compared, but after a narrow
+ *     date normalisation (see DATE_NORMALISERS below): the walk leaves the
+ *     history entry undecided, so the emitter stamps the run day
+ *     (serializeWorkingCopy's wall-clock fallback), and the licence stub
+ *     stamps the run year. Without normalisation the verify could only
+ *     ever pass on the baseline's capture day (diagnosed 2026-10-22).
+ *     The date logic itself is unit-pinned in renderHistoryMd.test.ts;
+ *     this lane locks emitted-file stability, not clock behaviour.
  * A mismatch fails with the differing entry names, so the spec delta that
  * changed the output is named, not inferred.
  *
@@ -90,6 +98,26 @@ const BASELINE_PATH = path.join(
 
 /** Entries checked for presence/shape only — see the header for why. */
 const NON_BYTE_COMPARED = new Set([".studio/decision-record.json"]);
+
+/**
+ * Entries byte-compared after masking their one wall-clock field:
+ * - HISTORY.md: the `## <version> (YYYY-MM-DD)` heading date.
+ * - LICENSE.md: a single-year `Copyright © YYYY` line (the emitted
+ *   author's line). A year RANGE (e.g. the inherited `2009-2019` SIL
+ *   line) is deliberately NOT masked — the negative lookahead keeps it
+ *   byte-locked.
+ * Every other byte in both files stays compared exactly.
+ */
+const DATE_NORMALISERS: Record<string, (text: string) => string> = {
+  "HISTORY.md": (text) =>
+    text.replace(/^(## .+ \()\d{4}-\d{2}-\d{2}(\))$/m, "$1<date>$2"),
+  "LICENSE.md": (text) =>
+    text.replace(/Copyright © \d{4}(?![-\d])/g, "Copyright © <year>"),
+};
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((byte, i) => byte === b[i]);
+}
 
 const CAPTURE = process.env["GOLDEN_WALK_CAPTURE"] === "1";
 
@@ -191,7 +219,12 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
     }
     const a = baselineEntries[name]!;
     const b = walkedEntries[name]!;
-    if (a.length !== b.length || !a.every((byte, i) => byte === b[i])) {
+    const normalise = DATE_NORMALISERS[name];
+    const equal = normalise
+      ? normalise(new TextDecoder().decode(a)) ===
+        normalise(new TextDecoder().decode(b))
+      : bytesEqual(a, b);
+    if (!equal) {
       differing.push(name);
     }
   }
