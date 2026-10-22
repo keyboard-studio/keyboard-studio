@@ -85,6 +85,7 @@ import {
   computeTouchCoverage,
   findDeadTouchKeys,
   isCustomTouchKeyId,
+  isEmulationKeyId,
   isFrameKeyLabel,
   isProducingKeyClass,
   isRulelessByConvention,
@@ -390,7 +391,11 @@ describe.skipIf(!available)("spec 104 T021 — corpus resolver⇔consumer equiva
         for (const ch of chars) {
           const expected = new Set<string>();
           occurrences.forEach((o, i) => {
-            if (o.key.id.toUpperCase() === "K_BKSP") return; // enumeration's defensive skip
+            // Enumeration never offers an emulation-class key (K_BKSP,
+            // K_ENTER, K_TAB, …): candidateMatchesViaProduction refuses
+            // them, since a context rule on one rewrites text rather than
+            // typing a character.
+            if (isEmulationKeyId(o.key.id)) return;
             if (productionMatchesRemovalSet(records[i]!, new Set([ch]))) expected.add(o.address);
           });
           const actual = new Set(
