@@ -150,6 +150,84 @@ export function normaliseWelcomeFolderFiles(welcomeFolderFiles: readonly string[
 }
 
 /**
+ * A font the descriptor must carry (#2308), in the writer's vocabulary: its
+ * `.kps` member reference relative to `source/` (forward slashes; may climb
+ * with `../` to reach the repo-level `shared/` tree) and whether the base
+ * declared it as the keyboard's OSK/display font.
+ */
+export interface KpsFontDescriptorEntry {
+  ref: string;
+  isOskFont: boolean;
+}
+
+/**
+ * The `.kps` member reference for a loader-carried asset (a font, the keyboard
+ * stylesheet), from its repo-relative path and the base keyboard's repo path.
+ *
+ * An asset inside the base's own `source/` ships inside the copy's `source/`
+ * too, so its reference is the part below `source/`. Anything else — the
+ * `shared/` fonts — lives at the keyboards-repo root, three levels up from
+ * `<group>/<id>/source/`, which is the spelling the corpus writes
+ * (`..\..\..\shared\fonts\…`).
+ */
+export function kpsMemberRef(relPath: string, baseKeyboardPath: string): string {
+  const ownSourcePrefix = `${baseKeyboardPath}/source/`;
+  if (relPath.startsWith(ownSourcePrefix)) {
+    return relPath.slice(ownSourcePrefix.length);
+  }
+  const belowRelease = relPath.startsWith("release/")
+    ? relPath.slice("release/".length)
+    : relPath;
+  return `../../../${belowRelease}`;
+}
+
+/**
+ * Normalise the caller's font entries: trims refs, drops blanks, dedupes by
+ * ref (case-insensitive — a base listing the same font as both a `<File>` and
+ * an `<OSKFont>` must yield ONE entry, with the OSK flag winning).
+ */
+export function normaliseKpsFontEntries(
+  fonts: readonly KpsFontDescriptorEntry[],
+): KpsFontDescriptorEntry[] {
+  const out: KpsFontDescriptorEntry[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const font of fonts) {
+    const ref = font.ref.trim().replace(/\\/g, "/");
+    if (ref === "") continue;
+    const key = ref.toLowerCase();
+    const existingIdx = indexByKey.get(key);
+    if (existingIdx !== undefined) {
+      const prev = out[existingIdx];
+      if (font.isOskFont && prev !== undefined) {
+        out[existingIdx] = { ref: prev.ref, isOskFont: true };
+      }
+      continue;
+    }
+    indexByKey.set(key, out.length);
+    out.push({ ref, isOskFont: font.isOskFont });
+  }
+  return out;
+}
+
+/** A member reference in the `.kps`'s backslash spelling. */
+function toKpsRef(ref: string): string {
+  return ref.replace(/\//g, "\\");
+}
+
+/**
+ * The `<OSKFont>` / `<DisplayFont>` lines for `<Keyboard>`, or "" when no
+ * carried font is the OSK font. The schema allows ONE of each element, and
+ * the corpus points both at the same font, so the first OSK-flagged entry
+ * fills both. Extra OSK-flagged fonts still ship via their `<File>` entries.
+ */
+function buildFontElements(fonts: readonly KpsFontDescriptorEntry[]): string {
+  const osk = fonts.find((f) => f.isOskFont);
+  if (osk === undefined) return "";
+  const ref = escapeHtml(toKpsRef(osk.ref));
+  return `      <OSKFont>${ref}</OSKFont>\n      <DisplayFont>${ref}</DisplayFont>\n`;
+}
+
+/**
  * @param welcomeFolderFiles the OTHER files shipped in `source/welcome/` beside
  *   the page — inherited base images and generated layout charts — as bare
  *   names relative to that folder (spec 080 FR-002/FR-006). Each is listed as
@@ -161,6 +239,19 @@ export function buildKpsContent(
   kmnText: string,
   version = "1.0",
   welcomeFolderFiles: readonly string[] = [],
+  /**
+   * The base's carried fonts (#2308): each is listed in `<Files>`, and the
+   * OSK-flagged one is also named by `<OSKFont>`/`<DisplayFont>`. Without
+   * this the descriptor silently drops fonts the package actually ships.
+   */
+  fonts: readonly KpsFontDescriptorEntry[] = [],
+  /**
+   * The base's carried keyboard stylesheet(s) (#2308), as member references
+   * relative to `source/` — listed in `<Files>` beside the fonts. The caller
+   * names the copy's file (the id-named sibling already renamed), matching
+   * the file the loader carried.
+   */
+  stylesheets: readonly string[] = [],
 ): string {
   const targetTokens = parseTargetTokens(kmnText);
   const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
@@ -182,6 +273,18 @@ export function buildKpsContent(
   // welcome\welcome.htm/readme.htm, which sit alongside (or below) the .kps
   // itself (criterion 8.4-kps-includes-license-md).
   files.push("..\\LICENSE.md");
+  // #2308: the fonts and keyboard stylesheet the loader carried are package
+  // members too. A listed file the build does not ship fails kmc, and an
+  // unlisted shipped file is dropped from the .kmp — so these list exactly
+  // the carried set, in the base's own reference spelling.
+  const carriedFonts = normaliseKpsFontEntries(fonts);
+  for (const font of carriedFonts) {
+    files.push(toKpsRef(font.ref));
+  }
+  for (const sheet of stylesheets) {
+    const ref = sheet.trim().replace(/\\/g, "/");
+    if (ref !== "") files.push(toKpsRef(ref));
+  }
 
   const fileEntries = files
     .map((f) => {
@@ -207,6 +310,7 @@ export function buildKpsContent(
     `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${website}${buildAttributionBlock(identity)}  </Info>\n` +
     `  <Files>\n${fileEntries}\n  </Files>\n` +
     `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n` +
+    buildFontElements(carriedFonts) +
     buildLanguagesBlock(identity) +
     `    </Keyboard>\n  </Keyboards>\n` +
     `</Package>\n`

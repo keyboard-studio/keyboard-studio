@@ -1203,3 +1203,61 @@ describe("single-line copyright metadata uses the Portions convention (spec 064 
     expect(f.kmnStore).toMatch(/^Copyright .+\. Portions .+$/);
   });
 });
+
+describe("scaffold — the generated .kps carries the base's fonts and stylesheet (#2308)", () => {
+  const cameroon: StartKeyboard = {
+    id: "sil_cameroon_qwerty",
+    path: "release/sil/sil_cameroon_qwerty",
+    script: "Latn",
+    targets: ["web"],
+    displayName: "Cameroon QWERTY",
+    version: "6.1.2",
+  };
+  const FONT_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";
+  const CAM_KPS = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    "<Package>",
+    "  <Files>",
+    "    <File>",
+    "      <Name>sil_cameroon_qwerty.css</Name>",
+    "      <FileType>.css</FileType>",
+    "    </File>",
+    "    <File>",
+    `      <Name>${FONT_REF}</Name>`,
+    "      <FileType>.ttf</FileType>",
+    "    </File>",
+    "  </Files>",
+    "  <Keyboards>",
+    "    <Keyboard>",
+    `      <OSKFont>${FONT_REF}</OSKFont>`,
+    `      <DisplayFont>${FONT_REF}</DisplayFont>`,
+    "    </Keyboard>",
+    "  </Keyboards>",
+    "</Package>",
+  ].join("\n");
+  const TTF_BYTES = new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+  it("lists the carried font + OSKFont and the RENAMED stylesheet in source/<new id>.kps", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kps")) return Promise.resolve(makeTextResponse(CAM_KPS));
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.includes(".css")) return Promise.resolve(makeTextResponse(".kmw-keyboard-x { color: red; }"));
+      if (url.includes(".ttf")) return Promise.resolve(makeBytesResponse(TTF_BYTES));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const { vfs, fonts } = await service.scaffold(cameroon, "ewondo", "Ewondo");
+    expect(fonts).toHaveLength(1);
+
+    const kpsEntry = vfs.get("source/ewondo.kps");
+    expect(kpsEntry).toBeDefined();
+    const kps = kpsEntry!.content as string;
+    expect(kps).toContain(`<Name>${FONT_REF}</Name>`);
+    expect(kps).toContain(`<OSKFont>${FONT_REF}</OSKFont>`);
+    expect(kps).toContain(`<DisplayFont>${FONT_REF}</DisplayFont>`);
+    // The stylesheet entry names the copy's renamed file, not the base's.
+    expect(kps).toContain("<Name>ewondo.css</Name>");
+    expect(kps).not.toContain("sil_cameroon_qwerty.css");
+  });
+});

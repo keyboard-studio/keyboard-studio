@@ -48,6 +48,8 @@ import { welcomeHtm, readmeHtm, helpPhpStub } from "../shared/packageDocs.js";
 import { HISTORY_INITIAL_RELEASE_BULLET } from "../shared/renderHistoryMd.js";
 import {
   buildKpsContent,
+  kpsMemberRef,
+  type KpsFontDescriptorEntry,
   type PackageDescriptorIdentity,
 } from "../package-descriptor/index.js";
 import { dropUnbackedBitmapStore } from "../compiler/stripDanglingAssetStores.js";
@@ -489,6 +491,15 @@ export function generateStubs(
    * on why both emission paths share one implementation.
    */
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
+  /**
+   * The base's carried fonts, as `.kps` member references (#2308). The
+   * descriptor is generated ONCE, here — the output projection only patches
+   * identity into it — so the font/stylesheet entries must be written now
+   * or they never reach the shipped package.
+   */
+  fonts: readonly KpsFontDescriptorEntry[] = [],
+  /** The base's carried keyboard stylesheet(s), as member references (#2308). */
+  stylesheets: readonly string[] = [],
 ): void {
   const now = new Date();
   const yyyy = emitYear;
@@ -625,7 +636,7 @@ export function generateStubs(
         ? { authorEmail: attribution.authorEmail }
         : {}),
     };
-    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version), false);
+    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version, [], fonts, stylesheets), false);
   }
 }
 
@@ -755,6 +766,18 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       renameFilesInVfs(vfs, actualStartId, keyboardId);
       applyTouchLayoutCleanup(vfs, keyboardId);
+      // #2308: the descriptor generateStubs writes must list the fonts and
+      // stylesheet the loader carried, in the base's own reference spelling.
+      // The stylesheet is the id-named sibling: renameFilesInVfs just renamed
+      // `source/<base id>.css` to the new id, so the entry names the new file.
+      const kpsFonts: KpsFontDescriptorEntry[] = loaderFonts.map((f) => ({
+        ref: kpsMemberRef(f.ttfRelPath, base.path),
+        isOskFont: f.isOskFont,
+      }));
+      const kpsStylesheets = loaderStylesheets.map((s) => {
+        const ref = kpsMemberRef(s.cssRelPath, base.path);
+        return ref === `${actualStartId}.css` ? `${keyboardId}.css` : ref;
+      });
       generateStubs(
         vfs,
         keyboardId,
@@ -764,6 +787,8 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         attribution,
         emitYear,
         inheritedHolders,
+        kpsFonts,
+        kpsStylesheets,
       );
 
       // The base's icon came across with the rest of source/ (loader) and was
