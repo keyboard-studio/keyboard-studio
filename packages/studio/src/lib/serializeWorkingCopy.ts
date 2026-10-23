@@ -473,13 +473,16 @@ export async function projectWorkingCopyForOutput(
 
   // spec 079 FR-013..FR-015: one deterministic layout chart per (platform,
   // layer), generated from the MODEL (never the on-screen preview) unless the
-  // base ships its own images and the author has not asked to regenerate.
+  // base ships its own images and the author has not asked to regenerate —
+  // on a copy, only when the author explicitly chose to keep them.
   // Computed before the projection so the descriptor's <Files> can list them.
   // Chart names carry the reserved `ks-layout-` prefix, so a base image can
   // never be overwritten; a (theoretical) same-named base image wins.
   const docWarnings: string[] = [];
   const baseShipsImages = carriedImageNames.length > 0;
-  const chartsWanted = effectiveChartPreference(chartPreference, baseShipsImages) === "regenerate" || !baseShipsImages;
+  const chartsWanted =
+    effectiveChartPreference(chartPreference, baseShipsImages, instantiationMode === "new-from-base") === "regenerate" ||
+    !baseShipsImages;
   const charts = chartsWanted
     ? buildLayoutCharts({
         displayName: identity?.displayName ?? startKeyboard.displayName,
