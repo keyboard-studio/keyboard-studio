@@ -103,8 +103,9 @@ export function DocumentationChecklist({ typingGuideSuppressed = false }: Docume
   const startWelcomeImages = useWorkingCopyStore((s) => s.startWelcomeImages);
   const chartPreference = useWorkingCopyStore((s) => s.chartPreference);
   const setChartPreference = useWorkingCopyStore((s) => s.setChartPreference);
+  const isCopy = useWorkingCopyStore((s) => s.instantiationMode === "new-from-base");
   const baseShipsImages = carriedWelcomeImages(startWelcomeImages).length > 0;
-  const effectivePreference: ChartPreference = effectiveChartPreference(chartPreference, baseShipsImages);
+  const effectivePreference: ChartPreference = effectiveChartPreference(chartPreference, baseShipsImages, isCopy);
 
   const memberName = (member: DocMemberId): string => {
     switch (member) {

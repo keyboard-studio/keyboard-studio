@@ -793,7 +793,10 @@ describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never b
     useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
     await serializeWorkingCopy();
     const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(callArg["welcomeFolderFiles"]).toEqual(["desktop_default.png", "phone_default.png"]);
+    const listed = callArg["welcomeFolderFiles"] as string[];
+    // The carried images lead, in loader order; a copy's generated charts follow.
+    expect(listed.slice(0, 2)).toEqual(["desktop_default.png", "phone_default.png"]);
+    expect(listed.slice(2).every((n) => n.startsWith("ks-layout-"))).toBe(true);
   });
 });
 
@@ -891,9 +894,28 @@ describe("serializeWorkingCopy — layout charts (spec 079 FR-013..FR-015)", () 
     expect(callArg["welcomeFolderFiles"]).toEqual(charts.map((p) => p.slice("source/welcome/".length)));
   });
 
-  it("a base that ships images keeps them and gets NO charts by default (FR-015)", async () => {
+  it("a copy regenerates charts by default even when its base ships images; the images still ship (FR-015)", async () => {
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedStore();
+    useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
+    const projected = await projectWorkingCopyForOutput();
+    expect(chartNames(projected!.vfs).length).toBeGreaterThan(0);
+    expect([...(projected!.vfs.get("source/welcome/desktop_default.png")!.content as Uint8Array)]).toEqual([1, 2, 3]);
+  });
+
+  it("a copy whose author chose to keep the base images gets NO charts", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
+    useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+    const projected = await projectWorkingCopyForOutput();
+    expect(chartNames(projected!.vfs)).toEqual([]);
+    expect([...(projected!.vfs.get("source/welcome/desktop_default.png")!.content as Uint8Array)]).toEqual([1, 2, 3]);
+  });
+
+  it("an adaptation whose base ships images keeps them and gets NO charts by default (FR-015)", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedAdaptStore();
     useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
     const projected = await projectWorkingCopyForOutput();
     expect(chartNames(projected!.vfs)).toEqual([]);
