@@ -42,6 +42,7 @@ import {
   normaliseWelcomeFolderFiles,
   welcomeFolderKpsRef,
   WELCOME_PAGE_KPS_REF,
+  type KpsFontDescriptorEntry,
   type PackageDescriptorIdentity,
 } from "./build.js";
 import { escapeHtml } from "../shared/escapeHtml.js";
@@ -107,6 +108,14 @@ export function applyIdentityToKps(
   version?: string,
   welcomeFolderFiles: readonly string[] = [],
   reportKeyboardId: string = keyboardId,
+  /**
+   * The base's carried fonts / stylesheets (#2308), consulted ONLY on the
+   * generate path: a descriptor that already exists keeps the entries it
+   * was scaffolded with (identity patching does not touch `<Files>` beyond
+   * the welcome migration), so passing them here cannot double-list.
+   */
+  fonts: readonly KpsFontDescriptorEntry[] = [],
+  stylesheets: readonly string[] = [],
 ): ApplyIdentityToKpsResult {
   const path = `source/${keyboardId}.kps`;
   const reportPath = `source/${reportKeyboardId}.kps`;
@@ -127,7 +136,7 @@ export function applyIdentityToKps(
     try {
       vfs.set(
         path,
-        buildKpsContent(keyboardId, identity, kmnText, version, welcomeFolderFiles),
+        buildKpsContent(keyboardId, identity, kmnText, version, welcomeFolderFiles, fonts, stylesheets),
         false,
       );
     } catch (err: unknown) {
