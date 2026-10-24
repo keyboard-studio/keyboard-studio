@@ -164,9 +164,9 @@ async function driveToBasicKbdusTouchStep(
 
 /**
  * Walk 1's marks series: click through the stations like
- * driveMarksSeries, but STOP at the spec 104 guard station and prove the
- * FR-013 gate — Continue is disabled until the question is answered —
- * then answer "swallow" explicitly. Returns via the punctuation step's
+ * driveMarksSeries, but STOP at the spec 104 guard station and prove it
+ * opens on the "swallow" default with Continue enabled, then pass it.
+ * Returns via the punctuation step's
  * landmark, which drivePunctuationStep then clicks through.
  */
 async function driveMarksSeriesExpectingGuard(page: Page): Promise<void> {
@@ -183,12 +183,11 @@ async function driveMarksSeriesExpectingGuard(page: Page): Promise<void> {
     if (await punctuationDone.isVisible().catch(() => false)) break;
     if (!(await continueBtn.isVisible().catch(() => false))) break;
     if (await page.getByTestId("guard-station").isVisible().catch(() => false)) {
-      // FR-013: the guard station completes only with an answer on
-      // record. On this fresh Copy walk there is no seed and no prior,
-      // so Continue must be gated until the author picks.
-      await expect(continueBtn).toBeDisabled();
-      await page.getByTestId("guard-option-swallow").check();
+      // FR-013: on this fresh Copy walk there is no seed and no prior, so
+      // the station opens on the "swallow" default with Continue enabled;
+      // passing the station records the default as the author's answer.
       await expect(page.getByTestId("guard-option-swallow")).toBeChecked();
+      await expect(page.getByTestId("guard-option-emit")).not.toBeChecked();
       await expect(continueBtn).toBeEnabled();
       guardAnswered = true;
     }

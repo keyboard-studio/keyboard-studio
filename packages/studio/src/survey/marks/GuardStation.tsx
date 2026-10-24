@@ -25,7 +25,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { GuardSpecification } from "@keyboard-studio/contracts";
 
 import { mutedParaFlush } from "../surveyStyles.ts";
-import type { GuardBehaviour } from "./guardSpecification.ts";
+import { DEFAULT_GUARD_BEHAVIOUR, type GuardBehaviour } from "./guardSpecification.ts";
 
 export interface GuardStationProps {
   /** The currently selected behaviour (the author's pick, the prior answer, or the seed). */
@@ -139,12 +139,13 @@ export interface GuardQuestionPromptProps {
 
 /**
  * The guard question where the touch editor needs it (FR-013's tail): a
- * mark is being placed and no specification exists. Two buttons — the
- * tap IS the answer, recorded by the caller as the keyboard's
+ * mark is being placed and no specification exists. It opens on the same
+ * default the station does, selected but not yet recorded; the confirm
+ * button IS the answer, recorded by the caller as the keyboard's
  * GuardSpecification before the mark's proposal is computed.
  */
 export function GuardQuestionPrompt({ onAnswer }: GuardQuestionPromptProps) {
-  const { t } = useLingui();
+  const [choice, setChoice] = useState<GuardBehaviour>(DEFAULT_GUARD_BEHAVIOUR);
   return (
     <div data-testid="guard-question-prompt" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -156,17 +157,10 @@ export function GuardQuestionPrompt({ onAnswer }: GuardQuestionPromptProps) {
           punctuation — the mark appears anyway, or nothing happens because there is no letter for it to sit on?
         </Trans>
       </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <button type="button" data-testid="guard-prompt-emit" onClick={() => onAnswer("emit")} style={{ alignSelf: "flex-start" }}>
-          {t({ id: "marks.guard.option.emit", message: "The mark appears anyway" })}
-        </button>
-        <button type="button" data-testid="guard-prompt-swallow" onClick={() => onAnswer("swallow")} style={{ alignSelf: "flex-start" }}>
-          {t({
-            id: "marks.guard.option.swallow",
-            message: "Nothing happens — there is no letter for it to sit on",
-          })}
-        </button>
-      </div>
+      <GuardOptions value={choice} name="marks-guard-prompt-behaviour" onChange={setChoice} />
+      <button type="button" data-testid="guard-prompt-confirm" onClick={() => onAnswer(choice)} style={{ alignSelf: "flex-start" }}>
+        <Trans id="marks.guard.prompt.confirm">Use this answer</Trans>
+      </button>
     </div>
   );
 }

@@ -198,7 +198,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     );
   });
 
-  it("simple orthography completes in at most THREE marks screens (SC-002, plus spec 104 FR-013's guard screen)", () => {
+  it("simple orthography completes in at most TWO marks screens (SC-002); a mark with no key of its own gets no guard question", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
@@ -207,13 +207,11 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     // Screen 1: the auto-confirmed attachment summary.
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
-    // Screen 2: the output-form notice.
+    // Screen 2: the output-form notice — the last screen, since the one
+    // mark is composed (spec 104's guard station needs a mark key).
     expect(screen.getByTestId("marks-output-form")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
-    // Screen 3: spec 104's guard question, asked once per keyboard.
-    expect(screen.getByTestId("guard-station")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("guard-option-emit"));
-    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(screen.queryByTestId("guard-station")).toBeNull();
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });
@@ -652,11 +650,8 @@ describe("MarksSeriesStep — S4 output-form station (#2297)", () => {
       const text = screen.getByTestId("marks-output-form").textContent ?? "";
       expect(text).not.toMatch(/unicode/i);
       expect(text).not.toMatch(/normali[sz]/i);
-      // Spec 104's guard station obeys the same author-language rule.
-      fireEvent.click(screen.getByTestId("marks-continue"));
-      const guardText = screen.getByTestId("guard-station").textContent ?? "";
-      expect(guardText).not.toMatch(/unicode/i);
-      expect(guardText).not.toMatch(/normali[sz]/i);
+      // Spec 104's guard station obeys the same rule — asserted in
+      // GuardStation.test.tsx, since these one-letter fixtures have no mark key.
     }
   });
 });
