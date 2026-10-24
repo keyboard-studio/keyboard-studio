@@ -116,6 +116,15 @@ export function detectImportedGuardBehaviour(ir: KeyboardIR): GuardBehaviour | u
 }
 
 /**
+ * The behaviour the guard question opens on when there is no prior answer
+ * and no import seed: a mark with no letter to sit on types nothing. A
+ * default is a proposal (Art. X) — it is shown selected, and it is recorded
+ * as the author's (`asked`, confirmed) only when they pass the guard station
+ * or confirm the touch-editor prompt with it.
+ */
+export const DEFAULT_GUARD_BEHAVIOUR: GuardBehaviour = "swallow";
+
+/**
  * Mint a specification record. Ids are content-derived (the codebase's
  * record convention — cf. severTouchKey's transplant ids); `supersedes`
  * chains to the record being replaced, never to the minted id itself.
