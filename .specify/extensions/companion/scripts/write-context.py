@@ -88,6 +88,7 @@ from capture import (  # noqa: E402,F401
     apply_batch,
     append_string_list,
     append_verification_runs,
+    record_plan_check,
     set_classification,
     set_fields,
     set_living_specs_loaded,
@@ -125,63 +126,6 @@ from living_spec_fold import (  # noqa: E402,F401
     apply_deltas,
     fold_living_spec,
 )
-
-
-# --------------------------------------------------------------------------- #
-# Output verbosity
-#
-# Every call's output lands in an agent's context window, and a single feature
-# makes dozens of these calls. By default a call reports itself briefly: paths
-# under the working directory are printed relative to it (the form the command
-# bodies already document, `specs/<NNN>-<slug>/.spec-context.json`), `--set`
-# names the keys it wrote rather than echoing their values back, and a usage
-# error prints a one-line usage instead of the whole flag list. Every line is
-# still printed — errors and warnings included; only their length changes.
-# `--verbose`, or SPECKIT_COMPANION_VERBOSE=1, restores the full output.
-# --------------------------------------------------------------------------- #
-
-VERBOSE_ENV = "SPECKIT_COMPANION_VERBOSE"
-_SHORT_USAGE = "%(prog)s [options]  (--help lists every flag)"
-
-
-def _verbose_requested(argv: list | None = None) -> bool:
-    argv = sys.argv[1:] if argv is None else argv
-    if "--verbose" in argv:
-        return True
-    return os.environ.get(VERBOSE_ENV, "").strip().lower() in ("1", "true", "yes", "on")
-
-
-class _RelPaths:
-    """Stream wrapper that prints paths under the cwd relative to it.
-
-    Output only: what is written to disk keeps the absolute path. A path outside
-    the cwd is printed unchanged.
-    """
-
-    def __init__(self, real, base: Path | None = None):
-        self._real = real
-        text = str(base or Path.cwd())
-        parts = [re.escape(p) for p in re.split(r"[\\/]+", text) if p]
-        lead = r"[\\/]" if text[:1] in "\\/" else ""
-        flags = re.IGNORECASE if os.name == "nt" else 0
-        # Only a path that STARTS at the cwd: the lookbehind stops a match inside a
-        # longer path (e.g. `/mnt` + the cwd) from being spliced.
-        self._prefix = (
-            re.compile(r"(?<![^\s'\"(=])" + lead + r"[\\/]".join(parts) + r"[\\/]", flags)
-            if parts else None
-        )
-
-    def write(self, s):
-        if self._prefix is not None and isinstance(s, str):
-            s = self._prefix.sub("", s)
-        self._real.write(s)
-        return len(s)
-
-    def flush(self):
-        self._real.flush()
-
-    def __getattr__(self, name):
-        return getattr(self._real, name)
 
 
 def _pointer_resolved(args) -> bool:
@@ -241,14 +185,25 @@ def update_context(
 
     log = canonical_log(ctx)
     fill_required(ctx, feature_dir, branch)
+    # `branch` is frozen at the first write, which lands before the feature branch exists; a step start records where the work moved to.
+    # Asked of the spec's own folder, never the fallback repo: a spec outside git has no working branch to record.
+    checked_out = _git_branch(feature_dir) if kind == "start" else None
+    if checked_out and checked_out != "HEAD":
+        if checked_out == ctx.get("branch"):
+            ctx.pop("workingBranch", None)
+        else:
+            ctx["workingBranch"] = checked_out
 
-    ctx["currentStep"] = step
+    # A start that lands after its step already finished is late, not a re-open.
+    late_start = kind == "start" and substep is None and _has_complete(log, step)
+    if not late_start:
+        ctx["currentStep"] = step
     # A start carries the step forward and leaves status alone. `--status` used to
     # default to "specified" and was written on every branch, so opening a step
     # without naming a status was indistinguishable from asking to go back to the
     # first one: a run would read currentStep=implement alongside status=specified
     # for the whole step, and only the later complete repaired it.
-    if status is not None:
+    if status is not None and not late_start:
         ctx["status"] = status
 
     if kind == "complete":
@@ -354,6 +309,13 @@ def journal_advance(feature_dir: Path, step: str, by: str) -> Path | None:
     return target
 
 
+UNVERIFIED_NOTE = "finished, unverified"
+
+
+def _has_entries(value) -> bool:
+    return isinstance(value, list) and bool(value)
+
+
 def mark_spec_complete(feature_dir: Path, by: str) -> Path | None:
     """Promote a finished spec to the terminal `completed` status.
 
@@ -412,6 +374,16 @@ def mark_spec_complete(feature_dir: Path, by: str) -> Path | None:
     if from_implementing_at_100:
         append_complete(log, "implement", by=by, at=_now_iso())
     ctx["status"] = "completed"
+    # Nothing is in flight in a finished spec; the task steps leave the last finished id here.
+    ctx["currentTask"] = None
+    if not _has_entries(ctx.get("verified")) and not ctx.get("concerns"):
+        # Added to the record this function is about to publish, so the status and its caveat land in one write.
+        ctx["concerns"] = [{"note": UNVERIFIED_NOTE, "step": "implement"}]
+        print(
+            f"[companion] Warning: {target} completed with nothing verified and no "
+            f'concern explaining why; recorded "{UNVERIFIED_NOTE}".',
+            file=sys.stderr,
+        )
     commit_log(ctx, log)
     atomic_write(target, ctx)
     _gc_events_log(feature_dir)
@@ -419,18 +391,7 @@ def mark_spec_complete(feature_dir: Path, by: str) -> Path | None:
 
 
 def _main() -> int:
-    verbose = _verbose_requested()
-    if not verbose:
-        sys.stdout, sys.stderr = _RelPaths(sys.stdout), _RelPaths(sys.stderr)
-    parser = argparse.ArgumentParser(
-        description="Write/update a feature's .spec-context.json",
-        usage=None if verbose else _SHORT_USAGE,
-    )
-    parser.add_argument(
-        "--verbose", action="store_true",
-        help=f"Full output: absolute paths, --set values echoed, full usage on error "
-             f"(also {VERBOSE_ENV}=1). The default is a one-line summary per write.",
-    )
+    parser = argparse.ArgumentParser(description="Write/update a feature's .spec-context.json")
     parser.add_argument("--step", default="specify")
     # No default: a caller that does not name a status does not want one changed.
     parser.add_argument("--status", default=None)
@@ -438,8 +399,9 @@ def _main() -> int:
     parser.add_argument("--kind", default="start", choices=["start", "complete"])
     parser.add_argument(
         "--at", default=None, metavar="ISO8601",
-        help="Timestamp for a step START the dispatcher already decided (the GUI's "
-             "dispatch time). Refused for anything else: a hand-chosen clock on a "
+        help="Timestamp for a step START read from a real clock before the feature "
+             "directory existed (the GUI's dispatch time, or the clock stock specify "
+             "notes as its first action). Refused for anything else: a hand-chosen clock on a "
              "finish is the batched-timestamp defect the doctor exists to catch.")
     parser.add_argument(
         "--substep", default=None,
@@ -714,8 +676,7 @@ def _main() -> int:
             captured.append(f"[companion] Recorded classification in {target}")
         if args.set_pairs:
             target = set_fields(feature_dir, args.set_pairs)
-            shown = args.set_pairs if verbose else [str(p).split("=", 1)[0].strip() for p in args.set_pairs]
-            captured.append(f"[companion] Set {', '.join(shown)} in {target}")
+            captured.append(f"[companion] Set {', '.join(args.set_pairs)} in {target}")
         if args.batch:
             target, landed = apply_batch(feature_dir, args.batch, args.step)
             if target is not None:
@@ -904,6 +865,16 @@ def _main() -> int:
     # recorded failure whose cause is only on the terminal cannot be diagnosed
     # from the trace file afterwards, which is the trace file's whole job.
     _record_outcome(target is not None, _DECLINED)
+
+    closes_plan = args.step == "plan" and not args.substep and (
+        args.finish or args.advance
+        or not (args.mark_complete or args.materialize or args.close_task or args.task or args.tasks_file)
+        and args.kind == "complete")
+    if target is not None and closes_plan:
+        try:
+            record_plan_check(feature_dir)
+        except Exception as exc:  # noqa: BLE001 - the close already landed
+            print(f"[companion] Warning: skipped the plan blocks check: {exc}", file=sys.stderr)
 
     if target is not None and not args.tasks_file:
         if args.mark_complete:
