@@ -44,7 +44,7 @@
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.6;margin:0}
 .wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.prose{max-width:66ch}
+.prose{max-width:none}
 h1,h2,h3{font-family:var(--f-head);text-wrap:balance;line-height:1.15;margin:0;font-weight:600}
 h1{font-size:clamp(2.1rem,5vw,3.4rem);letter-spacing:-.01em}
 h2{font-size:clamp(1.5rem,3vw,2rem)}
@@ -64,7 +64,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible{o
 /* hero */
 header{padding-block:64px 48px}
 .hero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:40px;align-items:end}
-.lede{font-size:1.2rem;color:var(--muted);max-width:56ch}
+.lede{font-size:1.2rem;color:var(--muted)}
 .cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
 .btn{font-family:var(--f-display);font-weight:700;font-size:.95rem;padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
@@ -76,7 +76,7 @@ header{padding-block:64px 48px}
 .demo .opt{font-size:.95rem}
 .demo .prov{font-size:.8rem;color:var(--accent);font-family:var(--f-display)}
 /* lists */
-.ux{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;max-width:62ch}
+.ux{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
 .ux li{padding-left:18px;position:relative}
 .ux li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--accent)}
 .ux b{font-family:var(--f-display)}
@@ -448,7 +448,7 @@ footer p+p{margin-top:12px}
     <h2 id="h-compare">Keyman's compiler checks the keyboard. The review checklist covers the rest.</h2>
     <p>Keyman's compiler, kmcmplib, validates the keyboard program, and the studio runs it in the browser on every edit. Much of what reviewers ask about on a pull request is in the files around the program: the package, history, licence, help pages, language tags, and touch layout. The studio turns the repository's review checklist into checks and questions, so authors can fix many of these before a reviewer ever sees them.</p>
   </div>
-  <div class="panel fixes" style="margin-top:28px;max-width:640px">
+  <div class="panel fixes" style="margin-top:28px">
     <h3>Fixes reviewers often ask for, and where the studio catches them</h3>
     <ul>
       <li><span>Missing <code>usealtgr</code> tag when RALT is used</span><span class="tag t-lint">7.5 check</span></li>
@@ -476,7 +476,7 @@ footer p+p{margin-top:12px}
       <span class="sub">The keyboards review checklist</span>
       <div class="big" data-count="total">149</div>
       <p class="note">The repository's review checklist written out as criteria, plus keyboard-design heuristics and checks for adapted keyboards. Each criterion is handled in one way:</p>
-      <div class="meter" id="meter" role="img" aria-label="Criteria by how they are handled"></div>
+      <div class="meter" id="meter" role="img" aria-label="40 built in, 67 checked, 32 asked, 10 left to people"><span data-band="scaffolder-bake" style="width:26.8%;background:var(--bake)"></span><span data-band="layer-c-enforce" style="width:45%;background:var(--lint)"></span><span data-band="yellow-survey" style="width:21.5%;background:var(--survey)"></span><span data-band="red-checklist" style="width:6.7%;background:var(--check)"></span></div>
       <div class="bands">
         <div class="band"><span class="n c-bake" data-count="scaffolder-bake">40</span><div><b>Built in from the start.</b><p>The studio produces it correctly, so the author can't get it wrong: folder placement, <code>.kps</code> file lists, licence syntax, README links, help-page header.</p></div></div>
         <div class="band"><span class="n c-lint" data-count="layer-c-enforce">67</span><div><b>Checked automatically.</b><p>A named check stops the output until it is fixed: version rules, HISTORY format, copyright consistency across files, targets, fonts, <code>welcome.htm</code>/<code>.php</code> parity, touch-layout limits.</p></div></div>
@@ -631,9 +631,9 @@ footer p+p{margin-top:12px}
       if (c != null) el.textContent = c;
     });
     var meter = document.getElementById("meter");
-    meter.innerHTML = ORDER.map(function (b) {
-      return '<span style="width:' + ((counts[b] || 0) / rows.length * 100).toFixed(1) + '%;background:var(' + BAND[b].v + ')"></span>';
-    }).join("");
+    meter.querySelectorAll("span[data-band]").forEach(function (seg) {
+      seg.style.width = ((counts[seg.getAttribute("data-band")] || 0) / rows.length * 100).toFixed(1) + "%";
+    });
     meter.setAttribute("aria-label", ORDER.map(function (b) { return (counts[b] || 0) + " " + BAND[b].label.toLowerCase(); }).join(", "));
 
     var secs = [];
