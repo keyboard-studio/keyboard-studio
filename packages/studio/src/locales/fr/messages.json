@@ -1162,6 +1162,7 @@
   "marks.contextTolerance.step.prior.accepted": "You chose to add the step that converts pasted letters and diacritics to the form this keyboard produces.",
   "marks.guard.option.emit": "La marque apparaît quand même",
   "marks.guard.option.swallow": "Rien ne se passe — il n'y a aucune lettre pour la porter",
+  "marks.guard.prompt.confirm": "Utiliser cette réponse",
   "marks.guard.prompt.heading": "Une seule question pour tout ce clavier",
   "marks.guard.station.change": "Modifier cette réponse",
   "marks.guard.station.heading": "Une marque sans lettre avant elle",
