@@ -406,6 +406,7 @@ export type {
   CompileCarveSuppressionResult,
 } from "./carveSuppression.js";
 export { isInSwallowSet } from "./swallowSet.js";
+export { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
 export type { SwallowCombo } from "./swallowSet.js";
 
 // Spec 104 Wave 3: the terminal-insertion primitive, exported so the

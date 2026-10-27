@@ -9,8 +9,7 @@
 // through every checkpoint, and `installRebuiltState`
 // (rebuildWorkingCopy.ts) installs it into the working copy's carve
 // state — so a replay rebuild reconstructs the carve overlay (deleted
-// node/item/touch-key sets, carve chars, dispositions, the closed-
-// keyboard card outcome) from the decision set alone.
+// node/item/touch-key sets, carve chars) from the decision set alone.
 //
 // The reconstruction is the inverse of `carvedLayoutValueFromOverlay`
 // (survey/carve/carveValue.ts, ruling D-090-30): the value's removal
@@ -21,7 +20,12 @@
 // `carveTouchKeepInert` has no slice field: the value carries none
 // (no live writer exists — D-090-30 condition (i) / D-090-31).
 
-import type { CarveDisposition } from "@keyboard-studio/contracts";
+import type { FallbackPolicy } from "@keyboard-studio/contracts";
+import {
+  hasFallbackFields,
+  migrateFallbackPolicy,
+  type LegacyFallbackFields,
+} from "../survey/carve/fallbackPolicyMigration.ts";
 import type {
   CarveRemovalItem,
   CarvedLayoutValue,
@@ -33,8 +37,15 @@ export interface CarveOverlaySlice {
   deletedItemIds: ReadonlySet<string>;
   disabledFamilyIds: ReadonlySet<string>;
   carveChars: ReadonlySet<string>;
-  carveDispositions: readonly CarveDisposition[];
-  closedKeyboardCard: "accepted" | "declined" | null;
+  /**
+   * The policy a LEGACY value (recorded with `dispositions` /
+   * `closedKeyboardCard`) migrates to; null for a current value, which
+   * carries none. Informational: `installRebuiltState` deliberately does
+   * not install it — the fallback policy is an author-set setting owned by
+   * the working copy (persisted in the draft, migrated there), and a rebuild
+   * must not revert a later choice to a carve-time snapshot.
+   */
+  legacyFallbackPolicy: FallbackPolicy | null;
 }
 
 /**
@@ -50,6 +61,7 @@ export interface CarveOverlaySlice {
  */
 export function carveOverlayFromValue(value: unknown): CarveOverlaySlice {
   const v = (value ?? {}) as Partial<CarvedLayoutValue>;
+  const legacy = (value ?? {}) as LegacyFallbackFields;
   const sets: Record<CarveRemovalItem["kind"], Set<string>> = {
     node: new Set<string>(),
     item: new Set<string>(),
@@ -73,10 +85,6 @@ export function carveOverlayFromValue(value: unknown): CarveOverlaySlice {
     deletedItemIds: sets.item,
     disabledFamilyIds: sets.family,
     carveChars: sets.char,
-    carveDispositions: Array.isArray(v.dispositions) ? [...v.dispositions] : [],
-    closedKeyboardCard:
-      v.closedKeyboardCard === "accepted" || v.closedKeyboardCard === "declined"
-        ? v.closedKeyboardCard
-        : null,
+    legacyFallbackPolicy: hasFallbackFields(legacy) ? migrateFallbackPolicy(legacy) : null,
   };
 }

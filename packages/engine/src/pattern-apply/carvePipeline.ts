@@ -20,8 +20,9 @@
 //      filter must not undo the compiler's in-place block rewrite, and
 //      allow-host removals are already gone (no double-removal).
 
-import type { CarveDisposition, KeyboardIR } from "@keyboard-studio/contracts";
+import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
 import { compileCarveSuppression } from "./carveSuppression.js";
+import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
 import { applyStoreSlotRemovals } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
 import { parseSlotId } from "./slotId.js";
@@ -32,9 +33,12 @@ import { parseSlotId } from "./slotId.js";
  * - `deletedNodeIds`  — whole-node carve deletions (group/rule/store/raw nodeIds).
  * - `deletedItemIds`  — glyph-level carve item ids (store-slot `<storeNodeId>#<index>`
  *                       ids plus bare rule/store nodeIds).
- * - `dispositions`    — per-combination carve dispositions for the suppression
- *                       stage (FR-019). Empty (or omitted) means "no suppression":
- *                       the pipeline degrades to the legacy slot-removals → filter
+ * - `fallbackPolicy`  — the keyboard-wide fallback policy for the suppression
+ *                       stage (FR-019, retired per-carve override). It is expanded
+ *                       over the carved combo ids (deletedNodeIds + deletedItemIds):
+ *                       swallow → block, pass-through → allow-host (deadkey carves
+ *                       still suppress). Omitted means "no suppression": the
+ *                       pipeline degrades to the legacy slot-removals → filter
  *                       behavior, content-identical.
  * - `loud`            — A6 loud/soft for the suppression stage. Default false
  *                       (soft); follows the A6 survey answer when it exists (FR-009).
@@ -42,7 +46,13 @@ import { parseSlotId } from "./slotId.js";
 export interface CarvePipelineInput {
   deletedNodeIds: ReadonlySet<string>;
   deletedItemIds: ReadonlySet<string>;
-  dispositions?: CarveDisposition[];
+  fallbackPolicy?: FallbackPolicy;
+  /**
+   * Ids in the deletion sets that are plain removals, not carves (e.g. rules
+   * of a disabled family). They are excluded from the policy expansion, so
+   * they are filtered out rather than rewritten into suppression rules.
+   */
+  suppressionExemptIds?: ReadonlySet<string>;
   loud?: boolean;
 }
 
@@ -80,13 +90,21 @@ export function partitionCarveItemIds(
  * Runs suppression → slot removals → whole-node filter (see the file header
  * for why this order is load-bearing). `startIr` is never mutated. The result
  * is content-identical to the legacy (pre-suppression) pipeline when
- * `dispositions` is empty or omitted.
+ * `fallbackPolicy` is omitted.
  */
 export function deriveCarvedIr(
   startIr: KeyboardIR,
   input: CarvePipelineInput,
 ): CarvePipelineResult {
-  const dispositions = input.dispositions ?? [];
+  const dispositions =
+    input.fallbackPolicy === undefined
+      ? []
+      : dispositionsForFallbackPolicy(
+          input.fallbackPolicy,
+          [...input.deletedNodeIds, ...input.deletedItemIds].filter(
+            (id) => input.suppressionExemptIds?.has(id) !== true,
+          ),
+        );
 
   // Stage 1 — suppression on the PRE-carve IR (T013 constraint).
   const suppressed = compileCarveSuppression(

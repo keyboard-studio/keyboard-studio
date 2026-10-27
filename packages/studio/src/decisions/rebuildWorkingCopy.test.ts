@@ -229,10 +229,6 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
             { kind: "family", id: "fam1", provenance: "asked" },
             { kind: "char", id: "é", provenance: "asked" },
           ],
-          dispositions: [
-            { comboId: "n1#0", disposition: "block", provenance: "author-override" },
-          ],
-          closedKeyboardCard: "accepted",
         },
         provenance: "asked",
       }),
@@ -246,10 +242,8 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
     expect([...wc.deletedItemIds]).toEqual(["i1"]);
     expect([...wc.disabledFamilyIds]).toEqual(["fam1"]);
     expect([...wc.carveChars]).toEqual(["é"]);
-    expect(wc.carveDispositions).toEqual([
-      { comboId: "n1#0", disposition: "block", provenance: "author-override" },
-    ]);
-    expect(wc.closedKeyboardCard).toBe("accepted");
+    // The fallback policy is an author-set setting: a rebuild leaves it as it stands.
+    expect(wc.fallbackPolicy).toBe("swallow");
   });
 
   it("recalculateForStartingPointChangeFromStores: retained decisions re-derive against the new base (T017)", () => {

@@ -1,8 +1,9 @@
 // carvedLayout — gallery decision module for `carved-layout` (spec 090).
 //
 // The value is the carve outcome (survey/carve/carveValue.ts): the
-// removal set (per-item provenance RULED flat enum, T003), the spec-076
-// carve dispositions unchanged, and the closed-keyboard card outcome.
+// removal set (per-item provenance RULED flat enum, T003). Values recorded
+// before the keyboard-wide fallback policy also carried carve dispositions
+// and a closed-keyboard card outcome; those are read, never written.
 // Recording is step-side: the CarveAdapter records the overlay-derived
 // value as this decision when the author completes the step (the
 // base-keyboard / deadkeys precedent — editor steps record their own

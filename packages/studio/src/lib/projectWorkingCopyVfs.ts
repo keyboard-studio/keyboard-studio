@@ -74,7 +74,7 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import type { CarveDisposition } from "@keyboard-studio/contracts";
+import type { FallbackPolicy } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
@@ -170,13 +170,19 @@ export interface ProjectWorkingCopyVfsInput {
   deletedItemIds?: ReadonlySet<string>;
   /**
   /**
-   * Carve dispositions (T015, FR-019) for the suppression stage. The caller
-   * (useWorkingCopyTransform) reads them from the working-copy store's
-   * `getCarveDispositions`. They are scoped to the live carve set here, so a
-   * stale disposition can never rewrite an uncarved rule. Empty/omitted
-   * degrades to the legacy carve behavior, content-identical.
+   * Keyboard-wide fallback policy (T015, FR-019) for the suppression stage.
+   * The caller (useWorkingCopyTransform) reads it from the working-copy
+   * store. The engine expands it over the live carve set, so it can never
+   * rewrite an uncarved rule. Omitted degrades to the legacy carve behavior,
+   * content-identical.
    */
-  carveDispositions?: CarveDisposition[];
+  fallbackPolicy?: FallbackPolicy;
+  /**
+   * Ids inside `deletedItemIds` that are plain removals rather than carves
+   * (disabled-family rules). They are removed outright, never rewritten into
+   * suppression rules by the fallback policy.
+   */
+  suppressionExemptIds?: ReadonlySet<string>;
   /**
    * A6 loud/soft for the suppression stage (FR-009). Default false (soft).
    * Follows the A6 survey answer when it exists.
@@ -378,7 +384,8 @@ export function projectWorkingCopyVfs(
     deletedItemIds = new Set<string>(),
     carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
-    carveDispositions = [],
+    fallbackPolicy,
+    suppressionExemptIds,
     carveLoud = false,
     carveTouchKeepInert,
     keyEditOps = [],
@@ -446,19 +453,10 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // T015 — scope dispositions to the live carve set. The store persists
-  // dispositions per combination; prune-on-uncarve (T010) keeps them fresh,
-  // but this scope is the backstop: a stale disposition must never rewrite
-  // an uncarved rule. Scoped to the #1809 §1 union (effectiveItemIds), the
-  // same id set the slot partition above consumed.
-  const carveIdSet = new Set([...deletedNodeIds, ...effectiveItemIds]);
-  const activeDispositions = carveDispositions.filter((d) =>
-    carveIdSet.has(d.comboId),
-  );
   // 1a/1b: Whole-node deletions + store-slot removals + VFS re-emit.
   //
   // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
-  // in the engine). When dispositions are present, the pipeline derives the
+  // in the engine). When a fallback policy is present, the pipeline derives the
   // carved IR from the PRE-carve startIr — the T013 constraint: guard selector
   // chars are read from the pre-removal stores and are unrecoverable after
   // slot removal. Since spec 089 T021 the pipeline runs through the mutate
@@ -532,7 +530,8 @@ export function projectWorkingCopyVfs(
       effectiveItemIds,
       undefined,
       {
-        dispositions: activeDispositions,
+        ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
+        ...(suppressionExemptIds !== undefined ? { suppressionExemptIds } : {}),
         loud: carveLoud,
         // The pipeline's slot-removal warnings (blocked stores, skips) are
         // part of this projection's warning surface — the legacy path

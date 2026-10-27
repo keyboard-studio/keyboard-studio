@@ -22,6 +22,7 @@ import { currentPhysicalLayoutValue } from "../../survey/assignLoop/physicalLayo
 import { applyPhysicalCompletionEffects } from "../../lib/assignLoopCompletion.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
+import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
 
 /**
  * EditorStep adapter for the Mechanism Gallery (Phase C — desktop key
@@ -45,12 +46,19 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     onComplete(undefined);
   }
 
+  // Interim host for the keyboard-wide fallback policy (the Behaviours step
+  // that will own it has not landed): a collapsed section below the gallery.
   return (
-    <MechanismGallery
-      selectedStartKeyboard={startKeyboard}
-      onComplete={handleComplete}
-      {...(placementMap ? { placementMap } : {})}
-      {...(onBack ? { onBack } : {})}
-    />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <MechanismGallery
+          selectedStartKeyboard={startKeyboard}
+          onComplete={handleComplete}
+          {...(placementMap ? { placementMap } : {})}
+          {...(onBack ? { onBack } : {})}
+        />
+      </div>
+      <FallbackPolicySection />
+    </div>
   );
 }

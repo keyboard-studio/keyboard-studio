@@ -25,8 +25,8 @@
 // defaulting to the five with no language signal. The caption stays honest:
 // best guess, not sight.
 //
-// A2 framing (supersedes the old "Allow means unpredictable; Block means
-// predictable" slogan): the allow/block choice is a tradeoff, not a verdict,
+// A2 framing (supersedes the old one-sided slogan): the allow/block choice is
+// a tradeoff, not a verdict,
 // and each option states its own risk:
 //   Allow — "key always does something, but what it does varies by computer"
 //           (unpredictable).

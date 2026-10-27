@@ -26,6 +26,7 @@ import type {
   CarveDispositionProvenance,
   CarveDispositionValue,
 } from "./carveDisposition";
+import type { FallbackPolicy } from "./fallbackPolicy";
 import type {
   TouchKeyProvenance,
   TouchKeyIR,
@@ -128,6 +129,9 @@ export const CarveDispositionSchema = z.object({
   disposition: CarveDispositionValueSchema,
   provenance: CarveDispositionProvenanceSchema,
 });
+
+/** Keyboard-wide fallback policy (specs/076-rule-behaviours/fallback-surface-design.md). */
+export const FallbackPolicySchema = z.enum(["swallow", "pass-through"]);
 
 // ---------------------------------------------------------------------------
 // AxisFill (spec §7.2 script-class default-fill prior) — provenance primitive
@@ -1017,6 +1021,12 @@ type _CarveDispositionValueGuard = Expect<
 >;
 type _CarveDispositionProvenanceGuard = Expect<
   AssignableTo<z.infer<typeof CarveDispositionProvenanceSchema>, CarveDispositionProvenance>
+>;
+type _FallbackPolicyGuard = Expect<
+  AssignableTo<z.infer<typeof FallbackPolicySchema>, FallbackPolicy>
+>;
+type _FallbackPolicyReverseGuard = Expect<
+  AssignableTo<FallbackPolicy, z.infer<typeof FallbackPolicySchema>>
 >;
 // AxisFill (spec §7.2). `axis`/`value` are validated loosely (see
 // AxisFillSchema doc) so the guard only pins `source`, which is where real

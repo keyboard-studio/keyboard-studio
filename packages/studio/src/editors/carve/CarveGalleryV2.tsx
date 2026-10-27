@@ -7,11 +7,13 @@
 // cascades through the shared workingCopyStore actions
 // (cascadeDelete/cascadeRestore) — no gallery-specific write path.
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { recommendedRemovalChars, displayChar, isSparseLatinOverlayTarget } from '../../lib/irToCarveNodes.ts';
+import { resolveCarvedCombos } from '../../lib/carvedCombo.ts';
+import { ReviewCarvedKeysDialog } from './ReviewCarvedKeys.tsx';
+import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import {
   irToCharacterView, groupCharacterCells, characterCellIds, characterCellIsToggleable,
@@ -708,6 +710,16 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // reference, so Zustand's Object.is comparison never re-renders on its
   // own.
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const startIrForReview = useWorkingCopyStore((s) => s.startIr);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const carvedCombos = useMemo(
+    () =>
+      startIrForReview === null
+        ? []
+        : resolveCarvedCombos(startIrForReview, [...deletedNodeIds, ...deletedItemIds]),
+    [startIrForReview, deletedNodeIds, deletedItemIds],
+  );
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
@@ -803,39 +815,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // own optional, low-priority group instead of being suppressed or mixed in.
   const primaryRows = useMemo(() => recommended.filter((r) => r.reason !== 'cross-script-latin'), [recommended]);
   const optionalLatinRows = useMemo(() => recommended.filter((r) => r.reason === 'cross-script-latin'), [recommended]);
-
-  // The Allow/Block UI was archived (docs/archive/carve-disposition-ui); the
-  // bulk-default pre-fill below stays so engine carve suppression still gets its
-  // dispositions.
-  // 076 FR-022 (T016): the FR-005 `sparseLatinOverlay` input for disposition
-  // pre-fill — the target script is the only signal the gallery can read at
-  // carve time (see isSparseLatinOverlayTarget's doc).
-  const sparseLatinOverlay = isSparseLatinOverlayTarget(identityBcp47);
-  // Ruling (A1–A3): deadkey carves never fall through — rule nodeIds whose
-  // rules carry deadkey context. Rows touching these combos offer no Allow
-  // option and pre-fill to `block` with `deadkey-requirement` provenance.
-  const deadkeyComboIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (!ir) return ids;
-    for (const group of ir.groups ?? []) {
-      for (const rule of group.rules ?? []) {
-        if (rule.context?.some((el) => el.kind === "deadkey")) ids.add(rule.nodeId);
-      }
-    }
-    return ids;
-  }, [ir]);
-  const prefillCarveDispositions = useWorkingCopyStore((s) => s.prefillCarveDispositions);
-  const closedKeyboardCard = useWorkingCopyStore((s) => s.closedKeyboardCard);
-  const recommendedComboIds = useMemo(() => recommended.flatMap(recommendedRowIds), [recommended]);
-  // Pre-fill per-carve dispositions for every carve-candidate row from the
-  // bulk default (closed-keyboard card / FR-005 proposal). The store writes
-  // ONLY for combos without an existing disposition, so re-running when the
-  // card is answered later fills genuinely new combos without ever
-  // re-prompting (FR-022: recompile never re-prompts).
-  useEffect(() => {
-    if (recommendedComboIds.length === 0) return;
-    prefillCarveDispositions(recommendedComboIds, { sparseLatinOverlay, deadkeyComboIds });
-  }, [recommendedComboIds, sparseLatinOverlay, deadkeyComboIds, closedKeyboardCard, prefillCarveDispositions]);
 
   // "...for a {descriptor} keyboard" — descriptor is translatable (#1588):
   // either "{name}-only" (e.g. "Russian-only") via the catalog, or the
@@ -1204,7 +1183,17 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             Source
           </label>
         </fieldset>
+        <button
+          type="button"
+          className="ks-focus-ring"
+          data-testid="review-carved-keys-button"
+          onClick={() => setReviewOpen(true)}
+          style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'var(--app-surface-2)', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '6px 12px' }}
+        >
+          <Trans id="carve.review.open">Review carved keys</Trans>
+        </button>
         <RemovedDropdown list={removedList} onRestore={restoreRemovedItem} onRestoreAll={restoreAll} />
+        <ReviewCarvedKeysDialog open={reviewOpen} combos={carvedCombos} onClose={() => setReviewOpen(false)} />
       </div>
 
       {/* Two-panel body — narrow viewports stack the details card above the
