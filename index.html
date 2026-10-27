@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Keyboard Studio</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <meta name="description" content="An experimental, browser-based way to make a Keyman keyboard by answering questions about your language. Built on Keyman; not an official Keyman project.">
 <!-- Text source: docs/design-notes/landing-page-copy.md. Criteria data: packages/contracts/data/criteria.json (fetched at load).
      Colours and fonts mirror the studio: packages/studio/src/styles/colors.css (light :root + navy),
@@ -177,6 +180,27 @@ td.sec{font-family:var(--f-display);font-size:.8rem;color:var(--muted);white-spa
 .shot{margin:40px 0 0;display:flex;flex-direction:column;gap:12px}
 .shot img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,21,42,.12)}
 .shot figcaption{font-size:.92rem;color:var(--muted)}
+.hero-icon{width:72px;height:72px;display:block;border-radius:16px}
+.lead{font-size:1.15rem}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:28px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.stat .v{font-family:var(--f-head);font-weight:600;font-size:2rem;line-height:1;color:var(--accent)}
+.stat p{font-size:.92rem;color:var(--muted)}
+.after{margin-top:28px}
+.uses{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+.use{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;font-size:.95rem}
+.use .cap{align-self:flex-start}
+.sub3{font-family:var(--f-display);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:32px}
+.timeline{list-style:none;margin:28px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;counter-reset:step}
+.timeline li{position:relative;padding-top:22px;border-top:3px solid var(--accent);display:flex;flex-direction:column;gap:6px;font-size:.95rem}
+.timeline li::before{content:"";position:absolute;top:-9px;left:0;width:15px;height:15px;border-radius:50%;background:var(--bg);border:3px solid var(--accent)}
+.timeline .when{font-family:var(--f-display);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.timeline b{font-family:var(--f-display)}
+.pull{margin-top:32px;font-family:var(--f-head);font-style:normal;font-size:1.3rem;line-height:1.4}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:28px}
+.pair .panel{display:flex;flex-direction:column;gap:10px}
+.pair .panel h3{font-size:1rem}
+.closing{margin-top:28px;font-size:1.05rem}
 .for{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:28px}
 dialog.popup{width:min(96vw,1200px);height:92vh;max-width:none;max-height:none;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);overflow:hidden}
 dialog.popup[open]{display:flex;flex-direction:column}
@@ -190,7 +214,9 @@ footer{padding-block:40px;border-top:1px solid var(--line);font-size:.85rem;colo
 footer ul{margin:8px 0 0;padding-left:1.2em}
 footer p+p{margin-top:12px}
 @media (max-width:760px){
-  .hero,.two,.tracks,.compare,.human,.roles,.for{grid-template-columns:minmax(0,1fr)}
+  .hero,.two,.tracks,.compare,.human,.roles,.for,.pair,.uses,.timeline{grid-template-columns:minmax(0,1fr)}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .timeline{gap:28px}
   .crow{grid-template-columns:minmax(0,8.5em) minmax(0,1fr) 2em}
   td.sec{white-space:normal}
 }
@@ -215,7 +241,7 @@ footer p+p{margin-top:12px}
 <header style="padding-top:48px">
   <div class="hero">
     <div class="stack">
-      <span class="eyebrow">Keyboard Studio</span>
+      <img class="hero-icon" src="assets/ks-icon.png" width="72" height="72" alt="">
       <h1>You know your language. We hope that can be enough to build its keyboard.</h1>
       <p class="lede">Keyboard Studio is an experimental, browser-based way to make a Keyman keyboard by answering questions about your language instead of writing code. It began as a hackathon project, built by people who use Keyman, teach it, and share its goal of every language being typeable. The keyboards it makes go through the same review as every other keyboard in the Keyman library.</p>
       <div class="cta">
@@ -245,15 +271,23 @@ footer p+p{margin-top:12px}
   <div class="stack prose">
     <span class="eyebrow">Built on Keyman</span>
     <h2 id="h-keyman">Keyboard Studio would not exist without Keyman</h2>
-    <p>Keyman has helped people type their own languages since 1992. It began on Windows and grew to Mac, Linux, iOS, Android, and the web, and today it is free and open source. For many communities it was the first time their language could be typed at all.</p>
-    <p>Behind those keyboards is Keyman Developer and the <a href="https://github.com/keymanapp/keyboards">keymanapp/keyboards</a> repository: more than 900 keyboards, each built, reviewed, and maintained by people who cared about getting them right. Much of the Bible translation, literacy, and language development work we have been part of depends on the foundation that Keyman provides.</p>
-    <p>That repository is also a remarkable record of how the world's scripts are typed. Keyboard Studio leans on it heavily, along with the rest of what the Keyman team has built:</p>
-    <ul class="ux">
-      <li><b>Keyman's own compiler</b> checks every keyboard the studio makes, running in your browser.</li>
-      <li><b>The keyboards in the repository</b> are where every studio keyboard starts.</li>
-      <li><b>The repository's review checklist</b> shapes what the studio asks and checks.</li>
-      <li><b>Keyman itself</b> is what people install to use the keyboard you make.</li>
-    </ul>
+    <p class="lead">Keyman has helped people type their own languages since 1992. For many communities it was the first time their language could be typed at all.</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="v">1992</span><p>Keyman's first release, on Windows</p></div>
+    <div class="stat"><span class="v">6</span><p>platforms today: Windows, Mac, Linux, iOS, Android, and the web</p></div>
+    <div class="stat"><span class="v">900+</span><p>reviewed keyboards in <a href="https://github.com/keymanapp/keyboards">keymanapp/keyboards</a></p></div>
+    <div class="stat"><span class="v">Free</span><p>and open source</p></div>
+  </div>
+  <div class="stack prose after">
+    <p>Behind those keyboards are Keyman Developer and the keyboards repository, each keyboard built, reviewed, and maintained by people who cared about getting it right. Much of the Bible translation, literacy, and language development work we have been part of depends on the foundation that Keyman provides.</p>
+  </div>
+  <p class="sub3">What Keyboard Studio uses from Keyman</p>
+  <div class="uses">
+    <div class="use"><span class="cap">Compiler</span><p>Keyman's own compiler checks every keyboard the studio makes, running in your browser.</p></div>
+    <div class="use"><span class="cap">Keyboards</span><p>Every studio keyboard starts from one in the repository, a remarkable record of how the world's scripts are typed.</p></div>
+    <div class="use"><span class="cap">Checklist</span><p>The repository's review checklist shapes what the studio asks and checks.</p></div>
+    <div class="use"><span class="cap">Keyman</span><p>Keyman itself is what people install to use the keyboard you make.</p></div>
   </div>
 </section>
 
@@ -261,13 +295,30 @@ footer p+p{margin-top:12px}
   <div class="stack prose">
     <span class="eyebrow">Where this came from</span>
     <h2 id="h-origin">A hackathon idea that grew</h2>
-    <p>Keyboard Studio started at a hackathon in summer 2026. We are staff and summer associates in SIL's Language Technology Use department, who work with language communities and have relied on Keyman for years.</p>
-    <p>Our first idea was small: a helper that would let AI coding assistants work with Keyman keyboards, so that people already using Keyman Developer could write keyboard code faster. As we worked, a bigger question kept coming up: what would it take for someone who has never built a keyboard to finish one?</p>
-    <p>It has grown since then, but it is still far younger and less tested than the Keyman Developer pipeline, and it is not an official Keyman project.</p>
-    <p>Many of us have spent years teaching keyboard development in workshops around the world. Again and again, the people who knew their language best were the ones who struggled most to finish a keyboard. They weren't struggling with their language. They were struggling with everything around it: the code, the files that must stay in step, the packaging, and the details a reviewer will rightly ask about.</p>
-    <p>Keyman Developer is most fruitful for a skilled keyboard author: someone at home with code, packaging, and the review process, who can use the complete control it offers. Many first-time authors we've met needed something different: fewer choices at once, a working example to start from, and a suggestion for each answer.</p>
-    <p>Keyboard Studio is our attempt to offer that path. It is still an experiment, and it is one more way into the Keyman ecosystem, not a way around it. The work still flows into the same repository and the same review.</p>
+    <p class="lead">We are staff and summer associates in SIL's Language Technology Use department. We work with language communities and have relied on Keyman for years.</p>
   </div>
+  <ol class="timeline">
+    <li><span class="when">Over many years</span><b>Workshops</b><p>Many of us have taught keyboard development around the world. The people who knew their language best were often the ones who struggled most to finish a keyboard.</p></li>
+    <li><span class="when">Summer 2026</span><b>A hackathon</b><p>Our first idea was small: a helper that lets AI coding assistants work with Keyman keyboards, so people already using Keyman Developer could write keyboard code faster.</p></li>
+    <li><span class="when">Along the way</span><b>A bigger question</b><p>What would it take for someone who has never built a keyboard to finish one?</p></li>
+    <li><span class="when">Today</span><b>Still an experiment</b><p>It has grown, but it is far younger and less tested than the Keyman Developer pipeline, and it is not an official Keyman project.</p></li>
+  </ol>
+  <blockquote class="pull">They weren't struggling with their language. They were struggling with everything around it: the code, the files that must stay in step, the packaging, and the details a reviewer will rightly ask about.</blockquote>
+  <div class="pair">
+    <div class="panel">
+      <h3>Keyman Developer is most fruitful for</h3>
+      <p>a skilled keyboard author: someone at home with code, packaging, and the review process, who can use the complete control it offers.</p>
+    </div>
+    <div class="panel">
+      <h3>Many first-time authors we've met needed</h3>
+      <ul class="ux">
+        <li>fewer choices at once</li>
+        <li>a working example to start from</li>
+        <li>a suggestion for each answer</li>
+      </ul>
+    </div>
+  </div>
+  <p class="closing">Keyboard Studio is our attempt to offer that path: one more way into the Keyman ecosystem, not a way around it. The work still flows into the same repository and the same review.</p>
 </section>
 
 <section aria-labelledby="h-roles">
