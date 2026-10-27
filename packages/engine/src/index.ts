@@ -213,6 +213,8 @@ export {
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
+  kpsMemberRef,
+  normaliseKpsFontEntries,
   // spec 080 FR-002 — the welcome page's folder-convention member reference.
   WELCOME_PAGE_KPS_REF,
   welcomeFolderKpsRef,
@@ -220,6 +222,7 @@ export {
 export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
+  KpsFontDescriptorEntry,
 } from "./package-descriptor/index.js";
 
 // spec 065 — help-docs rendering. The one implementation both the output
