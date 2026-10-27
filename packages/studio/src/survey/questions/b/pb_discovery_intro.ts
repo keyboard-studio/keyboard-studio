@@ -3,7 +3,8 @@
 // lists only question IDs). Prompt/help text use the "add your whole alphabet"
 // phrasing to match the PhaseB IntroChooser.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_discovery_intro",
@@ -47,24 +48,8 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["manual", "text-sample", "linguist", "picker"]);
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return { ok: false, code: "required", message: "Please choose a method." };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: `"${v}" is not a valid choice.`,
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose a method.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

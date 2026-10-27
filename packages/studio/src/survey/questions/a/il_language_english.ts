@@ -23,7 +23,8 @@
 // set on the resolveNext path, so the static fallback resolves to
 // il_language_autonym.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 import type { ExtractContext } from "../../../decisions/extractContext.ts";
 
 export const definition = {
@@ -47,20 +48,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const trimmed = typeof value === "string"
-    ? value.trim()
-    : Array.isArray(value)
-      ? value.join("").trim()
-      : "";
-
-  if (trimmed.length === 0) {
-    return { ok: false, code: "required", message: "English language name is required." };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("English language name is required.");
 
 // Decision spike (km/decisions-spike): base-keyboard probe. The catalog entry
 // carries language TAGS, not names, so the primary (first) tag — the same one

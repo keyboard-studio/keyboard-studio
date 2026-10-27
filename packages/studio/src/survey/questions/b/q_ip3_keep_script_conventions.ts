@@ -9,7 +9,8 @@
 // the base's neutral residue carries script variants (record-no-default: residue
 // is not a confident signal, so nothing is prefilled by default).
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "q_ip3_keep_script_conventions",
@@ -29,18 +30,8 @@ export const definition = {
   next: null,
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["keep", "propose", "discard"]);
 
-export function validate(value: string | string[] | undefined): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return { ok: false, code: "required", message: "Please choose a script-conventions posture." };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a valid choice.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose a script-conventions posture.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

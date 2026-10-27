@@ -21,7 +21,8 @@
 // remain registered, on disk, and test-covered, which is what makes this import a
 // stable seam rather than a reference into something on its way out.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 import authorDisplayName from "../reserve/author_display_name.ts";
 
 export const definition = {
@@ -33,12 +34,8 @@ export const definition = {
   next: "il_author_email",
 } satisfies import("../../types.ts").FlowQuestion;
 
-/** Reuses the demoted module's validator — same rule, one implementation. */
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  return authorDisplayName.validate!(value);
-}
+/** Same rule as the demoted module's validator (required, trimmed text). */
+export const validate = makeRequiredTextValidator("Author name is required.");
 
 export const fixtures: QuestionModule["fixtures"] = authorDisplayName.fixtures;
 

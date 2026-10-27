@@ -2,11 +2,9 @@
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 // Shown only when layout_family == 'non-roman'.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredFirstOptionValidator } from "../validators.ts";
 
-const VALID_FAMILIES = new Set([
-  "indic", "sea", "rtl", "syllabic", "alpha-nonlatin", "other",
-]);
 
 export const definition = {
   id: "script_family",
@@ -28,23 +26,7 @@ export const definition = {
   next: "pa_primary_target",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string"
-    ? value
-    : Array.isArray(value)
-      ? value[0] ?? ""
-      : "";
-
-  if (v.length === 0) {
-    return { ok: false, code: "required", message: "Please select a script family." };
-  }
-  if (!VALID_FAMILIES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a recognised script family.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredFirstOptionValidator(definition.options.map((o) => o.value), "Please select a script family.", (v) => `"${v}" is not a recognised script family.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
