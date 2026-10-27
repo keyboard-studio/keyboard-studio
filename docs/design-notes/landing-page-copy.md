@@ -78,7 +78,7 @@ the same repository and the same review.
 
 Very few keyboards are built from nothing. In the Keyman repository, most keyboards for a given
 script cluster around a handful of layouts. For example, [380 of 484] Latin-script keyboards sit
-on a QWERTY layout ([see the grouping](LINK)).
+on a QWERTY layout ([see how all 920 keyboards group](keyboard-grouping.html)).
 
 The studio makes that the starting point on purpose. Every keyboard begins as a copy of one
 existing keyboard, and you change what your language needs. When your script has only one or
@@ -155,5 +155,6 @@ to see it there.
 ---
 
 <!-- Footer -->
-Keyboard Studio is an independent project that began at a hackathon. It is not an official
+Keyboard Studio is a project of SIL's Language Technology Use department that began at a
+hackathon. It is not an official
 Keyman project. Keyman began in 1992 and is now developed by [the Keyman team at SIL Global]. [Open source, MIT licensed.]

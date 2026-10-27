@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How Keyman keyboards group</title>
+<!-- Source: the whole-set logical grouping analysis of the keyman keyboards corpus (920 keyboards).
+     Shown in a popup from the root index.html. Colours mirror the studio themes (packages/studio/src/styles/colors.css). -->
+<script>
+  try { var t = localStorage.getItem("ks.theme"); if (t === "light" || t === "navy") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  // When shown in the landing page's popup, Escape pressed in here should still close it.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || window.parent === window) return;
+    try { var d = window.parent.document.getElementById("popup"); if (d && d.open) d.close(); } catch (err) {}
+  });
+</script>
+<style>
+@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:400 700;font-display:swap;src:url(../../packages/studio/public/fonts/source-sans-3-400-latin.woff2) format('woff2')}
+@font-face{font-family:'Playfair Display';font-style:normal;font-weight:500 600;font-display:swap;src:url(../../packages/studio/public/fonts/playfair-display-500-latin.woff2) format('woff2')}
+:root{--bg:#F3F5F7;--surface:#FFFFFF;--ink:#18242E;--muted:#5B6976;--line:#E3E7EB;--accent:#005CB9;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#18243F;--surface:#1F2C49;--ink:#EAF1FB;--muted:#AEBCD6;--line:#33436A;--accent:#5AA7F0;color-scheme:dark}}
+:root[data-theme="navy"]{--bg:#18243F;--surface:#1F2C49;--ink:#EAF1FB;--muted:#AEBCD6;--line:#33436A;--accent:#5AA7F0;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;padding:24px max(16px,4vw) 48px;background:var(--bg);color:var(--ink);font:16px/1.55 'Source Sans 3',system-ui,sans-serif}
+h1{font:600 clamp(1.6rem,3.5vw,2.2rem)/1.15 'Playfair Display',Georgia,serif;margin:0 0 12px}
+.intro{max-width:70ch;display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.intro p{margin:0}
+.muted{color:var(--muted)}
+ul{list-style:none;padding-left:1.1em;margin:0}
+li{margin:2px 0}
+summary{cursor:pointer;font-weight:600}
+summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+details[open]>summary{color:var(--accent)}
+details ul ul li{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:.88em}
+details ul ul li details>summary,details ul ul li>span{font-family:'Source Sans 3',system-ui,sans-serif}
+</style>
+</head>
+<body>
+<h1>How the Keyman keyboards group</h1>
+<div class="intro">
+  <p>The 920 keyboards in the Keyman keyboards repository, grouped by writing system. Latin-script keyboards are split by the physical layout they build on (QWERTY, AZERTY, QWERTZ, Dvorak, and others). Inside each group, keyboards are sorted by how they produce characters: <b>Plain</b> (one key, one character), <b>Deadkey only</b>, <b>Context only</b> (rules that look at what was typed before), or <b>Both</b>.</p>
+  <p>Scripts with only two keyboards are listed together under <b>Pairs</b>, and scripts with a single keyboard under <b>Singleton</b>.</p>
+  <p class="muted">This shows how keyboards cluster, not which keyboard was copied from which. It is a snapshot of the repository at the time of the analysis.</p>
+</div>
+<ul><li><details open><summary>All keyboards <span class=muted>920 · Latin 484 · 32 script groups (342) · Pairs 24 · Singleton 70</span></summary><ul>
+<li><details open><summary>Latin <span class=muted>484 keyboards · 6 families</span></summary><ul>
+<li><details><summary>Latin:QWERTY <span class=muted>380 · Context only 180, Plain 145, Deadkey only 48, Both 7</span></summary><ul>
+<li><details><summary>Plain <span class=muted>145</span></summary><ul><li>akan</li><li>balochi_latin</li><li>bambara</li><li>basic_kbdadlm</li><li>basic_kbdazel</li><li>basic_kbdgthc</li><li>basic_kbdhau</li><li>basic_kbdhaw</li><li>basic_kbdhu1</li><li>basic_kbdit</li><li>basic_kbdit142</li><li>basic_kbdiulat</li><li>basic_kbdlt</li><li>basic_kbdlt1</li><li>basic_kbdlt2</li><li>basic_kbdmlt47</li><li>basic_kbdmlt48</li><li>basic_kbdosa</li><li>basic_kbdosm</li><li>basic_kbdsora</li><li>basic_kbdturme</li><li>basic_kbduk</li><li>basic_kbdus</li><li>basic_kbdusa</li><li>basic_kbdvntc</li><li>bukawa</li><li>cabecar</li><li>chechen_latin</li><li>chinuk_wawa</li><li>cs_pinyin</li><li>cypriot</li><li>cypro_minoan</li><li>dagaare</li><li>dakota_smsc</li><li>dene</li><li>dine_bizaad</li><li>easy_chakma</li><li>el_yolngu</li><li>elbasan</li><li>ewe</li><li>fulfulde_latin_qwerty</li><li>fv_anicinapemi8in</li><li>fv_atikamekw</li><li>fv_australian</li><li>fv_blackfoot</li><li>fv_bodewadminwen</li><li>fv_dakota_mb</li><li>fv_dakota_sk</li><li>fv_dene_mb</li><li>fv_dene_nt</li><li>fv_dexwlesucid</li><li>fv_dine_bizaad</li><li>fv_eastern_canadian_inuktitut</li><li>fv_goyogohono</li><li>fv_hulquminum</li><li>fv_ilnu_innu_aimun</li><li>fv_inuvialuktun</li><li>fv_isga_iabi</li><li>fv_lakota</li><li>fv_lunaapeewi_huluniixsuwaakan</li><li>fv_maori</li><li>fv_moose_cree</li><li>fv_nakoda</li><li>fv_naskapi</li><li>fv_neeaandeg</li><li>fv_neeaaneegn</li><li>fv_northern_east_cree</li><li>fv_nuxalk</li><li>fv_onayotaaka</li><li>fv_onodagega_onondagega</li><li>fv_onodowaga</li><li>fv_sahugotine_yati</li><li>fv_shihgotine_yati</li><li>fv_skaru_re</li><li>fv_skicinuwatuwewakon</li><li>fv_swampy_cree</li><li>fv_tlicho_yatii</li><li>fv_tsuutina</li><li>fv_uummarmiutun</li><li>fv_wendat</li><li>fv_wobanakiodwawogan</li><li>ga</li><li>grantha_inscript</li><li>hausa_kano</li><li>holikachuk</li><li>idoma</li><li>indigenous_nt</li><li>inuktitut_latin</li><li>inuktitut_pirurvik</li><li>jorai</li><li>karakalpak_latin</li><li>koalibrere</li><li>kreative_superipa</li><li>kreative_superlatin</li><li>kreative_superpet</li><li>lahu</li><li>laz</li><li>linear_b</li><li>luri</li><li>lycian</li><li>lydian</li><li>meroitic_hieroglyphs</li><li>mising</li><li>modi_kagapa_phonetic</li><li>mro_phonetic</li><li>nias</li><li>nzema</li><li>old_hungarian</li><li>old_hungarian_carpathian_highlands</li><li>old_persian</li><li>old_sogdian</li><li>old_turkic_udw21_qwerty</li><li>otoe_missouria</li><li>pan_kachin</li><li>phaistos_disc</li><li>phoenician</li><li>phonetic_farsi</li><li>postmodern_english_uk_dualstroke</li><li>postmodern_english_uk_natural</li><li>postmodern_english_us_dualstroke</li><li>postmodern_english_us_natural</li><li>pt_international</li><li>rac_brahui_latin</li><li>sahaptin_umatilla</li><li>sahaptin_yakima</li><li>sil_areare</li><li>sil_bari</li><li>sil_bru</li><li>sil_bwe_karen</li><li>sil_hawaiian</li><li>sil_kayah_latn</li><li>sil_philippines</li><li>sil_tanguat</li><li>sil_wayuu</li><li>sil_zaiwa</li><li>sisaali</li><li>slaviature</li><li>sundanese_latin</li><li>symbolic_logic</li><li>tfnalgonquin</li><li>tlahuica</li><li>todhri</li><li>tohono_oodham</li><li>ukwuani</li><li>yo</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>48</span></summary><ul><li>balochi_scientific</li><li>basic_kbdbr</li><li>basic_kbdca</li><li>basic_kbdcan</li><li>basic_kbdcz1</li><li>basic_kbdcz2</li><li>basic_kbdda</li><li>basic_kbdes</li><li>basic_kbdest</li><li>basic_kbdfi</li><li>basic_kbdfi1</li><li>basic_kbdfo</li><li>basic_kbdgae</li><li>basic_kbdgkl</li><li>basic_kbdgn</li><li>basic_kbdgrlnd</li><li>basic_kbdhela2</li><li>basic_kbdhela3</li><li>basic_kbdibo</li><li>basic_kbdic</li><li>basic_kbdinen</li><li>basic_kbdinuk2</li><li>basic_kbdir</li><li>basic_kbdla</li><li>basic_kbdlv1</li><li>basic_kbdlvst</li><li>basic_kbdmaori</li><li>basic_kbdne</li><li>basic_kbdno</li><li>basic_kbdno1</li><li>basic_kbdnso</li><li>basic_kbdpl1</li><li>basic_kbdpo</li><li>basic_kbdropr</li><li>basic_kbdrost</li><li>basic_kbdsl1</li><li>basic_kbdsmsfi</li><li>basic_kbdsmsno</li><li>basic_kbdsp</li><li>basic_kbdsw</li><li>basic_kbdtuq</li><li>basic_kbdukx</li><li>basic_kbdusx</li><li>breton_chwerty</li><li>caucasian_albanian</li><li>pt_pro</li><li>qom</li><li>vithkuqi</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>180 · context 1-20: 92, context 21-100: 48, context >100: 40</span></summary><ul><li>adiga_danef</li><li>akha_lahu</li><li>arbore</li><li>banne</li><li>bj_cree_east_latn</li><li>bj_cree_west_latn</li><li>bj_innu</li><li>bj_innu_phonemic</li><li>btl_kenya</li><li>bu_phonetic</li><li>budukh</li><li>burushaski_girminas</li><li>cantonese_telex</li><li>cham_latin</li><li>choctaw_modern</li><li>clavbur9</li><li>colchis_latin</li><li>dagbani</li><li>dazaga_gourane_karra</li><li>dega</li><li>dzardzongke</li><li>el_harari_latin</li><li>el_naija</li><li>el_pan_sahelian</li><li>el_pasifika</li><li>embera_north</li><li>enga</li><li>enggano</li><li>eo_plus</li><li>esperuni</li><li>foochow</li><li>fv_anishinaabemowin</li><li>fv_cree_latin</li><li>fv_dakelh</li><li>fv_dene_dzage</li><li>fv_dene_zhatie</li><li>fv_denesuline</li><li>fv_denesuline_epsilon</li><li>fv_diitiidatx</li><li>fv_gitsenimx</li><li>fv_gwichin</li><li>fv_hailzaqvla</li><li>fv_haisla</li><li>fv_halqemeylem</li><li>fv_han</li><li>fv_henqeminem</li><li>fv_hlgaagilda_xaayda_kil</li><li>fv_hulquminum_combine</li><li>fv_kanienkeha_e</li><li>fv_kashogotine_yati</li><li>fv_klahoose</li><li>fv_ktunaxa</li><li>fv_kwadacha_tsekene</li><li>fv_kwakwala</li><li>fv_kwakwala_liqwala</li><li>fv_lekwungen</li><li>fv_migmaq</li><li>fv_natwits</li><li>fv_nisgaa</li><li>fv_nlakapamuxcheen</li><li>fv_nlekepmxcin</li><li>fv_nlha7kapmxtsin</li><li>fv_northern_tutchone</li><li>fv_nsilxcen</li><li>fv_nuucaanul</li><li>fv_secwepemctsin</li><li>fv_sencoten</li><li>fv_sguuxs</li><li>fv_shashishalhem</li><li>fv_skwxwumesh_snichim</li><li>fv_smalgyax</li><li>fv_southern_tutchone</li><li>fv_statimcets</li><li>fv_stlatlimxec</li><li>fv_tagizi_dene</li><li>fv_taltan</li><li>fv_tlingit</li><li>fv_tlingityooxatangi</li><li>fv_tsekehne</li><li>fv_tsilhqotin</li><li>fv_uwikala</li><li>fv_xaislakala</li><li>gandhari</li><li>gautami_inditran</li><li>ghana</li><li>hainam</li><li>hakka</li><li>halang</li><li>haroi</li><li>hieroglyphic</li><li>ho_latin</li><li>ibono_chwerty</li><li>indonesia</li><li>indonesian_suku</li><li>itrans_roman</li><li>komono_ci</li><li>lamkaang</li><li>lazuri</li><li>libtralo</li><li>malar_tirhuta</li><li>maltese</li><li>mara</li><li>me_en</li><li>nailangs</li><li>nguphing</li><li>nisenan</li><li>nkonya</li><li>nlci_ipa</li><li>nobonob</li><li>northern_sierra_miwok</li><li>nrc_crk_cans</li><li>nrc_makah</li><li>numanggang</li><li>obolo_chwerty</li><li>obolo_qwerty</li><li>orma</li><li>pid_piaroa</li><li>pinyin_typer</li><li>pukapuka</li><li>rawang</li><li>sil_akha_act</li><li>sil_buang</li><li>sil_bunong_latn</li><li>sil_busa</li><li>sil_cheyenne</li><li>sil_cipher_music</li><li>sil_colombia_venezuela</li><li>sil_eastern_congo</li><li>sil_el_ethiopian_latin</li><li>sil_euro_latin</li><li>sil_hupdah</li><li>sil_indic_roman</li><li>sil_ipa</li><li>sil_kcho</li><li>sil_madi</li><li>sil_madurese</li><li>sil_makuri</li><li>sil_mali_qwerty</li><li>sil_nigeria_dot</li><li>sil_nigeria_odd_vowels</li><li>sil_nigeria_underline</li><li>sil_pan_africa_mnemonic</li><li>sil_pan_africa_positional</li><li>sil_sahu</li><li>sil_senegal_cou_qwerty</li><li>sil_senegal_krx_qwerty</li><li>sil_tagdal</li><li>sil_tchad</li><li>sil_tchad_faux_azerty</li><li>sil_tchad_qwerty</li><li>sil_temiar</li><li>sil_tepehuan</li><li>sil_uganda_tanzania</li><li>sil_yi</li><li>sil_yoruba8</li><li>sil_yoruba_bar</li><li>sil_yoruba_dot</li><li>slc_saliba</li><li>sudest</li><li>taichow</li><li>taigi_sdwxv</li><li>taigi_telex</li><li>taiwan_austronesian</li><li>tawallammat_latin</li><li>tay_latn</li><li>teochew</li><li>thamizha_new_typewriter</li><li>tibetan_ewts</li><li>triqui_itunyoso</li><li>udi_keyboard</li><li>uma_graphic</li><li>venetia_et_histria</li><li>vietnam</li><li>vietnamese_telex</li><li>vietnamese_telex_legacy</li><li>vietnamese_vni</li><li>wakhi_anglicized</li><li>wali</li><li>way</li><li>xinaliq</li></ul></details></li>
+<li><details><summary>Both <span class=muted>7</span></summary><ul><li>amazigh_latin</li><li>basic_kbdyba</li><li>jumjum</li><li>nw_iranian_latin</li><li>sil_bolivia</li><li>sil_cameroon_qwerty</li><li>winchus</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Latin:Other <span class=muted>45 · Context only 22, Plain 21, Both 1, Deadkey only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>21</span></summary><ul><li>anglish</li><li>anii</li><li>ausephon</li><li>basic_kbdoldit</li><li>basic_kbdusr</li><li>el_osmanya</li><li>engram</li><li>engram_en</li><li>geba_karen_latn</li><li>kayan</li><li>kirat_rai_inscript</li><li>o_tissi</li><li>quinault</li><li>sil_hmd_plrd</li><li>sil_kvl_kayaw</li><li>sil_lpo_plrd</li><li>sil_ygp_plrd</li><li>sil_yna_plrd</li><li>sil_ywq_plrd</li><li>sogdian_phonetic</li><li>takri_inscript</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>1</span></summary><ul><li>cymraeg_fodern</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>22</span></summary><ul><li>athinkra_vai</li><li>athinkra_vai_typewriter</li><li>el_dinka</li><li>el_nuer</li><li>fv_dane_zaa_zaage</li><li>fv_nexwslayemucen</li><li>gondi_gunjala</li><li>gondi_gunjala_inscript</li><li>jawa</li><li>landuma</li><li>malar_braille</li><li>mon_anonta</li><li>sil_hebr_grek_trans</li><li>sil_korda_latin</li><li>sil_mende_kikakui</li><li>sil_tai_dam_latin</li><li>sil_tai_dam_typewriter</li><li>sil_vai</li><li>sil_yupik_cyrillic</li><li>slp1_roman</li><li>taigi_viet_telex</li><li>thamizha_bamini</li></ul></details></li>
+<li><details><summary>Both <span class=muted>1</span></summary><ul><li>basic_kbdcherp</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Latin:AZERTY <span class=muted>25 · Context only 16, Deadkey only 6, Both 2, Plain 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>1</span></summary><ul><li>tem_kdh</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>6</span></summary><ul><li>basic_kbdbe</li><li>basic_kbdbene</li><li>basic_kbdfr</li><li>basic_kbdtzm</li><li>basic_kbdwol</li><li>pt_azerty</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>16</span></summary><ul><li>sil_mali_azerty</li><li>sil_moore</li><li>sil_senegal_bda_azerty</li><li>sil_senegal_bqj_azerty</li><li>sil_senegal_bsc_azerty</li><li>sil_senegal_cou_azerty</li><li>sil_senegal_csk_azerty</li><li>sil_senegal_dyo_azerty</li><li>sil_senegal_gsl_azerty</li><li>sil_senegal_knf_azerty</li><li>sil_senegal_krx_azerty</li><li>sil_senegal_ndv_azerty</li><li>sil_senegal_sav_azerty</li><li>sil_senegal_snf_azerty</li><li>sil_senegal_srr_azerty</li><li>sil_senegal_wo_azerty</li></ul></details></li>
+<li><details><summary>Both <span class=muted>2</span></summary><ul><li>sil_akebu</li><li>sil_cameroon_azerty</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Latin:QWERTZ <span class=muted>15 · Deadkey only 12, Both 2, Context only 1</span></summary><ul>
+<li><details><summary>Deadkey only <span class=muted>12</span></summary><ul><li>basic_kbdal</li><li>basic_kbdcr</li><li>basic_kbdcz</li><li>basic_kbdgr</li><li>basic_kbdgr1</li><li>basic_kbdhu</li><li>basic_kbdpl</li><li>basic_kbdsf</li><li>basic_kbdsl</li><li>basic_kbdsorex</li><li>basic_kbdsors1</li><li>basic_kbdycl</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>1</span></summary><ul><li>sil_mali_qwertz</li></ul></details></li>
+<li><details><summary>Both <span class=muted>2</span></summary><ul><li>basic_kbdsg</li><li>german_enhanced</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Latin:Relayout:Other <span class=muted>15 · Deadkey only 8, Plain 7</span></summary><ul>
+<li><details><summary>Plain <span class=muted>7</span></summary><ul><li>basic_kbdazst</li><li>basic_kbdusl</li><li>inddv</li><li>latinized_urdu</li><li>mitterhofer</li><li>uma_phonetic</li><li>xpert</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>8</span></summary><ul><li>basic_kbdlv</li><li>basic_kbdtuf</li><li>belgian_typewriter</li><li>br_nativo</li><li>camoes</li><li>french_zhjay</li><li>hcesar</li><li>romanian_popak</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Latin:Dvorak <span class=muted>4 · Plain 3, Context only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>anglish_dvorak</li><li>basic_kbddv</li><li>programmer_dvorak</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>1</span></summary><ul><li>urdu_dvorak</li></ul></details></li>
+</ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Arabic <span class=muted>91 · Plain 71, Context only 18, Deadkey only 2</span></summary><ul>
+<li><details><summary>Plain <span class=muted>71</span></summary><ul><li>arabic_flick</li><li>arabic_w_o_dots</li><li>basic_kbda1</li><li>basic_kbda2</li><li>basic_kbda3</li><li>basic_kbdfa</li><li>basic_kbdfar</li><li>basic_kbdkurd</li><li>basic_kbdpash</li><li>basic_kbdughr</li><li>basic_kbdughr1</li><li>basic_kbdurdu</li><li>easy_arabic</li><li>el_dari_clra</li><li>gilaki</li><li>kazakh_arabic</li><li>malay_jawi</li><li>multi_pak_phonetic</li><li>pak_urdu_phonetic</li><li>pashai</li><li>rac_aer</li><li>rac_arabic</li><li>rac_balti</li><li>rac_brahui</li><li>rac_burushaski</li><li>rac_dameli</li><li>rac_dhatki</li><li>rac_dogri</li><li>rac_gawar_bati</li><li>rac_gawri</li><li>rac_hazaragi</li><li>rac_hindko</li><li>rac_indus_kohistani</li><li>rac_kalasha</li><li>rac_kashmir_shina</li><li>rac_kashmiri</li><li>rac_khowar</li><li>rac_marwari</li><li>rac_munji</li><li>rac_oadki</li><li>rac_ormuri</li><li>rac_pahari</li><li>rac_palula</li><li>rac_parkari_koli</li><li>rac_pashai</li><li>rac_pashto</li><li>rac_saraiki</li><li>rac_shina</li><li>rac_sindhi</li><li>rac_torwali</li><li>rac_urdu</li><li>rac_ushojo</li><li>rac_uyghur</li><li>rac_wadiyara</li><li>rac_wakhi</li><li>rac_western_punjabi</li><li>rac_yidgha</li><li>sanjha_punjabi</li><li>saraiki</li><li>shahmukhi_phonetic</li><li>sil_gawri</li><li>sil_khowar</li><li>sil_torwali</li><li>sil_tunisian</li><li>soqotri_arabic</li><li>swahili_ajami_qwerty</li><li>urdu_phonetic</li><li>urdu_phonetic_crulp</li><li>wakhi</li><li>wolofal</li><li>yidgha</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>2</span></summary><ul><li>farsi_phonetic</li><li>persian_phonetic</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>18</span></summary><ul><li>afghan_turkmen</li><li>arabic_izza</li><li>balochi_inpage</li><li>balochi_persian</li><li>balochi_phonetic</li><li>balochi_urdu</li><li>behdini_arab</li><li>burushaski_girminas_perso_arabic</li><li>farsiman</li><li>fulfulde_ajami_qwerty</li><li>gilaki_phonetic</li><li>hausa_ajami_qwerty</li><li>horami</li><li>rohingya_arab</li><li>sil_arabic_phonetic</li><li>sil_extended_urdu_np</li><li>sorani_behdini_arab_qwerty</li><li>srr_ajami_qwerty</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Cyrillic <span class=muted>30 · Plain 25, Deadkey only 2, Context only 2, Both 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>25</span></summary><ul><li>basic_kbdaze</li><li>basic_kbdbash</li><li>basic_kbdbgph</li><li>basic_kbdbgph1</li><li>basic_kbdblr</li><li>basic_kbdbu</li><li>basic_kbdbulg</li><li>basic_kbdkaz</li><li>basic_kbdkyr</li><li>basic_kbdmac</li><li>basic_kbdmacst</li><li>basic_kbdmon</li><li>basic_kbdru</li><li>basic_kbdru1</li><li>basic_kbdtajik</li><li>basic_kbdtt102</li><li>basic_kbdur</li><li>basic_kbdur1</li><li>basic_kbduzb</li><li>basic_kbdyak</li><li>karakalpak_cyrillic</li><li>kreative_supercyrillic</li><li>mingrelian_cyrillic</li><li>mongolian_cyrillic_qwerty</li><li>russian_mnemonic_r</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>2</span></summary><ul><li>basic_kbdbhc</li><li>basic_kbdycc</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>2</span></summary><ul><li>sil_yupik_cyrillic_ru</li><li>turkmen_cyrl</li></ul></details></li>
+<li><details><summary>Both <span class=muted>1</span></summary><ul><li>basic_kbdrum</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Ethiopic <span class=muted>21 · Context only 21</span></summary><ul>
+<li><details><summary>Context only <span class=muted>21</span></summary><ul><li>geezbrhan</li><li>geezword_amharic</li><li>geezword_tigrinya</li><li>gff_amh_7</li><li>gff_amharic</li><li>gff_amharic_classic</li><li>gff_awngi_xamtanga</li><li>gff_blin</li><li>gff_ethiopic</li><li>gff_ethiopic_7</li><li>gff_geez</li><li>gff_gurage</li><li>gff_gurage_legacy</li><li>gff_harari</li><li>gff_harege_fidelat</li><li>gff_mesobe_fidelat</li><li>gff_tigre</li><li>gff_tigrinya_eritrea</li><li>gff_tigrinya_ethiopia</li><li>sil_ethiopic</li><li>sil_ethiopic_power_g</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Devanagari <span class=muted>20 · Context only 12, Plain 7, Both 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>7</span></summary><ul><li>basic_kbdindev</li><li>basic_kbdinhin</li><li>basic_kbdinmar</li><li>basic_kbdnepr</li><li>devanagari_kagapa_phonetic</li><li>nepali_romanized</li><li>nepali_traditional</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>12</span></summary><ul><li>common_devanagari</li><li>gondi_dev</li><li>hindi_modular</li><li>itrans_devanagari_hindi</li><li>itrans_devanagari_sanskrit_vedic</li><li>nlci_devanagari_winscript</li><li>optitrans_devanagari_sanskrit_pre_vedic</li><li>remington_gail</li><li>sil_devanagari_phonetic</li><li>sil_devanagari_romanized</li><li>sil_devanagari_typewriter</li><li>slp1_deva</li></ul></details></li>
+<li><details><summary>Both <span class=muted>1</span></summary><ul><li>gautami_devanagari</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Myanmar <span class=muted>19 · Context only 10, Plain 9</span></summary><ul>
+<li><details><summary>Plain <span class=muted>9</span></summary><ul><li>basic_kbdmyan</li><li>eastern_pwo_karen</li><li>geba_karen_mymr</li><li>knyaw</li><li>mon_phonetic</li><li>sgaw_karen</li><li>shan</li><li>shan_thailayout</li><li>sil_mon</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>10</span></summary><ul><li>mon_k_nemin</li><li>myancode_san</li><li>pa_oh</li><li>sil_kayah_mymr</li><li>sil_khamti</li><li>sil_myanmar_my3</li><li>sil_myanmar_mywinext</li><li>sil_sgaw_karen</li><li>sil_shan</li><li>sil_taang</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Canadian Aboriginal <span class=muted>16 · Context only 13, Plain 2, Deadkey only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>2</span></summary><ul><li>bj_cree_east_james_bay</li><li>bj_naskapi_classic</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>1</span></summary><ul><li>inuktitut_naqittaut</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>13</span></summary><ul><li>bj_cree_east</li><li>bj_cree_woods</li><li>bj_mista_wasaha_cree</li><li>bj_naskapi_common</li><li>bj_oji_cree</li><li>fv_ojibwa</li><li>fv_ojibwa_ifinal</li><li>fv_ojibwa_ifinal_rdot</li><li>fv_ojibwa_rdot</li><li>fv_plains_cree</li><li>fv_severn_ojibwa</li><li>fv_severn_ojibwa_rdot</li><li>fv_southern_carrier</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Bengali <span class=muted>11 · Plain 6, Context only 4, Both 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>6</span></summary><ul><li>bangla_joy</li><li>bangla_munir</li><li>bangla_probhat</li><li>basic_kbdinasa</li><li>basic_kbdinbe2</li><li>basic_kbdinben</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>4</span></summary><ul><li>itrans_bengali</li><li>nlci_bengali_winscript</li><li>sabdalipi_assamese</li><li>sil_bengali_phonetic</li></ul></details></li>
+<li><details><summary>Both <span class=muted>1</span></summary><ul><li>gautami_bangla_bengali</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Greek <span class=muted>11 · Context only 6, Deadkey only 4, Plain 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>1</span></summary><ul><li>kreative_supersymbol</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>4</span></summary><ul><li>basic_kbdhe</li><li>basic_kbdhe220</li><li>basic_kbdhe319</li><li>basic_kbdhept</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>6</span></summary><ul><li>galaxie_greek_mnemonic</li><li>galaxie_greek_positional</li><li>greek_polytonic_plus</li><li>greek_tonizo</li><li>greekclassical</li><li>sil_greek_polytonic</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Lao <span class=muted>10 · Context only 7, Plain 3</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>basic_kbdlao</li><li>lao_pali_us</li><li>sil_tai_dam_lao</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>7</span></summary><ul><li>kmhmu_2008</li><li>lao_2008_basic</li><li>lao_2008_rapid</li><li>lao_on_thai_layout</li><li>lao_pali</li><li>lao_phonetic</li><li>sil_kmhmu</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Hebrew <span class=muted>9 · Context only 6, Plain 3</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>basic_kbdheb</li><li>basic_kbdhebl3</li><li>ladino</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>6</span></summary><ul><li>galaxie_hebrew_mnemonic</li><li>galaxie_hebrew_positional</li><li>sil_hebrew</li><li>sil_hebrew_legacy</li><li>yiddish_hebrew</li><li>yiddish_pasekh</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Khmer <span class=muted>9 · Context only 5, Plain 4</span></summary><ul>
+<li><details><summary>Plain <span class=muted>4</span></summary><ul><li>basic_kbdkhmr</li><li>basic_kbdkni</li><li>khmer_traditional</li><li>sil_brao</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>5</span></summary><ul><li>khmer_angkor</li><li>krung</li><li>sil_bunong</li><li>sil_jarai</li><li>sil_khmer</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Tamil <span class=muted>9 · Context only 5, Plain 4</span></summary><ul>
+<li><details><summary>Plain <span class=muted>4</span></summary><ul><li>basic_kbdintam</li><li>basic_kbdtam99</li><li>vm_tamil_modular</li><li>vm_tamil_typewriter</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>5</span></summary><ul><li>ekwtamil99uni</li><li>gautami_thamizh_tamil</li><li>nlci_tamil_winscript</li><li>thamizha_anjal_paangu</li><li>thamizha_tamil99_ext</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Malayalam <span class=muted>8 · Context only 5, Plain 3</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>basic_kbdinmal</li><li>poorna_malayalam_extended_inscript</li><li>poorna_malayalam_typewriter</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>5</span></summary><ul><li>malar_malayalam</li><li>malar_malayalam_inscript</li><li>mozhi_malayalam</li><li>nlci_malayalam_winscript</li><li>swanalekha_malayalam</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Armenian <span class=muted>6 · Plain 6</span></summary><ul>
+<li><details><summary>Plain <span class=muted>6</span></summary><ul><li>armenian_mnemonic</li><li>armenian_mnemonic_r</li><li>basic_kbdarme</li><li>basic_kbdarmph</li><li>basic_kbdarmty</li><li>basic_kbdarmw</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Shavian <span class=muted>6 · Plain 5, Context only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>5</span></summary><ul><li>english_shavian_igc</li><li>english_shavian_qwerty</li><li>esperanto_sava_eujao</li><li>sxava</li><li>sxava_eo</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>1</span></summary><ul><li>english_shavian_jafl</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Syriac <span class=muted>6 · Plain 6</span></summary><ul>
+<li><details><summary>Plain <span class=muted>6</span></summary><ul><li>aramaic_hebrew</li><li>basic_kbdsyr1</li><li>basic_kbdsyr2</li><li>east_syriac_qwerty</li><li>syriac_arabic</li><li>syriac_phonetic</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Thai <span class=muted>6 · Plain 4, Context only 2</span></summary><ul>
+<li><details><summary>Plain <span class=muted>4</span></summary><ul><li>basic_kbdth0</li><li>basic_kbdth1</li><li>basic_kbdth2</li><li>basic_kbdth3</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>2</span></summary><ul><li>qwerty_farang</li><li>thai_kedmanee_mattix</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Georgian <span class=muted>5 · Plain 5</span></summary><ul>
+<li><details><summary>Plain <span class=muted>5</span></summary><ul><li>basic_kbdgeo</li><li>basic_kbdgeoer</li><li>basic_kbdgeome</li><li>basic_kbdgeooa</li><li>basic_kbdgeoqw</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Gujarati <span class=muted>4 · Plain 2, Context only 2</span></summary><ul>
+<li><details><summary>Plain <span class=muted>2</span></summary><ul><li>basic_kbdinguj</li><li>netgkb</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>2</span></summary><ul><li>itrans_gujarati</li><li>nlci_gujarati_winscript</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Hangul <span class=muted>4 · Context only 4</span></summary><ul>
+<li><details><summary>Context only <span class=muted>4</span></summary><ul><li>korean_phonetic</li><li>korean_rr</li><li>sil_korda_jamo</li><li>sil_korean_morse</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Lisu <span class=muted>4 · Plain 4</span></summary><ul>
+<li><details><summary>Plain <span class=muted>4</span></summary><ul><li>basic_kbdlisub</li><li>basic_kbdlisus</li><li>sil_lisu_basic</li><li>sil_lisu_standard</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Oriya <span class=muted>4 · Context only 3, Plain 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>1</span></summary><ul><li>basic_kbdinori</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>3</span></summary><ul><li>itrans_odia</li><li>kui_odia_winscript</li><li>nlci_oriya_winscript</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Telugu <span class=muted>4 · Context only 3, Plain 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>1</span></summary><ul><li>basic_kbdintel</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>3</span></summary><ul><li>gondi_tel</li><li>lavanya</li><li>nlci_telugu_winscript</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Tibetan <span class=muted>4 · Context only 2, Plain 1, Deadkey only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>1</span></summary><ul><li>basic_kbddzo</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>1</span></summary><ul><li>basic_kbdtiprd</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>2</span></summary><ul><li>sil_dzongkha</li><li>tibetan_direct_input</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Tifinagh <span class=muted>4 · Plain 4</span></summary><ul>
+<li><details><summary>Plain <span class=muted>4</span></summary><ul><li>basic_kbdtifi</li><li>basic_kbdtifi2</li><li>sil_tawallammat</li><li>tuareg_tifinagh</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Coptic <span class=muted>3 · Context only 3</span></summary><ul>
+<li><details><summary>Context only <span class=muted>3</span></summary><ul><li>coptic_greek</li><li>coptic_qwerty</li><li>sil_nubian</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Gurmukhi <span class=muted>3 · Context only 2, Plain 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>1</span></summary><ul><li>basic_kbdinpun</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>2</span></summary><ul><li>itrans_gurmukhi</li><li>nlci_gurmukhi_winscript</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Mongolian <span class=muted>3 · Plain 3</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>basic_kbdmonmo</li><li>basic_kbdmonst</li><li>manchu</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Newa <span class=muted>3 · Plain 3</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>newa_romanized</li><li>newa_traditional</li><li>newa_traditional_extended</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Nko <span class=muted>3 · Plain 2, Context only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>2</span></summary><ul><li>basic_kbdnko</li><li>sil_nko</li></ul></details></li>
+<li><details><summary>Context only <span class=muted>1</span></summary><ul><li>nko</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Runic <span class=muted>3 · Plain 2, Deadkey only 1</span></summary><ul>
+<li><details><summary>Plain <span class=muted>2</span></summary><ul><li>anglo_furthorc_english</li><li>younger_futhark_short_twig</li></ul></details></li>
+<li><details><summary>Deadkey only <span class=muted>1</span></summary><ul><li>basic_kbdfthrk</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Script:Sinhala <span class=muted>3 · Plain 3</span></summary><ul>
+<li><details><summary>Plain <span class=muted>3</span></summary><ul><li>basic_kbdsn1</li><li>basic_kbdsw09</li><li>kbdsn1</li></ul></details></li>
+</ul></details></li>
+<li><details><summary>Pairs <span class=muted>24 keyboards · 12 pairs, each sharing a script</span></summary><ul>
+<li>Script:Cham <span class=muted>eastern_cham, sil_cham_phonetic</span></li>
+<li>Script:Cherokee <span class=muted>basic_kbdcher, sil_cherokee_nation</span></li>
+<li>Script:Deseret <span class=muted>deseret, idc_deseret</span></li>
+<li>Script:Hanifi <span class=muted>hanifi_rohingya, hanifi_rohingya_alternate</span></li>
+<li>Script:Kannada <span class=muted>basic_kbdinkan, nlci_kannada_winscript</span></li>
+<li>Script:Limbu <span class=muted>sil_limbu_phonetic, sil_limbu_typewriter</span></li>
+<li>Script:New Tai <span class=muted>basic_kbdntl, ntl_onekey</span></li>
+<li>Script:Old South <span class=muted>gff_musnad, himyarit_musnad</span></li>
+<li>Script:Osage <span class=muted>osage_nation, osage_nation_new</span></li>
+<li>Script:Tai Le <span class=muted>basic_kbdtaile, tainua</span></li>
+<li>Script:Tai Tham <span class=muted>sil_boonkit, tai_tham_my</span></li>
+<li>Script:Thaana <span class=muted>basic_kbddiv1, basic_kbddiv2</span></li>
+</ul></details></li>
+<li><details><summary>Singleton <span class=muted>70 keyboards · each the only representative of its script</span></summary><ul>
+<li>Script:Ahom <span class=muted>ahom_star</span></li>
+<li>Script:Avestan <span class=muted>avestan_phonetic</span></li>
+<li>Script:Balinese <span class=muted>aksarabali_panlex</span></li>
+<li>Script:Bamum <span class=muted>bamum</span></li>
+<li>Script:Bassa <span class=muted>bassa_vah</span></li>
+<li>Script:Batak <span class=muted>batak</span></li>
+<li>Script:Bhaiksuki <span class=muted>bhaiksuki_inscript</span></li>
+<li>Script:Bopomofo <span class=muted>formosa</span></li>
+<li>Script:Brahmi <span class=muted>brahmi_inscript</span></li>
+<li>Script:Buginese <span class=muted>basic_kbdbug</span></li>
+<li>Script:Buhid <span class=muted>buhid</span></li>
+<li>Script:Dives <span class=muted>dives_akuru_inscript</span></li>
+<li>Script:Dogra <span class=muted>dogra_inscript</span></li>
+<li>Script:Glagolitic <span class=muted>glagolitic_phonetic</span></li>
+<li>Script:Hanunoo <span class=muted>hanunoo</span></li>
+<li>Script:Hatran <span class=muted>hatran_inscript</span></li>
+<li>Script:Inscriptional Pahlavi <span class=muted>inscriptional_pahlavi_phonetic</span></li>
+<li>Script:Inscriptional Parthian <span class=muted>inscriptional_parthian_phonetic</span></li>
+<li>Script:Javanese <span class=muted>basic_kbdjav</span></li>
+<li>Script:Kaithi <span class=muted>kaithi_inscript</span></li>
+<li>Script:Kawi <span class=muted>kawi_inscript</span></li>
+<li>Script:Kayah <span class=muted>sil_kayah_kali</span></li>
+<li>Script:Kharoshthi <span class=muted>kharoshthi_inscript</span></li>
+<li>Script:Khojki <span class=muted>khojki_inscript</span></li>
+<li>Script:Khudawadi <span class=muted>khudawadi_inscript</span></li>
+<li>Script:Lepcha <span class=muted>sil_lepcha</span></li>
+<li>Script:Linear <span class=muted>linear_b_full_syllabary</span></li>
+<li>Script:Mahajani <span class=muted>mahajani_inscript</span></li>
+<li>Script:Makasar <span class=muted>makasar_inscript</span></li>
+<li>Script:Mandaic <span class=muted>mandaic_phonetic</span></li>
+<li>Script:Manichaean <span class=muted>manichaean</span></li>
+<li>Script:Marchen <span class=muted>marchen_direct_input</span></li>
+<li>Script:Masaram <span class=muted>masaram_gondi</span></li>
+<li>Script:Medefaidrin <span class=muted>medefaidrin</span></li>
+<li>Script:Meroitic <span class=muted>meroitic_cursive</span></li>
+<li>Script:Modi <span class=muted>modi_inscript</span></li>
+<li>Script:Multani <span class=muted>multani_inscript</span></li>
+<li>Script:Nabataean <span class=muted>nabataean_inscript</span></li>
+<li>Script:Nag <span class=muted>nag_mundari</span></li>
+<li>Script:Nandinagari <span class=muted>nandinagari_inscript</span></li>
+<li>Script:Nyiakeng <span class=muted>nyiakeng_puachue_hmong</span></li>
+<li>Script:Ogham <span class=muted>basic_kbdogham</span></li>
+<li>Script:Ol <span class=muted>basic_kbdolch</span></li>
+<li>Script:Old North <span class=muted>old_north_arabian_phonetic</span></li>
+<li>Script:Old Permic <span class=muted>old_permic</span></li>
+<li>Script:Old Uyghur <span class=muted>old_uyghur</span></li>
+<li>Script:Pahawh <span class=muted>pahawh_hmong_basic</span></li>
+<li>Script:Palmyrene <span class=muted>palmyrene</span></li>
+<li>Script:Pau <span class=muted>pau_cin_hau</span></li>
+<li>Script:Phags-Pa <span class=muted>basic_kbdphags</span></li>
+<li>Script:Psalter <span class=muted>psalter_pahlavi_phonetic</span></li>
+<li>Script:Rejang <span class=muted>rejang</span></li>
+<li>Script:Samaritan <span class=muted>samaritan</span></li>
+<li>Script:Saurashtra <span class=muted>saurashtra_inscript</span></li>
+<li>Script:Sharada <span class=muted>sharada_inscript</span></li>
+<li>Script:Siddham <span class=muted>siddham_inscript</span></li>
+<li>Script:Soyombo <span class=muted>soyombo</span></li>
+<li>Script:Sundanese <span class=muted>sundanese</span></li>
+<li>Script:Syloti <span class=muted>sylheti_nagri</span></li>
+<li>Script:Tagalog <span class=muted>baybayin</span></li>
+<li>Script:Tagbanwa <span class=muted>tagbanwa_inscript</span></li>
+<li>Script:Tai Viet <span class=muted>sil_tai_dam</span></li>
+<li>Script:Takri <span class=muted>takri</span></li>
+<li>Script:Tirhuta <span class=muted>tirhuta</span></li>
+<li>Script:Toto <span class=muted>txo_toto</span></li>
+<li>Script:Ugaritic <span class=muted>ugaritic</span></li>
+<li>Script:Warang <span class=muted>warang_citi</span></li>
+<li>Script:Yezidi <span class=muted>yezidi</span></li>
+<li>Script:Zanabazar <span class=muted>zanabazar_square</span></li>
+<li>Unclassified <span class=muted>khmer_advanced</span></li>
+</ul></details></li>
+</ul></details></li></ul>
+</body>
+</html>

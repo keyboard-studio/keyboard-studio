@@ -37,9 +37,9 @@ deliberately covers a narrower set of well-understood keyboard designs.
 ## How it works
 
 - **Start from a working keyboard.** Most keyboards in the repository cluster around a few
-  layouts per script, so every session starts as a copy of one existing keyboard: a published
-  keyboard, a basic layout, an uploaded `.kmn`, or US QWERTY when nothing closer exists.
-  <!-- TODO: link the whole-set logical grouping analysis once it has a home in docs/. -->
+  layouts per script ([how the 920 keyboards group](https://keyboard-studio.github.io/keyboard-studio/docs/design-notes/keyboard-grouping.html)),
+  so every session starts as a copy of one existing keyboard: a published keyboard, a basic
+  layout, an uploaded `.kmn`, or US QWERTY when nothing closer exists.
 - **Suggested answers.** Each question offers a proposed answer with its source, to confirm or
   change. Where a guess could be wrong in a way that matters, such as the copyright holder, the
   studio asks instead.
@@ -109,8 +109,8 @@ must pass before merge. Run `pnpm lint` and `pnpm test` locally first.
 
 ## Acknowledgements
 
-Keyboard Studio is an independent project that began at a hackathon; it is not an official Keyman
-project. Keyman began in 1992 and is now developed by the Keyman team at SIL Global. Keyman,
+Keyboard Studio is a project of SIL's Language Technology Use department that began at a
+hackathon; it is not an official Keyman project. Keyman began in 1992 and is now developed by the Keyman team at SIL Global. Keyman,
 Keyman Developer, and the keyboards repository are the work of that team and many keyboard
 authors. Every keyboard this studio starts from was made by one of them. If any idea or code here
 is useful to Keyman, we would be glad to see it there.
