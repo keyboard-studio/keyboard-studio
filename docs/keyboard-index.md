@@ -17,6 +17,8 @@ To add a row:
 
 Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../packages/engine/src/base-browser/kps-parser.ts).
 
+**Exception: whole-corpus listings.** [design-notes/keyboard-grouping.html](design-notes/keyboard-grouping.html) lists every keyboard in the corpus to show how they cluster. That is an inventory of the corpus, not a reference to individual keyboards, so its entries do not need rows here. The rule still applies to any keyboard the project names on its own (as a starting point, fixture, example, or citation), including one that also appears in that listing.
+
 ## Index
 
 | Keyboard | id | Languages (BCP47) | Author | Path |
