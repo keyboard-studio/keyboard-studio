@@ -183,13 +183,12 @@ td.sec{font-family:var(--f-display);font-size:.8rem;color:var(--muted);white-spa
 .hero-icon{width:72px;height:72px;display:block;border-radius:16px}
 .lead{font-size:1.15rem}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:28px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.stat{padding:4px 20px 4px 0;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.stat:last-child{border-right:0}
+.stat+.stat{padding-left:20px}
 .stat .v{font-family:var(--f-head);font-weight:600;font-size:2rem;line-height:1;color:var(--accent)}
 .stat p{font-size:.92rem;color:var(--muted)}
 .after{margin-top:28px}
-.uses{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
-.use{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;font-size:.95rem}
-.use .cap{align-self:flex-start}
 .sub3{font-family:var(--f-display);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:32px}
 .timeline{list-style:none;margin:28px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;counter-reset:step}
 .timeline li{position:relative;padding-top:22px;border-top:3px solid var(--accent);display:flex;flex-direction:column;gap:6px;font-size:.95rem}
@@ -214,8 +213,10 @@ footer{padding-block:40px;border-top:1px solid var(--line);font-size:.85rem;colo
 footer ul{margin:8px 0 0;padding-left:1.2em}
 footer p+p{margin-top:12px}
 @media (max-width:760px){
-  .hero,.two,.tracks,.compare,.human,.roles,.for,.pair,.uses,.timeline{grid-template-columns:minmax(0,1fr)}
-  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero,.two,.tracks,.compare,.human,.roles,.for,.pair,.timeline{grid-template-columns:minmax(0,1fr)}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:20px}
+  .stat:nth-child(2n){border-right:0}
+  .stat:nth-child(2n+1){padding-left:0}
   .timeline{gap:28px}
   .crow{grid-template-columns:minmax(0,8.5em) minmax(0,1fr) 2em}
   td.sec{white-space:normal}
@@ -283,12 +284,12 @@ footer p+p{margin-top:12px}
     <p>Behind those keyboards are Keyman Developer and the keyboards repository, each keyboard built, reviewed, and maintained by people who cared about getting it right. Much of the Bible translation, literacy, and language development work we have been part of depends on the foundation that Keyman provides.</p>
   </div>
   <p class="sub3">What Keyboard Studio uses from Keyman</p>
-  <div class="uses">
-    <div class="use"><span class="cap">Compiler</span><p>Keyman's own compiler checks every keyboard the studio makes, running in your browser.</p></div>
-    <div class="use"><span class="cap">Keyboards</span><p>Every studio keyboard starts from one in the repository, a remarkable record of how the world's scripts are typed.</p></div>
-    <div class="use"><span class="cap">Checklist</span><p>The repository's review checklist shapes what the studio asks and checks.</p></div>
-    <div class="use"><span class="cap">Keyman</span><p>Keyman itself is what people install to use the keyboard you make.</p></div>
-  </div>
+  <ul class="ux">
+    <li><b>Keyman's own compiler</b> checks every keyboard the studio makes, running in your browser.</li>
+    <li><b>The keyboards in the repository</b> are where every studio keyboard starts: a remarkable record of how the world's scripts are typed.</li>
+    <li><b>The repository's review checklist</b> shapes what the studio asks and checks.</li>
+    <li><b>Keyman itself</b> is what people install to use the keyboard you make.</li>
+  </ul>
 </section>
 
 <section aria-labelledby="h-origin">
