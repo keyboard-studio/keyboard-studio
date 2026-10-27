@@ -44,8 +44,7 @@ leans on it heavily, along with the rest of what the Keyman team has built:
 
 ## Where this came from
 
-Keyboard Studio started at a hackathon in summer 2026. We are [a small group of volunteers /
-people from organizations] who work with language communities and have relied on Keyman for
+Keyboard Studio started at a hackathon in summer 2026. We are staff and summer associates in SIL's Language Technology Use department, who work with language communities and have relied on Keyman for
 years.
 
 Our first idea was small: a helper that would let AI coding assistants work with Keyman keyboards,

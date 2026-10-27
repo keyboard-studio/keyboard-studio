@@ -17,7 +17,8 @@ Keyman has let people type their languages on every major platform since 1992, a
 Developer, together with the keyboards repository, has carried more than 900 reviewed keyboards to
 the communities that use them. We are grateful for both, and this project depends on them.
 
-Keyboard Studio started at a hackathon in summer 2026 as something smaller: an MCP server to help
+Keyboard Studio started at a hackathon in summer 2026, among staff and summer associates in SIL's Language
+Technology Use department, as something smaller: an MCP server to help
 existing Keyman Developer users write keyboard code faster. We widened the goal as we went. Many of
 us have taught keyboard development in workshops for years. We kept meeting people who knew their
 language well but found it hard to finish a keyboard: the code, the files that must stay in step,
