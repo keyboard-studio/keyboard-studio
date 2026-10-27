@@ -50,13 +50,17 @@ h1{font-size:clamp(2.1rem,5vw,3.4rem);letter-spacing:-.01em}
 h2{font-size:clamp(1.5rem,3vw,2rem)}
 h3{font-size:1.2rem}
 .panel h3,.fixes h3,.for h3{font-family:var(--f-display);font-weight:700}
-/* Brand bar, after the software.sil.org header: SIL logo, a hairline rule, then the unit name. */
+/* Brand bar, after the software.sil.org product-site header (e.g. /fieldworks): SIL logo, a hairline rule,
+   the product name, and the unit as a small all-caps subtitle. */
 .brandbar{background:var(--surface);border-bottom:1px solid var(--line);box-shadow:0 6px 16px rgba(0,21,42,.06)}
 .brandbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px;padding-block:12px}
 .brand{display:flex;align-items:center;min-width:0}
 .brand-logo{display:flex;align-items:center;flex-shrink:0;padding-right:12px;margin-right:12px;border-right:1px solid var(--line);align-self:stretch}
 .brand-logo img{height:40px;width:auto;display:block}
-.brand-name{font-family:var(--f-display);font-weight:700;font-size:clamp(16px,3.5vw,24px);letter-spacing:-.025em;line-height:1.1;color:var(--brand-ink)}
+.brand-titles{display:flex;flex-direction:column;justify-content:center;min-width:0}
+.brand-name{font-family:var(--f-display);font-weight:700;font-size:clamp(16px,3.5vw,24px);letter-spacing:-.025em;line-height:1;color:var(--brand-ink);text-decoration:none}
+.brand-sub{font-family:var(--f-display);font-size:11.5px;font-weight:500;margin-top:5px;text-transform:uppercase;letter-spacing:.18em;line-height:1.2;color:var(--muted)}
+.copyright{margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}
 .theme-toggle{white-space:nowrap;flex-shrink:0;font-family:var(--f-display);font-size:.85rem;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
 p{margin:0}
 code,.mono{font-family:var(--f-mono);font-size:.84em}
@@ -192,8 +196,11 @@ footer p+p{margin-top:12px}
 <div class="brandbar">
   <div class="wrap">
     <div class="brand">
-      <a class="brand-logo" href="https://www.sil.org"><img src="assets/sil-logo.png" width="139" height="75" alt="SIL"></a>
-      <span class="brand-name">Language Technology Use</span>
+      <a class="brand-logo" href="https://software.sil.org"><img src="assets/sil-logo.png" width="139" height="75" alt="SIL Language Technology"></a>
+      <div class="brand-titles">
+        <a class="brand-name" href="./">Keyboard Studio</a>
+        <span class="brand-sub">Language Technology Use</span>
+      </div>
     </div>
     <button type="button" class="theme-toggle" id="theme-toggle">Navy theme</button>
   </div>
@@ -576,6 +583,7 @@ footer p+p{margin-top:12px}
     <li><a href="docs/lint.md">docs/lint.md</a>: the 14 kmcmplib checks, with source references</li>
     <li><a href="docs/design-notes/keyboard-vocabulary-glossary.md">docs/design-notes/keyboard-vocabulary-glossary.md</a>: the two tracks</li>
   </ul>
+  <p class="copyright">Copyright &copy; <span id="copyright-year">2026</span>&nbsp;<a href="https://www.sil.org/">SIL Global</a></p>
 </footer>
 </div>
 
@@ -588,6 +596,7 @@ footer p+p{margin-top:12px}
 </dialog>
 
 <script>
+document.getElementById("copyright-year").textContent = new Date().getFullYear();
 (function () {
   var root = document.documentElement, btn = document.getElementById("theme-toggle");
   var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
