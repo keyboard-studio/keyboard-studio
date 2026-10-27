@@ -23,7 +23,7 @@ keyboards it makes go through the same review as every other keyboard in the Key
 
 Keyboard Studio would not exist without Keyman.
 
-Keyman has helped people type their own languages since 1992. Today it is free and open source, and it runs on Windows, Mac, Linux, iOS, Android, and the web. For many communities it was the first time
+Keyman has helped people type their own languages since 1992. It began on Windows and grew to Mac, Linux, iOS, Android, and the web, and today it is free and open source. For many communities it was the first time
 their language could be typed at all.
 
 Behind those keyboards is Keyman Developer and the

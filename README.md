@@ -13,8 +13,8 @@ Try it at [kbstudio.langtech.cloud](https://kbstudio.langtech.cloud). The projec
 
 ## Why it exists
 
-Keyman has helped people type their own languages since 1992, and today it is free, open source,
-and available on every major platform. Keyman Developer, together with the keyboards repository, has carried more than 900 reviewed keyboards to
+Keyman has helped people type their own languages since 1992. It began on Windows and grew to
+every major desktop and mobile platform, and today it is free and open source. Keyman Developer, together with the keyboards repository, has carried more than 900 reviewed keyboards to
 the communities that use them. We are grateful for both, and this project depends on them.
 
 Keyboard Studio started at a hackathon in summer 2026, among staff and summer associates in SIL's Language
