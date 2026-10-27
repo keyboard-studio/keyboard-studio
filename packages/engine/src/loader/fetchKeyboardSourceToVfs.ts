@@ -175,6 +175,28 @@ export function resolveKpsFontPath(rawPath: string, kbPath: string): string | nu
   if (!resolved.startsWith("release/")) return null;
   return resolved;
 }
+
+/**
+ * The VFS path for a release-relative `.kps` asset (font or stylesheet)
+ * resolved by {@link resolveKpsFontPath}. An asset outside the start
+ * keyboard's own tree (the `shared/…` case) keeps its release-relative
+ * address minus the `release/` prefix — the VFS mirrors the tree, so the
+ * `..\..\..\shared\…` references a `.kps` carries resolve as written. An
+ * asset inside the keyboard's OWN `source/` is keyboard-local: it takes
+ * the plain `source/…` address every other keyboard-local file uses, so
+ * the scaffolder's rename pass sees it and nothing ships under the base's
+ * old release path (#2307 — a keyboard-local stylesheet used to be written
+ * at `sil/<base-id>/source/<base-id>.css` alongside the renamed copy).
+ *
+ * Exported for unit tests, like {@link resolveKpsFontPath}.
+ */
+export function kpsAssetVfsPath(relPath: string, kbPath: string): string {
+  const ownSourcePrefix = `${kbPath}/source/`;
+  if (relPath.startsWith(ownSourcePrefix)) {
+    return `source/${relPath.slice(ownSourcePrefix.length)}`;
+  }
+  return relPath.slice("release/".length);
+}
 const DEFAULT_OPTIONS: Required<CompilerOptions> = {
   compilerWarningsAsErrors: false,
   warnDeprecatedCode: true,
@@ -376,10 +398,10 @@ export async function fetchKeyboardSourceToVfs(
         warnings.push(fr.warn);
         continue;
       }
-      // VFS path strips the leading "release/" so it sits alongside the
-      // keyboard source tree root (mirrors how shared/ assets are addressed
-      // relative to the keyboard root).
-      const vfsPath = fr.ttfRelPath.slice("release/".length);
+      // VFS path: shared assets keep their release-relative address;
+      // a keyboard-local asset takes the plain source/ address
+      // (see kpsAssetVfsPath).
+      const vfsPath = kpsAssetVfsPath(fr.ttfRelPath, startKeyboard.path);
       // Font files are binary — flag them (see the sibling-asset write above for
       // what an unflagged byte payload costs downstream).
       vfs.set(vfsPath, fr.bytes, true);
@@ -429,7 +451,7 @@ export async function fetchKeyboardSourceToVfs(
         warnings.push(cr.warn);
         continue;
       }
-      const vfsPath = cr.cssRelPath.slice("release/".length);
+      const vfsPath = kpsAssetVfsPath(cr.cssRelPath, startKeyboard.path);
       vfs.set(vfsPath, cr.cssText);
       filesLoaded.push(vfsPath);
       stylesheets.push({
@@ -563,6 +585,32 @@ const WELCOME_FOLDER_PREFIX = "welcome/";
 const FOLDER_WELCOME_PAGE = "welcome/welcome.htm";
 const FLAT_WELCOME_PAGE = "welcome.htm";
 
+/**
+ * Extensions carried as welcome images (#2305). The copy track carries
+ * images only and no prose (spec 080 R9 / FR-007, spec 102 FR-032), so a
+ * `welcome\…` `<Files>` entry that is not an image — the per-layout `.htm`
+ * sub-pages and `kb.css` a keyboard like sil_cameroon_qwerty lists there —
+ * is not a welcome image: carrying it ships it in the copy's `.kps` and the
+ * generated welcome page renders it as a broken `<img>`.
+ */
+const WELCOME_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "svg",
+  "webp",
+  "bmp",
+  "ico",
+  "avif",
+]);
+
+/** True when `rel` names an image file, by extension (case-insensitive). */
+function isWelcomeImagePath(rel: string): boolean {
+  const m = /\.([a-z0-9]+)$/i.exec(rel);
+  return m !== null && WELCOME_IMAGE_EXTENSIONS.has(m[1]!.toLowerCase());
+}
+
 interface ResolvedStartWelcome {
   text: string | undefined;
   convention: WelcomeConvention;
@@ -639,8 +687,11 @@ function docStylesheetPaths(args: {
  *     entry), never to a failure.
  *
  * Images are the `welcome\…` `<Files>` entries other than the page, fetched as
- * bytes. Each miss is skipped and recorded — a listed file the base does not
- * ship is the base's defect, and the output must still build.
+ * bytes — image files only (#2305, see {@link WELCOME_IMAGE_EXTENSIONS}): the
+ * same folder listing also names prose sub-pages and stylesheets, which the
+ * copy track does not carry. Each miss is skipped and recorded — a listed
+ * file the base does not ship is the base's defect, and the output must
+ * still build.
  */
 async function resolveStartWelcome(
   baseUrl: string,
@@ -682,8 +733,11 @@ async function resolveStartWelcome(
     convention = "flat";
   }
 
-  // Folder images: every `welcome\…` <Files> entry other than the page itself,
-  // in `.kps` order (deterministic, and the order the corpus descriptor uses).
+  // Folder images: every `welcome\…` <Files> entry other than the page itself
+  // that names an image file (#2305), in `.kps` order (deterministic, and
+  // the order the corpus descriptor uses). Non-image entries (`.htm`
+  // sub-pages, `kb.css`) are skipped silently — they are not missing
+  // images, just not images.
   const images: WelcomeFolderImage[] = [];
   const seen = new Set<string>();
   if (convention === "folder" && kpsText !== undefined) {
@@ -691,6 +745,7 @@ async function resolveStartWelcome(
       const rel = kpsRefToPosix(name);
       if (!rel.startsWith(WELCOME_FOLDER_PREFIX) || hasTraversal(rel)) continue;
       if (rel === pagePath) continue;
+      if (!isWelcomeImagePath(rel)) continue;
       const key = rel.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
