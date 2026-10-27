@@ -8,7 +8,7 @@
   "content.criteria.10_5-kps-conlang-flagged.description": "Si le clavier concerne une langue construite, il est signalé pour une révision particulière",
   "content.criteria.10_6-kps-numeric-region-flagged.description": "Si la balise de langue inclut des codes régionaux numériques, elle est signalée pour une révision particulière",
   "content.criteria.10_7-kps-details-files-selected.description": "`readme.htm`, `welcome.htm` et `LICENSE.md` sont sélectionnés dans le champ License de l'onglet Details du `.kps`",
-  "content.criteria.10_8-kps-follow-keyboard-version.description": "« Follow keyboard version » est sélectionné dans l'onglet Details du `.kps`",
+  "content.criteria.10_8-kps-follow-keyboard-version.description": "L'option « Suivre la version clavier » est sélectionnée dans l'onglet « Détails » du fichier `.kps`",
   "content.criteria.10_9-kps-description-nonempty.description": "Le champ Description est présent et non vide dans le `.kps`",
   "content.criteria.11_1-php-exists-with-header.description": "Le fichier `<name>.php` existe et possède l'en-tête PHP approprié",
   "content.criteria.11_10-php-htm-style-parity.description": "Le CSS de `welcome.htm` et du `.php` est identique, aux espaces non significatifs près",
