@@ -30,7 +30,7 @@ their language could be typed at all.
 Behind those keyboards is Keyman Developer and the
 [keymanapp/keyboards](https://github.com/keymanapp/keyboards) repository: more than 900 keyboards, each
 built, reviewed, and maintained by people who cared about getting them right. Much of the Bible
-translation, literacy, and language development work we have been part of depends on them.
+translation, literacy, and language development work we have been part of depends on the foundation that Keyman provides.
 
 That repository is also a remarkable record of how the world's scripts are typed. Keyboard Studio
 leans on it heavily, along with the rest of what the Keyman team has built:
