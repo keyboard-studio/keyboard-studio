@@ -1633,6 +1633,50 @@ function resolveInstantiationCase(
   return { shouldNoop: false, preservedPhaseResults, preservedIrAxes };
 }
 
+/**
+ * Shared fresh-instance tail for instantiateFromStart / instantiateFromExisting.
+ *
+ * Both tracks reset exactly these slots to the same values; the only
+ * difference in the old copies was comment wording. Deliberately NOT a
+ * spread of INITIAL_STATE: instantiation must leave the other INITIAL_STATE
+ * slots (validator findings, context tolerance, and friends) untouched.
+ * Every call builds fresh Sets, Maps, and arrays, so no two instantiations
+ * (and no instantiation and reset()) can share a mutable object.
+ */
+function freshInstantiationTail() {
+  return {
+    desktopLocked: false,
+    // Reset unconditionally: a fresh/re-instantiated working copy has no
+    // flags, and flagging only happens in Phase C (well after instantiation
+    // settles), so no in-flight value can be lost here.
+    sequenceFlaggedChars: [],
+    touchLayoutJson: null,
+    touchDraft: null,
+    galleryIntrosSeen: { mechanism: false, touch: false },
+    // Fresh instance, not carried from any preceding working copy — see
+    // reset()'s identical comment.
+    keyEditOverlay: { ops: [] },
+    deadkeyOverlay: { ops: [] },
+    // Annotated, not inferred: without it the literal widens to string and
+    // the spread no longer matches TouchEditorMode ("character" | "key").
+    touchEditorMode: "character" as TouchEditorMode,
+    staleSteps: new Set<string>(),
+    // A new working copy has no default-fill provenance yet (#890) — the
+    // pattern-loading effect re-runs defaultFillAxes and republishes it.
+    axisFills: [],
+    // A new working copy has no closed-keyboard decision and no carve
+    // decisions yet — both are per-working-copy (076 FR-022).
+    closedKeyboardCard: null,
+    carveDispositions: [],
+    carveTouchKeepInert: [],
+    // Spec 104 identity records are per-working-copy too: a fresh start
+    // has no severances, no transplants and no guard answer yet.
+    keyIdentityDecisions: [],
+    keyTransplants: [],
+    guardSpecification: null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Initial state (extracted so reset() and the initializer share one source)
 // ---------------------------------------------------------------------------
@@ -2513,33 +2557,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         seedIrAxesFromStartIr(ir, preservedIrAxes),
         preservedPhaseResults,
       ),
-      desktopLocked: false,
-      // Reset unconditionally: a fresh/re-instantiated working copy has no
-      // flags, and flagging only happens in Phase C (well after instantiation
-      // settles), so no in-flight value can be lost here.
-      sequenceFlaggedChars: [],
-      touchLayoutJson: null,
-      touchDraft: null,
-      galleryIntrosSeen: { mechanism: false, touch: false },
-      // Fresh instance, not carried from any preceding working copy — see
-      // reset()'s identical comment.
-      keyEditOverlay: { ops: [] },
-      deadkeyOverlay: { ops: [] },
-      touchEditorMode: "character",
-      staleSteps: new Set<string>(),
-      // A new working copy has no default-fill provenance yet (#890) — the
-      // pattern-loading effect re-runs defaultFillAxes and republishes it.
-      axisFills: [],
-      // A new working copy has no closed-keyboard decision and no carve
-      // decisions yet — both are per-working-copy (076 FR-022).
-      closedKeyboardCard: null,
-      carveDispositions: [],
-      carveTouchKeepInert: [],
-      // Spec 104 identity records are per-working-copy too: a fresh start
-      // has no severances, no transplants and no guard answer yet.
-      keyIdentityDecisions: [],
-      keyTransplants: [],
-      guardSpecification: null,
+      ...freshInstantiationTail(),
     });
   },
 
@@ -2609,30 +2627,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         seedIrAxesFromStartIr(ir, preservedIrAxes),
         preservedPhaseResults,
       ),
-      desktopLocked: false,
-      sequenceFlaggedChars: [],
-      touchLayoutJson: null,
-      touchDraft: null,
-      galleryIntrosSeen: { mechanism: false, touch: false },
-      // Fresh instance, not carried from any preceding working copy — see
-      // reset()'s identical comment.
-      keyEditOverlay: { ops: [] },
-      deadkeyOverlay: { ops: [] },
-      touchEditorMode: "character",
-      staleSteps: new Set<string>(),
-      // A new working copy has no default-fill provenance yet (#890) — the
-      // pattern-loading effect re-runs defaultFillAxes and republishes it.
-      axisFills: [],
-      // A new working copy has no closed-keyboard decision and no carve
-      // decisions yet — both are per-working-copy (076 FR-022).
-      closedKeyboardCard: null,
-      carveDispositions: [],
-      carveTouchKeepInert: [],
-      // Spec 104 identity records are per-working-copy too (see
-      // instantiateFromStart).
-      keyIdentityDecisions: [],
-      keyTransplants: [],
-      guardSpecification: null,
+      ...freshInstantiationTail(),
     });
   },
 
