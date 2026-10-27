@@ -2,7 +2,7 @@
 
 Each item is a pass/fail check. Group order roughly follows the order a reviewer would walk through a PR.
 
-The references come from public pull-request reviews in [keymanapp/keyboards](https://github.com/keymanapp/keyboards/pulls), most of them by Lorna Evans. Her careful, consistent review history is what made it possible to write this checklist down. Where a reference says the reviewer changed something, the fix was made directly in the pull request.
+The references come from public pull-request reviews in [keymanapp/keyboards](https://github.com/keymanapp/keyboards/pulls), by the Keyman team's keyboard reviewers. Their careful, consistent review history is what made it possible to write this checklist down. Where a reference says the reviewer changed something, the fix was made directly in the pull request.
 
 Legend:
 - <span style="color:green">**Green**</span> — **Deterministic.** Can be checked mechanically from the keyboard files (file presence, regex/syntax, parsing, diffs, version comparisons).
