@@ -192,6 +192,7 @@ import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
+import { MethodCard } from "./parts/MethodCard.tsx";
 import {
   RemovableChipRow,
   HoverDangerChip,
@@ -225,11 +226,7 @@ import {
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectMenuStyle,
-  galleryHeaderBtnStyle as headerBtnStyle,
-  galleryCardHeaderRowStyle as cardHeaderRowStyle,
-  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
-  galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
 import {
   PATTERN_SEQUENCE,
@@ -806,10 +803,11 @@ interface MethodChooserProps {
 // SelectMenus); the base-key picker itself uses KeyPickerField, which carries
 // its own internal style.
 
-// inputStyle, headerBtnStyle, configStyle, and cardStyle are
+// inputStyle and configStyle are
 // imported (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte
-// with SequenceBuilderPanel.tsx (and, for headerBtnStyle/
-// configStyle/cardStyle, TouchGallery.tsx) rather than redefined here. The
+// with SequenceBuilderPanel.tsx (and, for configStyle, TouchGallery.tsx)
+// rather than redefined here. The card shell itself (header button,
+// header row, card container) now lives in parts/MethodCard.tsx. The
 // page-level wrapper style (pageStyle) is no longer imported directly here —
 // it's used via GalleryEmptyState.tsx (the no-base-keyboard/no-inventory
 // guards) rather than inline.
@@ -961,8 +959,9 @@ function MethodChooser({
         message: "[base letter]",
       });
 
-  // Each method is one card: transparent header button + inline config when
-  // selected. cardStyle is imported from ../../lib/galleryTheme.ts.
+  // Each method is one MethodCard: transparent header button + inline config
+  // when selected. The shell lives in parts/MethodCard.tsx, shared with
+  // TouchMethodChooser.
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -987,41 +986,26 @@ function MethodChooser({
       {/* S-01 — always shown. Rendered FIRST: "Assign to a key" is the
           per-character default method (see MechanismGallery's
           useState<Method>("swap")), so its card leads the list. */}
-      <div style={cardStyle(method === "swap")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "swap"}
-            onClick={() => onMethodChange("swap")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "swap" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.method.swap.title">
-                Assign to a key
-              </Trans>
-            </span>
-            {method !== "swap" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.method.swap.summary">
-                  Dedicate one physical key to produce {currentCharDisplay}
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "swap" && (
-            <CardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="mechanism-apply-swap"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "swap"}
+        onSelect={() => onMethodChange("swap")}
+        title={
+          <Trans id="editor.assignLoop.method.swap.title">Assign to a key</Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.method.swap.summary">
+            Dedicate one physical key to produce {currentCharDisplay}
+          </Trans>
+        }
+        applyRow={
+          <CardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="mechanism-apply-swap"
+          />
+        }
+      >
         {method === "swap" &&
           (() => {
             const filledRaltTokens = raltTokens.filter(
@@ -1311,35 +1295,21 @@ function MethodChooser({
               </div>
             );
           })()}
-      </div>
+      </MethodCard>
 
       {/* S-03 — always shown */}
-      <div style={cardStyle(method === "sequence")}>
-        <button
-          type="button"
-          aria-pressed={method === "sequence"}
-          onClick={() => onMethodChange("sequence")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "sequence" ? ACCENT : TEXT_MAIN,
-            }}
-          >
-            <Trans id="editor.assignLoop.method.sequence.title">
-              Type a sequence
-            </Trans>
-          </span>
-          {method !== "sequence" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.sequence.summary">
-                Type two or more keystrokes in a row to produce{" "}
-                {currentCharDisplay}
-              </Trans>
-            </span>
-          )}
-        </button>
+      <MethodCard
+        selected={method === "sequence"}
+        onSelect={() => onMethodChange("sequence")}
+        title={
+          <Trans id="editor.assignLoop.method.sequence.title">Type a sequence</Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.method.sequence.summary">
+            Type two or more keystrokes in a row to produce {currentCharDisplay}
+          </Trans>
+        }
+      >
         {method === "sequence" && (
           <div style={configStyle}>
             <p
@@ -1367,45 +1337,31 @@ function MethodChooser({
             </p>
           </div>
         )}
-      </div>
+      </MethodCard>
 
       {/* S-02 — always shown */}
-      <div style={cardStyle(method === "deadkey")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "deadkey"}
-            onClick={() => onMethodChange("deadkey")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "deadkey" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.method.deadkey.title">
-                Tap a trigger key, then a letter
-              </Trans>
-            </span>
-            {method !== "deadkey" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.method.deadkey.summary">
-                  Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr;{" "}
-                  {currentCharDisplay}
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "deadkey" && (
-            <CardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="mechanism-apply-deadkey"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "deadkey"}
+        onSelect={() => onMethodChange("deadkey")}
+        title={
+          <Trans id="editor.assignLoop.method.deadkey.title">
+            Tap a trigger key, then a letter
+          </Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.method.deadkey.summary">
+            Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr; {currentCharDisplay}
+          </Trans>
+        }
+        applyRow={
+          <CardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="mechanism-apply-deadkey"
+          />
+        }
+      >
         {method === "deadkey" && (
           <div style={configStyle}>
             <div
@@ -1535,7 +1491,7 @@ function MethodChooser({
             </p>
           </div>
         )}
-      </div>
+      </MethodCard>
     </div>
   );
 }
