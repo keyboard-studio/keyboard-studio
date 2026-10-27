@@ -18,7 +18,7 @@ The author is a language expert, not a keyboard developer (§3). They accept rea
 
 When the author reaches Phase A, the copyright holder, autonym, and display name arrive **already proposed**, each labeled with where the proposal came from, rather than as empty boxes.
 
-**Why this priority**: Phase A is the blank-canvas failure mode §2 and §3a name explicitly — the identity/paperwork fields a naive author leaves empty or guesses wrong, which reviewers then silently fix. These are the two HIGH flags (#1 copyright) plus the MEDIUM identity flags (#3 display name, #7 autonym).
+**Why this priority**: Phase A is the blank-canvas failure mode §2 and §3a name explicitly — the identity/paperwork fields a first-time author leaves empty or guesses wrong, which reviewers then fix in the PR. These are the two HIGH flags (#1 copyright) plus the MEDIUM identity flags (#3 display name, #7 autonym).
 
 **Independent Test**: Run Phase A for a keyboard whose BCP47 tag resolves in `langtags.json` and whose session is on the GitHub path; confirm copyright, autonym, and display name are all pre-populated with visible provenance and require only confirmation — no empty field appears.
 

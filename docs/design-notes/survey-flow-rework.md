@@ -145,7 +145,7 @@ here as "here is the plan" before Act 6 does "now place the keys."
 
 ## (b) Core reframe: defaults are the product
 
-[spec.md §3c](../../spec.md) is explicit: *"Naive users accept reasonable
+[spec.md §3c](../../spec.md) is explicit: *"First-time users accept reasonable
 defaults and do not question them. The studio's value sits in the defaults,
 not the override controls."* Every screen in the reworked flow is a
 **proposed answer rendered as an editable confirmation**, never a blank
