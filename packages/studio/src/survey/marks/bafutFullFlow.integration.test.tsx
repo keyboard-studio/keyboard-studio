@@ -28,6 +28,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { ActiveStepNav } from "../../test/ActiveStepNav.tsx";
@@ -165,8 +166,17 @@ function resetAllStores(): void {
 
 function seedStartAndIdentity(deps: ReducerDeps): void {
   bindManifest(manifest);
+  // Corpus resolved from process.cwd() (vitest sets it to packages/studio),
+  // NOT from $HOME/workspace: CI places the corpus as a sibling of the repo
+  // (KEYBOARDS_REPO), and $HOME on a runner is /home/runner, not a workspace
+  // root — the $HOME path made this suite fail on every CI run whose related
+  // set included it, while passing locally where ~/workspace/keyboards
+  // happens to exist. Same pattern as touchDiagnostics.corpus.test.ts.
   const kmnText = readFileSync(
-    `${process.env.HOME}/workspace/keyboards/release/basic/basic_kbdus/source/basic_kbdus.kmn`,
+    path.join(
+      path.resolve(process.cwd(), "../../../keyboards"),
+      "release/basic/basic_kbdus/source/basic_kbdus.kmn",
+    ),
     "utf8",
   );
   const { ir } = parseKmn(kmnText, "basic_kbdus");
