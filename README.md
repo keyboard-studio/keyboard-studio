@@ -1,29 +1,75 @@
-# keyboard-studio
+# Keyboard Studio
 
-Browser-based authoring studio for [Keyman](https://keyman.com) keyboards — a survey + show-by-example gallery that lets **language experts** create production-ready Keyman keyboards without writing `.kmn` by hand.
+An experimental, browser-based way to make [Keyman](https://keyman.com) keyboards by answering
+questions about a language instead of writing `.kmn` by hand. It began as a hackathon project,
+built by people who use and teach Keyman and share its goal of every language being typeable.
 
-## What it is
+Keyboard Studio is built on Keyman. It compiles with Keyman's own compiler, starts every keyboard
+from one in the [keymanapp/keyboards](https://github.com/keymanapp/keyboards) repository, and
+submits finished keyboards back to that repository through its normal review.
 
-Language experts know their language's phonology, orthography, and character inventory — but shipping a keyboard to [`keymanapp/keyboards`](https://github.com/keymanapp/keyboards) today means learning `.kmn` syntax, keeping a half-dozen package files consistent, and satisfying the PR-review criteria catalogued in [`docs/criteria.md`](docs/criteria.md). Keyboard Studio removes those mechanical barriers:
+Try it at [kbstudio.langtech.cloud](https://kbstudio.langtech.cloud). The project page is at
+[keyboard-studio.github.io/keyboard-studio](https://keyboard-studio.github.io/keyboard-studio/).
 
-- **Start from a real keyboard** — every session adapts a single base: the US-English fallback, any `release/` keyboard from `keymanapp/keyboards`, or an uploaded `.kmn`. The base is parsed into a typed intermediate representation (`KeyboardIR`) that every later step edits; nothing operates on raw `.kmn` text.
-- **Plain-language survey** — the user answers questions about their characters and how they behave, carves away base rules they don't want, and never sees `.kmn` syntax.
-- **Strategy selection** — the survey computes seven discovery axes and runs a decision tree to choose the right output method (simple swap, deadkey composition, mnemonic spelling, diacritic cycling, context-sensitive clusters, IME callout, …) from a catalog of twelve strategies.
-- **Show-by-example gallery** — the recommended strategy's interaction patterns appear as live mini-keyboards the user taps and confirms; each is a validated KMN skeleton with named slots.
-- **Defaults first** — every step proposes a sensible default and asks for confirmation rather than starting blank; a missing default is treated as a defect.
-- **In-browser compile + validate** — `kmcmplib` (WebAssembly) recompiles every edit within a single 300 ms cycle alongside a three-layer, language-aware lint engine, so invalid output is blocked before it reaches the compiler.
-- **Touch layout for free** — a `.keyman-touch-layout` is scaffolded from the desktop rules; the physical layout stays the mandatory substrate.
-- **Delivery** — a finished keyboard is downloaded as an installable `.kmp`, as a source `.zip`, or submitted directly via a GitHub OAuth fork-and-draft-PR to `keymanapp/keyboards`.
+## Why it exists
 
-All authoring happens in an in-memory virtual filesystem that mirrors the `keymanapp/keyboards` layout. The studio is a static single-page app and never writes to the host disk.
+Keyman has helped people type their own languages since 1992. It began on Windows and grew to
+every major desktop and mobile platform, and today it is free and open source. Keyman Developer, together with the keyboards repository, has carried more than 900 reviewed keyboards to
+the communities that use them. We are grateful for both, and this project depends on them.
 
-## Status
+Keyboard Studio started at a hackathon in summer 2026, among staff and summer associates in SIL's Language
+Technology Use department, as something smaller: an MCP server to help
+existing Keyman Developer users write keyboard code faster. We widened the goal as we went. Many of
+us have taught keyboard development in workshops for years. We kept meeting people who knew their
+language well but found it hard to finish a keyboard: the code, the files that must stay in step,
+and the review checklist were a lot to take on at once. Keyboard Studio tries to give those
+first-time authors a guided path into the same ecosystem.
 
-**Day-1 contract locked; engine and studio built and under active development.** The spec is signed off (currently v2.0.0; see the changelog at the top of [`spec.md`](spec.md)). `packages/contracts` holds the locked shared contract — types, the seven service interfaces and their mocks, zod runtime schemas, and the triaged criteria catalog (149 rows at last count; the number is descriptive and expected to grow). The engine, the Layer-C lint engine, the LLM client, the Glottolog catalog, and the React + Vite SPA are all real packages. Per-package detail lives in [`docs/packages.md`](docs/packages.md); how they compose in [`docs/architecture.md`](docs/architecture.md).
+It has grown since it began, but it is much younger and less tested than the Keyman Developer
+pipeline, and it is not an official Keyman project. It is a way into Keyman, not a way around it.
 
-## Quick start
+## What it is not
 
-Requires **pnpm 9** and **Node ≥ 22.19.0** (an older Node makes some codegen steps exit 0 having done nothing).
+It is **not a replacement for Keyman Developer.** Developer is most fruitful for a skilled keyboard
+author, and those authors should keep using it; it can do much more than the studio. The studio
+deliberately covers a narrower set of well-understood keyboard designs.
+
+## How it works
+
+- **Start from a working keyboard.** Most keyboards in the repository cluster around a few
+  layouts per script ([how the 920 keyboards group](https://keyboard-studio.github.io/keyboard-studio/docs/design-notes/keyboard-grouping.html)),
+  so every session starts as a copy of one existing keyboard: a published keyboard, a basic
+  layout, an uploaded `.kmn`, or US QWERTY when nothing closer exists.
+- **Suggested answers.** Each question offers a proposed answer with its source, to confirm or
+  change. Where a guess could be wrong in a way that matters, such as the copyright holder, the
+  studio asks instead.
+- **Live preview.** Type with the keyboard after every change, on desktop and touch layouts.
+- **Checks as you work.** Keyman's compiler (`kmcmplib`, as WebAssembly) and checks based on the
+  repository's review criteria ([docs/criteria.md](docs/criteria.md)) run on every edit.
+- **Output.** An installable `.kmp`, a source `.zip`, or a draft pull request to
+  `keymanapp/keyboards`.
+
+Two tracks: make a **new keyboard** from an existing one, or make a **new version** of an existing
+keyboard.
+
+## Limits
+
+- Experimental. Reviewers may still ask for changes, and passing the studio's checks does not
+  guarantee acceptance.
+- Not yet supported: CJK, Ethiopic, and Hangul jamo-composition input methods, LDML output,
+  predictive-text wordlists, and merging several keyboards into one. Full list in
+  [spec.md §16](spec.md#16-out-of-scope).
+- Some review criteria can't be checked by software (for example, the right to name a given
+  copyright holder). The studio asks the author to confirm them; Keyman's reviewers make the call.
+
+If something the studio produces makes a reviewer's job harder, please
+[open an issue](https://github.com/keyboard-studio/keyboard-studio/issues). We treat that as our
+bug.
+
+## For contributors
+
+Requires **pnpm 9** and **Node >= 22.19.0** (an older Node makes some codegen steps exit 0 having
+done nothing).
 
 ```sh
 pnpm install
@@ -32,34 +78,42 @@ pnpm dev         # studio SPA at the Vite dev URL
 pnpm test
 ```
 
-Run `pnpm build` before `pnpm typecheck` or `pnpm test` on a clean checkout — the engine and studio resolve types from `contracts/dist/`, which only exists after a build. Corpus-calibrated tests expect a sibling `../keyboards` checkout tracking the [keyboard-studio/keyboards](https://github.com/keyboard-studio/keyboards) fork's `master`. Everything else — lint, the E2E suite, running a single package's tests, the standalone utilities — is in [`docs/tooling.md`](docs/tooling.md).
+Run `pnpm build` before `pnpm typecheck` or `pnpm test` on a clean checkout: the engine and studio
+resolve types from `contracts/dist/`, which only exists after a build. Corpus-calibrated tests
+expect a sibling `../keyboards` checkout tracking the
+[keyboard-studio/keyboards](https://github.com/keyboard-studio/keyboards) fork's `master`. More in
+[docs/tooling.md](docs/tooling.md); how the packages fit together in
+[docs/architecture.md](docs/architecture.md) and [docs/packages.md](docs/packages.md).
 
-## Repository layout
+### Repository layout
 
 | Path | What it is |
 |------|------------|
-| [`spec.md`](spec.md) | The original signed-off design document (19 sections) — now **historical**. Authority is by topic under [Constitution v2.0.0](.specify/memory/constitution.md) (precedence table); this file's load-bearing sections are cited from [`docs/architecture.md`](docs/architecture.md) and the implementing specs. |
-| [`specs/`](specs/) | Per-feature specs (spec-kit). Numbered folders mirror the `spec.md` section they extract (e.g. `007-strategy-selection`) or take the next free number for new features. A live folder governs its section; once a feature ships, its AS-BUILT + the code are authoritative. |
-| [`docs/spec-signoff.md`](docs/spec-signoff.md) | Historical review-cycle log and the baked-in decisions (D1–D9) — governs nothing; read it to see *why* a spec section reads the way it does. |
-| [`docs/`](docs/) | Everything else you'd look up: [`architecture.md`](docs/architecture.md), [`packages.md`](docs/packages.md), [`tooling.md`](docs/tooling.md), [`workflow-model.md`](docs/workflow-model.md), [`keyboard-index.md`](docs/keyboard-index.md) (the phonebook of every keyboard the project references), [`criteria.md`](docs/criteria.md), [`lint.md`](docs/lint.md), [`accessibility.md`](docs/accessibility.md). |
-| [`packages/contracts/`](packages/contracts/) | `@keyboard-studio/contracts` — the locked shared TypeScript contract and the dependency root: types, service interfaces, mocks, fixtures, zod schemas, criteria catalog. |
-| [`packages/engine/`](packages/engine/) | `@keyboard-studio/engine` — codec (`.kmn` ↔ `KeyboardIR`), scaffolder, validator (Layer A/A'/B), compiler (`kmcmplib` wrapper), simulator, recognizer, strategy selector, pattern library, layout charts, and output (VirtualFS → `.kmp` / `.zip`). |
-| [`packages/keyboard-lint/`](packages/keyboard-lint/) | `@keymanapp/keyboard-lint` — the Layer C hygiene lint engine, including the documentation checks. |
-| [`packages/glottolog/`](packages/glottolog/) | `@keyboard-studio/glottolog` — offline, pinned Glottolog classification catalog plus the bridge that ranks candidate base keyboards from close genealogical relatives when a language has none. |
-| [`packages/studio/`](packages/studio/) | `@keyboard-studio/studio` — the React + Vite authoring SPA (three-pane gallery / editor / preview over a single working copy). |
-| [`api/`](api/) | Vercel serverless functions (OAuth exchange, managed PR submission, draft sync, crash reports). Outside the pnpm workspace; bundled separately and kept bundle-safe by [`api/bundle-safety.test.ts`](api/bundle-safety.test.ts). |
-| [`content/`](content/) | Content-team assets: pattern library YAML, facet records, survey flows and journeys, adaptation questions, recognizer rules, i18n source catalogs. |
-| [`utilities/`](utilities/) | Standalone tools deliberately kept out of `packages/*`: `spec-trace` (corpus search and drift tracking), the lint checkers chained by `pnpm lint`, `facet-index`, `kbgen`, the OAuth backend. |
-| [`.claude/`](.claude/) | Claude Code agents, slash commands, and skills for the **KM crew** — the specialist pipeline coordinated by `/km-lead`. Roster: [`.claude/agents/km-README.md`](.claude/agents/km-README.md). |
-| [`CLAUDE.md`](CLAUDE.md) | Orientation for working in this repo with Claude Code: the gates, cross-cutting invariants, and where everything else lives. |
+| [`spec.md`](spec.md) | The original signed-off design document, now **historical**. Authority is by topic under [Constitution v2.0.0](.specify/memory/constitution.md); this file's load-bearing sections are cited from [`docs/architecture.md`](docs/architecture.md) and the implementing specs. |
+| [`specs/`](specs/) | Per-feature specs (spec-kit). Once a feature ships, its AS-BUILT and the code are authoritative. |
+| [`docs/`](docs/) | [`architecture.md`](docs/architecture.md), [`packages.md`](docs/packages.md), [`tooling.md`](docs/tooling.md), [`workflow-model.md`](docs/workflow-model.md), [`keyboard-index.md`](docs/keyboard-index.md) (every keyboard the project references), [`criteria.md`](docs/criteria.md), [`lint.md`](docs/lint.md), [`accessibility.md`](docs/accessibility.md). |
+| [`packages/contracts/`](packages/contracts/) | `@keyboard-studio/contracts`: the shared TypeScript contract and dependency root (types, service interfaces, mocks, zod schemas, criteria catalog). |
+| [`packages/engine/`](packages/engine/) | `@keyboard-studio/engine`: codec (`.kmn` to `KeyboardIR` and back), scaffolder, validator, compiler wrapper, simulator, recognizer, strategy selector, pattern library, and output (`.kmp` / `.zip`). |
+| [`packages/keyboard-lint/`](packages/keyboard-lint/) | `@keymanapp/keyboard-lint`: the Layer C hygiene lint engine, including the documentation checks. |
+| [`packages/glottolog/`](packages/glottolog/) | `@keyboard-studio/glottolog`: offline Glottolog catalog, used to rank candidate starting keyboards from related languages. |
+| [`packages/studio/`](packages/studio/) | `@keyboard-studio/studio`: the React + Vite authoring app. |
+| [`api/`](api/) | Vercel serverless functions (OAuth, managed PR submission, draft sync, crash reports). Outside the pnpm workspace; kept bundle-safe by [`api/bundle-safety.test.ts`](api/bundle-safety.test.ts). |
+| [`content/`](content/) | Pattern library, facet records, survey flows, adaptation questions, recognizer rules, i18n source catalogs. |
+| [`utilities/`](utilities/) | Standalone tools kept out of `packages/*`: `spec-trace`, the lint checkers, `facet-index`, `kbgen`, the OAuth backend. |
+| [`.claude/`](.claude/) | Claude Code agents and skills for the KM crew. Roster: [`.claude/agents/km-README.md`](.claude/agents/km-README.md). |
+| [`CLAUDE.md`](CLAUDE.md) | Orientation for working in this repo with Claude Code. |
 
-## Scope (v1)
+Commit and issue titles follow the [keymanapp/keyman](https://github.com/keymanapp/keyman) style;
+see [CLAUDE.md](CLAUDE.md#commit-and-issue-title-style). `main` accepts pull requests only, and CI
+must pass before merge. Run `pnpm lint` and `pnpm test` locally first.
 
-In scope: physical + touch keyboard layouts, package generation (`.kps` / `.kvks` / `.keyman-touch-layout` / `.keyboard_info`), the QWERTY/QWERTZ, AZERTY, and Non-Roman script groups, and single-source adaptation of an existing keyboard. Out of scope for v1: CJK, Ethiopic, and Hangul jamo-composition patterns (the gallery renders a "not yet supported" stub rather than going empty), LDML output, predictive-text wordlists, touch-first authoring, multi-source merge, survey-editing of opaque `.kmn` fragments, and byte-identical round-trip. Full list in [`spec.md` §16](spec.md#16-out-of-scope).
+## Acknowledgements
 
-## Contributing
-
-Commit and issue titles follow the [keymanapp/keyman](https://github.com/keymanapp/keyman) style — `<prefix>(<area>): <description>`, with `bug` for issues and `fix` for the PRs that close them (details in [`CLAUDE.md`](CLAUDE.md#commit-and-issue-title-style)). `main` accepts pull requests only; CI (`build`) and the `km-triage/review` check must pass before merge. Run `pnpm lint` and `pnpm test` locally first.
+Keyboard Studio is a project of SIL's Language Technology Use department that began at a
+hackathon; it is not an official Keyman project. Keyman began in 1992 and is now developed by the Keyman team at SIL Global. Keyman,
+Keyman Developer, and the keyboards repository are the work of that team and many keyboard
+authors. Every keyboard this studio starts from was made by one of them. If any idea or code here
+is useful to Keyman, we would be glad to see it there.
 
 ## License
 

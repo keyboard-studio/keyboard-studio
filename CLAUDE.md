@@ -125,6 +125,9 @@ upstream, or corpus-calibrated tests (e.g. the recognizer `basic_kbdfr` fixtures
 whenever you introduce, cite, or otherwise reference a keyboard not yet in the table, you MUST
 add its row in the same change (read the keyboard's `<id>.kps` for name, BCP47 languages, and
 author — see the "Keep this current" recipe in that file). Treat a stale phonebook as a defect.
+One exception: whole-corpus listings such as
+[docs/design-notes/keyboard-grouping.html](docs/design-notes/keyboard-grouping.html) do not
+need a row per keyboard (details in the recipe).
 
 ## Architecture invariants
 
