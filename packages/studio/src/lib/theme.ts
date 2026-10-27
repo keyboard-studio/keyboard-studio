@@ -9,7 +9,7 @@
 // corrected" boot sequence — index.html hardcodes `data-theme="navy"` on
 // <html> so the default theme paints with zero FOUC, and this module only
 // needs to *change* that attribute when a saved non-default choice exists.
-import { storageAvailable } from "./storageGuard.ts";
+import { loadSavedValue, saveSavedValue } from "./storageGuard.ts";
 
 export type AppTheme = "light" | "navy";
 
@@ -24,23 +24,12 @@ function isAppTheme(value: string): value is AppTheme {
 
 /** The persisted theme choice, or null if none / invalid / unavailable. */
 export function loadSavedTheme(): AppTheme | null {
-  if (!storageAvailable()) return null;
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    return v !== null && isAppTheme(v) ? v : null;
-  } catch {
-    return null;
-  }
+  return loadSavedValue(THEME_KEY, isAppTheme);
 }
 
 /** Persist the choice — durable across reloads. */
 export function saveTheme(theme: AppTheme): void {
-  if (!storageAvailable()) return;
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    // Quota / private-mode — re-defaulting next boot is a harmless fallback.
-  }
+  saveSavedValue(THEME_KEY, theme);
 }
 
 /** Paint the theme by setting `data-theme` on the document root. */
