@@ -634,7 +634,7 @@ describe("delivered artifact — generated layout charts in <Files> (spec 079 FR
     expect(inTree.map((p) => `welcome\\${p.slice("source/welcome/".length)}`).sort()).toEqual([...chartNames].sort());
   });
 
-  it("copy track with base images: no charts listed by default; regenerate lists both images and charts", async () => {
+  it("copy track with base images: both images and charts listed by default; keeping the base images lists no charts", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedCopyTrackWithFlatStub();
     const wc = useWorkingCopyStore.getState();
@@ -642,12 +642,12 @@ describe("delivered artifact — generated layout charts in <Files> (spec 079 FR
     wc.setStartWelcomeImages([BASE_IMAGES[0]!]);
 
     await serializeWorkingCopy();
-    expect(fileNames(descriptorText("basic_kbdus")).some((n) => n.includes("ks-layout-"))).toBe(false);
-
-    useWorkingCopyStore.getState().setChartPreference("regenerate");
-    await serializeWorkingCopy();
     const names = fileNames(descriptorText("basic_kbdus"));
     expect(names).toContain("welcome\\desktop_layout_default.png");
     expect(names.some((n) => /^welcome\\ks-layout-desktop-.*\.svg$/.test(n))).toBe(true);
+
+    useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+    await serializeWorkingCopy();
+    expect(fileNames(descriptorText("basic_kbdus")).some((n) => n.includes("ks-layout-"))).toBe(false);
   });
 });
