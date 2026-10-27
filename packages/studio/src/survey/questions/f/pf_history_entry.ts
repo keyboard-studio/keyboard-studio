@@ -24,7 +24,8 @@
 // lib/historyEntryState.ts for a flow-assembly caller (flowStepOptions.tsx's
 // `phaseFOptions`) to call with live working-copy context.
 
-import type { FlowQuestion, QuestionModule, ValidationResult } from "../../types.ts";
+import type { FlowQuestion, QuestionModule } from "../../types.ts";
+import { makeOptionalOptionValidator } from "../validators.ts";
 
 // ---------------------------------------------------------------------------
 // pf_history_entry — confirm / edit / dismiss
@@ -86,22 +87,7 @@ export const definition = {
   ],
 } satisfies FlowQuestion;
 
-export function validate(value: string | string[] | undefined): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  // Optional (propose-then-confirm, §3c): leaving it blank means "not decided
-  // yet" — the state stays "proposed" and nothing ships until the author
-  // returns (FR-011). This check only guards against a value outside the
-  // three offered actions.
-  if (v === "") return { ok: true };
-  if (!isHistoryEntryAction(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: "Please choose one of the offered options.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeOptionalOptionValidator(definition.options.map((o) => o.value), "Please choose one of the offered options.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

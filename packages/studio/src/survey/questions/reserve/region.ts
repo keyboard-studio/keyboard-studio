@@ -1,7 +1,8 @@
 // Per-question module: region (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 
 export const definition = {
   id: "region",
@@ -15,20 +16,7 @@ export const definition = {
   next: "primary_script",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const trimmed = typeof value === "string"
-    ? value.trim()
-    : Array.isArray(value)
-      ? value.join("").trim()
-      : "";
-
-  if (trimmed.length === 0) {
-    return { ok: false, code: "required", message: "Region or country is required." };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Region or country is required.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

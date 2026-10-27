@@ -3,11 +3,11 @@
 // Shown for right-to-left scripts (Arabic, Hebrew, Syriac, Thaana, N'Ko, Adlam,
 // Mandaic, Samaritan, Hanifi Rohingya); Latin auto-sets LTR without asking.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredFirstOptionValidator } from "../validators.ts";
 
 import { irPath } from "@keyboard-studio/contracts";
 
-const VALID_DIRECTIONS = new Set(["rtl", "ltr"]);
 
 export const definition = {
   id: "writing_direction",
@@ -26,23 +26,7 @@ export const definition = {
   next: "layout_family",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string"
-    ? value
-    : Array.isArray(value)
-      ? value[0] ?? ""
-      : "";
-
-  if (v.length === 0) {
-    return { ok: false, code: "required", message: "Please select a writing direction." };
-  }
-  if (!VALID_DIRECTIONS.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a valid direction.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredFirstOptionValidator(definition.options.map((o) => o.value), "Please select a writing direction.", (v) => `"${v}" is not a valid direction.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

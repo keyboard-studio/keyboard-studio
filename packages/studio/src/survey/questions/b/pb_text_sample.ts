@@ -1,7 +1,8 @@
 // Per-question module: pb_text_sample (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_text_sample",
@@ -17,24 +18,7 @@ export const definition = {
   next: "pb_text_sample_review",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const text =
-    typeof value === "string"
-      ? value.trim()
-      : Array.isArray(value)
-        ? value.join("").trim()
-        : "";
-  if (text.length === 0) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please paste at least one sentence of text.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Please paste at least one sentence of text.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

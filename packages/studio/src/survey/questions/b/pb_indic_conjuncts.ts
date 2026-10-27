@@ -2,7 +2,8 @@
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 // A2a pre-signal (cluster sensitivity).
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeBoolValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_indic_conjuncts",
@@ -23,19 +24,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (v !== "true" && v !== "false") {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please answer Yes or No.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeBoolValidator("Please answer Yes or No.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

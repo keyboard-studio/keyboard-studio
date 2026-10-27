@@ -2,7 +2,8 @@
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 // A3a sub-axis probe; only shown when pb_typing_approach == "phonetic".
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_mark_input_order",
@@ -33,28 +34,8 @@ export const definition = {
   next: "pb_special_letters",
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["prefix", "postfix"]);
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please choose the mark-input order.",
-    };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: `"${v}" is not a valid choice.`,
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose the mark-input order.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

@@ -9,7 +9,8 @@
 // when it has none (~60% of languages — T008, and free-text/unmatched languages)
 // it falls back to the Q1 English name. Advances to il_language_code.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 
 export const definition = {
   id: "il_language_autonym",
@@ -24,20 +25,7 @@ export const definition = {
   next: "il_language_code",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const trimmed = typeof value === "string"
-    ? value.trim()
-    : Array.isArray(value)
-      ? value.join("").trim()
-      : "";
-
-  if (trimmed.length === 0) {
-    return { ok: false, code: "required", message: "Language name is required." };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Language name is required.");
 
 // mutate: STUB — KeyboardIR mutation surface is not yet a real contract.
 

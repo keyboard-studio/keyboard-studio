@@ -5,14 +5,10 @@
 // suggestion, and the inventory diff (spec §8/§9). CJK/Ethiopic/Hangul are
 // stub-gated to il_script_not_supported consistent with §9 three-group routing.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredFirstOptionValidator } from "../validators.ts";
 import type { ExtractContext } from "../../../decisions/extractContext.ts";
 
-const VALID_SCRIPT_VALUES = new Set([
-  "Latn", "romanization-Latn", "fonipa",
-  "Arab", "Hebr", "Deva", "Cyrl", "Grek", "Geor", "Armn",
-  "Ethi", "Hani", "Hang", "other",
-]);
 
 export const definition = {
   id: "il_target_script",
@@ -54,23 +50,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string"
-    ? value
-    : Array.isArray(value)
-      ? value[0] ?? ""
-      : "";
-
-  if (v.length === 0) {
-    return { ok: false, code: "required", message: "Please select a writing system." };
-  }
-  if (!VALID_SCRIPT_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a recognised script option.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredFirstOptionValidator(definition.options.map((o) => o.value), "Please select a writing system.", (v) => `"${v}" is not a recognised script option.`);
 
 // mutate: STUB — KeyboardIR mutation surface is not yet a real contract.
 
