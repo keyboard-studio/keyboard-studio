@@ -10,7 +10,6 @@
 // renderer so the two surfaces never compute different values (the
 // currentRuleSetValue precedent).
 
-import type { CarveDisposition } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
 /**
@@ -25,11 +24,17 @@ export interface CarveRemovalItem {
   provenance: "asked" | "derived" | "extracted";
 }
 
-/** The carved-layout decision value (data-model.md). */
+/**
+ * The carved-layout decision value (data-model.md). Values recorded before
+ * the keyboard-wide fallback policy also carried `dispositions` and
+ * `closedKeyboardCard`; those are read (never written) and folded into the
+ * policy by `carveOverlayFromValue` — see survey/carve/fallbackPolicyMigration.ts.
+ * The fallback policy itself is NOT part of this value: it is an
+ * author-set working-copy setting (Assign Mechanisms step), so recording it
+ * here at carve time would let a replay rebuild revert a later choice.
+ */
 export interface CarvedLayoutValue {
   removals: CarveRemovalItem[];
-  dispositions: CarveDisposition[];
-  closedKeyboardCard: "accepted" | "declined" | null;
 }
 
 /** The overlay slices the value snapshots — a structural subset of the
@@ -39,8 +44,6 @@ export interface CarveOverlaySnapshot {
   deletedItemIds: ReadonlySet<string>;
   disabledFamilyIds: ReadonlySet<string>;
   carveChars: ReadonlySet<string>;
-  carveDispositions: readonly CarveDisposition[];
-  closedKeyboardCard: "accepted" | "declined" | null;
 }
 
 const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family", "char"];
@@ -52,9 +55,7 @@ const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family
  * `kind` (data-model.md — the four id spaces stay distinct), sorted by
  * kind then id so the recorded value is canonical: two sessions that
  * reach the same overlay by different click orders record the same
- * value. Dispositions ride verbatim (the contracts type carries its
- * own spec-076 provenance — research R8), as does the closed-keyboard
- * card outcome.
+ * value.
  *
  * Per-item provenance is `asked` for every item, deliberately: in the
  * live flow every overlay removal is an author action (the gallery's
@@ -67,8 +68,7 @@ const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family
  *
  * Reconstructibility (ruling D-090-30 condition (i)): the snapshot
  * covers every overlay component that can be non-trivial at carve
- * completion and feeds the applied view — the four removal sets, the
- * dispositions, the card. The one remaining overlay field,
+ * completion and feeds the applied view — the four removal sets. The one remaining overlay field,
  * `carveTouchKeepInert`, has no live writer, so it is always empty
  * in the live flow; if a surface ever mounts a writer for it, this
  * value needs a field for it (named in the spec's downstream
@@ -89,11 +89,7 @@ export function carvedLayoutValueFromOverlay(
       removals.push({ kind, id, provenance: "asked" });
     }
   }
-  return {
-    removals,
-    dispositions: [...overlay.carveDispositions],
-    closedKeyboardCard: overlay.closedKeyboardCard,
-  };
+  return { removals };
 }
 
 /** The carved-layout value from the live working copy's carve overlay. */
@@ -104,7 +100,5 @@ export function currentCarvedLayoutValue(): CarvedLayoutValue {
     deletedItemIds: s.deletedItemIds,
     disabledFamilyIds: s.disabledFamilyIds,
     carveChars: s.carveChars,
-    carveDispositions: s.carveDispositions,
-    closedKeyboardCard: s.closedKeyboardCard,
   });
 }

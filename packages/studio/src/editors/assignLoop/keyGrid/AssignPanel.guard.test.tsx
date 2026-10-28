@@ -83,7 +83,9 @@ describe("AssignPanel — guard specification threading (spec 104 FR-013)", () =
     expect(screen.queryByTestId("assign-panel-proposal")).toBeNull();
     expect((screen.getByTestId("assign-panel-confirm") as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(screen.getByTestId("guard-prompt-swallow"));
+    // Opens on the swallow default; one confirm records it.
+    expect((screen.getByTestId("guard-option-swallow") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByTestId("guard-prompt-confirm"));
     expect(onGuardAnswer).toHaveBeenCalledWith("swallow");
   });
 

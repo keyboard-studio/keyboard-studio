@@ -128,20 +128,41 @@ function collectKeyChars(
   options: TouchCoverageOptions,
   occurrence: KeyOccurrenceContext,
 ): void {
-  // Blank (sp:9) and spacer (sp:10) keys are never char producers. Note that
-  // sp:8 is deadkey-STYLED, not a spacer, and IS credited — see
-  // isSpacerKeyClass's doc for the corrected enum.
-  if (isSpacerKeyClass(key.sp)) return;
+  // Blank (sp:9) and spacer (sp:10) classes: their KEYCAP is never a credit
+  // — a blank key's text is layout dressing, not production (Cameroon's
+  // T_BLANK sites carry " ", which spec 063 FR-012 stopped crediting as a
+  // produced space), so the text/output pushes and the dotted-circle strip
+  // below are suppressed for this class in both paths. Note that sp:8 is
+  // deadkey-STYLED, not a spacer, and IS credited — see isSpacerKeyClass's
+  // doc for the corrected enum.
+  //
+  // PRODUCTION is a separate question, and on the resolver path it is the
+  // resolver's alone (spec 104 FR-003): contracts §1 defines rule /
+  // u-decode / k-fallback production by id family, bindings, and state —
+  // with no sp-class condition — and the resolver's own arm order already
+  // yields `none` for a spacer-class key with no rule and no applicable
+  // fallback, so taking its verdict cannot resurrect a blank key.
+  // Preempting it here instead kept a second production model standing
+  // beside the resolver, and the corpus caught it (T021 arm 2): ruled
+  // sp:9 K_ keys emitting bidi controls, sp:9/10 K_ keys on the fallback,
+  // and sp:10 U_ keys on the decode were all resolver-produced yet
+  // uncredited. The LEGACY path has no resolver to defer to, so there the
+  // class still ends the walk outright, byte-identical to before.
+  const spacerClass = isSpacerKeyClass(key.sp);
+  const resolverPath = options.ruleIndex !== undefined && options.ir !== undefined;
+  if (spacerClass && !resolverPath) return;
 
   const push = (text?: string) => {
     if (text !== undefined && text.length > 0 && !text.startsWith("*")) {
       covered.add(text.normalize("NFC"));
     }
   };
-  push(key.text);
-  push(key.output);
+  if (!spacerClass) {
+    push(key.text);
+    push(key.output);
+  }
 
-  if (options.ruleIndex === undefined || options.ir === undefined) {
+  if (!resolverPath) {
     // LEGACY (no rule index, or an index without its IR): the pre-104
     // crediting, byte-identical. A decoded `U_<HEX>[_<HEX>]*` id is the
     // only id-derived credit, and no rule production is visible at all.
@@ -198,8 +219,10 @@ function collectKeyChars(
 
   // ADDITIVE (FR-006): the dotted-circle-stripped form of the keycap, credited
   // alongside the unstripped text above, never in place of it. Skipped for a
-  // `*`-prefixed frame label, same as `push`.
+  // `*`-prefixed frame label, same as `push`, and for the spacer/blank class,
+  // whose keycap is never a credit (see the head of this function).
   if (
+    !spacerClass &&
     options.stripDottedCircle !== false &&
     key.text !== undefined &&
     !key.text.startsWith("*")

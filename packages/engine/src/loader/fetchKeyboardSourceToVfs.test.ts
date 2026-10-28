@@ -766,6 +766,94 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
     expect(result.startHistoryMdText).toBeUndefined();
     expect(result.warnings.filter((w) => /README|HISTORY/.test(w))).toEqual([]);
   });
+
+  it("carries only image files from the .kps welcome list — .htm sub-pages and kb.css are not welcome images (#2305)", async () => {
+    const { result, calls } = await run({
+      [kpsUrl]: ok(
+        kps("welcome\\welcome.htm", [
+          "welcome\\welcome.htm",
+          "welcome\\qwerty-us-en.htm",
+          "welcome\\kb.css",
+          "welcome\\sil-logo-blue.png",
+          "welcome\\chart.JPG",
+        ]),
+      ),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+      [sourceUrl(euroLatinKb, "welcome/sil-logo-blue.png")]: ok(PNG),
+      [sourceUrl(euroLatinKb, "welcome/chart.JPG")]: ok(new Uint8Array([7, 7])),
+      // kb.css IS served (the stylesheet loop fetches it on its own route);
+      // it still must not appear among the welcome IMAGES.
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+    });
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual([
+      "welcome/sil-logo-blue.png",
+      "welcome/chart.JPG",
+    ]);
+    // The prose sub-page was never fetched at all, and neither non-image
+    // entry produced a missing-image warning.
+    expect(calls).not.toContain(sourceUrl(euroLatinKb, "welcome/qwerty-us-en.htm"));
+    expect(result.warnings.filter((w) => w.includes("welcome image"))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// .kps stylesheet / font VFS paths (#2307): a keyboard-local asset takes the
+// plain source/ address; a shared/ asset keeps its release-relative address.
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — .kps asset VFS paths (#2307)", () => {
+  const ok = (body: string | Uint8Array) => ({ ok: true, status: 200, body });
+  const kmnUrl = sourceUrl(euroLatinKb, "sil_euro_latin.kmn");
+  const kpsUrl = sourceUrl(euroLatinKb, "sil_euro_latin.kps");
+
+  function kpsWithFiles(files: string[]): string {
+    const entries = files
+      .map((f) => `    <File>\n      <Name>${f}</Name>\n      <FileType>${f.slice(f.lastIndexOf("."))}</FileType>\n    </File>`)
+      .join("\n");
+    return `<?xml version="1.0" encoding="utf-8"?>\n<Package>\n  <Files>\n${entries}\n  </Files>\n</Package>\n`;
+  }
+
+  async function run(responses: Record<string, { ok: boolean; status: number; body: string | Uint8Array }>) {
+    const { fetchImpl, calls } = makeMockFetch({ [kmnUrl]: ok(kmnMinimal), ...responses });
+    const vfs = createVirtualFS();
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    return { result, calls, vfs };
+  }
+
+  it("writes a keyboard-local .kps stylesheet at source/<file>, not under the base's release path", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(kpsWithFiles(["sil_euro_latin.css"])),
+      [sourceUrl(euroLatinKb, "sil_euro_latin.css")]: ok(".kmw-keyboard-sil_euro_latin { color: red; }"),
+    });
+    expect(result.stylesheets).toEqual([
+      {
+        vfsPath: "source/sil_euro_latin.css",
+        cssRelPath: "release/sil/sil_euro_latin/source/sil_euro_latin.css",
+        cssText: ".kmw-keyboard-sil_euro_latin { color: red; }",
+      },
+    ]);
+    expect(vfs.get("source/sil_euro_latin.css")?.content).toBe(".kmw-keyboard-sil_euro_latin { color: red; }");
+    expect(vfs.get("sil/sil_euro_latin/source/sil_euro_latin.css")).toBeUndefined();
+    expect(result.filesLoaded).toContain("source/sil_euro_latin.css");
+  });
+
+  it("keeps a shared/ stylesheet at its release-relative VFS address", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(kpsWithFiles(["..\\..\\..\\shared\\styles\\common.css"])),
+      [`${PROXY}/release/shared/styles/common.css`]: ok(".shared { margin: 0; }"),
+    });
+    expect(result.stylesheets.map((s) => s.vfsPath)).toEqual(["shared/styles/common.css"]);
+    expect(vfs.get("shared/styles/common.css")?.content).toBe(".shared { margin: 0; }");
+  });
+
+  it("does not write a welcome-folder stylesheet listed in the .kps into the VFS", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(kpsWithFiles(["welcome\\kb.css"])),
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+    });
+    expect(result.stylesheets.map((s) => s.vfsPath)).toEqual(["source/welcome/kb.css"]);
+    expect(vfs.get("source/welcome/kb.css")).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

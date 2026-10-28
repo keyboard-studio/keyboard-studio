@@ -88,8 +88,8 @@ export interface BaseConsequenceInput {
 /**
  * The per-row host-consequence label for a swallowed keystroke (spec 082
  * FR-003 / 1802 A2): plain description of what the keyboard did and what the
- * host would have done — never the retired "Allow means unpredictable;
- * Block means predictable" framing. Exported so the copy-absence test can
+ * host would have done — never the retired one-sided framing. Exported so
+ * the copy-absence test can
  * exercise every branch directly.
  */
 export function baseConsequenceFor({

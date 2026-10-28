@@ -304,8 +304,6 @@ function installRebuiltState(state: ReplayState): void {
       deletedItemIds: new Set(overlay.carve.deletedItemIds),
       disabledFamilyIds: new Set(overlay.carve.disabledFamilyIds),
       carveChars: new Set(overlay.carve.carveChars),
-      carveDispositions: [...overlay.carve.carveDispositions],
-      closedKeyboardCard: overlay.carve.closedKeyboardCard,
     });
   }
 }

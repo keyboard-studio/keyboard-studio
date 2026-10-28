@@ -13,7 +13,9 @@ import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { groupMarkClasses, proposeAttachments } from "@keyboard-studio/engine";
 import type { SavedAnswer } from "../../steps/answerTypes.ts";
 import { reconciledAttachmentChecked, initialAttachmentChecked, deriveMarksFlags } from "./marksViews.ts";
-import { marksAttachmentKey } from "../../steps/evidence.ts";
+import { marksAttachmentKey, marksBackspaceKey } from "../../steps/evidence.ts";
+import { nfcPostureOfInventory } from "@keyboard-studio/engine";
+import { stackKey } from "@keyboard-studio/contracts";
 
 const ACUTE = "́";
 
@@ -103,5 +105,53 @@ describe("deriveMarksFlags attachment reasons (spec 079 US3)", () => {
     const subjects = flags.filter((f) => f.screenId === "marks_attachment").map((f) => f.reason.subject);
     expect(subjects).toEqual(expect.arrayContaining(["u" + ACUTE, "u" + DIAERESIS]));
     expect(new Set(subjects).size).toBe(subjects.length);
+  });
+});
+
+describe("deriveMarksFlags backspace answer (#2302)", () => {
+  const posture = nfcPostureOfInventory(ALPHABET);
+  const postureId = [...posture]
+    .map((p) => `${stackKey(p.stack)}:${p.hasReadyMadeForm ? 1 : 0}`)
+    .sort()
+    .join(",");
+
+  function backspaceFlags(outputForm: string | undefined, savedKey: string) {
+    const classes = groupMarkClasses(ALPHABET);
+    const proposals = proposeAttachments(ALPHABET, classes);
+    const saved: SavedAnswer = {
+      value: "peel",
+      answerType: "select",
+      origin: "overturned",
+      stage: "confirmed",
+      evidenceKey: savedKey,
+      screenId: "marks_output_form",
+      savedAt: 0,
+    };
+    return deriveMarksFlags({
+      alphabet: ALPHABET,
+      proposals,
+      attachmentBases: ["e", "a"],
+      classes,
+      treatmentPrefills: [],
+      multiMarkStacks: [],
+      postureId,
+      ...(outputForm !== undefined ? { outputForm } : {}),
+      savedAnswers: { "marks_output_form.backspace": saved },
+      lastRecorded: {},
+    }).filter((f) => f.answerId === "marks_output_form.backspace");
+  }
+
+  it("does not flag a backspace answer whose key matches the current form", () => {
+    expect(backspaceFlags("ready-made", marksBackspaceKey("ready-made", postureId))).toEqual([]);
+  });
+
+  it("flags it when the form changed under it — its proposal followed the old form", () => {
+    const flags = backspaceFlags("base-plus-mark", marksBackspaceKey("ready-made", postureId));
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.screenId).toBe("marks_output_form");
+  });
+
+  it("never flags when the caller cannot state the current form", () => {
+    expect(backspaceFlags(undefined, marksBackspaceKey("ready-made", postureId))).toEqual([]);
   });
 });

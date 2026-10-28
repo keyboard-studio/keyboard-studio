@@ -137,6 +137,7 @@ import type {
   TouchMethodDescriptor,
   TouchKeyIdProposal,
 } from "@keyboard-studio/engine";
+import { summarizeInventory } from "@keyboard-studio/engine/kmAssist";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
@@ -1817,6 +1818,18 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // beside the currentChar-sync effect) so detectedChars/touchLettersToAdd
   // below, which also need it, can be declared before that effect.
   const inventoryKey = inventory.join("\0");
+  // The repertoire a freshly-minted guard store is drawn from (AssignPanel's
+  // `repertoire`): the confirmed inventory PLUS every character the working
+  // copy itself produces. The survey inventory alone holds letters, marks,
+  // punctuation and invisibles but never the space or the digits, so a guard
+  // minted from it alone could not swallow a mark after a space — the
+  // start-of-word case the guard question names. The keyboard's own outputs
+  // are still "the keyboard's own repertoire" (no hardcoded ASCII set);
+  // planGuardSynthesis drops the letters.
+  const guardRepertoire = useMemo(
+    () => (ir === null ? inventory : nfcDedup(inventory, summarizeInventory(ir).chars)),
+    [ir, inventory],
+  );
 
   // The placement walk set (issue #2293): the marks series' answers,
   // derived ONCE upstream (hooks/usePlacementInventory.ts) and shared with
@@ -2662,18 +2675,27 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
    * invalid state never exists" — nothing here runs before it) and before the
    * store commit, so a caller needing to apply something else first (only
    * AssignPanel's `result.nextIr` today) can do so at the right moment.
+   *
+   * `options.rejectionRuleIndex` is the rule index the FR-045 rejection gate
+   * judges against when the commit bundles its own IR (AssignPanel's guard
+   * synthesis in `result.nextIr`, or the severance-merged IR): the op and
+   * its rules land in one commit, so the gate must see the post-commit
+   * index — against the pre-commit index a guarded `T_` mint reads as a
+   * dead key and the commit is hard-refused before it can ever land
+   * (spec 104 FR-013; see `useKeyEditGuards.checkRejections`).
    */
   const commitKeyEditCore = useCallback(
     (
       op: PendingKeyEditOperation,
       promotedLayout: TouchLayoutIR,
       onGuardsPassed?: () => void,
+      options?: { readonly rejectionRuleIndex?: TouchKeyRuleIndex | undefined },
     ): { committed: boolean; warnings: readonly KeyEditInvalidationWarning[] } => {
       // T118 (FR-045) FIRST: there is no point warning about a lost character
       // for an edit that is about to be refused. A hard rejection returns
       // without touching the store at all — that is what "the invalid state
       // never exists" means, and why no finding is emitted for it.
-      const rejections = checkKeyEditRejectionNotices(op);
+      const rejections = checkKeyEditRejectionNotices(op, options?.rejectionRuleIndex);
       const unwaived = rejections.filter(
         (r) => r.blocking || !acknowledgedRejections.has(`${op.address}:${r.reason}`),
       );
@@ -2960,11 +2982,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   /** The commit exactly as AssignPanel authored it (the pre-104 behaviour). */
   const commitAssignmentAsAuthored = (result: AssignPanelCommitResult): boolean => {
-    const { committed } = commitKeyEditCore(result.op, result.promotedLayout, () => {
-      if (result.nextIr !== undefined) {
-        useWorkingCopyStore.getState().setWorkingIR(result.nextIr);
-      }
-    });
+    const { committed } = commitKeyEditCore(
+      result.op,
+      result.promotedLayout,
+      () => {
+        if (result.nextIr !== undefined) {
+          useWorkingCopyStore.getState().setWorkingIR(result.nextIr);
+        }
+      },
+      // A guard-station commit carries its rules in `nextIr`; the rejection
+      // gate judges the commit as a whole (op + synthesized rules), never
+      // the bare op against the pre-commit IR.
+      {
+        rejectionRuleIndex:
+          result.nextIr !== undefined ? buildTouchKeyRuleIndex(result.nextIr) : undefined,
+      },
+    );
     if (!committed) return false;
 
     // touchKeyAddress.ts builds the address from the key's OWN id, so a
@@ -3009,9 +3042,17 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       nextIr: result.nextIr,
       anchorLayerId,
     });
-    const { committed } = commitKeyEditCore(result.op, result.promotedLayout, () => {
-      useWorkingCopyStore.getState().setWorkingIR(mergedIr);
-    });
+    const { committed } = commitKeyEditCore(
+      result.op,
+      result.promotedLayout,
+      () => {
+        useWorkingCopyStore.getState().setWorkingIR(mergedIr);
+      },
+      // Same bundled-IR rule as the as-authored path: judge the rejection
+      // gate against the merged (transplant + synthesis) IR this commit
+      // installs, not the pre-commit IR.
+      { rejectionRuleIndex: buildTouchKeyRuleIndex(mergedIr) },
+    );
     if (!committed) return false;
     if (result.op.kind === "set" && result.op.fields.id !== undefined) {
       const parts = parseTouchKeyAddress(result.op.address);
@@ -3944,7 +3985,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // mutates `ir.touchLayout` directly via `setWorkingIR`, so Case B
   // (imported-existing) needs its OWN promotion afterward: `touchLayoutJson`
   // is re-emitted from the SAME `ir.touchLayout` `commitTouchKeyRename` just
-  // wrote, never re-derived independently.
+  // wrote, never re-derived independently. The one case that store path
+  // cannot see — a key whose current id was minted by an earlier overlay
+  // edit and so exists only in the replayed layout — falls back to
+  // `commitKeyEditOp` below; before that fallback, confirming such a rename
+  // closed the dialog having renamed nothing at all.
   const handleRenameConfirm = useCallback(
     (result: RenameDialogConfirmResult) => {
       const rejections = checkKeyEditRejectionNotices(result.op);
@@ -4002,11 +4047,43 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         if (parts !== undefined) {
           setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.newId));
         }
+      } else {
+        // The store rename found nothing to rename in `ir.touchLayout` —
+        // but the key may still be LIVE under an id an earlier overlay
+        // edit minted this session (an AssignPanel assignment renames via
+        // the overlay, and on the imported/Case B track the IR layout is
+        // deliberately never rewritten, so the minted id exists only in
+        // the replayed layout). Without this fallback the dialog closes
+        // having silently renamed nothing. Commit the rename as an
+        // ordinary overlay op through the single-writer chain instead —
+        // replay + Case A/B promotion included. (Rule retargeting is not
+        // owed here: an overlay-minted id with rules would have installed
+        // them via `nextIr`, and that case stays with the store path
+        // above whenever the id is present in the IR layout.)
+        const parts = parseTouchKeyAddress(result.op.address);
+        if (
+          parts !== undefined &&
+          effectiveKeyModeLayout !== null &&
+          resolveKeyAddress(effectiveKeyModeLayout, parts) !== undefined
+        ) {
+          if (commitKeyEditOp(result.op, { offerFamilyApply: false })) {
+            setSelectedKeyAddress(
+              touchKeyAddress(parts.platform, parts.layerId, result.newId),
+            );
+          }
+        }
       }
       setRenameDialogTarget(null);
       dialogInvokerRef.current?.focus();
     },
-    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance],
+    [
+      checkKeyEditOperation,
+      checkKeyEditRejectionNotices,
+      acknowledgedRejections,
+      keyModeProvenance,
+      effectiveKeyModeLayout,
+      commitKeyEditOp,
+    ],
   );
 
   // Spec 104 FR-029 (T020b) — the property panel's re-link action, offered
@@ -7580,7 +7657,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                         {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
                         {...(guardSpecification !== undefined ? { guardSpecification } : {})}
                         onGuardAnswer={handleGuardAnswer}
-                        repertoire={inventory}
+                        repertoire={guardRepertoire}
                         onCommit={handleAssignPanelCommit}
                       />
                     ),

@@ -27,16 +27,43 @@
 // the station states that as a note, never as a per-item question.
 //
 // The step-by-step backspace preview stays (the FR-017 consequence demo):
-// it shows what the chosen policy DOES to written text, which is a
-// consequence of the composition choice — it is not a typing demo and does
-// not stand in for the choice.
+// it shows what backspace DOES to written text under the recorded
+// backspace answer — it is not a typing demo and does not stand in for
+// either choice.
+//
+// The backspace question (#2302, restoring the #1791 framing #2297
+// retired): backspace behaviour is a SECOND whole-keyboard answer asked
+// at this same station, in its own terms — "What should backspace do to
+// an accented letter?" Matthew's model (2026-10-19): input order, output
+// composition and backspace are all interrelated, yet independent. The
+// consistent pairings (letter+mark sent separately ↔ peel one mark at a
+// time; single ready-made character ↔ clear the whole letter at once)
+// are the proposal — the backspace suggestion FOLLOWS the composition
+// answer above — and the author may override to the other behaviour
+// under either form: Keyman can mix and match with extra code, and the
+// engine generates the rules for the off-pairings (stepwise unwrap under
+// ready-made; whole-stack deletion under base-plus-mark). The preview
+// therefore keys off the BACKSPACE answer applied to the chosen form's
+// text — before #2302 it was derived from the form alone, which stated
+// the ready-made behaviour as whole-letter clear while generated
+// keyboards in fact peeled.
 //
 // SC-005: no designer-facing string here may contain the words "Unicode" or
 // "normalization" — asserted mechanically in the station's tests.
 
 import { Trans, useLingui } from "@lingui/react/macro";
-import { composeStack, toUPlusNotation, type MarkInputOrder } from "@keyboard-studio/contracts";
-import type { OutputForm, OutputFormProposal, PosturePair } from "@keyboard-studio/engine";
+import {
+  composeStack,
+  toUPlusNotation,
+  type BackspaceBehaviour,
+  type MarkInputOrder,
+} from "@keyboard-studio/contracts";
+import type {
+  BackspaceProposal,
+  OutputForm,
+  OutputFormProposal,
+  PosturePair,
+} from "@keyboard-studio/engine";
 import {
   ACCENT,
   BORDER,
@@ -58,6 +85,11 @@ export interface OutputFormStationProps {
    * suggestion ABOUT composition, derived from the order they chose.
    */
   inputOrder: MarkInputOrder;
+  /** The backspace proposal — derived from the composition answer alone. */
+  backspaceProposal: BackspaceProposal;
+  /** The current backspace answer (defaults to the proposal's behaviour). */
+  backspace: BackspaceBehaviour;
+  onBackspaceChange: (next: BackspaceBehaviour) => void;
 }
 
 /**
@@ -78,6 +110,34 @@ export function backspaceSteps(pair: PosturePair, form: OutputForm): string[] {
   return steps;
 }
 
+/**
+ * The step-by-step effect of backspace under a recorded BACKSPACE ANSWER
+ * (#2302), applied to the text the chosen form emits:
+ *
+ * - `peel` — one mark at a time off the stack, however the form emits it
+ *   (under ready-made the generated unwrap rules step the single character
+ *   down through the same sequence).
+ * - `whole-stack` — the emitted letter, then nothing: one press clears
+ *   the letter and all its marks (native under ready-made; generated
+ *   deletion rules under base-plus-mark).
+ */
+export function backspaceStepsForBehaviour(
+  pair: PosturePair,
+  form: OutputForm,
+  behaviour: BackspaceBehaviour,
+): string[] {
+  if (behaviour === "whole-stack") {
+    return [backspaceSteps(pair, form)[0] ?? "", ""];
+  }
+  const { base, marks } = pair.stack;
+  const steps: string[] = [];
+  for (let k = marks.length; k >= 0; k--) {
+    steps.push((base + marks.slice(0, k).join("")).normalize("NFC"));
+  }
+  steps.push("");
+  return steps;
+}
+
 /** Prefer a multi-mark stack for the preview — it shows the peeling clearly. */
 export function previewPair(posture: PosturePair[]): PosturePair | undefined {
   return posture.find((p) => p.stack.marks.length > 1) ?? posture[0];
@@ -88,9 +148,17 @@ function examplePair(posture: PosturePair[]): PosturePair | undefined {
   return posture.find((p) => p.hasReadyMadeForm) ?? posture[0];
 }
 
-function BackspacePreview({ pair, form }: { pair: PosturePair; form: OutputForm }) {
+function BackspacePreview({
+  pair,
+  form,
+  behaviour,
+}: {
+  pair: PosturePair;
+  form: OutputForm;
+  behaviour: BackspaceBehaviour;
+}) {
   const { t } = useLingui();
-  const steps = backspaceSteps(pair, form);
+  const steps = backspaceStepsForBehaviour(pair, form, behaviour);
   return (
     <div
       data-testid="backspace-preview"
@@ -154,7 +222,10 @@ function useFormLabel(): Record<OutputForm, string> {
  * Per-option consequence text: what backspace does, and how the sent text
  * behaves when it is searched or compared — the two observable consequences
  * of the composition policy. (Ids retained from the backspace framing: the
- * consequence sentences themselves are unchanged.)
+ * consequence sentences themselves are unchanged. Their backspace clause
+ * states the form's NATIVE behaviour — the pairing the backspace question
+ * below proposes; the recorded backspace answer governs what the produced
+ * keyboard actually does.)
  */
 function useFormConsequence(): Record<OutputForm, string> {
   const { t } = useLingui();
@@ -168,6 +239,27 @@ function useFormConsequence(): Record<OutputForm, string> {
       id: "survey.marks.outputForm.formConsequence.readyMade",
       message:
         "Backspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.",
+    }),
+  };
+}
+
+/**
+ * Per-option labels for the backspace question — the as-was #1791 strings,
+ * restored with their original ids (the ids were keyed by the form whose
+ * native behaviour the label describes; the label texts are behaviour
+ * descriptions, and each now labels the behaviour itself):
+ * `peel` carries the base-plus-mark label, `whole-stack` the ready-made one.
+ */
+function useBackspaceLabel(): Record<BackspaceBehaviour, string> {
+  const { t } = useLingui();
+  return {
+    peel: t({
+      id: "survey.marks.outputForm.backspaceLabel.basePlusMark",
+      message: "Backspace removes one mark at a time (letter and mark kept separate)",
+    }),
+    "whole-stack": t({
+      id: "survey.marks.outputForm.backspaceLabel.readyMade",
+      message: "Backspace removes the whole letter at once (one ready-made unit)",
     }),
   };
 }
@@ -239,10 +331,14 @@ export function OutputFormStation({
   value,
   onChange,
   inputOrder,
+  backspaceProposal,
+  backspace,
+  onBackspaceChange,
 }: OutputFormStationProps) {
   const { t } = useLingui();
   const formLabel = useFormLabel();
   const formConsequence = useFormConsequence();
+  const backspaceLabel = useBackspaceLabel();
   const pair = previewPair(posture);
   const example = examplePair(posture);
   const sectionAriaLabel = t({
@@ -257,6 +353,11 @@ export function OutputFormStation({
     proposal.form === "ready-made"
       ? ["ready-made", "base-plus-mark"]
       : ["base-plus-mark", "ready-made"];
+  // Same propose-then-confirm shape for the backspace question: the
+  // suggested behaviour (the one that follows the composition answer)
+  // is listed first and tagged; the other stays choosable.
+  const backspaceSuggestedFirst: BackspaceBehaviour[] =
+    backspaceProposal.behaviour === "peel" ? ["peel", "whole-stack"] : ["whole-stack", "peel"];
 
   return (
     <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
@@ -307,7 +408,6 @@ export function OutputFormStation({
             </span>
             {example !== undefined && <CodePointLine pair={example} form={form} />}
             <span style={{ ...mutedParaFlush, fontSize: 12 }}>{formConsequence[form]}</span>
-            {pair !== undefined && <BackspacePreview pair={pair} form={form} />}
           </label>
         ))}
       </div>
@@ -325,6 +425,73 @@ export function OutputFormStation({
           </Trans>
         </p>
       )}
+
+      {/* The backspace question (#2302): its own headed question at this
+          station, restored as it was (#1791 wording) and integrated with
+          the composition question above — neither stands in for the other.
+          The suggestion follows the composition answer (the consistent
+          pairing); either behaviour stays choosable under either form.
+          The preview keys off THIS answer applied to the chosen form's
+          text, so what it demonstrates is what the produced keyboard's
+          backspace actually does. */}
+      <div
+        data-testid="marks-backspace"
+        aria-label={t({
+          id: "survey.marks.outputForm.backspaceSectionAriaLabel",
+          message: "What backspace does to an accented letter",
+        })}
+        style={{ marginTop: 22 }}
+      >
+        <h3 style={sectionHeading}>
+          <Trans id="survey.marks.outputForm.backspaceHeading">
+            What should backspace do to an accented letter?
+          </Trans>
+        </h3>
+        <p style={mutedParaFlush}>{backspaceProposal.explanation}</p>
+        <div
+          role="radiogroup"
+          aria-label={t({
+            id: "survey.marks.outputForm.backspaceRadiogroupAriaLabel",
+            message: "What backspace does",
+          })}
+          style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}
+        >
+          {backspaceSuggestedFirst.map((behaviour) => (
+            <label
+              key={behaviour}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: "10px 12px",
+                border: `1px solid ${behaviour === backspace ? ACCENT : BORDER}`,
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: TEXT_MAIN }}>
+                <input
+                  type="radio"
+                  name="marks-backspace"
+                  checked={backspace === behaviour}
+                  onChange={() => onBackspaceChange(behaviour)}
+                />
+                <strong>{backspaceLabel[behaviour]}</strong>
+                {behaviour === backspaceProposal.behaviour && (
+                  <span style={{ fontSize: 11, color: ACCENT }}>
+                    <Trans id="survey.marks.outputForm.recommendedTag">recommended</Trans>
+                  </span>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
+        {pair !== undefined && (
+          <div style={{ marginTop: 10 }}>
+            <BackspacePreview pair={pair} form={value} behaviour={backspace} />
+          </div>
+        )}
+      </div>
     </section>
   );
 }

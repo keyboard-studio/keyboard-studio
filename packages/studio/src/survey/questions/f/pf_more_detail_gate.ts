@@ -11,7 +11,8 @@
 // a few screens. Answering "yes" opens the optional documentation battery.
 // Follows the established Phase B gate pattern (see pb_punctuation_gate).
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeBoolValidator } from "../validators.ts";
 
 export const definition = {
   id: "pf_more_detail_gate",
@@ -31,19 +32,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (v !== "true" && v !== "false") {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please answer Yes or No.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeBoolValidator("Please answer Yes or No.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

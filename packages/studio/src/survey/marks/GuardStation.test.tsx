@@ -24,6 +24,20 @@ function record(partial: Partial<GuardSpecification>): GuardSpecification {
   };
 }
 
+describe("GuardStation — author language (SC-005)", () => {
+  it("the station and the editor prompt never render the words Unicode or normalization", () => {
+    for (const ui of [
+      <GuardStation key="station" value="swallow" onChange={vi.fn()} />,
+      <GuardQuestionPrompt key="prompt" onAnswer={vi.fn()} />,
+    ]) {
+      cleanup();
+      const { container } = render(ui);
+      expect(container.textContent).not.toMatch(/unicode/i);
+      expect(container.textContent).not.toMatch(/normali[sz]/i);
+    }
+  });
+});
+
 describe("GuardStation — the question", () => {
   it("asks the contracts §6 question with both behaviours as options", () => {
     const onChange = vi.fn();
@@ -60,13 +74,24 @@ describe("GuardStation — the question", () => {
 });
 
 describe("GuardQuestionPrompt — the editor routing (FR-013 tail)", () => {
-  it("answers on tap with the same §6 question", () => {
+  it("asks the same §6 question with swallow pre-selected; confirming answers it", () => {
     const onAnswer = vi.fn();
     render(<GuardQuestionPrompt onAnswer={onAnswer} />);
     expect(screen.getByTestId("guard-question-prompt").textContent).toMatch(
       /taps a tone mark at the start of a word/,
     );
-    fireEvent.click(screen.getByTestId("guard-prompt-swallow"));
+    expect((screen.getByTestId("guard-option-swallow") as HTMLInputElement).checked).toBe(true);
+    expect(onAnswer).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("guard-prompt-confirm"));
     expect(onAnswer).toHaveBeenCalledWith("swallow");
+  });
+
+  it("answers emit when the author picks it before confirming", () => {
+    const onAnswer = vi.fn();
+    render(<GuardQuestionPrompt onAnswer={onAnswer} />);
+    fireEvent.click(screen.getByTestId("guard-option-emit"));
+    expect(onAnswer).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("guard-prompt-confirm"));
+    expect(onAnswer).toHaveBeenCalledWith("emit");
   });
 });

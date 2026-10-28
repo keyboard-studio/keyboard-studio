@@ -213,6 +213,8 @@ export {
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
+  kpsMemberRef,
+  normaliseKpsFontEntries,
   // spec 080 FR-002 — the welcome page's folder-convention member reference.
   WELCOME_PAGE_KPS_REF,
   welcomeFolderKpsRef,
@@ -220,6 +222,7 @@ export {
 export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
+  KpsFontDescriptorEntry,
 } from "./package-descriptor/index.js";
 
 // spec 065 — help-docs rendering. The one implementation both the output
@@ -555,11 +558,15 @@ export type {
 } from "./marks/attachment-proposals.js";
 export {
   resolveOutputFormProposal,
+  resolveBackspaceProposal,
+  nativeBackspaceBehaviour,
   hasDecidablePairs,
   normalizationFormForOutputForm,
   outputStringForStack,
 } from "./marks/output-form-policy.js";
 export type {
+  BackspaceBehaviour,
+  BackspaceProposal,
   OutputForm,
   OutputFormProposal,
 } from "./marks/output-form-policy.js";
@@ -619,6 +626,7 @@ export {
   MARKS_GUARD_GROUP,
   MARKS_UNWRAP_FROM_STORE,
   MARKS_UNWRAP_TO_STORE,
+  MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 

@@ -9,7 +9,7 @@
 // import time. Message ids are explicit and stable — see WelcomeScreen.tsx.
 import { i18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
-import { storageAvailable } from "./storageGuard.ts";
+import { loadSavedValue, saveSavedValue } from "./storageGuard.ts";
 import { activateContentLocale } from "./contentI18n.ts";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
@@ -30,23 +30,12 @@ function isSupported(value: string): value is Locale {
 
 /** The persisted locale choice, or null if none / invalid / unavailable. */
 export function loadSavedLocale(): Locale | null {
-  if (!storageAvailable()) return null;
-  try {
-    const v = localStorage.getItem(LOCALE_KEY);
-    return v !== null && isSupported(v) ? v : null;
-  } catch {
-    return null;
-  }
+  return loadSavedValue(LOCALE_KEY, isSupported);
 }
 
 /** Persist the choice — durable across reloads and the OAuth sign-in round trip. */
 export function saveLocale(locale: Locale): void {
-  if (!storageAvailable()) return;
-  try {
-    localStorage.setItem(LOCALE_KEY, locale);
-  } catch {
-    // Quota / private-mode — re-detecting next boot is a harmless fallback.
-  }
+  saveSavedValue(LOCALE_KEY, locale);
 }
 
 /**

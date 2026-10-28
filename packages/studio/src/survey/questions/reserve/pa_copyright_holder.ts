@@ -2,7 +2,8 @@
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 // maps_to: KeyboardIdentity.copyrightHolder
 
-import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
@@ -20,14 +21,7 @@ export const definition = {
   next: "provenance_opt_in",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  if (asText(value).length === 0) {
-    return { ok: false, code: "required", message: "Copyright holder is required." };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Copyright holder is required.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

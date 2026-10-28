@@ -20,14 +20,22 @@ import { getGuardSpecification } from "./guardSpecification.ts";
 const ACUTE = "́";
 const GRAVE = "̀";
 
+/**
+ * The acute on three letters: productive enough (PRODUCTIVITY_SPREAD_THRESHOLD)
+ * that its proposed treatment is a key of its own, so the guard question applies.
+ */
 function seedAlphabet(): void {
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],
     alphabet: {
-      bases: ["e"],
+      bases: ["a", "e", "o"],
       marks: [ACUTE],
-      attestedStacks: [{ base: "e", marks: [ACUTE] }],
+      attestedStacks: [
+        { base: "a", marks: [ACUTE] },
+        { base: "e", marks: [ACUTE] },
+        { base: "o", marks: [ACUTE] },
+      ],
       declaredRoles: {},
     },
   });
@@ -100,16 +108,27 @@ afterEach(() => {
   cleanup();
 });
 
+/** An imported keyboard whose one mark key is unguarded — it types the mark anywhere. */
+function unguardedImportIR(): KeyboardIR {
+  return layoutIR(
+    [key("T_0300", "◌̀")],
+    [
+      {
+        nodeId: "rule#p",
+        context: [{ kind: "vkey", name: "T_0300", modifiers: [] }],
+        output: [{ kind: "char", value: GRAVE }],
+      },
+    ],
+  );
+}
+
 describe("MarksSeriesStep — guard station (spec 104 FR-013)", () => {
-  it("asks once, blocks Continue until answered, and records a confirmed asked specification", () => {
+  it("defaults to swallow with no prior answer or seed; passing the station confirms it as the author's answer", () => {
     const onComplete = renderSeries();
     walkToGuard();
-    // No answer yet: Continue does not complete the step.
-    fireEvent.click(screen.getByTestId("marks-continue"));
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(screen.getByTestId("guard-station")).toBeTruthy();
+    expect((screen.getByTestId("guard-option-swallow") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("guard-option-emit") as HTMLInputElement).checked).toBe(false);
 
-    fireEvent.click(screen.getByTestId("guard-option-swallow"));
     fireEvent.click(screen.getByTestId("marks-continue"));
     expect(onComplete).toHaveBeenCalledTimes(1);
 
@@ -126,7 +145,36 @@ describe("MarksSeriesStep — guard station (spec 104 FR-013)", () => {
     });
   });
 
-  it("reports pre-answer U_ minting for re-evaluation when the answer lands on swallow (US1 scenario 6)", () => {
+  it("the author can still choose emit over the default", () => {
+    const onComplete = renderSeries();
+    walkToGuard();
+    fireEvent.click(screen.getByTestId("guard-option-emit"));
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(getGuardSpecification()).toMatchObject({ behaviour: "emit", origin: "asked", confirmed: true });
+  });
+
+  it("skips the station when no mark has a key of its own (every class composed)", () => {
+    const onComplete = renderSeries();
+    let composedChosen = 0;
+    for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+      expect(screen.queryByTestId("guard-station")).toBeNull();
+      for (const option of screen.queryAllByTestId(/^treatment-option-.*-composed$/)) {
+        fireEvent.click(option.querySelector("input")!);
+        composedChosen += 1;
+      }
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    // The skip is driven by the author's composed answer, not a fixture
+    // that never offered a mark key.
+    expect(composedChosen).toBeGreaterThan(0);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(getGuardSpecification()).toBeUndefined();
+    const result = onComplete.mock.calls[0]![0] as SurveyPhaseResult;
+    expect(result.answers.some((a) => a.questionId === "marks.marks_guard.behaviour")).toBe(false);
+  });
+
+  it("reports pre-answer U_ minting for re-evaluation when the defaulted answer is swallow (US1 scenario 6)", () => {
     // The working keyboard already carries a U_ mark key (minted before
     // any specification existed). `complete()` scans the working copy's
     // current IR — the same IR the editor mints into.
@@ -135,7 +183,6 @@ describe("MarksSeriesStep — guard station (spec 104 FR-013)", () => {
     });
     const onComplete = renderSeries();
     walkToGuard();
-    fireEvent.click(screen.getByTestId("guard-option-swallow"));
     fireEvent.click(screen.getByTestId("marks-continue"));
     expect(onComplete).toHaveBeenCalledTimes(1);
 
@@ -164,6 +211,25 @@ describe("MarksSeriesStep — guard station (spec 104 FR-013)", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(getGuardSpecification()).toMatchObject({
       behaviour: "swallow",
+      origin: "seeded-from-import",
+      confirmed: true,
+    });
+  });
+
+  it("Track 2: an emit seed overrides the swallow default", () => {
+    useDecisionStore.getState().record({ id: "authoring-track", value: "adapt", provenance: "asked" });
+    useWorkingCopyStore.setState({ startIr: unguardedImportIR() });
+    const onComplete = renderSeries();
+    walkToGuard();
+
+    expect(screen.getByTestId("guard-seeded-note")).toBeTruthy();
+    expect((screen.getByTestId("guard-option-emit") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("guard-option-swallow") as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(getGuardSpecification()).toMatchObject({
+      behaviour: "emit",
       origin: "seeded-from-import",
       confirmed: true,
     });

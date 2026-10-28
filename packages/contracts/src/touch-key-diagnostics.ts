@@ -749,8 +749,23 @@ export function findDeadTouchKeys(
     // Scope: custom ids only. A `K_` key resolves against the compiled-in
     // keyword table and has a physical position whether or not a rule mentions it.
     if (!isCustomTouchKeyId(key.id)) return;
-    // A layer-switch key does its job via `nextlayer`, not a rule.
-    if (key.nextlayer !== undefined && key.nextlayer.length > 0) return;
+    // `nextlayer` does NOT exempt a key here. FR-006 classifies by role
+    // set: a producing key that also navigates is still a producer, with
+    // `nextlayer` carried as a property — and the corpus's attested
+    // `nextlayer` idiom on producing-class keys is the post-output layer
+    // return (the basic_* symbol layers: `T_0031` "1" with
+    // `nextlayer: "default"`, which types nothing without a rule and is
+    // spec 104's named dead-key repair fixture, FR-028). The resolver
+    // already says so: such a key resolves `source: "none"` with only a
+    // layerSwitch production entry. Pure layer-switch keys are exempted
+    // by the gates that actually define them — non-producing `sp`
+    // classes, `*frame*` labels, sentinel/reserved ids — not by the mere
+    // presence of a layer return. (The pre-104 blanket exemption, from
+    // spec 058, hid exactly the basic_* dead producers: a corpus scan
+    // finds no switch-only T_ key it protected.) Note the engine
+    // edit-guard (`wouldBeDeadKey`, keyEditOps.ts) still carries the old
+    // exemption — flagged as a follow-up, not silently mirrored, because
+    // that surface can hard-block an edit.
     // Only a producing key class can be dead.
     if (!isProducingKeyClass(key.sp)) return;
     if (isSpacerKeyClass(key.sp)) return;

@@ -312,10 +312,16 @@ describe("Chrome-by-layout: full-screen for layout:full steps (FR-002, R4)", () 
       if (stubTestId === undefined) return;
 
       const stub = screen.getByTestId(stubTestId);
-      const parent = stub.parentElement!;
-      // StepHost wraps full-screen steps in a div with style.height === "100%".
-      expect(parent.style.height).toBe("100%");
-      expect(parent.style.overflow).toBe("hidden");
+      // StepHost wraps full-screen steps in a div with style.height === "100%"
+      // and overflow hidden. The mechanisms adapter nests the gallery one level
+      // deeper (it stacks the fallback-policy section beneath it), so walk up
+      // to the nearest overflow:hidden ancestor instead of assuming the parent.
+      let wrapper = stub.parentElement!;
+      while (wrapper.style.overflow !== "hidden" && wrapper.parentElement !== null) {
+        wrapper = wrapper.parentElement;
+      }
+      expect(wrapper.style.height).toBe("100%");
+      expect(wrapper.style.overflow).toBe("hidden");
     });
   }
 });

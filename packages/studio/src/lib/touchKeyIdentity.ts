@@ -317,7 +317,6 @@ export function deriveRepairRows(args: {
 }): DeadKeyRepairRow[] {
   const ruleIndex: TouchKeyRuleIndex = buildTouchKeyRuleIndex(args.ir);
   const findings = findDeadTouchKeys({ ir: args.ir, layout: args.layout, ruleIndex });
-  if (findings.length === 0) return [];
 
   // Every occurrence of every key id, in walk order, with overlay addresses,
   // plus each id's first main-key keycap text (the FR-009 evidence source).
@@ -408,6 +407,54 @@ export function deriveRepairRows(args: {
       occurrences,
       defaultAction,
       options,
+    });
+  }
+
+  // Answered rows whose finding has RESOLVED stay visible-and-answered
+  // (FR-017's row contract; the list component renders the recorded outcome
+  // against the row). A successful repair removes the key from
+  // `findDeadTouchKeys` — convert renames it, mint gives it a rule, blank
+  // makes it a spacer — so a findings-only derivation deletes the row at the
+  // exact moment the author answers it, and the recorded outcome has
+  // nothing left to render against. Re-derive those rows from the records
+  // (which is why records are an input at all). A declined record keeps its
+  // live finding row above, so it never reaches here; a record whose key
+  // has left the layout entirely (deleted, not repaired) stays buried.
+  const liveRefs = new Set(rows.map((r) => r.keyRef));
+  const latestByRef = new Map<string, RepairProposal>();
+  for (const proposal of liveRecords(recordsOrEmpty(args.records).repairProposals)) {
+    latestByRef.set(proposal.keyRef, proposal);
+  }
+  for (const proposal of latestByRef.values()) {
+    if (liveRefs.has(proposal.keyRef)) continue;
+    if (proposal.outcome === "unvisited") continue;
+    const parts = parseTouchKeyAddress(proposal.keyRef);
+    if (parts === undefined || parts.sub !== undefined) continue;
+    const keyId = parts.keyId;
+    const suffix = /^T_([0-9A-Fa-f]{4,6})$/.exec(keyId)?.[1];
+    const convertToId = suffix !== undefined ? `U_${suffix.toUpperCase()}` : undefined;
+    const liveId = occurrencesById.has(keyId)
+      ? keyId
+      : convertToId !== undefined && occurrencesById.has(convertToId)
+        ? convertToId
+        : undefined;
+    if (liveId === undefined) continue;
+    const occurrences = occurrencesById.get(liveId) ?? [];
+    const keycapText = keycapById.get(liveId) ?? "";
+    const keycapChar = keycapText !== "" ? stripDottedCircle(keycapText) : undefined;
+    rows.push({
+      keyRef: proposal.keyRef,
+      keyId,
+      platformId: parts.platform,
+      layerId: parts.layerId,
+      layerIds: [...new Set(occurrences.map((o) => o.layerId))],
+      keycapText,
+      evidenceChar:
+        keycapChar ?? (convertToId !== undefined ? decodeUnicodeKeyId(convertToId) : undefined),
+      convertToId,
+      occurrences,
+      defaultAction: proposal.defaultAction,
+      options: proposal.options,
     });
   }
   return rows;
@@ -585,6 +632,10 @@ export function keyHasRuleBindings(
  *    no synthesis (the decode path), the anchor layer's own combo, where
  *    the decode must show through. Clones at every other combo stand —
  *    they are what "both halves keep typing" means (US1).
+ *
+ * The composed result's delta over `baseIr` (standing clones, synthesized
+ * rules, minted stores) is stamped `rulesStepAdded` before returning —
+ * see {@link stampComposedAdditions} for why the projection depends on it.
  */
 export function mergeSeveranceWithSynthesis(args: {
   readonly plan: SeverTouchKeyResult;
@@ -629,14 +680,17 @@ export function mergeSeveranceWithSynthesis(args: {
     }
   }
   if (nextIr === undefined) {
-    if (dropIds.size === 0) return plan.ir;
-    return {
-      ...plan.ir,
-      groups: plan.ir.groups.map((g) => ({
-        ...g,
-        rules: g.rules.filter((r) => !dropIds.has(r.nodeId)),
-      })),
-    };
+    if (dropIds.size === 0) return stampComposedAdditions(plan.ir, baseIr);
+    return stampComposedAdditions(
+      {
+        ...plan.ir,
+        groups: plan.ir.groups.map((g) => ({
+          ...g,
+          rules: g.rules.filter((r) => !dropIds.has(r.nodeId)),
+        })),
+      },
+      baseIr,
+    );
   }
 
   const baseGroups = new Map(baseIr.groups.map((g) => [g.nodeId, g]));
@@ -665,11 +719,68 @@ export function mergeSeveranceWithSynthesis(args: {
 
   const baseStoreIds = new Set(baseIr.stores.map((s) => s.nodeId));
   const addedStores = nextIr.stores.filter((s) => !baseStoreIds.has(s.nodeId));
-  return {
-    ...plan.ir,
-    groups,
-    stores: addedStores.length > 0 ? [...plan.ir.stores, ...addedStores] : plan.ir.stores,
-  };
+  return stampComposedAdditions(
+    {
+      ...plan.ir,
+      groups,
+      stores: addedStores.length > 0 ? [...plan.ir.stores, ...addedStores] : plan.ir.stores,
+    },
+    baseIr,
+  );
+}
+
+/**
+ * Stamp every rule/store the composition ADDED over the base IR with
+ * `rulesStepAdded` — the marker the VFS projection's additions seam
+ * (`deriveRuleAdditions` / `spliceRuleAdditions`, spec 082) collects.
+ *
+ * The working IR is never emitted into the preview or the download
+ * directly; the projection rebuilds the artifact from the base IR plus
+ * replayable overlays, and the additions seam is the only channel a
+ * working-IR rule reaches it through. Unstamped, the transplant's clones
+ * and the panel's synthesized guard/producing rules existed only in the
+ * editor's model: the compiled preview keyboard had no guard at all, and
+ * the sibling rename ops' mechanical rule fix-up (projection step 1.7b)
+ * rewrote the SOURCE key's producing rule onto the new id instead — a
+ * guarded T_0301 minted from K_1 typed K_1's "&" (walk 1's OSK failure).
+ *
+ * The double-projection hazard the seam's marker discipline guards
+ * against (spec 082: a rule replayed by its own overlay must not also be
+ * spliced) does not apply here: no overlay replays these rules — step
+ * 1.7b handles only pure renames, and it skips a rename whose target the
+ * additions already bind. Returns `merged` itself when nothing was added,
+ * so a no-op composition keeps its identity.
+ */
+function stampComposedAdditions(merged: KeyboardIR, baseIr: KeyboardIR): KeyboardIR {
+  const baseRuleIds = new Set<string>();
+  for (const g of baseIr.groups) {
+    for (const r of g.rules) baseRuleIds.add(r.nodeId);
+  }
+  const baseStoreIds = new Set(baseIr.stores.map((s) => s.nodeId));
+  let changed = false;
+  const groups = merged.groups.map((g) => {
+    let groupChanged = false;
+    const rules = g.rules.map((r) => {
+      if (!baseRuleIds.has(r.nodeId) && r.rulesStepAdded !== true) {
+        groupChanged = true;
+        return { ...r, rulesStepAdded: true as const };
+      }
+      return r;
+    });
+    if (groupChanged) {
+      changed = true;
+      return { ...g, rules };
+    }
+    return g;
+  });
+  const stores = merged.stores.map((s) => {
+    if (!baseStoreIds.has(s.nodeId) && s.rulesStepAdded !== true) {
+      changed = true;
+      return { ...s, rulesStepAdded: true as const };
+    }
+    return s;
+  });
+  return changed ? { ...merged, groups, stores } : merged;
 }
 
 /** The platform/layer parts of an overlay address, for severance requests. */

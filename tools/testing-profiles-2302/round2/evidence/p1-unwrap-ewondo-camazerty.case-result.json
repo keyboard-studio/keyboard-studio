@@ -1,0 +1,61 @@
+{
+  "case": {
+    "id": "p1-unwrap-ewondo-camazerty",
+    "profile": 1,
+    "backspace": "unwrap",
+    "backspaceOnDiagonal": true,
+    "inputOrder": "postfix",
+    "outputForm": "base-plus-mark",
+    "lang": "ewondo",
+    "base": "sil_cameroon_azerty",
+    "english": "Ewondo",
+    "autonym": "Ewondo",
+    "code": "ewo",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "startedAt": "2026-10-19T23:45:59.045Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        },
+        {
+          "name": "pick-base",
+          "ok": true,
+          "via": "card"
+        }
+      ],
+      "errors": [
+        "locator.waitFor: Timeout 20000ms exceeded.\nCall log:\n  - waiting for getByRole('radio', { name: /^Copy/i }) to be visible\n"
+      ],
+      "failedAt": "pick-base",
+      "bodyExcerpt": ""
+    }
+  },
+  "finishedAt": "2026-10-19T23:53:41.319Z"
+}

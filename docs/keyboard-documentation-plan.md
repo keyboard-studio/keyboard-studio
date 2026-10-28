@@ -108,7 +108,7 @@ upstream finding (muted) until the member is edited (FR-020).
 1. **Identity first** — the `.kps` Info block: `Name`, `Author`/copyright holder, BCP47 language
    list. Every file below quotes this rather than deriving its own copy; a holder-name typo fixed
    in isolation on one file, but not the other four, is criteria.md's #1 recurring reviewer
-   finding (e.g. `jinland` PR #3647 — a misspelling silently fixed in `LICENSE.md`, `HISTORY.md`,
+   finding (e.g. `jinland` PR #3647 — a misspelling the reviewer fixed in `LICENSE.md`, `HISTORY.md`,
    and `.kps` across three separate commits).
 
 2. **`README.md`** — package-manager-facing description:

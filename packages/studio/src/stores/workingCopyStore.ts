@@ -21,13 +21,12 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
+import { DEFAULT_FALLBACK_POLICY } from "@keyboard-studio/contracts";
 import type {
   Attribution,
   AxisFill,
   StartKeyboard,
-  CarveDisposition,
-  CarveDispositionProvenance,
-  CarveDispositionValue,
+  FallbackPolicy,
   GuardSpecification,
   HelpDocsAnswers,
   KeyboardIR,
@@ -339,55 +338,6 @@ export interface AppliedContextTolerance {
  */
 export type InstantiationMode = "new-from-base" | "adapt-existing" | null;
 
-/**
- * The 076 closed-keyboard card's decision (User Story 1, FR-005) — the bulk
- * control for the two-tier allow/block choice (FR-019).
- *
- * - `"accepted"`: the author closed the keyboard; undefined keys (and carved
- *   combos, by default) are swallowed rather than falling through to the host
- *   layout.
- * - `"declined"`: the author keeps host-layout fallback (the FR-005 proposal
- *   for sparse Latin overlays); carved combos default to `allow-host`.
- *
- * The card UI itself is 076 User Story 1 scope. This type is the state slot
- * the disposition pre-fill (FR-022) reads; the card step will write it.
- */
-export type ClosedKeyboardCardDecision = "accepted" | "declined";
-
-/**
- * The bulk allow/block default for a carved combination (076 FR-005/FR-019/FR-022).
- *
- * Pure function of the closed-keyboard card state and the FR-005 proposal
- * input (`sparseLatinOverlay`: true for a sparse Latin overlay, false for a
- * non-Latin script base), so the carve gallery, the test pane, and the
- * compiler all read the same default the store's pre-fill used:
- *
- * - card accepted → `block` / `closed-keyboard-card`
- * - card declined (sparse Latin overlay) → `allow-host` / `closed-keyboard-card-declined`
- * - card unanswered → the FR-005 proposal rule (declined for sparse Latin
- *   overlays, accepted for non-Latin scripts) / `bulk-default`
- */
-export function bulkDispositionDefault(
-  card: ClosedKeyboardCardDecision | null,
-  sparseLatinOverlay: boolean,
-): {
-  disposition: CarveDispositionValue;
-  provenance: CarveDispositionProvenance;
-} {
-  if (card === "accepted") {
-    return { disposition: "block", provenance: "closed-keyboard-card" };
-  }
-  if (card === "declined") {
-    return {
-      disposition: "allow-host",
-      provenance: "closed-keyboard-card-declined",
-    };
-  }
-  return sparseLatinOverlay
-    ? { disposition: "allow-host", provenance: "bulk-default" }
-    : { disposition: "block", provenance: "bulk-default" };
-}
-
 // Identity patch lives in a leaf module (see identityPatch.ts); re-exported
 // here so existing importers keep resolving.
 export type { IdentityPatch } from "./identityPatch.ts";
@@ -695,44 +645,19 @@ export interface WorkingCopyState {
    * touch layout edit. */
   undoStack: UndoEntry[];
 
-  // -- Closed-keyboard card + carve dispositions (076 FR-005/FR-019/FR-022) -----
+  // -- Keyboard-wide fallback policy (076 FR-019, retired per-carve override) ---
   /**
-   * The 076 closed-keyboard card's decision state (User Story 1, FR-005) — the
-   * BULK control of the two-tier allow/block choice (FR-019). The card governs
-   * all undefined keys; the per-carve dispositions in `carveDispositions`
-   * override it for individual carved combinations.
+   * What a key that is not in the keyboard does: `"swallow"` (nothing; the
+   * default) or `"pass-through"` (the computer's own layout answers). One
+   * value per working copy, set by the author in the Assign Mechanisms step
+   * and never re-prompted on recompile. Deadkey carves always suppress
+   * regardless (engine backstop). Replaces the per-combination
+   * `carveDispositions` store and the closed-keyboard card, which are folded
+   * into it on load (see `migrateFallbackPolicy`).
    *
-   * - `"accepted"`: the author closed the keyboard → carved combos pre-fill to
-   *   `block` (provenance `closed-keyboard-card`).
-   * - `"declined"`: sparse Latin overlay, host fallback kept → carved combos
-   *   pre-fill to `allow-host` (provenance `closed-keyboard-card-declined`).
-   * - `null`: the card is unanswered → pre-fill follows the FR-005 proposal
-   *   rule (declined for sparse Latin overlays, accepted for non-Latin
-   *   scripts) with `bulk-default` provenance.
-   *
-   * The card UI itself is 076 User Story 1 scope; this field is its persisted
-   * state slot so the disposition pre-fill can read the bulk default on every
-   * recompile without re-prompting (FR-022). Null until the card is answered.
-   * Persisted with the working copy.
+   * Persisted with the working copy; never in the IR or the emitted keyboard.
    */
-  closedKeyboardCard: ClosedKeyboardCardDecision | null;
-  /**
-   * Per-carved-combination allow/block dispositions (076 FR-022).
-   * Keyed by `comboId` (the carve-node id: rule nodeId, or
-   * `<storeNodeId>#<index>` for slot carves — data-model.md "CarveDisposition").
-   *
-   * Lifecycle: pre-filled on carve from the bulk default
-   * (`prefillCarveDispositions`), flipped per row by the author (provenance
-   * becomes `author-override`), read — never re-prompted — on every recompile
-   * via `getCarveDispositions`, deleted on un-carve (`pruneCarveDispositions`
-   * and the restore actions below). Pre-fill writes ONLY for combos without an
-   * existing disposition: recompilation never re-prompts, and genuinely new
-   * combos take the current bulk default.
-   *
-   * Persisted with the working copy (carve-decision metadata on the carve
-   * overlay; never in the IR or the emitted keyboard).
-   */
-  carveDispositions: CarveDisposition[];
+  fallbackPolicy: FallbackPolicy;
 
   /**
    * Touch-layout keep-inert overrides, 076 FR-023 (T020): carved NFC
@@ -1029,71 +954,9 @@ export interface WorkingCopyState {
    */
   cascadeRestore: (ids: string[], restoredChars?: string[]) => void;
 
-  // -- Actions: closed-keyboard card + carve dispositions (076 FR-022) ------------
-  /**
-   * Record the 076 closed-keyboard card's decision (User Story 1 writes this).
-   * `null` clears the decision back to "unanswered". Dispositions already
-   * pre-filled keep their provenance — the card never rewrites a decision the
-   * author (or an earlier pre-fill) already made.
-   */
-  setClosedKeyboardCard: (decision: ClosedKeyboardCardDecision | null) => void;
-  /**
-   * Pre-fill dispositions for a set of carved comboIds from the bulk default
-   * (see {@link bulkDispositionDefault}).
-   *
-   * Writes ONLY for combos without an existing disposition — recompile never
-   * re-prompts; only genuinely new combos take the current bulk default.
-   * Unknown or stale comboIds are NOT filtered here: the caller passes the
-   * current carve set, and `pruneCarveDispositions` / the restore actions drop
-   * entries that no longer resolve. Empty input is a no-op.
-   *
-   * @param comboIds the carved combination ids to pre-fill (rule nodeIds and/or
-   *   `<storeNodeId>#<index>` slot ids).
-   * @param opts.sparseLatinOverlay the FR-005 proposal input: true when the
-   *   keyboard is a sparse Latin overlay, false for a non-Latin script base.
-   *   Only consulted while the card is unanswered.
-   * @param opts.deadkeyComboIds rule nodeIds whose rules carry deadkey
-   *   context. The ruling forbids host fallback for deadkey carves ("deadkey
-   *   carves never fall through"), so these pre-fill to `block` with
-   *   provenance `deadkey-requirement` regardless of the bulk default.
-   */
-  prefillCarveDispositions: (
-    comboIds: string[],
-    opts: {
-      sparseLatinOverlay: boolean;
-      deadkeyComboIds?: ReadonlySet<string>;
-    },
-  ) => void;
-  /**
-   * Per-row override (carve gallery): set one combo's disposition. Provenance
-   * becomes `author-override` — the value is the author's from here on and no
-   * later pre-fill may touch it.
-   *
-   * Upsert: a comboId with no existing disposition gains one, so the gallery
-   * can write the row even if pre-fill never ran for it.
-   */
-  setCarveDisposition: (
-    comboId: string,
-    disposition: CarveDispositionValue,
-  ) => void;
-  /**
-   * Un-carve bookkeeping: delete dispositions whose comboId is not in the
-   * live carve set (FR-022: un-carving deletes the metadata).
-   *
-   * The restore actions (`restoreNode`, `restoreItem`, `cascadeRestore`,
-   * `keepAll`/`restoreAll`) prune their own ids inline; this action is the
-   * compile path's sweep for entries that died any other way.
-   */
-  pruneCarveDispositions: (
-    liveComboIds: ReadonlySet<string> | readonly string[],
-  ) => void;
-  /**
-   * Read path for the compiler (076 FR-022): the dispositions for the given
-   * combos, in store order. With no argument, returns every disposition.
-   * Unknown comboIds are ignored (no record, no error). Returns copies, so
-   * callers cannot mutate store state.
-   */
-  getCarveDispositions: (comboIds?: readonly string[]) => CarveDisposition[];
+  // -- Actions: keyboard-wide fallback policy (076 FR-019) ---------------------
+  /** Record the author's fallback policy. Idempotent. */
+  setFallbackPolicy: (policy: FallbackPolicy) => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -1760,11 +1623,7 @@ export type WorkingCopyData = Omit<
   | "toggleFamilyDisabled"
   | "cascadeDelete"
   | "cascadeRestore"
-  | "setClosedKeyboardCard"
-  | "prefillCarveDispositions"
-  | "setCarveDisposition"
-  | "pruneCarveDispositions"
-  | "getCarveDispositions"
+  | "setFallbackPolicy"
   | "setCarveTouchKeepInert"
   | "recordPhase"
   | "recordAssignments"
@@ -1857,10 +1716,8 @@ const INITIAL_STATE: WorkingCopyData = {
   disabledFamilyIds: new Set(),
   carveChars: new Set(),
   undoStack: [],
-  // closed-keyboard card + carve dispositions (076 FR-005/FR-022):
-  // card unanswered, no carve decisions yet
-  closedKeyboardCard: null,
-  carveDispositions: [],
+  // keyboard-wide fallback policy (076 FR-019): flat swallow default
+  fallbackPolicy: DEFAULT_FALLBACK_POLICY,
   carveTouchKeepInert: [],
   // survey slots
   ...INITIAL_SURVEY,
@@ -1908,10 +1765,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       // Full IR replacement: stale carve deletions correctly must not carry
-      // over — and neither may their carve-decision metadata (076 FR-022)
-      // nor the aggregated-R carved-character set (#1809 §1).
+      // over — and neither may the aggregated-R carved-character set (#1809 §1).
       carveChars: new Set(),
-      carveDispositions: [],
       carveTouchKeepInert: [],
       // 082 rule-access tracks: the family-disabled overlay is IR-scoped too.
       disabledFamilyIds: new Set(),
@@ -2020,10 +1875,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return {
         deletedNodeIds: next,
         undoStack: s.undoStack.filter((e) => !(e.k === "n" && e.id === nodeId)),
-        // Un-carve deletes the carve-decision metadata (076 FR-022).
-        carveDispositions: s.carveDispositions.filter(
-          (d) => d.comboId !== nodeId,
-        ),
       };
     }),
 
@@ -2042,10 +1893,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return {
         deletedItemIds: next,
         undoStack: s.undoStack.filter((e) => !(e.k === "i" && e.id === itemId)),
-        // Un-carve deletes the carve-decision metadata (076 FR-022).
-        carveDispositions: s.carveDispositions.filter(
-          (d) => d.comboId !== itemId,
-        ),
       };
     }),
 
@@ -2101,9 +1948,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       carveChars: new Set(),
       undoStack: [],
       keyEditOverlay: { ops: [] },
-      // No carve remains applied: no carve-decision metadata survives either
-      // (076 FR-022 — un-carving deletes the metadata).
-      carveDispositions: [],
       carveTouchKeepInert: [],
       deadkeyOverlay: { ops: [] },
     }),
@@ -2157,12 +2001,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         (e) =>
           !(e.k === "batch" && e.itemIds.every((id) => !nextItems.has(id))),
       );
-      // Un-carve deletes the carve-decision metadata (076 FR-022): the
-      // restored combos are live rules again, not carved combinations.
-      const restored = new Set(ids);
-      const nextDispositions = s.carveDispositions.filter(
-        (d) => !restored.has(d.comboId),
-      );
       // Issue #1809 ruling §1: drop the un-carved characters from the
       // aggregated-R set — but keep any char a REMAINING batch still claims
       // (mirrors undoDelete's still-claimed filter; a char can be carved by
@@ -2181,93 +2019,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         deletedItemIds: nextItems,
         carveChars: nextCarveChars,
         undoStack: nextUndoStack,
-        carveDispositions: nextDispositions,
       };
     });
   },
 
-  // -- closed-keyboard card + carve dispositions (076 FR-022) -------------------
+  // -- keyboard-wide fallback policy (076 FR-019) ------------------------------
 
-  setClosedKeyboardCard: (decision) => set({ closedKeyboardCard: decision }),
-
-  prefillCarveDispositions: (
-    comboIds,
-    { sparseLatinOverlay, deadkeyComboIds },
-  ) => {
-    if (comboIds.length === 0) return;
-    const { closedKeyboardCard, carveDispositions } = get();
-    const existing = new Set(carveDispositions.map((d) => d.comboId));
-    // Never overwrite: recompile never re-prompts; only genuinely new combos
-    // take the current bulk default (076 FR-022).
-    const fresh = comboIds.filter((id) => !existing.has(id));
-    if (fresh.length === 0) return;
-    const { disposition, provenance } = bulkDispositionDefault(
-      closedKeyboardCard,
-      sparseLatinOverlay,
-    );
-    set({
-      carveDispositions: [
-        ...carveDispositions,
-        ...fresh.map((comboId): CarveDisposition => {
-          // Deadkey carves never fall through (ruling A1–A3): force `block`
-          // regardless of the bulk default, with honest provenance.
-          if (deadkeyComboIds?.has(comboId)) {
-            return {
-              comboId,
-              disposition: "block",
-              provenance: "deadkey-requirement",
-            };
-          }
-          return { comboId, disposition, provenance };
-        }),
-      ],
-    });
-  },
-
-  setCarveDisposition: (comboId, disposition) => {
-    const record: CarveDisposition = {
-      comboId,
-      disposition,
-      provenance: "author-override",
-    };
-    set((s) => {
-      const idx = s.carveDispositions.findIndex((d) => d.comboId === comboId);
-      if (idx === -1)
-        return { carveDispositions: [...s.carveDispositions, record] };
-      return {
-        carveDispositions: s.carveDispositions.map((d, i) =>
-          i === idx ? record : d,
-        ),
-      };
-    });
-  },
-
-  pruneCarveDispositions: (liveComboIds) => {
-    const live =
-      liveComboIds instanceof Set ? liveComboIds : new Set(liveComboIds);
-    set((s) => {
-      const pruned = s.carveDispositions.filter((d) => live.has(d.comboId));
-      // Avoid a state write (and subscriber churn) when nothing is stale.
-      if (pruned.length === s.carveDispositions.length) return s;
-      return { carveDispositions: pruned };
-    });
-  },
+  setFallbackPolicy: (policy) => set({ fallbackPolicy: policy }),
 
   // 076 FR-023 (T020): wholesale replace; NFC-normalize so the engine seam
   // comparison stays exact.
   setCarveTouchKeepInert: (chars) =>
     set({ carveTouchKeepInert: chars.map((c) => c.normalize("NFC")) }),
-
-  getCarveDispositions: (comboIds) => {
-    const { carveDispositions } = get();
-    const wanted = comboIds === undefined ? undefined : new Set(comboIds);
-    const list =
-      wanted === undefined
-        ? carveDispositions
-        : carveDispositions.filter((d) => wanted.has(d.comboId));
-    // Copies: callers (the compiler) must not mutate store state.
-    return list.map((d) => ({ ...d }));
-  },
 
   // -- surveyResultsStore actions --------------------------------------------
 

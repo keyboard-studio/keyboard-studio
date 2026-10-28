@@ -75,7 +75,7 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import type { CarveDisposition } from "@keyboard-studio/contracts";
+import type { FallbackPolicy } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
@@ -171,13 +171,19 @@ export interface ProjectWorkingCopyVfsInput {
   deletedItemIds?: ReadonlySet<string>;
   /**
   /**
-   * Carve dispositions (T015, FR-019) for the suppression stage. The caller
-   * (useWorkingCopyTransform) reads them from the working-copy store's
-   * `getCarveDispositions`. They are scoped to the live carve set here, so a
-   * stale disposition can never rewrite an uncarved rule. Empty/omitted
-   * degrades to the legacy carve behavior, content-identical.
+   * Keyboard-wide fallback policy (T015, FR-019) for the suppression stage.
+   * The caller (useWorkingCopyTransform) reads it from the working-copy
+   * store. The engine expands it over the live carve set, so it can never
+   * rewrite an uncarved rule. Omitted degrades to the legacy carve behavior,
+   * content-identical.
    */
-  carveDispositions?: CarveDisposition[];
+  fallbackPolicy?: FallbackPolicy;
+  /**
+   * Ids inside `deletedItemIds` that are plain removals rather than carves
+   * (disabled-family rules). They are removed outright, never rewritten into
+   * suppression rules by the fallback policy.
+   */
+  suppressionExemptIds?: ReadonlySet<string>;
   /**
    * A6 loud/soft for the suppression stage (FR-009). Default false (soft).
    * Follows the A6 survey answer when it exists.
@@ -386,7 +392,8 @@ export function projectWorkingCopyVfs(
     deletedItemIds = new Set<string>(),
     carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
-    carveDispositions = [],
+    fallbackPolicy,
+    suppressionExemptIds,
     carveLoud = false,
     carveTouchKeepInert,
     keyEditOps = [],
@@ -454,19 +461,10 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // T015 — scope dispositions to the live carve set. The store persists
-  // dispositions per combination; prune-on-uncarve (T010) keeps them fresh,
-  // but this scope is the backstop: a stale disposition must never rewrite
-  // an uncarved rule. Scoped to the #1809 §1 union (effectiveItemIds), the
-  // same id set the slot partition above consumed.
-  const carveIdSet = new Set([...deletedNodeIds, ...effectiveItemIds]);
-  const activeDispositions = carveDispositions.filter((d) =>
-    carveIdSet.has(d.comboId),
-  );
   // 1a/1b: Whole-node deletions + store-slot removals + VFS re-emit.
   //
   // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
-  // in the engine). When dispositions are present, the pipeline derives the
+  // in the engine). When a fallback policy is present, the pipeline derives the
   // carved IR from the PRE-carve startIr — the T013 constraint: guard selector
   // chars are read from the pre-removal stores and are unrecoverable after
   // slot removal. Since spec 089 T021 the pipeline runs through the mutate
@@ -540,7 +538,8 @@ export function projectWorkingCopyVfs(
       effectiveItemIds,
       undefined,
       {
-        dispositions: activeDispositions,
+        ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
+        ...(suppressionExemptIds !== undefined ? { suppressionExemptIds } : {}),
         loud: carveLoud,
         // The pipeline's slot-removal warnings (blocked stores, skips) are
         // part of this projection's warning surface — the legacy path
@@ -690,9 +689,52 @@ export function projectWorkingCopyVfs(
   // pass can respond to without that policy, so they are a no-op here today;
   // Phase 6's touchRuleSynthesis.ts is the seam that extends this switch
   // with `ensure` (mint) and `remove` (orphan cleanup) passes of its own.
-  const renameOps = keyEditOps.filter(
-    (op): op is RenameKeyOp => op.kind === "rename",
-  );
+  //
+  // One composition is NOT Phase 6 policy and does not wait for it: the
+  // spec-104 key-identity commit (severance transplant composed with the
+  // AssignPanel's synthesis by `mergeSeveranceWithSynthesis`). Its rules
+  // are already fully decided in the working IR, so they reach the artifact
+  // through the step-1.8 additions seam (stamped `rulesStepAdded`), and
+  // this pass must not re-decide them — see the severance exception at the
+  // `renameOps` filter below.
+  // Severance exception (spec 104): the key-identity commit re-keys the
+  // transplant's sibling layer occurrences with ordinary `rename` ops, but
+  // those renames are NOT pure renames — their rule half was decided by
+  // the severance composition in the working IR (the source key KEEPS its
+  // bindings; the target's clones and synthesized rules are composed, not
+  // copied), and that composition reaches this projection through the
+  // step-1.8 additions seam (the composed delta is stamped
+  // `rulesStepAdded` by `mergeSeveranceWithSynthesis`). Running the
+  // mechanical fix-up for such a rename would rewrite the source key's
+  // producing rule onto the target id — a guarded T_0301 minted from K_1
+  // typed K_1's "&" in the OSK preview and the download (walk 1). So a
+  // rename whose target id is already bound by a projected addition is
+  // skipped here, loudly: its layout half (step 1.7) still applies, and
+  // its rule half is the additions splice, never this rewrite. A rename
+  // whose target carries no composed rules (the RenameDialog case) is
+  // unaffected.
+  const additionBoundIds = new Set<string>();
+  if (additions !== undefined) {
+    for (const group of additions.groups) {
+      for (const rule of group.added) {
+        for (const el of rule.context) {
+          if (el.kind === "vkey") additionBoundIds.add(el.name.toUpperCase());
+        }
+      }
+    }
+  }
+  const renameOps = keyEditOps.filter((op): op is RenameKeyOp => {
+    if (op.kind !== "rename") return false;
+    if (additionBoundIds.has(op.toId.toUpperCase())) {
+      warnings.push(
+        `[project-working-copy] key edit rule projection: rename to "${op.toId}" ` +
+          `skipped — the working IR already carries composed rules for this id ` +
+          `(severance/synthesis); its rule half is projected via the rule additions.`,
+      );
+      return false;
+    }
+    return true;
+  });
   if (renameOps.length > 0) {
     const kmnPathForRename = `source/${keyboardId}.kmn`;
     const kmnTextForRename = readVfsText(vfs, kmnPathForRename);

@@ -9,6 +9,7 @@ export * from "./axes";
 export * from "./axisFill";
 export * from "./startKeyboard";
 export * from "./carveDisposition";
+export * from "./fallbackPolicy";
 export * from "./compileResult";
 export * from "./confirmedAlphabet";
 export * from "./copyright";

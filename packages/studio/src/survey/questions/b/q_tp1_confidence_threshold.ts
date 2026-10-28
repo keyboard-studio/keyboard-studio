@@ -8,7 +8,8 @@
 // default (80%) IS its no-evidence form — a workflow that never opens the trust
 // step runs on exactly that (FR-004).
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "q_tp1_confidence_threshold",
@@ -28,18 +29,8 @@ export const definition = {
   next: null,
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["0.6", "0.8", "0.95"]);
 
-export function validate(value: string | string[] | undefined): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return { ok: false, code: "required", message: "Please choose a confidence threshold." };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a valid threshold.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose a confidence threshold.", (v) => `"${v}" is not a valid threshold.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

@@ -1,0 +1,132 @@
+{
+  "case": {
+    "id": "p1-unwrap-ewondo-kbdfr",
+    "profile": 1,
+    "backspace": "unwrap",
+    "backspaceOnDiagonal": true,
+    "inputOrder": "postfix",
+    "outputForm": "base-plus-mark",
+    "lang": "ewondo",
+    "base": "basic_kbdfr",
+    "english": "Ewondo",
+    "autonym": "Ewondo",
+    "code": "ewo",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "round": 2,
+  "build": "ed251e1b (origin/main, PR #2312 merged)",
+  "startedAt": "2026-10-20T06:58:04.655Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        },
+        {
+          "name": "pick-base",
+          "ok": true,
+          "via": "card"
+        },
+        {
+          "name": "track-copy",
+          "ok": true
+        },
+        {
+          "name": "attribution",
+          "ok": true
+        },
+        {
+          "name": "project-name",
+          "ok": true
+        },
+        {
+          "name": "prefill",
+          "ok": true
+        },
+        {
+          "name": "charlist-continue",
+          "ok": true
+        },
+        {
+          "name": "alphabet-screen",
+          "ok": true
+        }
+      ],
+      "errors": [],
+      "prefillExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm the basics\n\nBased on your script and chosen keyboard, here is what we will assume. You can edit the language or script here, confirm to continue, or go back to change a choice.\n\nLanguage\nEwondoEdit\nScript\nLatnBCP47 script subtag (§5)Edit\nScripts included\nLatn\nScript class (A2)\nalphabeticderived from script\nRouting group (§9)\nqwerty-qwertzderived from script\nStarting keyboard\nFrench Basic (basic_kbdfr)your chosen starting keyboard\n\nSpare keys (A7), the full BCP47 tag, display name, and copyright are confirmed later from your starting keyboard and the documentation step.\n\nFrench Basic\nDesktop OSK\nMobile KB\n← Back\nConfirm and continue\nProject: Ewondo",
+      "exemplars": {
+        "present": true,
+        "checked": true
+      },
+      "discoveryCheckedId": "discovery_method-exemplars",
+      "alphabetHeading": "Confirm your alphabet",
+      "alphabetExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nConfirm your alphabet\n\nAdd your whole alphabet on this page — every character your language uses, not just the special ones. Type them in below, like this:\n\na b c d e ɛ ŋ ɔ …\n\nList your letters\n\nType the rest of your alphabet here (for example: a b c ŋ ɛ), then press Enter or + Add.\n\n+ Add\n\nYour alphabet (52)\n\nDashed characters were proposed for you (from CLDR 48.2.0). Remove any that are wrong.\n\nShow uppercase letters\na\nU+0061\nx\ná\nU+00E1\nx\nà\nU+00E0\nx\nâ\nU+00E2\nx\nǎ\nU+01CE\nx\nb\nU+0062\nx\nd\nU+0064\nx\ne\nU+0065\nx\né\nU+00E9\nx\nè\nU+00E8\nx\nê\nU+00EA\nx\ně\nU+011B\nx\nə\nU+0259\nx\nɛ\nU+025B\nx\nf\nU+0066\nx\ng\nU+0067\nx\nh\nU+0068\nx\ni\nU+0069\nx\ní\nU+00ED\nx\nì\nU+00EC\nx\nî\nU+00EE\nx\nǐ\nU+01D0\nx\nk\nU+006B\nx\nl\nU+006C\nx\nm\nU+006D\nx\nn\nU+006E\nx\nń\nU+0144\nx\nǹ\nU+01F9\nx\nŋ\nU+014B\nx\no\nU+006F\nx\nó\nU+00F3\nx\nò\nU+00F2\nx\nô\nU+00F4\nx\nǒ\nU+01D2\nx\nɔ\nU+0254\nx\np\nU+0070\nx\nr\nU+0072\nx\ns\nU+0073\nx\nt\nU+0074\nx\nu\nU+0075\nx\nú\nU+00FA\nx\nù\nU+00F9\nx\nû\nU+00FB\nx\nǔ\nU+01D4\nx\nv\nU+0076\nx\nw\nU+0077\nx\ny\nU+0079\nx\nz\nU+007A\nx\n◌̀\nU+0300\nx\n◌́\nU+0301\nx\n◌̂\nU+0302\nx\n◌̌\nU+030C\nx\nLoanword letters (4)\nAdd all loanword letters\n\nYour language's sources list these letters for borrowed words. They are not in your alphabet yet. Add any that your keyboard should type.\n\nc C\nU+0063\n+\nj J\nU+006A\n+\nq Q\nU+0071\n+\nx X\nU+0078\n+\nLet us find them in a sample\n\nPaste a paragraph of your language, or upload a plain-text (.txt) file — every distinct character in it will be proposed, alongside anything already in your alphabet.\n\nPreview these characters\nor upload a .txt file\nNewer exemplar data\n\nThe characters proposed here come from built-in CLDR data. A newer CLDR release may cover your language better — check online to compare. Checked data is used for this session only, and nothing is added to your alphabet without your confirmation.\n\nCheck for newer exemplar data for this language\nHow your alphabet breaks down\n\nLetters (26)\n\nLetters that stand on their own.\n\nShow uppercase letters\na\nU+0061\nb\nU+0062\nd\nU+0064\ne\nU+0065\nə\nU+0259\nɛ\nU+025B\nf\nU+0066\ng\nU+0067\nh\nU+0068\ni\nU+0069\nk\nU+006B\nl\nU+006C\nm\nU+006D\nn\nU+006E\nŋ\nU+014B\no\nU+006F\nɔ\nU+0254\np\nU+0070\nr\nU+0072\ns\nU+0073\nt\nU+0074\nu\nU+0075\nv\nU+0076\nw\nU+0077\ny\nU+0079\nz\nU+007A\n\nMarks (4)\n\nAccents and other marks that attach to a letter.\n\n◌̀\nU+0300\n◌́\nU+0301\n◌̂\nU+0302\n◌̌\nU+030C\n\nAccented letters (44)\n\nLetter-plus-mark combinations your language uses.\n\ná\nU+00E1\nÁ\nU+00C1\nà\nU+00E0\nÀ\nU+00C0\nâ\nU+00E2\nÂ\nU+00C2\nǎ\nU+01CE\nǍ\nU+01CD\né\nU+00E9\nÉ\nU+00C9\nè\nU+00E8\nÈ\nU+00C8\nê\nU+00EA\nÊ\nU+00CA\ně\nU+011B\nĚ\nU+011A\ní\nU+00ED\nÍ\nU+00CD\nì\nU+00EC\nÌ\nU+00CC\nî\nU+00EE\nÎ\nU+00CE\nǐ\nU+01D0\nǏ\nU+01CF\nń\nU+0144\nŃ\nU+0143\nǹ\nU+01F9\nǸ\nU+01F8\nó\nU+00F3\nÓ\nU+00D3\nò\nU+00F2\nÒ\nU+00D2\nô\nU+00F4\nÔ\nU+00D4\nǒ\nU+01D2\nǑ\nU+01D1\nú\nU+00FA\nÚ\nU+00DA\nù\nU+00F9\nÙ\nU+00D9\nû\nU+00FB\nÛ\nU+00DB\nǔ\nU+01D4\nǓ\nU+01D3\nCharacter map\n\nBrowse and click to toggle characters into your alphabet — the same list you're building on the left.\n\nCharacters with a dashed outline are on your starting keyboard. They are not in your alphabet until you add them.\n\nAdd any character by code point\nAdd\nSearch filters\n▾\n−\n100%\n+\nLoading the character map…\nBack\nContinue (100 characters)\nProject: Ewondo",
+      "charlistDoneEnabled": true
+    },
+    "2": {
+      "phase": 2,
+      "stations": [
+        {
+          "station": "attachment",
+          "text": "Which letters take each mark?\n\n◌́ (U+0301)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\ná\nb́\nd́\nź\né\nə́\nɛ́\nf́\nǵ\nh́\ní\nḱ\nṕ\nĺ\nḿ\nń\nŋ́\nó\nɔ́\nŕ\nś\nt́\nú\nv́\nẃ\ný\n\n◌̀ (U+0300)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nà\nb̀\nd̀\nz̀\nè\nə̀\nɛ̀\nf̀\ng̀\nh̀\nì\nk̀\np̀\nl̀\nm̀\nǹ\nŋ̀\nò\nɔ̀\nr̀\ns̀\nt̀\nù\nv̀\nẁ\nỳ\n\n◌̂ (U+0302)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nâ\nb̂\nd̂\nẑ\nê\nə̂\nɛ̂\nf̂\nĝ\nĥ\nî\nk̂\np̂\nl̂\nm̂\nn̂\nsuggested\nŋ̂\nô\nɔ̂\nr̂\nŝ\nt̂\nû\nv̂\nŵ\nŷ\n\n◌̌ (U+030C)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nǎ\nb̌\nď\nž\ně\nə̌\nɛ̌\nf̌\nǧ\nȟ\nǐ\nǩ\np̌\nľ\nm̌\nň\nsuggested\nŋ̌\nǒ\nɔ̌\nř\nš\nť\nǔ\nv̌\nw̌\ny̌\n\nCapital letters follow automatically — 26 capital/lowercase pairs in your alphabet carry the same marks."
+        }
+      ],
+      "errors": [],
+      "alphabetDone": true,
+      "textSample": {
+        "present": false
+      },
+      "sawMarks": true,
+      "punctuation": "not-rendered",
+      "invisibles": "not-rendered",
+      "convenience": "skipped-or-not-rendered",
+      "carveReached": false,
+      "deadkeys": "not-rendered",
+      "rules": "not-rendered",
+      "endBodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n35 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nAccents & marks\n\nYour alphabet includes 4 marks. Confirm how they attach to your letters before placing keys.\n\nWhich letters take each mark?\n\n◌́ (U+0301)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\ná\nb́\nd́\nź\né\nə́\nɛ́\nf́\nǵ\nh́\ní\nḱ\nṕ\nĺ\nḿ\nń\nŋ́\nó\nɔ́\nŕ\nś\nt́\nú\nv́\nẃ\ný\n\n◌̀ (U+0300)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nà\nb̀\nd̀\nz̀\nè\nə̀\nɛ̀\nf̀\ng̀\nh̀\nì\nk̀\np̀\nl̀\nm̀\nǹ\nŋ̀\nò\nɔ̀\nr̀\ns̀\nt̀\nù\nv̀\nẁ\nỳ\n\n◌̂ (U+0302)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nâ\nb̂\nd̂\nẑ\nê\nə̂\nɛ̂\nf̂\nĝ\nĥ\nî\nk̂\np̂\nl̂\nm̂\nn̂\nsuggested\nŋ̂\nô\nɔ̂\nr̂\nŝ\nt̂\nû\nv̂\nŵ\nŷ\n\n◌̌ (U+030C)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nǎ\nb̌\nď\nž\ně\nə̌\nɛ̌\nf̌\nǧ\nȟ\nǐ\nǩ\np̌\nľ\nm̌\nň\nsuggested\nŋ̌\nǒ\nɔ̌\nř\nš\nť\nǔ\nv̌\nw̌\ny̌\n\nCapital letters follow automatically — 26 capital/lowercase pairs in your alphabet carry the same marks.\n\nFrench Basic\nDesktop OSK\nMobile KB\nBack\nContinue\nProjec"
+    },
+    "3": {
+      "phase": 3,
+      "chars": [
+        {
+          "char": null,
+          "suggestion": null
+        }
+      ],
+      "errors": [
+        "no apply button at guard 0"
+      ],
+      "overwrite": null,
+      "emptyDiff": false,
+      "completed": false,
+      "overwriteAttempted": false,
+      "endText": "Skip to step navigation\nKeyboard Studio\nKeyboard\nEwondo\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\n35 characters still need review – resume in the Mechanism Gallery\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncompleted\nC\nCharacters\ncurrent step\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nAccents & marks\n\nYour alphabet includes 4 marks. Confirm how they attach to your letters before placing keys.\n\nWhich letters take each mark?\n\n◌́ (U+0301)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\ná\nb́\nd́\nź\né\nə́\nɛ́\nf́\nǵ\nh́\ní\nḱ\nṕ\nĺ\nḿ\nń\nŋ́\nó\nɔ́\nŕ\nś\nt́\nú\nv́\nẃ\ný\n\n◌̀ (U+0300)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nà\nb̀\nd̀\nz̀\nè\nə̀\nɛ̀\nf̀\ng̀\nh̀\nì\nk̀\np̀\nl̀\nm̀\nǹ\nŋ̀\nò\nɔ̀\nr̀\ns̀\nt̀\nù\nv̀\nẁ\nỳ\n\n◌̂ (U+0302)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nâ\nb̂\nd̂\nẑ\nê\nə̂\nɛ̂\nf̂\nĝ\nĥ\nî\nk̂\np̂\nl̂\nm̂\nn̂\nsuggested\nŋ̂\nô\nɔ̂\nr̂\nŝ\nt̂\nû\nv̂\nŵ\nŷ\n\n◌̌ (U+030C)\n\nTick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.\n\nǎ\nb̌\nď\nž\ně\nə̌\nɛ̌\nf̌\nǧ\nȟ\nǐ\nǩ\np̌\nľ\nm̌\nň\nsuggested\nŋ̌\nǒ\nɔ̌\nř\nš\nť\nǔ\nv̌\nw̌\ny̌\n\nCapital letters follow automatically — 26 capital/lowercase pairs in your alphabet carry the same marks.\n\nFrench Basic\nDesktop OSK\nMobile KB\nBack\nContinue\nProjec",
+      "reachedTouchSeed": false
+    }
+  },
+  "finishedAt": "2026-10-20T07:04:19.429Z"
+}

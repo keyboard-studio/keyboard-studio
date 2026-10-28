@@ -986,31 +986,39 @@ describe('CarveGalleryV2 — narrow details card (mobile, Phase 3)', () => {
 
 // ---------------------------------------------------------------------------
 // The Allow/Block disposition UI and the layout_family band were removed from
-// the gallery (archived in docs/archive/carve-disposition-ui). The data layer
-// stays: pre-fill still writes the bulk-default dispositions engine carve
-// suppression reads.
+// the gallery. What an undefined key does is the keyboard-wide fallback
+// policy (Assign Mechanisms step); the gallery only offers a plain review.
 // ---------------------------------------------------------------------------
 
-describe('CarveGalleryV2 — disposition UI removed, pre-fill retained', () => {
-  it('renders no Allow/Block control, review button, or layout_family band', async () => {
+describe('CarveGalleryV2 — no fallback controls; plain carve review', () => {
+  it('renders no Allow/Block control, fallback policy, or layout_family band', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set());
     recommendedRemovalCharsMock.mockReturnValueOnce([makeRow('a', ['r-a'])]);
     renderGalleryV2(makeFixtureIR());
     await screen.findByTestId('carve-v2-suggested-group');
     expect(screen.queryByTestId('carve-disposition-control')).toBeNull();
-    expect(screen.queryByTestId('carve-review-removed-keys')).toBeNull();
+    expect(screen.queryByTestId('fallback-policy-section')).toBeNull();
+    expect(screen.queryByRole('radio', { name: /Do nothing/ })).toBeNull();
     expect(screen.queryByTestId('layout-family-question')).toBeNull();
   });
 
-  it('still pre-fills a bulk-default disposition for each recommended row', async () => {
+  it('does not write any per-combo fallback state when rows are recommended', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set());
     recommendedRemovalCharsMock.mockReturnValueOnce([makeRow('a', ['r-a'])]);
     renderGalleryV2(makeFixtureIR());
     await screen.findByTestId('carve-v2-suggested-group');
-    const disp = useWorkingCopyStore.getState().getCarveDispositions(['r-a'])[0];
-    expect(disp).toBeDefined();
-    expect(disp!.provenance).toBe('bulk-default');
+    expect(Object.keys(useWorkingCopyStore.getState())).not.toContain('carveDispositions');
+    expect(useWorkingCopyStore.getState().fallbackPolicy).toBe('swallow');
+  });
+
+  it('offers a Review carved keys button that opens a disposition-free list', async () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+    fireEvent.click(await screen.findByTestId('review-carved-keys-button'));
+    const dialog = await screen.findByTestId('review-carved-keys-dialog');
+    expect(within(dialog).getByText('Review carved keys', { selector: 'h2' })).not.toBeNull();
+    expect(within(dialog).queryByText(/Allow|Block/)).toBeNull();
   });
 });

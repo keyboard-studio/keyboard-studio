@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveKpsFontPath } from "./fetchKeyboardSourceToVfs.js";
+import { kpsAssetVfsPath, resolveKpsFontPath } from "./fetchKeyboardSourceToVfs.js";
 
 describe("resolveKpsFontPath", () => {
   const KB_PATH = "release/sil/sil_cameroon_azerty";
@@ -59,5 +59,33 @@ describe("resolveKpsFontPath", () => {
         "release/a/akan/source/fonts/font.ttf",
       );
     });
+  });
+});
+
+describe("kpsAssetVfsPath", () => {
+  const KB_PATH = "release/sil/sil_cameroon_qwerty";
+
+  it("maps a keyboard-local asset to the plain source/ address (#2307)", () => {
+    expect(kpsAssetVfsPath("release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.css", KB_PATH)).toBe(
+      "source/sil_cameroon_qwerty.css",
+    );
+  });
+
+  it("keeps a nested keyboard-local asset's subpath under source/", () => {
+    expect(kpsAssetVfsPath("release/sil/sil_cameroon_qwerty/source/welcome/kb.css", KB_PATH)).toBe(
+      "source/welcome/kb.css",
+    );
+  });
+
+  it("keeps a shared/ asset release-relative, minus the release/ prefix", () => {
+    expect(kpsAssetVfsPath("release/shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf", KB_PATH)).toBe(
+      "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf",
+    );
+  });
+
+  it("does not remap an asset from a DIFFERENT keyboard's tree", () => {
+    expect(kpsAssetVfsPath("release/sil/other_keyboard/source/other.css", KB_PATH)).toBe(
+      "sil/other_keyboard/source/other.css",
+    );
   });
 });

@@ -1,7 +1,8 @@
 // Per-question module: pb_text_sample_review (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeBoolValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_text_sample_review",
@@ -22,19 +23,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (v !== "true" && v !== "false") {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please confirm whether to continue with this list.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeBoolValidator("Please confirm whether to continue with this list.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

@@ -66,6 +66,7 @@ import {
   proposeAttachments,
   nfcPostureOfInventory,
   resolveOutputFormProposal,
+  resolveBackspaceProposal,
   hasDecidablePairs,
   computeMarkTreatmentPrefills,
   buildPlacementWorklist,
@@ -86,7 +87,7 @@ import {
   type OutputForm,
   type PromotedComposedCharacter,
 } from "@keyboard-studio/engine";
-import type { MarkInputOrder } from "@keyboard-studio/contracts";
+import type { BackspaceBehaviour, MarkInputOrder } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import {
@@ -107,6 +108,7 @@ import {
   marksMarkTreatmentKey,
   marksStackKey as marksStackEvidenceKey,
   marksOutputFormKey,
+  marksBackspaceKey,
   marksInputOrderKey,
   marksPromotedKey,
   marksStackingAllowedKey,
@@ -125,6 +127,7 @@ import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
 import { GuardStation } from "./GuardStation.tsx";
 import {
+  DEFAULT_GUARD_BEHAVIOUR,
   GUARD_BEHAVIOUR_QUESTION_ID,
   detectImportedGuardBehaviour,
   findGuardReevaluationItems,
@@ -250,6 +253,7 @@ function seriesResult(
   computedAxes?: MarksComputedAxes,
   answers: SurveyAnswer[] = [],
   contextTolerance?: MarksContextToleranceDecision,
+  backspace?: BackspaceBehaviour,
 ): SurveyPhaseResult {
   return {
     phase: "C",
@@ -257,6 +261,7 @@ function seriesResult(
     ...(contextTolerance !== undefined ? { marksContextTolerance: contextTolerance } : {}),
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
+    ...(backspace !== undefined ? { marksBackspace: backspace } : {}),
     // spec 052 US4: the recorded treatment finally reaches strategy selection.
     // `computedAxes` is an existing additive optional field merged into
     // session.axes by mergePhaseResults — its OMISSION here was the defect, so
@@ -611,6 +616,40 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
+  // --- S4 backspace (#2302) ---
+  //
+  // Its own whole-keyboard answer at the same station, interrelated with
+  // the composition answer yet independent of it (Matthew's model,
+  // 2026-10-19). The SUGGESTION follows the chosen form — the consistent
+  // pairing (base-plus-mark ↔ peel, ready-made ↔ whole-stack) — and the
+  // author may override to the other behaviour; the engine generates the
+  // rules for the off-pairings at completion (pattern-apply/mark-guards).
+  // The evidence key carries the form, so changing the composition answer
+  // re-proposes the backspace answer against the new pairing (spec 079)
+  // rather than silently carrying the old confirmation across.
+  const backspaceProposal = useMemo(
+    () => resolveBackspaceProposal(outputForm),
+    [outputForm],
+  );
+  const backspaceKey = marksBackspaceKey(outputForm, postureId);
+  const backspaceView = reconcile(
+    savedAnswers["marks_output_form.backspace"],
+    backspaceKey,
+    backspaceProposal.behaviour,
+  );
+  const backspace = backspaceView.value as BackspaceBehaviour;
+
+  function handleBackspaceChange(next: BackspaceBehaviour): void {
+    saveAnswer(STEP_ID, "marks_output_form.backspace", {
+      value: next,
+      answerType: "select",
+      origin: next === backspaceProposal.behaviour ? "confirmed" : "overturned",
+      stage: "draft",
+      evidenceKey: backspaceKey,
+      screenId: "marks_output_form",
+    });
+  }
+
   // S5 — evidence: an attested >=2-mark stack, or two marks' reachable base
   // sets overlapping (FR-018). Confirmed list defaults to the attested stacks
   // (propose-then-confirm), never inferred from attachment rows (FR-019).
@@ -788,15 +827,16 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     [guardSeedBehaviour],
   );
   const [guardAnswer, setGuardAnswer] = useState<GuardSpecification | null>(null);
-  /** The behaviour the guard station displays / Continue requires: the author's pick, else the prior answer, else the seed. */
-  const guardChoice: GuardBehaviour | undefined =
-    guardAnswer?.behaviour ?? priorGuard?.behaviour ?? guardSeedBehaviour;
+  /** The behaviour the guard station displays: the author's pick, else the prior answer, else the seed, else the default. */
+  const guardChoice: GuardBehaviour =
+    guardAnswer?.behaviour ?? priorGuard?.behaviour ?? guardSeedBehaviour ?? DEFAULT_GUARD_BEHAVIOUR;
 
   /**
    * The specification a commit point records: the author's station answer
    * wins; a prior record is carried unchanged; a seed rides provisionally
    * until the commit point IS the guard station's own Continue, which
-   * confirms it as-is.
+   * confirms it as-is. With neither, the default is recorded only at the
+   * guard station's own Continue — the author saw it selected and passed.
    */
   function guardRecordForCommit(station: MarksStationId): GuardSpecification | null {
     if (guardAnswer !== null) return guardAnswer;
@@ -814,6 +854,14 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
             supersedesRecord: guardSeed,
           })
         : guardSeed;
+    }
+    if (station === "marks_guard") {
+      return makeGuardSpecification({
+        behaviour: DEFAULT_GUARD_BEHAVIOUR,
+        origin: "asked",
+        confirmed: true,
+        supersedesRecord: priorGuard ?? null,
+      });
     }
     return priorGuard ?? null;
   }
@@ -843,9 +891,12 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     if (hasDecidablePairs(posture)) stations.push("marks_output_form");
     if (stackingEvidence) stations.push("marks_stacking");
     if (showToleranceStation) stations.push("marks_context_tolerance");
-    stations.push("marks_guard");
+    // Only a mark with a key of its own can be tapped with no letter before
+    // it. Output form is not the test: a ready-made keyboard can still have
+    // mark keys (output composition is independent of placement).
+    if (hasOwnKeyMark) stations.push("marks_guard");
     return stations;
-  }, [proposals, needsTreatmentScreen, posture, stackingEvidence, showToleranceStation]);
+  }, [proposals, needsTreatmentScreen, posture, stackingEvidence, showToleranceStation, hasOwnKeyMark]);
 
   // spec 079 FR-004/FR-023: the author's position inside the series lives in
   // the answer store, not local state — leaving and returning (or an
@@ -881,10 +932,11 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         treatmentPrefills,
         multiMarkStacks,
         postureId,
+        outputForm,
         savedAnswers,
         lastRecorded,
       }),
-    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, savedAnswers, lastRecorded],
+    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, outputForm, savedAnswers, lastRecorded],
   );
   const flaggedWorkItems = useMemo(
     () =>
@@ -925,7 +977,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
             // spec 104 FR-013: the guard station completes only with an
             // answer on record — the author's pick, a prior answer, or the
             // Track 2 seed presented for confirmation.
-            disabled: nextGate.blocked || (currentStation === "marks_guard" && guardChoice === undefined),
+            disabled: nextGate.blocked,
             ...(nextGate.blocked ? { ariaDescribedBy: blockedHintId } : {}),
           },
         },
@@ -1019,6 +1071,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       case "marks_output_form":
         return [
           { questionId: "marks.marks_output_form.form", answerType: "select", value: outputForm },
+          { questionId: "marks.marks_output_form.backspace", answerType: "select", value: backspace },
         ];
       case "marks_stacking": {
         const confirmedKeys = multiMarkStacks
@@ -1033,10 +1086,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         // spec 104 FR-013: the answer rides the completion like every
         // other station's (R-04); the load-bearing record is the
         // GuardSpecification in the decision value (recordValue).
-        const behaviour = guardAnswer?.behaviour ?? priorGuard?.behaviour ?? guardSeedBehaviour;
-        return behaviour !== undefined
-          ? [{ questionId: GUARD_BEHAVIOUR_QUESTION_ID, answerType: "select", value: behaviour }]
-          : [];
+        return [{ questionId: GUARD_BEHAVIOUR_QUESTION_ID, answerType: "select", value: guardChoice }];
       }
       default:
         return [];
@@ -1105,8 +1155,13 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     const guard = guardRecordForCommit(activeStation);
     const guardReevaluation =
       guard !== null && workingIr !== null ? findGuardReevaluationItems(workingIr, guard) : [];
-    recordValue(answers, { worklist, outputForm, migrationNeeded, guardReevaluation }, effectiveTolerance, guard);
-    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision));
+    recordValue(
+      answers,
+      { worklist, outputForm, backspace, stacks: gate.alphabet.attestedStacks, migrationNeeded, guardReevaluation },
+      effectiveTolerance,
+      guard,
+    );
+    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision, backspace));
   }
 
   /**
@@ -1241,6 +1296,14 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           evidenceKey: outputFormKey,
           screenId: "marks_output_form",
         });
+        saveAnswer(STEP_ID, "marks_output_form.backspace", {
+          value: backspace,
+          answerType: "select",
+          origin: backspace === backspaceProposal.behaviour ? "confirmed" : "overturned",
+          stage: "confirmed",
+          evidenceKey: backspaceKey,
+          screenId: "marks_output_form",
+        });
         break;
       case "marks_stacking":
         saveAnswer(STEP_ID, "marks_stacking.allowed", {
@@ -1365,6 +1428,9 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           value={outputForm}
           onChange={handleOutputFormChange}
           inputOrder={inputOrder}
+          backspaceProposal={backspaceProposal}
+          backspace={backspace}
+          onBackspaceChange={handleBackspaceChange}
         />
       )}
 
@@ -1416,7 +1482,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
 
       {activeStation === "marks_guard" && (
         <GuardStation
-          {...(guardChoice !== undefined ? { value: guardChoice } : {})}
+          value={guardChoice}
           {...(priorGuard !== undefined ? { prior: priorGuard } : {})}
           {...(guardSeedBehaviour !== undefined ? { seededBehaviour: guardSeedBehaviour } : {})}
           onChange={handleGuardChange}

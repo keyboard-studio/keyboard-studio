@@ -581,14 +581,14 @@ export async function driveConvenienceStep(
  * a fixed-timeout absence read to mean "the S0 gate skipped this".
  */
 /**
- * Spec 104 FR-013: the marks series now ends at the guard station
- * ("A mark with no letter before it"), and its Continue is DISABLED until
- * the question is answered — a pick, a prior answer, or the Track 2 seed
- * presented for confirmation. A walk that simply clicks marks-continue
- * through the series stalls there forever.
+ * Spec 104 FR-013: the marks series ends at the guard station ("A mark
+ * with no letter before it") whenever some mark has a key of its own. The
+ * station opens on a selection — the author's pick, a prior answer, the
+ * Track 2 seed, or else the "swallow" default — so Continue is enabled.
  *
- * This helper answers ONLY the genuinely-unanswered case: when the station
- * is showing with neither option selected, it selects `behaviour`. A seed
+ * This helper answers ONLY the unselected case (kept as a safety net for
+ * older builds): when the station shows with neither option selected, it
+ * selects `behaviour`. A seed
  * or prior answer already selected is left exactly as it stands (on the
  * adapt track the seed is the imported keyboard's own behaviour, and
  * overriding it would change what the walk is adapting). The default,

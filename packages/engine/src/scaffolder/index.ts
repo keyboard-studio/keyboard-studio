@@ -48,6 +48,7 @@ import { welcomeHtm, readmeHtm, helpPhpStub } from "../shared/packageDocs.js";
 import { HISTORY_INITIAL_RELEASE_BULLET } from "../shared/renderHistoryMd.js";
 import {
   buildKpsContent,
+  kpsMemberRef,
   type PackageDescriptorIdentity,
 } from "../package-descriptor/index.js";
 import { dropUnbackedBitmapStore } from "../compiler/stripDanglingAssetStores.js";
@@ -490,10 +491,11 @@ export function generateStubs(
    */
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
   /**
-   * The base's packaged fonts, declared by the generated `.kps`:
-   * listed in `<Files>` and selected as the OSK/display font (criteria 8/10).
+   * The base's packaged fonts and carried stylesheet references, declared by
+   * the generated `.kps`.
    */
   packageFonts?: import("@keyboard-studio/contracts").PackageFontSet,
+  stylesheets: readonly string[] = [],
 ): void {
   const now = new Date();
   const yyyy = emitYear;
@@ -630,7 +632,11 @@ export function generateStubs(
         ? { authorEmail: attribution.authorEmail }
         : {}),
     };
-    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version, [], packageFonts), false);
+    vfs.set(
+      kpsPath,
+      buildKpsContent(keyboardId, identity, kmnText, version, [], packageFonts, stylesheets),
+      false,
+    );
   }
 }
 
@@ -762,6 +768,12 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       renameFilesInVfs(vfs, actualStartId, keyboardId);
       applyTouchLayoutCleanup(vfs, keyboardId);
+      const kpsStylesheets = loaderStylesheets
+        .filter((sheet) => !/^source\/(welcome|help)\//i.test(sheet.vfsPath))
+        .map((sheet) => {
+          const ref = kpsMemberRef(sheet.cssRelPath, base.path);
+          return ref === `${actualStartId}.css` ? `${keyboardId}.css` : ref;
+        });
       generateStubs(
         vfs,
         keyboardId,
@@ -772,6 +784,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         emitYear,
         inheritedHolders,
         packageFonts,
+        kpsStylesheets,
       );
 
       // The base's icon came across with the rest of source/ (loader) and was

@@ -409,7 +409,10 @@ export interface IRStore {
    * install). Set when the store is minted into the working IR; never by the
    * codec parser. The VFS projection splices marked stores absent from the
    * base IR into the projected artifact alongside the marked rules that
-   * reference them. Sibling of {@link IRRule.rulesStepAdded}.
+   * reference them. Sibling of {@link IRRule.rulesStepAdded} — including
+   * its one deliberate exception: a guard store minted by the spec-104
+   * key-identity commit composition carries this marker so the guard rule
+   * that references it projects with its store.
    */
   rulesStepAdded?: true;
 }
@@ -481,7 +484,14 @@ export interface IRRule {
    * artifact in working-IR order, so they take effect in the preview and
    * download. Rules minted by other flows (context-tolerance replay, touch
    * rule synthesis) deliberately do NOT carry this marker — they reach the
-   * artifact through their own projection paths.
+   * artifact through their own projection paths. One deliberate exception:
+   * the spec-104 key-identity commit composition
+   * (`mergeSeveranceWithSynthesis`) stamps the severance transplant's
+   * standing clones and the AssignPanel's synthesized rules with this
+   * marker — that composition has no overlay replay path of its own, so
+   * the additions seam is its only channel to the artifact, and the
+   * projection's rename fix-up skips any rename whose target the stamped
+   * additions already bind (no double projection).
    */
   rulesStepAdded?: true;
 }

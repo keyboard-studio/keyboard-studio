@@ -50,6 +50,7 @@
 // a second enumeration of the WorkingCopyData field list.
 
 import type {
+  FallbackPolicy,
   RemovalCapability,
   VirtualFS,
   VirtualFSEntry,
@@ -62,6 +63,7 @@ import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -135,7 +137,19 @@ export type WorkingCopySnapshot = Omit<
   | "keptGuardRuleIds"
   | "dismissedMissingGroups"
   | "narrowedGuardQuestions"
+  | "fallbackPolicy"
 > & {
+  /**
+   * Keyboard-wide fallback policy. Absent in drafts written before it
+   * existed; those carry the legacy `closedKeyboardCard` / `carveDispositions`
+   * below instead, and the read side folds them into a policy
+   * (`migrateFallbackPolicy`). Never written in the legacy shape.
+   */
+  fallbackPolicy?: FallbackPolicy;
+  /** LEGACY (read-only): the closed-keyboard card outcome of a pre-policy draft. */
+  closedKeyboardCard?: unknown;
+  /** LEGACY (read-only): the per-combination dispositions of a pre-policy draft. */
+  carveDispositions?: unknown;
   startVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
@@ -425,14 +439,12 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     keyIdentityDecisions: s.keyIdentityDecisions,
     keyTransplants: s.keyTransplants,
     guardSpecification: s.guardSpecification,
-    // Closed-keyboard card + carve dispositions (076 FR-005/FR-022): plain
-    // JSON-safe data, straight passthrough like axisFills
-    // above. The read side is the tolerant half: a snapshot written before
-    // these fields existed reads as "card unanswered, no decisions".
-    closedKeyboardCard: s.closedKeyboardCard,
-    carveDispositions: s.carveDispositions,
+    // Keyboard-wide fallback policy (076 FR-019): a plain JSON string. The
+    // read side is the tolerant half: a pre-policy snapshot carries the
+    // legacy card/dispositions fields instead and is migrated on read.
+    fallbackPolicy: s.fallbackPolicy,
     // 076 FR-023 T020 keep-inert overrides: plain JSON-safe string array,
-    // same passthrough + tolerant-read idiom as the dispositions above.
+    // same passthrough + tolerant-read idiom as axisFills above.
     carveTouchKeepInert: s.carveTouchKeepInert,
     // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
@@ -596,15 +608,19 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     axisFills: snapshot.axisFills,
     // Tolerate snapshots saved before these fields existed (spec 104): an
     // absent value reads as "no identity decisions recorded", never as a
-    // clobbering undefined — same idiom as carveDispositions above.
+    // clobbering undefined — same idiom as carveTouchKeepInert below.
     keyIdentityDecisions: snapshot.keyIdentityDecisions ?? [],
     keyTransplants: snapshot.keyTransplants ?? [],
     guardSpecification: snapshot.guardSpecification ?? null,
     // Tolerate snapshots saved before these fields existed (076 FR-022):
     // an absent value must not clobber the store defaults with undefined —
     // same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
-    closedKeyboardCard: snapshot.closedKeyboardCard ?? null,
-    carveDispositions: snapshot.carveDispositions ?? [],
+    // Fallback policy: a current snapshot carries it; a pre-policy snapshot
+    // (closed-keyboard card / per-combo dispositions) is folded into one
+    // policy and the legacy fields are dropped. Never throws; an absent or
+    // unrecognised shape reads as the default. The choice is recorded once
+    // here and never re-prompted.
+    fallbackPolicy: migrateFallbackPolicy(snapshot),
     carveTouchKeepInert: snapshot.carveTouchKeepInert ?? [],
     // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with

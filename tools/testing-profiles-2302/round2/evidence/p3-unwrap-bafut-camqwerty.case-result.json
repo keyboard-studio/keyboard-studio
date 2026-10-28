@@ -1,0 +1,56 @@
+{
+  "case": {
+    "id": "p3-unwrap-bafut-camqwerty",
+    "profile": 3,
+    "backspace": "unwrap",
+    "backspaceOnDiagonal": false,
+    "inputOrder": "postfix",
+    "outputForm": "ready-made",
+    "lang": "bafut",
+    "base": "sil_cameroon_qwerty",
+    "english": "Bafut",
+    "autonym": "Bafut",
+    "code": "bfd",
+    "overwriteChar": "ŋ",
+    "overwriteKey": "K_X",
+    "sampleText": "Àà Áá Ââ Èè Éé Êê Ìì Íí Îî Òò Óó Ôô Ùù Úú Ûû ə̀ ə́ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ à â ǎ è ê ě ì î ò ô ù û ə̀ ə̂ ɛ́ ɛ̂ ɔ́ ɔ̂ ŋ̂ ɨ̀"
+  },
+  "startedAt": "2026-10-19T23:38:02.470Z",
+  "phases": {
+    "1": {
+      "phase": 1,
+      "steps": [
+        {
+          "name": "il_language_english",
+          "ok": true
+        },
+        {
+          "name": "il_language_autonym",
+          "ok": true
+        },
+        {
+          "name": "il_language_code",
+          "ok": true
+        },
+        {
+          "name": "il_target_script",
+          "ok": true
+        },
+        {
+          "name": "layout-step",
+          "ok": true
+        },
+        {
+          "name": "base-picker",
+          "ok": true
+        }
+      ],
+      "errors": [
+        "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByTestId('base-confirm')\n    - locator resolved to <button disabled type=\"button\" data-testid=\"base-confirm\" class=\"ks-focus-ring ks-hit-target ks-press\">Preparing preview…</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n      - waiting 100ms\n    6 × waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n      - waiting 500ms\n    - waiting for element to be visible, enabled and stable\n"
+      ],
+      "failedAt": "base-picker",
+      "bodyExcerpt": "Skip to step navigation\nKeyboard Studio\nKeyboard\nNo keyboard yet\n▾\nStudio\nCompare\nOutput\nDecisions\nCriteria\nFlow Map\nFont for characters\nNoto Sans\n▾\nLanguage\nEnglish\n▾\nTheme\nNavy\nSign in\nReset\nA\nSurvey\ncompleted\nB\nStarting keyboard\ncurrent step\nC\nCharacters\nnot yet reached\nD\nDiscard\nnot yet reached\nE\nEnable\nnot yet reached\nF\nFinalize\nnot yet reached\nChoose a starting keyboard\n\nBased on your language and chosen script, here are the closest starting points. Search above or pick a suggestion below.\n\nSearch in:\nSuggested\nAll keyboards\nSEARCH KEYBOARDS\nImport readiness:\nEditable — small formatting differences after import\nWhat does import readiness mean?\n\nSuggested for you:\n\nCameroon AZERTY (sil_cameroon_azerty)\nAlready supports your language\nCameroon QWERTY (sil_cameroon_qwerty)\nAlready supports your language\nakan (akan)\nRelated: Akan, same script\nEuroLatin (SIL) (sil_euro_latin)\nRelated: Xhosa, same script\nBambara (bambara)\nMatches your script\nFrench Basic (basic_kbdfr)\nMatches your script\nGerman Basic (basic_kbdgr)\nMatches your script\nIPA (SIL) (sil_ipa)\nMatches your script\nNias (nias)\nMatches your script\nPiaroa (pid_piaroa)\nMatches your script\nUnited Kingdom Basic (basic_kbduk)\nMatches your script\nUnited States-International Basic (basic_kbdusx)\nMatches your script\nUS Basic (basic_kbdus)\nStart blank (US QWERTY)\nCameroon QWERTY\nDesktop OSK\nMobile KB\n← Back\nChoose this keyboard"
+    }
+  },
+  "finishedAt": "2026-10-19T23:41:26.096Z"
+}

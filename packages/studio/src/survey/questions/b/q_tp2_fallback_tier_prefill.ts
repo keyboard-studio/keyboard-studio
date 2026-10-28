@@ -9,7 +9,8 @@
 // of this dial (FR-006); this governs only whether the prefill is offered or
 // nulled to the ask form. Honest default: allow.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "q_tp2_fallback_tier_prefill",
@@ -28,18 +29,8 @@ export const definition = {
   next: null,
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["allow", "ask"]);
 
-export function validate(value: string | string[] | undefined): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return { ok: false, code: "required", message: "Please choose a fallback-tier policy." };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a valid choice.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose a fallback-tier policy.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

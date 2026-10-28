@@ -6,7 +6,12 @@ import type { AxisFill } from "./axisFill";
 import type { MarksContextToleranceDecision, SurveyPhaseResult } from "./surveyPhaseResult";
 import type { MechanismAssignment } from "./assignmentMap";
 import { mergeAssignments } from "./assignmentMap";
-import type { ConfirmedAlphabet, OutputForm, PlacementWorklist } from "./confirmedAlphabet";
+import type {
+  BackspaceBehaviour,
+  ConfirmedAlphabet,
+  OutputForm,
+  PlacementWorklist,
+} from "./confirmedAlphabet";
 import { deriveConfirmedInventory, makeConfirmedAlphabet } from "./confirmedAlphabet";
 
 /**
@@ -142,6 +147,13 @@ export interface SurveySession {
    */
   marksOutputForm?: OutputForm;
   /**
+   * The S4 backspace decision (issue #2302): last phase carrying one wins,
+   * mirroring `marksOutputForm`. **Additive optional** — absent until the
+   * marks series' output-form station has been confirmed (or for sessions
+   * recorded before the answer existed).
+   */
+  marksBackspace?: BackspaceBehaviour;
+  /**
    * Deduped union of all phases' `retainedConvenienceChars` — base-keyboard
    * characters kept for loanwords / email addresses / web addresses despite
    * not being in the orthography. Held ALONGSIDE `confirmedInventory`, never
@@ -259,6 +271,12 @@ export function mergePhaseResults(
     if (phase.marksOutputForm !== undefined) marksOutputForm = phase.marksOutputForm;
   }
 
+  // Backspace decision: same last-wins rule as marksOutputForm.
+  let marksBackspace: BackspaceBehaviour | undefined;
+  for (const phase of phaseResults) {
+    if (phase.marksBackspace !== undefined) marksBackspace = phase.marksBackspace;
+  }
+
   // Context-tolerance station decision: same last-wins rule as marksOutputForm.
   let marksContextTolerance: MarksContextToleranceDecision | undefined;
   for (const phase of phaseResults) {
@@ -292,6 +310,7 @@ export function mergePhaseResults(
     ...(alphabet !== undefined ? { alphabet } : {}),
     ...(marksWorklist !== undefined ? { marksWorklist } : {}),
     ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),
+    ...(marksBackspace !== undefined ? { marksBackspace } : {}),
     ...(convenienceAsked ? { retainedConvenienceChars } : {}),
     ...(marksContextTolerance !== undefined ? { marksContextTolerance } : {}),
   };

@@ -64,7 +64,7 @@ function behaviourFor(
 /**
  * Consequence copy for one host row. Symmetric tradeoff (A2): what the key
  * does there, and what the author risks — never a verdict, never the
- * banned one-sided "allow unpredictable / block predictable" phrasing.
+ * banned one-sided slogan phrasing.
  */
 function consequenceFor(
   host: ReferenceBaseName,

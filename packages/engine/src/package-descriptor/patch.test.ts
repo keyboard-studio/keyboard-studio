@@ -455,3 +455,55 @@ describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () =
     expect(names).toContain("welcome\\a.png");
   });
 });
+
+describe("applyIdentityToKps — carried fonts on the generate path (#2308)", () => {
+  const FONT_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";
+  const FONTS = [{ ref: "../../../shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf", isOskFont: true }];
+
+  it("a generated descriptor lists the fonts and names the OSK font", () => {
+    const vfs = createVirtualFS();
+    const result = applyIdentityToKps(
+      vfs,
+      "ewondo",
+      { displayName: "Ewondo", languageTag: "ewo" },
+      KMN,
+      "1.0",
+      [],
+      "ewondo",
+      FONTS,
+      ["ewondo.css"],
+    );
+    expect(result.generated).toBe(true);
+    const kps = textAt(vfs, "source/ewondo.kps");
+    expect(kps).toContain(`<Name>${FONT_REF}</Name>`);
+    expect(kps).toContain(`<OSKFont>${FONT_REF}</OSKFont>`);
+    expect(kps).toContain("<Name>ewondo.css</Name>");
+  });
+
+  it("the patch path leaves an existing descriptor's font entries untouched (no double-listing)", () => {
+    const existing = buildKpsContent(
+      "ewondo",
+      { displayName: "Ewondo" },
+      KMN,
+      "1.0",
+      [],
+      FONTS,
+      ["ewondo.css"],
+    );
+    const vfs = vfsWith("source/ewondo.kps", existing);
+    applyIdentityToKps(
+      vfs,
+      "ewondo",
+      { displayName: "Ewondo", languageTag: "ewo" },
+      KMN,
+      "1.0",
+      [],
+      "ewondo",
+      FONTS,
+      ["ewondo.css"],
+    );
+    const kps = textAt(vfs, "source/ewondo.kps");
+    expect(kps.match(/AndikaAfr-R\.ttf<\/Name>/g)).toHaveLength(1);
+    expect(kps.match(/<OSKFont>/g)).toHaveLength(1);
+  });
+});

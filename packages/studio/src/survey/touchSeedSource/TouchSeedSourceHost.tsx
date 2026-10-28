@@ -9,26 +9,13 @@
 // wrapper hands the host the recorded decision and the step navigation
 // (via GalleryStepContext — the renderer publishes its own Back/Confirm).
 
-import { useMemo } from "react";
-import type { ComponentType } from "react";
-import type { EditorStepProps } from "../../steps/types.ts";
-import { GalleryHost } from "../../steps/galleryHost.tsx";
-import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { makeGalleryStepHost } from "../makeGalleryStepHost.tsx";
 import touchSeedSourceModule from "../questions/gallery/touchSeedSource.ts";
 
-const TouchSeedSourceHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
-  const record = useDecisionStore((s) => s.decisions["touch-seed-source"]);
-  const deps = useMemo(buildGalleryHostDeps, []);
-  return (
-    <GalleryHost
-      module={touchSeedSourceModule}
-      record={record}
-      stepId="touch_seed_source"
-      deps={deps}
-      stepContext={{ onComplete, ...(onBack !== undefined && { onBack }) }}
-    />
-  );
-};
+const TouchSeedSourceHost = makeGalleryStepHost(
+  touchSeedSourceModule,
+  "touch-seed-source",
+  "touch_seed_source",
+);
 
 export { TouchSeedSourceHost };

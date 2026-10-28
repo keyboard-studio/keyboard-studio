@@ -50,10 +50,13 @@ import {
   buildLanguageElement,
   buildLanguagesBlock,
   effectiveDisplayName,
+  isKpsFontEntries,
+  normaliseKpsFontEntries,
   normaliseWelcomeFolderFiles,
   packageFontKpsRef,
   welcomeFolderKpsRef,
   WELCOME_PAGE_KPS_REF,
+  type KpsFontDescriptorEntry,
   type PackageDescriptorIdentity,
 } from "./build.js";
 import { escapeHtml } from "../shared/escapeHtml.js";
@@ -121,7 +124,8 @@ export function applyIdentityToKps(
   version?: string,
   welcomeFolderFiles: readonly string[] = [],
   reportKeyboardId: string = keyboardId,
-  fonts?: PackageFontSet,
+  fonts?: PackageFontSet | readonly KpsFontDescriptorEntry[],
+  stylesheets: readonly string[] = [],
 ): ApplyIdentityToKpsResult {
   const path = `source/${keyboardId}.kps`;
   const reportPath = `source/${reportKeyboardId}.kps`;
@@ -142,7 +146,7 @@ export function applyIdentityToKps(
     try {
       vfs.set(
         path,
-        buildKpsContent(keyboardId, identity, kmnText, version, welcomeFolderFiles, fonts),
+        buildKpsContent(keyboardId, identity, kmnText, version, welcomeFolderFiles, fonts, stylesheets),
         false,
       );
     } catch (err: unknown) {
@@ -306,11 +310,15 @@ function migrateWelcomePaths(
  */
 function ensurePackageFonts(
   text: string,
-  fonts: PackageFontSet | undefined,
+  fonts: PackageFontSet | readonly KpsFontDescriptorEntry[] | undefined,
 ): { text: string; rewrites: string[]; unlisted: string[] } {
   const rewrites: string[] = [];
   if (fonts === undefined) return { text, rewrites, unlisted: [] };
-  const refs = fonts.files.map(packageFontKpsRef);
+  const descriptorFonts = isKpsFontEntries(fonts) ? normaliseKpsFontEntries(fonts) : undefined;
+  const packageFonts = isKpsFontEntries(fonts) ? undefined : fonts;
+  const refs = descriptorFonts !== undefined
+    ? descriptorFonts.map((font) => font.ref.replace(/\//g, "\\"))
+    : packageFonts?.files.map(packageFontKpsRef) ?? [];
   let out = text;
   let unlisted: string[] = [];
 
@@ -338,9 +346,37 @@ function ensurePackageFonts(
 
   if (KEYBOARD_ELEMENT_RE.test(out)) {
     out = out.replace(KEYBOARD_ELEMENT_RE, (_m, open: string, body: string, close: string) => {
+      if (descriptorFonts !== undefined) {
+        const osk = descriptorFonts.find((font) => font.isOskFont);
+        const lines: string[] = [];
+        if (osk !== undefined && !/<OSKFont\b/i.test(body)) {
+          lines.push(`<OSKFont>${escapeHtml(osk.ref.replace(/\//g, "\\"))}</OSKFont>`);
+        }
+        if (osk !== undefined && !/<DisplayFont\b/i.test(body)) {
+          lines.push(`<DisplayFont>${escapeHtml(osk.ref.replace(/\//g, "\\"))}</DisplayFont>`);
+        }
+        if (lines.length === 0) return `${open}${body}${close}`;
+        if (lines.some((line) => line.startsWith("<OSKFont>"))) {
+          rewrites.push(`added <OSKFont> ${osk!.ref.replace(/\//g, "\\")}`);
+        }
+        if (lines.some((line) => line.startsWith("<DisplayFont>"))) {
+          rewrites.push(`added <DisplayFont> ${osk!.ref.replace(/\//g, "\\")}`);
+        }
+        const indent = /\n([ \t]*)<Version\b/.exec(body)?.[1] ?? "      ";
+        const elements = lines.map((line) => `${indent}${line}\n`).join("");
+        const afterVersion = /<\/Version\s*>[^\S\n]*\n?/;
+        const patched = afterVersion.test(body)
+          ? body.replace(afterVersion, (m) => `${m.endsWith("\n") ? m : `${m}\n`}${elements}`)
+          : `${body.replace(/\s*$/, "\n")}${elements}    `;
+        return `${open}${patched}${close}`;
+      }
       const missing: PackageFontSet = { files: [] };
-      if (fonts.oskFont !== undefined && !/<OSKFont\b/i.test(body)) missing.oskFont = fonts.oskFont;
-      if (fonts.displayFont !== undefined && !/<DisplayFont\b/i.test(body)) missing.displayFont = fonts.displayFont;
+      if (packageFonts?.oskFont !== undefined && !/<OSKFont\b/i.test(body)) {
+        missing.oskFont = packageFonts.oskFont;
+      }
+      if (packageFonts?.displayFont !== undefined && !/<DisplayFont\b/i.test(body)) {
+        missing.displayFont = packageFonts.displayFont;
+      }
       if (missing.oskFont === undefined && missing.displayFont === undefined) return `${open}${body}${close}`;
       const indent = /\n([ \t]*)<Version\b/.exec(body)?.[1] ?? "      ";
       const lines = buildFontSelectionLines(missing, indent);

@@ -94,3 +94,58 @@ describe("keyMatchesRemovalSet — resolver mode (spec 104 T007)", () => {
     expect(keyMatchesRemovalSet(sub, buildRemovalSet(["̀"]), ctxFor(ir, "default"))).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Emulation-class keys (T021 arm3 drift): a context rule on a function key
+// is a text-rewriting trigger, not a typing method — only an unconditional
+// (bare-rule) production of an emulation key counts for removal. Fixtures
+// are the corpus shapes behind the five arm3 failures, minimised:
+//   galaxie/hakka/taigi — `context + [K_TAB]/[K_ENTER] > output`
+//   ibono/obolo_chwerty — `+ [ALT K_ENTER] > U+000A`
+//   sil_cameroon (PR #2319) — `context + [K_BKSP] > stripped-base`
+// ---------------------------------------------------------------------------
+
+describe("keyMatchesRemovalSet — emulation-class keys (spec 104, T021 arm3)", () => {
+  const kmn = [
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    '"x" + [K_TAB] > "y"',
+    '"é" + [K_BKSP] > "e"',
+    '"x" + [K_A] > "z"',
+    "+ [ALT K_ENTER] > U+000A",
+    "",
+  ].join("\n");
+  const emuIr = parse(kmn, "emulation-fixture").ir;
+  const emuCtx = (layerId: string): RemovalProductionContext => ctxFor(emuIr, layerId);
+
+  it("a context (conversion) rule on K_TAB does not make Tab a producer of its output", () => {
+    expect(
+      keyMatchesRemovalSet({ id: "K_TAB" }, buildRemovalSet(["y"]), emuCtx("default")),
+    ).toBe(false);
+  });
+
+  it("a context (correction) rule on K_BKSP does not make Backspace a producer of the stripped base (PR #2319)", () => {
+    expect(
+      keyMatchesRemovalSet({ id: "K_BKSP" }, buildRemovalSet(["e"]), emuCtx("default")),
+    ).toBe(false);
+  });
+
+  it("a bare rule on K_ENTER is its own production in that state (alt-layer newline)", () => {
+    expect(
+      keyMatchesRemovalSet({ id: "K_ENTER" }, buildRemovalSet(["\n"]), emuCtx("alt")),
+    ).toBe(true);
+    // The same key in a state the bare rule does not bind produces nothing.
+    expect(
+      keyMatchesRemovalSet({ id: "K_ENTER" }, buildRemovalSet(["\n"]), emuCtx("default")),
+    ).toBe(false);
+  });
+
+  it("a context-conditional production on a NON-emulation key still matches", () => {
+    // The emulation refinement must not narrow ordinary keys: K_A's
+    // context rule is a (conditional) method for typing "z".
+    expect(
+      keyMatchesRemovalSet({ id: "K_A" }, buildRemovalSet(["z"]), emuCtx("default")),
+    ).toBe(true);
+  });
+});

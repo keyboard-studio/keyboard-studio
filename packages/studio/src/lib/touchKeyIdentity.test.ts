@@ -18,7 +18,13 @@ import {
   findDeadTouchKeys,
   buildTouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
-import { ensureTouchKeyRule, parseKmn } from "@keyboard-studio/engine";
+import {
+  applyGuardSynthesis,
+  ensureTouchKeyRule,
+  parseKmn,
+  planGuardSynthesis,
+} from "@keyboard-studio/engine";
+import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import type { TouchKeyIdentityRecords } from "../stores/workingCopyStore.ts";
 import { EMPTY_TOUCH_KEY_IDENTITY } from "../stores/workingCopyStore.ts";
 import {
@@ -194,6 +200,81 @@ describe("deriveRepairRows", () => {
     );
     const rows = deriveRepairRows({ ir: irOf(kmn), layout: layoutOf(), records: null });
     expect(rows.map((r) => r.keyId)).toEqual(["T_0300"]);
+  });
+
+  /** layoutOf() with the convert-to-u repair applied: T_0031 → U_0031. */
+  function layoutAfterConvert(): TouchLayoutIR {
+    const layout = layoutOf();
+    for (const platform of layout.platforms) {
+      for (const layer of platform.layers) {
+        for (const row of layer.rows) {
+          for (const key of row.keys) {
+            if (key.id === "T_0031") key.id = "U_0031";
+          }
+        }
+      }
+    }
+    return layout;
+  }
+
+  function repairRecord(outcome: "applied" | "declined"): TouchKeyIdentityRecords {
+    return recordsWith({
+      repairProposals: [
+        {
+          recordId: "repair:tablet:default:T_0031:1",
+          keyRef: "tablet:default:T_0031",
+          defaultAction: "convert-to-u",
+          options: ["convert-to-u", "mint-and-rule", "blank"],
+          outcome,
+          recordedAt: 1760000000000,
+          supersedes: null,
+        },
+      ],
+    });
+  }
+
+  it("an applied repair's row stays visible-and-answered after the rename resolves the finding", () => {
+    // The rename removes T_0031 from findDeadTouchKeys; the row must be
+    // re-derived from the record so the recorded outcome still renders
+    // (FR-017's visible-and-answered contract).
+    const rows = deriveRepairRows({
+      ir: irOf(),
+      layout: layoutAfterConvert(),
+      records: repairRecord("applied"),
+    });
+    const answered = rows.find((r) => r.keyId === "T_0031");
+    expect(answered).toBeDefined();
+    expect(answered!.keyRef).toBe("tablet:default:T_0031");
+    expect(answered!.layerId).toBe("default");
+    expect(answered!.layerIds).toEqual(["default", "symbol"]);
+    expect(answered!.defaultAction).toBe("convert-to-u");
+    expect(repairOutcomeFor(repairRecord("applied"), answered!.keyRef)?.outcome).toBe("applied");
+  });
+
+  it("a declined repair keeps exactly one row — the live finding's, not a synthesized duplicate", () => {
+    const rows = deriveRepairRows({
+      ir: irOf(),
+      layout: layoutOf(),
+      records: repairRecord("declined"),
+    });
+    expect(rows.filter((r) => r.keyId === "T_0031")).toHaveLength(1);
+  });
+
+  it("an answered record for a key deleted from the layout derives no row", () => {
+    const layout = layoutAfterConvert();
+    for (const platform of layout.platforms) {
+      for (const layer of platform.layers) {
+        for (const row of layer.rows) {
+          row.keys = row.keys.filter((k) => k.id !== "U_0031");
+        }
+      }
+    }
+    const rows = deriveRepairRows({
+      ir: irOf(),
+      layout,
+      records: repairRecord("applied"),
+    });
+    expect(rows.map((r) => r.keyId)).not.toContain("T_0031");
   });
 });
 
@@ -587,6 +668,70 @@ group(main) using keys
     expect(target.get("")).toBeUndefined();
     // The shift clone stands.
     expect(target.get("SHIFT")).toEqual(["!"]);
+  });
+
+  it("stamps the composed delta (clones, guard pair, guard store) for the projection's additions seam", () => {
+    const ir = irOf(MERGE_KMN);
+    const plan = planInlineSeverance({
+      ir,
+      layout: mergeLayout(),
+      platformId: "tablet",
+      anchorLayerId: "default",
+      sourceId: "K_1",
+      targetId: "T_0301",
+      track: "copy",
+    });
+    expect(plan.speculative.record.outcome).toBe("completed");
+
+    // The panel's guard synthesis for the same edit (walk 1's shape).
+    const index = buildTouchKeyRuleIndex(ir);
+    const gplan = planGuardSynthesis(ir, index, "T_0301", [], "́", {
+      repertoire: [" ", "1", "."],
+      opaqueAcknowledged: true,
+    });
+    expect(gplan.ok).toBe(true);
+    if (!gplan.ok) return;
+    const applied = applyGuardSynthesis(ir, index, gplan, "T_0301", "́", {
+      opaqueAcknowledged: true,
+    });
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+
+    const merged = mergeSeveranceWithSynthesis({
+      plan: plan.speculative,
+      baseIr: ir,
+      nextIr: applied.ir,
+      anchorLayerId: "default",
+    });
+
+    const baseRuleIds = new Set(ir.groups.flatMap((g) => g.rules.map((r) => r.nodeId)));
+    const baseStoreIds = new Set(ir.stores.map((s) => s.nodeId));
+    // Every rule the composition added over the base carries the marker —
+    // the standing SHIFT clone and the synthesized guard + producing rules.
+    const addedRules = merged.groups.flatMap((g) =>
+      g.rules.filter((r) => !baseRuleIds.has(r.nodeId)),
+    );
+    expect(addedRules.length).toBeGreaterThan(0);
+    for (const r of addedRules) expect(r.rulesStepAdded).toBe(true);
+    // Base rules are never stamped.
+    for (const g of merged.groups) {
+      for (const r of g.rules) {
+        if (baseRuleIds.has(r.nodeId)) expect(r.rulesStepAdded).toBeUndefined();
+      }
+    }
+    // The minted guard store is stamped too, so it splices in beside its rule.
+    const addedStores = merged.stores.filter((s) => !baseStoreIds.has(s.nodeId));
+    expect(addedStores.length).toBe(1);
+    expect(addedStores[0]?.rulesStepAdded).toBe(true);
+
+    // And the seam actually collects the composition: guard + producing +
+    // the standing clone are all additions over the base.
+    const additions = deriveRuleAdditions(merged, ir);
+    const addedIds = new Set(additions.groups.flatMap((g) => g.added.map((r) => r.nodeId)));
+    for (const r of addedRules) expect(addedIds.has(r.nodeId)).toBe(true);
+    expect(additions.stores.map((s) => s.nodeId)).toEqual(
+      addedStores.map((s) => s.nodeId),
+    );
   });
 });
 

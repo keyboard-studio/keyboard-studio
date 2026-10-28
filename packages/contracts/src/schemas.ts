@@ -26,6 +26,7 @@ import type {
   CarveDispositionProvenance,
   CarveDispositionValue,
 } from "./carveDisposition";
+import type { FallbackPolicy } from "./fallbackPolicy";
 import type {
   TouchKeyProvenance,
   TouchKeyIR,
@@ -39,6 +40,7 @@ import type { AxisFill, AxisFillSource } from "./axisFill";
 import type {
   AttachmentState,
   AttestedStack,
+  BackspaceBehaviour,
   BlockedCombination,
   ConfirmedAlphabet,
   DeclaredRole,
@@ -127,6 +129,9 @@ export const CarveDispositionSchema = z.object({
   disposition: CarveDispositionValueSchema,
   provenance: CarveDispositionProvenanceSchema,
 });
+
+/** Keyboard-wide fallback policy (specs/076-rule-behaviours/fallback-surface-design.md). */
+export const FallbackPolicySchema = z.enum(["swallow", "pass-through"]);
 
 // ---------------------------------------------------------------------------
 // AxisFill (spec §7.2 script-class default-fill prior) — provenance primitive
@@ -641,6 +646,11 @@ export const PlacementWorklistSchema = z.object({
 // SurveyPhaseResult/SurveySession as `marksOutputForm`.
 export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
 
+// The S4 backspace decision (issue #2302; spec 071 amendment 2026-10-19):
+// its own axis alongside the output form. Carried on
+// SurveyPhaseResult/SurveySession as `marksBackspace`.
+export const BackspaceBehaviourSchema = z.enum(["peel", "whole-stack"]);
+
 // The context-tolerance station's decision (spec 078). Carried on
 // SurveyPhaseResult/SurveySession as `marksContextTolerance`.
 export const MarksContextToleranceDecisionSchema = z.object({
@@ -1012,6 +1022,12 @@ type _CarveDispositionValueGuard = Expect<
 type _CarveDispositionProvenanceGuard = Expect<
   AssignableTo<z.infer<typeof CarveDispositionProvenanceSchema>, CarveDispositionProvenance>
 >;
+type _FallbackPolicyGuard = Expect<
+  AssignableTo<z.infer<typeof FallbackPolicySchema>, FallbackPolicy>
+>;
+type _FallbackPolicyReverseGuard = Expect<
+  AssignableTo<FallbackPolicy, z.infer<typeof FallbackPolicySchema>>
+>;
 // AxisFill (spec §7.2). `axis`/`value` are validated loosely (see
 // AxisFillSchema doc) so the guard only pins `source`, which is where real
 // drift (a renamed/added fill-source literal) would occur.
@@ -1058,6 +1074,9 @@ type _PlacementWorklistGuard = Expect<
   AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
 >;
 type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
+type _BackspaceBehaviourGuard = Expect<
+  AssignableTo<z.infer<typeof BackspaceBehaviourSchema>, BackspaceBehaviour>
+>;
 type _MarksContextToleranceDecisionGuard = Expect<
   AssignableTo<z.infer<typeof MarksContextToleranceDecisionSchema>, MarksContextToleranceDecision>
 >;

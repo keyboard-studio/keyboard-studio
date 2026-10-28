@@ -19,10 +19,6 @@ const value: CarvedLayoutValue = {
     { kind: "family", id: "fam1", provenance: "asked" },
     { kind: "char", id: "é", provenance: "asked" },
   ],
-  dispositions: [
-    { comboId: "n1#0", disposition: "block", provenance: "author-override" },
-  ],
-  closedKeyboardCard: "declined",
 };
 
 describe("carveOverlayFromValue", () => {
@@ -32,8 +28,7 @@ describe("carveOverlayFromValue", () => {
     expect([...slice.deletedItemIds]).toEqual(["i1"]);
     expect([...slice.disabledFamilyIds]).toEqual(["fam1"]);
     expect([...slice.carveChars]).toEqual(["é"]);
-    expect(slice.carveDispositions).toEqual(value.dispositions);
-    expect(slice.closedKeyboardCard).toBe("declined");
+    expect(slice.legacyFallbackPolicy).toBeNull();
   });
 
   it("round-trips through the value builder (D-090-30 reconstructibility)", () => {
@@ -50,14 +45,14 @@ describe("carveOverlayFromValue", () => {
       deletedItemIds: new Set(),
       disabledFamilyIds: new Set(),
       carveChars: new Set(),
-      carveDispositions: [],
-      closedKeyboardCard: null,
+      legacyFallbackPolicy: null,
     });
     const partial = carveOverlayFromValue({
       removals: [{ kind: "node", id: "n9", provenance: "asked" }],
       closedKeyboardCard: "maybe" as never,
     });
     expect([...partial.deletedNodeIds]).toEqual(["n9"]);
-    expect(partial.closedKeyboardCard).toBeNull();
+    // An unrecognised legacy card reads as the default policy, never throws.
+    expect(partial.legacyFallbackPolicy).toBe("swallow");
   });
 });

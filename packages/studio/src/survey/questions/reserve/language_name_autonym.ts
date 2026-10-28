@@ -7,7 +7,8 @@
 // the Flow Map, not run live), so this module carries the same shape as its
 // live counterpart il_language_autonym for consistency.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 
 // `satisfies` preserves the literal type of next: "iso_code" rather than
 // widening it to string | null | FlowGotoRule[]. Do NOT change this to `: FlowQuestion`.
@@ -23,20 +24,7 @@ export const definition = {
   next: "iso_code",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const trimmed = typeof value === "string"
-    ? value.trim()
-    : Array.isArray(value)
-      ? value.join("").trim()
-      : "";
-
-  if (trimmed.length === 0) {
-    return { ok: false, code: "required", message: "Language name is required." };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Language name is required.");
 
 // mutate: STUB — KeyboardIR mutation surface is not yet a real contract.
 // export function mutate(value, ctx): Partial<KeyboardIR> { ... }

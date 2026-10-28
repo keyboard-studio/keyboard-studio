@@ -14,12 +14,9 @@
 // (pf_doc_language_other). A second language for a bilingual page is
 // pf_doc_language_second. The main language becomes the page's `<html lang>`.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeOptionalOptionValidator } from "../validators.ts";
 
-// "bilingual" is the pre-pf_doc_language_second answer (English + the
-// keyboard's language). It is no longer offered, but a draft saved with it
-// must still validate; helpDocsFromDecisions reads it as ["en", target].
-const OPTION_VALUES = new Set(["english", "target", "other", "bilingual"]);
 
 export const definition = {
   id: "pf_doc_language",
@@ -52,24 +49,10 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  // Blank is allowed — the question is optional. The check below still guards
-  // against a value outside the offered options.
-  if (v.length === 0) {
-    return { ok: true };
-  }
-  if (!OPTION_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: "Please choose one of the offered languages.",
-    };
-  }
-  return { ok: true };
-}
+// "bilingual" is the pre-pf_doc_language_second answer (English + the
+// keyboard's language). It is no longer offered, but a draft saved with it
+// must still validate; helpDocsFromDecisions reads it as ["en", target].
+export const validate = makeOptionalOptionValidator([...definition.options.map((o) => o.value), "bilingual"], "Please choose one of the offered languages.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

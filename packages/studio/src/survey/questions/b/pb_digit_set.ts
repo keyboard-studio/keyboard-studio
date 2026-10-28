@@ -1,7 +1,8 @@
 // Per-question module: pb_digit_set (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_digit_set",
@@ -31,28 +32,8 @@ export const definition = {
   next: "pb_char_count",
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["western", "native", "both"]);
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please choose which digits your language uses.",
-    };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: `"${v}" is not a valid choice.`,
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose which digits your language uses.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

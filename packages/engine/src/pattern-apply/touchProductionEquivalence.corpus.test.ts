@@ -25,6 +25,20 @@
  *     address builders. This is also the "vice versa" flip direction: a
  *     ruled T_ producer legacy matching could not see MUST be enumerable
  *     now — arm 3 fails if it is not.
+ *     The expected side is judged with the shared removal definition
+ *     (`occurrenceMatchesRemovalSet`, the same helper enumeration's
+ *     matcher delegates to): an emulation-class occurrence (K_TAB,
+ *     K_ENTER, …) counts only its UNCONDITIONAL productions. A context
+ *     rule on a function key is a text-rewriting trigger, not a typing
+ *     method (PR #2319's BKSP carve ruling, generalised in the helper):
+ *     hakka/taigi's `phonetic + [K_TAB] > conversion` dictionaries and
+ *     galaxie_hebrew's `letter + [K_ENTER] > final-form` rules credit
+ *     Tab/Enter with thousands of conditional outputs that enumeration
+ *     rightly does not list, while ibono/obolo's bare
+ *     `+ [ALT K_ENTER] > U+000A` IS an unconditional production and must
+ *     be enumerated. (The gate's original expected side skipped only
+ *     K_BKSP — it predated the #2319 matcher change and the keyboards
+ *     that expose the rest of the emulation class.)
  *
  *   Arm 4 — THE FLIP POPULATION, enumerated. An id in the dead-key
  *     candidate scope that the resolver reports dead while it carries
@@ -103,7 +117,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
-import { productionMatchesRemovalSet } from "./touch-mechanism-shared.js";
+import { occurrenceMatchesRemovalSet } from "./touch-mechanism-shared.js";
 import {
   touchFlickAddress,
   touchKeyAddress,
@@ -118,13 +132,20 @@ const available = existsSync(RELEASE_ROOT);
 const PINNED_DELTAS: Readonly<
   Record<string, { flips: readonly string[]; coverageUnreachableUnits: number }>
 > = {
-  // The basic_* template family: the same four rule-free T_ keys with
-  // keycap text on every template (research.md §2's P9 population).
-  basic_kbdfr: { flips: ["T_002C", "T_002E", "T_003A", "T_FCFA"], coverageUnreachableUnits: 0 },
-  basic_kbdgr: { flips: ["T_002C", "T_002E", "T_003A", "T_FCFA"], coverageUnreachableUnits: 0 },
-  basic_kbduk: { flips: ["T_002C", "T_002E", "T_003A", "T_FCFA"], coverageUnreachableUnits: 0 },
-  basic_kbdus: { flips: ["T_002C", "T_002E", "T_003A", "T_FCFA"], coverageUnreachableUnits: 0 },
-  basic_kbdusx: { flips: ["T_002C", "T_002E", "T_003A", "T_FCFA"], coverageUnreachableUnits: 0 },
+  // The basic_* template family: the same rule-free T_ keys with keycap
+  // text on every template (research.md §2's P9 population). This pin
+  // originally listed only four ids (T_002C/T_002E/T_003A/T_FCFA): the
+  // candidate scope's blanket `nextlayer` skip hid every id whose only
+  // occurrences carry the symbol layer's post-output layer return — the
+  // digits T_0030–T_0039 and T_0021/T_003B/T_003F — although the
+  // resolver reported those keys dead (`source: "none"`) all along and
+  // FR-009 names the whole family as the repair population. With the
+  // scope corrected (FR-006), the pin is the full seventeen.
+  basic_kbdfr: { flips: ["T_0021", "T_002C", "T_002E", "T_0030", "T_0031", "T_0032", "T_0033", "T_0034", "T_0035", "T_0036", "T_0037", "T_0038", "T_0039", "T_003A", "T_003B", "T_003F", "T_FCFA"], coverageUnreachableUnits: 0 },
+  basic_kbdgr: { flips: ["T_0021", "T_002C", "T_002E", "T_0030", "T_0031", "T_0032", "T_0033", "T_0034", "T_0035", "T_0036", "T_0037", "T_0038", "T_0039", "T_003A", "T_003B", "T_003F", "T_FCFA"], coverageUnreachableUnits: 0 },
+  basic_kbduk: { flips: ["T_0021", "T_002C", "T_002E", "T_0030", "T_0031", "T_0032", "T_0033", "T_0034", "T_0035", "T_0036", "T_0037", "T_0038", "T_0039", "T_003A", "T_003B", "T_003F", "T_FCFA"], coverageUnreachableUnits: 0 },
+  basic_kbdus: { flips: ["T_0021", "T_002C", "T_002E", "T_0030", "T_0031", "T_0032", "T_0033", "T_0034", "T_0035", "T_0036", "T_0037", "T_0038", "T_0039", "T_003A", "T_003B", "T_003F", "T_FCFA"], coverageUnreachableUnits: 0 },
+  basic_kbdusx: { flips: ["T_0021", "T_002C", "T_002E", "T_0030", "T_0031", "T_0032", "T_0033", "T_0034", "T_0035", "T_0036", "T_0037", "T_0038", "T_0039", "T_003A", "T_003B", "T_003F", "T_FCFA"], coverageUnreachableUnits: 0 },
   // akan: no nextlayer keys anywhere ⇒ tablet/shift unreachable ⇒ its
   // 47 shift-only productions are coverage-uncredited (class above).
   akan: { flips: [], coverageUnreachableUnits: 47 },
@@ -311,7 +332,11 @@ describe.skipIf(!available)("spec 104 T021 — corpus resolver⇔consumer equiva
         const candidateTexts = new Map<string, boolean>();
         walkTouchKeysDeep(layout, ({ layer, key }) => {
           if (!isCustomTouchKeyId(key.id)) return;
-          if (key.nextlayer !== undefined && key.nextlayer.length > 0) return;
+          // No `nextlayer` gate: the scope mirrors findDeadTouchKeys'
+          // candidate gates as they now stand (spec 104 FR-006 — a
+          // producing key's layer return is a property, not an
+          // exemption; the pre-fix scope here carried the same blanket
+          // skip and the two sides agreed on the wrong population).
           if (!isProducingKeyClass(key.sp)) return;
           if (isSpacerKeyClass(key.sp)) return;
           if (isFrameKeyLabel(key.text)) return;
@@ -380,7 +405,7 @@ describe.skipIf(!available)("spec 104 T021 — corpus resolver⇔consumer equiva
           const expected = new Set<string>();
           occurrences.forEach((o, i) => {
             if (o.key.id.toUpperCase() === "K_BKSP") return; // enumeration's defensive skip
-            if (productionMatchesRemovalSet(records[i]!, new Set([ch]))) expected.add(o.address);
+            if (occurrenceMatchesRemovalSet(o.key.id, records[i]!, new Set([ch]))) expected.add(o.address);
           });
           const actual = new Set(
             enumerateTouchMethodsForChar(layout, ch, { production: inputs }).map((d) => d.id),
