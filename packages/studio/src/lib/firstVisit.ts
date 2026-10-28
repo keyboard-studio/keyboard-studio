@@ -9,27 +9,19 @@
 // Writes are synchronous, so markVisited() called in a WelcomeScreen button
 // handler is durably persisted before connect() redirects to the provider.
 
-import { storageAvailable } from "./storageGuard.ts";
+import { loadSavedValue, saveSavedValue } from "./storageGuard.ts";
 
 /** localStorage key for the durable first-visit flag. */
 const VISITED_KEY = "ks.visited";
 
 /** True once the browser has entered the app at least once. */
 export function hasVisited(): boolean {
-  if (!storageAvailable()) return false;
-  try {
-    return localStorage.getItem(VISITED_KEY) === "1";
-  } catch {
-    return false;
-  }
+  return (
+    loadSavedValue(VISITED_KEY, (value: string): value is "1" => value === "1") !== null
+  );
 }
 
 /** Mark this browser as having visited — called when leaving the welcome screen. */
 export function markVisited(): void {
-  if (!storageAvailable()) return;
-  try {
-    localStorage.setItem(VISITED_KEY, "1");
-  } catch {
-    // Quota / private-mode — a re-shown welcome screen is a harmless fallback.
-  }
+  saveSavedValue(VISITED_KEY, "1");
 }
