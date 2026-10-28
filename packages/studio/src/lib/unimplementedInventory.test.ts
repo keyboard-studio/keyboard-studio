@@ -11,7 +11,11 @@ import {
   inventoryCoverageGate,
   formatUncoveredCharsList,
 } from "./unimplementedInventory.ts";
-import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import {
+  makeConfirmedAlphabet,
+  type MechanismAssignment,
+} from "@keyboard-studio/contracts";
+import { buildPlacementWorklist, makeMarkTreatmentAnswer } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -270,5 +274,121 @@ describe("formatUncoveredCharsList", () => {
     const chars = Array.from({ length: 34 }, (_, i) => `c${i}`);
     const result = formatUncoveredCharsList(chars);
     expect(result).toBe(`${chars.slice(0, 12).join(", ")}, +22 more`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// inventoryCoverageGate — composed-treatment mark credit (main-CI gallery
+// cluster, 2026-10-19). A lone mark whose marks-series treatment is
+// `composed` is not a placement unit in either gallery (issue #2293), so
+// no walk can ever produce it; from #2294 the gate demanded it anyway and
+// every composed-treatment session trapped at Output (verified live:
+// basic_kbdfr + é — lettersToAdd [U+0301], placement [e, é], gate blocked
+// with zero possible assignments; golden walk's FR-008 alert named
+// U+0301 + U+0327 identically). The gate credits the mark once every
+// attested combination of it is produced in the gated modality.
+// ---------------------------------------------------------------------------
+
+describe("inventoryCoverageGate — composed-treatment mark credit", () => {
+  const ACUTE = "́"; // U+0301
+  const frAlphabet = makeConfirmedAlphabet({
+    bases: ["e"],
+    marks: [ACUTE],
+    attestedStacks: [{ base: "e", marks: [ACUTE], source: "text" as const }],
+  });
+  const frWorklist = buildPlacementWorklist({
+    alphabet: frAlphabet,
+    classes: [{ id: "above-1", label: "Marks above the letter", marks: [ACUTE] }],
+    attachments: { [ACUTE]: { e: true } },
+    treatment: {
+      ...makeMarkTreatmentAnswer("postfix"),
+      classTreatment: { "above-1": "composed" },
+    },
+    prefills: [],
+  });
+
+  it("desktop: the mark alone in lettersToAdd no longer blocks once its composed form is in the produced set", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [],
+      lettersToAdd: [ACUTE],
+      touchLayoutJson: null,
+      confirmedInventory: ["e", "é", ACUTE],
+      desktopProducedSet: new Set(["e", "é"]),
+      alphabet: frAlphabet,
+      marksWorklist: frWorklist,
+    });
+    expect(gate.unimplementedDesktop).toEqual([]);
+    expect(gate.blocked).toBe(false);
+  });
+
+  it("desktop: still blocks while the composed form is unproduced (the credit is production, not a waiver)", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [],
+      lettersToAdd: [ACUTE],
+      touchLayoutJson: null,
+      confirmedInventory: ["e", "é", ACUTE],
+      desktopProducedSet: new Set(["e"]),
+      alphabet: frAlphabet,
+      marksWorklist: frWorklist,
+    });
+    expect(gate.unimplementedDesktop).toEqual([ACUTE]);
+    expect(gate.blockedOnDesktop).toBe(true);
+    expect(gate.blocked).toBe(true);
+  });
+
+  it("desktop: without the alphabet/worklist inputs the pre-credit behaviour stands (optional-additive)", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [],
+      lettersToAdd: [ACUTE],
+      touchLayoutJson: null,
+      confirmedInventory: ["e", "é", ACUTE],
+      desktopProducedSet: new Set(["e", "é"]),
+    });
+    expect(gate.unimplementedDesktop).toEqual([ACUTE]);
+    expect(gate.blocked).toBe(true);
+  });
+
+  it("touch: an authored layout covering the composed form credits the mark; a layout missing the form does not", () => {
+    const covered = inventoryCoverageGate({
+      desktopAssignments: [],
+      lettersToAdd: [],
+      touchLayoutJson: touchLayoutJsonWith(["e", "é"]),
+      confirmedInventory: ["e", "é", ACUTE],
+      desktopProducedSet: new Set(["e", "é"]),
+      alphabet: frAlphabet,
+      marksWorklist: frWorklist,
+    });
+    expect(covered.unimplementedTouch).toEqual([]);
+    expect(covered.blockedOnTouch).toBe(false);
+
+    const missing = inventoryCoverageGate({
+      desktopAssignments: [],
+      lettersToAdd: [],
+      touchLayoutJson: touchLayoutJsonWith(["e"]),
+      confirmedInventory: ["e", "é", ACUTE],
+      desktopProducedSet: new Set(["e"]),
+      alphabet: frAlphabet,
+      marksWorklist: frWorklist,
+    });
+    // Neither the layout nor the desktop seed produces é, so the mark's
+    // one attested combination is unproduced on touch: no credit, and
+    // both é and the mark itself stay unimplemented.
+    expect(missing.unimplementedTouch).toEqual(["é", ACUTE]);
+    expect(missing.blockedOnTouch).toBe(true);
+  });
+
+  it("touch: a corrupted layout stays fail-closed — the credit never applies", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [],
+      lettersToAdd: [],
+      touchLayoutJson: "{ not json",
+      confirmedInventory: ["e", "é", ACUTE],
+      desktopProducedSet: new Set(["e", "é"]),
+      alphabet: frAlphabet,
+      marksWorklist: frWorklist,
+    });
+    expect(gate.touchLayoutCorrupted).toBe(true);
+    expect(gate.blockedOnTouch).toBe(true);
+    expect(gate.unimplementedTouch).toEqual(["e", "é", ACUTE]);
   });
 });
