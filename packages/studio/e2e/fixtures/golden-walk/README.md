@@ -65,3 +65,18 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
 - Verify mode fails loudly on a missing baseline rather than passing
   vacuously — do not soften that, and do not commit a fabricated
   baseline.
+- **Re-capture: 2026-10-28 (America/Chicago), from main `4caeda5a`
+  (merge of PR #2355, dev promotion).** The 2026-10-20 baseline predated
+  #2304 ("copy track never ships the starting keyboard's welcome/help
+  prose", spec 102 FR-032), so main's golden lane failed on exactly
+  `source/help/test.php` and `source/welcome/welcome.htm`: the walk now
+  emits a fresh "Start Using Test Autonym" page with no French Basic
+  prose, while every other emitted file (including the keyboard, .kps,
+  and generated typing-guide sections) is byte-identical to the old
+  baseline. This capture was taken locally (Playwright desktop, pinned
+  corpus `435f82d6`, same tree as `4caeda5a` plus the test-only
+  `releasePathToVfsKey` rename that fixed the build lane) and verify
+  mode passes against it locally, including after the
+  workingCopyStore fresh-instance-tail fix that landed in the same
+  push; the HISTORY entry carries the
+  2026-10-28 capture date, which verify normalises.

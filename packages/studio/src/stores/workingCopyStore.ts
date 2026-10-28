@@ -1527,10 +1527,12 @@ function freshInstantiationTail() {
     // A new working copy has no default-fill provenance yet (#890) — the
     // pattern-loading effect re-runs defaultFillAxes and republishes it.
     axisFills: [],
-    // A new working copy has no closed-keyboard decision and no carve
-    // decisions yet — both are per-working-copy (076 FR-022).
-    closedKeyboardCard: null,
-    carveDispositions: [],
+    // The fallback policy is per-working-copy: a new one starts on the
+    // flat default (076 FR-019). The retired per-combo carveDispositions
+    // store and closed-keyboard card are NOT slots here — #2340 removed
+    // them, and re-adding them (as the shared-tail refactor did from
+    // dev's older tracks) resurrects them in the store state.
+    fallbackPolicy: DEFAULT_FALLBACK_POLICY,
     carveTouchKeepInert: [],
     // Spec 104 identity records are per-working-copy too: a fresh start
     // has no severances, no transplants and no guard answer yet.
