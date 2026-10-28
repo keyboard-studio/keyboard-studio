@@ -292,6 +292,7 @@ import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
+import { MethodCard } from "./parts/MethodCard.tsx";
 import { ProposalCard } from "./parts/ProposalCard.tsx";
 import {
   RemovableChipRow,
@@ -317,10 +318,7 @@ import {
   BG_CARD,
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
-  galleryCardHeaderRowStyle as cardHeaderRowStyle,
-  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
-  galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
 // T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
 // its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is
@@ -556,9 +554,10 @@ function touchMechanismLabel(
 }
 
 
-// ghostBtn, configStyle, and cardStyle are imported
+// ghostBtn and configStyle are imported
 // (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte with
-// MechanismGallery.tsx rather than redefined here. The page-level wrapper
+// MechanismGallery.tsx rather than redefined here. The card shell itself
+// now lives in parts/MethodCard.tsx. The page-level wrapper
 // style (pageStyle) is no longer imported directly here — it's used via
 // GalleryEmptyState.tsx (the no-inventory guard) rather than inline.
 
@@ -1248,7 +1247,21 @@ function TouchMethodChooser({
   // macro collapses it to a POSITIONAL {0}/{1}, which is what broke the fr
   // catalog (see the module-level fix note near MechanismGallery's twin).
   const currentCharDisplay = displayChar(currentChar);
-  // cardStyle is imported from ../../lib/galleryTheme.ts.
+  // The card shell is MethodCard in parts/ (shared with MethodChooser).
+  // Props shared by all four TouchLayerBuilderSection calls below — only
+  // `method` differs per card, so each call is `method="…" {...props}`.
+  const layerBuilderProps = {
+    layerTokens,
+    onLayerTokenChange,
+    onAddLayerSlot,
+    onRemoveLayerSlot,
+    validLayerCombos,
+    layerComboValid,
+    selectPlaceholder: layerSelectPlaceholder,
+    addButtonLabel: layerAddButtonLabel,
+    notYetValidNote: layerNotYetValidNote,
+    layerPreviewLabel,
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1259,42 +1272,28 @@ function TouchMethodChooser({
       </p>
 
       {/* 1. Long-press on a key */}
-      <div style={cardStyle(method === "longpress_alternates")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "longpress_alternates"}
-            onClick={() => onMethodChange("longpress_alternates")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "longpress_alternates" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.method.longpress.title">
-                Long-press on a key
-              </Trans>
-            </span>
-            {method !== "longpress_alternates" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.touch.method.longpress.summary">
-                  Hold a key to reveal {currentCharDisplay} as a long-press
-                  option.
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "longpress_alternates" && (
-            <TouchCardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="touch-apply-longpress"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "longpress_alternates"}
+        onSelect={() => onMethodChange("longpress_alternates")}
+        title={
+          <Trans id="editor.assignLoop.touch.method.longpress.title">
+            Long-press on a key
+          </Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.touch.method.longpress.summary">
+            Hold a key to reveal {currentCharDisplay} as a long-press option.
+          </Trans>
+        }
+        applyRow={
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-longpress"
+          />
+        }
+      >
         {method === "longpress_alternates" && (
           <div style={configStyle}>
             <div
@@ -1331,57 +1330,35 @@ function TouchMethodChooser({
             </div>
             <TouchLayerBuilderSection
               method="longpress_alternates"
-              layerTokens={layerTokens}
-              onLayerTokenChange={onLayerTokenChange}
-              onAddLayerSlot={onAddLayerSlot}
-              onRemoveLayerSlot={onRemoveLayerSlot}
-              validLayerCombos={validLayerCombos}
-              layerComboValid={layerComboValid}
-              selectPlaceholder={layerSelectPlaceholder}
-              addButtonLabel={layerAddButtonLabel}
-              notYetValidNote={layerNotYetValidNote}
-              layerPreviewLabel={layerPreviewLabel}
+              {...layerBuilderProps}
             />
           </div>
         )}
-      </div>
+      </MethodCard>
 
       {/* 2. Swipe a key (flick) */}
-      <div style={cardStyle(method === "flick_gestures")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "flick_gestures"}
-            onClick={() => onMethodChange("flick_gestures")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "flick_gestures" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.method.flick.title">
-                Swipe a key (flick)
-              </Trans>
-            </span>
-            {method !== "flick_gestures" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.touch.method.flick.summary">
-                  Swipe a key in a direction to produce {currentCharDisplay}.
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "flick_gestures" && (
-            <TouchCardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="touch-apply-flick"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "flick_gestures"}
+        onSelect={() => onMethodChange("flick_gestures")}
+        title={
+          <Trans id="editor.assignLoop.touch.method.flick.title">
+            Swipe a key (flick)
+          </Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.touch.method.flick.summary">
+            Swipe a key in a direction to produce {currentCharDisplay}.
+          </Trans>
+        }
+        applyRow={
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-flick"
+          />
+        }
+      >
         {method === "flick_gestures" && (
           <div style={configStyle}>
             <div
@@ -1442,57 +1419,35 @@ function TouchMethodChooser({
             </label>
             <TouchLayerBuilderSection
               method="flick_gestures"
-              layerTokens={layerTokens}
-              onLayerTokenChange={onLayerTokenChange}
-              onAddLayerSlot={onAddLayerSlot}
-              onRemoveLayerSlot={onRemoveLayerSlot}
-              validLayerCombos={validLayerCombos}
-              layerComboValid={layerComboValid}
-              selectPlaceholder={layerSelectPlaceholder}
-              addButtonLabel={layerAddButtonLabel}
-              notYetValidNote={layerNotYetValidNote}
-              layerPreviewLabel={layerPreviewLabel}
+              {...layerBuilderProps}
             />
           </div>
         )}
-      </div>
+      </MethodCard>
 
       {/* 3. Tap multiple times (multitap) */}
-      <div style={cardStyle(method === "multitap")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "multitap"}
-            onClick={() => onMethodChange("multitap")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "multitap" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.method.multitap.title">
-                Tap multiple times (multitap)
-              </Trans>
-            </span>
-            {method !== "multitap" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.touch.method.multitap.summary">
-                  Tap a key rapidly more than once to reach {currentCharDisplay}.
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "multitap" && (
-            <TouchCardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="touch-apply-multitap"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "multitap"}
+        onSelect={() => onMethodChange("multitap")}
+        title={
+          <Trans id="editor.assignLoop.touch.method.multitap.title">
+            Tap multiple times (multitap)
+          </Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.touch.method.multitap.summary">
+            Tap a key rapidly more than once to reach {currentCharDisplay}.
+          </Trans>
+        }
+        applyRow={
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-multitap"
+          />
+        }
+      >
         {method === "multitap" && (
           <div style={configStyle}>
             <div
@@ -1529,58 +1484,35 @@ function TouchMethodChooser({
             </div>
             <TouchLayerBuilderSection
               method="multitap"
-              layerTokens={layerTokens}
-              onLayerTokenChange={onLayerTokenChange}
-              onAddLayerSlot={onAddLayerSlot}
-              onRemoveLayerSlot={onRemoveLayerSlot}
-              validLayerCombos={validLayerCombos}
-              layerComboValid={layerComboValid}
-              selectPlaceholder={layerSelectPlaceholder}
-              addButtonLabel={layerAddButtonLabel}
-              notYetValidNote={layerNotYetValidNote}
-              layerPreviewLabel={layerPreviewLabel}
+              {...layerBuilderProps}
             />
           </div>
         )}
-      </div>
+      </MethodCard>
 
       {/* 4. Replace a key */}
-      <div style={cardStyle(method === "touch_key_replace")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "touch_key_replace"}
-            onClick={() => onMethodChange("touch_key_replace")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "touch_key_replace" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.method.replace.title">
-                Replace a key
-              </Trans>
-            </span>
-            {method !== "touch_key_replace" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.touch.method.replace.summary">
-                  Make a key type {currentCharDisplay} directly on the touch
-                  keyboard.
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "touch_key_replace" && (
-            <TouchCardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="touch-apply-replace"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "touch_key_replace"}
+        onSelect={() => onMethodChange("touch_key_replace")}
+        title={
+          <Trans id="editor.assignLoop.touch.method.replace.title">
+            Replace a key
+          </Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.touch.method.replace.summary">
+            Make a key type {currentCharDisplay} directly on the touch keyboard.
+          </Trans>
+        }
+        applyRow={
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-replace"
+          />
+        }
+      >
         {method === "touch_key_replace" && (
           <div style={configStyle}>
             <div
@@ -1617,20 +1549,11 @@ function TouchMethodChooser({
             </div>
             <TouchLayerBuilderSection
               method="touch_key_replace"
-              layerTokens={layerTokens}
-              onLayerTokenChange={onLayerTokenChange}
-              onAddLayerSlot={onAddLayerSlot}
-              onRemoveLayerSlot={onRemoveLayerSlot}
-              validLayerCombos={validLayerCombos}
-              layerComboValid={layerComboValid}
-              selectPlaceholder={layerSelectPlaceholder}
-              addButtonLabel={layerAddButtonLabel}
-              notYetValidNote={layerNotYetValidNote}
-              layerPreviewLabel={layerPreviewLabel}
+              {...layerBuilderProps}
             />
           </div>
         )}
-      </div>
+      </MethodCard>
     </div>
   );
 }
