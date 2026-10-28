@@ -316,6 +316,10 @@ export function usePreviewArtifact(): PreviewArtifact {
     activeSpec,
     workingCopyTransform,
     onInstantiate,
+    // This screen re-previews the working copy's own starting keyboard on
+    // mount; only a picker switch to another keyboard (a Track 1 copy, see
+    // onInstantiate above) may replace the start docs.
+    { startDocs: "copy-on-switch" },
   );
 
   const diagnostics: CompilerDiagnostic[] =

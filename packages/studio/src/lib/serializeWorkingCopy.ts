@@ -373,6 +373,12 @@ export async function projectWorkingCopyForOutput(
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
   const isAdaptation = instantiationMode === "adapt-existing";
+  // spec 102 FR-032 / spec 080 FR-007: only an adaptation inherits the start
+  // keyboard's welcome/help prose. The slices are session state another
+  // screen's artifact run can refill, so a copy is guarded here by its track,
+  // never by the slices being null.
+  const inheritedWelcomeHtmText = isAdaptation ? startWelcomeHtmText : null;
+  const inheritedHelpPhpText = isAdaptation ? startHelpPhpText : null;
   // spec 094 (research R1/R2): the one publish-version decision, and the
   // version this production actually ships at. A test build ships at its own
   // version everywhere the publish version would go. Stable (fingerprint) mode
@@ -468,8 +474,10 @@ export async function projectWorkingCopyForOutput(
   // Their bare names feed the descriptor's `<Files>` list (step 3.6, below)
   // and the fresh page's "Keyboard Layout" section (step 5c). Loader order is
   // kept: it is the base's own `.kps` order, and it is deterministic (SC-004).
-  const carriedImages = carriedWelcomeImages(startWelcomeImages);
-  const carriedImageNames = welcomeFolderFileNames(startWelcomeImages);
+  // A copy carries the welcome folder's images only — never its
+  // sub-pages or stylesheets, which are the base's prose and page styling.
+  const carriedImages = carriedWelcomeImages(startWelcomeImages, !isAdaptation);
+  const carriedImageNames = welcomeFolderFileNames(startWelcomeImages, !isAdaptation);
 
   // spec 079 FR-013..FR-015: one deterministic layout chart per (platform,
   // layer), generated from the MODEL (never the on-screen preview) unless the
@@ -508,6 +516,7 @@ export async function projectWorkingCopyForOutput(
     identity: identityForProjection,
     touchLayoutJson,
     welcomeFolderFiles,
+    ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
     // spec 083: the committed deadkey lifecycle overlay, replayed at step
     // 1.8 so the download carries the same deadkey edits the preview does.
     deadkeyOps: state.deadkeyOverlay.ops,
@@ -589,7 +598,7 @@ export async function projectWorkingCopyForOutput(
   const docContent = buildDocContent({
     ir: workingIr ?? startIr,
     touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
-    inheritedProse: isAdaptation ? (startWelcomeHtmText ?? startHelpPhpText) : null,
+    inheritedProse: inheritedWelcomeHtmText ?? inheritedHelpPhpText,
   });
   // Issue 1908: the author's ACCEPTED documentation-fix proposals become
   // render fixes here exactly as in useDocsPreview — adapt track only; the
@@ -625,7 +634,7 @@ export async function projectWorkingCopyForOutput(
   clonedVfs.delete(FLAT_WELCOME_PATH);
   clonedVfs.set(
     WELCOME_PAGE_PATH,
-    renderWelcomeHtm(docsInput, startWelcomeHtmText, welcomeFolderFiles, startHelpPhpText),
+    renderWelcomeHtm(docsInput, inheritedWelcomeHtmText, welcomeFolderFiles, inheritedHelpPhpText),
     false,
   );
   // FR-006: every carried base image, beside the page under its own name.
@@ -636,7 +645,7 @@ export async function projectWorkingCopyForOutput(
   for (const chart of charts) {
     clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
   }
-  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, startHelpPhpText, startWelcomeHtmText), false);
+  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, inheritedHelpPhpText, inheritedWelcomeHtmText), false);
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is
@@ -694,7 +703,7 @@ export async function projectWorkingCopyForOutput(
   // ship (unlisted in its `.kps`, or 404 at fetch). Named, not swallowed — the
   // checklist annotates the welcome row and the author can supply them.
   const missingInheritedImages =
-    startWelcomeHtmText !== null ? missingInheritedImageRefs(startWelcomeHtmText, welcomeFolderFiles) : [];
+    inheritedWelcomeHtmText !== null ? missingInheritedImageRefs(inheritedWelcomeHtmText, welcomeFolderFiles) : [];
   if (missingInheritedImages.length > 0) {
     docWarnings.push(
       `[docs] the base welcome page references images that were not carried: ${missingInheritedImages.join(", ")}`,

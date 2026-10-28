@@ -32,14 +32,28 @@
 // page (inherited images, generated charts) are appended when missing. Every
 // rewrite is reported through `warnings`, never done silently. Nothing else in
 // those blocks is touched; do not widen this exception without a spec decision.
+//
+// THE SECOND SANCTIONED WRITE: THE STARTING KEYBOARD'S FONTS
+//
+// Ruled 2026-10-20 (criteria 8/9/10): the produced package re-declares the fonts
+// the starting keyboard packaged — every font file and its companions in
+// `<Files>`, and the OSK/display selections on the first `<Keyboard>`. A
+// descriptor missing any of them (a copy scaffolded before the fix, or any
+// patched descriptor) has the missing entries APPENDED and the missing
+// selections ADDED, each reported through `warnings`. Existing entries and an
+// existing selection are never rewritten or removed.
 
-import type { VirtualFS } from "@keyboard-studio/contracts";
+import type { PackageFontSet, VirtualFS } from "@keyboard-studio/contracts";
 import {
+  buildFontSelectionLines,
   buildKpsContent,
   buildLanguageElement,
   buildLanguagesBlock,
   effectiveDisplayName,
+  isKpsFontEntries,
+  normaliseKpsFontEntries,
   normaliseWelcomeFolderFiles,
+  packageFontKpsRef,
   welcomeFolderKpsRef,
   WELCOME_PAGE_KPS_REF,
   type KpsFontDescriptorEntry,
@@ -95,6 +109,8 @@ const INFO_ELEMENT_RE = /(<Info>)([\s\S]*?)(<\/Info>)/;
  *   calls this under the PRE-rename id and renames the file afterwards, so it
  *   passes the author's id here: a warning naming `source/<base id>.kps` reads
  *   as the base's identity leaking into the output (spec 059 FR-003).
+ * @param fonts the starting keyboard's packaged fonts. Declared
+ *   on generate; their missing entries and selections added on patch.
  *
  * Generating a missing descriptor is not reported. On the adapt track it is the
  * designed path, not a fault (FR-006 asks only that a FAILURE be named);
@@ -108,13 +124,7 @@ export function applyIdentityToKps(
   version?: string,
   welcomeFolderFiles: readonly string[] = [],
   reportKeyboardId: string = keyboardId,
-  /**
-   * The base's carried fonts / stylesheets (#2308), consulted ONLY on the
-   * generate path: a descriptor that already exists keeps the entries it
-   * was scaffolded with (identity patching does not touch `<Files>` beyond
-   * the welcome migration), so passing them here cannot double-list.
-   */
-  fonts: readonly KpsFontDescriptorEntry[] = [],
+  fonts?: PackageFontSet | readonly KpsFontDescriptorEntry[],
   stylesheets: readonly string[] = [],
 ): ApplyIdentityToKpsResult {
   const path = `source/${keyboardId}.kps`;
@@ -174,7 +184,17 @@ export function applyIdentityToKps(
       `[package-descriptor] could not list welcome-folder files in ${reportPath} (no <Files> block): ${migrated.unlisted.join(", ")}`,
     );
   }
-  const text = migrated.text;
+  // The second sanctioned write — the starting keyboard's fonts.
+  const withFonts = ensurePackageFonts(migrated.text, fonts);
+  for (const rewrite of withFonts.rewrites) {
+    warnings.push(`[package-descriptor] declared font in ${reportPath}: ${rewrite}`);
+  }
+  if (withFonts.unlisted.length > 0) {
+    warnings.push(
+      `[package-descriptor] could not list fonts in ${reportPath} (no <Files> block): ${withFonts.unlisted.join(", ")}`,
+    );
+  }
+  const text = withFonts.text;
   if (text !== entry.content) {
     try {
       vfs.set(path, text, false);
@@ -274,6 +294,105 @@ function migrateWelcomePaths(
   });
 
   return { text: out, rewrites, unlisted: [] };
+}
+
+/**
+ * The font declaration (see the module header). Pure.
+ *
+ *   - Each font-set file not already in `<Files>` is appended, with the same
+ *     entry shape the welcome migration and `buildKpsContent` use.
+ *   - A missing `<OSKFont>` / `<DisplayFont>` on the first `<Keyboard>` is added
+ *     after its `<Version>` (where the corpus puts it). A selection the
+ *     descriptor already makes is kept as it stands.
+ *
+ * Returns the text, one line per addition, and the files it could not list
+ * because the descriptor has no `<Files>` block.
+ */
+function ensurePackageFonts(
+  text: string,
+  fonts: PackageFontSet | readonly KpsFontDescriptorEntry[] | undefined,
+): { text: string; rewrites: string[]; unlisted: string[] } {
+  const rewrites: string[] = [];
+  if (fonts === undefined) return { text, rewrites, unlisted: [] };
+  const descriptorFonts = isKpsFontEntries(fonts) ? normaliseKpsFontEntries(fonts) : undefined;
+  const packageFonts = isKpsFontEntries(fonts) ? undefined : fonts;
+  const refs = descriptorFonts !== undefined
+    ? descriptorFonts.map((font) => font.ref.replace(/\//g, "\\"))
+    : packageFonts?.files.map(packageFontKpsRef) ?? [];
+  let out = text;
+  let unlisted: string[] = [];
+
+  const filesRe = /(<Files\s*>)([\s\S]*?)(<\/Files\s*>)/i;
+  if (refs.length > 0 && !filesRe.test(out)) {
+    unlisted = refs;
+  } else if (refs.length > 0) {
+    out = out.replace(filesRe, (_m, open: string, body: string, close: string) => {
+      const listed = new Set<string>();
+      for (const block of body.match(/<File\s*>[\s\S]*?<\/File\s*>/gi) ?? []) {
+        const name = /<Name\s*>([^<]*)<\/Name\s*>/i.exec(block)?.[1];
+        if (name !== undefined) listed.add(memberKey(name));
+      }
+      const additions = refs.filter((ref) => !listed.has(memberKey(ref)));
+      if (additions.length === 0) return `${open}${body}${close}`;
+      const entries = additions.map((ref) => {
+        rewrites.push(`appended <File> ${ref}`);
+        const dot = ref.lastIndexOf(".");
+        const ext = dot >= 0 ? ref.slice(dot).toLowerCase() : "";
+        return `    <File>\n      <Name>${escapeHtml(ref)}</Name>\n      <FileType>${escapeHtml(ext)}</FileType>\n    </File>`;
+      });
+      return `${open}${body.replace(/\s*$/, "\n")}${entries.join("\n")}\n  ${close}`;
+    });
+  }
+
+  if (KEYBOARD_ELEMENT_RE.test(out)) {
+    out = out.replace(KEYBOARD_ELEMENT_RE, (_m, open: string, body: string, close: string) => {
+      if (descriptorFonts !== undefined) {
+        const osk = descriptorFonts.find((font) => font.isOskFont);
+        const lines: string[] = [];
+        if (osk !== undefined && !/<OSKFont\b/i.test(body)) {
+          lines.push(`<OSKFont>${escapeHtml(osk.ref.replace(/\//g, "\\"))}</OSKFont>`);
+        }
+        if (osk !== undefined && !/<DisplayFont\b/i.test(body)) {
+          lines.push(`<DisplayFont>${escapeHtml(osk.ref.replace(/\//g, "\\"))}</DisplayFont>`);
+        }
+        if (lines.length === 0) return `${open}${body}${close}`;
+        if (lines.some((line) => line.startsWith("<OSKFont>"))) {
+          rewrites.push(`added <OSKFont> ${osk!.ref.replace(/\//g, "\\")}`);
+        }
+        if (lines.some((line) => line.startsWith("<DisplayFont>"))) {
+          rewrites.push(`added <DisplayFont> ${osk!.ref.replace(/\//g, "\\")}`);
+        }
+        const indent = /\n([ \t]*)<Version\b/.exec(body)?.[1] ?? "      ";
+        const elements = lines.map((line) => `${indent}${line}\n`).join("");
+        const afterVersion = /<\/Version\s*>[^\S\n]*\n?/;
+        const patched = afterVersion.test(body)
+          ? body.replace(afterVersion, (m) => `${m.endsWith("\n") ? m : `${m}\n`}${elements}`)
+          : `${body.replace(/\s*$/, "\n")}${elements}    `;
+        return `${open}${patched}${close}`;
+      }
+      const missing: PackageFontSet = { files: [] };
+      if (packageFonts?.oskFont !== undefined && !/<OSKFont\b/i.test(body)) {
+        missing.oskFont = packageFonts.oskFont;
+      }
+      if (packageFonts?.displayFont !== undefined && !/<DisplayFont\b/i.test(body)) {
+        missing.displayFont = packageFonts.displayFont;
+      }
+      if (missing.oskFont === undefined && missing.displayFont === undefined) return `${open}${body}${close}`;
+      const indent = /\n([ \t]*)<Version\b/.exec(body)?.[1] ?? "      ";
+      const lines = buildFontSelectionLines(missing, indent);
+      if (missing.oskFont !== undefined) rewrites.push(`added <OSKFont> ${packageFontKpsRef(missing.oskFont)}`);
+      if (missing.displayFont !== undefined) {
+        rewrites.push(`added <DisplayFont> ${packageFontKpsRef(missing.displayFont)}`);
+      }
+      const afterVersion = /<\/Version\s*>[^\S\n]*\n?/;
+      const patched = afterVersion.test(body)
+        ? body.replace(afterVersion, (m) => `${m.endsWith("\n") ? m : `${m}\n`}${lines}`)
+        : `${body.replace(/\s*$/, "\n")}${lines}    `;
+      return `${open}${patched}${close}`;
+    });
+  }
+
+  return { text: out, rewrites, unlisted };
 }
 
 /**

@@ -1020,6 +1020,10 @@ export async function driveTouchGallery(page: Page): Promise<void> {
       // long-press on K_A for every character, so it declines the proposal
       // ("Choose a different touch method" — propose-then-confirm's deny
       // path, which reveals the chooser) and proceeds exactly as before.
+      // Ported from main's a52612c7 (fix(galleries): credit
+      // composed-treatment marks in the coverage gate), which dev never
+      // received — without it dev's golden walk stalls at this exact
+      // step on both the PR code and the base-code capture.
       const denySuggestion = page.getByRole("button", {
         name: "Choose a different touch method",
       });

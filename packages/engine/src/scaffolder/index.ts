@@ -49,7 +49,6 @@ import { HISTORY_INITIAL_RELEASE_BULLET } from "../shared/renderHistoryMd.js";
 import {
   buildKpsContent,
   kpsMemberRef,
-  type KpsFontDescriptorEntry,
   type PackageDescriptorIdentity,
 } from "../package-descriptor/index.js";
 import { dropUnbackedBitmapStore } from "../compiler/stripDanglingAssetStores.js";
@@ -492,13 +491,10 @@ export function generateStubs(
    */
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
   /**
-   * The base's carried fonts, as `.kps` member references (#2308). The
-   * descriptor is generated ONCE, here — the output projection only patches
-   * identity into it — so the font/stylesheet entries must be written now
-   * or they never reach the shipped package.
+   * The base's packaged fonts and carried stylesheet references, declared by
+   * the generated `.kps`.
    */
-  fonts: readonly KpsFontDescriptorEntry[] = [],
-  /** The base's carried keyboard stylesheet(s), as member references (#2308). */
+  packageFonts?: import("@keyboard-studio/contracts").PackageFontSet,
   stylesheets: readonly string[] = [],
 ): void {
   const now = new Date();
@@ -636,7 +632,11 @@ export function generateStubs(
         ? { authorEmail: attribution.authorEmail }
         : {}),
     };
-    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version, [], fonts, stylesheets), false);
+    vfs.set(
+      kpsPath,
+      buildKpsContent(keyboardId, identity, kmnText, version, [], packageFonts, stylesheets),
+      false,
+    );
   }
 }
 
@@ -701,6 +701,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       };
 
       let loaderFonts: import("@keyboard-studio/contracts").KpsFontEntry[] = [];
+      let packageFonts: import("@keyboard-studio/contracts").PackageFontSet | undefined;
       let loaderStylesheets: import("@keyboard-studio/contracts").KpsStylesheetEntry[] = [];
       try {
         const loaderOpts = {
@@ -709,6 +710,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         };
         const loaderResult = await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
         loaderFonts = loaderResult.fonts;
+        packageFonts = loaderResult.packageFonts;
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
         startLicenseText = loaderResult.startLicenseText;
@@ -766,18 +768,12 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       renameFilesInVfs(vfs, actualStartId, keyboardId);
       applyTouchLayoutCleanup(vfs, keyboardId);
-      // #2308: the descriptor generateStubs writes must list the fonts and
-      // stylesheet the loader carried, in the base's own reference spelling.
-      // The stylesheet is the id-named sibling: renameFilesInVfs just renamed
-      // `source/<base id>.css` to the new id, so the entry names the new file.
-      const kpsFonts: KpsFontDescriptorEntry[] = loaderFonts.map((f) => ({
-        ref: kpsMemberRef(f.ttfRelPath, base.path),
-        isOskFont: f.isOskFont,
-      }));
-      const kpsStylesheets = loaderStylesheets.map((s) => {
-        const ref = kpsMemberRef(s.cssRelPath, base.path);
-        return ref === `${actualStartId}.css` ? `${keyboardId}.css` : ref;
-      });
+      const kpsStylesheets = loaderStylesheets
+        .filter((sheet) => !/^source\/(welcome|help)\//i.test(sheet.vfsPath))
+        .map((sheet) => {
+          const ref = kpsMemberRef(sheet.cssRelPath, base.path);
+          return ref === `${actualStartId}.css` ? `${keyboardId}.css` : ref;
+        });
       generateStubs(
         vfs,
         keyboardId,
@@ -787,7 +783,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         attribution,
         emitYear,
         inheritedHolders,
-        kpsFonts,
+        packageFonts,
         kpsStylesheets,
       );
 
@@ -805,6 +801,9 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         vfs,
         warnings,
         fonts: loaderFonts,
+        // Handed back so the working copy keeps it — the output
+        // projection re-declares these fonts if a descriptor lacks them.
+        ...(packageFonts !== undefined ? { packageFonts } : {}),
         stylesheets: loaderStylesheets,
         attributionMissing,
         inheritedHolderCount: inheritedHolders.length,

@@ -393,6 +393,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // Issue #2139: plain JSON pairs, straight passthrough — a resumed draft
     // must judge 11.8 against the same kb.css the live session saw.
     startDocCssTexts: s.startDocCssTexts,
+    startPackageFonts: s.startPackageFonts,
     startWelcomeConvention: s.startWelcomeConvention,
     ...(startWelcomeImages !== undefined ? { startWelcomeImages } : {}),
     // Over budget => the images are omitted AND the omission is recorded, so a
@@ -567,6 +568,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // restore with those entries dropped — a text whose stylesheet path is
     // unknown cannot be written back, so it is not guessed at.
     startDocCssTexts: normalizeStartDocCssTexts(snapshot.startDocCssTexts),
+    // Absent from a draft saved before the slice existed.
+    startPackageFonts: snapshot.startPackageFonts ?? null,
     startWelcomeConvention: snapshot.startWelcomeConvention ?? null,
     startWelcomeImages: deserializeWelcomeImages(snapshot.startWelcomeImages),
     startWelcomeImagesDropped: snapshot.startWelcomeImagesDropped === true,
