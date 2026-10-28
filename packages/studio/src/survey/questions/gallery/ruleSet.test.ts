@@ -92,8 +92,6 @@ describe("ruleSet apply (splice)", () => {
         provenance: "asked",
         value: {
           removals: [{ kind: "node", id: "r-added", provenance: "asked" }],
-          dispositions: [],
-          closedKeyboardCard: null,
         },
       },
     };

@@ -3,12 +3,11 @@
 // pass-2 included), and the overlay → value builder — canonical
 // regardless of click order, and lossless for hand removals: an
 // orphaned hand-set item stays in the value, and a refresh of the
-// derived state (dispositions re-prefill) never touches the hand
+// derived state never touches the hand
 // removals. The hosted gallery flow is covered by the carve suites.
 
 import { describe, it, expect } from "vitest";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import type { CarveDisposition } from "@keyboard-studio/contracts";
 import carvedLayout, { type CarvedLayoutValue } from "./carvedLayout.ts";
 import { CarveDecisionRenderer } from "../../carve/CarveDecisionRenderer.tsx";
 import {
@@ -27,16 +26,8 @@ function ctx(
   return { ir, writes: carvedLayout.writes, decisions, currentHistoryEntryState: null };
 }
 
-const DISPOSITION: CarveDisposition = {
-  comboId: "rule-9",
-  disposition: "block",
-  provenance: "author-override",
-};
-
 const VALUE: CarvedLayoutValue = {
   removals: [{ kind: "node", id: "rule-9", provenance: "asked" }],
-  dispositions: [DISPOSITION],
-  closedKeyboardCard: "accepted",
 };
 
 function snapshot(overrides: Partial<CarveOverlaySnapshot> = {}): CarveOverlaySnapshot {
@@ -45,8 +36,6 @@ function snapshot(overrides: Partial<CarveOverlaySnapshot> = {}): CarveOverlaySn
     deletedItemIds: new Set(),
     disabledFamilyIds: new Set(),
     carveChars: new Set(),
-    carveDispositions: [],
-    closedKeyboardCard: null,
     ...overrides,
   };
 }
@@ -100,15 +89,13 @@ describe("carvedLayout module contract", () => {
 });
 
 describe("carvedLayoutValueFromOverlay", () => {
-  it("maps the four removal sets to one kind-discriminated list; dispositions and card ride verbatim", () => {
+  it("maps the four removal sets to one kind-discriminated list", () => {
     const value = carvedLayoutValueFromOverlay(
       snapshot({
         deletedNodeIds: new Set(["rule-9"]),
         deletedItemIds: new Set(["store-1#2"]),
         disabledFamilyIds: new Set(["fam-3"]),
         carveChars: new Set(["q"]),
-        carveDispositions: [DISPOSITION],
-        closedKeyboardCard: "accepted",
       }),
     );
     expect(value).toEqual({
@@ -118,8 +105,6 @@ describe("carvedLayoutValueFromOverlay", () => {
         { kind: "family", id: "fam-3", provenance: "asked" },
         { kind: "char", id: "q", provenance: "asked" },
       ],
-      dispositions: [DISPOSITION],
-      closedKeyboardCard: "accepted",
     });
   });
 
@@ -152,24 +137,8 @@ describe("carvedLayoutValueFromOverlay", () => {
     ]);
   });
 
-  it("a proposal refresh (dispositions re-prefilled under a new card state) keeps hand removals identical", () => {
-    const removals = { deletedNodeIds: new Set(["rule-9"]), carveChars: new Set(["q"]) };
-    const before = carvedLayoutValueFromOverlay(
-      snapshot({ ...removals, carveDispositions: [], closedKeyboardCard: null }),
-    );
-    const after = carvedLayoutValueFromOverlay(
-      snapshot({ ...removals, carveDispositions: [DISPOSITION], closedKeyboardCard: "declined" }),
-    );
-    expect(after.removals).toEqual(before.removals);
-    expect(after.closedKeyboardCard).toBe("declined");
-  });
-
   it("an untouched overlay records an empty value (author removed nothing)", () => {
-    expect(carvedLayoutValueFromOverlay(snapshot())).toEqual({
-      removals: [],
-      dispositions: [],
-      closedKeyboardCard: null,
-    });
+    expect(carvedLayoutValueFromOverlay(snapshot())).toEqual({ removals: [] });
   });
 });
 
@@ -181,8 +150,6 @@ describe("currentCarvedLayoutValue (the recording reader)", () => {
       deletedItemIds: new Set(["store-1#2"]),
       disabledFamilyIds: new Set(),
       carveChars: new Set(["q"]),
-      carveDispositions: [DISPOSITION],
-      closedKeyboardCard: "accepted",
     });
     try {
       expect(currentCarvedLayoutValue()).toEqual({
@@ -191,8 +158,6 @@ describe("currentCarvedLayoutValue (the recording reader)", () => {
           { kind: "item", id: "store-1#2", provenance: "asked" },
           { kind: "char", id: "q", provenance: "asked" },
         ],
-        dispositions: [DISPOSITION],
-        closedKeyboardCard: "accepted",
       });
     } finally {
       useWorkingCopyStore.setState({
@@ -200,8 +165,6 @@ describe("currentCarvedLayoutValue (the recording reader)", () => {
         deletedItemIds: before.deletedItemIds,
         disabledFamilyIds: before.disabledFamilyIds,
         carveChars: before.carveChars,
-        carveDispositions: before.carveDispositions,
-        closedKeyboardCard: before.closedKeyboardCard,
       });
     }
   });

@@ -253,14 +253,12 @@ export function useWorkingCopyTransform(
   // an IR mutation — the toggle stays O(1) and reversible.
   const workingIr = useWorkingCopyStore((s) => s.ir);
   const disabledFamilyIds = useWorkingCopyStore((s) => s.disabledFamilyIds);
-  // T015: carve dispositions for the suppression stage (FR-019), read from
-  // the working-copy store. Scoped to the live carve set so stale
-  // dispositions never rewrite uncarved rules; projectWorkingCopyVfs scopes
-  // them again as a backstop. A6 loud/soft (FR-009) has no UI yet — the
-  // suppression stage defaults to soft (loud: false).
-  const getCarveDispositions = useWorkingCopyStore(
-    (s) => s.getCarveDispositions,
-  );
+  // T015: the keyboard-wide fallback policy for the suppression stage
+  // (FR-019), read from the working-copy store. The engine expands it over
+  // the live carve set, so it can never rewrite an uncarved rule. A6
+  // loud/soft (FR-009) has no UI yet — the suppression stage defaults to soft
+  // (loud: false).
+  const fallbackPolicy = useWorkingCopyStore((s) => s.fallbackPolicy);
   // 076 FR-023 (T020): keep-inert chars for carved touch keys ("kept, does
   // nothing" instead of removed). The set is built inside the main useMemo;
   // this array feeds a primitive-stable memo key below.
@@ -387,18 +385,6 @@ export function useWorkingCopyTransform(
   // always small.
   const keyEditOpsKey = useMemo(() => JSON.stringify(keyEditOps), [keyEditOps]);
 
-  // Carve dispositions key (T015, FR-019) — primitive-stable so the main
-  // useMemo doesn't fire on reference churn. The dispositions themselves are
-  // read from the store inside the main useMemo via getCarveDispositions,
-  // scoped to the live carve set.
-  const carveDispositionsKey = useMemo(
-    () =>
-      JSON.stringify(
-        getCarveDispositions([...deletedNodeIds, ...deletedItemIds]),
-      ),
-    [getCarveDispositions, deletedNodeIds, deletedItemIds],
-  );
-
   // Keep-inert key (T020, FR-023) — primitive-stable so the main useMemo
   // doesn't fire on reference churn. Sorted for order-independence.
   const carveTouchKeepInertKey = useMemo(
@@ -505,14 +491,6 @@ export function useWorkingCopyTransform(
           ? deletedItemIds
           : new Set([...deletedItemIds, ...disabledRuleIds]);
 
-      // T015: carve dispositions for the suppression stage (FR-019), scoped to
-      // the live carve set. projectWorkingCopyVfs scopes them again as a
-      // backstop. A6 loud/soft (FR-009) has no UI yet — soft (loud: false).
-      const carveDispositions = getCarveDispositions([
-        ...deletedNodeIds,
-        ...deletedItemIds,
-      ]);
-
       const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
@@ -522,7 +500,10 @@ export function useWorkingCopyTransform(
         deletedItemIds: effectiveDeletedItemIds,
         carveChars,
         deletedTouchKeyIds,
-        ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
+        fallbackPolicy,
+        // Disabled-family rules are removed outright, not carved: keep them
+        // out of the policy expansion.
+        ...(disabledRuleIds.size > 0 ? { suppressionExemptIds: disabledRuleIds } : {}),
         // T020 (FR-023): keep-inert chars for carved touch keys. The store
         // array is NFC-normalized at write time; the Set is the engine seam.
         ...(carveTouchKeepInertChars.length > 0
@@ -557,7 +538,7 @@ export function useWorkingCopyTransform(
     deletedKey,
     disabledKey,
     ruleAdditionsKey,
-    carveDispositionsKey,
+    fallbackPolicy,
     carveTouchKeepInertKey,
     assignmentsKey,
     identityDisplayName,

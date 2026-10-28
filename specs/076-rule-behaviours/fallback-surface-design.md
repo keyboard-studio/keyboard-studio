@@ -1,6 +1,6 @@
 # Fallback-character surface for `swallowUndefined` — design (#1912)
 
-**Status**: Proposed for review.  
+**Status**: Implemented (interim host: the Assign Mechanisms step, pending the Behaviours step). See the amendment in [AS-BUILT.md](AS-BUILT.md).  
 **Replaces**: The archived carve-gallery Allow/Block disposition UI (spec 076
 amendments A1–A4, archived 2026-09-29 to `docs/archive/carve-disposition-ui/`).  
 **Decides**: FR-019 per-carve override — re-enable or retire.
