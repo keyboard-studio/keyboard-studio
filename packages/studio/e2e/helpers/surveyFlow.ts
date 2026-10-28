@@ -1008,6 +1008,28 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
+      // A character with a touch SUGGESTION (a Phase C desktop assignment's
+      // long-press/replace proposal, the decomposable-accent fallback, or
+      // the corpus long-press tie-breaker) renders the suggestion card
+      // INSTEAD of the method chooser — the "Host key for long-press"
+      // select does not exist until the suggestion is resolved, so
+      // reaching for it directly waits out selectMenuOption's timeout on
+      // a control that was never going to render (the golden walk's
+      // 2026-10-19 stall: first stop U+2010, corpus suggestion "long-press
+      // z", chooser hidden). This walk's fixed answer is the default
+      // long-press on K_A for every character, so it declines the proposal
+      // ("Choose a different touch method" — propose-then-confirm's deny
+      // path, which reveals the chooser) and proceeds exactly as before.
+      // Ported from main's a52612c7 (fix(galleries): credit
+      // composed-treatment marks in the coverage gate), which dev never
+      // received — without it dev's golden walk stalls at this exact
+      // step on both the PR code and the base-code capture.
+      const denySuggestion = page.getByRole("button", {
+        name: "Choose a different touch method",
+      });
+      if (await waitVisible(denySuggestion, 2_000)) {
+        await denySuggestion.click();
+      }
       await selectMenuOption(page, baseKeySelect, "K_A");
       await applyButton.click();
     }

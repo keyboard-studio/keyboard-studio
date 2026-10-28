@@ -24,6 +24,7 @@ import type { MarkClass } from "@keyboard-studio/engine";
 import {
   derivePlacementInventory,
   deriveTreatmentFilteredChars,
+  treatmentCreditedMarks,
 } from "./placementInventory.ts";
 
 const GRAVE = "̀"; // U+0300
@@ -272,5 +273,98 @@ describe("deriveTreatmentFilteredChars — the strip-selection gate (issue #2293
     expect(
       deriveTreatmentFilteredChars(flat, undefined, bafutWorklist("own-key")).size,
     ).toBe(0);
+  });
+});
+
+describe("treatmentCreditedMarks — the composed-mark production credit (main-CI gallery cluster, 2026-10-19)", () => {
+  const ACUTE = "́"; // U+0301
+
+  function frAlphabet(): ConfirmedAlphabet {
+    return makeConfirmedAlphabet({
+      bases: ["e"],
+      marks: [ACUTE],
+      attestedStacks: [{ base: "e", marks: [ACUTE], source: "text" as const }],
+    });
+  }
+
+  function frWorklist(treatment: "own-key" | "composed"): PlacementWorklist {
+    const alphabet = frAlphabet();
+    const classes: MarkClass[] = [
+      { id: "above-1", label: "Marks above the letter", marks: [ACUTE] },
+    ];
+    return buildPlacementWorklist({
+      alphabet,
+      classes,
+      attachments: { [ACUTE]: { e: true } },
+      treatment: {
+        ...makeMarkTreatmentAnswer("postfix"),
+        classTreatment: { "above-1": treatment },
+      },
+      prefills: [],
+    });
+  }
+
+  it("credits a composed-treatment lone mark once its composed form is produced (the basic_kbdfr + é gate trap)", () => {
+    const credited = treatmentCreditedMarks(
+      frAlphabet(),
+      frWorklist("composed"),
+      new Set(["e", "é"]),
+    );
+    expect(credited).toEqual(new Set([ACUTE]));
+  });
+
+  it("does NOT credit the mark while any attested combination is unproduced", () => {
+    const credited = treatmentCreditedMarks(
+      frAlphabet(),
+      frWorklist("composed"),
+      new Set(["e"]),
+    );
+    expect(credited.size).toBe(0);
+  });
+
+  it("never credits an own-key mark — it is a placement unit and must be placed", () => {
+    const credited = treatmentCreditedMarks(
+      frAlphabet(),
+      frWorklist("own-key"),
+      new Set(["e", "é"]),
+    );
+    expect(credited.size).toBe(0);
+  });
+
+  it("never credits on vacuous truth: a mark with no attested combinations", () => {
+    const alphabet = makeConfirmedAlphabet({
+      bases: ["e"],
+      marks: [ACUTE],
+      attestedStacks: [],
+    });
+    const credited = treatmentCreditedMarks(
+      alphabet,
+      frWorklist("composed"),
+      new Set(["e", "é"]),
+    );
+    expect(credited.size).toBe(0);
+  });
+
+  it("fallbacks are empty: no worklist, empty worklist, no alphabet", () => {
+    const alphabet = frAlphabet();
+    const covered = new Set(["e", "é"]);
+    expect(treatmentCreditedMarks(alphabet, undefined, covered).size).toBe(0);
+    expect(treatmentCreditedMarks(alphabet, makeEmptyPlacementWorklist(), covered).size).toBe(0);
+    expect(treatmentCreditedMarks(undefined, frWorklist("composed"), covered).size).toBe(0);
+  });
+
+  it("Bafut composed mirror: all three marks credited when every composed form is covered; a single missing form withholds only its own mark", () => {
+    const alphabet = bafutAlphabet();
+    const worklist = bafutWorklist("composed");
+    const allForms = new Set(BAFUT_COMPOSED);
+    expect(treatmentCreditedMarks(alphabet, worklist, allForms)).toEqual(
+      new Set([GRAVE, CIRC, CARON]),
+    );
+    const missingCircForm = BAFUT_STACKS.find(([b, m]) => m === CIRC && b === "a")!;
+    const partial = new Set(BAFUT_COMPOSED);
+    partial.delete((missingCircForm[0] + missingCircForm[1]).normalize("NFC"));
+    expect(treatmentCreditedMarks(alphabet, worklist, partial)).toEqual(
+      new Set([GRAVE, CARON]),
+    );
   });
 });

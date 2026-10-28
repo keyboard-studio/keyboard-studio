@@ -30,6 +30,12 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // The marks-treatment credit inputs (see unimplementedInventory.ts's
+  // InventoryCoverageInputs doc): the gate credits a composed-treatment
+  // lone mark through its produced combinations; without these two
+  // slices it cannot tell such a mark from a genuinely unplaced one.
+  const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
+  const marksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
   // producedSet is the SAME session-aware (base + this session's physical
   // assignments, composability-augmented) set MechanismGallery/TouchGallery
   // derive their own coverage from — reused here (not re-derived) so the
@@ -50,7 +56,9 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
         touchLayoutJson,
         confirmedInventory,
         desktopProducedSet: producedSet,
+        ...(alphabet !== undefined ? { alphabet } : {}),
+        ...(marksWorklist !== undefined ? { marksWorklist } : {}),
       }),
-    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory, producedSet],
+    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory, producedSet, alphabet, marksWorklist],
   );
 }
