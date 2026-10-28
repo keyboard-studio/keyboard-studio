@@ -72,6 +72,7 @@
 import {
   bindingsForKeyId,
   buildTouchKeyRuleIndex,
+  isEmulationKeyId,
   parseTouchKeyAddress,
   producedByKeyId,
   type ContextElement,
@@ -93,6 +94,7 @@ import {
 } from "./keyEditOps.js";
 import { groupLayerFamilies } from "./layerFamilies.js";
 import { proposeKeyId } from "./keyIdMinting.js";
+import { touchKeyIdFamily } from "./touch-mechanism-shared.js";
 
 // ---------------------------------------------------------------------------
 // Request / result shapes
@@ -163,33 +165,6 @@ export type RelinkTouchKeyResult =
 // Small predicates
 // ---------------------------------------------------------------------------
 
-function idFamily(id: string): "K_" | "T_" | "U_" | undefined {
-  const upper = id.toUpperCase();
-  if (upper.startsWith("K_")) return "K_";
-  if (upper.startsWith("T_")) return "T_";
-  if (upper.startsWith("U_")) return "U_";
-  return undefined;
-}
-
-/**
- * Engine-defined special-function K_ ids (contracts §1 `emulation`): they
- * produce through KMW's emulation arm, not rules, and are excluded from
- * FR-002 equality and severance. Mirrors the resolver's conservative list
- * in contracts' touchProduction.ts (which does not export it).
- */
-const EMULATION_KEY_IDS: ReadonlySet<string> = new Set([
-  "K_BKSP",
-  "K_ENTER",
-  "K_TAB",
-  "K_LOPT",
-  "K_ROPT",
-]);
-
-function isEmulationKeyId(id: string): boolean {
-  const upper = id.toUpperCase();
-  return EMULATION_KEY_IDS.has(upper) || upper.startsWith("K_NP");
-}
-
 /** Every key id a layout carries, main keys and subkeys alike. */
 function collectLayoutKeyIds(layout: TouchLayoutIR): Set<string> {
   const ids = new Set<string>();
@@ -252,7 +227,7 @@ export function severTouchKey(
   };
 
   // -- Source eligibility ----------------------------------------------------
-  if (idFamily(sourceId) === undefined) {
+  if (touchKeyIdFamily(sourceId) === undefined) {
     return refuse(
       `source key "${sourceId}" is outside the K_/T_/U_ families (unclassified) — no criterion may sever it`,
     );
@@ -737,7 +712,7 @@ export function applyKeyEditsWithSeverance(
     const resolved = resolveKeyAddress(addressable, parts);
     if (resolved === undefined) continue;
     const key = resolved.key;
-    if (idFamily(key.id) !== "K_") continue;
+    if (touchKeyIdFamily(key.id) !== "K_") continue;
     const newOutput = op.fields.output;
     if (newOutput === key.output) continue;
     triggers.push({
