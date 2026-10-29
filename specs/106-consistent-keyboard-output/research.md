@@ -17,6 +17,13 @@ carve + caps, fixture/compile/simulate infra) and one km-keyman ruling. Line num
   `carveTouchKeepInert` and `keyEditOps`; the download path (`serializeWorkingCopy.ts:505`) passes
   none of them. Preview and download can differ today. Fix: one pure
   `projectionInputFromState(state, extras)` used by both callers; parity test.
+- **Correction (T004, 2026-10-29)**: `keyEditOps` was never a real divergence. Committed key edits are
+  spliced into the store's `touchLayoutJson` on commit (`TouchGallery.tsx` ~:2766), and only
+  TouchGallery's live-layout preview replays the overlay, onto a layout that does not yet contain it.
+  Replaying the store's overlay in the download would apply every edit twice (`applyKeyEditsToRawJson`
+  is not idempotent). `projectionInputFromState` therefore takes `keyEditOps` only from a caller's live
+  override. The real divergence was `fallbackPolicy`, `suppressionExemptIds`, the disabled families and
+  `carveTouchKeepInert`.
 - **Loading bases**: reuse `src/test/sc004Harness.ts` (`loadVfs` at :58 — export it) against
   `../keyboards/release`, gated by `sc004GatesEnabled` / `announceSc004Skip` (skip locally when absent,
   fail in CI). The instantiate chain is `walkEmit.compile.test.ts` `instantiateLikeStudio` (~:133).

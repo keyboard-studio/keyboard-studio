@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Consistent keyboard output from base + decisions + carve",
   "branch": "106-consistent-keyboard-output",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -32,7 +32,106 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-10-29T21:43:42.066Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-29T22:22:49.929Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:24:02.799Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:24:03.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:24:40.994Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:33:44.848Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:33:45.201Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:33:45.553Z"
     }
   ],
-  "telemetryInstanceId": "c5ffbd69-afee-4690-a346-3b60c164a673"
+  "telemetryInstanceId": "c5ffbd69-afee-4690-a346-3b60c164a673",
+  "currentTask": "T006",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Stack base unchanged (PR #2358 head 5d3a3e44 = merge-base), ../keyboards at keyboard-studio fork origin/master 435f82d69; pnpm build running"
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added cabecar and dega rows from their .kps (winchus already listed)",
+      "files": [
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Extracted 4 decision records (kbdus/camqwerty/kbdfr/camazerty) plus the p1 walk kmn, with PROVENANCE.md",
+      "files": [
+        "packages/studio/src/lib/__fixtures__/decision-points/records/"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "projectionInputFromState: store-derived input incl. fallbackPolicy, disabled families (+suppressionExemptIds), keep-inert; keyEditOps only via live override (store touchLayoutJson already carries committed edits)",
+      "files": [
+        "packages/studio/src/lib/projectionInput.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Download and preview both build input via projectionInputFromState; hook memo keys unchanged and cover every field",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/hooks/useWorkingCopyTransform.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Parity test (swallow/pass-through, carved rule + disabled family); fails on old callers, passes now; fragment test preview path switched to shared input",
+      "files": [
+        "packages/studio/src/lib/projectionInput.parity.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.fragmentBearing.carve.test.ts"
+      ]
+    }
+  }
 }

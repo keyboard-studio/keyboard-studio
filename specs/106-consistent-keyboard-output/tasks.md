@@ -21,17 +21,17 @@ Each story phase ends with the same three gate tasks:
 
 ## Phase 1: Setup
 
-- [ ] T001 Rebase `106-consistent-keyboard-output` on `km/s02-deadkey-purpose` if PR #2358 changed. Confirm `pnpm build` is green and `../keyboards` is on the keyboard-studio fork's master (CLAUDE.md "Keyboard phonebook").
-- [ ] T002 [P] Add phonebook rows for `cabecar`, `winchus` and `dega` (cited in research R5) to `docs/keyboard-index.md`. Follow the "Keep this current" recipe and read each keyboard's `.kps`.
-- [ ] T003 [P] Extract `.studio/decision-record.json` from four case zips in `../ks-2302-main/tools/testing-profiles-2302/zips/` (`p1-whole-bafut-kbdus.zip`, `p4-unwrap-bafut-camqwerty.zip`, plus one Ewondo kbdfr and one Ewondo camazerty case; the records are inside the zips, not extracted on disk) into `packages/studio/src/lib/__fixtures__/decision-points/records/` (one per base keyboard: kbdus, kbdfr, camqwerty, camazerty). Add a `PROVENANCE.md` naming the case id and the build it came from.
+- [x] T001 Rebase `106-consistent-keyboard-output` on `km/s02-deadkey-purpose` if PR #2358 changed. Confirm `pnpm build` is green and `../keyboards` is on the keyboard-studio fork's master (CLAUDE.md "Keyboard phonebook").
+- [x] T002 [P] Add phonebook rows for `cabecar`, `winchus` and `dega` (cited in research R5) to `docs/keyboard-index.md`. Follow the "Keep this current" recipe and read each keyboard's `.kps`.
+- [x] T003 [P] Extract `.studio/decision-record.json` from four case zips in `../ks-2302-main/tools/testing-profiles-2302/zips/` (`p1-whole-bafut-kbdus.zip`, `p4-unwrap-bafut-camqwerty.zip`, plus one Ewondo kbdfr and one Ewondo camazerty case; the records are inside the zips, not extracted on disk) into `packages/studio/src/lib/__fixtures__/decision-points/records/` (one per base keyboard: kbdus, kbdfr, camqwerty, camazerty). Add a `PROVENANCE.md` naming the case id and the build it came from.
 
 ---
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T004 Create `packages/studio/src/lib/projectionInput.ts` with a pure `projectionInputFromState(state, extras)` that returns the full `ProjectWorkingCopyVfsInput`. It must include `fallbackPolicy`, `suppressionExemptIds`, `disabledFamilyIds` merged into `deletedItemIds`, `carveTouchKeepInert` and `keyEditOps`, which today only the preview passes (research R1 F-DIVERGE).
-- [ ] T005 Switch `packages/studio/src/lib/serializeWorkingCopy.ts` (~:505) and `packages/studio/src/hooks/useWorkingCopyTransform.ts` (~:494) to `projectionInputFromState` (FR-005). The hook's `useMemo` dependency keys must cover every field.
-- [ ] T006 Add a preview/download parity test in `packages/studio/src/lib/projectionInput.parity.test.ts`. Seed the store with fallbackPolicy, a disabled family and keyEditOps, then assert that the preview transform VFS equals the `projectWorkingCopyForOutput()` VFS.
+- [x] T004 Create `packages/studio/src/lib/projectionInput.ts` with a pure `projectionInputFromState(state, extras)` that returns the full `ProjectWorkingCopyVfsInput`. It must include `fallbackPolicy`, `suppressionExemptIds`, `disabledFamilyIds` merged into `deletedItemIds`, `carveTouchKeepInert` and `keyEditOps`, which today only the preview passes (research R1 F-DIVERGE).
+- [x] T005 Switch `packages/studio/src/lib/serializeWorkingCopy.ts` (~:505) and `packages/studio/src/hooks/useWorkingCopyTransform.ts` (~:494) to `projectionInputFromState` (FR-005). The hook's `useMemo` dependency keys must cover every field.
+- [x] T006 Add a preview/download parity test in `packages/studio/src/lib/projectionInput.parity.test.ts`. Seed the store with fallbackPolicy, a disabled family and keyEditOps, then assert that the preview transform VFS equals the `projectWorkingCopyForOutput()` VFS.
 - [ ] T007 Commit `fix(studio): one projection input for preview and download` and push it to `106-consistent-keyboard-output`.
 > **Deferred (tracking issue #2361):** the method for starting stores follows the outcome of keymanapp/keyboards#4181. T070-T072 are **blocked** until then; do not implement them. T073 goes ahead for generated stores only.
 
