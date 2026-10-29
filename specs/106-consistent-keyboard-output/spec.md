@@ -35,7 +35,7 @@ requirement below.
 - Q: Which keys does `&CasedKeys` cover? → A: Every key, on every modifier plane the assignments use, that carries a cased pair. The layout-family list is the floor, not the ceiling.
 - Q: How is the touch "lost keys" report handled? → A: Every walk run diffs the touch `default` layers against the alphabet, and the bug is filed when the loss reproduces. There is no separate story.
 - Q: May `nul` / `beep` appear inside stores? -> A: No. Keyman 19's compiler rejects them (keymanapp/keyboards#4181, from keymanapp/keyman#16723). The agreed upstream fix is to strip the `nul`/`beep` items and their corresponding key/base items out of the parallel stores and place them in separate rules. Generated stores never contain them. Starting keyboards that still do (e.g. `sil_cameroon_qwerty` `store(dkt003b)`, `sil_cameroon_azerty`) are normalised in the projection by that same method. As rule outputs (`> nul`, `> beep`, `> context(1) beep`), they remain legal.
-- Q: Should blocked marks offer a beep variant? -> A: No. In current Keyman, `beep` and `nul` have the same effect (neither audibly beeps), so swallow already covers beep. There is no beep answer and no beep variant.
+- Q: Should blocked marks offer a beep variant? -> A: No. In current Keyman, `beep` and `nul` have the same effect (neither audibly beeps), so swallow already covers beep. There is no beep answer and no beep variant. Direction: prefer `nul` over `beep`. Generated rules always use `nul`, and items split out of illegal stores are emitted as `nul`.
 - Q: How are consistent results confirmed? → A: Primarily by **decision-point fixtures**: a clean starting IR plus a decision record built up to each decision point, then projected and asserted. The UI walk is the end-to-end gate, not the primary check.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -238,7 +238,7 @@ accepted, and all 32 cases pass the consistency gates.
 - **FR-012**: Blocking MUST cover every context outside the mark's allowed set (non-letters, digits, punctuation, buffer start) using one rule per mark; blocked marks are swallowed. At buffer start the existing bare-mark behaviour answer (swallow | emit) decides.
 - **FR-013**: The attachment station MUST offer a space column, unchecked by default, on every mark row. Ticking it adds U+0020 to that mark's allowed set.
 
-- **FR-014**: No store in the downloaded keyboard may contain `nul` or `beep`, whether generated or carried over from the starting keyboard. A starting store that contains them MUST be normalised in the projection: the `nul`/`beep` items and their index-aligned partner items are removed from the parallel stores, and each becomes a separate rule with the same context and output. Typed behaviour MUST be identical before and after (simulator-checked).
+- **FR-014**: No store in the downloaded keyboard may contain `nul` or `beep`, whether generated or carried over from the starting keyboard. A starting store that contains them MUST be normalised in the projection: the `nul`/`beep` items and their index-aligned partner items are removed from the parallel stores, and each becomes a separate rule with the same context and the output `nul` (a `beep` item becomes `nul`, since they behave the same). Typed behaviour MUST be identical before and after (simulator-checked).
 
 **Output form (US3)**
 - **FR-020**: Every output string the assignments emit MUST be rewritten to the keyboard-wide output form through one seam.

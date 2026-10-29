@@ -314,16 +314,16 @@ Required test vectors:
     fork's master may predate the upstream fix, and the pinned oracle is kmc-kmn 19.0.240-alpha, so
     these may already fail or warn at compile.
 - **Decision**:
-  1. **Generator rule**: no generated store ever contains `nul`/`beep`. This covers mark-guard allowed
+  1. **Generator rule**: generated rules use `nul`, never `beep`. No generated store ever contains `nul`/`beep`. This covers mark-guard allowed
      stores, S-02 base stores, postfix-composed stores, S-08 output stores, unwrap stores and
      `&CasedKeys`. Rule outputs may use them; R5 still forbids `nul`/`beep` in deadkey rules.
   2. **Normaliser**: new pure engine function `splitIllegalStoreItems(ir)` in
      `packages/engine/src/pattern-apply/store-legality.ts`.
      - For every rule `ctx any(K) > index(V, n)` (and `dk(x) + any(K) > index(V, n)`) whose output
        store `V` has `nul`/`beep` at positions i, it removes item i from both `K` and `V`.
-     - It emits one rule per removed item, `ctx <K[i]> > nul|beep`, placed immediately before the
-       original rule. It keeps the author's token: `nul` and `beep` behave the same, and keeping the
-       token makes the split a pure move.
+     - It emits one rule per removed item, `ctx <K[i]> > nul`, placed immediately before the original
+       rule. A `beep` item becomes `nul`. Ruling 2026-10-29: move toward `nul` over `beep`; they behave
+       the same.
      - It keeps the other items aligned, and it is idempotent.
      - If a store is shared by several rules in ways that prevent a safe split, the store is left
        alone and a warning is raised (it becomes a G8 failure with detail).

@@ -35,7 +35,7 @@ Each story phase ends with the same three gate tasks:
 - [ ] T007 Commit `fix(studio): one projection input for preview and download` and push it to `106-consistent-keyboard-output`.
 - [ ] T070 Write tests in `packages/engine/src/pattern-apply/store-legality.test.ts` for `splitIllegalStoreItems(ir)` (research R11). Cover:
   - a `dk(x) + any(K) > index(V,2)` store with `nul` items becomes separate `dk(x) + 'k' > nul` rules, with the remaining items still aligned;
-  - `beep` items get the same treatment;
+  - `beep` items are split the same way and emitted as `nul` (the simulator equivalence compares final output only, because beep and nul behave the same);
   - it is idempotent;
   - a store shared by rules where a safe split is impossible is left alone with a warning;
   - a corpus case on `sil_cameroon_qwerty.kmn:352` `store(dkt003b)`: compile succeeds and the simulator output plus beep flag are identical for every key after `;`, before and after the split.
@@ -104,7 +104,7 @@ Each story phase ends with the same three gate tasks:
   - `5` at buffer start is blocked under swallow.
   - Touch `T_0300` follows the same route; use the touch simulator `TouchTapSession` if it is reachable, otherwise record a skip with the reason.
 - [ ] T018 [US2] Add `allowedContexts?: Record<string, string[]>` to `PlacementWorklist` in `packages/engine/src/marks/worklist.ts` (:52-97). Space is never a base and never a blocked combination.
-- [ ] T019 [US2] (Generated stores never contain `nul`/`beep`: R11, G8.) Rewrite the blocking emission in `packages/engine/src/pattern-apply/mark-guards.ts` (:106-124) as per-mark `notany` rules over a generated allowed store (case-expanded bases plus allowedContexts), with a `nul '<mark>'` buffer-start rule driven by a new `bareMarkBehaviour` parameter. Keep the existing stripping of `generated_marks_*` and keep the result counts.
+- [ ] T019 [US2] (Generated stores never contain `nul`/`beep`, and generated rules use `nul`, never `beep`: R11, G8.) Rewrite the blocking emission in `packages/engine/src/pattern-apply/mark-guards.ts` (:106-124) as per-mark `notany` rules over a generated allowed store (case-expanded bases plus allowedContexts), with a `nul '<mark>'` buffer-start rule driven by a new `bareMarkBehaviour` parameter. Keep the existing stripping of `generated_marks_*` and keep the result counts.
 - [ ] T020 [US2] Add projection step 2.6 to `packages/studio/src/lib/projectWorkingCopyVfs.ts` at ~:890, between 2.5 and 2.7 (research R3):
   - add a new `marksGuards` input;
   - parse, then `applyMarkGuards`, then emit only when the IR changed;
