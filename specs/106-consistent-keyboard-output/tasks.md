@@ -33,6 +33,16 @@ Each story phase ends with the same three gate tasks:
 - [ ] T005 Switch `packages/studio/src/lib/serializeWorkingCopy.ts` (~:505) and `packages/studio/src/hooks/useWorkingCopyTransform.ts` (~:494) to `projectionInputFromState` (FR-005). The hook's `useMemo` dependency keys must cover every field.
 - [ ] T006 Add a preview/download parity test in `packages/studio/src/lib/projectionInput.parity.test.ts`. Seed the store with fallbackPolicy, a disabled family and keyEditOps, then assert that the preview transform VFS equals the `projectWorkingCopyForOutput()` VFS.
 - [ ] T007 Commit `fix(studio): one projection input for preview and download` and push it to `106-consistent-keyboard-output`.
+- [ ] T070 Write tests in `packages/engine/src/pattern-apply/store-legality.test.ts` for `splitIllegalStoreItems(ir)` (research R11). Cover:
+  - a `dk(x) + any(K) > index(V,2)` store with `nul` items becomes separate `dk(x) + 'k' > nul` rules, with the remaining items still aligned;
+  - `beep` items get the same treatment;
+  - it is idempotent;
+  - a store shared by rules where a safe split is impossible is left alone with a warning;
+  - a corpus case on `sil_cameroon_qwerty.kmn:352` `store(dkt003b)`: compile succeeds and the simulator output plus beep flag are identical for every key after `;`, before and after the split.
+  The corpus case is a `*.corpus.test.ts` and is skipped when `../keyboards` is absent.
+- [ ] T071 Implement `splitIllegalStoreItems` in `packages/engine/src/pattern-apply/store-legality.ts` and export it from `packages/engine/src/index.ts`. It operates on the IR (Art. II) and never mutates its input.
+- [ ] T072 Add projection step 1.9 in `packages/studio/src/lib/projectWorkingCopyVfs.ts`, after the 1.8 deadkey overlay and before step 2. It does parse, then `splitIllegalStoreItems`, then emit only when the IR changed, and pushes one `[project-working-copy]` warning per split store. Update the header comment.
+- [ ] T073 Add the G8 gate to `checkConsistencyGates` when T010 lands; until then, track it here. Commit `fix(engine): no nul or beep inside stores` and push it to `106-consistent-keyboard-output`.
 
 ---
 
@@ -54,7 +64,7 @@ Each story phase ends with the same three gate tasks:
     - `caps`: adds `caps-handling` (absent in pre-US5 records, so the harness seeds the module default);
     - `tolerance`: restores `contextTolerance`.
   - Add a unit test against the p1 record (entry counts, the cut keeps only decisions at or before the point).
-- [ ] T010 [US1] Implement `checkConsistencyGates` (G1-G7, see [contracts/consistency-gates.md](contracts/consistency-gates.md)) in `packages/studio/src/test/consistencyGates.ts`, with unit tests on synthetic IRs: one passing and one failing case per gate.
+- [ ] T010 [US1] Implement `checkConsistencyGates` (G1-G8, see [contracts/consistency-gates.md](contracts/consistency-gates.md)) in `packages/studio/src/test/consistencyGates.ts`, with unit tests on synthetic IRs: one passing and one failing case per gate.
 - [ ] T011 [US1] Implement `buildDecisionPointFixture` in `packages/studio/src/test/decisionPointFixture.ts` (see [contracts/decision-point-fixture.md](contracts/decision-point-fixture.md)).
   1. Reset the stores.
   2. Run `loadVfs`.
@@ -94,7 +104,7 @@ Each story phase ends with the same three gate tasks:
   - `5` at buffer start is blocked under swallow.
   - Touch `T_0300` follows the same route; use the touch simulator `TouchTapSession` if it is reachable, otherwise record a skip with the reason.
 - [ ] T018 [US2] Add `allowedContexts?: Record<string, string[]>` to `PlacementWorklist` in `packages/engine/src/marks/worklist.ts` (:52-97). Space is never a base and never a blocked combination.
-- [ ] T019 [US2] Rewrite the blocking emission in `packages/engine/src/pattern-apply/mark-guards.ts` (:106-124) as per-mark `notany` rules over a generated allowed store (case-expanded bases plus allowedContexts), with a `nul '<mark>'` buffer-start rule driven by a new `bareMarkBehaviour` parameter. Keep the existing stripping of `generated_marks_*` and keep the result counts.
+- [ ] T019 [US2] (Generated stores never contain `nul`/`beep`: R11, G8.) Rewrite the blocking emission in `packages/engine/src/pattern-apply/mark-guards.ts` (:106-124) as per-mark `notany` rules over a generated allowed store (case-expanded bases plus allowedContexts), with a `nul '<mark>'` buffer-start rule driven by a new `bareMarkBehaviour` parameter. Keep the existing stripping of `generated_marks_*` and keep the result counts.
 - [ ] T020 [US2] Add projection step 2.6 to `packages/studio/src/lib/projectWorkingCopyVfs.ts` at ~:890, between 2.5 and 2.7 (research R3):
   - add a new `marksGuards` input;
   - parse, then `applyMarkGuards`, then emit only when the IR changed;
@@ -252,7 +262,7 @@ Each story phase ends with the same three gate tasks:
 ## Dependencies
 
 ```
-Setup (T001-T003) -> Foundational (T004-T007) -> US1 (T008-T015)
+Setup (T001-T003) -> Foundational (T004-T007, T070-T073) -> US1 (T008-T015)
 US1 -> US2 -> US3 -> US4 -> US6 -> US8
               US3 -> US5 (independent of US4/US6)
               US3 + US4 -> US7
@@ -294,3 +304,5 @@ The 2026-10-29 advisor review (Fable) found 11 issues: 1 blocker, 6 major and 4 
 - Paths were corrected (T028, T039).
 - The output-form assertion was restored (T032).
 - The spec's assumption line and fixture count were fixed.
+
+2026-10-29: the user pointed to keymanapp/keyboards#4181. `nul`/`beep` are illegal inside stores under the 19.0 compiler. As a result, FR-014, gate G8, research R11 and tasks T070-T073 were added (foundational: they run before the fixtures, because two walk bases carry illegal stores). The R3 "no beep" wording was corrected: beep exists in IR, codec and simulator; only the marks decision lacks a beep option.

@@ -83,14 +83,16 @@ carve + caps, fixture/compile/simulate infra) and one km-keyman ruling. Line num
   - Keep `blockingRuleCount`.
   - km-keyman confirmed (ruling below) that rules the deadkey emits always pass the guard, because
     both come from the same matrix row.
-- **No beep.** The spec draft said "swallow/beep". The code has no beep concept anywhere in marks.
-  The only behaviour answer is `GuardSpecification.behaviour: "swallow" | "emit"`
+- **No beep option in the marks decision.** `beep` and `nul` are modelled throughout the IR, codec
+  and simulator (`contracts/src/keyboard-ir.ts`, `engine/src/simulator`, recognizer `s02-families.ts`),
+  but the marks treatment has no beep answer. The only behaviour answer is `GuardSpecification.behaviour: "swallow" | "emit"`
   (`contracts/src/decisionRecord.ts:525-538`), and it governs a mark key tapped with no letter
   before it. The decision is:
   - attachment blocking always swallows;
   - the buffer-start rule honours `GuardSpecification.behaviour` (emit = let the bare mark through
     at buffer start).
-  - Beep is dropped (spec FR-012 is corrected).
+  - The beep variant is deferred: it would need a new answer value. If it is added, it is a rule
+    output (`notany(...) '<mark>' > context(1) beep`) and is legal; it must never be a store item (R11).
 - **Space column**: `AttachmentStation.tsx` (rows at :74-110). Storage is the existing answer key
   `marks_attachment.<mark>|<base>` with base = `" "` (U+0020), default unchecked.
   `buildPlacementWorklist` (`engine/src/marks/worklist.ts:52-97`) must not treat space as an alphabet
@@ -292,3 +294,45 @@ Required test vectors:
   Accept.
 - Harness (`../ks-2302-main/tools/testing-profiles-2302/scripts/phase2.template.js`): drop the `zzq`
   path, accept the pre-selected proposal, record it. The G6 touch diff goes into `run-zip.mjs`.
+
+## R11. `nul` / `beep` in stores (keymanapp/keyboards#4181)
+
+- **Source**: keymanapp/keyman#16723 makes the 19.0 compiler reject `nul`/`beep` inside stores.
+  Before that, they half-worked through compiler unfolding of `any`/`index`. Issue
+  keymanapp/keyboards#4181 lists the affected corpus keyboards: clavbur9, hausa_ajami_qwerty,
+  sil_cameroon_qwerty, sil_cameroon_azerty, sil_dzongkha, sil_yoruba8, sil_yoruba_bar and sil_yoruba_dot.
+  The method agreed there (comment 6501435991) is to strip the `nul`/`beep` items and their
+  corresponding base keys out of the stores and put them in separate rules, because it has virtually
+  zero side effects. The `dk(none)` substitute was rejected as riskier, since it blocks preceding-context
+  matches.
+- **Exposure in this feature**:
+  - `sil_cameroon_qwerty.kmn:352` `store(dkt003b)` holds 11 `nul` items. The file has 12 `nul` and 21
+    `BEEP` tokens in total.
+  - `sil_cameroon_azerty.kmn:399` `store(dkt0021)` is the same family.
+  - Both are #2302 walk bases, and `sil_yoruba8` is used by the tolerance tests. The keyboard-studio
+    fork's master may predate the upstream fix, and the pinned oracle is kmc-kmn 19.0.240-alpha, so
+    these may already fail or warn at compile.
+- **Decision**:
+  1. **Generator rule**: no generated store ever contains `nul`/`beep`. This covers mark-guard allowed
+     stores, S-02 base stores, postfix-composed stores, S-08 output stores, unwrap stores and
+     `&CasedKeys`. Rule outputs may use them; R5 still forbids `nul`/`beep` in deadkey rules.
+  2. **Normaliser**: new pure engine function `splitIllegalStoreItems(ir)` in
+     `packages/engine/src/pattern-apply/store-legality.ts`.
+     - For every rule `ctx any(K) > index(V, n)` (and `dk(x) + any(K) > index(V, n)`) whose output
+       store `V` has `nul`/`beep` at positions i, it removes item i from both `K` and `V`.
+     - It emits one rule per removed item, `ctx <K[i]> > nul|beep`, placed immediately before the
+       original rule.
+     - It keeps the other items aligned, and it is idempotent.
+     - If a store is shared by several rules in ways that prevent a safe split, the store is left
+       alone and a warning is raised (it becomes a G8 failure with detail).
+  3. **Placement**: projection step **1.9**, after carve (1) and the deadkey overlay (1.8), and
+     before assignments (2). It runs on both tracks, so all later steps see legal stores.
+     - It is a behaviour-preserving legality fix, which counts as precertification under Art. X, not
+       an author decision.
+     - It is reported in the projection warnings and in the PR or change summary, so it is not silent.
+  4. **Gate G8**: every `store()` item in the projected IR is neither `nul` nor `beep`.
+     - Proof of equivalence: a simulator diff over every affected key x deadkey on the starting
+       keyboard, before and after the split, compared by final output and beep flag.
+- **Alternatives rejected**:
+  - `dk(none)` substitution: it changes context matching.
+  - Leaving starting stores untouched: the 19.0 compile fails and keyboards-repo PRs get rejected.
