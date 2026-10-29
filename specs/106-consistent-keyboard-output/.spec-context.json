@@ -1,0 +1,38 @@
+{
+  "workflow": "speckit",
+  "specName": "Consistent keyboard output from base + decisions + carve",
+  "branch": "106-consistent-keyboard-output",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-29T21:31:10.885Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-29T21:42:02.447Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-29T21:42:06.648Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-29T21:43:42.066Z"
+    }
+  ],
+  "telemetryInstanceId": "c5ffbd69-afee-4690-a346-3b60c164a673"
+}
