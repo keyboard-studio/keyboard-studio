@@ -2706,6 +2706,18 @@ export function MechanismGallery({
     },
     [inventory, treatmentFilteredChars, setCurrentChar],
   );
+  // The strip's second row: the treatment-filtered COMPOSED forms (a letter
+  // plus marks the author types on their own keys or via deadkeys). Lone
+  // marks stay on the main row.
+  const composedStripSet = useMemo(
+    () =>
+      new Set(
+        inventory.filter(
+          (c) => treatmentFilteredChars.has(c.normalize("NFC")) && [...c.normalize("NFD")].length > 1,
+        ),
+      ),
+    [inventory, treatmentFilteredChars],
+  );
 
   // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
   // leftContent wrapping div below) rather than on CharScrollStrip itself —
@@ -4790,6 +4802,7 @@ export function MechanismGallery({
             preAugmentSessionAwareSet={baseProducedSet}
             markedSet={markedDesktopSet}
             loanwordSet={loanwordSet}
+            composedSet={composedStripSet}
           />
         )}
 
