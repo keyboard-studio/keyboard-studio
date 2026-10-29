@@ -298,6 +298,8 @@ Required test vectors:
 
 ## R11. `nul` / `beep` in stores (keymanapp/keyboards#4181)
 
+**Deferred (tracking issue #2361):** the method for starting stores follows the outcome of keymanapp/keyboards#4181. The split method described in item 2 below is the leading candidate, not a decision. Generated stores and rules (item 1) are decided now.
+
 - **Source**: keymanapp/keyman#16723 makes the 19.0 compiler reject `nul`/`beep` inside stores.
   Before that, they half-worked through compiler unfolding of `any`/`index`. Issue
   keymanapp/keyboards#4181 lists the affected corpus keyboards: clavbur9, hausa_ajami_qwerty,

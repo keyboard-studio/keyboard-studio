@@ -33,16 +33,18 @@ Each story phase ends with the same three gate tasks:
 - [ ] T005 Switch `packages/studio/src/lib/serializeWorkingCopy.ts` (~:505) and `packages/studio/src/hooks/useWorkingCopyTransform.ts` (~:494) to `projectionInputFromState` (FR-005). The hook's `useMemo` dependency keys must cover every field.
 - [ ] T006 Add a preview/download parity test in `packages/studio/src/lib/projectionInput.parity.test.ts`. Seed the store with fallbackPolicy, a disabled family and keyEditOps, then assert that the preview transform VFS equals the `projectWorkingCopyForOutput()` VFS.
 - [ ] T007 Commit `fix(studio): one projection input for preview and download` and push it to `106-consistent-keyboard-output`.
-- [ ] T070 Write tests in `packages/engine/src/pattern-apply/store-legality.test.ts` for `splitIllegalStoreItems(ir)` (research R11). Cover:
+> **Deferred (tracking issue #2361):** the method for starting stores follows the outcome of keymanapp/keyboards#4181. T070-T072 are **blocked** until then; do not implement them. T073 goes ahead for generated stores only.
+
+- [ ] T070 [BLOCKED #2361] Write tests in `packages/engine/src/pattern-apply/store-legality.test.ts` for `splitIllegalStoreItems(ir)` (research R11). Cover:
   - a `dk(x) + any(K) > index(V,2)` store with `nul` items becomes separate `dk(x) + 'k' > nul` rules, with the remaining items still aligned;
   - `beep` items are split the same way and emitted as `nul` (the simulator equivalence compares final output only, because beep and nul behave the same);
   - it is idempotent;
   - a store shared by rules where a safe split is impossible is left alone with a warning;
   - a corpus case on `sil_cameroon_qwerty.kmn:352` `store(dkt003b)`: compile succeeds and the simulator output plus beep flag are identical for every key after `;`, before and after the split.
   The corpus case is a `*.corpus.test.ts` and is skipped when `../keyboards` is absent.
-- [ ] T071 Implement `splitIllegalStoreItems` in `packages/engine/src/pattern-apply/store-legality.ts` and export it from `packages/engine/src/index.ts`. It operates on the IR (Art. II) and never mutates its input.
-- [ ] T072 Add projection step 1.9 in `packages/studio/src/lib/projectWorkingCopyVfs.ts`, after the 1.8 deadkey overlay and before step 2. It does parse, then `splitIllegalStoreItems`, then emit only when the IR changed, and pushes one `[project-working-copy]` warning per split store. Update the header comment.
-- [ ] T073 Add the G8 gate to `checkConsistencyGates` when T010 lands; until then, track it here. Commit `fix(engine): no nul or beep inside stores` and push it to `106-consistent-keyboard-output`.
+- [ ] T071 [BLOCKED #2361] Implement `splitIllegalStoreItems` in `packages/engine/src/pattern-apply/store-legality.ts` and export it from `packages/engine/src/index.ts`. It operates on the IR (Art. II) and never mutates its input.
+- [ ] T072 [BLOCKED #2361] Add projection step 1.9 in `packages/studio/src/lib/projectWorkingCopyVfs.ts`, after the 1.8 deadkey overlay and before step 2. It does parse, then `splitIllegalStoreItems`, then emit only when the IR changed, and pushes one `[project-working-copy]` warning per split store. Update the header comment.
+- [ ] T073 Add the G8 gate to `checkConsistencyGates` when T010 lands. It is enforced for generated stores; for starting stores it is `it.fails` with the test name citing #2361 until T070-T072 unblock.
 
 ---
 
@@ -262,7 +264,7 @@ Each story phase ends with the same three gate tasks:
 ## Dependencies
 
 ```
-Setup (T001-T003) -> Foundational (T004-T007, T070-T073) -> US1 (T008-T015)
+Setup (T001-T003) -> Foundational (T004-T007; T073 with US1; T070-T072 blocked on #2361) -> US1 (T008-T015)
 US1 -> US2 -> US3 -> US4 -> US6 -> US8
               US3 -> US5 (independent of US4/US6)
               US3 + US4 -> US7
@@ -306,3 +308,5 @@ The 2026-10-29 advisor review (Fable) found 11 issues: 1 blocker, 6 major and 4 
 - The spec's assumption line and fixture count were fixed.
 
 2026-10-29: the user pointed to keymanapp/keyboards#4181. `nul`/`beep` are illegal inside stores under the 19.0 compiler. As a result, FR-014, gate G8, research R11 and tasks T070-T073 were added (foundational: they run before the fixtures, because two walk bases carry illegal stores). The R3 "no beep" wording was corrected: beep exists in IR, codec and simulator; only the marks decision lacks a beep option.
+
+2026-10-29 (later): the method for `nul`/`beep` inside starting stores is deferred to the outcome of keymanapp/keyboards#4181, tracked in #2361. T070-T072 are blocked. Generated stores and rules (no `nul`/`beep` in stores; `nul` over `beep` in rules) remain decided.
