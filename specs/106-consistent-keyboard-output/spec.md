@@ -35,6 +35,7 @@ requirement below.
 - Q: Which keys does `&CasedKeys` cover? → A: Every key, on every modifier plane the assignments use, that carries a cased pair. The layout-family list is the floor, not the ceiling.
 - Q: How is the touch "lost keys" report handled? → A: Every walk run diffs the touch `default` layers against the alphabet, and the bug is filed when the loss reproduces. There is no separate story.
 - Q: May `nul` / `beep` appear inside stores? -> A: No. Keyman 19's compiler rejects them (keymanapp/keyboards#4181, from keymanapp/keyman#16723). The agreed upstream fix is to strip the `nul`/`beep` items and their corresponding key/base items out of the parallel stores and place them in separate rules. Generated stores never contain them. Starting keyboards that still do (e.g. `sil_cameroon_qwerty` `store(dkt003b)`, `sil_cameroon_azerty`) are normalised in the projection by that same method. As rule outputs (`> nul`, `> beep`, `> context(1) beep`), they remain legal.
+- Q: Should blocked marks offer a beep variant? -> A: No. In current Keyman, `beep` and `nul` have the same effect (neither audibly beeps), so swallow already covers beep. There is no beep answer and no beep variant.
 - Q: How are consistent results confirmed? → A: Primarily by **decision-point fixtures**: a clean starting IR plus a decision record built up to each decision point, then projected and asserted. The UI walk is the end-to-end gate, not the primary check.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -78,7 +79,7 @@ after space, and at buffer start; touch `T_0300` takes the same route.
 
 1. **Given** marks treatment = swallow with an attachment matrix, **When** the keyboard is downloaded, **Then** it contains the generated guard group and the whole-stack backspace rules.
 2. **Given** the space column is ticked for one mark, **When** that mark is typed after a space, **Then** it is emitted; for any other mark it is blocked.
-3. **Given** the bare-mark behaviour answer = emit, **When** the mark is typed at buffer start, **Then** it is emitted; with swallow it is not. Attachment blocking swallows. The marks decision has no beep option today; `beep` is legal only as a rule output, never inside a store (research R3, R11).
+3. **Given** the bare-mark behaviour answer = emit, **When** the mark is typed at buffer start, **Then** it is emitted; with swallow it is not. Attachment blocking swallows. No beep variant: `beep` and `nul` have the same effect in current Keyman (research R3).
 4. **Given** the marks decision is changed or removed, **When** projected again, **Then** the guard output updates and no stale guard rule remains.
 
 ---

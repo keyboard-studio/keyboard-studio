@@ -91,8 +91,9 @@ carve + caps, fixture/compile/simulate infra) and one km-keyman ruling. Line num
   - attachment blocking always swallows;
   - the buffer-start rule honours `GuardSpecification.behaviour` (emit = let the bare mark through
     at buffer start).
-  - The beep variant is deferred: it would need a new answer value. If it is added, it is a rule
-    output (`notany(...) '<mark>' > context(1) beep`) and is legal; it must never be a store item (R11).
+  - **No beep variant (ruling 2026-10-29).** In current Keyman, `beep` and `nul` have the same
+    effect; neither audibly beeps. Swallow therefore already is the beep behaviour, and no answer
+    value is added.
 - **Space column**: `AttachmentStation.tsx` (rows at :74-110). Storage is the existing answer key
   `marks_attachment.<mark>|<base>` with base = `" "` (U+0020), default unchecked.
   `buildPlacementWorklist` (`engine/src/marks/worklist.ts:52-97`) must not treat space as an alphabet
@@ -321,7 +322,8 @@ Required test vectors:
      - For every rule `ctx any(K) > index(V, n)` (and `dk(x) + any(K) > index(V, n)`) whose output
        store `V` has `nul`/`beep` at positions i, it removes item i from both `K` and `V`.
      - It emits one rule per removed item, `ctx <K[i]> > nul|beep`, placed immediately before the
-       original rule.
+       original rule. It keeps the author's token: `nul` and `beep` behave the same, and keeping the
+       token makes the split a pure move.
      - It keeps the other items aligned, and it is idempotent.
      - If a store is shared by several rules in ways that prevent a safe split, the store is left
        alone and a warning is raised (it becomes a G8 failure with detail).
