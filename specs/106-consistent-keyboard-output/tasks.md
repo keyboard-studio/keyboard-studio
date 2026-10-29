@@ -32,7 +32,7 @@ Each story phase ends with the same three gate tasks:
 - [x] T004 Create `packages/studio/src/lib/projectionInput.ts` with a pure `projectionInputFromState(state, extras)` that returns the full `ProjectWorkingCopyVfsInput`. It must include `fallbackPolicy`, `suppressionExemptIds`, `disabledFamilyIds` merged into `deletedItemIds`, `carveTouchKeepInert` and `keyEditOps`, which today only the preview passes (research R1 F-DIVERGE).
 - [x] T005 Switch `packages/studio/src/lib/serializeWorkingCopy.ts` (~:505) and `packages/studio/src/hooks/useWorkingCopyTransform.ts` (~:494) to `projectionInputFromState` (FR-005). The hook's `useMemo` dependency keys must cover every field.
 - [x] T006 Add a preview/download parity test in `packages/studio/src/lib/projectionInput.parity.test.ts`. Seed the store with fallbackPolicy, a disabled family and keyEditOps, then assert that the preview transform VFS equals the `projectWorkingCopyForOutput()` VFS.
-- [ ] T007 Commit `fix(studio): one projection input for preview and download` and push it to `106-consistent-keyboard-output`.
+- [x] T007 Commit `fix(studio): one projection input for preview and download` and push it to `106-consistent-keyboard-output`.
 > **Deferred (tracking issue #2361):** the method for starting stores follows the outcome of keymanapp/keyboards#4181. T070-T072 are **blocked** until then; do not implement them. T073 goes ahead for generated stores only.
 
 - [ ] T070 [BLOCKED #2361] Write tests in `packages/engine/src/pattern-apply/store-legality.test.ts` for `splitIllegalStoreItems(ir)` (research R11). Cover:
@@ -44,7 +44,7 @@ Each story phase ends with the same three gate tasks:
   The corpus case is a `*.corpus.test.ts` and is skipped when `../keyboards` is absent.
 - [ ] T071 [BLOCKED #2361] Implement `splitIllegalStoreItems` in `packages/engine/src/pattern-apply/store-legality.ts` and export it from `packages/engine/src/index.ts`. It operates on the IR (Art. II) and never mutates its input.
 - [ ] T072 [BLOCKED #2361] Add projection step 1.9 in `packages/studio/src/lib/projectWorkingCopyVfs.ts`, after the 1.8 deadkey overlay and before step 2. It does parse, then `splitIllegalStoreItems`, then emit only when the IR changed, and pushes one `[project-working-copy]` warning per split store. Update the header comment.
-- [ ] T073 Add the G8 gate to `checkConsistencyGates` when T010 lands. It is enforced for generated stores; for starting stores it is `it.fails` with the test name citing #2361 until T070-T072 unblock.
+- [x] T073 Add the G8 gate to `checkConsistencyGates` when T010 lands. It is enforced for generated stores; for starting stores it is `it.fails` with the test name citing #2361 until T070-T072 unblock.
 
 ---
 
@@ -54,8 +54,8 @@ Each story phase ends with the same three gate tasks:
 
 **Independent test**: `npx vitest run --config vitest.corpus.config.ts src/test/decisionPoint` reports every gate per fixture. Today's gaps E1-E7 are `it.fails`.
 
-- [ ] T008 [US1] Export `loadVfs` from `packages/studio/src/test/sc004Harness.ts` (:58) and widen it from `(typeof KEYBOARDS)[number]` (KEYBOARDS :29-35 lacks basic_kbdfr and sil_cameroon_*) to `{ id, group }`, so it can load any corpus keyboard. Keep the existing callers unchanged.
-- [ ] T009 [US1] Implement `recordToDecisionSet(record, upTo)` in `packages/studio/src/test/recordToDecisionSet.ts`.
+- [x] T008 [US1] Export `loadVfs` from `packages/studio/src/test/sc004Harness.ts` (:58) and widen it from `(typeof KEYBOARDS)[number]` (KEYBOARDS :29-35 lacks basic_kbdfr and sil_cameroon_*) to `{ id, group }`, so it can load any corpus keyboard. Keep the existing callers unchanged.
+- [x] T009 [US1] Implement `recordToDecisionSet(record, upTo)` in `packages/studio/src/test/recordToDecisionSet.ts`.
   - Parse the record with `parseDecisionRecord` (`engine/src/decision-audit/record.ts:251`) and keep the non-superseded entries.
   - Map `decision` entries to `decisionId`.
   - Map `survey-answer` entries through each registry module's `provides` (`survey/questions/registry.ts`).
@@ -66,8 +66,8 @@ Each story phase ends with the same three gate tasks:
     - `caps`: adds `caps-handling` (absent in pre-US5 records, so the harness seeds the module default);
     - `tolerance`: restores `contextTolerance`.
   - Add a unit test against the p1 record (entry counts, the cut keeps only decisions at or before the point).
-- [ ] T010 [US1] Implement `checkConsistencyGates` (G1-G8, see [contracts/consistency-gates.md](contracts/consistency-gates.md)) in `packages/studio/src/test/consistencyGates.ts`, with unit tests on synthetic IRs: one passing and one failing case per gate.
-- [ ] T011 [US1] Implement `buildDecisionPointFixture` in `packages/studio/src/test/decisionPointFixture.ts` (see [contracts/decision-point-fixture.md](contracts/decision-point-fixture.md)).
+- [x] T010 [US1] Implement `checkConsistencyGates` (G1-G8, see [contracts/consistency-gates.md](contracts/consistency-gates.md)) in `packages/studio/src/test/consistencyGates.ts`, with unit tests on synthetic IRs: one passing and one failing case per gate.
+- [x] T011 [US1] Implement `buildDecisionPointFixture` in `packages/studio/src/test/decisionPointFixture.ts` (see [contracts/decision-point-fixture.md](contracts/decision-point-fixture.md)).
   1. Reset the stores.
   2. Run `loadVfs`.
   3. Instantiate the way `sc004Harness.runAdaptFlow` (:143-158) does: `parseKmn`, then `makeStartKeyboard`, then `instantiateFromStart` for copy or `instantiateFromExisting` for adapt. Add the `recognizePatterns` and touch-layout parse from `tests/survey/walkEmit.compile.test.ts` :149-156. (`instantiateLikeStudio` itself loads from `tests/fixtures/walkBases`, not the corpus.)
@@ -80,13 +80,13 @@ Each story phase ends with the same three gate tasks:
      e. `fallbackPolicy`: it is in no decision value and not in the record (`survey/carve/carveValue.ts:29-33`). The harness uses DEFAULT; this limitation is recorded in the fixture header.
   6. Call `buildOutputBundle()`.
   7. Return the compiled result, a `simulate` closure and the gates.
-- [ ] T012 [US1] Add the script `fixtures:decision-points` to `packages/studio/package.json`. It runs `scripts/genDecisionPoints.ts`, which writes `src/lib/__fixtures__/decision-points/<base>/<profile>/<point>.decisions.json` from the T003 records, and its output must be deterministic. Generate and commit the JSON.
-- [ ] T013 [US1] Write `packages/studio/src/test/decisionPoint.corpus.test.ts`.
+- [x] T012 [US1] Add the script `fixtures:decision-points` to `packages/studio/package.json`. It runs `scripts/genDecisionPoints.ts`, which writes `src/lib/__fixtures__/decision-points/<base>/<profile>/<point>.decisions.json` from the T003 records, and its output must be deterministic. Generate and commit the JSON.
+- [x] T013 [US1] Write `packages/studio/src/test/decisionPoint.corpus.test.ts`.
   - Run every committed fixture through `buildDecisionPointFixture` and assert the gates.
-  - Mark the known gaps `it.fails` with the owning story in the test name: G3 → US2, G4 → US3, G1 → US4 (G1 applies at `assignments` and later, because unreachable hints come from assignment shadowing), G5 → US5, G2 → US6.
+  - Mark the known gaps `it.fails` with the owning story in the test name: G3 → US2, G4 → US3, G1 → US4 (G1 applies at `assignments` and later, because unreachable hints come from assignment shadowing), G2 → US6. As built, G5 has no row: the four records contain no cased pair the gate misses (see T042). The camazerty G2 row is owned by an engine bug, not US6: the tolerance analysis throws on rules keyed to touch-only `T_` keys.
   - Add G7 determinism: project twice, byte-equal.
   - Gate missing corpus with `announceSc004Skip`.
-- [ ] T014 [US1] Add a fidelity assertion to the same file: for p1-whole-bafut-kbdus at the last point, the fixture's `source/bafut.kmn` equals the walk zip's `.kmn` modulo the known E-gaps. Any diff outside those gaps fails, and the diff is printed. This proves the fixtures reproduce what the UI produces. **Lifecycle**: the match is exact at US1. The zip predates the T005 F-DIVERGE fix and contains `zzq` placeholders, so normalise both of those first. From US2 on, each story records its expected diff in the test (`expectedDiffs[story]`). T064 re-baselines everything against the fresh walk zip.
+- [x] T014 [US1] Add a fidelity assertion to the same file: for p1-whole-bafut-kbdus at the last point, the fixture's `source/bafut.kmn` equals the walk zip's `.kmn` modulo the known E-gaps. Any diff outside those gaps fails, and the diff is printed. This proves the fixtures reproduce what the UI produces. **Lifecycle**: the match is exact at US1. The zip predates the T005 F-DIVERGE fix and contains `zzq` placeholders, so normalise both of those first. From US2 on, each story records its expected diff in the test (`expectedDiffs[story]`). T064 re-baselines everything against the fresh walk zip.
 - [ ] T015 [US1] Gate: run the quickstart steps 1, 3 and 4. Commit `feat(studio): decision-point fixtures with consistency gates` and push. Open a PR from `106-consistent-keyboard-output` (base: `km/s02-deadkey-purpose` until #2358 merges, then `main`) carrying the spec folder and Phases 1-3.
 
 ---
@@ -119,7 +119,7 @@ Each story phase ends with the same three gate tasks:
   - in `reconciledAttachmentChecked` (`marksViews.ts:90`) and the `MarksSeriesStep.tsx` case expansion (:384-390), pass it through without case-expanding it;
   - in `buildPlacementWorklist`, map it to `allowedContexts`;
   - add the en/fr i18n catalog entries (named placeholders only), following `packages/studio/CLAUDE.md`.
-- [ ] T024 [US2] Gate. Commit `fix(studio): mark guards reach the downloaded keyboard`, push, and open a PR.
+- [ ] T024 [US2] Gate. Re-run T013 first: G2 on basic_kbdus/basic_kbdfr passes today only because no guard is emitted. If it flips once guards land, add its US6 row in this PR. Commit `fix(studio): mark guards reach the downloaded keyboard`, push, and open a PR.
 
 ---
 
@@ -189,6 +189,7 @@ Each story phase ends with the same three gate tasks:
   - the casing gate (a caseless alphabet gives mode none, not asked);
   - the copy default with QWERTY and AZERTY floors;
   - the union with a non-letter key carrying ŋ/Ŋ on base/shift and on RAlt/Shift+RAlt.
+  - The four decision-point fixtures cannot show the US5 gap (all are copy-track bases that already carry `&CasedKeys`). Add a synthetic fixture with ŋ/Ŋ on a non-letter key and a caseless base, and extend G5 to read store-routed pairs (`any(altgrKeys) > index(...)`), so G5 fails before T048 and passes after it.
 - [ ] T043 [P] [US5] Write adapt-track tests:
   - an explicit CAPS/NCAPS start IR is offered only when the simulator outputs under {none, SHIFT, CAPS, SHIFT+CAPS} match for every key;
   - otherwise the offer is withheld with a reason;

@@ -1,0 +1,5196 @@
+{
+  "author-name": {
+    "id": "author-name",
+    "value": "Walk Author",
+    "provenance": "asked"
+  },
+  "authoring-track": {
+    "id": "authoring-track",
+    "value": "copy",
+    "provenance": "asked"
+  },
+  "base-keyboard": {
+    "id": "base-keyboard",
+    "value": {
+      "id": "sil_cameroon_azerty",
+      "name": "Cameroon AZERTY"
+    },
+    "provenance": "asked"
+  },
+  "carved-layout": {
+    "id": "carved-layout",
+    "value": {
+      "removals": [],
+      "dispositions": [
+        {
+          "comboId": "rule#81",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#82",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#44",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#55",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#100",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#55",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#100",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#24",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#43",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#52",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#98",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#52",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#98",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#49",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#89",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#260",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#17",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#56",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#101",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#17",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#56",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#101",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#3",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#16",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#53",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#99",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#16",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#53",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#99",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#51",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#65",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#64",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#48",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#20",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#47",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#45",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#74",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#73",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#51",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#22",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#50",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#9",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#47",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#85",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#20#61",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#50",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#13",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#13",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#13",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#86",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#146",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#145",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#56",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#20#63",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#25",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#39",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#55",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#15",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#20#62",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#62",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#93",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#94",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#59",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#27",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#58",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#17",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#18",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#52",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#17",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#17",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#121",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#122",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#68",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#57",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#57",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#33",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#67",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#26",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#27",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#54",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#54",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#56",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#26",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#26",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#138",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#137",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#69",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#68",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#27",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#28",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#60",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#27",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#27",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#142",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#141",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#76",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#38",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#75",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#34",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#35",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#61",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#34",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#34",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#149",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#38",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#63",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#158",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#157",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#82",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#42",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#81",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#41",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#65",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#90",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#45",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#26",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#44",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#150",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#79",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#78",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#214",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#244",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#88",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#84",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#85",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#86",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#87",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#88",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#89",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#90",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#91",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#92",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#93",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#94",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#95",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#96",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#97",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#98",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#99",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#100",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#101",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#215",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#217",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#218",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#219",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#220",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#84",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#85",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#86",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#87",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#88",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#89",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#90",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#91",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#92",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#93",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#94",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#95",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#96",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#97",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#98",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#99",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#100",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#101",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#215",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#217",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#218",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#219",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#220",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#72",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#21#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#149",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#150",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#186",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#246",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#38",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#79",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#93",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#102",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#103",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#104",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#105",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#106",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#107",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#108",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#109",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#110",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#111",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#112",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#113",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#114",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#115",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#116",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#117",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#118",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#215",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#102",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#103",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#104",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#105",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#106",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#107",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#108",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#109",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#110",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#111",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#112",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#113",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#114",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#115",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#116",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#117",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#118",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#215",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#3",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#4",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#7",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#9",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#10",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#11",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#12",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#63",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#83",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#12#78",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#13#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#14#37",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#21#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#53",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#67",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#254",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#94",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#157",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#158",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#159",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#160",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#161",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#162",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#163",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#164",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#165",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#166",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#167",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#168",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#169",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#170",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#171",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#172",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#173",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#174",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#175",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#176",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#177",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#178",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#201",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#202",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#157",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#158",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#159",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#160",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#161",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#162",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#163",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#164",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#165",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#166",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#167",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#168",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#169",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#170",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#171",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#172",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#173",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#174",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#175",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#176",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#177",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#178",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#201",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#202",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#20#55",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#46",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#21#7",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#251",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#252",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#95",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#71",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#21#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#213",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#257",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#258",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#11#96",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#179",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#180",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#181",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#182",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#183",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#184",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#179",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#180",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#181",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#182",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#183",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#184",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#21#9",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#53",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#157",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#201",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#157",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#201",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#20#55",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#168",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#202",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#168",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#202",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#119",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#203",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#119",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#203",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#122",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#204",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#122",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#204",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#129",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#205",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#129",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#205",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#138",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#206",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#138",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#206",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#141",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#207",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#141",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#207",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#148",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#208",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#148",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#208",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#89",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#215",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#89",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#215",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#96",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#96",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#216",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#126",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#217",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#126",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#217",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#130",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#218",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#130",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#218",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#145",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#219",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#145",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#219",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#149",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#220",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#149",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#220",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#221",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#221",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#222",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#223",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#3",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#51",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#13",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#109",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#20#58",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#30",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#184",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#119",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#120",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#121",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#122",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#123",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#124",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#125",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#126",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#127",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#128",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#129",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#130",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#131",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#132",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#133",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#134",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#135",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#136",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#137",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#138",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#139",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#140",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#141",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#142",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#143",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#144",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#145",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#146",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#147",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#148",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#149",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#150",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#151",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#152",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#153",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#154",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#155",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#156",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#203",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#204",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#205",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#206",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#207",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#208",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#217",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#218",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#219",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#220",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#119",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#120",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#121",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#122",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#123",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#124",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#125",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#126",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#127",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#128",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#129",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#130",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#131",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#132",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#133",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#134",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#135",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#136",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#137",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#138",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#139",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#140",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#141",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#142",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#143",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#144",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#145",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#146",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#147",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#148",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#149",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#150",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#151",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#152",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#153",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#154",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#155",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#156",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#203",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#204",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#205",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#206",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#207",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#208",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#217",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#218",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#219",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#220",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#207",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#271",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#272",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#209",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#275",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#276",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#222",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#267",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#268",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#68",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#224",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#263",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "rule#264",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#70",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#185",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#185",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#23#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#193",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#193",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#23#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#188",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#188",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#23#3",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#196",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#196",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#23#4",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#189",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#189",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#23#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#197",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#197",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#23#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#25#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#25#4",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#25#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#25#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#25#7",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#102",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#102",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#1",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#111",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#111",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#2",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#103",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#103",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#3",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#112",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#112",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#4",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#105",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#105",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#5",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#114",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#114",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#106",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#106",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#7",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#115",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#115",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#108",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#108",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#9",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#116",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#116",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#10",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#110",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#110",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#11",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#33#12",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#35#8",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#34",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#34",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#51",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#51",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#21",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#21",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#38",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#38",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#23",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#23",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#40",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#28",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#28",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#45",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#45",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#24",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#24",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#41",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#41",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#25",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#25",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#42",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#42",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#29",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#29",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#46",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#46",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#30",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#30",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#47",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#47",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#32",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#32",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#49",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#49",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#33",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#33",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#50",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#50",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#6",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#14",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#7",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#7",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#15",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#15",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#70",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#70",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#83",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#83",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#61",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#61",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#74",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#74",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#62",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#62",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#75",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#75",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#66",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#66",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#79",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#79",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#68",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#68",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#81",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#81",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#69",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#69",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#15#82",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        },
+        {
+          "comboId": "store#16#82",
+          "disposition": "allow-host",
+          "provenance": "bulk-default"
+        }
+      ],
+      "closedKeyboardCard": null
+    },
+    "provenance": "asked"
+  },
+  "character-inventory": {
+    "id": "character-inventory",
+    "value": {
+      "chars": [
+        "a",
+        "A",
+        "á",
+        "Á",
+        "à",
+        "À",
+        "â",
+        "Â",
+        "ǎ",
+        "Ǎ",
+        "b",
+        "B",
+        "d",
+        "D",
+        "z",
+        "Z",
+        "e",
+        "E",
+        "é",
+        "É",
+        "è",
+        "È",
+        "ê",
+        "Ê",
+        "ě",
+        "Ě",
+        "ə",
+        "Ə",
+        "́",
+        "̀",
+        "̂",
+        "̌",
+        "ɛ",
+        "Ɛ",
+        "f",
+        "F",
+        "g",
+        "G",
+        "h",
+        "H",
+        "i",
+        "I",
+        "í",
+        "Í",
+        "ì",
+        "Ì",
+        "î",
+        "Î",
+        "ǐ",
+        "Ǐ",
+        "k",
+        "K",
+        "p",
+        "P",
+        "l",
+        "L",
+        "m",
+        "M",
+        "n",
+        "N",
+        "ń",
+        "Ń",
+        "ǹ",
+        "Ǹ",
+        "ŋ",
+        "Ŋ",
+        "o",
+        "O",
+        "ó",
+        "Ó",
+        "ò",
+        "Ò",
+        "ô",
+        "Ô",
+        "ǒ",
+        "Ǒ",
+        "ɔ",
+        "Ɔ",
+        "r",
+        "R",
+        "s",
+        "S",
+        "t",
+        "T",
+        "u",
+        "U",
+        "ú",
+        "Ú",
+        "ù",
+        "Ù",
+        "û",
+        "Û",
+        "ǔ",
+        "Ǔ",
+        "v",
+        "V",
+        "w",
+        "W",
+        "y",
+        "Y"
+      ],
+      "bases": [
+        "a",
+        "A",
+        "b",
+        "B",
+        "d",
+        "D",
+        "z",
+        "Z",
+        "e",
+        "E",
+        "ə",
+        "Ə",
+        "ɛ",
+        "Ɛ",
+        "f",
+        "F",
+        "g",
+        "G",
+        "h",
+        "H",
+        "i",
+        "I",
+        "k",
+        "K",
+        "p",
+        "P",
+        "l",
+        "L",
+        "m",
+        "M",
+        "n",
+        "N",
+        "ŋ",
+        "Ŋ",
+        "o",
+        "O",
+        "ɔ",
+        "Ɔ",
+        "r",
+        "R",
+        "s",
+        "S",
+        "t",
+        "T",
+        "u",
+        "U",
+        "v",
+        "V",
+        "w",
+        "W",
+        "y",
+        "Y"
+      ],
+      "marks": [
+        "́",
+        "̀",
+        "̂",
+        "̌"
+      ],
+      "attestedStacks": [
+        {
+          "base": "a",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "A",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "a",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "A",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "a",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "A",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "a",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "A",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "e",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "E",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "e",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "E",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "e",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "E",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "e",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "E",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "i",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "I",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "i",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "I",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "i",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "I",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "i",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "I",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "n",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "N",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "n",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "N",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "o",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "O",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "o",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "O",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "o",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "O",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "o",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "O",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "u",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "U",
+          "marks": [
+            "́"
+          ]
+        },
+        {
+          "base": "u",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "U",
+          "marks": [
+            "̀"
+          ]
+        },
+        {
+          "base": "u",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "U",
+          "marks": [
+            "̂"
+          ]
+        },
+        {
+          "base": "u",
+          "marks": [
+            "̌"
+          ]
+        },
+        {
+          "base": "U",
+          "marks": [
+            "̌"
+          ]
+        }
+      ],
+      "declaredRoles": {},
+      "numbers": [],
+      "punctuation": [],
+      "symbols": [],
+      "separators": [],
+      "controls": [],
+      "provenance": {
+        "a": "cldr",
+        "A": "cldr",
+        "á": "cldr",
+        "Á": "cldr",
+        "à": "cldr",
+        "À": "cldr",
+        "â": "cldr",
+        "Â": "cldr",
+        "ǎ": "cldr",
+        "Ǎ": "cldr",
+        "b": "cldr",
+        "B": "cldr",
+        "d": "cldr",
+        "D": "cldr",
+        "z": "cldr",
+        "Z": "cldr",
+        "e": "cldr",
+        "E": "cldr",
+        "é": "cldr",
+        "É": "cldr",
+        "è": "cldr",
+        "È": "cldr",
+        "ê": "cldr",
+        "Ê": "cldr",
+        "ě": "cldr",
+        "Ě": "cldr",
+        "ə": "cldr",
+        "Ə": "cldr",
+        "́": "cldr",
+        "̀": "cldr",
+        "̂": "cldr",
+        "̌": "cldr",
+        "ɛ": "cldr",
+        "Ɛ": "cldr",
+        "f": "cldr",
+        "F": "cldr",
+        "g": "cldr",
+        "G": "cldr",
+        "h": "cldr",
+        "H": "cldr",
+        "i": "cldr",
+        "I": "cldr",
+        "í": "cldr",
+        "Í": "cldr",
+        "ì": "cldr",
+        "Ì": "cldr",
+        "î": "cldr",
+        "Î": "cldr",
+        "ǐ": "cldr",
+        "Ǐ": "cldr",
+        "k": "cldr",
+        "K": "cldr",
+        "p": "cldr",
+        "P": "cldr",
+        "l": "cldr",
+        "L": "cldr",
+        "m": "cldr",
+        "M": "cldr",
+        "n": "cldr",
+        "N": "cldr",
+        "ń": "cldr",
+        "Ń": "cldr",
+        "ǹ": "cldr",
+        "Ǹ": "cldr",
+        "ŋ": "cldr",
+        "Ŋ": "cldr",
+        "o": "cldr",
+        "O": "cldr",
+        "ó": "cldr",
+        "Ó": "cldr",
+        "ò": "cldr",
+        "Ò": "cldr",
+        "ô": "cldr",
+        "Ô": "cldr",
+        "ǒ": "cldr",
+        "Ǒ": "cldr",
+        "ɔ": "cldr",
+        "Ɔ": "cldr",
+        "r": "cldr",
+        "R": "cldr",
+        "s": "cldr",
+        "S": "cldr",
+        "t": "cldr",
+        "T": "cldr",
+        "u": "cldr",
+        "U": "cldr",
+        "ú": "cldr",
+        "Ú": "cldr",
+        "ù": "cldr",
+        "Ù": "cldr",
+        "û": "cldr",
+        "Û": "cldr",
+        "ǔ": "cldr",
+        "Ǔ": "cldr",
+        "v": "cldr",
+        "V": "cldr",
+        "w": "cldr",
+        "W": "cldr",
+        "y": "cldr",
+        "Y": "cldr"
+      },
+      "exemplarDigraphs": [
+        "dz",
+        "ə́",
+        "ə̀",
+        "ə̂",
+        "ə̌",
+        "ɛ́",
+        "ɛ̀",
+        "ɛ̂",
+        "ɛ̌",
+        "kp",
+        "ng",
+        "nk",
+        "ɔ́",
+        "ɔ̀",
+        "ɔ̂",
+        "ɔ̌",
+        "ts"
+      ],
+      "loanwordChars": [],
+      "rejected": [],
+      "proposalConfidence": {
+        "cldr": "approved"
+      },
+      "proposalRelease": {
+        "cldr": "48.2.0"
+      },
+      "exemplarMethodDeclined": false,
+      "seededProposals": [],
+      "selectedFont": "noto-sans",
+      "alphabetEvidenceKey": "ewo|Latn|Latn|sil_cameroon_azerty"
+    },
+    "provenance": "asked"
+  },
+  "language-autonym": {
+    "id": "language-autonym",
+    "value": "Ewondo",
+    "provenance": "asked"
+  },
+  "language-code": {
+    "id": "language-code",
+    "value": "ewo",
+    "provenance": "asked"
+  },
+  "language-name": {
+    "id": "language-name",
+    "value": "Ewondo",
+    "provenance": "asked"
+  },
+  "marks-treatment": {
+    "id": "marks-treatment",
+    "value": {
+      "answers": {
+        "marks.marks_attachment.́": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "i",
+          "I",
+          "n",
+          "N",
+          "o",
+          "O",
+          "u",
+          "U"
+        ],
+        "marks.marks_attachment.̀": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "i",
+          "I",
+          "n",
+          "N",
+          "o",
+          "O",
+          "u",
+          "U"
+        ],
+        "marks.marks_attachment.̂": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "i",
+          "I",
+          "o",
+          "O",
+          "u",
+          "U"
+        ],
+        "marks.marks_attachment.̌": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "i",
+          "I",
+          "o",
+          "O",
+          "u",
+          "U"
+        ],
+        "marks.marks_treatment.class.above-1": "own-key",
+        "marks.marks_treatment.promoted": [],
+        "marks.marks_treatment.input_order": "prefix",
+        "marks.marks_output_form.form": "base-plus-mark",
+        "marks.marks_output_form.backspace": "peel",
+        "marks.marks_stacking.allowed": false,
+        "marks.marks_stacking.stacks": [],
+        "marks.marks_guard.behaviour": "swallow"
+      },
+      "completion": {
+        "worklist": {
+          "ownLetterUnits": [
+            "a",
+            "A",
+            "b",
+            "B",
+            "d",
+            "D",
+            "z",
+            "Z",
+            "e",
+            "E",
+            "ə",
+            "Ə",
+            "ɛ",
+            "Ɛ",
+            "f",
+            "F",
+            "g",
+            "G",
+            "h",
+            "H",
+            "i",
+            "I",
+            "k",
+            "K",
+            "p",
+            "P",
+            "l",
+            "L",
+            "m",
+            "M",
+            "n",
+            "N",
+            "ŋ",
+            "Ŋ",
+            "o",
+            "O",
+            "ɔ",
+            "Ɔ",
+            "r",
+            "R",
+            "s",
+            "S",
+            "t",
+            "T",
+            "u",
+            "U",
+            "v",
+            "V",
+            "w",
+            "W",
+            "y",
+            "Y"
+          ],
+          "markUnits": [
+            {
+              "mark": "́",
+              "inputOrder": "prefix"
+            },
+            {
+              "mark": "̀",
+              "inputOrder": "prefix"
+            },
+            {
+              "mark": "̂",
+              "inputOrder": "prefix"
+            },
+            {
+              "mark": "̌",
+              "inputOrder": "prefix"
+            }
+          ],
+          "blockedCombinations": [
+            {
+              "base": "b",
+              "mark": "́"
+            },
+            {
+              "base": "B",
+              "mark": "́"
+            },
+            {
+              "base": "d",
+              "mark": "́"
+            },
+            {
+              "base": "D",
+              "mark": "́"
+            },
+            {
+              "base": "z",
+              "mark": "́"
+            },
+            {
+              "base": "Z",
+              "mark": "́"
+            },
+            {
+              "base": "ə",
+              "mark": "́"
+            },
+            {
+              "base": "Ə",
+              "mark": "́"
+            },
+            {
+              "base": "ɛ",
+              "mark": "́"
+            },
+            {
+              "base": "Ɛ",
+              "mark": "́"
+            },
+            {
+              "base": "f",
+              "mark": "́"
+            },
+            {
+              "base": "F",
+              "mark": "́"
+            },
+            {
+              "base": "g",
+              "mark": "́"
+            },
+            {
+              "base": "G",
+              "mark": "́"
+            },
+            {
+              "base": "h",
+              "mark": "́"
+            },
+            {
+              "base": "H",
+              "mark": "́"
+            },
+            {
+              "base": "k",
+              "mark": "́"
+            },
+            {
+              "base": "K",
+              "mark": "́"
+            },
+            {
+              "base": "p",
+              "mark": "́"
+            },
+            {
+              "base": "P",
+              "mark": "́"
+            },
+            {
+              "base": "l",
+              "mark": "́"
+            },
+            {
+              "base": "L",
+              "mark": "́"
+            },
+            {
+              "base": "m",
+              "mark": "́"
+            },
+            {
+              "base": "M",
+              "mark": "́"
+            },
+            {
+              "base": "ŋ",
+              "mark": "́"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "́"
+            },
+            {
+              "base": "ɔ",
+              "mark": "́"
+            },
+            {
+              "base": "Ɔ",
+              "mark": "́"
+            },
+            {
+              "base": "r",
+              "mark": "́"
+            },
+            {
+              "base": "R",
+              "mark": "́"
+            },
+            {
+              "base": "s",
+              "mark": "́"
+            },
+            {
+              "base": "S",
+              "mark": "́"
+            },
+            {
+              "base": "t",
+              "mark": "́"
+            },
+            {
+              "base": "T",
+              "mark": "́"
+            },
+            {
+              "base": "v",
+              "mark": "́"
+            },
+            {
+              "base": "V",
+              "mark": "́"
+            },
+            {
+              "base": "w",
+              "mark": "́"
+            },
+            {
+              "base": "W",
+              "mark": "́"
+            },
+            {
+              "base": "y",
+              "mark": "́"
+            },
+            {
+              "base": "Y",
+              "mark": "́"
+            },
+            {
+              "base": "b",
+              "mark": "̀"
+            },
+            {
+              "base": "B",
+              "mark": "̀"
+            },
+            {
+              "base": "d",
+              "mark": "̀"
+            },
+            {
+              "base": "D",
+              "mark": "̀"
+            },
+            {
+              "base": "z",
+              "mark": "̀"
+            },
+            {
+              "base": "Z",
+              "mark": "̀"
+            },
+            {
+              "base": "ə",
+              "mark": "̀"
+            },
+            {
+              "base": "Ə",
+              "mark": "̀"
+            },
+            {
+              "base": "ɛ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ɛ",
+              "mark": "̀"
+            },
+            {
+              "base": "f",
+              "mark": "̀"
+            },
+            {
+              "base": "F",
+              "mark": "̀"
+            },
+            {
+              "base": "g",
+              "mark": "̀"
+            },
+            {
+              "base": "G",
+              "mark": "̀"
+            },
+            {
+              "base": "h",
+              "mark": "̀"
+            },
+            {
+              "base": "H",
+              "mark": "̀"
+            },
+            {
+              "base": "k",
+              "mark": "̀"
+            },
+            {
+              "base": "K",
+              "mark": "̀"
+            },
+            {
+              "base": "p",
+              "mark": "̀"
+            },
+            {
+              "base": "P",
+              "mark": "̀"
+            },
+            {
+              "base": "l",
+              "mark": "̀"
+            },
+            {
+              "base": "L",
+              "mark": "̀"
+            },
+            {
+              "base": "m",
+              "mark": "̀"
+            },
+            {
+              "base": "M",
+              "mark": "̀"
+            },
+            {
+              "base": "ŋ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "̀"
+            },
+            {
+              "base": "ɔ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ɔ",
+              "mark": "̀"
+            },
+            {
+              "base": "r",
+              "mark": "̀"
+            },
+            {
+              "base": "R",
+              "mark": "̀"
+            },
+            {
+              "base": "s",
+              "mark": "̀"
+            },
+            {
+              "base": "S",
+              "mark": "̀"
+            },
+            {
+              "base": "t",
+              "mark": "̀"
+            },
+            {
+              "base": "T",
+              "mark": "̀"
+            },
+            {
+              "base": "v",
+              "mark": "̀"
+            },
+            {
+              "base": "V",
+              "mark": "̀"
+            },
+            {
+              "base": "w",
+              "mark": "̀"
+            },
+            {
+              "base": "W",
+              "mark": "̀"
+            },
+            {
+              "base": "y",
+              "mark": "̀"
+            },
+            {
+              "base": "Y",
+              "mark": "̀"
+            },
+            {
+              "base": "b",
+              "mark": "̂"
+            },
+            {
+              "base": "B",
+              "mark": "̂"
+            },
+            {
+              "base": "d",
+              "mark": "̂"
+            },
+            {
+              "base": "D",
+              "mark": "̂"
+            },
+            {
+              "base": "z",
+              "mark": "̂"
+            },
+            {
+              "base": "Z",
+              "mark": "̂"
+            },
+            {
+              "base": "ə",
+              "mark": "̂"
+            },
+            {
+              "base": "Ə",
+              "mark": "̂"
+            },
+            {
+              "base": "ɛ",
+              "mark": "̂"
+            },
+            {
+              "base": "Ɛ",
+              "mark": "̂"
+            },
+            {
+              "base": "f",
+              "mark": "̂"
+            },
+            {
+              "base": "F",
+              "mark": "̂"
+            },
+            {
+              "base": "g",
+              "mark": "̂"
+            },
+            {
+              "base": "G",
+              "mark": "̂"
+            },
+            {
+              "base": "h",
+              "mark": "̂"
+            },
+            {
+              "base": "H",
+              "mark": "̂"
+            },
+            {
+              "base": "k",
+              "mark": "̂"
+            },
+            {
+              "base": "K",
+              "mark": "̂"
+            },
+            {
+              "base": "p",
+              "mark": "̂"
+            },
+            {
+              "base": "P",
+              "mark": "̂"
+            },
+            {
+              "base": "l",
+              "mark": "̂"
+            },
+            {
+              "base": "L",
+              "mark": "̂"
+            },
+            {
+              "base": "m",
+              "mark": "̂"
+            },
+            {
+              "base": "M",
+              "mark": "̂"
+            },
+            {
+              "base": "n",
+              "mark": "̂"
+            },
+            {
+              "base": "N",
+              "mark": "̂"
+            },
+            {
+              "base": "ŋ",
+              "mark": "̂"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "̂"
+            },
+            {
+              "base": "ɔ",
+              "mark": "̂"
+            },
+            {
+              "base": "Ɔ",
+              "mark": "̂"
+            },
+            {
+              "base": "r",
+              "mark": "̂"
+            },
+            {
+              "base": "R",
+              "mark": "̂"
+            },
+            {
+              "base": "s",
+              "mark": "̂"
+            },
+            {
+              "base": "S",
+              "mark": "̂"
+            },
+            {
+              "base": "t",
+              "mark": "̂"
+            },
+            {
+              "base": "T",
+              "mark": "̂"
+            },
+            {
+              "base": "v",
+              "mark": "̂"
+            },
+            {
+              "base": "V",
+              "mark": "̂"
+            },
+            {
+              "base": "w",
+              "mark": "̂"
+            },
+            {
+              "base": "W",
+              "mark": "̂"
+            },
+            {
+              "base": "y",
+              "mark": "̂"
+            },
+            {
+              "base": "Y",
+              "mark": "̂"
+            },
+            {
+              "base": "b",
+              "mark": "̌"
+            },
+            {
+              "base": "B",
+              "mark": "̌"
+            },
+            {
+              "base": "d",
+              "mark": "̌"
+            },
+            {
+              "base": "D",
+              "mark": "̌"
+            },
+            {
+              "base": "z",
+              "mark": "̌"
+            },
+            {
+              "base": "Z",
+              "mark": "̌"
+            },
+            {
+              "base": "ə",
+              "mark": "̌"
+            },
+            {
+              "base": "Ə",
+              "mark": "̌"
+            },
+            {
+              "base": "ɛ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ɛ",
+              "mark": "̌"
+            },
+            {
+              "base": "f",
+              "mark": "̌"
+            },
+            {
+              "base": "F",
+              "mark": "̌"
+            },
+            {
+              "base": "g",
+              "mark": "̌"
+            },
+            {
+              "base": "G",
+              "mark": "̌"
+            },
+            {
+              "base": "h",
+              "mark": "̌"
+            },
+            {
+              "base": "H",
+              "mark": "̌"
+            },
+            {
+              "base": "k",
+              "mark": "̌"
+            },
+            {
+              "base": "K",
+              "mark": "̌"
+            },
+            {
+              "base": "p",
+              "mark": "̌"
+            },
+            {
+              "base": "P",
+              "mark": "̌"
+            },
+            {
+              "base": "l",
+              "mark": "̌"
+            },
+            {
+              "base": "L",
+              "mark": "̌"
+            },
+            {
+              "base": "m",
+              "mark": "̌"
+            },
+            {
+              "base": "M",
+              "mark": "̌"
+            },
+            {
+              "base": "n",
+              "mark": "̌"
+            },
+            {
+              "base": "N",
+              "mark": "̌"
+            },
+            {
+              "base": "ŋ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "̌"
+            },
+            {
+              "base": "ɔ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ɔ",
+              "mark": "̌"
+            },
+            {
+              "base": "r",
+              "mark": "̌"
+            },
+            {
+              "base": "R",
+              "mark": "̌"
+            },
+            {
+              "base": "s",
+              "mark": "̌"
+            },
+            {
+              "base": "S",
+              "mark": "̌"
+            },
+            {
+              "base": "t",
+              "mark": "̌"
+            },
+            {
+              "base": "T",
+              "mark": "̌"
+            },
+            {
+              "base": "v",
+              "mark": "̌"
+            },
+            {
+              "base": "V",
+              "mark": "̌"
+            },
+            {
+              "base": "w",
+              "mark": "̌"
+            },
+            {
+              "base": "W",
+              "mark": "̌"
+            },
+            {
+              "base": "y",
+              "mark": "̌"
+            },
+            {
+              "base": "Y",
+              "mark": "̌"
+            }
+          ]
+        },
+        "outputForm": "base-plus-mark",
+        "backspace": "peel",
+        "stacks": [
+          {
+            "base": "a",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "A",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "a",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "A",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "a",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "A",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "a",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "A",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "e",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "E",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "e",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "E",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "e",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "E",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "e",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "E",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "i",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "I",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "i",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "I",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "i",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "I",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "i",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "I",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "n",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "N",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "n",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "N",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "o",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "O",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "o",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "O",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "o",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "O",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "o",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "O",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "u",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "U",
+            "marks": [
+              "́"
+            ]
+          },
+          {
+            "base": "u",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "U",
+            "marks": [
+              "̀"
+            ]
+          },
+          {
+            "base": "u",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "U",
+            "marks": [
+              "̂"
+            ]
+          },
+          {
+            "base": "u",
+            "marks": [
+              "̌"
+            ]
+          },
+          {
+            "base": "U",
+            "marks": [
+              "̌"
+            ]
+          }
+        ],
+        "migrationNeeded": false,
+        "guardReevaluation": []
+      },
+      "contextTolerance": null,
+      "guardSpecification": {
+        "recordId": "guard-specification:asked:swallow",
+        "behaviour": "swallow",
+        "origin": "asked",
+        "confirmed": true,
+        "recordedAt": 1792519607325,
+        "supersedes": null
+      }
+    },
+    "provenance": "asked"
+  },
+  "project-display-name": {
+    "id": "project-display-name",
+    "value": "Ewondo",
+    "provenance": "asked"
+  },
+  "project-keyboard-id": {
+    "id": "project-keyboard-id",
+    "value": "ewondo",
+    "provenance": "asked"
+  },
+  "punctuation-inventory": {
+    "id": "punctuation-inventory",
+    "value": {
+      "accepted": [
+        {
+          "char": "-",
+          "provenance": "derived"
+        },
+        {
+          "char": "‐",
+          "provenance": "derived"
+        },
+        {
+          "char": "‑",
+          "provenance": "derived"
+        },
+        {
+          "char": ",",
+          "provenance": "derived"
+        },
+        {
+          "char": ";",
+          "provenance": "derived"
+        },
+        {
+          "char": ":",
+          "provenance": "derived"
+        },
+        {
+          "char": "!",
+          "provenance": "derived"
+        },
+        {
+          "char": "?",
+          "provenance": "derived"
+        },
+        {
+          "char": ".",
+          "provenance": "derived"
+        },
+        {
+          "char": "(",
+          "provenance": "derived"
+        },
+        {
+          "char": ")",
+          "provenance": "derived"
+        },
+        {
+          "char": "[",
+          "provenance": "derived"
+        },
+        {
+          "char": "]",
+          "provenance": "derived"
+        },
+        {
+          "char": "{",
+          "provenance": "derived"
+        },
+        {
+          "char": "}",
+          "provenance": "derived"
+        },
+        {
+          "char": "\"",
+          "provenance": "extracted"
+        },
+        {
+          "char": "#",
+          "provenance": "extracted"
+        },
+        {
+          "char": "%",
+          "provenance": "extracted"
+        },
+        {
+          "char": "&",
+          "provenance": "extracted"
+        },
+        {
+          "char": "'",
+          "provenance": "extracted"
+        },
+        {
+          "char": "*",
+          "provenance": "extracted"
+        },
+        {
+          "char": "/",
+          "provenance": "extracted"
+        },
+        {
+          "char": "@",
+          "provenance": "extracted"
+        },
+        {
+          "char": "\\",
+          "provenance": "extracted"
+        },
+        {
+          "char": "_",
+          "provenance": "extracted"
+        },
+        {
+          "char": "§",
+          "provenance": "extracted"
+        },
+        {
+          "char": "«",
+          "provenance": "extracted"
+        },
+        {
+          "char": "»",
+          "provenance": "extracted"
+        },
+        {
+          "char": "–",
+          "provenance": "extracted"
+        },
+        {
+          "char": "—",
+          "provenance": "extracted"
+        },
+        {
+          "char": "‘",
+          "provenance": "extracted"
+        },
+        {
+          "char": "’",
+          "provenance": "extracted"
+        },
+        {
+          "char": "“",
+          "provenance": "extracted"
+        },
+        {
+          "char": "”",
+          "provenance": "extracted"
+        },
+        {
+          "char": "†",
+          "provenance": "extracted"
+        },
+        {
+          "char": "…",
+          "provenance": "extracted"
+        },
+        {
+          "char": "‹",
+          "provenance": "extracted"
+        },
+        {
+          "char": "›",
+          "provenance": "extracted"
+        }
+      ],
+      "declined": []
+    },
+    "provenance": "asked"
+  },
+  "retained-convenience-chars": {
+    "id": "retained-convenience-chars",
+    "value": {
+      "retained": [
+        {
+          "char": "c",
+          "provenance": "extracted"
+        },
+        {
+          "char": "C",
+          "provenance": "extracted"
+        },
+        {
+          "char": "j",
+          "provenance": "extracted"
+        },
+        {
+          "char": "J",
+          "provenance": "extracted"
+        },
+        {
+          "char": "q",
+          "provenance": "extracted"
+        },
+        {
+          "char": "Q",
+          "provenance": "extracted"
+        },
+        {
+          "char": "x",
+          "provenance": "extracted"
+        },
+        {
+          "char": "X",
+          "provenance": "extracted"
+        }
+      ],
+      "rejected": []
+    },
+    "provenance": "asked"
+  },
+  "target-script": {
+    "id": "target-script",
+    "value": "Latn",
+    "provenance": "asked"
+  },
+  "windows-layout": {
+    "id": "windows-layout",
+    "value": {
+      "layoutIds": [
+        "basic_kbdus"
+      ],
+      "origin": "confirmed"
+    },
+    "provenance": "asked"
+  }
+}

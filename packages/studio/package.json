@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "coverage:report": "vitest run src/test/journeyCoverage.report.test.ts --mode coverage-report",
-    "measure:sc004": "vitest run --config vitest.measure.config.ts"
+    "measure:sc004": "vitest run --config vitest.measure.config.ts",
+    "fixtures:decision-points": "tsx --import ../../utilities/i18n-content-extract/registerMacroShim.ts scripts/genDecisionPoints.ts"
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",

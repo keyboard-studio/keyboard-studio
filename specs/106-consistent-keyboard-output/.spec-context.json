@@ -87,10 +87,82 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-29T22:33:45.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:42:30.656Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:20.737Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:20.997Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:21.263Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:21.533Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:21.801Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:22.073Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:22.360Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:22.647Z"
     }
   ],
   "telemetryInstanceId": "c5ffbd69-afee-4690-a346-3b60c164a673",
-  "currentTask": "T006",
+  "currentTask": "T073",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -131,6 +203,72 @@
       "files": [
         "packages/studio/src/lib/projectionInput.parity.test.ts",
         "packages/studio/src/lib/serializeWorkingCopy.fragmentBearing.carve.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Committed 6e01070d and pushed to 106-consistent-keyboard-output (studio 10036/10037, known flake; lint 0 err / 389 warn)"
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Exported loadVfs from sc004Harness and widened it to { id, group }",
+      "files": [
+        "packages/studio/src/test/sc004Harness.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "recordToDecisionSet with explicit per-point allow-lists, decisionPointBases matrix, unit tests incl. committed-fixture drift guard",
+      "files": [
+        "packages/studio/src/test/recordToDecisionSet.ts",
+        "packages/studio/src/test/decisionPointBases.ts",
+        "packages/studio/src/test/recordToDecisionSet.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "checkConsistencyGates G1-G8 (G8 split generated/starting) with pass and fail unit tests per gate",
+      "files": [
+        "packages/studio/src/test/consistencyGates.ts",
+        "packages/studio/src/test/consistencyGates.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "buildDecisionPointFixture: instantiate, replay, install unreplayed slices, buildOutputBundle, simulate, gates",
+      "files": [
+        "packages/studio/src/test/decisionPointFixture.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "fixtures:decision-points script and 20 deterministic decision-point fixtures",
+      "files": [
+        "packages/studio/scripts/genDecisionPoints.ts",
+        "packages/studio/package.json",
+        "packages/studio/src/lib/__fixtures__/decision-points"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "decisionPoint.corpus.test.ts: 4 bases x 5 points x gates, known gaps as it.fails with owning story",
+      "files": [
+        "packages/studio/src/test/decisionPoint.corpus.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Fidelity assertion: p1 kbdus tolerance fixture .kmn is byte-identical to the walk zip .kmn",
+      "files": [
+        "packages/studio/src/test/decisionPoint.corpus.test.ts"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "G8 gate in checkConsistencyGates: generated stores enforced, starting stores it.fails citing #2361",
+      "files": [
+        "packages/studio/src/test/consistencyGates.ts",
+        "packages/studio/src/test/decisionPoint.corpus.test.ts"
       ]
     }
   }
