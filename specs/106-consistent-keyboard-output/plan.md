@@ -3,7 +3,7 @@
 **Branch**: `106-consistent-keyboard-output` (stacked on `km/s02-deadkey-purpose` / PR #2358) | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/106-consistent-keyboard-output/spec.md`; evidence and rulings in
-`PLAN-consistent-output.md` (untracked note at repo root); code facts in [research.md](research.md).
+[source-plan.md](source-plan.md) (the original plan note); code facts in [research.md](research.md).
 
 ## Summary
 

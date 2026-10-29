@@ -18,8 +18,8 @@ spec 106 has been written yet.
 |---|---|
 | Phase 0 (S-02 deadkey purpose) | PR #2358, branch `km/s02-deadkey-purpose`. Open; do not merge. |
 | This spec | branch `106-consistent-keyboard-output`, stacked on `km/s02-deadkey-purpose`. Rebase if #2358 changes (T001). |
-| Walk harness | worktree `../ks-2302-main`, branch `km/2302-walk-zips`, with uncommitted harness edits (see repo-root `HANDOFF-s02-deadkey-purpose.md`, section 5). |
-| Source plan + evidence | untracked `PLAN-consistent-output.md` at the repo root. Keep it until T068. |
+| Walk harness | worktree `../ks-2302-main`, branch `km/2302-walk-zips`, with uncommitted harness edits (see [handoff-s02.md](handoff-s02.md), section 5). |
+| Source plan + evidence | [source-plan.md](source-plan.md) (the original plan note, evidence E1-E7). |
 
 ## Rules that bite
 

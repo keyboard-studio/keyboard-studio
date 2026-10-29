@@ -6,12 +6,12 @@
 
 **Status**: Draft
 
-**Input**: User description: "Consistent keyboard output from base + decisions + carve, per PLAN-consistent-output.md (phases 1-7). Verification: confirm consistent results by constructing clean IR starting points (starting IR + decision record) up to each decision point and projecting, rather than only driving the UI; the 32-case #2302 walk is the end-to-end gate."
+**Input**: User description: "Consistent keyboard output from base + decisions + carve, per source-plan.md (phases 1-7). Verification: confirm consistent results by constructing clean IR starting points (starting IR + decision record) up to each decision point and projecting, rather than only driving the UI; the 32-case #2302 walk is the end-to-end gate."
 
 ## Context
 
 The #2302 zip walk (Bafut on `basic_kbdus`) produced a keyboard that disagrees with the decisions the
-author made. Seven gaps (E1-E7, evidence in `PLAN-consistent-output.md`):
+author made. Seven gaps (E1-E7, evidence in [source-plan.md](source-plan.md)):
 
 - **E1**: the marks-guard decision never reaches the download.
 - **E2**: the output form is not followed (deadkey stores precomposed under base-plus-mark).

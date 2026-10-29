@@ -23,7 +23,7 @@ Each story phase ends with the same three gate tasks:
 
 - [ ] T001 Rebase `106-consistent-keyboard-output` on `km/s02-deadkey-purpose` if PR #2358 changed. Confirm `pnpm build` is green and `../keyboards` is on the keyboard-studio fork's master (CLAUDE.md "Keyboard phonebook").
 - [ ] T002 [P] Add phonebook rows for `cabecar`, `winchus` and `dega` (cited in research R5) to `docs/keyboard-index.md`. Follow the "Keep this current" recipe and read each keyboard's `.kps`.
-- [ ] T003 [P] Copy the two Bafut decision records (`tools/testing-profiles-2302/zips/p1-whole-bafut-kbdus/.studio/decision-record.json`, `.../p4-unwrap-bafut-camqwerty/...`) and one Ewondo record from `../ks-2302-main/tools/testing-profiles-2302/zips/*.zip` into `packages/studio/src/lib/__fixtures__/decision-points/records/` (one per base keyboard: kbdus, kbdfr, camqwerty, camazerty). Add a `PROVENANCE.md` naming the case id and the build it came from.
+- [ ] T003 [P] Extract `.studio/decision-record.json` from four case zips in `../ks-2302-main/tools/testing-profiles-2302/zips/` (`p1-whole-bafut-kbdus.zip`, `p4-unwrap-bafut-camqwerty.zip`, plus one Ewondo kbdfr and one Ewondo camazerty case; the records are inside the zips, not extracted on disk) into `packages/studio/src/lib/__fixtures__/decision-points/records/` (one per base keyboard: kbdus, kbdfr, camqwerty, camazerty). Add a `PROVENANCE.md` naming the case id and the build it came from.
 
 ---
 
@@ -256,7 +256,7 @@ Each story phase ends with the same three gate tasks:
 
 - [ ] T066 [P] Run `/speckit-analyze` (km-doc / km-synthesis review) on spec, plan and tasks before the first story PR, and fix the drift it finds.
 - [ ] T067 [P] Update `docs/architecture.md` with the projection step list (2.6, 2.8, claimed-inputs carve, shared projection input) and record the R5 ruling cross-link.
-- [ ] T068 Delete the untracked `HANDOFF-s02-deadkey-purpose.md` and `PLAN-consistent-output.md` once their content lives in this spec folder. Ask the user first.
+- [x] T068 Move the two root notes into this folder as [source-plan.md](source-plan.md) and [handoff-s02.md](handoff-s02.md) (done 2026-10-29, on the user's instruction).
 - [ ] T069 After all story PRs merge, run `km-retire` for spec 106 (AS-BUILT + archive).
 
 ---
