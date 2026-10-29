@@ -245,6 +245,17 @@ import {
 } from "../deadkey/deadkeyTriggerOptions.ts";
 import { allocateDeadkeyId } from "@keyboard-studio/contracts";
 import { hex4 } from "../deadkey/deadkeyWrite.ts";
+// One deadkey per purpose: trigger proposal, id reuse, and base-clash guard.
+import {
+  formatDeadkeyEscapes,
+  proposeS02TriggerKey,
+  recordedDeadkeyEscapes,
+  rememberedDeadkeyEscapes,
+  s02BaseClash,
+  sessionDeadkeys,
+  type DeadkeyEscape,
+} from "./deadkeyPurpose.ts";
+import { DeadkeyEscapesBanner } from "./DeadkeyEscapesBanner.tsx";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
@@ -434,6 +445,10 @@ function excludeSequenceMechanisms(
 // Ids are numeric-only (hex4 for the deadkeyName slot): the "dead0" forced
 // derivation is gone — every mint goes through allocateDeadkeyId.
 //
+// One deadkey per trigger: a placement on a trigger the session already gave
+// a deadkey reuses that id rather than minting a second, unreachable one
+// (deadkeyPurpose.ts proposes the trigger by the mark the character adds).
+//
 // Honest seam note: allocateDeadkeyId(workingIr) alone is NOT enough. The
 // working IR does not carry this session's phase-C assignments
 // (recordAssignments stores them in phaseResults; the working IR only sees
@@ -502,7 +517,12 @@ export interface S02DeadkeyIdentity {
  * Resolve the identity for a new S-02 deadkey assignment — the single seam
  * the manual deadkey card and the S-02 suggestion accept derive
  * deadkeyName/accentChar through. accentChar keeps the old convention (the
- * trigger key's literal character); the id is always freshly allocated.
+ * trigger key's literal character).
+ *
+ * A trigger key carries ONE deadkey: when a session placement already put a
+ * deadkey on the resolved trigger, its id and accentChar are reused, so
+ * applyAssignments merges the two into one bases/output store pair (see
+ * deadkeyPurpose.ts). Only a trigger with no session deadkey mints a fresh id.
  */
 export function resolveS02DeadkeyIdentity(params: {
   /** Raw key-picker value (one of DEADKEY_OPTIONS or ""). */
@@ -513,6 +533,11 @@ export function resolveS02DeadkeyIdentity(params: {
   sessionAssignments: readonly MechanismAssignment[];
 }): S02DeadkeyIdentity {
   const { triggerKey, triggerResolution, workingIr, sessionAssignments } = params;
+  const vkey = resolvedVkeyOf(triggerResolution);
+  const existing = vkey !== null ? sessionDeadkeys(sessionAssignments).get(vkey) : undefined;
+  if (existing !== undefined) {
+    return { deadkeyName: existing.deadkeyName, accentChar: existing.accentChar };
+  }
   const id = allocateS02DeadkeyId(workingIr, sessionAssignments);
   const accentChar =
     triggerResolution.kind === "customOk"
@@ -565,8 +590,10 @@ function buildDeadkeyAssignment(params: {
   triggerVkey: string;
   deadkeyName: string;
   accentChar: string;
+  /** Set only on a deadkey's FIRST placement (see deadkeyPurpose.ts's trigger escapes). */
+  escapes?: string | undefined;
 }): MechanismAssignment {
-  const { currentChar, baseLetter, triggerVkey, deadkeyName, accentChar } = params;
+  const { currentChar, baseLetter, triggerVkey, deadkeyName, accentChar, escapes } = params;
   return {
     scope: "individual",
     target: currentChar,
@@ -581,6 +608,7 @@ function buildDeadkeyAssignment(params: {
           baseLetters: baseLetter,
           accentedForms: currentChar,
           accentChar,
+          ...(escapes !== undefined ? { escapes } : {}),
         },
       },
     ],
@@ -767,6 +795,11 @@ interface MethodChooserProps {
   onTriggerKeyCustomCharChange: (v: string) => void;
   deadkeyBaseLetter: string;
   onDeadkeyBaseLetterChange: (v: string) => void;
+  /**
+   * What the chosen trigger + base letter already type, when that is another
+   * character (one deadkey per trigger — see deadkeyPurpose.ts). Blocks Apply.
+   */
+  deadkeyClashOutput: string | null;
   /** The single physical key picker for the combined "swap" card — the base
    *  key of the layer combo when raltTokens is non-empty, or the plain
    *  assigned key when it is empty. */
@@ -875,6 +908,7 @@ function MethodChooser({
   onTriggerKeyCustomCharChange,
   deadkeyBaseLetter,
   onDeadkeyBaseLetterChange,
+  deadkeyClashOutput,
   selectedSwapKey,
   onSwapKeyChange,
   selectedSwapKeyCustomChar,
@@ -952,6 +986,7 @@ function MethodChooser({
   const deadkeyBaseSummaryDisplay = deadkeyBaseLetterDisplay
     ? displayChar(deadkeyBaseLetterDisplay)
     : t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" });
+  const deadkeyClashDisplay = displayChar(deadkeyClashOutput ?? "");
   const deadkeyBasePreviewDisplay = deadkeyBaseLetterDisplay
     ? displayChar(deadkeyBaseLetterDisplay)
     : t({
@@ -1462,6 +1497,24 @@ function MethodChooser({
                     <Trans id="editor.assignLoop.deadkey.loneCombiningMarkWarning">
                       That looks like a combining mark on its own — the base
                       letter is usually a plain letter.
+                    </Trans>
+                  </span>
+                )}
+                {deadkeyClashOutput !== null && (
+                  <span
+                    role="alert"
+                    data-testid="deadkey-base-clash"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--app-danger-text)",
+                      opacity: 0.85,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.deadkey.baseClash">
+                      {triggerKeyDisplay} then {deadkeyBasePreviewDisplay}{" "}
+                      already types {deadkeyClashDisplay}. Pick another
+                      trigger key.
                     </Trans>
                   </span>
                 )}
@@ -2085,6 +2138,7 @@ export function MechanismGallery({
     propose: proposeCompanion,
     dismiss: dismissCompanion,
     clear: clearCompanion,
+    rebase: rebaseCompanion,
   } = useCasePairCompanion();
 
   // Demotion proposal for a displaced glyph (#2300, gate G3) — its own
@@ -2097,6 +2151,7 @@ export function MechanismGallery({
     propose: proposeDisplacement,
     dismiss: dismissDisplacement,
     clear: clearDisplacement,
+    rebase: rebaseDisplacement,
   } = useDisplacementProposal();
 
   /** The base assignment a proposal was raised for, when it has one (physical
@@ -2169,6 +2224,8 @@ export function MechanismGallery({
   const maybeRaiseDisplacement = useCallback(
     (assignment: MechanismAssignment) => {
       if (currentChar === null) return;
+      // A deadkey's trigger slot is not handled here: its own character's
+      // escapes (double-tap / space / AltGr) are the escape banner's job.
       for (const slot of assignmentSlotKeys(assignment)) {
       const displaced = displacedFor(
         slotOccupancy,
@@ -2244,6 +2301,77 @@ export function MechanismGallery({
       }
     },
     [currentChar, slotOccupancy, needSets, sessionAssignments, proposeDisplacement],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Deadkey trigger escapes (DeadkeyEscapesBanner). A deadkey's FIRST
+  // placement records the remembered escapes on its `escapes` slot (the
+  // engine emits each one, AltGr included) and raises the banner; each
+  // checkbox then edits that slot live.
+  // ---------------------------------------------------------------------------
+
+  const [escapePrompt, setEscapePrompt] = useState<{
+    triggerKey: string;
+    deadkeyName: string;
+    accentChar: string;
+  } | null>(null);
+
+  /** The `escapes` value for a deadkey about to be placed on `triggerVkey`:
+   *  the remembered choice when the trigger has no session deadkey yet, else
+   *  undefined (that deadkey already chose). AltGr drops out when AltGr + the
+   *  trigger already types something. */
+  const newTriggerEscapes = useCallback(
+    (triggerVkey: string): string | undefined => {
+      if (sessionDeadkeys(sessionAssignments).has(triggerVkey)) return undefined;
+      const escapes = rememberedDeadkeyEscapes(sessionAssignments);
+      if (slotOccupancy.has(slotKeyFor(triggerVkey, ["RALT"]))) escapes.delete("altgr");
+      return formatDeadkeyEscapes(escapes);
+    },
+    [sessionAssignments, slotOccupancy],
+  );
+
+  /** Raise the escape banner when `assignment` is a deadkey's first
+   *  placement (it carries an `escapes` slot). */
+  const raiseDeadkeyEscapes = useCallback((assignment: MechanismAssignment) => {
+    const sv = assignment.mechanisms.find(
+      (m) => m.patternId === PATTERN_DEADKEY && typeof m.slotValues?.["escapes"] === "string",
+    )?.slotValues;
+    if (sv === undefined) return;
+    setEscapePrompt({
+      triggerKey: sv["triggerKey"] ?? "",
+      deadkeyName: sv["deadkeyName"] ?? "",
+      accentChar: sv["accentChar"] ?? "",
+    });
+  }, []);
+
+  const handleEscapeToggle = useCallback(
+    (escape: DeadkeyEscape, on: boolean) => {
+      if (escapePrompt === null) return;
+      const { deadkeyName } = escapePrompt;
+      const escapes = recordedDeadkeyEscapes(sessionAssignments, deadkeyName) ?? new Set<DeadkeyEscape>();
+      if (on) escapes.add(escape);
+      else escapes.delete(escape);
+      const value = formatDeadkeyEscapes(escapes);
+      const carriesEscapes = (m: MechanismRef) =>
+        m.patternId === PATTERN_DEADKEY &&
+        m.slotValues?.["deadkeyName"] === deadkeyName &&
+        typeof m.slotValues?.["escapes"] === "string";
+      const next = sessionAssignments.map((a) => {
+        if (!a.mechanisms.some(carriesEscapes)) return a;
+        const edited: MechanismAssignment = {
+          ...a,
+          mechanisms: a.mechanisms.map((m) =>
+            carriesEscapes(m) ? { ...m, slotValues: { ...m.slotValues, escapes: value } } : m,
+          ),
+        };
+        // Pending banners hold the placement by identity — keep them on it.
+        rebaseCompanion(a, edited);
+        rebaseDisplacement(a, edited);
+        return edited;
+      });
+      recordAssignments(next);
+    },
+    [escapePrompt, sessionAssignments, rebaseCompanion, rebaseDisplacement, recordAssignments],
   );
 
   // S-08 layer-combo picker: the modifier tokens already used elsewhere in
@@ -2620,12 +2748,34 @@ export function MechanismGallery({
     setRaltTokens([]);
   }, []);
 
+  // Latest session deadkeys + IR for the per-character trigger proposal below.
+  // Read through a ref so the reset effect still fires only on a character
+  // change, not on every assignment the author records.
+  const triggerProposalInputsRef = useRef({ sessionAssignments, workingIr });
+  triggerProposalInputsRef.current = { sessionAssignments, workingIr };
+  // The trigger the reset effect proposed for the current character — the
+  // S-02 suggestion accept re-proposes with its own base letter while the
+  // author has left this proposal untouched.
+  const proposedTriggerKeyRef = useRef<string>("K_COLON");
+
   // Reset method inputs (not suggestionResolved — that persists per char)
   // whenever currentChar changes.
   useEffect(() => {
     clearCompanion();
     clearDisplacement();
+    setEscapePrompt(null);
     resetMethodState();
+    if (currentChar !== null) {
+      // One deadkey per purpose: propose the trigger of the session deadkey
+      // that already adds this character's mark, else a free trigger.
+      const proposed = proposeS02TriggerKey({
+        currentChar,
+        baseLetter: [...currentChar.normalize("NFD")][0] ?? "",
+        ...triggerProposalInputsRef.current,
+      });
+      proposedTriggerKeyRef.current = proposed;
+      setTriggerKey(proposed);
+    }
     // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
     // reasoning (also used by TouchGallery's longpress suggestion memo).
     if (
@@ -2772,30 +2922,46 @@ export function MechanismGallery({
         );
         return;
       }
+      // While the author has left the proposed trigger untouched, re-propose
+      // with the suggestion's own base letter (ɛ is typed as trigger + e, not
+      // trigger + ɛ) so a base clash on the shared deadkey is avoided.
+      const acceptTriggerKey =
+        triggerKey === proposedTriggerKeyRef.current
+          ? proposeS02TriggerKey({ currentChar, baseLetter, sessionAssignments, workingIr })
+          : triggerKey;
       const triggerResolution = resolveKeyPickerSelection(
-        triggerKey,
+        acceptTriggerKey,
         triggerKeyCustomChar,
         TRIGGER_KEY_RESOLVE_OPTIONS,
       );
       const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
-      if (resolvedTriggerVkey === null) {
-        // The currently-held trigger-key state doesn't resolve (e.g. a
-        // custom trigger character left blank) — fall back to prefilling
-        // the deadkey method card (defaults-first, §3c) rather than
-        // dismissing outright, so the author can pick a trigger and Apply
-        // manually. Dismisses THIS chip only — a sibling chip (e.g. S-08)
-        // stays offered.
+      if (
+        resolvedTriggerVkey === null ||
+        s02BaseClash({
+          triggerKey: resolvedTriggerVkey,
+          baseLetter,
+          currentChar,
+          sessionAssignments,
+        }) !== null
+      ) {
+        // The trigger doesn't resolve (e.g. a custom trigger character left
+        // blank), or its deadkey already maps this base letter to another
+        // character — fall back to prefilling the deadkey method card
+        // (defaults-first, §3c) rather than dismissing outright, so the
+        // author can pick a trigger and Apply manually. Dismisses THIS chip
+        // only — a sibling chip (e.g. S-08) stays offered.
         setMethod("deadkey");
+        setTriggerKey(acceptTriggerKey);
         setDeadkeyBaseLetter(baseLetter);
         markSuggestionEntryDismissed(currentChar, entry.strategyId);
         return;
       }
       // The id + accent char come from the shared S-02 seam
       // (resolveS02DeadkeyIdentity) — the same call handleApply's manual
-      // deadkey method makes, so the two write paths cannot drift. The
-      // numeric id is freshly allocated (never the "dead0" fallback).
+      // deadkey method makes, so the two write paths cannot drift. The id is
+      // the trigger's existing session deadkey, else freshly allocated.
       const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
-        triggerKey,
+        triggerKey: acceptTriggerKey,
         triggerResolution,
         workingIr,
         sessionAssignments,
@@ -2806,6 +2972,7 @@ export function MechanismGallery({
         triggerVkey: resolvedTriggerVkey,
         deadkeyName,
         accentChar,
+        escapes: newTriggerEscapes(resolvedTriggerVkey),
       });
       // S-02 case-pair proposal — same companion the manual deadkey Apply
       // raises (see handleApply's method === "deadkey" branch): the base
@@ -2841,6 +3008,7 @@ export function MechanismGallery({
       return;
     }
     recordAssignments([...sessionAssignments, assignment]);
+    raiseDeadkeyEscapes(assignment);
     // The successful accept's own mechanism is now recorded with this
     // strategyId — recordedSuggestionStrategyIds (above) filters this ONE
     // chip out of visibleSuggestions on the next render; a sibling chip with
@@ -2886,6 +3054,8 @@ export function MechanismGallery({
     sessionAssignments,
     recordAssignments,
     resetMethodState,
+    raiseDeadkeyEscapes,
+    newTriggerEscapes,
     markSuggestionEntryDismissed,
     proposeCompanion,
     maybeRaiseDisplacement,
@@ -2899,6 +3069,32 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
   // Apply action
   // ---------------------------------------------------------------------------
+
+  // The character the deadkey card's trigger already types with its base
+  // letter, when that isn't the current character — applying would leave the
+  // current character unreachable, so Apply is blocked and the card says so.
+  const deadkeyClashOutput = useMemo(() => {
+    if (currentChar === null || method !== "deadkey") return null;
+    const vkey = resolvedVkeyOf(
+      resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, TRIGGER_KEY_RESOLVE_OPTIONS),
+    );
+    const base = resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions);
+    if (vkey === null || !base.ok) return null;
+    return s02BaseClash({
+      triggerKey: vkey,
+      baseLetter: base.value,
+      currentChar,
+      sessionAssignments,
+    });
+  }, [
+    currentChar,
+    method,
+    triggerKey,
+    triggerKeyCustomChar,
+    deadkeyBaseLetter,
+    deadkeyBaseLetterResolveOptions,
+    sessionAssignments,
+  ]);
 
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
@@ -2933,7 +3129,8 @@ export function MechanismGallery({
           TRIGGER_KEY_RESOLVE_OPTIONS,
         ),
       ) !== null &&
-      resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions).ok
+      resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions).ok &&
+      deadkeyClashOutput === null
     );
   }, [
     currentChar,
@@ -2945,6 +3142,7 @@ export function MechanismGallery({
     selectedSwapKeyCustomChar,
     raltTokens,
     deadkeyBaseLetterResolveOptions,
+    deadkeyClashOutput,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -3031,9 +3229,9 @@ export function MechanismGallery({
       // (resolveS02DeadkeyIdentity) — the same call the S-02 suggestion
       // accept makes, so the two write paths cannot drift. accentChar keeps
       // the old convention (the trigger key's literal character, so
-      // trigger+trigger escapes back to the bare character); the id is
-      // always freshly allocated via allocateDeadkeyId — the "dead0"
-      // forced derivation is gone.
+      // trigger+trigger escapes back to the bare character); the id is the
+      // trigger's existing session deadkey, else freshly allocated via
+      // allocateDeadkeyId — the "dead0" forced derivation is gone.
       const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
         triggerKey,
         triggerResolution,
@@ -3046,6 +3244,7 @@ export function MechanismGallery({
         triggerVkey: resolvedTriggerVkey,
         deadkeyName,
         accentChar,
+        escapes: newTriggerEscapes(resolvedTriggerVkey),
       });
 
       // S-02 case-pair proposal: the parallel combo case-shifts the BASE
@@ -3273,6 +3472,7 @@ export function MechanismGallery({
     }
 
     recordAssignments([...sessionAssignments, assignment]);
+    raiseDeadkeyEscapes(assignment);
     // #2300 G3: if this apply shadowed a still-needed glyph, propose its
     // demotion (never blocks the apply — it already happened).
     maybeRaiseDisplacement(assignment);
@@ -3295,6 +3495,8 @@ export function MechanismGallery({
     resetMethodState,
     deadkeyBaseLetterResolveOptions,
     maybeRaiseDisplacement,
+    raiseDeadkeyEscapes,
+    newTriggerEscapes,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -3594,15 +3796,33 @@ export function MechanismGallery({
           source: "user",
         };
       }
+      // The demoted glyph is typed as trigger + itself — propose its trigger
+      // on its own (one deadkey per purpose), not the current character's.
+      const demotionTriggerKey = proposeS02TriggerKey({
+        currentChar: targetChar,
+        baseLetter: targetChar,
+        sessionAssignments,
+        workingIr,
+      });
       const triggerResolution = resolveKeyPickerSelection(
-        triggerKey,
-        triggerKeyCustomChar,
+        demotionTriggerKey,
+        "",
         TRIGGER_KEY_RESOLVE_OPTIONS,
       );
       const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
       if (resolvedTriggerVkey === null) return null;
+      if (
+        s02BaseClash({
+          triggerKey: resolvedTriggerVkey,
+          baseLetter: targetChar,
+          currentChar: targetChar,
+          sessionAssignments,
+        }) !== null
+      ) {
+        return null;
+      }
       const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
-        triggerKey,
+        triggerKey: demotionTriggerKey,
         triggerResolution,
         workingIr,
         sessionAssignments,
@@ -3615,13 +3835,7 @@ export function MechanismGallery({
         accentChar,
       });
     },
-    [
-      pendingDisplacement,
-      triggerKey,
-      triggerKeyCustomChar,
-      workingIr,
-      sessionAssignments,
-    ],
+    [pendingDisplacement, workingIr, sessionAssignments],
   );
 
   /**
@@ -4963,6 +5177,7 @@ export function MechanismGallery({
               onTriggerKeyCustomCharChange={setTriggerKeyCustomChar}
               deadkeyBaseLetter={deadkeyBaseLetter}
               onDeadkeyBaseLetterChange={setDeadkeyBaseLetter}
+              deadkeyClashOutput={deadkeyClashOutput}
               selectedSwapKey={selectedSwapKey}
               onSwapKeyChange={setSelectedSwapKey}
               selectedSwapKeyCustomChar={selectedSwapKeyCustomChar}
@@ -5017,6 +5232,23 @@ export function MechanismGallery({
                     ? handleBothCoreDemoteOverride
                     : dismissDisplacement
                 }
+              />
+            )}
+
+            {/* Deadkey trigger escapes — raised by a deadkey's first
+                placement; the choice is already applied, the checkboxes
+                edit it live. */}
+            {escapePrompt !== null && (
+              <DeadkeyEscapesBanner
+                triggerKey={escapePrompt.triggerKey}
+                triggerChar={escapePrompt.accentChar}
+                escapes={
+                  recordedDeadkeyEscapes(sessionAssignments, escapePrompt.deadkeyName) ??
+                  new Set<DeadkeyEscape>()
+                }
+                altgrAvailable={!slotOccupancy.has(slotKeyFor(escapePrompt.triggerKey, ["RALT"]))}
+                onToggle={handleEscapeToggle}
+                onDone={() => setEscapePrompt(null)}
               />
             )}
 

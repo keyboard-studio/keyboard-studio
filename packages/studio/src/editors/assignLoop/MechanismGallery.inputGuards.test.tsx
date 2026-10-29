@@ -240,6 +240,39 @@ describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => 
     });
     expect(second.deadkeyName).toBe("dead2");
   });
+
+  it("a second mint on an occupied trigger reuses that trigger's deadkey", () => {
+    // One deadkey per trigger: ǎ then ě on K_COLON must share dk(3000) so
+    // applyAssignments merges them — a fresh id would emit a second
+    // `+ [K_COLON] > dk(...)` that can never fire.
+    const second = resolveS02DeadkeyIdentity({
+      triggerKey: "K_COLON",
+      triggerResolution: { kind: "key", vkey: "K_COLON" },
+      workingIr: null,
+      sessionAssignments: [
+        {
+          scope: "individual",
+          target: "ǎ",
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_DEADKEY,
+              strategyId: "S-02",
+              slotValues: {
+                triggerKey: "K_COLON",
+                deadkeyName: "3000",
+                baseLetters: "a",
+                accentedForms: "ǎ",
+                accentChar: ";",
+              },
+            },
+          ],
+          source: "user",
+        },
+      ],
+    });
+    expect(second).toEqual({ deadkeyName: "3000", accentChar: ";" });
+  });
 });
 
 describe("MechanismGallery — custom key option (S-08 ralt)", () => {

@@ -85,6 +85,41 @@ interface GroupBlock {
   bodyLines: string[];
 }
 
+/**
+ * The `deadkey_single_tap` fragment always carries two escapes that keep the
+ * trigger's own character typeable: trigger twice, and trigger then space.
+ * An optional `escapes` slot (space-separated tokens, e.g. "double-tap space")
+ * records which ones the author kept; a line whose token is absent is
+ * dropped. A third token, "altgr", adds `+ [RALT trigger] > char` so AltGr +
+ * the trigger types the character directly (sil_cameroon_qwerty's ; deadkey
+ * keeps all three). No `escapes` slot means double-tap and space only —
+ * assignments recorded before the slot existed keep exactly what they had.
+ */
+function applyDeadkeyEscapes(text: string, slotValues: Record<string, string>): string {
+  const escapes = slotValues["escapes"];
+  if (escapes === undefined) return text;
+  const kept = new Set(escapes.split(/\s+/).filter((t) => t.length > 0));
+  const name = slotValues["deadkeyName"] ?? "";
+  const trigger = slotValues["triggerKey"] ?? "";
+  const doubleTap = `dk(${name}) + [${trigger}] >`;
+  const space = `dk(${name}) + [K_SPACE] >`;
+  const lines = text.split("\n").filter((line) => {
+    const l = line.trim();
+    if (!kept.has("double-tap") && l.startsWith(doubleTap)) return false;
+    if (!kept.has("space") && l.startsWith(space)) return false;
+    return true;
+  });
+  const accentChar = slotValues["accentChar"] ?? "";
+  if (kept.has("altgr") && trigger !== "" && accentChar !== "") {
+    // U+ notation, not a quoted literal: the character may itself be a quote.
+    const output = [...accentChar]
+      .map((c) => `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`)
+      .join(" ");
+    lines.push(`+ [RALT ${trigger}] > ${output}`);
+  }
+  return lines.join("\n");
+}
+
 /** Parsed representation of a .kmn file for merge purposes. */
 interface ParsedKmn {
   /** Lines from top of file up to and including the `begin` line (and any
@@ -522,6 +557,7 @@ export function applyAssignments(
     for (const [, group] of byTriggerAndName) {
       if (group.length <= 1) continue;
       const first = group[0]!;
+      const escapes = group.find((r) => r.slotValues?.["escapes"] !== undefined)?.slotValues?.["escapes"];
       const merged: MechanismRef = {
         ...first,
         slotValues: {
@@ -531,6 +567,9 @@ export function applyAssignments(
           accentedForms: group.map((r) => r.slotValues?.["accentedForms"] ?? "").join(""),
           // Double-tap emits the first ref's accentChar (consistent with single-char case).
           accentChar: first.slotValues?.["accentChar"] ?? "",
+          // The deadkey's escapes are the author's choice for the whole
+          // deadkey — the first ref that recorded one carries it.
+          ...(escapes !== undefined ? { escapes } : {}),
         },
       };
       for (const r of group) mergedOfMember.set(mechanismKey(r), merged);
@@ -666,7 +705,9 @@ export function applyAssignments(
       );
     }
 
-    const parsed = parseFragment(text);
+    const parsed = parseFragment(
+      ref.patternId === DEADKEY_PATTERN ? applyDeadkeyEscapes(text, slotValues) : text,
+    );
 
     // Warn about (and skip) system stores in fragments.
     if (parsed.systemStoreLines.length > 0) {

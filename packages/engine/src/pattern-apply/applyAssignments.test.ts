@@ -914,6 +914,52 @@ describe("applyAssignments — deadkey_single_tap (S-02) merge by triggerKey acr
     ).toHaveLength(1);
     expect(kmn.match(/\+ \[K_QUOTE\] > dk\(acute\)/g) ?? []).toHaveLength(1);
   });
+
+  describe("escapes slot — which trigger escapes the author kept", () => {
+    const caron = (target: string, base: string, escapes?: string): MechanismAssignment => {
+      const a = makeDeadkeyAssignment(target, {
+        triggerKey: "K_COLON",
+        deadkeyName: "3000",
+        baseLetters: base,
+        accentedForms: target,
+        accentChar: ";",
+      });
+      if (escapes !== undefined) a.mechanisms[0]!.slotValues!["escapes"] = escapes;
+      return a;
+    };
+    const apply = (assignments: MechanismAssignment[]) => {
+      const pattern = getById("deadkey_single_tap")!;
+      return applyAssignments(assignments, (id) => (id === pattern.id ? pattern : undefined), BASE_KMN_DEADKEY);
+    };
+
+    it("keeps both the double-tap and the space escape when no escapes slot was recorded", () => {
+      const { kmn } = apply([caron("ǎ", "a")]);
+      expect(kmn).toContain("dk(3000) + [K_COLON] > ';'");
+      expect(kmn).toContain("dk(3000) + [K_SPACE] > ';'");
+    });
+
+    it("drops the escapes the author left out", () => {
+      const { kmn } = apply([caron("ǎ", "a", "double-tap")]);
+      expect(kmn).toContain("dk(3000) + [K_COLON] > ';'");
+      expect(kmn).not.toContain("[K_SPACE]");
+      expect(kmn).not.toContain("[RALT K_COLON]");
+      expect(apply([caron("ǎ", "a", "")]).kmn).not.toMatch(/dk\(3000\) \+ \[K_(COLON|SPACE)\] >/);
+    });
+
+    it("adds AltGr + trigger for the altgr escape", () => {
+      const { kmn } = apply([caron("ǎ", "a", "double-tap space altgr")]);
+      expect(kmn).toContain("+ [RALT K_COLON] > U+003B");
+      // Only once for a merged deadkey.
+      expect(apply([caron("ǎ", "a", "altgr"), caron("ě", "e")]).kmn.match(/\[RALT K_COLON\]/g)).toHaveLength(1);
+    });
+
+    it("a merged deadkey keeps the escapes its first placement recorded", () => {
+      const { kmn } = apply([caron("ǎ", "a", "space"), caron("ě", "e")]);
+      expect(kmn).toContain("store(dk_3000_bases)  'ae'");
+      expect(kmn).toContain("dk(3000) + [K_SPACE] > ';'");
+      expect(kmn).not.toContain("dk(3000) + [K_COLON] >");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
