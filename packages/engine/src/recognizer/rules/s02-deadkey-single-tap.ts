@@ -61,12 +61,19 @@ function buildPattern(match: MatchResult): Pattern {
         answerType: "char-list",
         default: match.slotValues["baseLetters"] ?? "",
       },
-      {
-        id: "accentedForms",
-        prompt: "Resulting accented forms",
-        answerType: "char-list",
-        default: match.slotValues["accentedForms"] ?? "",
-      },
+      match.slotValues["markChars"] !== undefined
+        ? {
+            id: "markChars",
+            prompt: "Combining mark(s) emitted after each base letter",
+            answerType: "text",
+            default: match.slotValues["markChars"],
+          }
+        : {
+            id: "accentedForms",
+            prompt: "Resulting accented forms",
+            answerType: "char-list",
+            default: match.slotValues["accentedForms"] ?? "",
+          },
       {
         id: "accentChar",
         prompt: "Bare combining accent character (emitted by escape rule)",
@@ -102,11 +109,11 @@ export const s02Recognizer: RecognizerRule = {
           ? [ruleRef(family.escape.nodeId)]
           : []),
         storeRef(family.baseStore.nodeId),
-        storeRef(family.outStore.nodeId),
+        ...(family.nfdMarks === undefined ? [storeRef(family.outStore.nodeId)] : []),
       ];
       const primary = family.primaryTrigger;
       results.push({
-        patternId: `deadkey_single_tap#${family.idSuffix}`,
+        patternId: `${family.nfdMarks !== undefined ? "deadkey_single_tap_nfd" : "deadkey_single_tap"}#${family.idSuffix}`,
         ownedNodes,
         slotValues: {
           triggerKey:
@@ -116,7 +123,9 @@ export const s02Recognizer: RecognizerRule = {
             : {}),
           deadkeyName: formatDkName(family.deadkeyId),
           baseLetters: storeItemsToCharString(family.baseStore),
-          accentedForms: storeItemsToCharString(family.outStore),
+          ...(family.nfdMarks !== undefined
+            ? { markChars: family.nfdMarks.join("") }
+            : { accentedForms: storeItemsToCharString(family.outStore) }),
           ...(family.accentChar !== undefined
             ? { accentChar: family.accentChar }
             : {}),

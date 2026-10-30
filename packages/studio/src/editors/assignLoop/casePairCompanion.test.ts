@@ -14,7 +14,9 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { MechanismAssignment, OutputForm, Pattern } from "@keyboard-studio/contracts";
+import { makePattern } from "@keyboard-studio/contracts";
+import { applyAssignments } from "@keyboard-studio/engine";
 import { useCasePairCompanion } from "./casePairCompanion.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
@@ -332,5 +334,97 @@ describe("useCasePairCompanion — ralt-layer proposal", () => {
     });
     expect(raised).toBe(false);
     expect(proposal).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-023: the case-pair companion passes through the same output form as the
+// source. The studio records both deadkey assignments form-independently
+// (deadkey_single_tap, NFC accentedForms); the engine picks the shape.
+// ---------------------------------------------------------------------------
+
+describe("case-pair companion output form (spec 106 FR-023)", () => {
+  const BASE_KMN =
+    "store(&VERSION) '10.0'\nstore(&NAME) 'Test'\nbegin Unicode > use(main)\n\ngroup(main) using keys\n";
+
+  const pattern = (id: string, questions: string[], kmnFragment: string) =>
+    makePattern({
+      id,
+      title: id,
+      description: id,
+      category: "desktop",
+      appliesTo: [],
+      questions: questions.map((q) => ({ id: q, prompt: q, answerType: "text" as const })),
+      kmnFragment,
+      tests: [],
+      validatedForFamilies: [],
+      sourceKeyboards: [],
+      reviewedBy: "",
+      reviewDate: "2026-10-29",
+    });
+
+  const patterns = new Map<string, Pattern>(
+    [
+      pattern(
+        "deadkey_single_tap",
+        ["triggerKey", "deadkeyName", "baseLetters", "accentedForms", "accentChar"],
+        "store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'\n" +
+          "store(dk_{{deadkeyName}}_output) '{{accentedForms}}'\n\n" +
+          "dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)\n" +
+          "dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'\n" +
+          "dk({{deadkeyName}}) + [K_SPACE] > '{{accentChar}}'\n" +
+          "+ [{{triggerKey}}] > dk({{deadkeyName}})\n",
+      ),
+      pattern(
+        "deadkey_single_tap_nfd",
+        ["triggerKey", "deadkeyName", "baseLetters", "markChars", "accentChar"],
+        "store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'\n\n" +
+          "dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_bases, 2) '{{markChars}}'\n" +
+          "dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'\n" +
+          "dk({{deadkeyName}}) + [K_SPACE] > '{{accentChar}}'\n" +
+          "+ [{{triggerKey}}] > dk({{deadkeyName}})\n",
+      ),
+    ].map((p) => [p.id, p]),
+  );
+
+  const deadkey = (target: string, base: string): MechanismAssignment => ({
+    scope: "individual",
+    target,
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: "deadkey_single_tap",
+        strategyId: "S-02",
+        slotValues: {
+          triggerKey: "K_COLON",
+          deadkeyName: "3000",
+          baseLetters: base,
+          accentedForms: target,
+          accentChar: ";",
+        },
+      },
+    ],
+    source: "user",
+  });
+
+  const sourceAndCompanion = [deadkey("ǎ", "a"), deadkey("Ǎ", "A")];
+  const emit = (outputForm: OutputForm) => {
+    const result = applyAssignments(sourceAndCompanion, (id) => patterns.get(id), BASE_KMN, { outputForm });
+    expect(result.warnings).toEqual([]);
+    return result.kmn;
+  };
+
+  it("base-plus-mark: source and companion both emit base + combining caron", () => {
+    const kmn = emit("base-plus-mark");
+    expect(kmn).toContain("store(dk_3000_bases)  'aA'");
+    expect(kmn).toContain("index(dk_3000_bases, 2) '̌'");
+    expect(kmn).not.toContain("ǎ");
+    expect(kmn).not.toContain("Ǎ");
+  });
+
+  it("ready-made: source and companion both emit the precomposed letters", () => {
+    const kmn = emit("ready-made");
+    expect(kmn).toContain("store(dk_3000_output) 'ǎǍ'");
+    expect(kmn).not.toContain("̌");
   });
 });

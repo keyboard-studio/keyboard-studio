@@ -563,6 +563,7 @@ export {
   hasDecidablePairs,
   normalizationFormForOutputForm,
   outputStringForStack,
+  outputFormString,
 } from "./marks/output-form-policy.js";
 export type {
   BackspaceBehaviour,
@@ -922,6 +923,9 @@ export {
   substituteSlots,
   applyAssignments,
   applyAssignmentsToVfs,
+  DEADKEY_PATTERNS,
+  OUTPUT_FORM_SEAM_PATTERN_IDS,
+  applyOutputFormSeam,
   applyCarveToVfs,
   carveFilterIr,
   deriveCarvedIr,
@@ -988,6 +992,8 @@ export {
 export type {
   SubstituteResult,
   ApplyAssignmentsResult,
+  OutputFormOptions,
+  EmitUnit,
   ApplyTouchAssignmentsResult,
   ApplyTouchAssignmentsToRawJsonResult,
   DesktopModifications,
