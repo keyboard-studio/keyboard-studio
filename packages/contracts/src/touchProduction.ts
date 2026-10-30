@@ -55,7 +55,6 @@
  * Pure, browser-safe, no I/O.
  */
 
-import type { GuardSpecification } from "./decisionRecord.js";
 import type { KeyboardIR, OutputElement, TouchKeyIR } from "./keyboard-ir.js";
 import { listDeadkeys } from "./ir/deadkeys.js";
 import { US_BASE_LAYOUT } from "./ir/usBaseLayout.js";
@@ -620,8 +619,14 @@ export interface KeyIdFormInput {
   readonly isCombiningMark?: boolean;
   /** True when the mark is the output of a deadkey composition (arm d″). */
   readonly deadkeyComposedMark?: boolean;
-  /** The keyboard's guard specification (FR-013), when one is in force. A `"swallow"` behaviour is what specifies a guard. */
-  readonly guardSpecification?: GuardSpecification;
+  /**
+   * Per-mark "start of line" box (#2374, replacing spec 104 FR-013's
+   * keyboard-wide guard specification): `true` when the mark's box is
+   * ticked (the bare mark may appear at buffer start — old `"emit"`).
+   * Unticked or absent (a late-added mark with no survey row) mints
+   * guarded `T_` (old `"swallow"`).
+   */
+  readonly bareMarkAllowed?: boolean;
   /** The keyboard's `&VERSION`, e.g. `"15.0"`. Absent reads as below every floor. */
   readonly keyboardVersion?: string;
 }
@@ -710,21 +715,22 @@ export function decideKeyIdForm(input: KeyIdFormInput): KeyIdDecision {
         arm: "d″",
         destination: ruleDestination(input),
         reason:
-          "The mark is the output of a deadkey composition; it routes to arm (a) as a deadkey output rule. The guard specification is irrelevant to this route.",
+          "The mark is the output of a deadkey composition; it routes to arm (a) as a deadkey output rule. The mark's guard is irrelevant to this route.",
       };
     }
-    if (input.guardSpecification?.behaviour === "swallow") {
+    if (input.bareMarkAllowed === true) {
       return {
-        arm: "d′",
-        destination: ruleDestination(input),
+        arm: "d",
+        destination: { form: "U_", action: "mint", output: input.plainOutput },
         reason:
-          "A guard is specified for marks in this keyboard (the guard specification); the mark routes to arm (a) with the guard taken from that specification.",
+          "The mark's \"start of line\" box is ticked, so the bare mark may appear at buffer start; it decodes directly from a U_ id.",
       };
     }
     return {
-      arm: "d",
-      destination: { form: "U_", action: "mint", output: input.plainOutput },
-      reason: "A combining mark with no guard specified and no deadkey route decodes directly from a U_ id.",
+      arm: "d′",
+      destination: ruleDestination(input),
+      reason:
+        "The mark's \"start of line\" box is unticked, so the mark is blocked at buffer start; it mints a guarded T_ id with the guard taken from the per-mark rule.",
     };
   }
 

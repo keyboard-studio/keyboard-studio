@@ -630,7 +630,11 @@ export {
   MARKS_UNWRAP_TO_STORE,
   MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
-export type { BareMarkBehaviour, MarkGuardsResult } from "./pattern-apply/mark-guards.js";
+export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
+// Issue #2374: the per-mark "start of line" sentinel lives on the attachment
+// row; the worklist builder reads it into `bareMarkAllowed`. Re-exported so
+// the survey layer uses this exact value instead of redefining it.
+export { ATTACHMENT_START_OF_LINE } from "./marks/worklist.js";
 
 // spec 065 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
 // sanctioned door to the inherit-first proposer and the keycap judgement.
