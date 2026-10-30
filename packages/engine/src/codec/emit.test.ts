@@ -338,7 +338,7 @@ describe("emit — quoted store values", () => {
   // NO .kmx artifact at all. The pattern-apply "drop" edit class (see
   // applyStoreSlotRemovals) removes a store emptied by a carve together with
   // the rules that reference it, so a real carve never hands emit() an empty
-  // any()-consumed store.
+  // any()-consumed store. This test
   // pins emit()'s own behavior for any caller that hands it an empty store.
   it("emits a bare `store(name) ` line (trailing space, no value) for an emptied store", () => {
     const out = emit(makeUserStoreIR("emptied", []));
