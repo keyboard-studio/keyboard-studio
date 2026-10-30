@@ -87,7 +87,7 @@ Each story phase ends with the same three gate tasks:
   - Add G7 determinism: project twice, byte-equal.
   - Gate missing corpus with `announceSc004Skip`.
 - [x] T014 [US1] Add a fidelity assertion to the same file: for p1-whole-bafut-kbdus at the last point, the fixture's `source/bafut.kmn` equals the walk zip's `.kmn` modulo the known E-gaps. Any diff outside those gaps fails, and the diff is printed. This proves the fixtures reproduce what the UI produces. **Lifecycle**: the match is exact at US1. The zip predates the T005 F-DIVERGE fix and contains `zzq` placeholders, so normalise both of those first. From US2 on, each story records its expected diff in the test (`expectedDiffs[story]`). T064 re-baselines everything against the fresh walk zip.
-- [ ] T015 [US1] Gate: run the quickstart steps 1, 3 and 4. Commit `feat(studio): decision-point fixtures with consistency gates` and push. Open a PR from `106-consistent-keyboard-output` (base: `km/s02-deadkey-purpose` until #2358 merges, then `main`) carrying the spec folder and Phases 1-3.
+- [x] T015 [US1] Gate: run the quickstart steps 1, 3 and 4. Commit `feat(studio): decision-point fixtures with consistency gates` and push. Open a PR from `106-consistent-keyboard-output` (base: `km/s02-deadkey-purpose` until #2358 merges, then `main`) carrying the spec folder and Phases 1-3.
 
 ---
 
