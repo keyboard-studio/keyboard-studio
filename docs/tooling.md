@@ -280,12 +280,43 @@ npx playwright install chromium                       # once per version bump
 E2E stays out of the unit CI lanes (vitest and tsc both exclude `e2e/**`), but CI runs it in its
 own **non-blocking** `e2e` job in [ci.yml](../.github/workflows/ci.yml) (`continue-on-error`, not a
 required check): it checks out the pinned corpus, builds studio's workspace dependencies,
-installs Chromium, and runs `test:e2e boot-smoke copy-edit` — Playwright's positional args are
+installs Chromium, and runs `test:e2e` with the spec filters listed under
+[PR CI budget](#pr-ci-budget) — Playwright's positional args are
 file filters, so widening the lane is adding a spec name there. On failure the HTML report and
 traces (`playwright-report/`, `test-results/`, CI-only) upload as the `playwright-report`
 artifact. Make the job blocking once it has proved stable. All specs import from
 `"playwright/test"` — the `playwright` package's test entry; do not add `@playwright/test` as a
 second runner package.
+
+### PR CI budget
+
+A pull request's `CI` run must finish in **under 10 minutes; the target is about 5**. The
+required gate (`build`, after `fast`) takes about 5.5 minutes, so every other lane has to stay at
+or under that. Measured on a 2026-10-30 run (per-test times from the Playwright `list` output):
+`boot-smoke` about 48 s, `decision-store-reload` about 21 s, `touch-key-identity` about 4.3 min
+(its walk 1 about 50 s), `copy-edit` about 10.6 min, 16.1 min of tests in all. Walks that long
+run on the schedule, not on pull requests.
+
+| Where | `e2e desktop` runs | Approx. time |
+|---|---|---|
+| Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity.spec.ts:264`) | about 3 min |
+| Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks) | about 17 min |
+
+- **Path gate.** On a pull request `e2e desktop` is skipped unless the `changes` job's `e2e`
+  output is true: any non-markdown change under `packages/studio/` or `packages/glottolog/`, any
+  change that turns the `golden` gate on (`packages/engine/`, `packages/contracts/`, `ci.yml`,
+  root `package.json`, the lockfile, the golden-walk studio paths), or the `run-all-gates` label.
+  Non-PR events always run it. The job is not a required check, so a skip blocks nothing; the
+  required checks stay `build` and `km-triage/review`.
+- **Failures on the schedule.** The `e2e nightly failure report` job opens (or comments on) one
+  open issue titled `Nightly e2e desktop failure (<ref>)` when the full set fails on a non-PR run.
+- **Run the nightly set by hand.** Locally:
+  `pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity`.
+  On GitHub: Actions, CI, "Run workflow" (`workflow_dispatch`) on the branch.
+- **Adding a walk.** Estimate its time first. Under about 1 minute it may join the PR filter list
+  in the `e2e-desktop` job; longer goes in the full-set step only.
+- Other lanes: `fast` about 3.5 min, `e2e golden-walk` about 2.7 min and `e2e mobile` about
+  2.7 min run in parallel with `build`; none is on the critical path.
 
 ### Shared helpers
 
@@ -319,7 +350,7 @@ Live and passing:
 - [touch-key-identity.spec.ts](../packages/studio/e2e/touch-key-identity.spec.ts) — spec 104
   T023: guard-station creation walk, Cameroon copy parity + basic_kbdus repair list,
   adapt-with-repair (OSK-verified), Track 2 choice + FR-017 decline suppression. Added
-  to the CI `e2e` job's desktop filter list by the spec 104 close-out; its first lane
+  to the CI `e2e` job's desktop filter list by the spec 104 close-out (walk 1 only on PRs, all walks nightly); its first lane
   run is the passing verdict.
 - [touch-derivation-us1.spec.ts](../packages/studio/e2e/touch-derivation-us1.spec.ts) — spec 035
   US1, bambara import-and-adapt walk

@@ -67,6 +67,10 @@ jobs:
   #     which no longer run in the default suite (see vitest configs).
   #   golden — the studio surfaces whose emitted bytes the walk
   #     compares, plus engine/contracts.
+  #   e2e — everything `golden` covers, plus any non-markdown change under
+  #     packages/studio/ (the SPA the desktop walks drive). Gates
+  #     `e2e-desktop`, which is not a required check, so a skip blocks
+  #     nothing. (#2367: keep PR CI under 10 minutes, target 5.)
   # ci.yml / root package.json / lockfile changes, the `run-corpus` /
   # `run-golden` / `run-all-gates` labels, and every non-PR run turn
   # every gate on; an unavailable diff fails open. The corpus gate
@@ -83,6 +87,7 @@ jobs:
     outputs:
       corpus: ${{ steps.gates.outputs.corpus }}
       golden: ${{ steps.gates.outputs.golden }}
+      e2e: ${{ steps.gates.outputs.e2e }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,15 +104,18 @@ jobs:
         run: |
           corpus=false
           golden=false
+          e2e=false
           if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
             corpus=true
             golden=true
+            e2e=true
           else
             files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" 2>/dev/null || true)"
             if [ -z "$files" ]; then
               # Diff unavailable — fail open and run everything.
               corpus=true
               golden=true
+              e2e=true
             else
               while IFS= read -r f; do
                 case "$f" in
@@ -120,7 +128,14 @@ jobs:
                   packages/studio/src/decisions/*|packages/studio/src/steps/*|packages/studio/src/stores/*|packages/studio/src/survey/*|packages/studio/src/lib/*|packages/studio/src/StudioShell.*|packages/studio/e2e/*)
                     golden=true ;;
                 esac
+                # e2e reaches everything golden does, plus the rest of the
+                # studio package (docs-only .md edits excepted).
+                case "$f" in
+                  packages/studio/*.md|packages/studio/*/*.md) ;;
+                  packages/studio/*|packages/glottolog/*) e2e=true ;;
+                esac
               done <<< "$files"
+              if [ "$golden" = "true" ]; then e2e=true; fi
             fi
             case "$PR_LABELS" in
               *'"run-corpus"'*) corpus=true ;;
@@ -129,12 +144,13 @@ jobs:
               *'"run-golden"'*) golden=true ;;
             esac
             case "$PR_LABELS" in
-              *'"run-all-gates"'*) corpus=true; golden=true ;;
+              *'"run-all-gates"'*) corpus=true; golden=true; e2e=true ;;
             esac
           fi
           echo "corpus=$corpus" >> "$GITHUB_OUTPUT"
           echo "golden=$golden" >> "$GITHUB_OUTPUT"
-          echo "Expensive gates for this run: corpus=$corpus golden=$golden (event: $GITHUB_EVENT_NAME)"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+          echo "Expensive gates for this run: corpus=$corpus golden=$golden e2e=$e2e (event: $GITHUB_EVENT_NAME)"
 
   # Fast gate (km/ci-fast-gate, 2026-10-15 — owner ruling after the
   # #2191 red-main incident): the cheap, high-signal slice of the build
@@ -540,14 +556,27 @@ jobs:
   # Actions has no step-level reuse); it costs a few minutes of setup per
   # lane and buys independent, parallel results.
 
+  #
+  # Desktop lane budget (#2367 - PR CI must finish in under 10 minutes,
+  # target 5). Measured on run 41069595484: boot-smoke ~48 s,
+  # decision-store-reload ~21 s, touch-key-identity ~4.3 m (walk 1 ~50 s),
+  # copy-edit ~10.6 m - 16.1 m of tests in total. Pull requests therefore
+  # run only the quick slice (boot-smoke, decision-store-reload and spec
+  # 104 walk 1), and only when the `changes` job says the PR can reach the
+  # SPA (outputs.e2e). Every non-PR event (the nightly schedule, push to
+  # main, workflow_dispatch, the nightly dev soak) runs the full set, and
+  # a failure there is filed by the `e2e-nightly-report` job below.
   e2e-desktop:
     name: e2e desktop (Playwright, non-blocking)
     needs: changes
+    if: ${{ needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 60
     permissions:
       contents: read
+    outputs:
+      pw_failed: ${{ steps.verdict.outputs.failed }}
 
     steps:
       - name: Checkout
@@ -603,8 +632,30 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright (boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks)
+      # PR lane: the quick slice only. `touch-key-identity.spec.ts:264` is
+      # spec 104 walk 1 (file:line filter; if that test moves, Playwright
+      # finds nothing and the step fails loudly rather than skipping).
+      - name: Playwright (PR quick slice - boot-smoke + decision-store-reload + spec 104 walk 1)
+        id: pw_pr
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload touch-key-identity.spec.ts:264
+
+      # Full set (nightly schedule, push to main, workflow_dispatch):
+      # boot-smoke + copy-edit + spec 088 live gate + spec 104 walks.
+      - name: Playwright (full set - boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks)
+        id: pw_full
+        if: ${{ github.event_name != 'pull_request' }}
         run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity
+
+      # `continue-on-error` makes this job report success even when the
+      # tests failed, so surface the real verdict as a job output for
+      # `e2e-nightly-report`. On a non-PR event anything
+      # but a passing full set counts (a failed setup step skips the test
+      # step).
+      - name: Record test verdict
+        id: verdict
+        if: ${{ !cancelled() }}
+        run: echo "failed=${{ steps.pw_pr.outcome == 'failure' || (github.event_name != 'pull_request' && steps.pw_full.outcome != 'success') }}" >> "$GITHUB_OUTPUT"
 
       - name: Summarize Playwright results
         if: always()
@@ -647,6 +698,37 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+
+  # Files or updates a tracking issue when the full desktop set fails on a
+  # non-PR event, so a nightly failure is not silent (#2367). One open issue
+  # per ref: later failures comment on it instead of opening duplicates.
+  # `e2e-desktop` is `continue-on-error`, so its `result` is always
+  # success; the verdict comes from its `pw_failed` output.
+  e2e-nightly-report:
+    name: e2e nightly failure report
+    needs: e2e-desktop
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.e2e-desktop.outputs.pw_failed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TARGET_REF: ${{ inputs.checkout_ref || github.ref_name }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open or update the tracking issue
+        run: |
+          title="Nightly e2e desktop failure ($TARGET_REF)"
+          body="The full desktop Playwright set failed on $TARGET_REF (event: $GITHUB_EVENT_NAME). Run: $RUN_URL. The PR lane only runs a quick slice; copy-edit and the other long walks run on the schedule only (docs/tooling.md, PR CI budget). Reproduce locally: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number,title --jq "[.[] | select(.title == \"$title\")][0].number // empty")"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
 
   e2e-mobile:
     name: e2e mobile (Playwright, non-blocking)
