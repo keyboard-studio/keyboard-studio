@@ -37,6 +37,7 @@ import {
   rulesLabel,
   rulesLegend,
   rulesNote,
+  rulesOutputPreview,
   rulesSection,
   rulesSectionHeading,
   rulesTable,
@@ -205,11 +206,16 @@ export function DemoPane(props: DemoPaneProps = {}) {
   }, [likelyBases, handPicked]);
 
   // --- Simulator engine (lazy, once per session; no debounce, no compile) ---
-  const [simulate, setSimulate] = useState<DemoSimulate | null>(props.simulateImpl ?? null);
+  // NOTE: the initializer is wrapped in an arrow function — useState would
+  // otherwise INVOKE a function-valued simulateImpl as a lazy initializer
+  // (any impl that reads its arguments crashes on mount; #2384).
+  const [simulate, setSimulate] = useState<DemoSimulate | null>(() => props.simulateImpl ?? null);
   const [engineError, setEngineError] = useState<string | null>(null);
   useEffect(() => {
     if (props.simulateImpl !== undefined) {
-      setSimulate(props.simulateImpl);
+      // Wrapped: setSimulate would otherwise invoke a function-valued impl
+      // as a state updater (same footgun as the useState initializer above).
+      setSimulate(() => props.simulateImpl ?? null);
       setEngineError(null);
       return;
     }
@@ -499,6 +505,27 @@ export function DemoPane(props: DemoPaneProps = {}) {
 
           {showTrace && (
             <>
+              {/* #2384: the typing box above keeps the author's raw keystrokes
+                  exactly as typed (Matthew's ruling — never rewritten). This
+                  read-only box shows what the keyboard WOULD output —
+                  result.finalOutput, the same SimulationResult that feeds the
+                  play-by-play trace table below. */}
+              <div style={{ margin: "0 0 12px 0" }}>
+                <label style={rulesLabel}>
+                  <Trans id="rules.demo.outputPreviewLabel">Output preview</Trans>
+                  <output
+                    data-testid="rules-demo-output-preview"
+                    aria-live="polite"
+                    style={rulesOutputPreview}
+                  >
+                    {result !== null && result.finalOutput !== "" ? (
+                      result.finalOutput
+                    ) : (
+                      <em>—</em>
+                    )}
+                  </output>
+                </label>
+              </div>
               {!enrichmentPresent && (
                 <p data-testid="rules-demo-no-enrichment" style={rulesNote}>
                   <Trans id="rules.demo.noEnrichment">
