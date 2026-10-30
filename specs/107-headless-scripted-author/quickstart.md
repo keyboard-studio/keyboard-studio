@@ -35,21 +35,24 @@ Expect: 0 unexplained differences across the 4 committed records; stale allow-li
 
 ## 3. PR lane (what CI runs on every PR, SC-002)
 
+The same command the `build` job's capped step runs (`timeout-minutes: 1`):
+
 ```sh
-npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity
-npx vitest run src/test/headlessAuthor/driftGuard
+npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard
 ```
 
-Expect: 6 PR-set cases report every gate (expected failures named with their owner); total test time
-about 1 min. SC-005 check: revert `sameGroupName` in
+Expect: 6 PR-set cases report every gate (expected failures named with their owner); wall time under
+60 s including vitest's module load. SC-005 check: revert `sameGroupName` in
 `packages/engine/src/codec/groupName.ts` locally, rebuild the engine, rerun; the `bj_cree_woods`
 case fails with a duplicate-group compile error.
 
 ## 4. The 32 harness cases (US3, SC-008; on demand)
 
+The cases come from the committed canonical file
+`src/test/headlessAuthor/cases/harness-cases.json` (FR-035); nothing is fetched from another branch.
+
 ```sh
-git show origin/km/2302-walk-zips:tools/testing-profiles-2302/harness/cases.json > /tmp/cases.json
-KS_AUTHOR_CASES=/tmp/cases.json npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/harnessCases
+KS_AUTHOR_HARNESS=1 npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/harnessCases
 ```
 
 Expect: 32 lines, each with gates, placeholder count and displacement actions; under 10 min.

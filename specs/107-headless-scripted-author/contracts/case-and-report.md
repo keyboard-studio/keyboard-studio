@@ -3,15 +3,22 @@
 ## Case file
 
 A JSON array of `Case` objects ([data-model.md](../data-model.md#case)). `loadCases(path)` accepts the
-`harness/cases.json` shape unchanged, plus optional `group` and `track`; when absent, `group` is looked
-up from the corpus and `track` defaults to `copy`.
+`harness/cases.json` shape unchanged, plus optional `group`, `track` and `script`; when absent, `group`
+is looked up from the corpus, `track` defaults to `copy`, and `script` comes from the identity step's
+own prefill.
+
+**Canonical file**: `packages/studio/src/test/headlessAuthor/cases/harness-cases.json` (FR-035), a byte
+copy of `tools/testing-profiles-2302/harness/cases.json` from `km/2302-walk-zips` commit `a4bd8591`,
+with `cases/PROVENANCE.md` beside it. The PR set and the scheduled run read this file; nothing fetches
+cases from another branch. The Playwright harness should read from it or be synced from it (harness
+owner's follow-up).
 
 ## PR-set manifest: `packages/studio/src/test/headlessAuthor/prSet.json`
 
 ```json
 [
   {
-    "case": { "id": "p1-whole-bafut-kbdus", "base": "basic_kbdus", "group": "basic", "...": "..." },
+    "caseId": "p1-whole-bafut-kbdus",
     "shape": ["simple"],
     "reason": "No deadkeys, no stores, one group; committed walk record anchors parity."
   },
@@ -23,6 +30,9 @@ up from the corpus and `track` defaults to `copy`.
   }
 ]
 ```
+
+An entry names either `caseId` (a case in the canonical file) or an inline `case` (only for keyboards
+outside the harness set: `bj_cree_woods`, `chechen_latin`), never both.
 
 Initial entries (spec FR-031): `basic_kbdus`, `basic_kbdfr` (Ewondo), `bj_cree_woods`,
 `sil_cameroon_qwerty`, `sil_cameroon_azerty`, `chechen_latin`. Rules:

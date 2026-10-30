@@ -40,3 +40,8 @@
   under 5); walk zips stay off `main` and parity runs on spec 106's committed records plus records
   produced on demand (FR-020); `fallbackPolicy` is tracked by #2366 (FR-060); stacking on
   `106-consistent-keyboard-output` is recorded under Dependencies.
+- Re-run 2026-10-30 after two further owner rulings: the PR lane is one step inside `build`, capped
+  at 60 s (SC-002; the "new job" question is closed), and the harness case definitions are committed as
+  the canonical copy (FR-035; no sparse checkout from `km/2302-walk-zips`). The generated-layout build
+  side effect is closed by #2370. Still **zero** [NEEDS CLARIFICATION] markers and no open questions;
+  every item above stays checked.

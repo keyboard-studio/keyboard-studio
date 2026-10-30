@@ -15,6 +15,7 @@ walks today. The harness lives outside this repo, in
 `ks-2302-main/tools/testing-profiles-2302`:
 
 - `harness/cases.json` holds the 32 cases (4 copied keyboards x 4 profiles x 2 backspace answers).
+  This spec commits a copy to the repo as the canonical case definitions (FR-035).
 - `harness/run-zip.mjs` drives one case through `scripts/phase{1,2,3,4}.template.js`.
 
 One case takes about 25 minutes, needs a dev server and a free port, and is flaky under load. On
@@ -68,6 +69,8 @@ product proposal, and it records that value's provenance the way the UI records 
 - Q: What is the PR CI time budget? → A: Total PR CI wall time (the whole PR run, not just this spec's share) must finish in under 10 minutes, preferably under 5. Larger-corpus scans run occasionally (scheduled or on demand), never on PRs. See SC-002 (PR budget) and SC-009 (scheduled scan).
 - Q: Are walk zips (or more walk records) imported to cover parity? → A: No. The repo keeps the **framework** that produces walk records (the headless author, and the Playwright harness for UX walks) but does not commit walk zips to `main`. Parity runs against the decision records spec 106 already commits under `packages/studio/src/lib/__fixtures__/decision-points/records/`, plus any record a maintainer produces on demand with the framework. The zips stay on `km/2302-walk-zips`.
 - Q: Is `fallbackPolicy` fixed here? → A: No; it is tracked as issue #2366 (FR-060).
+- Q: Does the PR lane run in its own CI job or inside `build`? → A: Inside `build`, as one step capped at 60 seconds (owner, 2026-10-30). A separate job would repeat `pnpm install` and the build (about a minute) and put max(headless, `fast`) + `build` on the critical path. A step in `build` reuses `build`'s install and `dist`, is covered by the required `build` check with no ruleset change, and adds at most 60 s. The cap is enforced (`timeout-minutes: 1` on the step), so an overrun fails loudly instead of growing quietly. See SC-002.
+- Q: Where do the harness case definitions live? → A: In this repo (owner, 2026-10-30), committed once from `km/2302-walk-zips` with their provenance, at `packages/studio/src/test/headlessAuthor/cases/harness-cases.json`. It is a case description, not a zip or a record, so it fits "keep the framework, no zips on main". That copy is canonical: the PR set and the scheduled run read it, and the Playwright harness should read from it or be synced from it (a follow-up for the harness owner; `km/2302-walk-zips` is not edited here). See FR-035.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -134,8 +137,8 @@ the same per-case gate report the Playwright harness was meant to produce for sp
 the count of placeholder decisions. That report replaces the walk as the evidence for decision
 coverage.
 
-The 32-case suite is an **on-demand** (and scheduled) run, not a PR gate. It reads `cases.json` from a
-path the maintainer supplies. What runs on every PR is the minimal curated set (FR-031).
+The 32-case suite is an **on-demand** (and scheduled) run, not a PR gate. It reads the committed
+canonical case definitions (FR-035). What runs on every PR is the minimal curated set (FR-031).
 
 **Why this priority**: This unblocks spec 106 US8 (T063/T064) without 32 browser walks.
 
@@ -244,7 +247,7 @@ layout; no walk zip is committed for this check.
   - `sampleText`;
   - overrides (`overwriteChar` / `overwriteKey`, and any later override kind).
 
-  It MUST be able to read `cases.json` directly.
+  It MUST read the committed canonical copy (`packages/studio/src/test/headlessAuthor/cases/harness-cases.json`, FR-035) directly, and any other file in the same shape.
 - **FR-002**: The author MUST visit steps in the order the product's own step routing yields, by reusing the routing that spec 032's journey runner drives (`steps/advance.ts`, `steps/reducer.ts`, the survey runner's exported routing). It MUST NOT use a hard-coded step list.
 - **FR-003**: At each decision, the author MUST apply the walk policy in this order:
   1. accept the top suggestion the product offers;
@@ -310,9 +313,9 @@ layout; no walk zip is committed for this check.
 
 **Harness cases (US3)**
 
-- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner). The suite reads `cases.json` from a path the maintainer supplies and runs on demand or on the schedule (FR-034). It is not a PR gate.
+- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner). The suite reads the committed canonical case definitions (FR-035) and runs on demand or on the schedule (FR-034). It is not a PR gate.
 - **FR-031**: A corpus sweep mode MUST run the author over any copied keyboard in `../keyboards` crossed with any profile. It runs in two tiers (owner ruling, 2026-10-30):
-  - **PR set (required on every PR).** A minimal curated set of keyboards chosen by shape. Each entry is a committed case description (keyboard, profile, sample text, overrides) with a recorded reason. No walk zip or walk record is needed to run it. The set covers:
+  - **PR set (required on every PR).** A minimal curated set of keyboards chosen by shape. Each entry is a committed case description (keyboard, profile, sample text, overrides) with a recorded reason. An entry whose keyboard and profile are among the harness cases references that case by id in the canonical copy (FR-035); only keyboards outside the harness set (`bj_cree_woods`, `chechen_latin`) carry their own case description. No walk zip or walk record is needed to run it. The set covers:
     - a few **simple** keyboards (for example `basic_kbdus`);
     - **structurally different** keyboards: deadkey-heavy, a shipped touch layout, `any()`/`index()` store pairs, read-only or opaque groups, mixed-case group names;
     - **regression guards**: keyboards whose keyboard-specific bugs were repaired. The seeds are `bj_cree_woods` (a `group(Main)` duplicate-group merge, fixed in `502fb061`) and `basic_kbdfr` with Ewondo (S-02: three deadkeys on `K_COLON`, fixed in #2358).
@@ -344,6 +347,10 @@ layout; no walk zip is committed for this check.
   - never block, fail or gate a PR.
 
   The plan fixes the cadence and the issue-filing rules.
+- **FR-035**: The harness case definitions MUST be committed to this repo at `packages/studio/src/test/headlessAuthor/cases/harness-cases.json`, copied byte for byte from `km/2302-walk-zips` (`tools/testing-profiles-2302/harness/cases.json`), with a `PROVENANCE.md` beside it naming the source branch and commit. That copy is canonical:
+  - the PR set (FR-031) and the scheduled run (FR-034) read it; no run fetches case definitions from another branch;
+  - a change to a case is a change to this file, reviewed like any other;
+  - the Playwright harness should read from it or be synced from it. That is a follow-up for the harness owner; this spec does not edit `km/2302-walk-zips` or `ks-2302-main`.
 
 **Lifting component logic (US5)**
 
@@ -394,7 +401,7 @@ layout; no walk zip is committed for this check.
 ### Measurable Outcomes
 
 - **SC-001**: One case runs headlessly, end to end (author, replay, compile, gates), in under 60 seconds on a maintainer's machine from a cold vitest start, and adds under 5 seconds per further case in the same run. That is down from about 25 minutes for a Playwright walk. Baseline measured for the plan on 2026-10-30: the existing replay alone takes about 25 s of one-time module load and 0.06-1.0 s per fixture warm (the full-decision `tolerance` fixture: 0.08 s on `basic_kbdus`, 1.0 s on `sil_cameroon_azerty`).
-- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time, preferably under 5. After #2368 the critical path is `fast` then `build`, about 5.6 minutes. This spec's PR lane (the curated PR set of FR-031, parity on the committed records, and the drift guard) MUST fit with headroom: it runs in a job parallel to `fast` and finishes no later than `fast` does, so it adds **0 seconds** to the critical path. If it cannot, it may extend the critical path by at most 60 seconds, and never past 10 minutes. The plan sizes the set from the measured per-case cost (replay: about 25 s one-time module load plus 0.1-1.0 s per case; the author's own proposal calls are budgeted at under 5 s per case until measured), so six cases cost about 55 s of test time. The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). The wide sweep and the 32-case suite never run on a PR.
+- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time, preferably under 5. The PR critical path is `fast` then `build`, about 5.1 minutes measured on #2368's run. This spec's PR lane (the curated PR set of FR-031, parity on the committed records, and the drift guard) runs as **one step inside the `build` job**, reusing its install and `dist`, and grows the critical path by **at most 60 seconds** (to about 6 minutes; never past 10). The cap is enforced on the step (`timeout-minutes: 1`), so an overrun fails the run rather than quietly growing it. The plan sizes the set from the measured per-case cost (replay: about 25 s one-time module load plus 0.04-0.8 s per case; the author's own proposal calls are budgeted at under 5 s per case until measured), so six cases cost about 30-60 s of test time. The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). The wide sweep and the 32-case suite never run on a PR.
 - **SC-003**: Parity holds on 100% of recorded walks: every decision equal, or explained by an allow-list entry. 0 unexplained differences, and 0 records edited.
 - **SC-004**: 100% of the suggestions and defaults the author uses come from product functions covered by the drift guard (FR-011). The author contains 0 copies of proposal logic.
 - **SC-005**: Re-introducing the `group(main)` vs `group(Main)` defect (reverting `502fb061`) makes the PR set fail on its `bj_cree_woods` case, in under 60 seconds.
@@ -409,7 +416,8 @@ layout; no walk zip is committed for this check.
 - Any `Pattern` schema change (Constitution Art. I).
 - LDML output; touch-first authoring (Decision 6); CJK and Ethiopic paths (stubbed and skipped).
 - Adding `fallbackPolicy` to the decision record (issue #2366).
-- Committing walk zips, or walk records beyond spec 106's four, to the repo. The zips stay on `km/2302-walk-zips`.
+- Committing walk zips, or walk records beyond spec 106's four, to the repo. The zips stay on `km/2302-walk-zips`. (The harness **case definitions** are committed; see FR-035.)
+- Editing `km/2302-walk-zips` or the harness to read the canonical case file; that is the harness owner's follow-up (FR-035).
 - Running the wide sweep or the 32-case suite on PRs.
 - Retiring or editing the harness in `ks-2302-main`. That is a separate repo, and its retirement follows FR-070.
 - Editing spec 106 files.
@@ -418,7 +426,8 @@ layout; no walk zip is committed for this check.
 
 - **Based on `main`.** 107 needs spec 106 US1's replay pieces (`decisionPointFixture.ts`, `recordToDecisionSet.ts`, `consistencyGates.ts`, `decisionPoint.corpus.test.ts`). It first stacked on `106-consistent-keyboard-output` by merge; on 2026-10-30 the whole spec 106 stack merged to `main` (#2358, #2362, #2364, #2365, #2369), so 107 merged `origin/main` (a merge, never a rebase, because the branch is pushed). 107 is now based on `main` and its PR targets `main`.
 - **On `main` now.** Everything this spec names from spec 106 is on `main`: the replay code; the Ewondo `kbdfr` re-record after the S-02 fix (one deadkey on `K_COLON`, G1 passing); the group-name fix `502fb061` (`sameGroupName`, `packages/engine/src/codec/groupName.ts`), which the `bj_cree_woods` guard and SC-005 rely on; and the carve "marked until Continue" code (`suggestionFingerprintOf` and `isUntouchedSuggestion` in `survey/carve/carveValue.ts`; `isMarkedRow`, `applySuggestion` and `handleSkip` in `CarveGalleryV2.tsx`), which the FR-040 carve lift moves.
-- **PR CI budget baseline.** After #2368, e2e-desktop on PRs runs only boot-smoke, decision-store reload and spec 104 walk 1 (the full set runs nightly), and the PR critical path is `fast` then `build`, about 5.6 minutes. This spec's PR lane must fit inside that (SC-002).
+- **PR CI budget baseline.** After #2368, e2e-desktop on PRs runs only boot-smoke, decision-store reload and spec 104 walk 1 (the full set runs nightly), and the PR critical path is `fast` then `build`, about 5.1 minutes measured on #2368's run. This spec's PR lane is a step in `build` and adds at most 60 s (SC-002).
+- **Build side effect, closed.** `pnpm build` used to rewrite `baseLayouts.generated.json` and `windowsLayouts.generated.json` with a one-line change. PR #2370 (deterministic codegen) fixes it; it is not an open item here.
 - **Issues.** #2363 (tolerance analysis throws on `sil_cameroon_azerty`), #2361 (`nul`/`beep` in starting stores), and #2366 (`fallbackPolicy` in the record) are owned elsewhere. The author reports them as expected, with their owner, and does not fix them.
 
 ## Assumptions

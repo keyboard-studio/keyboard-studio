@@ -14,8 +14,8 @@ check.
 ## Inputs it needs
 
 - the pinned corpus (same checkout step and pin as `ci.yml`);
-- for `cases`: `cases.json` (case descriptions only, no zips) by sparse checkout of that one file from
-  `km/2302-walk-zips` (`tools/testing-profiles-2302/harness/cases.json`), exposed as `KS_AUTHOR_CASES`. Absent → `[WARN]`, run the PR set only.
+- for `cases`: the committed canonical case file
+  `packages/studio/src/test/headlessAuthor/cases/harness-cases.json` (FR-035), from the checkout.
 
 ## Outputs
 

@@ -13,7 +13,9 @@ One row in the `harness/cases.json` shape, plus the copied keyboard's group and 
 | `base` | string | corpus keyboard id |
 | `group` | string | corpus directory under `release/` |
 | `track` | `"copy"` \| `"adapt"` | as in `DecisionPointBase.track` |
-| `english`, `autonym`, `code`, `script` | string | identity; `code` is BCP 47, `script` ISO 15924 |
+| `english`, `autonym`, `code` | string | identity; `code` is BCP 47 |
+| `script?` | string | ISO 15924; absent in the harness file, then taken from the identity step's prefill |
+| `profile`, `lang` | number, string | harness bookkeeping fields, carried through to the report |
 | `inputOrder` | string | marks profile |
 | `outputForm` | string | marks profile |
 | `backspace` | string | marks profile |
@@ -29,7 +31,9 @@ eligibility (R6) or the case is skipped with a named reason.
 
 ## PrSetEntry
 
-`prSet.json` is an array of `{ case: Case; shape: Shape[]; reason: string; guards?: string }`.
+`prSet.json` is an array of `{ caseId?: string; case?: Case; shape: Shape[]; reason: string; guards?: string }`,
+with exactly one of `caseId` (a case in the canonical `cases/harness-cases.json`, FR-035) or `case`
+(inline, only for keyboards outside the harness set).
 
 - `shape` ⊆ `simple`, `deadkey-heavy`, `touch-layout`, `any-index`, `readonly-group`, `opaque-group`,
   `mixed-case-group`, `non-latin`, `regression-guard`.

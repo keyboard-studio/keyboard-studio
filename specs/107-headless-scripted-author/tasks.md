@@ -29,7 +29,8 @@ phase's gates are green, message naming the tasks it closes (`spec 107 T0NN-T0NN
 
 - [ ] T001 Create `packages/studio/src/test/headlessAuthor/` with an `index.ts`-free layout per plan.md (no barrel; test files import modules directly) and a short header comment in `HA/runAuthorCase.ts` stating it is test-only and must call product functions only (FR-010)
 - [ ] T002 [P] Define `Case`, `Override`, `PrSetEntry`, `Shape`, `PolicyStep`, `RunReport`, `AuthorRun`, `ParityAllowEntry`, `SweepSummary` in `HA/caseTypes.ts` exactly as [data-model.md](data-model.md)
-- [ ] T003 [P] Create `HA/prSet.json` with the six FR-031 entries (`basic_kbdus`, `basic_kbdfr` Ewondo, `bj_cree_woods`, `sil_cameroon_qwerty`, `sil_cameroon_azerty`, `chechen_latin`), each with `shape`, `reason` and, for regression guards, `guards`; identity and marks-profile fields for the four recorded bases copied from `packages/studio/src/test/decisionPointBases.ts`, and for `bj_cree_woods` (`cr`, `Cans`) and `chechen_latin` (`ce-Latn`, `Latn`) a whole-alphabet profile with sample text from the keyboard's own `welcome.htm`/README
+- [ ] T003 [P] Create `HA/prSet.json` with the six FR-031 entries (`basic_kbdus`, `basic_kbdfr` Ewondo, `bj_cree_woods`, `sil_cameroon_qwerty`, `sil_cameroon_azerty`, `chechen_latin`), each with `shape`, `reason` and, for regression guards, `guards`. The four harness keyboards reference their case by `caseId` in the canonical `HA/cases/harness-cases.json` (T076): `p1-whole-bafut-kbdus`, `p1-whole-ewondo-kbdfr`, `p4-unwrap-bafut-camqwerty`, `p4-unwrap-ewondo-camazerty`. `bj_cree_woods` (`cr`, `Cans`) and `chechen_latin` (`ce-Latn`, `Latn`) carry an inline whole-alphabet case with sample text from the keyboard's own `welcome.htm`/README
+- [ ] T076 [P] Commit the canonical harness case definitions (FR-035): write `git show origin/km/2302-walk-zips:tools/testing-profiles-2302/harness/cases.json` byte for byte to `HA/cases/harness-cases.json`, and `HA/cases/PROVENANCE.md` naming the source branch `km/2302-walk-zips`, commit `a4bd8591be30360e06ec4c6b88812f5376d84548` (the last commit touching that file), the source path, the copy date, the rule that this copy is canonical (the PR set and the scheduled run read it; case changes are made here), and the follow-up for the harness owner to read from or sync from it. Do not edit `km/2302-walk-zips`. (ID appended so existing IDs stay stable.)
 - [ ] T004 Confirm `packages/studio/vitest.corpus.config.ts` discovers `HA/*.corpus.test.ts` and the default `packages/studio/vitest.config.ts` discovers `HA/driftGuard.test.ts` and excludes the corpus files; adjust only the `include`/`exclude` globs if not
 
 **Checkpoint**: `pnpm --filter @keyboard-studio/studio typecheck` green.
@@ -41,7 +42,7 @@ phase's gates are green, message naming the tasks it closes (`spec 107 T0NN-T0NN
 **Purpose**: load, decide, walk, hand off. Every step driver is still a stub returning "use the
 default" at the end of this phase.
 
-- [ ] T005 [P] Implement `loadCases(path)` and `loadPrSet()` in `HA/loadCases.ts`: accept the `harness/cases.json` shape unchanged plus optional `group`/`track`, reject unknown fields, look up `group` from the corpus when absent
+- [ ] T005 [P] Implement `loadCases(path = HA/cases/harness-cases.json)` and `loadPrSet()` in `HA/loadCases.ts`: accept the harness shape unchanged (including `profile`, `lang`, `overwriteChar`/`overwriteKey`) plus optional `group`/`track`/`script`, reject unknown fields, look up `group` from the corpus when absent; `loadPrSet()` resolves each `caseId` against the canonical file and fails on an unknown id or an entry with both `caseId` and `case`
 - [ ] T006 [P] Unit-test `HA/loadCases.ts` in `HA/loadCases.test.ts` against a 3-row fixture in the harness shape and a malformed row
 - [ ] T007 [P] Implement the walk policy in `HA/walkPolicy.ts`: `override` > `top-suggestion` > `default` > `placeholder`, returning a `PolicyStep`; no proposal logic of its own (it receives the product's suggestions and default as arguments)
 - [ ] T008 [P] Implement `placeholderFor(char, startIr)` in `HA/placeholder.ts`: `zzq` + lowercase hex code points, indicator `j`; detect a clash with an existing sequence in the copied keyboard and return a `placeholder-clash` failure
@@ -126,13 +127,13 @@ it, add a unit test for the function, and leave the component's existing tests u
 
 **Goal**: the six-keyboard PR set runs on every PR without extending the critical path.
 
-**Independent Test**: quickstart 3; a PR run shows `headless-author` finishing before `fast`.
+**Independent Test**: quickstart 3; on a PR run the `build` job's headless-author step finishes inside its 60 s cap.
 
 - [ ] T048 [P] [US4] `HA/prSet.corpus.test.ts`: run every `prSet.json` entry in one vitest invocation; report gates, placeholders, displacements; expected failures only from spec 106 `KNOWN_GAPS`
 - [ ] T049 [P] [US4] `HA/prSetManifest.test.ts`: every FR-031 shape covered; every `regression-guard` entry has `guards`; at most 6 entries (research R1)
-- [ ] T050 [US4] Add a `headless-author` job to `.github/workflows/ci.yml` per research R3: pinned corpus checkout (reuse the `build` job's steps and pin), install, `pnpm --filter "@keyboard-studio/studio^..." build`, then `vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity` and `vitest run src/test/headlessAuthor/driftGuard`; make `build` `needs:` it so the required `build` check covers it
+- [ ] T050 [US4] Add one step to the existing `build` job in `.github/workflows/ci.yml` per research R3: `if: github.event_name == 'pull_request'`, placed after "Build workspace dependencies (PR path)" so it reuses `build`'s corpus checkout, install and `dist`; `timeout-minutes: 1`; runs `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`. No new job, no `needs:` change, no ruleset change; the required `build` check covers it
 - [ ] T051 [US4] Measure the author's per-case cost from the PR set's `timingMs` (replaces research R1's 5 s budget with a measurement); update research.md R1 and SC-002's figure in spec.md if it moved
-- [ ] T052 [US4] Verify on 3 PR runs that `headless-author` finishes before `fast`; if not, move the step into `build` (fallback, at most 60 s) and record the decision in research.md R3
+- [ ] T052 [US4] Verify on 3 PR runs that the step finishes inside its 60 s cap and record the step times in research.md R3; if a run comes within 10 s of the cap, cut the PR set (weakest shape first, keeping both regression guards) rather than raising the cap, and update spec FR-031's table in the same change
 - [ ] T053 [US4] SC-005: locally revert `sameGroupName` use in `packages/engine/src/codec/groupName.ts` callers, rebuild the engine, run the PR set; confirm the `bj_cree_woods` case fails with the duplicate-group compile error in under 60 s; restore; record the evidence in the phase commit message
 
 **Checkpoint**: PR lane green in CI within SC-002.
@@ -145,10 +146,10 @@ it, add a unit test for the function, and leave the component's existing tests u
 
 **Independent Test**: quickstart 4.
 
-- [ ] T054 [US3] `HA/harnessCases.corpus.test.ts`: when `KS_AUTHOR_CASES` names a `cases.json`, run all its cases in one invocation; skip the file with an `[WARN]` naming the variable when unset (never a silent pass)
+- [ ] T054 [US3] `HA/harnessCases.corpus.test.ts`: when `KS_AUTHOR_HARNESS=1`, run every case in the canonical `HA/cases/harness-cases.json` in one invocation (a different same-shape file may be named with `KS_AUTHOR_CASES_FILE`); when unset, skip the file with a `[WARN]` naming the variable (never a silent pass)
 - [ ] T055 [US3] Per-case output names case, gate and decision point plus the one-line reproduce command (`KS_AUTHOR_CASE=<id> ...`) for any failure (acceptance 2)
 - [ ] T056 [US3] Known gaps reported as expected with their spec 106 owner, without masking new failures (acceptance 3)
-- [ ] T057 [US3] Run the 32 cases from `origin/km/2302-walk-zips:tools/testing-profiles-2302/harness/cases.json`; record wall time (SC-008) and the per-case report summary in the phase commit message, for spec 106 T063/T064
+- [ ] T057 [US3] Run the 32 cases from the canonical `HA/cases/harness-cases.json`; record wall time (SC-008) and the per-case report summary in the phase commit message, for spec 106 T063/T064
 
 ---
 
@@ -161,7 +162,7 @@ it, add a unit test for the function, and leave the component's existing tests u
 - [ ] T058 [P] [US4] `HA/sweep.corpus.test.ts`: `KS_AUTHOR_SWEEP` (`latin` | `eligible`) and `KS_AUTHOR_SHARD` (`k/n`) select the slice via `HA/eligibility.ts`; write `headless-report-<tier>-<shard>.json` per [contracts/case-and-report.md](contracts/case-and-report.md); summary grouped by gate, first failing step and skip reason (US4 acceptance 1-3)
 - [ ] T059 [P] [US4] `scripts/file-sweep-issues.mjs`: read the merged report, key failures as `[headless-sweep] <keyboard> <profile> <gate> @ <decision point>`, search open `headless-sweep` issues with `gh`, comment on a match, else file `bug(<area>): ...` with the reproduce command; skip `KNOWN_GAPS`-owned failures (contracts/scheduled-sweep.md)
 - [ ] T060 [P] [US4] Unit-test the keying and dedupe logic of `scripts/file-sweep-issues.mjs` with a stubbed `gh` in `scripts/file-sweep-issues.test.mjs`
-- [ ] T061 [US4] Create `.github/workflows/headless-sweep.yml` per [contracts/scheduled-sweep.md](contracts/scheduled-sweep.md): nightly `23 5 * * *` (`cases` tier: 32 cases + PR set x 8 profile variants), weekly `41 3 * * 0` (`latin`, 4 shards), `workflow_dispatch` (`tier`, `shards`); pinned corpus; sparse checkout of `cases.json` from `km/2302-walk-zips`; artifacts with 90-day retention; a `summarise` job; `permissions: contents: read, issues: write`; no `pull_request` trigger
+- [ ] T061 [US4] Create `.github/workflows/headless-sweep.yml` per [contracts/scheduled-sweep.md](contracts/scheduled-sweep.md): nightly `23 5 * * *` (`cases` tier: 32 cases + PR set x 8 profile variants), weekly `41 3 * * 0` (`latin`, 4 shards), `workflow_dispatch` (`tier`, `shards`); pinned corpus; the `cases` tier reads the committed `HA/cases/harness-cases.json` (no other branch fetched); artifacts with 90-day retention; a `summarise` job; `permissions: contents: read, issues: write`; no `pull_request` trigger
 - [ ] T062 [US4] Dispatch the workflow once with `tier=latin, shards=1` and once with a seeded failing case; confirm artifact upload, one issue filed, and a rerun commenting on it (SC-009); delete the seeded issue's test label afterwards
 - [ ] T063 [US4] Document in the phase commit that adding a keyboard to `prSet.json` is part of fixing a keyboard-specific bug (US4 acceptance 4), and add the same rule as a comment at the top of `HA/prSet.json`'s loader in `HA/loadCases.ts`
 
@@ -217,7 +218,7 @@ No phase depends on code outside `main` (the spec 106 stack is merged).
 
 ## Parallel opportunities
 
-- Phase 1: T002, T003.
+- Phase 1: T002, T003, T076.
 - Phase 2: T005-T012 are separate files; T013-T017 are sequential.
 - Phase 3: the seven lifts T018-T024 are separate components; drivers T026-T031 and T033 are separate files once the lifts they use exist (T031 needs T018; T029 needs T023-T024; T032 needs T019-T022).
 - Phase 4: T041, T042.

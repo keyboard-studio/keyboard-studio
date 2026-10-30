@@ -18,13 +18,15 @@ Three run tiers share one runner:
 
 | Tier | What | Where | Budget |
 |---|---|---|---|
-| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, a job parallel to `fast` | 0 s added to the critical path (about 5.6 min after #2368); at most 60 s if it ever must (SC-002) |
-| 32-case suite | `harness/cases.json`, read from a supplied path | on demand, and nightly | under 10 min (SC-008) |
+| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, one step inside the `build` job | at most 60 s added to the critical path (about 5.1 min measured on #2368's run), enforced by `timeout-minutes: 1` (SC-002) |
+| 32-case suite | the committed canonical case file `cases/harness-cases.json` (FR-035) | on demand, and nightly | under 10 min (SC-008) |
 | Wide sweep | eligible slice of `../keyboards` x profiles | weekly schedule, sharded; manual dispatch | not on PRs; failures filed as issues (FR-034) |
 
 Timing is measured, not estimated, for the replay half (research R1). The author half (proposal calls)
 does not exist yet, so its cost is an estimate with a stated ceiling that task T051 measures and that
-gates the PR set's size.
+gates the PR set's size. The 60 s cap includes vitest's one-time module load (about 25 s measured), which
+leaves about 35 s for cases: six cases fit if the author costs under about 5 s per case. If T051 measures
+more, the set is cut to fit the cap (weakest shape first), never the cap raised.
 
 ## Technical Context
 
@@ -45,7 +47,7 @@ The PR set runs as its own corpus-config invocation in CI (research R3).
 lifts of component logic into pure functions in the studio source.
 
 **Performance Goals**: SC-001 (one case under 60 s cold, under 5 s warm per further case); SC-002
-(PR lane finishes inside `fast`'s wall time, 0 s on the critical path); SC-008 (32 cases under 10 min).
+(PR lane is a `build` step capped at 60 s); SC-008 (32 cases under 10 min).
 
 **Constraints**: no browser, dev server, port or network (FR-008); deterministic (FR-007); no
 re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
@@ -103,7 +105,10 @@ specs/107-headless-scripted-author/
 ```text
 packages/studio/src/test/headlessAuthor/
 ├── caseTypes.ts              # Case, Override, PrSetEntry (test-only types)
-├── loadCases.ts              # reads cases.json-shaped input and the PR-set manifest
+├── cases/
+│   ├── harness-cases.json    # canonical copy of the 32 harness cases (FR-035), byte copy
+│   └── PROVENANCE.md         # source branch km/2302-walk-zips, commit a4bd8591, path
+├── loadCases.ts              # reads cases/harness-cases.json (and same-shape files) and the PR-set manifest
 ├── walkPolicy.ts             # override > top suggestion > default > placeholder
 ├── placeholder.ts            # zzq<hex> + indicator j; clash detection
 ├── stepDrivers/              # one driver per step; each calls product functions only
@@ -116,17 +121,17 @@ packages/studio/src/test/headlessAuthor/
 ├── eligibility.ts            # missing / not codec-clean / stub-routed / outside slice
 ├── parity.ts                 # DecisionSet vs record diff, normalisation, allow-list, stale check
 ├── parityAllowList.ts        # reviewed entries
-├── prSet.json                # the curated PR set: case + reason per keyboard
+├── prSet.json                # the curated PR set: case id (or inline case) + reason per keyboard
 ├── driftGuard.ts             # FR-010 function inventory for the drift-guard test
 ├── authorCase.corpus.test.ts       # US1 cases (determinism, edge cases)
 ├── parity.corpus.test.ts           # US2
 ├── prSet.corpus.test.ts            # PR tier (US4 PR set) + SC-005 guard
-├── harnessCases.corpus.test.ts     # US3, opt-in via KS_AUTHOR_CASES
+├── harnessCases.corpus.test.ts     # US3, opt-in via KS_AUTHOR_HARNESS=1; reads cases/harness-cases.json
 ├── sweep.corpus.test.ts            # US4 wide sweep, opt-in via KS_AUTHOR_SWEEP
 └── driftGuard.test.ts              # FR-011 (no corpus needed; runs in the default config)
 
 packages/studio/src/...       # lifted pure functions next to their components (FR-040)
-.github/workflows/ci.yml      # new `headless-author` job, parallel to `fast`; `build` needs it
+.github/workflows/ci.yml      # one new step in the `build` job (PR events), timeout-minutes: 1
 .github/workflows/headless-sweep.yml   # scheduled + dispatch: 32 cases nightly, wide sweep weekly
 scripts/file-sweep-issues.mjs # dedupe-and-file for sweep failures
 ```
@@ -140,12 +145,12 @@ they come from, as plain exported functions with their own unit tests.
 
 | Phase | Content | Green means | Depends on |
 |---|---|---|---|
-| 1 Setup | folder, types, PR-set manifest skeleton, corpus-config wiring | typecheck + empty suites discovered | none |
+| 1 Setup | folder, types, canonical `cases/harness-cases.json` + `PROVENANCE.md` (FR-035), PR-set manifest skeleton, corpus-config wiring | typecheck + empty suites discovered | none |
 | 2 Foundational | case loader, walk policy, placeholder, run report, eligibility, routing loop over the journey runner's routing, replay hand-off | unit tests for each; the loop walks `basic_kbdus` with every driver stubbed to "default" and replay compiles | 1 |
 | 3 US1 (P1) | step drivers + the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism order, S-02 identity, displacement order, case-pair companion, marks series assembly, text sample); drift guard (FR-011) | `p1-whole-bafut-kbdus` runs headless, compiles, reports gates; byte-identical rerun; edge cases; drift guard green; lifted components' existing tests unchanged | 2 |
 | 4 US2 (P1) | parity against the 4 committed records + on-demand records; allow-list; stale report | 0 unexplained differences on the 4 records | 3 |
-| 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, `headless-author` CI job, timing check | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
-| 6 US3 | 32-case suite (opt-in path) | 32 cases report gates, placeholders, displacements; under 10 min | 3 |
+| 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, a capped step in the `build` job, timing check | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
+| 6 US3 | 32-case suite over the committed canonical case file | 32 cases report gates, placeholders, displacements; under 10 min | 3 |
 | 7 US4b wide sweep + schedule | eligibility slice, sweep summary, `headless-sweep.yml`, issue filing | dispatch run completes, artifacts uploaded, a seeded failure files one issue and a rerun appends rather than duplicates | 6 |
 | 8 US5 closure | lift audit (every FR-040 rule lifted or listed), Playwright-only list (FR-042), any rule the drivers still reach through a component | every FR-040 row resolved; component tests and golden walk unchanged (SC-006) | 3 |
 | 9 US6 (P3) | touch seed driver, G6 headless, N/A reporting | G6 evaluated on camqwerty/camazerty; N/A on `bj_cree_woods` | 3 |
@@ -159,4 +164,3 @@ code outside `main`.
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
 | Art. X: the `zzq<hex>` placeholder is a value no product function proposes | Some decisions have neither a suggestion nor a default (a character the copied keyboard cannot place). A walk must still finish to reach the gates. It mirrors exactly what the Playwright harness types today, so parity with recorded walks holds. | Stopping the case at the first unproposed decision would hide every later gate failure; inventing a "better" scheme would break parity with the existing records and add a second placeholder convention. Each placeholder is recorded as `hand-set` and counted in the run report, so nothing is silent. |
-| A second CI job for the PR set | Keeps the PR set off the critical path (SC-002, owner budget; the critical path is already about 5.6 min, over the preferred 5). | A step inside `build` adds about 60-90 s to the critical path; kept only as the fallback if the parallel job ever outlasts `fast` (research R3), and then capped at 60 s. |

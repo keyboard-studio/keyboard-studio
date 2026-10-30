@@ -40,12 +40,11 @@ must run as **one vitest invocation** (one module graph), not one process per ca
 Budget: **under 5 s per case** until task T051 measures it. With replay at under 1 s, a case is
 budgeted at 6 s.
 
-**Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x 6 s = **about 61 s** of test time in the worst
-case of the budget, about 30 s if the author is as cheap as replay. The post-#2368 PR critical path is
-`fast` (about 3.5 min) then `build` (about 2 min), 5.6 min total. A parallel job needs about 1.5-2 min
-of setup (checkout, corpus checkout ~20 s, install from cache, `contracts`/`engine` build) plus about 1
-min of tests: **about 3 min, inside `fast`'s 3.5 min**, so it adds 0 s. Six cases is the ceiling that
-keeps the job under `fast` with headroom; a seventh shape replaces a weaker one (FR-031).
+**Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x up to 6 s = about 31-61 s of test time,
+about 30 s if the author is as cheap as replay. The PR lane is a step inside `build` capped at 60 s
+(R3; owner ruling), so the critical path (`fast` then `build`, about 5.1 min measured on #2368's run)
+grows by at most 60 s. Six cases is the ceiling at the 5 s author budget; T051 measures the real cost
+and the set is cut to fit if needed. A seventh shape replaces a weaker one (FR-031).
 
 **32-case suite (SC-008)**: 25 s + 32 x 6 s = about 3.6 min, under the 10-minute bound.
 
@@ -121,21 +120,31 @@ The group-name fix the `bj_cree_woods` guard protects is `sameGroupName`
 
 ## R3. Where the PR lane runs
 
-**Decision**: a new `headless-author` job in `.github/workflows/ci.yml`, parallel to `fast`, with
-`build` declaring `needs: [changes, fast, headless-author]` so the required `build` check covers it.
-It checks out the pinned corpus the same way `build` does, installs from cache, builds
-`contracts`+`engine`, and runs one vitest invocation:
-`pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity`,
-plus `driftGuard.test.ts` under the default config.
+**Decision** (owner, 2026-10-30): **one step inside the existing `build` job** of
+`.github/workflows/ci.yml`, on `pull_request` events, placed after "Build workspace dependencies (PR
+path)" so the corpus checkout, install and `dist` it needs are already there. The step runs one vitest
+invocation and carries `timeout-minutes: 1`:
+`pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`.
+(`driftGuard.test.ts` is not a corpus file; the step names it explicitly, or a second short invocation
+under the default config runs it inside the same capped step.)
 
-**Rationale**: R1 puts the job at about 3 min, inside `fast`'s 3.5 min, so the critical path stays at
-about 5.6 min (SC-002: 0 s added). One invocation pays the 25 s module load once.
+**Rationale**: the `build` job already has the pinned corpus at `../keyboards`, the installed
+workspace and the built `contracts`/`engine` `dist`, so the step pays only vitest's module load (about
+25 s, R1) plus the cases. It is covered by the required `build` check, so no ruleset change. The PR
+critical path (`fast` then `build`, about 5.1 min measured on #2368's run) grows by at most 60 s, to
+about 6 min. `timeout-minutes: 1` makes an overrun fail the run loudly rather than grow it quietly.
 
-**Alternatives considered**: (a) a step inside `build` after `test:pr`: simplest, but adds about 60-90 s
-to the critical path, which already exceeds the preferred 5 min; kept as the fallback, capped at 60 s.
-(b) Adding the files to `scripts/test-pr.mjs` `CURATED_CORE`: rejected, the default studio config
-excludes `*.corpus.test.ts`, and the PR set needs the corpus config. (c) Path-gating the PR lane:
-rejected, the ruling makes the curated set required on every PR.
+**Sizing inside the cap**: 60 s - about 25 s module load = about 35 s for cases. Replay is 0.04-0.8 s
+per case (R1); the author's proposal calls are budgeted under 5 s per case until T051 measures them.
+Six cases fit at that budget. If T051 measures more, the set is cut (weakest shape first), never the
+cap raised.
+
+**Alternatives considered**: (a) a separate `headless-author` job that `build` needs: rejected by the
+owner, it repeats `pnpm install` and the build (about a minute) and puts max(headless, `fast`) + `build`
+on the critical path. (b) Adding the files to `scripts/test-pr.mjs` `CURATED_CORE`: rejected, the
+default studio config excludes `*.corpus.test.ts`, the PR set needs the corpus config, and the cap
+would be shared with unrelated suites. (c) Path-gating the PR lane: rejected, the ruling makes the
+curated set required on every PR.
 
 ## R4. Scheduled workflow (FR-034)
 
@@ -145,12 +154,9 @@ rejected, the ruling makes the curated set required on every PR.
   variants (about 5 min); weekly (Sunday 03:41 UTC) for the wide sweep over the Latin codec-clean
   slice, sharded 4 ways (`strategy.matrix.shard`). `workflow_dispatch` with inputs `tier`
   (`cases` | `latin` | `eligible`) and `shards`.
-- The 32-case suite needs `harness/cases.json`; the workflow reads it from a path given by
-  `KS_AUTHOR_CASES`. The Playwright harness repo is not in CI, so the nightly run uses a copy of the
-  case descriptions only (small JSON, no zips) checked out from `km/2302-walk-zips` by sparse checkout
-  of the one file, `tools/testing-profiles-2302/harness/cases.json` (the branch also holds the 32 zips,
-  which the sparse checkout skips). If that branch or file is absent, the job reports `[WARN] cases.json not found` and
-  runs the PR set only; it never fails silently.
+- The 32-case suite reads the committed canonical case file
+  `packages/studio/src/test/headlessAuthor/cases/harness-cases.json` (FR-035) from the checkout. No
+  other branch is fetched.
 - Results: each shard uploads `headless-report-<tier>-<shard>.json` as a run artifact (90-day
   retention); a final job merges them into a sweep summary grouped by gate and first failing step.
 - Issue filing: `scripts/file-sweep-issues.mjs` keys each failure by
@@ -216,6 +222,8 @@ twice in one process and comparing record (minus timestamps), DecisionSet and bu
 
 ## R10. Committed inputs
 
-**Decision**: the repo commits only `prSet.json` (case descriptions and reasons) and
-`parityAllowList.ts`. No walk zip and no new walk record is committed (owner ruling). Parity reads
+**Decision**: the repo commits `prSet.json` (case ids or descriptions, and reasons),
+`parityAllowList.ts`, and the canonical harness case file `cases/harness-cases.json` with its
+`cases/PROVENANCE.md` (FR-035; copied byte for byte from `km/2302-walk-zips` commit `a4bd8591`,
+`tools/testing-profiles-2302/harness/cases.json`; the Playwright harness should read or sync from it). No walk zip and no new walk record is committed (owner ruling). Parity reads
 extra records from `KS_PARITY_RECORDS` (a directory) when a maintainer supplies one.
