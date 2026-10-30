@@ -23,7 +23,7 @@ Three run tiers share one runner:
 | Wide sweep | eligible slice of `../keyboards` x profiles | weekly schedule, sharded; manual dispatch | not on PRs; failures filed as issues (FR-034) |
 
 Timing is measured, not estimated, for the replay half (research R1). The author half (proposal calls)
-does not exist yet, so its cost is an estimate with a stated ceiling that task T060 measures and that
+does not exist yet, so its cost is an estimate with a stated ceiling that task T051 measures and that
 gates the PR set's size.
 
 ## Technical Context

@@ -1,0 +1,237 @@
+---
+description: "Task list for spec 107: headless scripted author for decision walks"
+---
+
+# Tasks: Headless scripted author for decision walks
+
+**Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md),
+[data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
+
+**Tests**: this feature *is* test tooling, and the spec's acceptance scenarios and SCs are test
+assertions, so test tasks are included throughout.
+
+**Paths**: `HA/` below means `packages/studio/src/test/headlessAuthor/`. All other paths are from the
+repo root.
+
+**Commit cadence** (CLAUDE.md): one commit per phase, pushed to `107-headless-scripted-author` when the
+phase's gates are green, message naming the tasks it closes (`spec 107 T0NN-T0NN`).
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: can run in parallel (different files, no dependency on an incomplete task)
+- **[Story]**: the user story the task serves (US1-US6)
+
+---
+
+## Phase 1: Setup
+
+**Purpose**: the folder, the types and the PR-set skeleton.
+
+- [ ] T001 Create `packages/studio/src/test/headlessAuthor/` with an `index.ts`-free layout per plan.md (no barrel; test files import modules directly) and a short header comment in `HA/runAuthorCase.ts` stating it is test-only and must call product functions only (FR-010)
+- [ ] T002 [P] Define `Case`, `Override`, `PrSetEntry`, `Shape`, `PolicyStep`, `RunReport`, `AuthorRun`, `ParityAllowEntry`, `SweepSummary` in `HA/caseTypes.ts` exactly as [data-model.md](data-model.md)
+- [ ] T003 [P] Create `HA/prSet.json` with the six FR-031 entries (`basic_kbdus`, `basic_kbdfr` Ewondo, `bj_cree_woods`, `sil_cameroon_qwerty`, `sil_cameroon_azerty`, `chechen_latin`), each with `shape`, `reason` and, for regression guards, `guards`; identity and marks-profile fields for the four recorded bases copied from `packages/studio/src/test/decisionPointBases.ts`, and for `bj_cree_woods` (`cr`, `Cans`) and `chechen_latin` (`ce-Latn`, `Latn`) a whole-alphabet profile with sample text from the keyboard's own `welcome.htm`/README
+- [ ] T004 Confirm `packages/studio/vitest.corpus.config.ts` discovers `HA/*.corpus.test.ts` and the default `packages/studio/vitest.config.ts` discovers `HA/driftGuard.test.ts` and excludes the corpus files; adjust only the `include`/`exclude` globs if not
+
+**Checkpoint**: `pnpm --filter @keyboard-studio/studio typecheck` green.
+
+---
+
+## Phase 2: Foundational (blocks every story)
+
+**Purpose**: load, decide, walk, hand off. Every step driver is still a stub returning "use the
+default" at the end of this phase.
+
+- [ ] T005 [P] Implement `loadCases(path)` and `loadPrSet()` in `HA/loadCases.ts`: accept the `harness/cases.json` shape unchanged plus optional `group`/`track`, reject unknown fields, look up `group` from the corpus when absent
+- [ ] T006 [P] Unit-test `HA/loadCases.ts` in `HA/loadCases.test.ts` against a 3-row fixture in the harness shape and a malformed row
+- [ ] T007 [P] Implement the walk policy in `HA/walkPolicy.ts`: `override` > `top-suggestion` > `default` > `placeholder`, returning a `PolicyStep`; no proposal logic of its own (it receives the product's suggestions and default as arguments)
+- [ ] T008 [P] Implement `placeholderFor(char, startIr)` in `HA/placeholder.ts`: `zzq` + lowercase hex code points, indicator `j`; detect a clash with an existing sequence in the copied keyboard and return a `placeholder-clash` failure
+- [ ] T009 [P] Unit-test `HA/walkPolicy.ts` and `HA/placeholder.ts` in `HA/walkPolicy.test.ts` (precedence order, placeholder text for a multi-code-point character, clash)
+- [ ] T010 [P] Implement `RunReport` accumulation in `HA/runReport.ts` (placeholders, displacements, skipped steps, known gaps, `fallbackPolicy`, `timingMs`) and the ASCII console line format from [contracts/case-and-report.md](contracts/case-and-report.md)
+- [ ] T011 [P] Implement `eligibility(base, slice)` in `HA/eligibility.ts` per research R6: present under the corpus root; `docs/import-corpus.json` status `clean` or `clean-with-opaque`; not routed to the CJK/Ethiopic stub by the product's three-group routing; inside the slice. No try/catch around `parse()` or the scaffold
+- [ ] T012 [P] Unit-test `HA/eligibility.ts` in `HA/eligibility.test.ts` with one id per skip reason
+- [ ] T013 Implement the routing loop in `HA/runAuthorCase.ts`: instantiate the working copy for the case's copied keyboard and track exactly as `buildDecisionPointFixture` does (`packages/studio/src/test/decisionPointFixture.ts:171`), then visit steps in the order the product's routing yields (`advance`, `packages/studio/src/steps/advance.ts:200`; `applyDecisionEffects`, `steps/reducer.ts:460`; `resolveNext`/`advanceThrough`, `survey/SurveyRunner.tsx:98`/`:201`, as `test/journey-runner.ts` drives them), dispatching each step to a driver in `HA/stepDrivers/`; no hard-coded step list (FR-002)
+- [ ] T014 Implement the replay hand-off in `HA/runAuthorCase.ts`: after the last step call `rebuildWorkingCopyFromStores` (`decisions/rebuildWorkingCopy.ts:319`), `buildOutputBundle` (`lib/buildOutputBundle.ts:80`), compile, and `checkConsistencyGates` (`test/consistencyGates.ts:336`) through the same code path `decisionPointFixture.ts` uses, extracting a shared helper inside `packages/studio/src/test/decisionPointFixture.ts` if needed rather than copying it (FR-005); reset every studio store before and after the case (contract guarantee 4)
+- [ ] T015 Implement `HA/recordWriter.ts`: produce the 053 decision record through the UI's recording path (the store's record, not a hand-built JSON) and assert it passes `parseDecisionRecord` (`packages/engine/src/decision-audit/record.ts:251`) and folds with `recordToDecisionSet` (`test/recordToDecisionSet.ts:69`)
+- [ ] T016 Create one stub driver per step in `HA/stepDrivers/` (`identity.ts`, `windowsLayout.ts`, `track.ts`, `inventory.ts`, `marks.ts`, `outputForm.ts`, `tolerance.ts`, `convenience.ts`, `carve.ts`, `mechanism.ts`, `displacement.ts`, `caps.ts`, `touchSeed.ts`) that takes the step's store default via the step's own store action
+- [ ] T017 Smoke test in `HA/authorCase.corpus.test.ts`: `basic_kbdus` walks every step with stub drivers, replay compiles to `.kmx` and `.js`, gates are reported per gate
+
+**Checkpoint**: the loop walks a real keyboard end to end with defaults only.
+
+---
+
+## Phase 3: User Story 1 - One case, headless, from a case description (P1) MVP
+
+**Goal**: `p1-whole-bafut-kbdus` runs headless with the full walk policy and is deterministic.
+
+**Independent Test**: `KS_AUTHOR_CASE=p1-whole-bafut-kbdus npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/authorCase` (quickstart 1).
+
+### Lifts US1 cannot walk without (FR-040; labelled US1, audited in Phase 8)
+
+Each lift: move the rule to an exported pure function next to its component, make the component call
+it, add a unit test for the function, and leave the component's existing tests unchanged (FR-041).
+
+- [ ] T018 [P] [US1] Lift carve "marked until Continue" (`isMarkedRow` :909, `applySuggestion` :941, `handleSkip` :1214 in `packages/studio/src/editors/carve/CarveGalleryV2.tsx`) into `continueCarve`/`skipCarve` in `packages/studio/src/survey/carve/carveContinue.ts`, keeping the provenance rule of `packages/studio/src/editors/adapters/carveAdapter.tsx:45`; unit test in `packages/studio/src/survey/carve/carveContinue.test.ts`
+- [ ] T019 [P] [US1] Lift the mechanism chip order and spec 106 pre-selection (`orderedVisibleSuggestions`, `packages/studio/src/editors/assignLoop/MechanismGallery.tsx:2551`) into `orderVisibleSuggestions` in `packages/studio/src/editors/assignLoop/suggestionOrder.ts`; unit test beside it
+- [ ] T020 [P] [US1] Move `resolveS02DeadkeyIdentity` (`MechanismGallery.tsx:530`) into `packages/studio/src/editors/assignLoop/deadkeyPurpose.ts` beside `proposeS02TriggerKey`, re-exported from its old location only if a test imports it there; unit test in `deadkeyPurpose.test.ts`
+- [ ] T021 [P] [US1] Lift the displacement banner action order (confirm move, else keep both, else leave) from `packages/studio/src/editors/assignLoop/DisplacementProposalBanner.tsx` and `MechanismGallery.tsx` into `displacementActions` in `packages/studio/src/survey/slotOccupancy.ts`; unit test in `slotOccupancy.test.ts`
+- [ ] T022 [P] [US1] Lift case-pair companion acceptance out of the `useCasePairCompanion` hook (`packages/studio/src/editors/assignLoop/casePairCompanion.ts:206`) into a pure `acceptCasePairCompanion` in the same file, the hook calling it; unit test in `casePairCompanion.test.ts`
+- [ ] T023 [P] [US1] Lift marks-series assembly from station answers (`packages/studio/src/survey/marks/MarksSeriesStep.tsx`, `OutputFormStation.tsx`) into `assembleMarksSeries` in `packages/studio/src/survey/marks/marksSeriesValue.ts`; unit test beside it
+- [ ] T024 [P] [US1] Lift the text-sample proposal and confirm from `packages/studio/src/survey/MarksTextSamplePrompt.tsx` into `proposeTextSample`/`confirmTextSample` in `packages/studio/src/survey/marksTextSample.ts`; unit test beside it
+- [ ] T025 [US1] Run the existing tests of every touched component (`npx vitest run src/editors/carve src/editors/assignLoop src/survey/marks src/survey/MarksTextSamplePrompt`) unchanged and green; record the command and result in the phase commit message
+
+### Step drivers (each calls only the functions research R2 lists for its step)
+
+- [ ] T026 [P] [US1] Identity driver in `HA/stepDrivers/identity.ts`: `defaultsFor` (`lib/langtagsDefaults.ts:130`), `deriveScriptPrefill` (`lib/scriptAxes.ts:110`); case fields are overrides
+- [ ] T027 [P] [US1] Windows-layout and track drivers in `HA/stepDrivers/windowsLayout.ts` and `HA/stepDrivers/track.ts`: `proposeWindowsLayout` (`lib/windowsLayouts.ts:134`); `proposeTrack` (`lib/proposeTrack.ts:78`) recorded for comparison when the case names the track
+- [ ] T028 [P] [US1] Inventory driver in `HA/stepDrivers/inventory.ts`: `suggestMissingChars` (`lib/services.ts:308`) over pinned exemplars; `derivePlacementInventory`/`deriveTreatmentFilteredChars` (`lib/placementInventory.ts:79`/`:189`); a proposal needing the network fails with `network-required`
+- [ ] T029 [P] [US1] Marks and output-form drivers in `HA/stepDrivers/marks.ts` and `HA/stepDrivers/outputForm.ts`: `proposeAttachments`, `computeMarkTreatmentPrefills`, `resolveOutputFormProposal`, `resolveBackspaceProposal` (engine `marks/`), assembled with T023's `assembleMarksSeries` and T024's text-sample functions; the case's `inputOrder`/`outputForm`/`backspace`/`backspaceOnDiagonal` are overrides
+- [ ] T030 [P] [US1] Tolerance driver in `HA/stepDrivers/tolerance.ts`: `analyseContextTolerance` (`lib/contextToleranceAnalysis.ts:64`), `applyContextToleranceDecision` (`lib/contextToleranceApply.ts:62`); a throw fails the case at this step (no default substituted)
+- [ ] T031 [P] [US1] Convenience and carve drivers in `HA/stepDrivers/convenience.ts` and `HA/stepDrivers/carve.ts`: `computeConvenienceGate`, `deriveCarveNeededSet`, `recommendedRemovalChars`, `suggestionFingerprintOf`, `isUntouchedSuggestion`, then T018's `continueCarve`
+- [ ] T032 [US1] Mechanism and displacement drivers in `HA/stepDrivers/mechanism.ts` and `HA/stepDrivers/displacement.ts`: `buildPlacementSeeds`, `getRankedSuggestionsForChar`, T019's order (top suggestion = first chip), `proposeS02TriggerKey`/T020, `orthographyTier`/`displacedFor` with T021's action order, T022's companion acceptance; overrides (`overwriteChar`/`overwriteKey`) applied as "Assign to a key"
+- [ ] T033 [P] [US1] Caps driver in `HA/stepDrivers/caps.ts`: the spec 106 `caps-handling` decision through its step; module default when the step is absent; phase-F metadata questions (`proposeProjectUrl`, `proposeProvenanceBasis` in `lib/phaseFSeeds.ts:59`/`:71`; `proposeTroubleshooting` in `lib/troubleshootingProposal.ts:115`) through their registry questions
+- [ ] T034 [US1] Report `fallbackPolicy` (store default) in every run report and write it nowhere else (FR-060)
+
+### Tests for US1
+
+- [ ] T035 [US1] In `HA/authorCase.corpus.test.ts`: `p1-whole-bafut-kbdus` completes, compiles, reports G1-G8 per gate with spec 106 `KNOWN_GAPS` owners as expected failures (acceptance 1)
+- [ ] T036 [US1] Same file: override case (`ŋ` onto `K_X`) applies "Assign to a key" and resolves displacement in harness order (acceptance 2)
+- [ ] T037 [US1] Same file: a step with no suggestion and no default uses the placeholder and counts it (acceptance 3)
+- [ ] T038 [US1] Same file: run the case twice; record minus timestamps, DecisionSet and bundle bytes are identical (acceptance 4, FR-007)
+- [ ] T039 [US1] Same file: missing keyboard and a `round-trip-divergence` keyboard skip with named reasons; a proposal throw (the tolerance analysis on `sil_cameroon_azerty`) fails at that step (acceptance 5, edge cases)
+- [ ] T040 [US1] Implement the drift guard in `HA/driftGuard.ts` (the research R2 inventory: function, module, production caller file) and `HA/driftGuard.test.ts`: each function still exported, each caller file still imports it, and no `HA/` file outside `stepDrivers/` imports a proposal module (FR-011, SC-004)
+
+**Checkpoint**: US1 green; SC-001 timing recorded from the run report's `timingMs`.
+
+---
+
+## Phase 4: User Story 2 - The author matches the UI (parity) (P1)
+
+**Goal**: 0 unexplained differences against the 4 committed records.
+
+**Independent Test**: quickstart 2.
+
+- [ ] T041 [P] [US2] Implement `compareParity` in `HA/parity.ts` per [contracts/author-api.md](contracts/author-api.md), with the named normalisation rules of research R8 (timestamps dropped, `zzq<hex>` reduced to `zzq`, carve fingerprint recomputed with `suggestionFingerprintOf`)
+- [ ] T042 [P] [US2] Create `HA/parityAllowList.ts` (empty array, typed) with a header stating entries need decision id, reason and explaining change, and records are never edited
+- [ ] T043 [US2] `HA/parity.corpus.test.ts`: for each record in `packages/studio/src/lib/__fixtures__/decision-points/records/` (`kbdus.json`, `kbdfr.json`, `camqwerty.json`, `camazerty.json`), run the matching case and compare per decision id and value; fail on unexplained differences
+- [ ] T044 [US2] Same file: compare the record's 053 agency against the author's per the provenance mapping in [data-model.md](data-model.md#provenance-mapping-088--053)
+- [ ] T045 [US2] Same file: report stale allow-list entries (FR-022) as a failing assertion listing them
+- [ ] T046 [US2] Same file: when `KS_PARITY_RECORDS` names a directory, also compare every `*.json` record in it (on-demand records, never committed)
+- [ ] T047 [US2] Triage every difference on the 4 records: fix the author when it diverges from the product; otherwise add an allow-list entry naming the product change or record age (camqwerty/camazerty predate S-02, per `records/PROVENANCE.md`)
+
+**Checkpoint**: SC-003 holds on the committed records.
+
+---
+
+## Phase 5: User Story 4a - Curated PR set in PR CI (P2, required on every PR)
+
+**Goal**: the six-keyboard PR set runs on every PR without extending the critical path.
+
+**Independent Test**: quickstart 3; a PR run shows `headless-author` finishing before `fast`.
+
+- [ ] T048 [P] [US4] `HA/prSet.corpus.test.ts`: run every `prSet.json` entry in one vitest invocation; report gates, placeholders, displacements; expected failures only from spec 106 `KNOWN_GAPS`
+- [ ] T049 [P] [US4] `HA/prSetManifest.test.ts`: every FR-031 shape covered; every `regression-guard` entry has `guards`; at most 6 entries (research R1)
+- [ ] T050 [US4] Add a `headless-author` job to `.github/workflows/ci.yml` per research R3: pinned corpus checkout (reuse the `build` job's steps and pin), install, `pnpm --filter "@keyboard-studio/studio^..." build`, then `vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity` and `vitest run src/test/headlessAuthor/driftGuard`; make `build` `needs:` it so the required `build` check covers it
+- [ ] T051 [US4] Measure the author's per-case cost from the PR set's `timingMs` (replaces research R1's 5 s budget with a measurement); update research.md R1 and SC-002's figure in spec.md if it moved
+- [ ] T052 [US4] Verify on 3 PR runs that `headless-author` finishes before `fast`; if not, move the step into `build` (fallback, at most 60 s) and record the decision in research.md R3
+- [ ] T053 [US4] SC-005: locally revert `sameGroupName` use in `packages/engine/src/codec/groupName.ts` callers, rebuild the engine, run the PR set; confirm the `bj_cree_woods` case fails with the duplicate-group compile error in under 60 s; restore; record the evidence in the phase commit message
+
+**Checkpoint**: PR lane green in CI within SC-002.
+
+---
+
+## Phase 6: User Story 3 - The 32 harness cases run headless (P2, on demand)
+
+**Goal**: spec 106 T063/T064 can close on this suite's report.
+
+**Independent Test**: quickstart 4.
+
+- [ ] T054 [US3] `HA/harnessCases.corpus.test.ts`: when `KS_AUTHOR_CASES` names a `cases.json`, run all its cases in one invocation; skip the file with an `[WARN]` naming the variable when unset (never a silent pass)
+- [ ] T055 [US3] Per-case output names case, gate and decision point plus the one-line reproduce command (`KS_AUTHOR_CASE=<id> ...`) for any failure (acceptance 2)
+- [ ] T056 [US3] Known gaps reported as expected with their spec 106 owner, without masking new failures (acceptance 3)
+- [ ] T057 [US3] Run the 32 cases from `origin/km/2302-walk-zips:tools/testing-profiles-2302/harness/cases.json`; record wall time (SC-008) and the per-case report summary in the phase commit message, for spec 106 T063/T064
+
+---
+
+## Phase 7: User Story 4b - Wide sweep and scheduled workflow (P2, never on PRs)
+
+**Goal**: the scheduled larger-corpus scan, with failures filed as issues.
+
+**Independent Test**: a `workflow_dispatch` run of `tier=latin, shards=1` completes and uploads its report; a seeded failure files one issue and a rerun comments instead of duplicating.
+
+- [ ] T058 [P] [US4] `HA/sweep.corpus.test.ts`: `KS_AUTHOR_SWEEP` (`latin` | `eligible`) and `KS_AUTHOR_SHARD` (`k/n`) select the slice via `HA/eligibility.ts`; write `headless-report-<tier>-<shard>.json` per [contracts/case-and-report.md](contracts/case-and-report.md); summary grouped by gate, first failing step and skip reason (US4 acceptance 1-3)
+- [ ] T059 [P] [US4] `scripts/file-sweep-issues.mjs`: read the merged report, key failures as `[headless-sweep] <keyboard> <profile> <gate> @ <decision point>`, search open `headless-sweep` issues with `gh`, comment on a match, else file `bug(<area>): ...` with the reproduce command; skip `KNOWN_GAPS`-owned failures (contracts/scheduled-sweep.md)
+- [ ] T060 [P] [US4] Unit-test the keying and dedupe logic of `scripts/file-sweep-issues.mjs` with a stubbed `gh` in `scripts/file-sweep-issues.test.mjs`
+- [ ] T061 [US4] Create `.github/workflows/headless-sweep.yml` per [contracts/scheduled-sweep.md](contracts/scheduled-sweep.md): nightly `23 5 * * *` (`cases` tier: 32 cases + PR set x 8 profile variants), weekly `41 3 * * 0` (`latin`, 4 shards), `workflow_dispatch` (`tier`, `shards`); pinned corpus; sparse checkout of `cases.json` from `km/2302-walk-zips`; artifacts with 90-day retention; a `summarise` job; `permissions: contents: read, issues: write`; no `pull_request` trigger
+- [ ] T062 [US4] Dispatch the workflow once with `tier=latin, shards=1` and once with a seeded failing case; confirm artifact upload, one issue filed, and a rerun commenting on it (SC-009); delete the seeded issue's test label afterwards
+- [ ] T063 [US4] Document in the phase commit that adding a keyboard to `prSet.json` is part of fixing a keyboard-specific bug (US4 acceptance 4), and add the same rule as a comment at the top of `HA/prSet.json`'s loader in `HA/loadCases.ts`
+
+---
+
+## Phase 8: User Story 5 - Lift audit and Playwright-only list (P2)
+
+**Goal**: every FR-040 rule is lifted or listed; no copied proposal logic.
+
+**Independent Test**: the audit table is complete and SC-006 evidence is recorded.
+
+- [ ] T064 [US5] Audit every driver in `HA/stepDrivers/` for logic reached through a component or hook rather than a lifted function; lift any found (same rules as T018-T024)
+- [ ] T065 [US5] Add a "Playwright-only" table (rule, component, reason) to the header comment of `HA/runAuthorCase.ts` for any rule that cannot be lifted without a behaviour change, and mark those decisions as not covered in the run report (FR-042); empty table if none
+- [ ] T066 [US5] Extend `HA/driftGuard.ts` with every lifted function and its component caller (T018-T024, T064)
+- [ ] T067 [US5] SC-006: run the golden walk in verify mode (`npx playwright test e2e/golden-walk.spec.ts`) and the touched components' tests; 0 re-baselines; record the result in the phase commit message
+
+---
+
+## Phase 9: User Story 6 - Touch default layers checked headlessly (P3)
+
+**Goal**: G6 evaluated on the headless bundle.
+
+**Independent Test**: G6 reported for `sil_cameroon_qwerty`/`sil_cameroon_azerty`, not applicable for `bj_cree_woods`.
+
+- [ ] T068 [US6] Touch-seed driver in `HA/stepDrivers/touchSeed.ts`: `deriveSeedLayout` (`lib/buildTouchLayoutJson.ts:169`) and the seed-source step's default (FR-050)
+- [ ] T069 [US6] Report G6 as `not-applicable` (not passed) when the copied keyboard has no touch layout, in `HA/runAuthorCase.ts`
+- [ ] T070 [US6] Tests in `HA/authorCase.corpus.test.ts`: G6 evaluated on a touch-layout keyboard; `not-applicable` on `bj_cree_woods`
+
+---
+
+## Phase 10: Polish and cross-cutting
+
+- [ ] T071 [P] SC-002 flake check: run the PR lane 5 times locally (`for i in 1 2 3 4 5; do ...; done`); 0 non-gate failures; record in the commit message
+- [ ] T072 [P] Add a "Headless author" section to `docs/tooling.md` (how to run each tier, the env variables, the PR set rule) linking [quickstart.md](specs/107-headless-scripted-author/quickstart.md)
+- [ ] T073 [P] Note in the PR body (not in spec 106 files) that spec 106 T063/T064 can close on the T057 report, per this spec's "Relationship to spec 106"
+- [ ] T074 Run `pnpm lint` (includes `test-antipattern-lint` and `spec-number-lint`) and `pnpm --filter @keyboard-studio/studio typecheck`; fix findings
+- [ ] T075 Run `/speckit-analyze` over spec, plan and tasks before `/speckit-implement`'s final pass; resolve findings
+
+---
+
+## Dependencies and order
+
+- Phase 1 → Phase 2 → Phase 3 (US1, MVP).
+- Phase 4 (US2) needs Phase 3.
+- Phase 5 (PR set + CI) needs Phase 4 (parity runs in the PR lane).
+- Phase 6 (US3) needs Phase 3 only; can run alongside Phases 4-5.
+- Phase 7 (wide sweep + schedule) needs Phase 6 (the `cases` tier) and Phase 5 (the PR set).
+- Phase 8 (US5 audit) needs Phase 3; can run alongside Phases 4-7.
+- Phase 9 (US6) needs Phase 3.
+- Phase 10 last.
+
+No phase depends on code outside `main` (the spec 106 stack is merged).
+
+## Parallel opportunities
+
+- Phase 1: T002, T003.
+- Phase 2: T005-T012 are separate files; T013-T017 are sequential.
+- Phase 3: the seven lifts T018-T024 are separate components; drivers T026-T031 and T033 are separate files once the lifts they use exist (T031 needs T018; T029 needs T023-T024; T032 needs T019-T022).
+- Phase 4: T041, T042.
+- Phase 5: T048, T049.
+- Phase 7: T058, T059, T060.
+- Phases 6, 8 and 9 can proceed in parallel after Phase 3.
+
+## Implementation strategy
+
+1. **MVP**: Phases 1-3. One case headless, deterministic, drift-guarded. Stop and validate with
+   quickstart 1.
+2. **Trust**: Phase 4 (parity). Without it a green run proves nothing about the product.
+3. **Guard PRs**: Phase 5. Only now does the work reach required CI.
+4. **Breadth**: Phases 6-7 (32 cases on demand and nightly; weekly sweep filing issues).
+5. **Close out**: Phases 8-10.
+
+Each phase is one commit, pushed when its gates are green.

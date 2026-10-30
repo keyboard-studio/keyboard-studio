@@ -37,7 +37,7 @@ must run as **one vitest invocation** (one module graph), not one process per ca
 
 **Author half (not yet measurable)**: the author adds proposal calls per case (exemplar lookup,
 `suggestMissingChars`, marks proposals, `analyseContextTolerance` which simulates, placement ranking).
-Budget: **under 5 s per case** until task T060 measures it. With replay at under 1 s, a case is
+Budget: **under 5 s per case** until task T051 measures it. With replay at under 1 s, a case is
 budgeted at 6 s.
 
 **Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x 6 s = **about 61 s** of test time in the worst
