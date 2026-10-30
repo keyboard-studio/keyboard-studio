@@ -1,6 +1,6 @@
 # Feature Specification: Headless scripted author for decision walks
 
-**Feature Branch**: `107-headless-scripted-author` (cut from `origin/main`, then stacked on `106-consistent-keyboard-output` by merge on 2026-10-30; see Dependencies)
+**Feature Branch**: `107-headless-scripted-author` (based on `main`; its PR targets `main`. See Dependencies)
 
 **Created**: 2026-10-30
 
@@ -20,7 +20,7 @@ walks today. The harness lives outside this repo, in
 One case takes about 25 minutes, needs a dev server and a free port, and is flaky under load. On
 2026-10-30 a walk spent hours surfacing a pure engine defect: `applyAssignments` merged `group(main)`
 into a keyboard that declares `group(Main)` case-sensitively, so a duplicate group failed `kmcmplib`
-(fixed in `502fb061` on `km/106-carve-claimed`). A headless run would have caught it in seconds.
+(fixed in `502fb061`, now on `main` as `sameGroupName` in `packages/engine/src/codec/groupName.ts`). A headless run would have caught it in seconds.
 
 Spec 106 US1 already supplies headless **replay**. Given a recorded DecisionSet it seeds the real
 studio stores, rebuilds the working copy, runs the real download path, compiles, simulates and
@@ -63,7 +63,7 @@ product proposal, and it records that value's provenance the way the UI records 
 
 ### Session 2026-10-30 (owner rulings, closed)
 
-- Q: Does 107 wait for spec 106's replay code to reach `main`, or stack on it? → A: It stacks. `107-headless-scripted-author` merges `origin/106-consistent-keyboard-output` (a merge, not a rebase, because 107 was already pushed). 107's PR targets that branch until PR #2362 merges. See Dependencies.
+- Q: Does 107 wait for spec 106's replay code to reach `main`, or stack on it? → A: It stacked on `106-consistent-keyboard-output` by merge. Later the same day the whole spec 106 stack merged to `main` (#2358, #2362, #2364, #2365, #2369), so 107 merged `origin/main` and is now based on `main`; its PR targets `main`. See Dependencies.
 - Q: Which slice runs in CI on a pull request (FR-031)? → A: A **minimal curated set** of keyboards chosen by shape, each with a recorded reason: a few simple ones, structurally different ones, and keyboards whose bugs were repaired, kept as regression guards. Adding a keyboard to this set is part of fixing a keyboard-specific bug. The wider sweep (the Latin codec-clean slice, the whole eligible corpus) is opt-in or scheduled, never required on a PR.
 - Q: What is the PR CI time budget? → A: Total PR CI wall time (the whole PR run, not just this spec's share) must finish in under 10 minutes, preferably under 5. Larger-corpus scans run occasionally (scheduled or on demand), never on PRs. See SC-002 (PR budget) and SC-009 (scheduled scan).
 - Q: Are walk zips (or more walk records) imported to cover parity? → A: No. The repo keeps the **framework** that produces walk records (the headless author, and the Playwright harness for UX walks) but does not commit walk zips to `main`. Parity runs against the decision records spec 106 already commits under `packages/studio/src/lib/__fixtures__/decision-points/records/`, plus any record a maintainer produces on demand with the framework. The zips stay on `km/2302-walk-zips`.
@@ -394,7 +394,7 @@ layout; no walk zip is committed for this check.
 ### Measurable Outcomes
 
 - **SC-001**: One case runs headlessly, end to end (author, replay, compile, gates), in under 60 seconds on a maintainer's machine from a cold vitest start, and adds under 5 seconds per further case in the same run. That is down from about 25 minutes for a Playwright walk. Baseline measured for the plan on 2026-10-30: the existing replay alone takes about 25 s of one-time module load and 0.06-1.0 s per fixture warm (the full-decision `tolerance` fixture: 0.08 s on `basic_kbdus`, 1.0 s on `sil_cameroon_azerty`).
-- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time, preferably under 5. This spec's PR share (the curated PR set of FR-031 plus parity on the committed records and the drift guard) MUST fit with headroom: it adds **at most 90 seconds** to the PR run's critical path, and 0 seconds if it runs in a job parallel to an existing longer one. The plan sizes the set from the measured per-case cost (about 25 s fixed plus under 5 s per case, so six cases is about 55 s). The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). The wide sweep and the 32-case suite never run on a PR.
+- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time, preferably under 5. After #2368 the critical path is `fast` then `build`, about 5.6 minutes. This spec's PR lane (the curated PR set of FR-031, parity on the committed records, and the drift guard) MUST fit with headroom: it runs in a job parallel to `fast` and finishes no later than `fast` does, so it adds **0 seconds** to the critical path. If it cannot, it may extend the critical path by at most 60 seconds, and never past 10 minutes. The plan sizes the set from the measured per-case cost (replay: about 25 s one-time module load plus 0.1-1.0 s per case; the author's own proposal calls are budgeted at under 5 s per case until measured), so six cases cost about 55 s of test time. The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). The wide sweep and the 32-case suite never run on a PR.
 - **SC-003**: Parity holds on 100% of recorded walks: every decision equal, or explained by an allow-list entry. 0 unexplained differences, and 0 records edited.
 - **SC-004**: 100% of the suggestions and defaults the author uses come from product functions covered by the drift guard (FR-011). The author contains 0 copies of proposal logic.
 - **SC-005**: Re-introducing the `group(main)` vs `group(Main)` defect (reverting `502fb061`) makes the PR set fail on its `bj_cree_woods` case, in under 60 seconds.
@@ -416,8 +416,9 @@ layout; no walk zip is committed for this check.
 
 ## Dependencies
 
-- **Stacked on spec 106.** 107 is stacked on `106-consistent-keyboard-output` (PR #2362), which carries spec 106 US1's replay pieces (`decisionPointFixture.ts`, `recordToDecisionSet.ts`, `consistencyGates.ts`, `decisionPoint.corpus.test.ts`). The branch merged `origin/106-consistent-keyboard-output` on 2026-10-30 (a merge, not a rebase, because 107 was already pushed). Until #2362 merges, 107's PR targets `106-consistent-keyboard-output`, not `main`. When #2362 merges, 107 retargets to whatever #2362 merged into.
-- **Not yet on the 106 base.** Two things this spec names live further up the 106 stack, on `km/106-carve-claimed`, and are not yet in `106-consistent-keyboard-output`: the group-name fix `502fb061` (needed by the `bj_cree_woods` regression guard and SC-005) and the carve "marked until Continue" code (`suggestionFingerprintOf`, `isUntouchedSuggestion`, `isMarkedRow`, `applySuggestion`, `handleSkip`; needed by the FR-040 carve lift). The plan orders the work so nothing depends on them until they reach the base.
+- **Based on `main`.** 107 needs spec 106 US1's replay pieces (`decisionPointFixture.ts`, `recordToDecisionSet.ts`, `consistencyGates.ts`, `decisionPoint.corpus.test.ts`). It first stacked on `106-consistent-keyboard-output` by merge; on 2026-10-30 the whole spec 106 stack merged to `main` (#2358, #2362, #2364, #2365, #2369), so 107 merged `origin/main` (a merge, never a rebase, because the branch is pushed). 107 is now based on `main` and its PR targets `main`.
+- **On `main` now.** Everything this spec names from spec 106 is on `main`: the replay code; the Ewondo `kbdfr` re-record after the S-02 fix (one deadkey on `K_COLON`, G1 passing); the group-name fix `502fb061` (`sameGroupName`, `packages/engine/src/codec/groupName.ts`), which the `bj_cree_woods` guard and SC-005 rely on; and the carve "marked until Continue" code (`suggestionFingerprintOf` and `isUntouchedSuggestion` in `survey/carve/carveValue.ts`; `isMarkedRow`, `applySuggestion` and `handleSkip` in `CarveGalleryV2.tsx`), which the FR-040 carve lift moves.
+- **PR CI budget baseline.** After #2368, e2e-desktop on PRs runs only boot-smoke, decision-store reload and spec 104 walk 1 (the full set runs nightly), and the PR critical path is `fast` then `build`, about 5.6 minutes. This spec's PR lane must fit inside that (SC-002).
 - **Issues.** #2363 (tolerance analysis throws on `sil_cameroon_azerty`), #2361 (`nul`/`beep` in starting stores), and #2366 (`fallbackPolicy` in the record) are owned elsewhere. The author reports them as expected, with their owner, and does not fix them.
 
 ## Assumptions
