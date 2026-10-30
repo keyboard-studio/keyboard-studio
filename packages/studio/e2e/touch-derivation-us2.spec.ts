@@ -249,6 +249,8 @@ async function carveCharacters(
   for (const ch of chars) {
     const glyph = page.getByRole("button", { name: new RegExp(`^${ch}\\s`, "u") });
     await expect(glyph).toBeVisible();
+    // Spec 106 FR-042: a suggested discard arrives marked (Continue applies it).
+    if ((await glyph.getAttribute("aria-pressed")) === "true") continue;
     await glyph.click();
 
     // A character that belongs to a recognized pattern (e.g. an S-01 "Simple
@@ -263,6 +265,8 @@ async function carveCharacters(
 
   const survivorGlyph = page.getByRole("button", { name: new RegExp(`^${survivor}\\s`, "u") });
   await expect(survivorGlyph).toBeVisible();
+  // A survivor marked as a suggested discard is kept explicitly.
+  if ((await survivorGlyph.getAttribute("aria-pressed")) === "true") await survivorGlyph.click();
   await expect(survivorGlyph).toHaveAttribute("aria-pressed", "false");
 
   await page.getByTestId("carve-continue").click();

@@ -125,6 +125,20 @@ describe("physicalLayoutValueFromPhaseResults", () => {
     expect(physicalLayoutValueFromPhaseResults([])).toEqual({ assignments: [] });
   });
 
+  it("records declined displacements only while their incoming character is still assigned (spec 106 FR-043)", () => {
+    const phaseResults = [
+      { phase: "C", assignments: [assignment("á", "physical")] },
+    ] as unknown as SurveyPhaseResult[];
+    const value = physicalLayoutValueFromPhaseResults(phaseResults, [
+      "'|K_QUOTE||é",
+      "'|K_QUOTE||á",
+    ]);
+    expect(value.displacedDeclined).toEqual(["'|K_QUOTE||á"]);
+    expect(physicalLayoutValueFromPhaseResults(phaseResults, ["'|K_QUOTE||é"])).toEqual({
+      assignments: value.assignments,
+    });
+  });
+
   it("the value's list is a copy — later phase-result edits do not leak in", () => {
     const entry = { phase: "C", assignments: [assignment("á", "physical")] };
     const phaseResults = [entry] as unknown as SurveyPhaseResult[];

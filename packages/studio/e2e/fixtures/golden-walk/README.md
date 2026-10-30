@@ -80,3 +80,14 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   workingCopyStore fresh-instance-tail fix that landed in the same
   push; the HISTORY entry carries the
   2026-10-28 capture date, which verify normalises.
+- **Re-capture: 2026-10-30 (America/Chicago), from `km/106-carve-claimed`
+  at `502fb061`.** Taken locally (Playwright desktop, Windows). Spec 106
+  US4 changed what the walk emits, so the old baseline differed in
+  `HISTORY.md`, `build/*`, and `source/test.{kmn,keyman-touch-layout,kvks}`:
+  the carve step now applies marked suggested discards on Continue (the
+  composed forms of the dead-key stores and the micro sign key are gone,
+  with `dk(..) X > context` guards for the discarded composed forms), and
+  carve drops starting rules that assignments claimed (the K_COLON and
+  K_RBRKT starting rules, shadowed by dk(3000) and dk(3001)). HISTORY
+  gains a "Removed 15 keys." bullet and carries the 2026-10-30 capture
+  date, which verify normalises. Verify mode passes against it locally.

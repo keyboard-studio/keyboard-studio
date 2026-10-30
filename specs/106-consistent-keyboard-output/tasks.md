@@ -95,31 +95,31 @@ Each story phase ends with the same three gate tasks:
 
 **Goal**: the marks decision is enforced in the download (FR-010 to FR-013). **Independent test**: the US2-tagged `it.fails` in T013 now pass, plus the simulator cases below. **Branch**: `km/106-mark-guards`.
 
-- [ ] T016 [P] [US2] Write engine tests in `packages/engine/src/pattern-apply/mark-guards.test.ts`. Rules are now one per mark (`notany(generated_marks_allowed_<n>) '<mark>' > context(1)`) plus the buffer-start rule. Cover:
+- [x] T016 [P] [US2] Write engine tests in `packages/engine/src/pattern-apply/mark-guards.test.ts`. Rules are now one per mark (`notany(generated_marks_allowed_<n>) '<mark>' > context(1)`) plus the buffer-start rule. Cover:
   - an allowed context with U+0020 when the space column is ticked;
   - the bare-mark `emit` behaviour at buffer start;
   - idempotency on re-application.
-- [ ] T017 [P] [US2] Write simulator tests in `packages/studio/src/test/decisionPoint.guards.corpus.test.ts` against the Bafut kbdus fixture at `marks`.
+- [x] T017 [P] [US2] Write simulator tests in `packages/studio/src/test/decisionPoint.guards.corpus.test.ts` against the Bafut kbdus fixture at `marks`. **As built**: the fixture is cut at `assignments`, because before assignments no key types a bare mark (K_5 types U+0300 there); `k` stands in for the unchecked base, since the grave's row checks `a`. The touch case is a recorded skip: the fixtures do not reproduce the touch step.
   - `a` then `5` is blocked when `à` is unchecked.
   - `5` after `1` is blocked.
   - `5` after a space is blocked when the column is unticked and allowed when it is ticked.
   - `5` at buffer start is blocked under swallow.
   - Touch `T_0300` follows the same route; use the touch simulator `TouchTapSession` if it is reachable, otherwise record a skip with the reason.
-- [ ] T018 [US2] Add `allowedContexts?: Record<string, string[]>` to `PlacementWorklist` in `packages/engine/src/marks/worklist.ts` (:52-97). Space is never a base and never a blocked combination.
-- [ ] T019 [US2] (Generated stores never contain `nul`/`beep`, and generated rules use `nul`, never `beep`: R11, G8.) Rewrite the blocking emission in `packages/engine/src/pattern-apply/mark-guards.ts` (:106-124) as per-mark `notany` rules over a generated allowed store (case-expanded bases plus allowedContexts), with a `nul '<mark>'` buffer-start rule driven by a new `bareMarkBehaviour` parameter. Keep the existing stripping of `generated_marks_*` and keep the result counts.
-- [ ] T020 [US2] Add projection step 2.6 to `packages/studio/src/lib/projectWorkingCopyVfs.ts` at ~:890, between 2.5 and 2.7 (research R3):
+- [x] T018 [US2] Add `allowedContexts?: Record<string, string[]>` to `PlacementWorklist` in `packages/engine/src/marks/worklist.ts` (:52-97). Space is never a base and never a blocked combination.
+- [x] T019 [US2] (Generated stores never contain `nul`/`beep`, and generated rules use `nul`, never `beep`: R11, G8.) Rewrite the blocking emission in `packages/engine/src/pattern-apply/mark-guards.ts` (:106-124) as per-mark `notany` rules over a generated allowed store (case-expanded bases plus allowedContexts), with a `nul '<mark>'` buffer-start rule driven by a new `bareMarkBehaviour` parameter. Keep the existing stripping of `generated_marks_*` and keep the result counts. **As built**: stores are named by the mark's code point (`generated_marks_allowed_0301`). The allowed set also takes, from the attested stacks, the mark before a stacked mark and the precomposed prefix, so multi-mark stacks are not swallowed. A mark with nothing allowed gets a plain `'<mark>' > nul` rule (an empty store cannot back `notany`). Stripping now also recognises the guard hop parsed back from a `.kmn` (trailing comment in the raw `use()`), so the projection's re-parse is idempotent.
+- [x] T020 [US2] Add projection step 2.6 to `packages/studio/src/lib/projectWorkingCopyVfs.ts` at ~:890, between 2.5 and 2.7 (research R3):
   - add a new `marksGuards` input;
   - parse, then `applyMarkGuards`, then emit only when the IR changed;
   - warn on `guardHopSkipped`;
   - update the header comments at :14-56 and :670-674.
-- [ ] T021 [US2] Fill `marksGuards` in `projectionInputFromState` (`packages/studio/src/lib/projectionInput.ts`) from `getMarksTreatmentValue()` (`survey/marks/marksValue.ts:136`) for the download, and from the decision store selector for the preview. `bareMarkBehaviour` comes from `guardSpecification.behaviour`.
-- [ ] T022 [US2] In `packages/studio/src/survey/questions/gallery/marksTreatment.ts`, make `apply` return `{}` and `writes` `[]` (FR-011). Also change the write map at `decisions/decisionTypes.ts:393` (`"marks-treatment": [["groups"],["stores"]]`, i.e. `MARKS_WRITES`) to `[]`. Update every test that asserted guard groups in the working IR or referenced the marks writes so it asserts them in the projection instead; this includes `lib/carvePipelineParity.test.ts` and `lib/silCameroonQwerty.carve.test.ts`.
-- [ ] T023 [US2] Add the space column to `packages/studio/src/survey/marks/AttachmentStation.tsx`:
+- [x] T021 [US2] Fill `marksGuards` in `projectionInputFromState` (`packages/studio/src/lib/projectionInput.ts`) from `getMarksTreatmentValue()` (`survey/marks/marksValue.ts:136`) for the download, and from the decision store selector for the preview. `bareMarkBehaviour` comes from `guardSpecification.behaviour`.
+- [x] T022 [US2] In `packages/studio/src/survey/questions/gallery/marksTreatment.ts`, make `apply` return `{}` and `writes` `[]` (FR-011). Also change the write map at `decisions/decisionTypes.ts:393` (`"marks-treatment": [["groups"],["stores"]]`, i.e. `MARKS_WRITES`) to `[]`. Update every test that asserted guard groups in the working IR or referenced the marks writes so it asserts them in the projection instead; this includes `lib/carvePipelineParity.test.ts` and `lib/silCameroonQwerty.carve.test.ts`.
+- [x] T023 [US2] Add the space column to `packages/studio/src/survey/marks/AttachmentStation.tsx`:
   - a "space" checkbox per mark row, unchecked by default, stored as `marks_attachment.<mark>| `;
   - in `reconciledAttachmentChecked` (`marksViews.ts:90`) and the `MarksSeriesStep.tsx` case expansion (:384-390), pass it through without case-expanding it;
   - in `buildPlacementWorklist`, map it to `allowedContexts`;
   - add the en/fr i18n catalog entries (named placeholders only), following `packages/studio/CLAUDE.md`.
-- [ ] T024 [US2] Gate. Re-run T013 first: G2 on basic_kbdus/basic_kbdfr passes today only because no guard is emitted. If it flips once guards land, add its US6 row in this PR. Commit `fix(studio): mark guards reach the downloaded keyboard`, push, and open a PR.
+- [x] T024 [US2] Gate. Re-run T013 first: G2 on basic_kbdus/basic_kbdfr passes today only because no guard is emitted. If it flips once guards land, add its US6 row in this PR. Commit `fix(studio): mark guards reach the downloaded keyboard`, push, and open a PR. **As built**: G3 flipped on all 20 fixture rows and G2 on basic_kbdus/basic_kbdfr still holds, so no US6 row was added. The T014 fidelity diff is now a multiset diff with per-story allowed patterns (US2: only marks-series lines are added). Review fixes: the completion records only the stacks the stacking station kept, and the guard case-expands stacks.
 
 ---
 
@@ -127,30 +127,30 @@ Each story phase ends with the same three gate tasks:
 
 **Goal**: one form everywhere (FR-020 to FR-023). **Independent test**: the US3 `it.fails` (G4) pass across the four profiles x {deadkey, mark key}. **Branch**: `km/106-output-form`.
 
-- [ ] T025 [P] [US3] Write engine tests in `packages/engine/src/pattern-apply/applyAssignments.outputForm.test.ts`. Each mechanism (S-01, S-02, S-03, S-08) under both forms emits only that form. Under base-plus-mark with a multi-codepoint item, S-08 and S-01 emit per-key rules rather than a store pair.
-- [ ] T026 [P] [US3] Write simulator tests for the R5 vectors in `packages/studio/src/test/decisionPoint.outputForm.corpus.test.ts`:
+- [x] T025 [P] [US3] Write engine tests in `packages/engine/src/pattern-apply/applyAssignments.outputForm.test.ts`. Each mechanism (S-01, S-02, S-03, S-08) under both forms emits only that form. Under base-plus-mark with a multi-codepoint item, S-08 and S-01 emit per-key rules rather than a store pair. **As built**: 21 tests, including the advisor's mixed-group vector and a pin of the content fragments against the engine's inline mirrors.
+- [x] T026 [P] [US3] Write simulator tests for the R5 vectors in `packages/studio/src/test/decisionPoint.outputForm.corpus.test.ts`: **As built**: the escapes type the trigger's own `;` (a studio deadkey's accentChar), not U+030C; the U+030C escape vectors live in the pattern YAML. The fall-through key is `K_K` (Bafut reassigns `K_X` to ŋ).
   - `[K_QUOTE,K_A]` gives a U+030C;
   - shifted `A` gives A U+030C;
   - `e` gives e U+030C;
   - the double-tap and space escapes give U+030C;
   - `K_X` falls through to plain `x`;
   - postfix compose `a` + `K_5` gives `à` under ready-made, and the bare mark appears only when kept.
-- [ ] T027 [US3] Add `outputFormString(s, form)` next to `outputStringForStack` in `packages/engine/src/marks/output-form-policy.ts`, decomposing fully under base-plus-mark. Export it from `engine/src/index.ts`.
-- [ ] T028 [US3] Add options `{ outputForm? }` to `applyAssignments` in `packages/engine/src/pattern-apply/applyAssignments.ts` (:480).
+- [x] T027 [US3] Add `outputFormString(s, form)` next to `outputStringForStack` in `packages/engine/src/marks/output-form-policy.ts`, decomposing fully under base-plus-mark. Export it from `engine/src/index.ts`.
+- [x] T028 [US3] Add options `{ outputForm? }` to `applyAssignments` in `packages/engine/src/pattern-apply/applyAssignments.ts` (:480). **As built (advisor-approved amendment)**: the seam is a new module `pattern-apply/outputFormSeam.ts`, applied after the merges. When an output form is set, the legacy deadkey/AltGr slot-merges are skipped and the seam plans each trigger+name group (both deadkey ids) from a normalised pair list: single-code-point pairs stay in the parallel pair; multi-code-point pairs get one self-indexing store per mark sequence (`dk_N_<HEX>_bases`, or `deadkey_single_tap_nfd` when that is the whole group); a precomposed base key gets its own `dk(N) + U+.. > U+..` rule. AltGr multi-code-point outputs become per-key rules. No form = byte-identical output. `OUTPUT_FORM_SEAM_PATTERN_IDS` must be preloaded by every resolver.
   - Rewrite the output-bearing slots on the merged refs before `substituteSlots` (:675).
   - Switch the S-08 and S-01 multi-codepoint items to per-key rules.
   - Generalise every `DEADKEY_PATTERN` check to the set `{deadkey_single_tap, deadkey_single_tap_nfd}`: the merge (:540-651) and the `applyDeadkeyEscapes` gate (:709). Do the same in studio: `editors/assignLoop/patternIds.ts:14` (`PATTERN_DEADKEY`), `lib/extractMechanismBaseKey.ts:59` and `lib/occupiedBaseKeys.ts:67-78`.
   - Thread the option through `applyAssignmentsToVfs.ts:31` (its only caller of `applyAssignments` is :62). Then grep for every `applyAssignmentsToVfs` caller and thread it there too.
-- [ ] T029 [P] [US3] Content: add `content/patterns/desktop-input/deadkey-single-tap-nfd.yaml` with exactly the R5 shape: a self-indexing store, the mark literal after `index(..,2)`, no `accentedForms`, the escapes unchanged, `strategyId: S-02`, the R5 test vectors, and `sourceKeyboards: [cabecar, winchus]`. Regenerate the content i18n catalogs; never hand-edit them. Needs content-team review.
-- [ ] T030 [P] [US3] Content: add `content/patterns/desktop-input/postfix-compose.yaml` with the R5 (a) shape, the `bare` escape slot, a test vector, and `sourceKeyboards: [dega]`. Regenerate the catalogs.
-- [ ] T031 [US3] Add a recognizer test so an imported keyboard containing the NFD deadkey shape is recognised as `deadkey_single_tap_nfd` (`packages/engine/src/recognizer`).
-- [ ] T032 [US3] Pass `outputForm` into step 2 in `packages/studio/src/lib/projectWorkingCopyVfs.ts` (~:797), via `projectionInputFromState`. Also add the projection-time uniformity assertion (plan P2.4, the retired FR-022 lint). After step 2, scan the generated rules and stores for characters in the wrong form and push a `[project-working-copy]` warning; it is not a user-facing lint.
-- [ ] T033 [US3] In `packages/studio/src/editors/assignLoop/MechanismGallery.tsx`:
+- [x] T029 [P] [US3] Content: add `content/patterns/desktop-input/deadkey-single-tap-nfd.yaml` with exactly the R5 shape: a self-indexing store, the mark literal after `index(..,2)`, no `accentedForms`, the escapes unchanged, `strategyId: S-02`, the R5 test vectors, and `sourceKeyboards: [cabecar, winchus]`. Regenerate the content i18n catalogs; never hand-edit them. Needs content-team review.
+- [x] T030 [P] [US3] Content: add `content/patterns/desktop-input/postfix-compose.yaml` with the R5 (a) shape, the `bare` escape slot, a test vector, and `sourceKeyboards: [dega]`. Regenerate the catalogs. **As built**: `strategyId: S-03` (spec 007 rule 3a: postfix order is S-03 + S-04). The engine emits it from an S-01 lone-mark key + the attachment matrix under ready-made; the bare line is kept by default (no escape answer exists yet).
+- [x] T031 [US3] Add a recognizer test so an imported keyboard containing the NFD deadkey shape is recognised as `deadkey_single_tap_nfd` (`packages/engine/src/recognizer`). **As built**: `s02-families.ts` accepts a self-indexing fan-out with trailing marks and lifts it as `deadkey_single_tap_nfd` with `markChars`; winchus now yields one NFD lift. cabecar's shape is not caught (different context form, not investigated).
+- [x] T032 [US3] Pass `outputForm` into step 2 in `packages/studio/src/lib/projectWorkingCopyVfs.ts` (~:797), via `projectionInputFromState`. Also add the projection-time uniformity assertion (plan P2.4, the retired FR-022 lint). After step 2, scan the generated rules and stores for characters in the wrong form and push a `[project-working-copy]` warning; it is not a user-facing lint. **As built**: `lib/markAttachments.ts` derives the allowed bases per mark from the worklist; `lib/outputFormUniformity.ts` reports only runs new after step 2.
+- [x] T033 [US3] In `packages/studio/src/editors/assignLoop/MechanismGallery.tsx`: **As built (amended)**: stored assignments stay form-independent, so `buildDeadkeyAssignment` keeps `deadkey_single_tap` and the engine picks the NFD shape at emit time (changing the output form later rewrites nothing). Postfix compose is derived in the engine, so there is no studio postfix builder. The S-01 write sites all route through the multi-code-point builders (`toUPlusSequence`). Deadkey reads use `isDeadkeyPatternId`.
   - `buildDeadkeyAssignment` (:595) picks `deadkey_single_tap_nfd` under base-plus-mark and drops `accentedForms`;
   - the S-01 builders (:2829-2845, :3323, :3408, :3709, :3736) write every code point of `currentChar`, not just the first;
   - the postfix mark-key flow emits a `postfix_compose` assignment, with stores derived from the attachment matrix rows (allowed pairs only).
-- [ ] T034 [US3] Case counterparts: assert in `casePairCompanion.ts` tests that the companion output passes through the same form (FR-023).
-- [ ] T035 [US3] Gate. Record the R5 ruling text in the PR body. Commit `feat(engine): emitted output follows the output-form decision`, push, and open a PR.
+- [x] T034 [US3] Case counterparts: assert in `casePairCompanion.ts` tests that the companion output passes through the same form (FR-023).
+- [x] T035 [US3] Gate. Record the R5 ruling text in the PR body. Commit `feat(engine): emitted output follows the output-form decision`, push, and open a PR.
 
 ---
 
@@ -158,26 +158,26 @@ Each story phase ends with the same three gate tasks:
 
 **Goal**: zero unreachable hints, approvable suggested discards, and needed punctuation never silently lost (FR-040 to FR-043). **Independent test**: G1 passes on every fixture at `carve` and later. **Branch**: `km/106-carve-claimed`.
 
-- [ ] T036 [P] [US4] Write tests in `packages/studio/src/lib/claimedInputs.test.ts`:
+- [x] T036 [P] [US4] Write tests in `packages/studio/src/lib/claimedInputs.test.ts`:
   - a plain override drops the base rule;
   - a Shift-only difference is kept;
   - a rule with preceding context, deadkey or `if()` survives;
   - removing the assignment restores the rule;
   - the S-02 trigger and the RALT escape are claimed;
   - the postfix mark key is claimed.
-- [ ] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
-- [ ] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
-- [ ] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
+- [x] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
+- [x] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
+- [x] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
   - on the first visit, when the value's `suggestionFingerprint` does not match, apply `toggleRecommendedRows(primaryRows, true)` with provenance `derived`;
   - render those rows as "discarded, suggested — click to keep";
   - `editors/adapters/carveAdapter.tsx` (:28-40) records `carved-layout` with provenance `default` while only derived items exist, and `asked` once the author has toggled anything;
   - add en/fr i18n entries;
   - add a component test.
-- [ ] T040 [US4] Needed punctuation.
+- [x] T040 [US4] Needed punctuation.
   1. Write a fixture test: Bafut kbdus with `'` → `’` must raise the demotion proposal.
   2. Diagnose which gate in `maybeRaiseDisplacement` (`MechanismGallery.tsx:2224-2304`) skips it, and fix it.
   3. Record a decline in `carved-layout.displacedDeclined` (`useDisplacementProposal.ts` dismiss path).
-- [ ] T041 [US4] Gate: G1 = 0 on all fixtures. Commit `fix(studio): carve drops starting rules that assignments claimed`, push, and open a PR.
+- [x] T041 [US4] Gate: G1 = 0 on all fixtures. Commit `fix(studio): carve drops starting rules that assignments claimed`, push, and open a PR.
 
 ---
 
@@ -311,3 +311,13 @@ The 2026-10-29 advisor review (Fable) found 11 issues: 1 blocker, 6 major and 4 
 2026-10-29: the user pointed to keymanapp/keyboards#4181. `nul`/`beep` are illegal inside stores under the 19.0 compiler. As a result, FR-014, gate G8, research R11 and tasks T070-T073 were added (foundational: they run before the fixtures, because two walk bases carry illegal stores). The R3 "no beep" wording was corrected: beep exists in IR, codec and simulator; only the marks decision lacks a beep option.
 
 2026-10-29 (later): the method for `nul`/`beep` inside starting stores is deferred to the outcome of keymanapp/keyboards#4181, tracked in #2361. T070-T072 are blocked. Generated stores and rules (no `nul`/`beep` in stores; `nul` over `beep` in rules) remain decided.
+
+2026-10-30 (US4): rulings and deviations recorded during implementation.
+- **Punctuation is never core** (owner ruling, T040). The walk's lost `'` was a both-core standoff: the punctuation step had put `'` in the inventory, and "Keep both" only dismissed. `orthographyTier` now ranks every digit, punctuation mark and symbol as convenience, so an overwritten `'` gets the "move to AltGr" proposal. A script that writes a letter with an apostrophe records it as U+02BC, which stays core.
+- **Declines live in `physical-layout`, not `carved-layout`** (T040 step 3; R6 preferred carve). The decline happens in the gallery step, and writing an upstream decision from a later step would rewrite it.
+- **Claimed inputs are group(main) only and gated on mergeable mechanisms** (T038, advisor review). Assignments merge only into `main`; a mechanism step 2 would skip claims nothing.
+- **Duplicate inputs are a studio bug, not a carve job** (owner ruling). Two rules with the same input in one group hide all but the first. US4 drops only starting rules an assignment replaces; session-vs-session and starting-vs-starting duplicates must be prevented where they are created, not deduplicated in the projection. Known generators: two S-02 deadkeys on one trigger (fixed at record time by #2358; older drafts still carry it), "Keep both" on a both-core displacement, and hand-chosen triggers colliding with S-01/S-08. A guard at the assignment-record seam is proposed as a follow-up story.
+- **kbdfr re-recorded, not left as a gap** (owner ruling, T041). Its round-3 record predated the S-02 fix (three deadkeys on K_COLON). The Ewondo kbdfr case was re-walked on this branch (502fb061) and its record copied unedited; K_COLON now carries one deadkey and G1 passes, so the KNOWN_GAPS row is gone. Only the camqwerty and camazerty records still predate the S-02 fix.
+- **Group names match case-insensitively** (found by the T041 e2e run). bj_cree_woods declares `group(Main)`; once "." and "_" were placed (punctuation ruling), `applyAssignments` appended a second `group(main)` and kmcmplib rejected the keyboard. Fixed in its own commit, 502fb061 (`sameGroupName`, plus the same check in rule-pack install and the normalization step). The INDEXSTORELONG hint seen at the same time is in the starting keyboard and was not the cause.
+- **US8 T063/T064 depend on spec 107** (headless scripted author, branch `107-headless-scripted-author`). The 32 harness cases move to a headless vitest run; the walk zips stay on `km/2302-walk-zips`, never on main. T065 stays here.
+- **Suggested discards are marked, not removed, until Continue** (owner ruling, T039, Art. X). The default is discard, but carve only marks the suggested characters; clicking one keeps it (and clicking again re-marks it). Continue on the carve screen is the confirmation that applies the marked ones as `derived` removals; Skip keeps them all; Back changes nothing. An earlier build that applied the default on arrival was rejected.

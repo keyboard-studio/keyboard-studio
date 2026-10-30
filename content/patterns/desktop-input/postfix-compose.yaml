@@ -1,0 +1,149 @@
+# postfix-compose.yaml
+# Spec 106 US3 (R5): letter first, then a mark key composes the precomposed letter.
+# Strategy: S-03 (A3a = postfix mental model) + S-04 parallel-store lookup.
+
+id: postfix_compose
+title: "Type the letter, then the accent key"
+description: >
+  Type a base letter, then press the accent key — the letter is replaced by its
+  accented form. After a letter with no accented form of its own, the accent key
+  types the bare mark, and the keyboard's mark rules decide whether it stays.
+category: desktop
+appliesTo: []
+priority: 2
+group_visibility: any
+strategyId: "S-03"
+combinesWith: ["S-04"]
+
+questions:
+  - id: markName
+    prompt: >
+      Internal name for this accent (e.g. "grave", "acute"). Use letters,
+      digits and underscores only — it becomes a KMN identifier.
+    answerType: text
+    default: "grave"
+
+  - id: markKey
+    prompt: >
+      The key spec of the accent key, as written inside the brackets
+      (e.g. K_5 or SHIFT K_5).
+    answerType: text
+    default: "K_5"
+
+  - id: markChar
+    prompt: "The bare accent mark typed when no listed letter comes before it (e.g. U+0300)."
+    answerType: char-single
+    default: "̀"
+
+  - id: baseChars
+    prompt: "Which letters take this accent? Type them without spaces. Example: aeiouAEIOU"
+    answerType: char-list
+
+  - id: composedChars
+    prompt: >
+      The accented letters in the same order as the base letters above.
+      Example: àèìòùÀÈÌÒÙ
+    answerType: char-list
+
+  - id: escapes
+    prompt: >
+      Escape tokens. "bare" keeps the rule that types the bare mark when the key
+      is pressed after any other letter.
+    answerType: text
+    required: false
+
+kmnFragment: |
+  store(pc_{{markName}}_bases)    '{{baseChars}}'
+  store(pc_{{markName}}_composed) '{{composedChars}}'
+
+  any(pc_{{markName}}_bases) + [{{markKey}}] > index(pc_{{markName}}_composed, 1)
+  + [{{markKey}}] > '{{markChar}}'
+
+touchLayoutFragment: null
+
+reorderRules: null
+
+tests:
+  - input: ["K_A", "K_5"]
+    expectedOutput: "à"
+    description: "a then the mark key produces a-grave (U+00E0)"
+  - input: ["K_5"]
+    expectedOutput: "̀"
+    description: "the mark key alone types the bare combining grave"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/d/dega"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-10-29"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "postfix mark keys are common in the corpus; dega is the cited exemplar"
+
+provenance:
+  - keyboard: "release/d/dega/source/dega.kmn"
+    lines: [150, 155]
+    rules:
+      - "any(aeouK) + [K_BKQUOTE] > index(aeouGrave,1)"
+      - "any(ou_Grave) + [K_W] > index(ou_GraveHorn,1)"
+    note: >
+      The letter is typed first; the any() rule, with the key as the only
+      keystroke after it, replaces the letter by its accented form. Offset 1
+      is correct here: there is no deadkey, so the matched letter is position 1.
+      The any() rule must come before the bare-mark rule in source order.
+
+demo:
+  filled_kmn: |
+    c Demo: postfix compose, grave on the 5 key
+    c Type a letter then 5 to get the accented letter.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Postfix Compose Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    store(pc_grave_bases)    'aeiou'
+    store(pc_grave_composed) 'àèìòù'
+
+    any(pc_grave_bases) + [K_5] > index(pc_grave_composed, 1)
+    + [K_5] > U+0300
+
+  sample_keys:
+    - keys: ["a", "5"]
+      output: "à"
+      note: "a then 5 — a-grave"
+    - keys: ["5"]
+      output: "̀"
+      note: "5 alone — bare combining grave"
+
+  sample_output: >
+    Type a then 5 to get à.
+    Type 5 after anything else to get the bare grave mark.
+
+skeleton:
+  kmn_template: |
+    store(pc_{{markName}}_bases)    '{{baseChars}}'
+    store(pc_{{markName}}_composed) '{{composedChars}}'
+
+    any(pc_{{markName}}_bases) + [{{markKey}}] > index(pc_{{markName}}_composed, 1)
+    + [{{markKey}}] > '{{markChar}}'
+
+  parameters:
+    - id: markName
+      description: "Internal identifier for this accent; letters, digits and underscores only."
+    - id: markKey
+      description: "Key spec inside the brackets, e.g. K_5 or SHIFT K_5."
+    - id: markChar
+      description: "The bare mark typed when the key follows a letter not in baseChars."
+    - id: baseChars
+      description: "Letters that take the accent, no spaces. Order matches composedChars."
+    - id: composedChars
+      description: "The accented letters in the same order as baseChars; equal store lengths."
+    - id: escapes
+      description: "Optional tokens; the engine decides whether the bare-mark line is kept."

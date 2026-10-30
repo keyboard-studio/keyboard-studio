@@ -20,105 +20,199 @@
   "carved-layout": {
     "id": "carved-layout",
     "value": {
-      "removals": [],
-      "dispositions": [
+      "removals": [
         {
-          "comboId": "rule#27",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "rule#101",
+          "provenance": "derived"
         },
         {
-          "comboId": "rule#101",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "rule#27",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#10#1",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#10#1",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#10#2",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#10#2",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#10#3",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#10#3",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#10#4",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#10#4",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#10#5",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#10#5",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#10#6",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#10#6",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#1",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#1",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#2",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#10",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#3",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#11",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#4",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#2",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#5",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#3",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#6",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#4",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#7",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#5",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#8",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#6",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#9",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#7",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#10",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#8",
+          "provenance": "derived"
         },
         {
-          "comboId": "store#14#11",
-          "disposition": "allow-host",
-          "provenance": "bulk-default"
+          "kind": "item",
+          "id": "store#14#9",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "µ",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ã",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ä",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ë",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ï",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ñ",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Õ",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ö",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "Ü",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ã",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ä",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ç",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ë",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ï",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ñ",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "õ",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ö",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ü",
+          "provenance": "derived"
+        },
+        {
+          "kind": "char",
+          "id": "ÿ",
+          "provenance": "derived"
         }
       ],
-      "closedKeyboardCard": null
+      "suggestionFingerprint": "[\"µ\",\"Ã\",\"Ä\",\"Ë\",\"Ï\",\"Ñ\",\"Õ\",\"Ö\",\"Ü\",\"ã\",\"ä\",\"ç\",\"ë\",\"ï\",\"ñ\",\"õ\",\"ö\",\"ü\",\"ÿ\"]"
     },
     "provenance": "asked"
   },
@@ -1792,7 +1886,7 @@
         "behaviour": "swallow",
         "origin": "asked",
         "confirmed": true,
-        "recordedAt": 1792514818896,
+        "recordedAt": 1793376840236,
         "supersedes": null
       }
     },
@@ -1883,7 +1977,8 @@
                 "deadkeyName": "3000",
                 "baseLetters": "e",
                 "accentedForms": "ɛ",
-                "accentChar": ";"
+                "accentChar": ";",
+                "escapes": "double-tap space altgr"
               }
             }
           ],
@@ -1899,7 +1994,7 @@
               "strategyId": "S-02",
               "slotValues": {
                 "triggerKey": "K_COLON",
-                "deadkeyName": "3001",
+                "deadkeyName": "3000",
                 "baseLetters": "E",
                 "accentedForms": "Ɛ",
                 "accentChar": ";"
@@ -1983,7 +2078,7 @@
               "strategyId": "S-02",
               "slotValues": {
                 "triggerKey": "K_COLON",
-                "deadkeyName": "3002",
+                "deadkeyName": "3000",
                 "baseLetters": "O",
                 "accentedForms": "Ɔ",
                 "accentChar": ";"
@@ -2002,6 +2097,25 @@
               "strategyId": "S-01",
               "slotValues": {
                 "kmnRules": "+ [K_5] > U+0300"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "(",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_COLON",
+                "deadkeyName": "3000",
+                "baseLetters": "(",
+                "accentedForms": "(",
+                "accentChar": ";"
               }
             }
           ],

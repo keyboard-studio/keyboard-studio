@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { AttestedStack, PlacementWorklist } from "@keyboard-studio/contracts";
+import { createVirtualFS, type AttestedStack, type PlacementWorklist, type SimKeyInput } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
+import { compile } from "../compiler/index.js";
+import { simulate } from "../simulator/index.js";
 import {
   applyMarkGuards,
+  MARKS_ALLOWED_STORE_PREFIX,
   MARKS_GUARD_GROUP,
   MARKS_UNWRAP_FROM_STORE,
   MARKS_UNWRAP_TO_STORE,
@@ -41,12 +44,16 @@ function worklist(overrides: Partial<PlacementWorklist> = {}): PlacementWorklist
   };
 }
 
-describe("applyMarkGuards — blocking (FR-021 swallow)", () => {
-  it("adds a guard group with one swallow rule per blocked pair + the match hop", () => {
+const chars = (store: { items: { kind: string; value?: string }[] } | undefined): string[] =>
+  (store?.items ?? []).map((i) => (i.kind === "char" ? i.value! : `?${i.kind}`));
+
+describe("applyMarkGuards — blocking (FR-021 swallow; spec 106 FR-012)", () => {
+  it("adds one buffer-start rule and one notany rule per mark, over a generated allowed store", () => {
     const { ir } = parse(BASE_KMN, "guards");
     const result = applyMarkGuards(
       ir,
       worklist({
+        ownLetterUnits: ["a", "b", "k"],
         blockedCombinations: [
           { base: "k", mark: ACUTE },
           { base: "b", mark: ACUTE },
@@ -56,34 +63,202 @@ describe("applyMarkGuards — blocking (FR-021 swallow)", () => {
     );
     expect(result.blockingRuleCount).toBe(2);
     const guard = result.ir.groups.find((g) => g.name === MARKS_GUARD_GROUP);
-    expect(guard).toBeDefined();
     expect(guard?.usingKeys).toBe(false);
-    // Swallow shape: context [base, mark] → output [base].
-    expect(guard?.rules[0]?.context).toEqual([
-      { kind: "char", value: "k" },
-      { kind: "char", value: ACUTE },
+    const store = `${MARKS_ALLOWED_STORE_PREFIX}0301`;
+    // Buffer start first, then the notany rule (first match wins).
+    expect(guard?.rules.map((r) => [r.context, r.output])).toEqual([
+      [[{ kind: "raw", text: "nul" }, { kind: "char", value: ACUTE }], [{ kind: "nul" }]],
+      [
+        [{ kind: "notany", storeRef: store }, { kind: "char", value: ACUTE }],
+        [{ kind: "context", offset: 1 }],
+      ],
     ]);
-    expect(guard?.rules[0]?.output).toEqual([{ kind: "char", value: "k" }]);
+    expect(chars(result.ir.stores.find((s) => s.name === store))).toEqual(["a"]);
     // The entry group gained a match > use(guard) hop.
     const main = result.ir.groups.find((g) => g.name === "main");
     const hop = main?.rules.find((r) => r.matchKind === "match");
     expect(hop?.output).toContainEqual({ kind: "useGroup", groupName: MARKS_GUARD_GROUP });
   });
 
+  it("adds U+0020 to the allowed store when the space column is ticked", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["a"], markUnits: [{ mark: ACUTE, inputOrder: "postfix" }], allowedContexts: { [ACUTE]: [" "] } }),
+      "base-plus-mark",
+    );
+    expect(chars(result.ir.stores.find((s) => s.name === `${MARKS_ALLOWED_STORE_PREFIX}0301`))).toEqual([" ", "a"]);
+  });
+
+  it("lets a stacked mark follow the mark before it, and the precomposed prefix", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["a"], markUnits: [{ mark: CIRCUMFLEX, inputOrder: "postfix" }, { mark: ACUTE, inputOrder: "postfix" }] }),
+      "base-plus-mark",
+      "peel",
+      [{ base: "a", marks: [CIRCUMFLEX, ACUTE] }],
+    );
+    expect(chars(result.ir.stores.find((s) => s.name === `${MARKS_ALLOWED_STORE_PREFIX}0301`))).toEqual([
+      "a",
+      "â",
+      CIRCUMFLEX,
+    ]);
+  });
+
+  it("stacks on the case counterpart too, which ready-made shows as a precomposed capital", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["a", "A"], markUnits: [{ mark: CIRCUMFLEX, inputOrder: "postfix" }, { mark: ACUTE, inputOrder: "postfix" }] }),
+      "ready-made",
+      "whole-stack",
+      [{ base: "a", marks: [CIRCUMFLEX, ACUTE] }],
+    );
+    expect(chars(result.ir.stores.find((s) => s.name === `${MARKS_ALLOWED_STORE_PREFIX}0301`))).toEqual([
+      "A",
+      "a",
+      "Â",
+      "â",
+      CIRCUMFLEX,
+    ]);
+  });
+
+  it("under emit, drops the buffer-start rule so a bare mark passes there", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["a"], markUnits: [{ mark: ACUTE, inputOrder: "postfix" }] }),
+      "base-plus-mark",
+      "peel",
+      [],
+      "emit",
+    );
+    const guard = result.ir.groups.find((g) => g.name === MARKS_GUARD_GROUP);
+    expect(guard?.rules.map((r) => r.nodeId)).toEqual(["gen-marks-block-0301"]);
+  });
+
+  it("never puts nul or beep in a generated store (G8)", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["a", "e", "é"], blockedCombinations: [{ base: "a", mark: ACUTE }] }),
+      "ready-made",
+    );
+    const generated = result.ir.stores.filter((s) => s.name.startsWith("generated_marks_"));
+    expect(generated.length).toBeGreaterThan(0);
+    for (const s of generated) expect(s.items.every((i) => i.kind === "char")).toBe(true);
+  });
+
   it("round-trips through the codec emitter", () => {
     const { ir } = parse(BASE_KMN, "guards");
     const result = applyMarkGuards(
       ir,
-      worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] }),
+      worklist({ ownLetterUnits: ["a", "k"], blockedCombinations: [{ base: "k", mark: ACUTE }] }),
       "base-plus-mark",
     );
     const emitted = emit(result.ir);
     expect(emitted).toContain(`group(${MARKS_GUARD_GROUP})`);
     expect(emitted).toContain("match > use(generated_marks_guard)");
-    // The swallow rule itself, verbatim: [base, mark] context > [base]. The
-    // combining mark must emit as a standalone U+XXXX token, never a quoted
+    // The combining mark must emit as a standalone U+XXXX token, never a quoted
     // literal that would attach to a neighbouring char in source.
-    expect(emitted).toContain("U+006B U+0301 > U+006B");
+    expect(emitted).toContain(`notany(${MARKS_ALLOWED_STORE_PREFIX}0301) U+0301 > context(1)`);
+    expect(emitted).toContain("nul U+0301 > nul");
+  });
+});
+
+// The guard as Keyman runs it: compile the emitted keyboard and type.
+describe("applyMarkGuards — compiled behaviour", () => {
+  const KEYS_KMN = [
+    'store(&NAME) "Guard fixture"',
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    '+ [K_A] > "a"',
+    '+ [K_K] > "k"',
+    '+ [K_1] > "1"',
+    "+ [K_SPACE] > U+0020",
+    "+ [K_5] > U+0301",
+    "",
+  ].join("\n");
+  const type = (vkeys: string[]): SimKeyInput[] => vkeys.map((vkey) => ({ vkey, modifiers: [], caps: false }));
+
+  async function build(allowSpace: boolean, bare: "swallow" | "emit") {
+    const { ir } = parse(KEYS_KMN, "guards");
+    const guarded = applyMarkGuards(
+      ir,
+      worklist({
+        ownLetterUnits: ["a", "k"],
+        markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+        blockedCombinations: [{ base: "k", mark: ACUTE }],
+        ...(allowSpace ? { allowedContexts: { [ACUTE]: [" "] } } : {}),
+      }),
+      "base-plus-mark",
+      "peel",
+      [],
+      bare,
+    );
+    const vfs = createVirtualFS([{ path: "source/guards.kmn", content: emit(guarded.ir), isBinary: false }]);
+    const compiled = await compile(vfs, "guards");
+    expect(compiled.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal")).toEqual([]);
+    return (vkeys: string[]) => simulate(compiled, type(vkeys)).finalOutput;
+  }
+
+  it("blocks the mark after an unchecked base, a digit and an unticked space; keeps it after a checked base", async () => {
+    const run = await build(false, "swallow");
+    expect(run(["K_A", "K_5"])).toBe(`a${ACUTE}`);
+    expect(run(["K_K", "K_5"])).toBe("k");
+    expect(run(["K_1", "K_5"])).toBe("1");
+    expect(run(["K_SPACE", "K_5"])).toBe(" ");
+    expect(run(["K_5"])).toBe("");
+  }, 60_000);
+
+  it("allows the mark after a ticked space, and at buffer start under emit", async () => {
+    const run = await build(true, "emit");
+    expect(run(["K_SPACE", "K_5"])).toBe(` ${ACUTE}`);
+    expect(run(["K_5"])).toBe(ACUTE);
+    expect(run(["K_1", "K_5"])).toBe("1");
+  }, 60_000);
+});
+
+describe("applyMarkGuards — format version for notany()+context()", () => {
+  const kmnAt = (version: string): string =>
+    [
+      'store(&NAME) "Guard fixture"',
+      `store(&VERSION) '${version}'`,
+      "store(&TARGETS) 'any'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      '+ [K_A] > "a"',
+      "",
+    ].join("\n");
+  const wl = worklist({
+    ownLetterUnits: ["a"],
+    markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+  });
+
+  it.each([
+    ["10.0", "14.0"],
+    ["13.0", "14.0"],
+    ["14.0", "14.0"],
+    ["17.0", "17.0"],
+  ])("a keyboard declaring &VERSION %s compiles with the guard and ends at %s", async (declared, expected) => {
+    const { ir } = parse(kmnAt(declared), "guards");
+    const guarded = applyMarkGuards(ir, wl, "base-plus-mark");
+    const version = guarded.ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === "VERSION");
+    expect(chars(version).join("")).toBe(expected);
+    const vfs = createVirtualFS([{ path: "source/guards.kmn", content: emit(guarded.ir), isBinary: false }]);
+    const compiled = await compile(vfs, "guards");
+    expect(compiled.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal")).toEqual([]);
+  }, 60_000);
+});
+
+describe("applyMarkGuards — idempotency (spec 106 T016)", () => {
+  it("is idempotent over its own emitted .kmn parsed back (the projection's path)", () => {
+    const wl = worklist({ ownLetterUnits: ["a", "k"], blockedCombinations: [{ base: "k", mark: ACUTE }] });
+    const once = emit(applyMarkGuards(parse(BASE_KMN, "guards").ir, wl, "base-plus-mark").ir);
+    const twice = emit(applyMarkGuards(parse(once, "guards").ir, wl, "base-plus-mark").ir);
+    expect(twice).toBe(once);
   });
 
   it("is idempotent — re-applying replaces rather than duplicates", () => {
@@ -163,8 +338,9 @@ describe("applyMarkGuards — backspace answer gating (#2302)", () => {
     const result = applyMarkGuards(ir, worklist({ ownLetterUnits: ["e", "é"] }), "ready-made", "whole-stack");
     expect(result.unwrapPairCount).toBe(0);
     expect(result.ir.stores.some((s) => s.name === MARKS_UNWRAP_FROM_STORE)).toBe(false);
-    // Nothing else to generate — the IR comes back unchanged.
-    expect(result.ir).toBe(ir);
+    // Only the guard for é's acute is generated; no backspace rules.
+    const main = result.ir.groups.find((g) => g.name === "main");
+    expect(main?.rules.some((r) => r.nodeId === "gen-marks-unwrap-rule")).toBe(false);
   });
 
   it("ready-made + peel generates the unwrap (the override pairing)", () => {
@@ -180,7 +356,7 @@ describe("applyMarkGuards — backspace answer gating (#2302)", () => {
       { base: "e", marks: [ACUTE] },
     ]);
     expect(result.wholeStackRuleCount).toBe(0);
-    expect(result.ir).toBe(ir);
+    expect(result.unwrapPairCount).toBe(0);
   });
 
   it("flipping the answer tears the previous pairing's generation down", () => {

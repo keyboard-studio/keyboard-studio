@@ -563,6 +563,7 @@ export {
   hasDecidablePairs,
   normalizationFormForOutputForm,
   outputStringForStack,
+  outputFormString,
 } from "./marks/output-form-policy.js";
 export type {
   BackspaceBehaviour,
@@ -624,11 +625,12 @@ export type {
 export {
   applyMarkGuards,
   MARKS_GUARD_GROUP,
+  MARKS_ALLOWED_STORE_PREFIX,
   MARKS_UNWRAP_FROM_STORE,
   MARKS_UNWRAP_TO_STORE,
   MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
-export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
+export type { BareMarkBehaviour, MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
 // spec 065 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
 // sanctioned door to the inherit-first proposer and the keycap judgement.
@@ -921,6 +923,9 @@ export {
   substituteSlots,
   applyAssignments,
   applyAssignmentsToVfs,
+  DEADKEY_PATTERNS,
+  OUTPUT_FORM_SEAM_PATTERN_IDS,
+  applyOutputFormSeam,
   applyCarveToVfs,
   carveFilterIr,
   deriveCarvedIr,
@@ -987,6 +992,8 @@ export {
 export type {
   SubstituteResult,
   ApplyAssignmentsResult,
+  OutputFormOptions,
+  EmitUnit,
   ApplyTouchAssignmentsResult,
   ApplyTouchAssignmentsToRawJsonResult,
   DesktopModifications,

@@ -7,6 +7,7 @@ import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { applyAssignments } from "./applyAssignments.js";
 import type { ApplyAssignmentsResult } from "./applyAssignments.js";
+import type { OutputFormOptions } from "./outputFormSeam.js";
 
 /**
  * Read `source/<keyboardId>.kmn` from `vfs`, run {@link applyAssignments}
@@ -22,6 +23,8 @@ import type { ApplyAssignmentsResult } from "./applyAssignments.js";
  *                    e.g. `"tyv"` → `"source/tyv.kmn"`).
  * @param assignments Physical assignment map (touch entries are silently ignored).
  * @param getPattern  Resolver: returns the Pattern for a given id, or `undefined`.
+ * @param options     Output form + marks attachment matrix, passed through to
+ *                    {@link applyAssignments} (spec 106 US3).
  * @returns `{ kmn, warnings, conflicts }` — the updated .kmn text, any diagnostic
  *          messages, and any explicit deadkey identity conflicts (spec 083 US6).
  *          A warning is added if the .kmn file does not exist in the VFS (the
@@ -32,7 +35,8 @@ export function applyAssignmentsToVfs(
   vfs: VirtualFS,
   keyboardId: string,
   assignments: ReadonlyArray<MechanismAssignment>,
-  getPattern: (id: string) => Pattern | undefined
+  getPattern: (id: string) => Pattern | undefined,
+  options: OutputFormOptions = {},
 ): ApplyAssignmentsResult {
   const kmnPath = `source/${keyboardId}.kmn`;
 
@@ -59,7 +63,7 @@ export function applyAssignmentsToVfs(
   }
 
   // Apply assignments.
-  const result = applyAssignments(assignments, getPattern, kmnSource);
+  const result = applyAssignments(assignments, getPattern, kmnSource, options);
 
   // Collect all warnings (VFS-level first, then apply-level).
   const allWarnings = [...warnings, ...result.warnings];

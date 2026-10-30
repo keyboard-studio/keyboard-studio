@@ -47,6 +47,14 @@ import { effectiveMechanisms } from "@keyboard-studio/contracts";
 import type { Pattern } from "@keyboard-studio/contracts";
 import type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 import { substituteSlots } from "./substitute.js";
+import { sameGroupName } from "../codec/groupName.js";
+import {
+  applyOutputFormSeam,
+  DEADKEY_PATTERN,
+  DEADKEY_PATTERNS,
+  POSTFIX_COMPOSE_PATTERN,
+  type OutputFormOptions,
+} from "./outputFormSeam.js";
 
 /**
  * Result returned by {@link applyAssignments}.
@@ -118,6 +126,19 @@ function applyDeadkeyEscapes(text: string, slotValues: Record<string, string>): 
     lines.push(`+ [RALT ${trigger}] > ${output}`);
   }
   return lines.join("\n");
+}
+
+/**
+ * `postfix_compose` keeps its bare-mark line (`+ [key] > mark`, after the
+ * compose rule in source) only while its `escapes` slot carries "bare".
+ */
+function applyPostfixEscapes(text: string, slotValues: Record<string, string>): string {
+  const kept = new Set((slotValues["escapes"] ?? "").split(/\s+/));
+  if (kept.has("bare")) return text;
+  return text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("+ ["))
+    .join("\n");
 }
 
 /** Parsed representation of a .kmn file for merge purposes. */
@@ -316,7 +337,7 @@ function parseFragment(fragmentText: string): ParsedFragment {
   if (bareRules.length > 0) {
     // Check whether there's already a group(main) in the fragment groups;
     // if so, prepend the bare rules into it; otherwise create a new one.
-    const mainIdx = groups.findIndex((g) => g.name === "main");
+    const mainIdx = groups.findIndex((g) => sameGroupName(g.name, "main"));
     if (mainIdx !== -1) {
       groups[mainIdx]!.bodyLines.unshift(...bareRules);
     } else {
@@ -475,12 +496,15 @@ export function resolveRenderableMechanisms(
  * @param assignments - Physical assignment map. Touch-modality entries are ignored.
  * @param getPattern  - Resolver: returns the Pattern for a given id, or `undefined`.
  * @param kmnSource   - Current .kmn source text (scaffolder output or empty string).
+ * @param options     - The keyboard-wide output form and the marks attachment
+ *                      matrix (spec 106 US3). Omitted = output unchanged.
  * @returns `{ kmn, warnings }`.
  */
 export function applyAssignments(
   assignments: ReadonlyArray<MechanismAssignment>,
   getPattern: (id: string) => Pattern | undefined,
-  kmnSource: string
+  kmnSource: string,
+  options: OutputFormOptions = {},
 ): ApplyAssignmentsResult {
   const warnings: string[] = [];
   const conflicts: DeadkeyConflict[] = [];
@@ -504,7 +528,9 @@ export function applyAssignments(
   // would produce duplicate store declarations → KMN compile error.
   const LAYER_SWITCH_PATTERN = "modifier_as_layer_switch";
   const layerSwitchRefs = [...seen.values()].filter((r) => r.patternId === LAYER_SWITCH_PATTERN);
-  if (layerSwitchRefs.length > 1) {
+  // With an output form recorded the seam pairs keys with outputs itself:
+  // joining outputs here would misalign a multi-code-point output.
+  if (layerSwitchRefs.length > 1 && options.outputForm === undefined) {
     for (const r of layerSwitchRefs) seen.delete(mechanismKey(r));
     const merged: MechanismRef = {
       ...layerSwitchRefs[0]!,
@@ -537,7 +563,6 @@ export function applyAssignments(
   //   deadkeys' rules and stores (first-wins ordering preserved): it may be
   //   degraded — the second trigger rule is unreachable at runtime — but it
   //   is non-lossy and the collision is explicit.
-  const DEADKEY_PATTERN = "deadkey_single_tap";
   const deadkeyRefs = [...seen.values()].filter((r) => r.patternId === DEADKEY_PATTERN);
   if (deadkeyRefs.length > 1) {
     // Group by (triggerKey, deadkeyName); only groups with >1 ref need merging.
@@ -547,7 +572,10 @@ export function applyAssignments(
       if (!byTriggerAndName.has(k)) byTriggerAndName.set(k, []);
       byTriggerAndName.get(k)!.push(r);
     }
-    // Merge each multi-ref group into one ref. The merged ref takes the
+    // Merge each multi-ref group into one ref — unless an output form is
+    // recorded, when the seam plans each group from its raw refs (a joined
+    // accentedForms cannot carry an output of more than one code point, nor
+    // a deadkey_single_tap_nfd ref's markChars). The merged ref takes the
     // position of the group's FIRST member in `seen` so first-wins ordering
     // is preserved: with refs [acute, grave, acute], the merged acute group
     // must still emit before grave (delete-then-append would wrongly let the
@@ -555,7 +583,7 @@ export function applyAssignments(
     const mergedOfMember = new Map<string, MechanismRef>();
     const firstMemberKeys = new Set<string>();
     for (const [, group] of byTriggerAndName) {
-      if (group.length <= 1) continue;
+      if (group.length <= 1 || options.outputForm !== undefined) continue;
       const first = group[0]!;
       const escapes = group.find((r) => r.slotValues?.["escapes"] !== undefined)?.slotValues?.["escapes"];
       const merged: MechanismRef = {
@@ -600,12 +628,18 @@ export function applyAssignments(
     // and keeps working while the collision is unresolved. Non-deadkey refs
     // keep their positions; only relative order within deadkey refs changes.
     const deadkeyKeys = [...seen.keys()].filter(
-      (k) => seen.get(k)?.patternId === DEADKEY_PATTERN,
+      (k) => DEADKEY_PATTERNS.has(seen.get(k)?.patternId ?? ""),
     );
     if (deadkeyKeys.length > 1) {
-      const reversedValues = deadkeyKeys
-        .map((k) => seen.get(k)!)
-        .reverse();
+      // Unmerged refs (an output form is recorded) reverse as whole
+      // trigger + name groups, so each deadkey's own pairs keep their order.
+      const groups = new Map<string, MechanismRef[]>();
+      for (const k of deadkeyKeys) {
+        const r = seen.get(k)!;
+        const g = `${r.slotValues?.["triggerKey"] ?? ""}::${r.slotValues?.["deadkeyName"] ?? ""}`;
+        groups.set(g, [...(groups.get(g) ?? []), r]);
+      }
+      const reversedValues = [...groups.values()].reverse().flat();
       const swapped = new Map(
         deadkeyKeys.map((k, i) => [k, reversedValues[i]!] as const),
       );
@@ -627,7 +661,7 @@ export function applyAssignments(
     // surviving deadkey ref, not just the merged groups.
     const namesByTrigger = new Map<string, Set<string>>();
     for (const r of seen.values()) {
-      if (r.patternId !== DEADKEY_PATTERN) continue;
+      if (!DEADKEY_PATTERNS.has(r.patternId)) continue;
       const trigger = r.slotValues?.["triggerKey"] ?? "";
       const name = r.slotValues?.["deadkeyName"] ?? "";
       if (!namesByTrigger.has(trigger)) namesByTrigger.set(trigger, new Set());
@@ -654,10 +688,20 @@ export function applyAssignments(
     return { kmn: kmnSource, warnings, conflicts };
   }
 
-  // Step 2: resolve each unique ref to a substituted fragment.
+  // Step 2: resolve each unique ref to a substituted fragment, every output
+  // in the keyboard-wide form (spec 106 FR-020; see outputFormSeam.ts).
   const allFragments: ParsedFragment[] = [];
 
-  for (const ref of seen.values()) {
+  for (const unit of applyOutputFormSeam([...seen.values()], options)) {
+    if (unit.kind === "raw") {
+      allFragments.push(
+        parseFragment(
+          unit.escapeSlots !== undefined ? applyDeadkeyEscapes(unit.text, unit.escapeSlots) : unit.text,
+        ),
+      );
+      continue;
+    }
+    const ref = unit.ref;
     const pattern = getPattern(ref.patternId);
     if (pattern === undefined) {
       warnings.push(
@@ -706,7 +750,11 @@ export function applyAssignments(
     }
 
     const parsed = parseFragment(
-      ref.patternId === DEADKEY_PATTERN ? applyDeadkeyEscapes(text, slotValues) : text,
+      DEADKEY_PATTERNS.has(ref.patternId)
+        ? applyDeadkeyEscapes(text, slotValues)
+        : ref.patternId === POSTFIX_COMPOSE_PATTERN
+          ? applyPostfixEscapes(text, slotValues)
+          : text,
     );
 
     // Warn about (and skip) system stores in fragments.
@@ -766,7 +814,7 @@ export function applyAssignments(
   for (const frag of allFragments) {
     for (const fragGroup of frag.groups) {
       const baseGroupIdx = baseParsed.groups.findIndex(
-        (g) => g.name === fragGroup.name
+        (g) => sameGroupName(g.name, fragGroup.name)
       );
       if (baseGroupIdx !== -1) {
         // Merge into existing group.

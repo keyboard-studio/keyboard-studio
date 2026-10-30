@@ -52,6 +52,7 @@ import {
   contextHasDirectBackspace,
 } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
+import { isAlwaysKeepCategory } from "../lib/irToCarveNodes.ts";
 
 // ---------------------------------------------------------------------------
 // Slot identity
@@ -76,7 +77,7 @@ export function slotKeyFor(
 export type SlotSource = "base" | "session";
 
 export interface SlotOccupant {
-  /** The glyph (single NFC codepoint string) this slot currently types. */
+  /** The glyph (one NFC grapheme) this slot currently types. */
   char: string;
   /** Whether the occupant comes from the working IR or a session assignment. */
   source: SlotSource;
@@ -179,6 +180,32 @@ export interface MechanismSlotEntry {
 
 type MechanismLike = MechanismAssignment["mechanisms"][number];
 
+/** `parseKeySpec`, with a mutually-exclusive modifier pair read as no key. */
+function safeParseKeySpec(spec: string): ReturnType<typeof parseKeySpec> {
+  try {
+    return parseKeySpec(spec);
+  } catch {
+    return null;
+  }
+}
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * The glyph an S-01 line writes: every `U+XXXX` on its right-hand side,
+ * NFC-normalised, accepted only when that is ONE grapheme. An NFD output
+ * (`> U+0061 U+030C`) therefore names `ǎ`, not its bare base letter.
+ */
+function s01OutputGlyph(line: string): string | null {
+  const rhs = line.slice(line.indexOf(">") + 1);
+  const cps = [...rhs.matchAll(/U\+([0-9A-Fa-f]{4,6})/g)].map((m) =>
+    parseInt(m[1] ?? "", 16),
+  );
+  if (cps.length === 0 || cps.some((cp) => Number.isNaN(cp))) return null;
+  const glyph = String.fromCodePoint(...cps).normalize("NFC");
+  return [...graphemes.segment(glyph)].length === 1 ? glyph : null;
+}
+
 function isSwapMechanism(mech: MechanismLike): boolean {
   return mech.patternId === "simple_swap" || mech.strategyId === "S-01";
 }
@@ -189,9 +216,19 @@ function isRaltMechanism(mech: MechanismLike): boolean {
   );
 }
 
+function isDeadkeyMechanism(mech: MechanismLike): boolean {
+  return mech.strategyId === "S-02" || mech.patternId.startsWith("deadkey_single_tap");
+}
+
+/** postfix_compose is S-03 like a plain sequence, so it is told by pattern id. */
+function isPostfixMechanism(mech: MechanismLike): boolean {
+  return mech.patternId === "postfix_compose";
+}
+
 /**
  * The slots ONE recorded mechanism writes, parsed from its slotValues.
- * S-01: each kmnRules line is `+ [MODS K_X] > U+XXXX`
+ * S-01: each kmnRules line is `+ [MODS K_X] > U+XXXX` (an NFD output carries
+ * several `U+XXXX`; their NFC form must be one grapheme)
  * (buildStartRuleLines / buildShiftRuleLines / buildCasePairRuleLines all
  * emit this shape, one line per plane — which is what makes a CAPS quad
  * land on its four distinct slots). If ANY line cannot be keyed exactly,
@@ -212,17 +249,15 @@ export function mechanismSlotEntries(
     if (lines.length === 0) return [];
     const entries: MechanismSlotEntry[] = [];
     for (const line of lines) {
-      const parsed = parseKeySpec(line);
+      const parsed = safeParseKeySpec(line);
       if (parsed === null) return [];
-      const outMatch = />\s*U\+([0-9A-Fa-f]{4,6})/.exec(line);
-      if (outMatch === null || outMatch[1] === undefined) return [];
-      const cp = parseInt(outMatch[1], 16);
-      if (Number.isNaN(cp)) return [];
+      const char = s01OutputGlyph(line);
+      if (char === null) return [];
       entries.push({
         key: slotKeyFor(parsed.vkey, parsed.tokens),
         vkey: parsed.vkey,
         modifiers: [...parsed.tokens],
-        char: String.fromCodePoint(cp).normalize("NFC"),
+        char,
       });
     }
     return entries;
@@ -231,7 +266,7 @@ export function mechanismSlotEntries(
     const altgrKeyList = mech.slotValues?.["altgrKeyList"];
     const altgrOutputList = mech.slotValues?.["altgrOutputList"];
     if (altgrKeyList === undefined || altgrOutputList === undefined) return [];
-    const parsed = parseKeySpec(altgrKeyList);
+    const parsed = safeParseKeySpec(altgrKeyList);
     if (parsed === null) return [];
     const out = altgrOutputList.normalize("NFC");
     // Only a single-glyph output names an incumbent (module doc).
@@ -259,6 +294,74 @@ export function assignmentSlotKeys(
 ): MechanismSlotEntry[] {
   if (assignment.modality !== "physical") return [];
   return assignment.mechanisms.flatMap((mech) => mechanismSlotEntries(mech));
+}
+
+// ---------------------------------------------------------------------------
+// Claimed slots — "which bare keystrokes does this mechanism answer FIRST?"
+//
+// Unlike mechanismSlotEntries this is glyph-agnostic: it feeds the carve
+// projection's claimed-inputs filter (lib/claimedInputs.ts), which drops the
+// starting rules an assignment shadows, not the displacement ledger. A
+// deadkey trigger types no glyph, yet its `+ [trigger] > dk(..)` line still
+// shadows the starting rule on that key. Each slot is claimed only while the
+// emitted fragment really carries a bare rule on it (applyAssignments.ts
+// applyDeadkeyEscapes / applyPostfixEscapes read the same `escapes` tokens).
+// ---------------------------------------------------------------------------
+
+/** One bare keystroke (vkey + exact modifiers) a mechanism answers first. */
+export interface ClaimedSlot {
+  vkey: string;
+  modifiers: string[];
+}
+
+function escapeTokens(mech: MechanismLike): Set<string> {
+  return new Set(
+    (mech.slotValues?.["escapes"] ?? "").split(/\s+/).filter((t) => t.length > 0),
+  );
+}
+
+function claimFor(spec: string): ClaimedSlot[] {
+  const parsed = safeParseKeySpec(spec);
+  return parsed === null ? [] : [{ vkey: parsed.vkey, modifiers: [...parsed.tokens] }];
+}
+
+/**
+ * The bare keystrokes ONE recorded mechanism claims:
+ *   - S-01: the key of every kmnRules line, whatever its output;
+ *   - S-08: every keystroke in altgrKeyList;
+ *   - S-02: the trigger, plus `RALT trigger` when `escapes` has `altgr`;
+ *   - postfix_compose: the mark key, only when `escapes` has `bare` (without
+ *     it the compose rule needs a preceding base, so the starting rule on
+ *     the key stays reachable and is the key's only output after a non-base).
+ * A spec that does not parse claims nothing.
+ */
+export function mechanismClaimedSlots(mech: MechanismLike): ClaimedSlot[] {
+  const slots = mech.slotValues ?? {};
+  if (isSwapMechanism(mech)) {
+    return (slots["kmnRules"] ?? "")
+      .split(/\r?\n/)
+      .filter((l) => l.trim().length > 0)
+      .flatMap(claimFor);
+  }
+  if (isRaltMechanism(mech)) {
+    return [...(slots["altgrKeyList"] ?? "").matchAll(/\[[^\]]+\]/g)].flatMap((m) =>
+      claimFor(m[0]),
+    );
+  }
+  if (isDeadkeyMechanism(mech)) {
+    const trigger = (slots["triggerKey"] ?? "").trim();
+    if (trigger === "") return [];
+    return [
+      ...claimFor(`[${trigger}]`),
+      ...(escapeTokens(mech).has("altgr") ? claimFor(`[RALT ${trigger}]`) : []),
+    ];
+  }
+  if (isPostfixMechanism(mech)) {
+    const markKey = (slots["markKey"] ?? "").trim();
+    if (markKey === "" || !escapeTokens(mech).has("bare")) return [];
+    return claimFor(`[${markKey}]`);
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -327,17 +430,22 @@ export function classifySlot(
  * that data. A convenience character would lose to core-orthography."
  * Never pretend a frequency ranking happened.
  *
- *   - "core"        — in the author's confirmed inventory: part of the
- *                     target orthography the author declared
- *                     (= the needed-frequent need class).
+ *   - "core"        — a letter or mark in the author's confirmed
+ *                     inventory: part of the target orthography the
+ *                     author declared.
  *   - "convenience" — base-produced and retained (spec-075 punctuation
  *                     defaults, loanword / URL / name coverage) but NOT
- *                     in the confirmed inventory (= needed-rare).
+ *                     in the confirmed inventory, AND every digit,
+ *                     punctuation mark or symbol (the carve always-keep
+ *                     categories) even when it is in the inventory.
  *   - "none"        — produced nowhere / in no need set.
  *
- * This maps the existing need classes onto tiers rather than building a
- * parallel classification: needed-frequent IS core, needed-rare IS
- * convenience.
+ * Punctuation is never core (owner ruling 2026-10-29, spec 106 FR-043):
+ * the punctuation step puts `'` in the inventory, and `’` taking its key
+ * was then a both-core standoff whose default demoted nothing, leaving
+ * `'` shadowed with no key. As convenience, an overwritten `'` gets the
+ * ordinary "move it to AltGr" proposal. A script that writes a letter
+ * with `'` should record that letter as ʼ (U+02BC), which stays core.
  */
 export type OrthographyTier = "core" | "convenience" | "none";
 
@@ -346,15 +454,10 @@ export function orthographyTier(
   needSets: NeedSets,
 ): OrthographyTier {
   const ch = char.normalize("NFC");
-  if (needSets.confirmedInventory.has(ch)) return "core";
+  if (needSets.confirmedInventory.has(ch)) {
+    return isAlwaysKeepCategory(ch) ? "convenience" : "core";
+  }
   if (needSets.baseProducedSet.has(ch)) return "convenience";
-  return "none";
-}
-
-/** The tier a slot classification's incumbent sits at. */
-export function tierForNeedKind(kind: SlotNeedKind): OrthographyTier {
-  if (kind === "needed-frequent") return "core";
-  if (kind === "needed-rare") return "convenience";
   return "none";
 }
 

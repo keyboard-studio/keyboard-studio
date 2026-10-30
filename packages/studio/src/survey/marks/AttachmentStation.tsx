@@ -7,12 +7,15 @@
 // A mark with exactly one attested base and no plausible additions renders as
 // an already-confirmed summary the designer can open and edit (FR-008).
 // Case pairs are derived from the alphabet's case data, never asked (FR-009).
+// Each row also has a "space" box, unticked by default: ticked, the mark may
+// follow a space too (spec 106 FR-013).
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { AttachmentProposal } from "@keyboard-studio/engine";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { prefixCombiningMark } from "../../lib/irToCarveNodes.ts";
+import { ATTACHMENT_SPACE } from "./marksViews.ts";
 import {
   ACCENT,
   BORDER,
@@ -54,7 +57,8 @@ function AttachmentRow({
   // base even though the base is folded out of the displayed lowercase choices
   // (spec 049). Filtering the display list would render a blank "confirmed on"
   // summary for such a mark. The worklist is unaffected either way.
-  const checkedBases = Object.keys(checked).filter((b) => checked[b] === true);
+  const checkedBases = Object.keys(checked).filter((b) => b !== ATTACHMENT_SPACE && checked[b] === true);
+  const spaceChecked = checked[ATTACHMENT_SPACE] === true;
   const body = (
     <>
       <p style={{ ...mutedParaFlush, margin: "6px 0" }}>
@@ -108,6 +112,32 @@ function AttachmentRow({
             </label>
           );
         })}
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 8px",
+            border: `1px solid ${BORDER}`,
+            borderRadius: 6,
+            fontSize: 14,
+            color: TEXT_MAIN,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={spaceChecked}
+            onChange={(e) => onToggle(ATTACHMENT_SPACE, e.target.checked)}
+            aria-label={t({
+              id: "survey.marks.attachment.spaceAriaLabel",
+              message: `${{ mark: markLabel(proposal.mark) }} can follow a space`,
+            })}
+          />
+          <span>
+            <Trans id="survey.marks.attachment.spaceLabel">after a space</Trans>
+          </span>
+        </label>
       </div>
     </>
   );

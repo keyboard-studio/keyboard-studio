@@ -14,7 +14,10 @@
 //   - markUnits — each mark resolving to `own-key`, carrying the keyboard's
 //     confirmed input order;
 //   - blockedCombinations — every mark × base left unchecked at the attachment
-//     station (must never be reachable by ordinary typing, FR-021).
+//     station (must never be reachable by ordinary typing, FR-021);
+//   - allowedContexts — per mark, the non-base contexts ticked at the station
+//     (spec 106 FR-013: the space column). Space is never a base, so it never
+//     becomes a keyed unit or a blocked combination.
 //
 // The field name `ownLetterUnits` is now a misnomen — it holds keyed units, not
 // "own letters" — and is left alone deliberately: renaming it would touch the
@@ -30,10 +33,16 @@ import type { MarkClass } from "./mark-classes.js";
 import { treatmentFor, type MarkTreatmentAnswer } from "./treatment.js";
 import type { MarkTreatmentPrefill } from "./treatment-prefill.js";
 
+/** The attachment station's space column key (spec 106 FR-013). */
+const SPACE = " ";
+
 export interface WorklistInputs {
   alphabet: ConfirmedAlphabet;
   classes: MarkClass[];
-  /** Per mark, per base: checked = reachable (attested or plausible-accepted). */
+  /**
+   * Per mark, per base: checked = reachable (attested or plausible-accepted).
+   * The `" "` key is the space column, not a base.
+   */
   attachments: Record<string, Record<string, boolean>>;
   /**
    * The recorded S2 answer (spec 052) — REPLACES `mentalModel` + `markOverrides`
@@ -67,6 +76,7 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
 
   const markUnits: PlacementWorklist["markUnits"] = [];
   const blockedCombinations: PlacementWorklist["blockedCombinations"] = [];
+  const allowedContexts: Record<string, string[]> = {};
 
   for (const mark of alphabet.marks) {
     const row = attachments[mark] ?? {};
@@ -85,6 +95,8 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
     for (const base of alphabet.bases) {
       if (row[base] !== true) blockedCombinations.push({ base, mark });
     }
+
+    if (row[SPACE] === true) allowedContexts[mark] = [SPACE];
   }
 
   // Promoted composed characters earn dedicated keys REGARDLESS of their mark's
@@ -93,7 +105,12 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
   // composed-produced and promoted yields exactly one entry.
   for (const promoted of treatment.promoted) pushUnit(promoted);
 
-  return { ownLetterUnits, markUnits, blockedCombinations };
+  return {
+    ownLetterUnits,
+    markUnits,
+    blockedCombinations,
+    ...(Object.keys(allowedContexts).length > 0 ? { allowedContexts } : {}),
+  };
 }
 
 /**

@@ -791,11 +791,18 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
           ? [ruleRef(family.escape.nodeId)]
           : []),
         storeRef(family.baseStore.nodeId),
-        storeRef(family.outStore.nodeId),
+        ...(family.nfdMarks === undefined ? [storeRef(family.outStore.nodeId)] : []),
       ];
 
+      // NFD (base-plus-mark) family: lifts to deadkey_single_tap_nfd with the
+      // mark sequence in markChars and no accentedForms (self-indexing store).
+      if (family.nfdMarks !== undefined) {
+        delete slotValues["accentedForms"];
+        slotValues["markChars"] = family.nfdMarks.join("");
+      }
+
       results.push({
-        patternId: `${rule.lifts_to.patternId}#${family.idSuffix}`,
+        patternId: `${family.nfdMarks !== undefined ? `${rule.lifts_to.patternId}_nfd` : rule.lifts_to.patternId}#${family.idSuffix}`,
         ownedNodes,
         slotValues: {
           ...slotValues,
@@ -963,6 +970,18 @@ export function interpretLift(rule: RecognizerRuleYaml, match: MatchResult): Pat
 
   // Derive questions from slot_mapping
   const questions = buildQuestions(rule, cleanSlotValues);
+  // NFD S-02 family: no accentedForms question; the mark sequence is asked instead.
+  if (cleanSlotValues["markChars"] !== undefined) {
+    const at = questions.findIndex((q) => q.id === "accentedForms");
+    const markQ = {
+      id: "markChars",
+      prompt: "Combining mark(s) emitted after each base letter",
+      answerType: "text" as const,
+      default: cleanSlotValues["markChars"],
+    };
+    if (at >= 0) questions.splice(at, 1, markQ);
+    else questions.push(markQ);
+  }
 
   // Derive kmnFragment from strategyId defaults
   const kmnFragment = buildKmnFragment(rule.strategyId, cleanSlotValues);

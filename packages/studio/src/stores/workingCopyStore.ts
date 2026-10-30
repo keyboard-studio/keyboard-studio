@@ -346,6 +346,41 @@ export type { IdentityPatch } from "./identityPatch.ts";
 // State interface
 // ---------------------------------------------------------------------------
 
+/**
+ * The carve gallery's suggested-discard default (spec 106 FR-042). Suggested
+ * characters are only MARKED for discard until the author continues:
+ * `kept` holds the ones the author chose to keep instead, and `derived`
+ * the removal keys (`kind:id`, survey/carve/carveValue.ts `removalKey`)
+ * that Continue applied for the marked ones. `fingerprint` is the
+ * suggestion set at that Continue.
+ */
+export interface CarveSuggestionApplied {
+  fingerprint: string;
+  derived: string[];
+  /** Suggested characters (NFC) the author chose to keep. */
+  kept?: string[];
+  /** True once the author restored an applied default (keep, restore all, undo). */
+  touched?: boolean;
+}
+
+/**
+ * The applied carve suggestion after the author restored `ids` / `chars`:
+ * those removals are the author's from now on, so they leave `derived`, and
+ * the suggestion is marked touched (spec 106 FR-042: `asked` provenance).
+ */
+function pruneCarveSuggestion(
+  cs: CarveSuggestionApplied | null,
+  ids: readonly string[],
+  chars: readonly string[],
+): CarveSuggestionApplied | null {
+  if (cs === null) return null;
+  const gone = new Set([
+    ...ids.flatMap((id) => [`item:${id}`, `node:${id}`]),
+    ...chars.map((c) => `char:${c.normalize("NFC")}`),
+  ]);
+  return { ...cs, derived: cs.derived.filter((k) => !gone.has(k)), touched: true };
+}
+
 export interface WorkingCopyState {
   // -- Instantiation mode (spec §8 v1.3.0) ------------------------------------
   /**
@@ -671,6 +706,30 @@ export interface WorkingCopyState {
 
   /** Set the keep-inert character set for carved touch keys (replaces wholesale). */
   setCarveTouchKeepInert: (chars: string[]) => void;
+
+  /**
+   * Declined displacement proposals (spec 106 FR-043): each entry is
+   * `displaced|vkey|sorted-modifiers|incoming`, written when the author leaves a
+   * displaced character without a new key ("Leave it" / "Keep both"). The
+   * gallery does not re-propose a declined displacement, and the
+   * physical-layout decision records the list, so the loss is a recorded
+   * choice rather than a silent one.
+   */
+  displacedDeclined: string[];
+
+  /** Record one declined displacement (idempotent). */
+  declineDisplacement: (key: string) => void;
+
+  /**
+   * The carve gallery's suggested-discard default (spec 106 FR-042): which
+   * suggested characters the author kept, and which removals Continue
+   * applied for the marked ones. The carved-layout value reads `derived`
+   * provenance from it. Null until the author first acts on carve.
+   */
+  carveSuggestion: CarveSuggestionApplied | null;
+
+  /** Record the applied carve suggestion (replaces wholesale). */
+  setCarveSuggestion: (applied: CarveSuggestionApplied | null) => void;
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
@@ -1534,6 +1593,8 @@ function freshInstantiationTail() {
     // dev's older tracks) resurrects them in the store state.
     fallbackPolicy: DEFAULT_FALLBACK_POLICY,
     carveTouchKeepInert: [],
+    displacedDeclined: [],
+    carveSuggestion: null,
     // Spec 104 identity records are per-working-copy too: a fresh start
     // has no severances, no transplants and no guard answer yet.
     keyIdentityDecisions: [],
@@ -1627,6 +1688,8 @@ export type WorkingCopyData = Omit<
   | "cascadeRestore"
   | "setFallbackPolicy"
   | "setCarveTouchKeepInert"
+  | "declineDisplacement"
+  | "setCarveSuggestion"
   | "recordPhase"
   | "recordAssignments"
   | "setIrAxes"
@@ -1721,6 +1784,8 @@ const INITIAL_STATE: WorkingCopyData = {
   // keyboard-wide fallback policy (076 FR-019): flat swallow default
   fallbackPolicy: DEFAULT_FALLBACK_POLICY,
   carveTouchKeepInert: [],
+  displacedDeclined: [],
+  carveSuggestion: null,
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
@@ -1866,6 +1931,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           deletedItemIds: nextItems,
           carveChars: nextCarveChars,
           undoStack: nextUndoStack,
+          carveSuggestion: pruneCarveSuggestion(
+            s.carveSuggestion,
+            [...last.nodeIds, ...last.itemIds],
+            [...undoneChars],
+          ),
         };
       }
     }),
@@ -1943,7 +2013,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // undoStack — otherwise a committed key edit would be left applied with no
   // remaining way to undo it.
   keepAll: () =>
-    set({
+    set((s) => ({
+      carveSuggestion:
+        s.carveSuggestion === null
+          ? null
+          : { ...s.carveSuggestion, derived: [], touched: true },
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
@@ -1952,7 +2026,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       keyEditOverlay: { ops: [] },
       carveTouchKeepInert: [],
       deadkeyOverlay: { ops: [] },
-    }),
+    })),
 
   restoreAll: () => get().keepAll(),
 
@@ -2021,6 +2095,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         deletedItemIds: nextItems,
         carveChars: nextCarveChars,
         undoStack: nextUndoStack,
+        carveSuggestion: pruneCarveSuggestion(s.carveSuggestion, ids, restoredChars),
       };
     });
   },
@@ -2033,6 +2108,15 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // comparison stays exact.
   setCarveTouchKeepInert: (chars) =>
     set({ carveTouchKeepInert: chars.map((c) => c.normalize("NFC")) }),
+
+  setCarveSuggestion: (applied) => set({ carveSuggestion: applied }),
+
+  declineDisplacement: (key) =>
+    set((s) =>
+      s.displacedDeclined.includes(key)
+        ? s
+        : { displacedDeclined: [...s.displacedDeclined, key] },
+    ),
 
   // -- surveyResultsStore actions --------------------------------------------
 

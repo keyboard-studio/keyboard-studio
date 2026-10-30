@@ -161,6 +161,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       // Registered ONLY here (spec 105 Phase 0 task ruling): the
       // dormant-slices entry names it in evidence but does not claim it.
       "setCarveTouchKeepInert",
+      "setCarveSuggestion",
     ],
     fields: [
       "deletedNodeIds",
@@ -169,6 +170,9 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "carveChars",
       "undoStack",
       "carveTouchKeepInert",
+      // spec 106 FR-042: the applied suggested-discard default; the value
+      // carries its fingerprint and the derived provenance it implies.
+      "carveSuggestion",
     ],
     decisionIds: ["carved-layout"],
     evidence: [
@@ -187,8 +191,10 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "unflagCharForSequence",
       "lockDesktop",
       "unlockDesktop",
+      "declineDisplacement",
     ],
-    fields: ["desktopLocked", "sequenceFlaggedChars"],
+    // displacedDeclined (spec 106 FR-043) is snapshotted into the value.
+    fields: ["desktopLocked", "sequenceFlaggedChars", "displacedDeclined"],
     decisionIds: ["physical-layout"],
     evidence: [
       "inventory-carve-deadkeys.md §C: physical-layout is RECORD-ONLY — snapshotted from the WC at completion, its apply() is a no-op and replay has no fold for it",
@@ -381,6 +387,10 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   fallbackPolicy: { kind: "field", class: "EDITOR-AUTHORED" },
   carveTouchKeepInert: { kind: "field", class: "UNCLASSIFIED" },
   setCarveTouchKeepInert: { kind: "action", class: "UNCLASSIFIED" },
+  carveSuggestion: { kind: "field", class: "EDITOR-AUTHORED" },
+  setCarveSuggestion: { kind: "action", class: "EDITOR-AUTHORED" },
+  displacedDeclined: { kind: "field", class: "EDITOR-AUTHORED" },
+  declineDisplacement: { kind: "action", class: "EDITOR-AUTHORED" },
   phaseResults: { kind: "field", class: "SURVEY-SLOT" },
   irAxes: { kind: "field", class: "SURVEY-SLOT" },
   session: { kind: "field", class: "SURVEY-SLOT" },

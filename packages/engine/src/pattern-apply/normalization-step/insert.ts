@@ -1,5 +1,6 @@
 import type { IRComment, IRGroup, IRRule, KeyboardIR, NormalizationStep } from "@keyboard-studio/contracts";
 import { emitRule } from "../../codec/emit.js";
+import { sameGroupName } from "../../codec/groupName.js";
 import { NORMALIZATION_GROUP, NORMALIZATION_STORE_PREFIX } from "./constants.js";
 
 /**
@@ -74,7 +75,7 @@ export function generatedStepGroupOf(ir: KeyboardIR): IRGroup | undefined {
   const nomatch = group.rules.find((r) => r.matchKind === "nomatch");
   const target = nomatch === undefined ? undefined : groupNamedByUse(nomatch.output);
   if (target === undefined || target === NORMALIZATION_GROUP) return undefined;
-  return ir.groups.some((g) => g.name === target) ? group : undefined;
+  return ir.groups.some((g) => sameGroupName(g.name, target)) ? group : undefined;
 }
 
 /**

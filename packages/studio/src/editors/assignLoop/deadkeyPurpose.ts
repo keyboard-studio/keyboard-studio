@@ -17,7 +17,7 @@
 import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import { DEADKEY_OPTIONS } from "../deadkey/deadkeyTriggerOptions.ts";
-import { PATTERN_DEADKEY, PATTERN_SWAP } from "./patternIds.ts";
+import { PATTERN_SWAP, deadkeyPairsOfSlots, isDeadkeyPatternId } from "./patternIds.ts";
 
 /** Purpose key for characters with no combining mark (ɛ, Ɔ, ŋ …). */
 export const VARIANT_PURPOSE = "variant";
@@ -58,7 +58,7 @@ export function sessionDeadkeys(
   for (const a of sessionAssignments) {
     if (excludeTarget !== undefined && a.target === excludeTarget) continue;
     for (const m of a.mechanisms) {
-      if (m.patternId !== PATTERN_DEADKEY) continue;
+      if (!isDeadkeyPatternId(m.patternId)) continue;
       const sv = m.slotValues ?? {};
       const triggerKey = sv["triggerKey"];
       const deadkeyName = sv["deadkeyName"];
@@ -76,14 +76,10 @@ export function sessionDeadkeys(
       } else if (dk.deadkeyName !== deadkeyName) {
         continue;
       }
-      const bases = [...(typeof sv["baseLetters"] === "string" ? sv["baseLetters"] : "")];
-      const outputs = [...(typeof sv["accentedForms"] === "string" ? sv["accentedForms"] : "")];
-      bases.forEach((b, i) => {
-        const out = outputs[i];
-        if (out === undefined) return;
-        if (!dk.outputsByBase.has(b)) dk.outputsByBase.set(b, out);
-        dk.purposes.add(deadkeyPurposeOf(out));
-      });
+      for (const { base, output } of deadkeyPairsOfSlots(m.patternId, sv)) {
+        if (!dk.outputsByBase.has(base)) dk.outputsByBase.set(base, output);
+        dk.purposes.add(deadkeyPurposeOf(output));
+      }
     }
   }
   return byTrigger;
@@ -199,7 +195,7 @@ export function recordedDeadkeyEscapes(
   for (const a of sessionAssignments) {
     for (const m of a.mechanisms) {
       const sv = m.slotValues ?? {};
-      if (m.patternId === PATTERN_DEADKEY && sv["deadkeyName"] === deadkeyName && typeof sv["escapes"] === "string") {
+      if (isDeadkeyPatternId(m.patternId) && sv["deadkeyName"] === deadkeyName && typeof sv["escapes"] === "string") {
         return parseDeadkeyEscapes(sv["escapes"]);
       }
     }
@@ -217,7 +213,7 @@ export function rememberedDeadkeyEscapes(
   for (let i = sessionAssignments.length - 1; i >= 0; i--) {
     for (const m of sessionAssignments[i]!.mechanisms) {
       const escapes = m.slotValues?.["escapes"];
-      if (m.patternId === PATTERN_DEADKEY && typeof escapes === "string") {
+      if (isDeadkeyPatternId(m.patternId) && typeof escapes === "string") {
         return parseDeadkeyEscapes(escapes);
       }
     }

@@ -130,7 +130,11 @@ const show = (s: string): string =>
 function g1(input: GateInput): GateResult {
   if (!atOrAfter(input.point, "assignments")) return notApplicable("G1", "applies at assignments and later");
   const hits = input.compileDiagnostics.filter((d) => UNREACHABLE_CODES.has(d.code));
-  return result("G1", hits.length === 0 ? [] : [`${hits.length} unreachable-rule hint(s)`]);
+  if (hits.length === 0) return result("G1", []);
+  const lines = (readVfsText(input.vfs, `source/${input.keyboardId}.kmn`) ?? "").split(/\r?\n/);
+  const where = [...new Set(hits.map((d) => d.location?.line))]
+    .map((n) => (n === undefined ? "?" : `${n}: ${lines[n - 1]?.trim() ?? ""}`));
+  return result("G1", [`${hits.length} unreachable-rule hint(s)`, ...where]);
 }
 
 async function g2(input: GateInput, ir: KeyboardIR | undefined): Promise<GateResult> {

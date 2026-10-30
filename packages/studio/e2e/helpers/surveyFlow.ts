@@ -667,8 +667,11 @@ export async function carveCharacter(page: Page, ch: string): Promise<void> {
     .join(" ");
   const cells = page.getByTestId("carve-gallery").locator(`button[aria-label*="— ${label}"]`);
   await expect(cells.first()).toBeVisible({ timeout: 30_000 });
-  await expect(cells.first()).toHaveAttribute("aria-pressed", "false");
-  await cells.first().click();
+  // Spec 106 FR-042: a suggested-to-discard character arrives marked for
+  // discard (carve-continue applies it), so it needs no click.
+  if ((await cells.first().getAttribute("aria-pressed")) !== "true") {
+    await cells.first().click();
+  }
   const count = await cells.count();
   for (let i = 0; i < count; i++) {
     await expect(cells.nth(i)).toHaveAttribute("aria-pressed", "true");
