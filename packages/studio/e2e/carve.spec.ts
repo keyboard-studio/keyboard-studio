@@ -204,9 +204,10 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     // confirm. No search box to narrow through (#1619 AC4 removed it).
     const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
     await expect(targetCell).toBeVisible();
-    await expect(targetCell).toHaveAttribute("aria-pressed", "false");
-
-    await targetCell.click();
+    // Spec 106 FR-042: a suggested discard arrives already discarded.
+    if ((await targetCell.getAttribute("aria-pressed")) !== "true") {
+      await targetCell.click();
+    }
     await expect(targetCell).toHaveAttribute("aria-pressed", "true");
 
     // ---------------------------------------------------------------------
@@ -358,10 +359,14 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     const carveGallery = page.getByTestId("carve-gallery");
     await expect(carveGallery).toBeVisible({ timeout: 30_000 });
 
-    // Confirm the target cell is present and not (yet) discarded, but do NOT
-    // click it — this is the "nothing carved" control path.
-    const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
+    // Confirm the target cell is present and kept — the "nothing carved"
+    // control path. Spec 106 FR-042: if it arrived as a suggested discard
+    // (the carve default), one click keeps it.
+    const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`).first();
     await expect(targetCell).toBeVisible();
+    if ((await targetCell.getAttribute("aria-pressed")) === "true") {
+      await targetCell.click();
+    }
     await expect(targetCell).toHaveAttribute("aria-pressed", "false");
 
     await expect

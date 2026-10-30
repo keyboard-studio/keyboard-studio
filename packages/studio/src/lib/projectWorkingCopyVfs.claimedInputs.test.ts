@@ -45,13 +45,13 @@ function swap(kmnRules: string): MechanismAssignment {
   };
 }
 
-function project(assignments: MechanismAssignment[], fallbackPolicy?: FallbackPolicy): string {
+function project(assignments: MechanismAssignment[], fallbackPolicy?: FallbackPolicy, kmn: string = KMN): string {
   const vfs = createVirtualFS();
-  vfs.set("source/projected.kmn", KMN, false);
+  vfs.set("source/projected.kmn", kmn, false);
   projectWorkingCopyVfs({
     vfs,
     keyboardId: "projected",
-    startIr: parseKmn(KMN, "projected").ir,
+    startIr: parseKmn(kmn, "projected").ir,
     deletedNodeIds: new Set(),
     assignments,
     getPattern: (id) => (id === SWAP.id ? SWAP : undefined),
@@ -86,5 +86,21 @@ describe("projectWorkingCopyVfs — claimed inputs (spec 106 US4)", () => {
   it("is a plain removal under a fallback policy, never a suppression rule", () => {
     const out = lines(project([swap("+ [K_QUOTE] > U+2019")], "swallow"));
     expect(out.filter((l) => l.startsWith("+ [K_QUOTE] >"))).toEqual(["+ [K_QUOTE] > U+2019"]);
+  });
+
+  it("drops a shadowed starting deadkey trigger but keeps its dk() compositions (FR-041)", () => {
+    const withDeadkey = [
+      "store(&NAME) 'Projected'",
+      "store(&VERSION) '14.0'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [K_COLON] > dk(1)",
+      "dk(1) + [K_A] > U+00E4",
+      "",
+    ].join("\n");
+    const out = lines(project([swap("+ [K_COLON] > U+025B")], undefined, withDeadkey));
+    expect(out).toContain("+ [K_COLON] > U+025B");
+    expect(out.filter((l) => l.startsWith("+ [K_COLON] > dk("))).toEqual([]);
+    expect(out.some((l) => l.startsWith("dk(") && l.endsWith("> U+00E4"))).toBe(true);
   });
 });

@@ -29,6 +29,8 @@ import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import type { CharContributors } from '@keyboard-studio/engine';
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import { currentCarvedLayoutValue, isUntouchedSuggestion } from '../../survey/carve/carveValue.ts';
+import { CarveAdapter } from '../adapters/carveAdapter.tsx';
+import { useDecisionStore } from '../../stores/decisionStore.ts';
 
 const { collectCharContributorsMock, neededCharsResult, recommendedRemovalCharsMock } = vi.hoisted(() => {
   let _needed: Set<string> | null = null;
@@ -1052,7 +1054,7 @@ describe('CarveGalleryV2 — suggested discards as the default (spec 106 T039)',
     const value = currentCarvedLayoutValue();
     expect(value.removals.length).toBeGreaterThan(0);
     expect(value.removals.every((r) => r.provenance === 'derived')).toBe(true);
-    expect(value.suggestionFingerprint).toBe('C');
+    expect(value.suggestionFingerprint).toBe('["C"]');
     expect(isUntouchedSuggestion(value, suggestion)).toBe(true);
   });
 
@@ -1122,10 +1124,64 @@ describe('CarveGalleryV2 — the suggested default stands only once confirmed (s
 
     fireEvent.click(screen.getByTestId('carve-continue'));
     expect(onComplete).toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().carveSuggestion?.confirmed).toBe(true);
+    const cs = useWorkingCopyStore.getState().carveSuggestion;
+    expect(cs?.confirmed).toEqual(cs?.derived);
 
     fireEvent.click(screen.getByTestId('carve-back'));
     expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+  });
+
+  it('a suggestion arriving after Continue is withdrawn by Back; the approved rows stay', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderWithNav();
+    await screen.findByTestId('carve-v2-suggested-group');
+    fireEvent.click(screen.getByTestId('carve-continue'));
+
+    const real = recommendedRemovalCharsMock.getMockImplementation();
+    recommendedRemovalCharsMock.mockImplementation(() => [makeRow('C', ['r-shiftc']), makeRow('a', ['r-a'])]);
+    try {
+      // Any session change re-derives the suggestion set; 'a' is new to it.
+      act(() => {
+        useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: ['z'] });
+      });
+      await waitFor(() => expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true));
+
+      fireEvent.click(screen.getByTestId('carve-back'));
+      expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+      expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    } finally {
+      recommendedRemovalCharsMock.mockImplementation(real!);
+    }
+  });
+
+  it('Skip keeps everything and confirms an empty default', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderWithNav();
+    await screen.findByTestId('carve-v2-suggested-group');
+
+    fireEvent.click(screen.getByTestId('carve-skip'));
+    expect(currentCarvedLayoutValue().removals).toEqual([]);
+    expect(useWorkingCopyStore.getState().carveSuggestion?.confirmed).toEqual([]);
+  });
+
+  it('the adapter records carved-layout as default when untouched, asked after a Keep', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    const first = render(<CarveAdapter onComplete={vi.fn()} />, { withStepNav: true });
+    await screen.findByTestId('carve-v2-suggested-group');
+    fireEvent.click(screen.getByTestId('carve-continue'));
+    expect(useDecisionStore.getState().decisions['carved-layout']?.provenance).toBe('default');
+    first.unmount();
+
+    render(<CarveAdapter onComplete={vi.fn()} />, { withStepNav: true });
+    const group = await screen.findByTestId('carve-v2-suggested-group');
+    fireEvent.click(within(group).getByRole('button', { name: /^C — U\+0043/ }));
+    fireEvent.click(screen.getByTestId('carve-continue'));
+    expect(useDecisionStore.getState().decisions['carved-layout']?.provenance).toBe('asked');
   });
 
   it("a row the author kept and discarded again is the author's, not the suggestion's", async () => {

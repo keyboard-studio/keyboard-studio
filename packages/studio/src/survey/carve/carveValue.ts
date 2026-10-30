@@ -62,6 +62,39 @@ export function removalKey(item: Pick<CarveRemovalItem, "kind" | "id">): string 
   return `${item.kind}:${item.id}`;
 }
 
+/**
+ * Split removal keys back into the two restore channels: item/node ids and
+ * carved characters (the inverse of {@link removalKey}, for cascadeRestore).
+ */
+export function partitionRemovalKeys(keys: readonly string[]): {
+  ids: string[];
+  chars: string[];
+} {
+  const ids: string[] = [];
+  const chars: string[] = [];
+  for (const key of keys) {
+    const id = key.slice(key.indexOf(":") + 1);
+    if (key.startsWith("char:")) chars.push(id);
+    else ids.push(id);
+  }
+  return { ids, chars };
+}
+
+/** The fingerprint of a suggestion set: its NFC characters, sorted. */
+export function suggestionFingerprintOf(chars: readonly string[]): string {
+  return JSON.stringify([...new Set(chars.map((c) => c.normalize("NFC")))].sort());
+}
+
+/** The characters a {@link suggestionFingerprintOf} fingerprint names. */
+export function suggestedCharsOf(fingerprint: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(fingerprint);
+    return Array.isArray(parsed) ? parsed.filter((c): c is string => typeof c === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family", "char"];
 
 /**

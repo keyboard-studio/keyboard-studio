@@ -11,7 +11,13 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { currentCarvedLayoutValue, removalKey } from '../../survey/carve/carveValue.ts';
+import {
+  currentCarvedLayoutValue,
+  partitionRemovalKeys,
+  removalKey,
+  suggestedCharsOf,
+  suggestionFingerprintOf,
+} from '../../survey/carve/carveValue.ts';
 import { resolveCarvedCombos } from '../../lib/carvedCombo.ts';
 import { ReviewCarvedKeysDialog } from './ReviewCarvedKeys.tsx';
 import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
@@ -887,7 +893,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const carveSuggestion = useWorkingCopyStore((s) => s.carveSuggestion);
   const setCarveSuggestion = useWorkingCopyStore((s) => s.setCarveSuggestion);
   const suggestionFingerprint = useMemo(
-    () => primaryRows.map((r) => r.ch.normalize('NFC')).sort().join(' '),
+    () => suggestionFingerprintOf(primaryRows.map((r) => r.ch)),
     [primaryRows],
   );
   useEffect(() => {
@@ -907,12 +913,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     const kept = (applied?.derived ?? []).filter(isCurrent);
     const stale = (applied?.derived ?? []).filter((k) => !isCurrent(k));
     if (stale.length > 0) {
-      const ids = stale.filter((k) => !k.startsWith('char:')).map((k) => k.slice(k.indexOf(':') + 1));
-      const chars = stale.filter((k) => k.startsWith('char:')).map((k) => k.slice('char:'.length));
+      const { ids, chars } = partitionRemovalKeys(stale);
       cascadeRestore(ids, chars);
     }
 
-    const previouslySuggested = new Set(applied?.fingerprint.split(' ').filter((c) => c !== '') ?? []);
+    const previouslySuggested = new Set(applied !== null ? suggestedCharsOf(applied.fingerprint) : []);
     const before = new Set(currentCarvedLayoutValue().removals.map(removalKey));
     toggleRecommendedRows(
       primaryRows.filter(
@@ -921,15 +926,18 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       true,
     );
     const added = currentCarvedLayoutValue().removals.map(removalKey).filter((k) => !before.has(k));
-    // The effect's own restores are not author actions: keep the prior touched state.
+    // The effect's own restores are not author actions: keep the prior
+    // touched state, and the approval of every still-suggested row.
+    const confirmed = (applied?.confirmed ?? []).filter(isCurrent);
     setCarveSuggestion({
       fingerprint: suggestionFingerprint,
       derived: [...kept, ...added],
       ...(applied?.touched === true ? { touched: true } : {}),
+      ...(confirmed.length > 0 ? { confirmed } : {}),
     });
   }, [recommendationReady, primaryRows, suggestionFingerprint, toggleRecommendedRows, cascadeRestore, isItemDeleted, setCarveSuggestion]);
   const derivedIds = useMemo(
-    () => new Set((carveSuggestion?.derived ?? []).map((k) => k.slice(k.indexOf(':') + 1))),
+    () => new Set(partitionRemovalKeys(carveSuggestion?.derived ?? []).ids),
     [carveSuggestion],
   );
   const isDerivedRow = useCallback(
@@ -1153,25 +1161,43 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // The nav ids are the ones Carve v1 used, restored so their existing
   // translations come back (FR-044).
   // Spec 106 FR-042 / Art. X: the suggested default stands only once the
-  // author continues. Continue (or Skip) confirms it; Back before that
-  // withdraws the unconfirmed default, so leaving carve backwards never
-  // carries removals nobody approved. The next visit proposes it again.
+  // author continues. Continue (or Skip) approves every derived removal;
+  // Back withdraws the ones not yet approved (a first visit, or a
+  // suggestion that arrived after the last Continue), so leaving carve
+  // backwards never carries removals nobody approved. Withdrawn rows leave
+  // the fingerprint, so the next visit proposes them again.
   const confirmSuggestion = useCallback(() => {
     const cs = useWorkingCopyStore.getState().carveSuggestion;
-    if (cs !== null && cs.confirmed !== true) setCarveSuggestion({ ...cs, confirmed: true });
+    if (cs !== null) setCarveSuggestion({ ...cs, confirmed: [...cs.derived] });
   }, [setCarveSuggestion]);
   const handleBack = useCallback(() => {
     const cs = useWorkingCopyStore.getState().carveSuggestion;
-    if (cs !== null && cs.confirmed !== true) {
-      const strip = (k: string): string => k.slice(k.indexOf(':') + 1);
-      cascadeRestore(
-        cs.derived.filter((k) => !k.startsWith('char:')).map(strip),
-        cs.derived.filter((k) => k.startsWith('char:')).map(strip),
-      );
-      setCarveSuggestion(null);
+    if (cs !== null) {
+      const approved = new Set(cs.confirmed ?? []);
+      const pending = cs.derived.filter((k) => !approved.has(k));
+      if (pending.length > 0) {
+        const { ids, chars } = partitionRemovalKeys(pending);
+        cascadeRestore(ids, chars);
+        const pendingIds = new Set(ids);
+        const withdrawn = new Set(
+          primaryRows
+            .filter((r) => recommendedRowIds(r).some((id) => pendingIds.has(id)))
+            .map((r) => r.ch.normalize('NFC')),
+        );
+        const remaining = suggestedCharsOf(cs.fingerprint).filter((c) => !withdrawn.has(c));
+        setCarveSuggestion(
+          approved.size === 0
+            ? null
+            : {
+              ...cs,
+              fingerprint: suggestionFingerprintOf(remaining),
+              derived: cs.derived.filter((k) => approved.has(k)),
+            },
+        );
+      }
     }
     onBack?.();
-  }, [cascadeRestore, setCarveSuggestion, onBack]);
+  }, [cascadeRestore, setCarveSuggestion, primaryRows, onBack]);
   const handleContinue = useCallback(() => {
     confirmSuggestion();
     onComplete();

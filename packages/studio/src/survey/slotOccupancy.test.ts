@@ -10,6 +10,7 @@ import {
   classifySlot,
   displacedFor,
   isProducedOnOtherSlot,
+  mechanismClaimedSlots,
   orthographyTier,
   slotKeyFor,
   type NeedSets,
@@ -369,5 +370,48 @@ describe("orthographyTier", () => {
   it("base-produced characters outside the inventory are convenience; the rest none", () => {
     expect(orthographyTier("-", needs)).toBe("convenience");
     expect(orthographyTier("q", needs)).toBe("none");
+  });
+});
+
+describe("mechanismClaimedSlots (spec 106 US4)", () => {
+  it("an S-08 claims every keystroke of a multi-key list, whatever its outputs", () => {
+    const slots = mechanismClaimedSlots({
+      patternId: "modifier_as_layer_switch",
+      strategyId: "S-08",
+      slotValues: { altgrKeyList: "[RALT K_E] [RALT SHIFT K_E]", altgrOutputList: "éÉ" },
+    });
+    expect(slots).toEqual([
+      { vkey: "K_E", modifiers: ["RALT"] },
+      { vkey: "K_E", modifiers: ["SHIFT", "RALT"] },
+    ]);
+  });
+
+  it("an S-02 claims its trigger, and RALT trigger only with the altgr escape", () => {
+    const dk = (escapes?: string) => ({
+      patternId: "deadkey_single_tap",
+      strategyId: "S-02" as const,
+      slotValues: { triggerKey: "K_COLON", ...(escapes !== undefined ? { escapes } : {}) },
+    });
+    expect(mechanismClaimedSlots(dk())).toEqual([{ vkey: "K_COLON", modifiers: [] }]);
+    expect(mechanismClaimedSlots(dk("double-tap space altgr"))).toEqual([
+      { vkey: "K_COLON", modifiers: [] },
+      { vkey: "K_COLON", modifiers: ["RALT"] },
+    ]);
+  });
+
+  it("postfix_compose claims its mark key only with the bare escape", () => {
+    const pc = (escapes: string) => ({
+      patternId: "postfix_compose",
+      strategyId: "S-03" as const,
+      slotValues: { markKey: "K_5", escapes },
+    });
+    expect(mechanismClaimedSlots(pc("bare"))).toEqual([{ vkey: "K_5", modifiers: [] }]);
+    expect(mechanismClaimedSlots(pc(""))).toEqual([]);
+  });
+
+  it("a plain S-03 sequence claims nothing", () => {
+    expect(
+      mechanismClaimedSlots({ patternId: "multi_char_sequence", strategyId: "S-03", slotValues: {} }),
+    ).toEqual([]);
   });
 });

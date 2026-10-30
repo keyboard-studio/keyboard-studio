@@ -216,6 +216,15 @@ function isRaltMechanism(mech: MechanismLike): boolean {
   );
 }
 
+function isDeadkeyMechanism(mech: MechanismLike): boolean {
+  return mech.strategyId === "S-02" || mech.patternId.startsWith("deadkey_single_tap");
+}
+
+/** postfix_compose is S-03 like a plain sequence, so it is told by pattern id. */
+function isPostfixMechanism(mech: MechanismLike): boolean {
+  return mech.patternId === "postfix_compose";
+}
+
 /**
  * The slots ONE recorded mechanism writes, parsed from its slotValues.
  * S-01: each kmnRules line is `+ [MODS K_X] > U+XXXX` (an NFD output carries
@@ -339,7 +348,7 @@ export function mechanismClaimedSlots(mech: MechanismLike): ClaimedSlot[] {
       claimFor(m[0]),
     );
   }
-  if (mech.strategyId === "S-02" || mech.patternId.startsWith("deadkey_single_tap")) {
+  if (isDeadkeyMechanism(mech)) {
     const trigger = (slots["triggerKey"] ?? "").trim();
     if (trigger === "") return [];
     return [
@@ -347,7 +356,7 @@ export function mechanismClaimedSlots(mech: MechanismLike): ClaimedSlot[] {
       ...(escapeTokens(mech).has("altgr") ? claimFor(`[RALT ${trigger}]`) : []),
     ];
   }
-  if (mech.patternId === "postfix_compose") {
+  if (isPostfixMechanism(mech)) {
     const markKey = (slots["markKey"] ?? "").trim();
     if (markKey === "" || !escapeTokens(mech).has("bare")) return [];
     return claimFor(`[${markKey}]`);

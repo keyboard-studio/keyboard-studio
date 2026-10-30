@@ -11,13 +11,14 @@
 // decision — the working copy's carve overlay as one value (the
 // base-keyboard precedent: editor steps record their own decision;
 // the record-from-working-copy precedent is ratified by D-090-31).
-// Spec 106 FR-042: while the removals are exactly the gallery's suggested
-// default, Continue approves it and the decision is `default`-provenance;
-// once the author has changed anything it is `asked`.
 // The decision module's renderer
 // (survey/carve/CarveDecisionRenderer) is the same gallery hosted by
 // the decision host: it reports the value through onChange on
 // completion instead of recording directly.
+//
+// Spec 106 FR-042: while the removals are exactly the gallery's suggested
+// default, Continue approves it and the decision is `default`-provenance;
+// once the author has changed anything it is `asked`.
 
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";

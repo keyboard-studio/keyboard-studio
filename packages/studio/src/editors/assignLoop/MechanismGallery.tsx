@@ -2272,11 +2272,9 @@ export function MechanismGallery({
       // frequency data exists, so tier decides): both core → neither by
       // default; core incumbent + non-core incoming → the INCOMING char
       // loses the primary slot; otherwise the incumbent is demoted.
-      // Note: "demote-incoming" cannot fire from today's walk — every
-      // selectable currentChar is a confirmed-inventory member, so
-      // incomingTier is never "convenience" here. The direction is
-      // fully wired for a future surface that places non-inventory
-      // characters (follow-up #6 in the Cycle 2 report owns it).
+      // "demote-incoming" fires when a punctuation, digit or symbol
+      // currentChar (convenience even in the inventory: punctuation is
+      // never core, spec 106 FR-043) lands on a core letter's slot.
       const displacedTier = orthographyTier(displaced.char, needSets);
       const incomingTier = orthographyTier(currentChar, needSets);
       const direction =

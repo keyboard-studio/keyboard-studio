@@ -166,12 +166,16 @@ async function carveCharacters(page: Page, chars: readonly string[]): Promise<vo
   for (const ch of chars) {
     const glyph = page.getByRole("button", { name: new RegExp(`^${ch}\\s`, "u") });
     await expect(glyph).toBeVisible();
+    // Spec 106 FR-042: a suggested discard arrives already discarded.
+    if ((await glyph.getAttribute("aria-pressed")) === "true") continue;
     await glyph.click();
   }
 
   // Sanity check that the survivor was never touched.
   const survivor = page.getByRole("button", { name: new RegExp(`^${SURVIVOR_CHAR}\\s`, "u") });
   await expect(survivor).toBeVisible();
+  // A survivor that arrived as a suggested discard is kept explicitly.
+  if ((await survivor.getAttribute("aria-pressed")) === "true") await survivor.click();
   await expect(survivor).toHaveAttribute("aria-pressed", "false");
 
   await page.getByTestId("carve-continue").click();

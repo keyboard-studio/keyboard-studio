@@ -356,8 +356,8 @@ export interface CarveSuggestionApplied {
   derived: string[];
   /** True once the author restored anything (keep, restore all, undo). */
   touched?: boolean;
-  /** True once the author continued past carve: the default is approved. */
-  confirmed?: boolean;
+  /** The derived removal keys the author approved by continuing past carve. */
+  confirmed?: string[];
 }
 
 /**
@@ -375,7 +375,12 @@ function pruneCarveSuggestion(
     ...ids.flatMap((id) => [`item:${id}`, `node:${id}`]),
     ...chars.map((c) => `char:${c.normalize("NFC")}`),
   ]);
-  return { ...cs, derived: cs.derived.filter((k) => !gone.has(k)), touched: true };
+  return {
+    ...cs,
+    derived: cs.derived.filter((k) => !gone.has(k)),
+    ...(cs.confirmed !== undefined ? { confirmed: cs.confirmed.filter((k) => !gone.has(k)) } : {}),
+    touched: true,
+  };
 }
 
 export interface WorkingCopyState {
@@ -2016,7 +2021,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       carveSuggestion:
         s.carveSuggestion === null
           ? null
-          : { ...s.carveSuggestion, derived: [], touched: true },
+          : { ...s.carveSuggestion, derived: [], confirmed: [], touched: true },
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
