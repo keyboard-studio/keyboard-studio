@@ -446,6 +446,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // 076 FR-023 T020 keep-inert overrides: plain JSON-safe string array,
     // same passthrough + tolerant-read idiom as axisFills above.
     carveTouchKeepInert: s.carveTouchKeepInert,
+    displacedDeclined: s.displacedDeclined,
     // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
@@ -622,6 +623,7 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // here and never re-prompted.
     fallbackPolicy: migrateFallbackPolicy(snapshot),
     carveTouchKeepInert: snapshot.carveTouchKeepInert ?? [],
+    displacedDeclined: snapshot.displacedDeclined ?? [],
     // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.

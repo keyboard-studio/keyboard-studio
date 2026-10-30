@@ -52,6 +52,7 @@ import {
   contextHasDirectBackspace,
 } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
+import { isAlwaysKeepCategory } from "../lib/irToCarveNodes.ts";
 
 // ---------------------------------------------------------------------------
 // Slot identity
@@ -420,17 +421,22 @@ export function classifySlot(
  * that data. A convenience character would lose to core-orthography."
  * Never pretend a frequency ranking happened.
  *
- *   - "core"        — in the author's confirmed inventory: part of the
- *                     target orthography the author declared
- *                     (= the needed-frequent need class).
+ *   - "core"        — a letter or mark in the author's confirmed
+ *                     inventory: part of the target orthography the
+ *                     author declared.
  *   - "convenience" — base-produced and retained (spec-075 punctuation
  *                     defaults, loanword / URL / name coverage) but NOT
- *                     in the confirmed inventory (= needed-rare).
+ *                     in the confirmed inventory, AND every digit,
+ *                     punctuation mark or symbol (the carve always-keep
+ *                     categories) even when it is in the inventory.
  *   - "none"        — produced nowhere / in no need set.
  *
- * This maps the existing need classes onto tiers rather than building a
- * parallel classification: needed-frequent IS core, needed-rare IS
- * convenience.
+ * Punctuation is never core (owner ruling 2026-10-29, spec 106 FR-043):
+ * the punctuation step puts `'` in the inventory, and `’` taking its key
+ * was then a both-core standoff whose default demoted nothing, leaving
+ * `'` shadowed with no key. As convenience, an overwritten `'` gets the
+ * ordinary "move it to AltGr" proposal. A script that writes a letter
+ * with `'` should record that letter as ʼ (U+02BC), which stays core.
  */
 export type OrthographyTier = "core" | "convenience" | "none";
 
@@ -439,15 +445,10 @@ export function orthographyTier(
   needSets: NeedSets,
 ): OrthographyTier {
   const ch = char.normalize("NFC");
-  if (needSets.confirmedInventory.has(ch)) return "core";
+  if (needSets.confirmedInventory.has(ch)) {
+    return isAlwaysKeepCategory(ch) ? "convenience" : "core";
+  }
   if (needSets.baseProducedSet.has(ch)) return "convenience";
-  return "none";
-}
-
-/** The tier a slot classification's incumbent sits at. */
-export function tierForNeedKind(kind: SlotNeedKind): OrthographyTier {
-  if (kind === "needed-frequent") return "core";
-  if (kind === "needed-rare") return "convenience";
   return "none";
 }
 

@@ -18,6 +18,13 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 /** The physical-layout decision value (data-model.md). */
 export interface PhysicalLayoutValue {
   assignments: MechanismAssignment[];
+  /**
+   * Displacements the author declined (spec 106 FR-043): each entry is
+   * `displaced|vkey|sorted-modifiers`, a still-needed character left
+   * without a new key. Absent when there are none, so values recorded
+   * before the field existed are unchanged.
+   */
+  displacedDeclined?: string[];
 }
 
 /**
@@ -39,13 +46,16 @@ export interface PhysicalLayoutValue {
  */
 export function physicalLayoutValueFromPhaseResults(
   phaseResults: Parameters<typeof selectDesktopAssignments>[0],
+  displacedDeclined: readonly string[] = [],
 ): PhysicalLayoutValue {
-  return { assignments: [...selectDesktopAssignments(phaseResults)] };
+  return {
+    assignments: [...selectDesktopAssignments(phaseResults)],
+    ...(displacedDeclined.length > 0 ? { displacedDeclined: [...displacedDeclined].sort() } : {}),
+  };
 }
 
 /** The physical-layout value from the live working copy. */
 export function currentPhysicalLayoutValue(): PhysicalLayoutValue {
-  return physicalLayoutValueFromPhaseResults(
-    useWorkingCopyStore.getState().phaseResults,
-  );
+  const s = useWorkingCopyStore.getState();
+  return physicalLayoutValueFromPhaseResults(s.phaseResults, s.displacedDeclined);
 }

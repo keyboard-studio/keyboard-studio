@@ -19,14 +19,17 @@
 // same Apply that raises a case-pair companion, and the two banners
 // co-render (the SiblingAccent precedent).
 //
-// "Leave it" is an explicit, recorded choice: dismiss() remembers the
-// dismissal in component state (keyed by displaced glyph + slot), so the
-// same displacement is not re-proposed on a later apply in this gallery
-// visit. The dismissal records NO assignment — the honest consequence
-// (the glyph stays shadowed on that key) is stated in the banner copy.
+// "Leave it" is an explicit, recorded choice: dismiss() records the
+// dismissal (keyed by displaced glyph + slot) in the working copy's
+// `displacedDeclined` list (spec 106 FR-043), which persists with the
+// draft and rides the physical-layout decision, so the same displacement
+// is not re-proposed and the loss is on the record. The dismissal records
+// NO assignment — the honest consequence (the glyph stays shadowed on
+// that key) is stated in the banner copy.
 
 import { useCallback, useState } from "react";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
 export interface DisplacementProposal {
   /** The glyph that was displaced from its slot. */
@@ -67,7 +70,7 @@ export interface UseDisplacementProposal {
   proposal: DisplacementProposal | null;
   /** Raise a proposal, or do nothing when suppressed / already dismissed. */
   propose: (input: DisplacementProposalInput) => boolean;
-  /** "Leave it": record the dismissal in component state and clear. */
+  /** "Leave it": record the dismissal in the working copy and clear. */
   dismiss: () => void;
   /** Clear without recording a dismissal (caller confirmed, or stale). */
   clear: () => void;
@@ -75,6 +78,7 @@ export interface UseDisplacementProposal {
   rebase: (from: MechanismAssignment, to: MechanismAssignment) => void;
 }
 
+/** The `displacedDeclined` key: displaced glyph, vkey, sorted modifiers. */
 function dismissalKey(p: {
   displacedChar: string;
   vkey: string;
@@ -85,35 +89,24 @@ function dismissalKey(p: {
 
 export function useDisplacementProposal(): UseDisplacementProposal {
   const [proposal, setProposal] = useState<DisplacementProposal | null>(null);
-  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(
-    () => new Set<string>(),
-  );
+  const declined = useWorkingCopyStore((s) => s.displacedDeclined);
+  const declineDisplacement = useWorkingCopyStore((s) => s.declineDisplacement);
 
   const propose = useCallback(
     (input: DisplacementProposalInput): boolean => {
       const { alreadyDemoted, ...parts } = input;
       if (alreadyDemoted?.() === true) return false;
-      if (dismissed.has(dismissalKey(parts))) return false;
+      if (declined.includes(dismissalKey(parts))) return false;
       setProposal(parts);
       return true;
     },
-    [dismissed],
+    [declined],
   );
 
   const dismiss = useCallback(() => {
-    setProposal((current) => {
-      if (current !== null) {
-        setDismissed((prev) => {
-          const key = dismissalKey(current);
-          if (prev.has(key)) return prev;
-          const next = new Set(prev);
-          next.add(key);
-          return next;
-        });
-      }
-      return null;
-    });
-  }, []);
+    if (proposal !== null) declineDisplacement(dismissalKey(proposal));
+    setProposal(null);
+  }, [proposal, declineDisplacement]);
 
   const clear = useCallback(() => setProposal(null), []);
   const rebase = useCallback((from: MechanismAssignment, to: MechanismAssignment) => {

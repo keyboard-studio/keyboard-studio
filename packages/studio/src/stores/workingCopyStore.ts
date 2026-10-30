@@ -672,6 +672,19 @@ export interface WorkingCopyState {
   /** Set the keep-inert character set for carved touch keys (replaces wholesale). */
   setCarveTouchKeepInert: (chars: string[]) => void;
 
+  /**
+   * Declined displacement proposals (spec 106 FR-043): each entry is
+   * `displaced|vkey|sorted-modifiers`, written when the author leaves a
+   * displaced character without a new key ("Leave it" / "Keep both"). The
+   * gallery does not re-propose a declined displacement, and the
+   * physical-layout decision records the list, so the loss is a recorded
+   * choice rather than a silent one.
+   */
+  displacedDeclined: string[];
+
+  /** Record one declined displacement (idempotent). */
+  declineDisplacement: (key: string) => void;
+
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
@@ -1534,6 +1547,7 @@ function freshInstantiationTail() {
     // dev's older tracks) resurrects them in the store state.
     fallbackPolicy: DEFAULT_FALLBACK_POLICY,
     carveTouchKeepInert: [],
+    displacedDeclined: [],
     // Spec 104 identity records are per-working-copy too: a fresh start
     // has no severances, no transplants and no guard answer yet.
     keyIdentityDecisions: [],
@@ -1627,6 +1641,7 @@ export type WorkingCopyData = Omit<
   | "cascadeRestore"
   | "setFallbackPolicy"
   | "setCarveTouchKeepInert"
+  | "declineDisplacement"
   | "recordPhase"
   | "recordAssignments"
   | "setIrAxes"
@@ -1721,6 +1736,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // keyboard-wide fallback policy (076 FR-019): flat swallow default
   fallbackPolicy: DEFAULT_FALLBACK_POLICY,
   carveTouchKeepInert: [],
+  displacedDeclined: [],
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
@@ -2033,6 +2049,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // comparison stays exact.
   setCarveTouchKeepInert: (chars) =>
     set({ carveTouchKeepInert: chars.map((c) => c.normalize("NFC")) }),
+
+  declineDisplacement: (key) =>
+    set((s) =>
+      s.displacedDeclined.includes(key)
+        ? s
+        : { displacedDeclined: [...s.displacedDeclined, key] },
+    ),
 
   // -- surveyResultsStore actions --------------------------------------------
 

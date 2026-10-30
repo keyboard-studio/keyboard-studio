@@ -10,6 +10,7 @@ import {
   classifySlot,
   displacedFor,
   isProducedOnOtherSlot,
+  orthographyTier,
   slotKeyFor,
   type NeedSets,
 } from "./slotOccupancy.ts";
@@ -345,5 +346,28 @@ describe("classifySlot / displacedFor", () => {
     expect(isProducedOnOtherSlot(occ2, "'", "K_QUOTE|")).toBe(true);
     expect(isProducedOnOtherSlot(occ, "'", "K_QUOTE|")).toBe(false);
     void noNeeds;
+  });
+});
+
+describe("orthographyTier", () => {
+  const needs: NeedSets = {
+    confirmedInventory: new Set(["ə", "ʼ", "'", "’", "5"]),
+    baseProducedSet: new Set(["a", "'", "-"]),
+  };
+
+  it("an inventory letter is core, including the modifier-letter apostrophe ʼ", () => {
+    expect(orthographyTier("ə", needs)).toBe("core");
+    expect(orthographyTier("ʼ", needs)).toBe("core");
+  });
+
+  it("inventory punctuation and digits are convenience, never core (spec 106 FR-043)", () => {
+    expect(orthographyTier("'", needs)).toBe("convenience");
+    expect(orthographyTier("’", needs)).toBe("convenience");
+    expect(orthographyTier("5", needs)).toBe("convenience");
+  });
+
+  it("base-produced characters outside the inventory are convenience; the rest none", () => {
+    expect(orthographyTier("-", needs)).toBe("convenience");
+    expect(orthographyTier("q", needs)).toBe("none");
   });
 });

@@ -87,8 +87,10 @@ describe("scoreCandidate — ʔ onto a still-used apostrophe (gate G2)", () => {
     priorCount: 0,
     confidence: 0.85,
   };
-  // ' is in the confirmed inventory here (core) and so is ʔ — the
-  // both-core case of steer 2: G2 fires, but no demotion victim is picked.
+  // ' is in the confirmed inventory here and so is ʔ. G2 still fires (the
+  // slot's glyph is used in words), but punctuation is never core (owner
+  // ruling 2026-10-29, spec 106 FR-043): ' is the convenience incumbent and
+  // moves to AltGr, so it is never left without a key.
   const scored = scoreCandidate(glottal, "ʔ", ctx(occupancy, ["'", "ʔ"], ["'"]));
 
   it("scores 0 occupied points and fires G2", () => {
@@ -98,12 +100,23 @@ describe("scoreCandidate — ʔ onto a still-used apostrophe (gate G2)", () => {
     expect(scored.incumbent).toEqual({ char: "'", need: "needed-frequent" });
   });
 
-  it("picks NO demotion victim when both are core (frequency data would be needed)", () => {
+  it("demotes the inventory ' to AltGr: punctuation is never core", () => {
+    expect(scored.incumbentTier).toBe("convenience");
+    expect(scored.incomingTier).toBe("core");
     expect(scored.demotion?.method).toBe("ralt");
-    expect(scored.demotion?.target).toBe("none");
-    const line = buildRationaleLine(scored, "ʔ");
+    expect(scored.demotion?.target).toBe("incumbent");
+    expect(buildRationaleLine(scored, "ʔ")).toMatch(/' moves to AltGr/);
+  });
+
+  it("two inventory letters on one key are still both-core (no frequency data)", () => {
+    const both = scoreCandidate(
+      { ...glottal, vkey: "K_N" },
+      "ñ",
+      ctx({ "K_N|": { char: "n", source: "base" } }, ["n", "ñ"], ["n"]),
+    );
+    expect(both.demotion?.target).toBe("none");
+    const line = buildRationaleLine(both, "ñ");
     expect(line).toMatch(/part of your alphabet too/);
-    expect(line).toMatch(/frequency data/);
     expect(line).toMatch(/nothing is demoted unless you choose/);
   });
 });
@@ -253,13 +266,12 @@ describe("the Ñ/ẞ rule — type-match gate on corpus (Matthew's ruling)", () 
     expect(factor(scored, "occupied")?.points).toBe(0);
     expect(scored.gated).toBe("G2");
     const line = buildRationaleLine(scored, "ẞ");
-    // ' is core here and ẞ is not in the inventory, so the tier rule
-    // inverts the demotion: ẞ is the character that moves. The line leads
-    // with that cost and never cites the corpus count.
-    expect(scored.demotion?.target).toBe("incoming");
-    expect(line).toMatch(/part of your alphabet/);
-    expect(line).toMatch(/ẞ moves to AltGr/);
-    expect(line).toMatch(/keeps this key/);
+    // ' is in the inventory, but punctuation is never core (owner ruling
+    // 2026-10-29), so ' is the convenience incumbent that moves. The line
+    // leads with that cost and never cites the corpus count.
+    expect(scored.demotion?.target).toBe("incumbent");
+    expect(line).toMatch(/you still use '''/);
+    expect(line).toMatch(/' moves to AltGr/);
     expect(line).not.toMatch(/20 keyboards/);
     expect(line).not.toMatch(/keyboards do this/);
   });

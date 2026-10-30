@@ -173,7 +173,7 @@ Each story phase ends with the same three gate tasks:
   - `editors/adapters/carveAdapter.tsx` (:28-40) records `carved-layout` with provenance `default` while only derived items exist, and `asked` once the author has toggled anything;
   - add en/fr i18n entries;
   - add a component test.
-- [ ] T040 [US4] Needed punctuation.
+- [x] T040 [US4] Needed punctuation.
   1. Write a fixture test: Bafut kbdus with `'` → `’` must raise the demotion proposal.
   2. Diagnose which gate in `maybeRaiseDisplacement` (`MechanismGallery.tsx:2224-2304`) skips it, and fix it.
   3. Record a decline in `carved-layout.displacedDeclined` (`useDisplacementProposal.ts` dismiss path).

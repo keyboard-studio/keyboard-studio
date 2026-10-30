@@ -1915,7 +1915,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
  * punctuation step's base-group caption; changing the rule is a separate
  * feature.
  */
-function isAlwaysKeepCategory(ch: string): boolean {
+export function isAlwaysKeepCategory(ch: string): boolean {
   return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
 }
 
