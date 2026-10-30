@@ -98,7 +98,6 @@ describe("marksGuardsFromValue", () => {
       outputForm: "ready-made",
       backspace: "peel",
       migrationNeeded: false,
-      guardReevaluation: [],
     },
     ...over,
   });

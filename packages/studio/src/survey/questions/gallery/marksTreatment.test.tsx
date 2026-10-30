@@ -62,7 +62,6 @@ function completedValue(over: Partial<MarksCompletion> = {}): MarksTreatmentValu
       },
       outputForm: "base-plus-mark",
       migrationNeeded: false,
-      guardReevaluation: [],
       ...over,
     },
   };
