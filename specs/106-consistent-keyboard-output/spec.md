@@ -29,7 +29,7 @@ requirement below.
 
 ### Session 2026-10-29 (rulings carried from the plan, closed)
 
-- Q: How does the author allow a mark after a space? → A: The attachment station gets a **space** column on every mark row, unchecked by default. Ticking it allows the mark after U+0020. Digits, punctuation and buffer start are never offered and are always blocked.
+- Q: How does the author allow a mark after a space? → A: The attachment station gets a **space** column on every mark row, unchecked by default. Ticking it allows the mark after U+0020. Digits, punctuation and buffer start are never offered and are always blocked. **Re-ruled 2026-10-30 via #2374 (see Session 2026-10-30 below): buffer start IS offered, as a per-mark "start of line" column.**
 - Q: What rule shape does an S-02 deadkey use under base-plus-mark? → A: km-keyman rules on it at the start of that story. The builder follows the ruling, and the ruling is recorded in the PR body and in `research.md`.
 - Q: Are carve's suggested discards opt-in? → A: No. They are an **approvable default**: Continue on the carve step approves them.
 - Q: Which keys does `&CasedKeys` cover? → A: Every key, on every modifier plane the assignments use, that carries a cased pair. The layout-family list is the floor, not the ceiling.
@@ -37,6 +37,11 @@ requirement below.
 - Q: May `nul` / `beep` appear inside stores? -> A: No. Keyman 19's compiler rejects them (keymanapp/keyboards#4181, from keymanapp/keyman#16723). Generated stores never contain them. How starting keyboards that still do (e.g. `sil_cameroon_qwerty` `store(dkt003b)`, `sil_cameroon_azerty`) are normalised is **deferred to the outcome of that issue** (split into separate rules vs `dk(none)`), tracked in #2361. As rule outputs (`> nul`, `> beep`, `> context(1) beep`), they remain legal.
 - Q: Should blocked marks offer a beep variant? -> A: No. In current Keyman, `beep` and `nul` have the same effect (neither audibly beeps), so swallow already covers beep. There is no beep answer and no beep variant. Direction: prefer `nul` over `beep`. Generated rules always use `nul`, and items split out of illegal stores are emitted as `nul`.
 - Q: How are consistent results confirmed? → A: Primarily by **decision-point fixtures**: a clean starting IR plus a decision record built up to each decision point, then projected and asserted. The UI walk is the end-to-end gate, not the primary check.
+
+### Session 2026-10-30 (re-ruling via #2374, km-lead ruling; supersedes "buffer start never offered" above)
+
+- Q: Is buffer start ever offered? → A: Yes, as a per-mark **"start of line"** column on the attachment station, mirroring the space column: unchecked by default, excluded from the FR-008 summary. Unticked (default) = the `nul '<mark>' > nul` buffer-start swallow rule applies; ticked = the `nul` rule is omitted and `"\n"` is added to the mark's generated allowed store, so the mark may start a line and follow line breaks. This replaces the retired per-keyboard guard question (spec 104 FR-013): confirmed `emit` answers migrate to ticked boxes with `origin: "migrated-from-guard"`; `swallow` needs no migration (the unchecked default reproduces it exactly); seeded-but-unconfirmed answers are dropped.
+- Q: Does anything else change? → A: No. Digits and punctuation are still never offered and always blocked; the space column is unchanged. The only new allowance is after line breaks for ticked marks (the defined meaning of "start of line").
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -65,7 +70,7 @@ expected-failure assertions, which flip to passing as each story lands.
 ### User Story 2 - Blocked marks never reach the text (Priority: P1)
 
 The author decides which letters each mark may attach to; a blocked mark is swallowed. The downloaded keyboard enforces that decision. A blocked mark typed after a non-letter, a
-digit, punctuation, a space (unless ticked) or at buffer start is blocked. Backspace follows the
+digit, punctuation, a space (unless the space column is ticked) or at buffer start (unless the mark's start-of-line box is ticked) is blocked. Backspace follows the
 backspace decision.
 
 **Why this priority**: E1. The decision exists but has no effect on the artifact, which is the most
@@ -73,13 +78,13 @@ visible inconsistency, and story 6 (tolerance) depends on it.
 
 **Independent Test**: Run the fixture "Bafut kbdus after marks treatment" and simulate the
 compiled keyboard: `5` after `a` is blocked when `à` is unchecked; it is also blocked after `1`,
-after space, and at buffer start; touch `T_0300` takes the same route.
+after space (unticked space column), and at buffer start (unticked start-of-line box); touch `T_0300` takes the same route.
 
 **Acceptance Scenarios**:
 
 1. **Given** marks treatment = swallow with an attachment matrix, **When** the keyboard is downloaded, **Then** it contains the generated guard group and the whole-stack backspace rules.
 2. **Given** the space column is ticked for one mark, **When** that mark is typed after a space, **Then** it is emitted; for any other mark it is blocked.
-3. **Given** the bare-mark behaviour answer = emit, **When** the mark is typed at buffer start, **Then** it is emitted; with swallow it is not. Attachment blocking swallows. No beep variant: `beep` and `nul` have the same effect in current Keyman (research R3).
+3. **Given** the mark's start-of-line box is ticked, **When** the mark is typed at buffer start, **Then** it is emitted; unticked, it is swallowed. Attachment blocking swallows. No beep variant: `beep` and `nul` have the same effect in current Keyman (research R3).
 4. **Given** the marks decision is changed or removed, **When** projected again, **Then** the guard output updates and no stale guard rule remains.
 
 ---
@@ -235,8 +240,9 @@ accepted, and all 32 cases pass the consistency gates.
 **Mark guards (US2)**
 - **FR-010**: The projection MUST emit the mark guard group and the backspace rules from the recorded marks-treatment decision, after assignments and before context tolerance, idempotently.
 - **FR-011**: Guard generation MUST live only in the projection. The marks-treatment apply no longer writes guards into the working copy; the decision value is unchanged.
-- **FR-012**: Blocking MUST cover every context outside the mark's allowed set (non-letters, digits, punctuation, buffer start) using one rule per mark; blocked marks are swallowed. At buffer start the existing bare-mark behaviour answer (swallow | emit) decides.
+- **FR-012**: Blocking MUST cover every context outside the mark's allowed set (non-letters, digits, punctuation, and buffer start unless the mark's start-of-line box is ticked — FR-015) using one rule per mark; blocked marks are swallowed. At buffer start the per-mark start-of-line box decides.
 - **FR-013**: The attachment station MUST offer a space column, unchecked by default, on every mark row. Ticking it adds U+0020 to that mark's allowed set.
+- **FR-015**: The attachment station MUST offer a start-of-line column, unchecked by default, on every mark row. Unticked = the `nul '<mark>' > nul` buffer-start swallow rule applies; ticked = the `nul` rule is omitted and `"\n"` is added to the mark's generated allowed set, so the mark may start a line and follow line breaks. The column's sentinel never enters `allowedContexts` and is excluded from the FR-008 summary (same posture as the space column).
 
 - **FR-014**: No store in the downloaded keyboard may contain `nul` or `beep`, whether generated or carried over from the starting keyboard. A starting store that contains them MUST be normalised in the projection by the method keymanapp/keyboards#4181 adopts (tracking issue #2361); typed behaviour MUST be identical before and after (simulator-checked). Until then, G8 is enforced for generated stores and reported (expected failure) for starting stores.
 
