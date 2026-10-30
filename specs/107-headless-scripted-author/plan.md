@@ -67,7 +67,7 @@ lifts of component logic into pure functions in the studio source.
 (owner ruling).
 
 **Scale/Scope**: 6 PR-set cases; 32 harness cases; wide sweep over about 608 codec-parseable keyboards
-(amended R6: every keyboard the codec parses completely, 887 of 921 in `docs/import-corpus.json`), narrowed to the Latin slice by
+(amended R6: every keyboard the codec parses without error, all 921 in `docs/import-corpus.json`), narrowed to the Latin slice by
 default.
 
 ## Constitution Check

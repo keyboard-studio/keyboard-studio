@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eligibility, type EligibilityDeps } from "./eligibility.ts";
 
-// `parses`: the codec parses it completely (no parse errors, I1 complete).
+// `parses`: the codec parses it without error.
 const table: Record<string, { group?: string; parses?: boolean; script?: string }> = {
   ok_latin: { group: "o", parses: true, script: "Latn" },
   ok_cyrl: { group: "o", parses: true, script: "Cyrl" },
@@ -20,7 +20,7 @@ const deps: EligibilityDeps = {
 };
 
 describe("eligibility", () => {
-  it("accepts any keyboard the codec parses completely, round-trip divergent or not", () => {
+  it("accepts any keyboard the codec parses, round-trip divergent or not", () => {
     expect(eligibility("ok_latin", "all-eligible", deps)).toEqual({ eligible: true, group: "o" });
     expect(eligibility("diverges", undefined, deps)).toEqual({ eligible: true, group: "d" });
   });
@@ -29,7 +29,7 @@ describe("eligibility", () => {
     expect(eligibility("nope", "all-eligible", deps)).toEqual({ eligible: false, reason: "missing" });
   });
 
-  it("skips: not-codec-clean (incomplete parse or unlisted)", () => {
+  it("skips: not-codec-clean (parse errors or unlisted)", () => {
     expect(eligibility("partial", "all-eligible", deps)).toEqual({ eligible: false, reason: "not-codec-clean" });
     expect(eligibility("unlisted", "all-eligible", deps)).toEqual({ eligible: false, reason: "not-codec-clean" });
   });

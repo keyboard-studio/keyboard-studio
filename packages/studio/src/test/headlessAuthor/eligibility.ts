@@ -3,8 +3,8 @@
 // fails to scaffold is a failure, never a skip. There is no try/catch around
 // parse() or the scaffold anywhere in the author.
 //
-// Order: present under the corpus root; the codec parses it completely
-// (docs/import-corpus.json: no parse errors and Layer A' I1 parse-complete);
+// Order: present under the corpus root; the codec parses it without error
+// (docs/import-corpus.json: no parse errors);
 // script not routed to the CJK/Ethiopic stub by the product's own routing
 // (isExcludedScript); inside the requested slice.
 //
@@ -13,8 +13,12 @@
 // `round-trip-divergence` keyboard parses fully and only emits a structurally
 // different .kmn (byte-identical round-trip is out of scope for v1); spec 106's
 // replay already compiles three of them (basic_kbdfr, sil_cameroon_qwerty,
-// sil_cameroon_azerty). The skip reason keeps its id, `not-codec-clean`, and
-// means "the codec does not parse it completely" (owner ruling, 2026-10-30).
+// sil_cameroon_azerty). Layer A' I1 is not used: it is a token-count
+// heuristic with documented false positives (it flags chechen_latin, whose
+// readonly groups the codec keeps as fidelity-only groups). A keyboard that
+// parses and then fails to scaffold is a failure the sweep reports, never a
+// skip. The skip reason keeps its id, `not-codec-clean`, and means "the codec
+// reports parse errors" (owner ruling, 2026-10-30).
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -34,8 +38,8 @@ export interface EligibilityDeps {
   /** The directory under the corpus root holding `<base>/`, or undefined when absent. */
   groupOf?: (base: string) => string | undefined;
   /**
-   * Whether the codec parses `base` completely, per `docs/import-corpus.json`
-   * (no parse errors, I1 parse-complete); undefined when unlisted.
+   * Whether the codec parses `base` without error, per `docs/import-corpus.json`;
+   * undefined when unlisted.
    */
   parsesCompletely?: (base: string) => boolean | undefined;
   /** The keyboard's script as the product's .kps reader derives it. */
@@ -47,11 +51,9 @@ let parseCache: Map<string, boolean> | undefined;
 function defaultParsesCompletely(base: string): boolean | undefined {
   if (parseCache === undefined) {
     const doc = JSON.parse(readFileSync(IMPORT_CORPUS_PATH, "utf8")) as {
-      keyboards: { keyboardId: string; parseErrors: unknown[]; layerAPrime?: { i1ParseComplete?: boolean } }[];
+      keyboards: { keyboardId: string; parseErrors: unknown[] }[];
     };
-    parseCache = new Map(
-      doc.keyboards.map((k) => [k.keyboardId, k.parseErrors.length === 0 && k.layerAPrime?.i1ParseComplete === true]),
-    );
+    parseCache = new Map(doc.keyboards.map((k) => [k.keyboardId, k.parseErrors.length === 0]));
   }
   return parseCache.get(base);
 }
