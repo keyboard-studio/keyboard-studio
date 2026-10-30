@@ -34,25 +34,25 @@ import { useMemo, useRef, useCallback, useEffect } from "react";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import type {
-  DecisionProposalSource,
-  SurveyPhaseResult,
-  LintFinding,
-  HistoryEntryState,
-} from "@keyboard-studio/contracts";
+import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
 import { loadFlowSourceDef, screenIdForFlow } from "../../steps/flowSources.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { selectTrack, useDecisionStore } from "../../stores/decisionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import {
+  buildFlowStepDeps,
+  flowStepCompletion,
+  type FlowStepDeps,
+  type FlowStepOptions,
+} from "./flowStepDeps.ts";
 import { useGitHubAuth } from "../../hooks/useGitHubAuth.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import type { DecisionSet } from "../../decisions/decisionTypes.ts";
-import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
-import type { SurveyContext } from "../../survey/types.ts";
+
+export type { FlowStepDeps, FlowStepOptions };
 
 // ---------------------------------------------------------------------------
 // Step-title localization (Tier A UI chrome). The heading FlowStepHost paints
@@ -75,130 +75,6 @@ const SCREEN_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
     message: "Help documentation",
   }),
 };
-
-// ---------------------------------------------------------------------------
-// FlowStepDeps — live store/hook values the per-flow options consume.
-// ---------------------------------------------------------------------------
-
-export interface FlowStepDeps {
-  localStart: { displayName: string; languages?: string[] } | null;
-  /**
-   * The live decision set (spec 089 FR-005). Everything the per-flow options
-   * used to read from stored session fields — the identity result, the
-   * recorded scaffold spec, the survey context — is derived from this, via
-   * decisions/identitySelectors.ts, at the point of use. The factory reads
-   * it from the decision store; the options records never touch a store for
-   * it (flowStepOptions.tsx's working-copy reads are the documented
-   * exception, for seed-time slices — see readAdaptiveDescriptionContext).
-   */
-  decisions: DecisionSet;
-  surveyContext: SurveyContext;
-  findingsByQuestionId: Record<string, LintFinding[]>;
-  /**
-   * Per-mount mutable ref for tracking the committed display name across
-   * Back→forward navigation within the project_name step.
-   * Allocated by makeFlowStepComponent (useRef) — never module-level — so
-   * each mount starts with an empty string and re-entry resets correctly.
-   */
-  displayNameRef: { current: string };
-  /**
-   * The currently-recorded track choice (`selectTrack` over `decisions`),
-   * or `null` before the author has ever chosen one. Spec 057 FR-031: a step
-   * reached by deep link (or by walking Back into it) must show the
-   * currently-recorded answer, not an empty field —
-   * trackOptions.seeds.getSeedValue reads this to seed track_choice's radio
-   * group on arrival (flowStepOptions.tsx).
-   */
-  selectedTrack: "copy" | "adapt" | null;
-  /**
-   * The authenticated author's profile (spec 064 D7), or nulls for a
-   * guest / a profile that does not publish them. Read once here (the
-   * factory owns all hook access, C2.5) for the options records whose
-   * seeders evaluate profile lookup defaults — the attribution flow's
-   * author name / email (#1901): the modules declare the rule
-   * (`lookupDefault`); the seed callback only supplies this input.
-   */
-  authorProfile: { name: string | null; email: string | null };
-  /**
-   * The working copy's currently-derived HISTORY-entry proposal state
-   * (spec 079 US5), or `null` before it has ever been derived.
-   * `phaseFOptions.onMount` reads this as `deriveHistoryEntryState`'s
-   * `previous` (so a re-derivation with an unchanged version is a no-op,
-   * never re-stamping `dateIso` — research R12), and
-   * `phaseFOptions.buildContext` reads it to inject the proposal's
-   * heading/bullets into `pf_history_entry`'s `{{token}}`s. The onMount
-   * WRITE goes through the working-copy store directly (flowStepOptions.tsx
-   * reads/writes those slices via getState(), as its seed functions already
-   * did) — no setter is plumbed through here since spec 089.
-   */
-  historyEntryState: HistoryEntryState | null;
-}
-
-// ---------------------------------------------------------------------------
-// FlowStepOptions<Extracted> — per-flow configuration record.
-// ---------------------------------------------------------------------------
-
-export interface FlowStepOptions<Extracted = unknown> {
-  /** Key into flowSources (flow_id). Validated at factory call time — throws if absent. */
-  flowRef: string;
-  /** Header title. Falls back to flowSources[flowRef].title if omitted. */
-  title?: string;
-  /**
-   * Build the SurveyContext from live store/hook deps.
-   */
-  buildContext: (deps: FlowStepDeps) => SurveyContext;
-  /**
-   * Shape the runner result into the step payload.
-   * Return undefined to stay on the step (no-advance guard — C2.4).
-   */
-  extract: (result: SurveyPhaseResult) => Extracted | undefined;
-  /**
-   * Fires once per mount (spec 079 US5) — BEFORE the first `buildContext`
-   * consumer sees a derived value, since it runs in a `useEffect` after the
-   * mount render commits, same as every other React effect. Used by
-   * `phaseFOptions` to derive (and identity-guard-store) the HISTORY-entry
-   * proposal on entering the Phase F step; optional because most flows need
-   * no mount-time derivation at all.
-   */
-  onMount?: (deps: FlowStepDeps) => void;
-  /**
-   * Optional seeding hooks (e.g. project_name slug derivation).
-   */
-  seeds?: {
-    /**
-     * Optional: a flow whose seeds are decision records (spec 092 — the
-     * extraction pass seeds them, SurveyRunner reads the records) omits
-     * this; the factory then passes an always-undefined seed callback.
-     */
-    getSeedValue?: (questionId: string, deps: FlowStepDeps) => string | string[] | undefined;
-    /**
-     * Where `getSeedValue`'s seed for a question came from, recorded with the
-     * saved answer so the decision trail can name it. Optional: without it a
-     * seed is still saved as a proposal, just with no source.
-     */
-    getSeedSource?: (questionId: string, deps: FlowStepDeps) => DecisionProposalSource | undefined;
-    /**
-     * Optional one-line reason for a seed, shown under the field as the
-     * seed's provenance caption (forwarded to SurveyRunner's
-     * getSeedProvenance). A flow supplies this when its proposal has a
-     * human-readable "why" the author should see before confirming it.
-     */
-    getSeedCaption?: (questionId: string, deps: FlowStepDeps) => string | undefined;
-    onAnswerCommit?: (questionId: string, value: string | string[] | undefined, deps: FlowStepDeps) => void;
-    /**
-     * Optional per-question `required` override (spec 079 FR-009). Forwarded
-     * to FlowStepHost -> SurveyRunner's own `getRequiredOverride` prop —
-     * see its doc there for the override contract. Absent for every flow
-     * that has no conditionally-required question (the common case).
-     */
-    getRequiredOverride?: (questionId: string, deps: FlowStepDeps) => boolean | undefined;
-  };
-  /**
-   * When true, the factory reads findingsByQuestionId from workingCopyStore
-   * and forwards it to FlowStepHost (used by phase_f_helpdocs).
-   */
-  usesFindings?: boolean;
-}
 
 // ---------------------------------------------------------------------------
 // makeFlowStepComponent — the factory (C2.1)
@@ -256,8 +132,6 @@ export function makeFlowStepComponent<Extracted>(
     // and selected track are no longer stored session fields — they derive
     // from the decision store's live set, here at the factory boundary.
     const decisions = useDecisionStore((s) => s.decisions);
-    const surveyContext = deriveSurveyContext(decisions);
-    const selectedTrack = selectTrack(decisions);
     const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
     // The profile seed source for the attribution flow's lookup defaults
     // (#1901) — the same hook IdentityLiteAdapter reads; nulls for a
@@ -277,16 +151,14 @@ export function makeFlowStepComponent<Extracted>(
 
     // Mutable ref so seed callbacks always read current store values.
     const depsRef = useRef<FlowStepDeps>({} as FlowStepDeps);
-    depsRef.current = {
+    depsRef.current = buildFlowStepDeps({
       localStart,
       decisions,
-      surveyContext,
       findingsByQuestionId,
       displayNameRef,
-      selectedTrack,
       historyEntryState,
       authorProfile: { name: authorName, email: authorEmail },
-    };
+    });
 
     // Fires once per mount (C2.5 — store access confined to this factory).
     // depsRef.current is current for THIS render by the time the effect runs
@@ -353,9 +225,9 @@ export function makeFlowStepComponent<Extracted>(
     // applyDecisionEffects after the answers are recorded as decisions.
     const wrappedOnComplete = useCallback(
       (result: SurveyPhaseResult): void => {
-        const extracted = options.extract(result);
         // Stay on step when extract returns undefined (no-advance guard).
-        if (extracted === undefined) return;
+        const completion = flowStepCompletion(options, result);
+        if (completion === undefined) return;
         // Forward the UNTOUCHED SurveyPhaseResult, not `extracted` — StepHost's
         // generic completion path (recordPhase / recordStepCompletion / advance)
         // expects the same opaque result the step actually produced (contract §2
@@ -364,7 +236,7 @@ export function makeFlowStepComponent<Extracted>(
         // every answer this step recorded from the decision-audit seam
         // (isSurveyPhaseResult in createDecisionRecorder.ts requires the
         // `answers` array `extracted` does not carry).
-        onComplete(result);
+        onComplete(completion);
       },
       [onComplete],
     );

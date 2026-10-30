@@ -120,11 +120,16 @@ describe("position, status, recording", () => {
 // FR-033: reset only on start-over and new project.
 // ---------------------------------------------------------------------------
 
-function sourceFiles(dir: string): string[] {
+// Product sources only: tests, the test setup, and the src/test/ support tree
+// (whose per-case resets, e.g. the headless author's, isolate test cases and
+// are not a product call site).
+function sourceFiles(dir: string, srcRoot = dir): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...sourceFiles(full));
+    if (statSync(full).isDirectory()) {
+      if (full !== join(srcRoot, "test")) out.push(...sourceFiles(full, srcRoot));
+    }
     else if (/\.(ts|tsx)$/.test(name) && !/\.test\.(ts|tsx)$/.test(name) && name !== "test-setup.ts") {
       out.push(full);
     }

@@ -25,7 +25,7 @@ import {
   type DecisionPointBase,
 } from "./decisionPointBases.ts";
 import type { GateId } from "./consistencyGates.ts";
-import { ownerOf } from "./decisionPointKnownGaps.ts";
+import { ownerOf } from "./decisionPointKnownGaps.fixture.ts";
 import { announceSc004Skip, sc004GatesEnabled } from "./sc004Harness.ts";
 
 announceSc004Skip("decision-point fixtures", (name) => it.skip(name, () => {}));

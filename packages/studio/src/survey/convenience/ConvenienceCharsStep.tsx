@@ -38,23 +38,25 @@
 import { useEffect, useMemo, useRef, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
-import type {
-  RetainedConvenienceChar,
-  RetainedConvenienceCharsValue,
-} from "./convenienceValue.ts";
+import type { RetainedConvenienceCharsValue } from "./convenienceValue.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { convenienceKey } from "../../steps/evidence.ts";
 import { useCarveNeededSet } from "../../hooks/useCarveNeededSet.ts";
 import { useGlyphFontStack } from "../useGlyphFontStack.ts";
-import { computeConvenienceGate } from "./convenienceGate.ts";
-import type { ConvenienceCandidate } from "@keyboard-studio/engine";
+import {
+  buildRetainedValue,
+  continueConvenience,
+  convenienceGateFor,
+  gateCandidates,
+  keptPrimaries,
+  recordConvenienceStatus,
+  skipConvenience,
+  uncheckedPrimaries,
+} from "./convenienceContinue.ts";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -87,33 +89,6 @@ function codepointLabel(ch: string): string {
   return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
-/**
- * The step's "asked" phase result. `[]` records "asked, kept nothing" — not
- * "never asked" (absent); see SurveyPhaseResult.retainedConvenienceChars.
- *
- * `phase: "C"` mirrors the marks series, the other pre-carve step that emits a
- * derived-state-only result. This step is not a phase of its own in spec §8,
- * and the label carries no routing weight — the manifest orders steps, and
- * `mergePhaseResults` merges by FIELD, not by phase. Reusing marks' label keeps
- * the one place that does read a phase label (`find(p => p.phase === "C")` in
- * TouchGallery, for `assignments`) resolving to the same result it already did.
- */
-function convenienceResult(retained: string[]): SurveyPhaseResult {
-  return { phase: "C", answers: [], retainedConvenienceChars: retained };
-}
-
-/**
- * The `not-applicable` phase result (R-09): NO `retainedConvenienceChars` at
- * all — absent means "never asked", distinct from `[]`'s "asked, kept
- * nothing". The reason and evidence key live in `surveyAnswerStore`'s
- * `not-asked` status instead, not in this result.
- */
-function convenienceNotAskedResult(): SurveyPhaseResult {
-  return { phase: "C", answers: [] };
-}
-
-/** Stable reference for "nothing to offer" — see `candidates` below. */
-const EMPTY_CANDIDATES: ConvenienceCandidate[] = [];
 /** Stable empty set for value records where no candidate was acted on. */
 const EMPTY_ACTED: ReadonlySet<string> = new Set();
 
@@ -128,17 +103,7 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
   const ir = useWorkingCopyStore((s) => s.ir);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const { neededSet, neededCharsResolved, hasSignal } = useCarveNeededSet();
-  const setStatus = useSurveyAnswerStore((s) => s.setStatus);
   const glyphFontStack = useGlyphFontStack();
-
-  // The working copy, not startIr: carve operates on `ir`, so the letters on
-  // offer must be the ones carve will actually see. (Carve's own deletions are
-  // an overlay, not an IR mutation, so re-entering this step after a carve
-  // pass still offers the same list.)
-  const produced = useMemo(
-    () => (ir !== null ? buildProducedSet(ir) : new Set<string>()),
-    [ir],
-  );
 
   // Hold the gate until the CLDR/SLDR exemplars have settled — deciding early
   // would either read a step as `unknown` that should have been `applies`, or
@@ -149,23 +114,19 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
   // the gate's own `unknown` outcome below, which is a SETTLED "no signal at
   // all" state that must render, never wait silently (FR-064).
   const ready = neededCharsResolved;
+  // The gate itself is convenienceContinue.ts's convenienceGateFor (over the
+  // working copy's IR, not startIr: carve operates on `ir`, so the letters on
+  // offer must be the ones carve will actually see), shared with the headless
+  // author.
   const gate = useMemo(
     () => (ready
-      ? computeConvenienceGate({
-        produced,
-        needed: neededSet,
-        hasSignal,
-        instantiated: instantiationMode !== null,
-      })
+      ? convenienceGateFor({ ir, instantiationMode, needed: { neededSet, hasSignal } })
       : null),
-    [ready, produced, neededSet, hasSignal, instantiationMode],
+    [ready, ir, instantiationMode, neededSet, hasSignal],
   );
   // A stable empty array reference when there is nothing to offer, so the
   // memos below do not recompute every render on a fresh `[]` literal.
-  const candidates = useMemo(
-    () => (gate?.kind === "applies" ? gate.candidates : EMPTY_CANDIDATES),
-    [gate],
-  );
+  const candidates = useMemo(() => gateCandidates(gate), [gate]);
   const unknown = gate?.kind === "unknown";
 
   // Decision-backed (spec 090 T024, D-090-12; was store-backed per spec 079
@@ -177,27 +138,7 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
   // pre-checked (propose-then-confirm): a candidate the value does not
   // reject — including one that became surplus only after the value was
   // recorded — is checked by construction.
-  const retainedByChar = useMemo(
-    () => new Map((value?.retained ?? []).map((i) => [i.char, i.provenance])),
-    [value],
-  );
-  const rejectedPrimaries = useMemo(() => new Set(value?.rejected ?? []), [value]);
-  const unchecked = useMemo(() => {
-    const set = new Set<string>();
-    for (const candidate of candidates) {
-      if (rejectedPrimaries.has(candidate.primary)) set.add(candidate.primary);
-    }
-    return set;
-  }, [candidates, rejectedPrimaries]);
-
-  /** The recorded provenance for a candidate's chars, or the proposal's. */
-  function provenanceFor(candidate: ConvenienceCandidate): RetainedConvenienceChar["provenance"] {
-    for (const ch of candidate.chars) {
-      const p = retainedByChar.get(ch);
-      if (p !== undefined) return p;
-    }
-    return "extracted";
-  }
+  const unchecked = useMemo(() => uncheckedPrimaries(candidates, value), [candidates, value]);
 
   /**
    * Build the value for a kept-primary set. Candidates the author acted on
@@ -208,17 +149,7 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
     kept: ReadonlySet<string>,
     acted: ReadonlySet<string>,
   ): RetainedConvenienceCharsValue {
-    const retained: RetainedConvenienceChar[] = [];
-    const rejected: string[] = [];
-    for (const c of candidates) {
-      if (kept.has(c.primary)) {
-        const provenance = acted.has(c.primary) ? "asked" : provenanceFor(c);
-        for (const ch of c.chars) retained.push({ char: ch, provenance });
-      } else {
-        rejected.push(c.primary);
-      }
-    }
-    return { retained, rejected };
+    return buildRetainedValue(candidates, kept, acted, value);
   }
 
   function recordValue(kept: ReadonlySet<string>, acted: ReadonlySet<string>): void {
@@ -252,19 +183,15 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
     if (gate === null || gate.kind !== "not-applicable" || completedRef.current) return;
     completedRef.current = true;
     // FR-065: record "not asked" with its reason and the evidence key it was
-    // judged against, so a later evidence change (surplus letters appear) is
-    // read as a shape change (FR-067), not silently re-decided.
-    setStatus("convenience", {
-      kind: "not-asked",
-      reason: gate.reason,
-      evidenceKey: convenienceKey(hasSignal ? "known" : "unknown", []),
-    });
+    // judged against (convenienceContinue.ts's skipConvenience).
+    const skip = skipConvenience(gate, hasSignal);
+    recordConvenienceStatus(skip.status);
     if (useSurveySessionStore.getState().lastNavigation === "pop" && onBack !== undefined) {
       onBack();
     } else {
-      onComplete(convenienceNotAskedResult());
+      onComplete(skip.result);
     }
-  }, [gate, onComplete, onBack, hasSignal, setStatus]);
+  }, [gate, onComplete, onBack, hasSignal]);
 
   const keptCount = candidates.length - unchecked.size;
 
@@ -304,12 +231,8 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
 
   if (gate === null || gate.kind === "not-applicable") return null;
 
-  function keptPrimaries(): Set<string> {
-    return new Set(candidates.filter((c) => !unchecked.has(c.primary)).map((c) => c.primary));
-  }
-
   function toggle(primary: string): void {
-    const kept = keptPrimaries();
+    const kept = keptPrimaries(candidates, unchecked);
     if (unchecked.has(primary)) kept.add(primary);
     else kept.delete(primary);
     recordValue(kept, new Set([primary]));
@@ -318,21 +241,16 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
   function complete(): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    const kept = keptPrimaries();
-    const retained = candidates.filter((c) => kept.has(c.primary)).flatMap((c) => c.chars);
     // spec 090 T024 (D-090-12): the completion result is computed FROM the
-    // recorded value — reconcile the record to the current candidate set
-    // first (a toggle-built record already matches; a never-touched pass
-    // has no record yet, and a shape change may have added candidates
-    // since the last toggle).
-    const next = buildValue(kept, EMPTY_ACTED);
-    if (JSON.stringify(next) !== JSON.stringify(value ?? null)) onChange(next);
+    // recorded value (convenienceContinue.ts's continueConvenience).
+    const done = continueConvenience(candidates, value);
+    if (done.record !== null) onChange(done.record);
     // The step was genuinely asked (candidates offered) or its gap was
     // surfaced (`unknown`, nothing to offer) — either way the author has now
     // been through it, so the status moves past "in-progress" (data-model.md
     // §1). Nothing previously set this to `finished`.
-    setStatus("convenience", { kind: "finished" });
-    onComplete(convenienceResult(retained));
+    recordConvenienceStatus(done.status);
+    onComplete(done.result);
   }
 
   return (

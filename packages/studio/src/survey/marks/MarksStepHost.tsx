@@ -22,9 +22,9 @@ import type { EditorStepProps } from "../../steps/types.ts";
 import { GalleryHost } from "../../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import marksTreatmentModule from "../questions/gallery/marksTreatment.ts";
 import type { MarksTreatmentValue } from "./marksValue.ts";
+import { mirrorMarksCompletionToSession } from "./marksSessionMirror.ts";
 
 const MARKS_STEP_ID = "marks";
 
@@ -33,14 +33,7 @@ const MarksStepHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: E
   const deps = useMemo(buildGalleryHostDeps, []);
   const completion = (record?.value as MarksTreatmentValue | undefined)?.completion ?? null;
   useEffect(() => {
-    if (completion?.migrationNeeded === true) {
-      useSurveySessionStore.getState().setMarksMigrationNeeded(true);
-    }
-  }, [completion]);
-  useEffect(() => {
-    if (completion !== null && completion.guardReevaluation.length > 0) {
-      useSurveySessionStore.getState().setMarksGuardReevaluation(completion.guardReevaluation);
-    }
+    mirrorMarksCompletionToSession(completion);
   }, [completion]);
   return (
     <GalleryHost

@@ -7,6 +7,7 @@
 
 import { useMemo } from "react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { loanwordSetOf } from "../lib/placementInventory.ts";
 
 /**
  * Loanword-tier letters the author added, as a Set for O(1) membership
@@ -14,5 +15,5 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
  */
 export function useLoanwordSet(): Set<string> {
   const sessionLoanwordChars = useWorkingCopyStore((s) => s.session.loanwordChars);
-  return useMemo(() => new Set(sessionLoanwordChars ?? []), [sessionLoanwordChars]);
+  return useMemo(() => loanwordSetOf(sessionLoanwordChars), [sessionLoanwordChars]);
 }

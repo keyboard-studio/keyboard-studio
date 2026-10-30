@@ -11,14 +11,14 @@ import { useMemo } from "react";
 import type { ComponentType } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
-import { GalleryHost, decideGalleryValue } from "../../steps/galleryHost.tsx";
+import { GalleryHost } from "../../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
-import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { proposeWindowsLayout } from "../../lib/windowsLayouts.ts";
 import { LAYOUT_FAMILY_STEP_ID, pickedLayoutIds } from "../../lib/layoutFamily.ts";
+import { confirmWindowsLayout } from "./confirmWindowsLayout.ts";
 import windowsLayoutModule from "../questions/gallery/windowsLayout.ts";
 import type { WindowsLayoutValue } from "../questions/gallery/windowsLayout.ts";
 
@@ -35,16 +35,7 @@ const LayoutStepHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
   const isSuggestion = (recordedId ?? proposal.layout.id) === proposal.layout.id;
 
   function confirm(): void {
-    if (record === undefined) {
-      decideGalleryValue<WindowsLayoutValue>(
-        windowsLayoutModule,
-        { layoutIds: [proposal.layout.id], origin: "confirmed" },
-        { provenance: "asked" },
-        LAYOUT_FAMILY_STEP_ID,
-        deps,
-      );
-    }
-    useSurveyAnswerStore.getState().setStatus(LAYOUT_FAMILY_STEP_ID, { kind: "finished" });
+    confirmWindowsLayout(record, proposal.layout.id, deps);
     onComplete(undefined);
   }
 

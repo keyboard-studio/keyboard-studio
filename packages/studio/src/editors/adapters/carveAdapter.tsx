@@ -21,12 +21,7 @@
 // once the author has changed anything it is `asked`.
 
 import type { EditorStepProps } from "../../steps/types.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import {
-  currentCarvedLayoutValue,
-  isUntouchedSuggestion,
-} from "../../survey/carve/carveValue.ts";
+import { recordCarveDecision } from "../../survey/carve/carveContinue.ts";
 import { CarveGalleryV2 } from "../carve/CarveGalleryV2.tsx";
 
 /**
@@ -37,13 +32,7 @@ export function CarveAdapter({ onComplete, onBack }: EditorStepProps) {
   return (
     <CarveGalleryV2
       onComplete={() => {
-        const value = currentCarvedLayoutValue();
-        const suggestion = useWorkingCopyStore.getState().carveSuggestion;
-        useDecisionStore.getState().record({
-          id: "carved-layout",
-          value,
-          provenance: isUntouchedSuggestion(value, suggestion) ? "default" : "asked",
-        });
+        recordCarveDecision();
         onComplete(undefined);
       }}
       onBack={onBack}

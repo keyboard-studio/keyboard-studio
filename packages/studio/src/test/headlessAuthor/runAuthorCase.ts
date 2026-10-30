@@ -47,13 +47,14 @@ import {
   createStudioSnapshotter,
 } from "../../lib/studioReducerDeps.ts";
 import { buildDecisionPointFixture, instantiate, type DecisionPointFixtureSpec } from "../decisionPointFixture.ts";
-import { ownerOf } from "../decisionPointKnownGaps.ts";
+import { ownerOf } from "../decisionPointKnownGaps.fixture.ts";
 import { CORPUS } from "../sc004Harness.ts";
-import type { AuthorRun, Case, RunFailure } from "./caseTypes.ts";
+import type { AuthorRun, Case } from "./caseTypes.ts";
 import { eligibility, type Slice } from "./eligibility.ts";
 import { createRunReport } from "./runReport.ts";
 import { readRunRecord } from "./recordWriter.ts";
 import { resetAuthorStores } from "./resetStores.ts";
+import { StepFailure } from "./stepFailure.ts";
 import type { DriverContext, StepDrivers } from "./stepDrivers/types.ts";
 import { identityDrivers } from "./stepDrivers/identity.ts";
 import { windowsLayoutDrivers } from "./stepDrivers/windowsLayout.ts";
@@ -92,12 +93,6 @@ const TERMINALS = new Set(["done", "unsupported"]);
 /** The routing visits each step a bounded number of times; more means it is stuck. */
 const MAX_STEP_VISITS = 64;
 
-class StepFailure extends Error {
-  constructor(readonly failure: RunFailure) {
-    super(failure.detail);
-  }
-}
-
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** Script and display name as the product's .kps reader gives them (case fields win). */
@@ -106,12 +101,17 @@ function kpsInfo(c: Case): { script: string; displayName: string } {
   return { script: c.script ?? kps.script ?? "", displayName: kps.displayName || c.base };
 }
 
-async function walk(ctx: DriverContext): Promise<void> {
+async function walk(base: DriverContext): Promise<void> {
+  // One recorder, as StudioShell holds one: the reducer deps record each
+  // completion through it and drivers record each non-final Next (per-screen
+  // answers, the base contribution) through the same instance.
+  const recorder = createStudioRecordDecision(createStudioSnapshotter());
   const reducerDeps = createStudioReducerDeps({
     instantiateFromStart: useWorkingCopyStore.getState().instantiateFromStart,
     clearTouchSeedChoice,
-    recordDecision: createStudioRecordDecision(createStudioSnapshotter()),
+    recordDecision: recorder,
   });
+  const ctx: DriverContext = { ...base, recorder };
 
   let step: string = useSurveySessionStore.getState().activeStepId;
   for (let visits = 0; !TERMINALS.has(step); visits++) {

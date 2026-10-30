@@ -1,6 +1,7 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect } from "react";
 import type { PlacementMap } from "@keyboard-studio/contracts";
+import { loadPlacementMap } from "../lib/placementMapLoader.ts";
 
 /**
  * Lazily loads packages/engine/data/placement-priors.json and converts it to
@@ -14,13 +15,9 @@ export function usePlacementPriors(): PlacementMap | null {
     let cancelled = false;
     (async () => {
       try {
-        const [mod, { corpusPriorsToPlacementMap, parsePlacementPriorsJSON }] = await Promise.all([
-          import("@keyboard-studio/engine/data/placement-priors.json"),
-          import("@keyboard-studio/engine/placement"),
-        ]);
+        const map = await loadPlacementMap();
         if (cancelled) return;
-        const priors = parsePlacementPriorsJSON(mod.default ?? mod);
-        setPlacementMap(corpusPriorsToPlacementMap(priors));
+        setPlacementMap(map);
       } catch (err) {
         if (!cancelled) {
           devLog.warn("Placement priors unavailable:", err);

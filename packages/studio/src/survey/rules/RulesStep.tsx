@@ -30,8 +30,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { currentRuleSetValue } from "./ruleSetValue.ts";
+import { completeRulesStep } from "../../lib/mechanismStepCompletion.ts";
 import { isExcludedScript } from "../../lib/excludedScriptFamilies.ts";
 import { UnsupportedScriptStub } from "../../components/UnsupportedScriptStub.tsx";
 import { DemoPane } from "../../components/rules/DemoPane.tsx";
@@ -55,11 +54,7 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
   const complete = () => {
     if (completedRef.current) return;
     completedRef.current = true;
-    useDecisionStore.getState().record({
-      id: "rule-set",
-      value: currentRuleSetValue(),
-      provenance: "asked",
-    });
+    completeRulesStep();
     onComplete(undefined);
   };
 

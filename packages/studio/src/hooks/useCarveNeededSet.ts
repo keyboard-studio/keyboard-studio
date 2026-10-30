@@ -17,31 +17,11 @@
 // of this set at its own call site; the question reads this set raw.
 
 import { useEffect, useMemo, useState } from "react";
-import { deriveCarveNeededSet, normalizationFormForOutputForm } from "@keyboard-studio/engine";
-import type { CharNormalizationForm } from "@keyboard-studio/engine";
-import { nonAlphabetConfirmedInventory } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { neededCharsForLanguage } from "../lib/services.ts";
+import { composeCarveNeededSet, type CarveNeededSetResult as ComposedCarveNeededSet } from "../lib/carveNeededSet.ts";
 
-export interface CarveNeededSetResult {
-  /**
-   * The orthography's needed characters, normalized to {@link form}: the
-   * marks-series tiered set (required primary + optional secondary) unioned
-   * with non-alphabet confirmed inventory and, when resolvable, the language's
-   * CLDR/SLDR exemplars.
-   */
-  neededSet: Set<string>;
-  /**
-   * The tiered/inventory slice alone, unnormalized — the "is there any signal
-   * at all?" gate both surfaces use to decide whether to recommend anything.
-   */
-  tieredNeededSet: Set<string>;
-  /**
-   * The async CLDR/SLDR slice. `null` means "not yet resolved" or "no CLDR
-   * locale for this language" — callers treat it exactly as "not supplied"
-   * and fall back to inventory-only behaviour.
-   */
-  neededChars: Set<string> | null;
+export interface CarveNeededSetResult extends ComposedCarveNeededSet {
   /**
    * False while the CLDR/SLDR lookup is still in flight, true once it has
    * settled either way (including "no locale match", which also yields a null
@@ -51,24 +31,6 @@ export interface CarveNeededSetResult {
    * exemplars land would show letters that silently vanish a moment later.
    */
   neededCharsResolved: boolean;
-  /** NFC or NFD, per the marks series' whole-keyboard output-form decision. */
-  form: CharNormalizationForm;
-  /** The resolved identity tag, or undefined before identity is set. */
-  bcp47: string | undefined;
-  /** True once there is any signal to reason about (tiered entries or a resolved CLDR set). */
-  hasSignal: boolean;
-  /**
-   * Composed characters for each `worklist.blockedCombinations` entry (#526
-   * AC #3) — NOT unioned into `neededSet`/`tieredNeededSet` (a block-candidate
-   * is never "needed"; unioning it there would shield it from removal, the
-   * opposite of its purpose). Callers pass this straight through to
-   * `recommendedRemovalChars`'s `blockCandidateChars` argument, which adds
-   * these as ADDITIONAL removal-recommendation candidates without bypassing
-   * any of that function's existing safety guards. Empty when the worklist is
-   * absent/empty (S0-skip or pre-046 fallback) — a no-op union at the call
-   * site, so behavior degrades to byte-identical pre-#526 output.
-   */
-  blockCandidateChars: Set<string>;
 }
 
 /**
@@ -88,51 +50,6 @@ export function useCarveNeededSet(): CarveNeededSetResult {
   const marksOutputForm = useWorkingCopyStore((s) => s.session.marksOutputForm);
   const bcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
 
-  // The chosen whole-keyboard output form drives which Unicode normalization
-  // form the comparison (produced vs. needed) normalizes BOTH sides to, so
-  // "base-plus-mark" (decomposed) vs. "ready-made" (precomposed) actually
-  // changes what counts as a match. Undefined (marks series skipped) degrades
-  // to NFC.
-  const form = useMemo(
-    () => normalizationFormForOutputForm(marksOutputForm),
-    [marksOutputForm],
-  );
-
-  const carveNeeded = useMemo(
-    () => deriveCarveNeededSet({
-      alphabet,
-      worklist: marksWorklist,
-      ...(marksOutputForm !== undefined ? { outputForm: marksOutputForm } : {}),
-    }),
-    [alphabet, marksWorklist, marksOutputForm],
-  );
-
-  const nonAlphabetConfirmed = useMemo(
-    () => nonAlphabetConfirmedInventory(confirmedInventory, alphabet),
-    [confirmedInventory, alphabet],
-  );
-
-  // #526 AC #3: the engine has already composed each blocked-combination pair
-  // into its concrete grapheme (CarveNeededSet.blockCandidateChars, using the
-  // same outputForm as every other tier); here we only re-normalize to `form`
-  // — the same normalization every other member of this hook's sets receives,
-  // so a direct Set.has(ch) comparison against recommendedRemovalChars'
-  // `produced` (already normalized to `form` there) behaves consistently
-  // regardless of the chosen output form.
-  const blockCandidateChars = useMemo(
-    () => new Set([...carveNeeded.blockCandidateChars].map((ch) => ch.normalize(form))),
-    [carveNeeded, form],
-  );
-
-  const tieredNeededSet = useMemo(
-    () => new Set([
-      ...carveNeeded.requiredPrimary,
-      ...carveNeeded.optionalSecondary,
-      ...nonAlphabetConfirmed,
-    ]),
-    [carveNeeded, nonAlphabetConfirmed],
-  );
-
   const [neededChars, setNeededChars] = useState<Set<string> | null>(null);
   const [neededCharsResolved, setNeededCharsResolved] = useState(false);
   useEffect(() => {
@@ -149,26 +66,15 @@ export function useCarveNeededSet(): CarveNeededSetResult {
     return () => { cancelled = true; };
   }, [bcp47]);
 
-  // Members are normalized to `form` at construction: this set is the
-  // `coveringSet`/`needed` argument to isCharCoveredForLocale-based passes,
-  // whose contract requires the covering set to already be in that form.
-  // Skipping this silently mismatches under NFD (base-plus-mark output).
-  const neededSet = useMemo(
-    () => new Set(
-      [...(neededChars ? [...neededChars, ...tieredNeededSet] : tieredNeededSet)]
-        .map((ch) => ch.normalize(form)),
+  // The derivation itself is lib/carveNeededSet.ts's composeCarveNeededSet,
+  // shared with the headless author (spec 107).
+  const composed = useMemo(
+    () => composeCarveNeededSet(
+      { confirmedInventory, alphabet, marksWorklist, marksOutputForm, bcp47 },
+      neededChars,
     ),
-    [neededChars, tieredNeededSet, form],
+    [confirmedInventory, alphabet, marksWorklist, marksOutputForm, bcp47, neededChars],
   );
 
-  return {
-    neededSet,
-    tieredNeededSet,
-    neededChars,
-    neededCharsResolved,
-    form,
-    bcp47,
-    hasSignal: tieredNeededSet.size > 0 || neededChars !== null,
-    blockCandidateChars,
-  };
+  return { ...composed, neededCharsResolved };
 }

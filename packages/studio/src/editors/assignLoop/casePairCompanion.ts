@@ -196,6 +196,71 @@ export interface UseCasePairCompanion {
 }
 
 // ---------------------------------------------------------------------------
+// Pure derivation (the hook's `propose` body, lifted)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decide whether a case-pair companion proposal exists for a just-placed
+ * lowercase character, and build it. Pure: reads no store, holds no state.
+ * The hook's `propose` is exactly this plus `setProposal`.
+ *
+ * Contract:
+ * - `input` is the proposal minus everything derived from `caseCounterpart`
+ *   (the sole casing source on this path, FR-002).
+ * - `bcp47` is the working copy's identity tag; `undefined` or "" both mean
+ *   "no locale".
+ * - Returns the proposal the author is asked to confirm, or null when nothing
+ *   should be raised: no confident single-character uppercase counterpart
+ *   (caseless, self-mapping, multi-character expansion), an orthographically
+ *   unicameral script (Georgian), the counterpart already produced
+ *   (`alreadyProduced`), or a combo whose input side has no capital.
+ * - Applying the accepted proposal (recording the companion assignment) stays
+ *   with each mechanism's confirm handler; this function never records.
+ */
+export function acceptCasePairCompanion(
+  input: CasePairProposalInput,
+  bcp47: string | undefined,
+): CasePairProposal | null {
+  const locale = bcp47 !== undefined && bcp47 !== "" ? bcp47 : undefined;
+
+  // The single casing source. `caseCounterpart` owns every guard that
+  // decides whether a pairing exists at all — one code point, \p{Ll}/\p{Lu}
+  // only, one-to-one, locale-aware — so caseless scripts, self-mapping
+  // letters (ĸ) and multi-character expansions (ß, ﬃ) all land here as
+  // null and raise nothing.
+  const pair = caseCounterpart(input.originalChar, locale);
+  if (pair === null || pair.direction !== "toUpper") return null;
+
+  // Georgian: Unicode gives Mkhedruli a formal Mtavruli uppercase mapping,
+  // but that mapping is a stylistic all-caps register, not a Shift
+  // companion in ordinary Georgian orthography — Unicode case properties
+  // say nothing about orthographic convention. The corpus backs this up:
+  // basic_kbdgeo (../keyboards) maps every [SHIFT K_x] to the IDENTICAL
+  // codepoint as its base rule, and this project's own facet classifier
+  // independently labels it casing: "caseless", caps-handling:
+  // notApplicable. Suppressed here rather than in `caseCounterpart` so the
+  // engine's case-pair derivation stays a pure Unicode fact and the
+  // orthographic-convention judgment call lives with the one caller that
+  // turns it into an authored proposal.
+  if (isOrthographicallyUnicameral(input.originalChar)) return null;
+
+  // "Counterpart already placed" (spec §Edge Cases) — asked only now that
+  // the counterpart exists, and stripped from what gets stored.
+  const { alreadyProduced, ...parts } = input;
+  if (alreadyProduced?.(pair.counterpart) === true) return null;
+
+  if (parts.mechanism === "combo") {
+    // The INPUT side must case-shift too: a parallel combo whose base
+    // letter has no confident capital is not a combo we can propose.
+    const parallelCombo = caseShiftCombo(parts.combo, locale);
+    if (parallelCombo === null) return null;
+    return { ...parts, counterpart: pair.counterpart, parallelCombo };
+  }
+
+  return { ...parts, counterpart: pair.counterpart };
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -217,42 +282,9 @@ export function useCasePairCompanion(): UseCasePairCompanion {
 
   const propose = useCallback(
     (input: CasePairProposalInput): boolean => {
-      // The single casing source. `caseCounterpart` owns every guard that
-      // decides whether a pairing exists at all — one code point, \p{Ll}/\p{Lu}
-      // only, one-to-one, locale-aware — so caseless scripts, self-mapping
-      // letters (ĸ) and multi-character expansions (ß, ﬃ) all land here as
-      // null and raise nothing.
-      const pair = caseCounterpart(input.originalChar, bcp47);
-      if (pair === null || pair.direction !== "toUpper") return false;
-
-      // Georgian: Unicode gives Mkhedruli a formal Mtavruli uppercase mapping,
-      // but that mapping is a stylistic all-caps register, not a Shift
-      // companion in ordinary Georgian orthography — Unicode case properties
-      // say nothing about orthographic convention. The corpus backs this up:
-      // basic_kbdgeo (../keyboards) maps every [SHIFT K_x] to the IDENTICAL
-      // codepoint as its base rule, and this project's own facet classifier
-      // independently labels it casing: "caseless", caps-handling:
-      // notApplicable. Suppressed here rather than in `caseCounterpart` so the
-      // engine's case-pair derivation stays a pure Unicode fact and the
-      // orthographic-convention judgment call lives with the one caller that
-      // turns it into an authored proposal.
-      if (isOrthographicallyUnicameral(input.originalChar)) return false;
-
-      // "Counterpart already placed" (spec §Edge Cases) — asked only now that
-      // the counterpart exists, and stripped from what gets stored.
-      const { alreadyProduced, ...parts } = input;
-      if (alreadyProduced?.(pair.counterpart) === true) return false;
-
-      if (parts.mechanism === "combo") {
-        // The INPUT side must case-shift too: a parallel combo whose base
-        // letter has no confident capital is not a combo we can propose.
-        const parallelCombo = caseShiftCombo(parts.combo, bcp47);
-        if (parallelCombo === null) return false;
-        setProposal({ ...parts, counterpart: pair.counterpart, parallelCombo });
-        return true;
-      }
-
-      setProposal({ ...parts, counterpart: pair.counterpart });
+      const next = acceptCasePairCompanion(input, bcp47);
+      if (next === null) return false;
+      setProposal(next);
       return true;
     },
     [bcp47],

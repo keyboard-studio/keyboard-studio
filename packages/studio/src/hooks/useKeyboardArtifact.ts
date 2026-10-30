@@ -17,8 +17,7 @@ import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
 import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
-import { analyseContextTolerance } from "../lib/contextToleranceAnalysis.ts";
-import { lookupNormalizationVerification } from "../lib/normalizationVerification.ts";
+import { runContextToleranceAnalysis } from "../lib/contextToleranceRun.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -678,42 +677,9 @@ export function useKeyboardArtifact(
     // Analyse what the preview actually compiled: the IR parsed from the
     // projected .kmn. The store's working IR is never emitted into the
     // artifact (see projectWorkingCopyVfs), so it can lag what the author runs.
-    const {
-      ir: workingIr,
-      startKeyboard,
-      setContextTolerance,
-      contextToleranceOverlay,
-      contextNormalizationStep,
-      setContextNormalizationStep,
-    } = useWorkingCopyStore.getState();
-    const ir = parsedIr ?? workingIr;
+    const ir = parsedIr ?? useWorkingCopyStore.getState().ir;
     if (ir === null) return;
-    const isCurrent = (): boolean => runId.current === thisRunId;
-    setContextTolerance({ status: "analysing", runId: thisRunId });
-    analyseContextTolerance(ir, isCurrent, contextToleranceOverlay, {
-      normalizationSnapshot: contextNormalizationStep,
-      verificationLookup: lookupNormalizationVerification,
-      // A copy-a-keyboard project carries a new keyboard id, but its rules are
-      // the base's: the base's verification verdict applies to it (spec 086).
-      verificationLineage: startKeyboard === null ? [] : [startKeyboard.id],
-      onNormalizationStored: (stored) => {
-        // Persist only a changed entry (spec 086 FR-016): a cache hit re-stores nothing.
-        if (isCurrent() && stored.cacheKey !== contextNormalizationStep?.cacheKey) {
-          setContextNormalizationStep(stored);
-        }
-      },
-    }).then(
-      (result) => {
-        if (result === null || !isCurrent()) return;
-        useWorkingCopyStore.getState().setContextTolerance({ status: "ready", runId: thisRunId, ...result });
-      },
-      (err: unknown) => {
-        if (!isCurrent()) return;
-        const reason = err instanceof Error ? err.message : String(err);
-        devLog.warn("[useKeyboardArtifact] context-tolerance analysis failed:", err);
-        useWorkingCopyStore.getState().setContextTolerance({ status: "failed", runId: thisRunId, reason });
-      },
-    );
+    void runContextToleranceAnalysis(ir, thisRunId, () => runId.current === thisRunId);
   }, []);
 
   // Separate compile step, callable independently for the recompile() path.

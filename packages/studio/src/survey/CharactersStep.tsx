@@ -24,8 +24,7 @@ import type {
   RemapPosture,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
-import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
-import { deriveRemapPosture, marksLackingPairingEvidence } from "@keyboard-studio/engine";
+import { deriveRemapPosture } from "@keyboard-studio/engine";
 import type { SurveyContext } from "./types.ts";
 import type { Decision, DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../steps/galleryHost.tsx";
@@ -48,6 +47,12 @@ import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import { ADDITION_ANSWER_PREFIX } from "./characterFlags.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
 import { MarksTextSamplePrompt } from "./MarksTextSamplePrompt.tsx";
+import {
+  TEXT_SAMPLE_PROMPT_ANSWER_ID,
+  isTextSamplePromptDismissed,
+  proposeTextSample,
+  textSampleSkipAnswer,
+} from "./marksTextSample.ts";
 // The substage views (Prefill, PhaseB) arrive through the gallery
 // host's step-context extras, supplied by CharactersStepHost — NOT by
 // import. Both views transitively import the question registry
@@ -96,7 +101,6 @@ export interface CharactersStepExtras {
 // The survey-answer id recording a #1784 text-sample-prompt dismissal. The
 // value is `skipped:<alphabet key>` — keyed by alphabet content so a
 // genuinely changed alphabet re-arms the prompt.
-const TEXT_SAMPLE_PROMPT_ANSWER_ID = "characters.textSamplePrompt";
 
 // Manifest step id — matches steps/manifest.ts's "characters" entry.
 //
@@ -391,19 +395,15 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
 
   /** The #1784 prompt was dismissed for this exact alphabet already. */
   function textSamplePromptDismissed(alphabet: ConfirmedAlphabet): boolean {
-    const saved =
-      useSurveyAnswerStore.getState().steps[CHARACTERS_STEP_ID]?.answers[
-        TEXT_SAMPLE_PROMPT_ANSWER_ID
-      ];
-    return saved?.value === `skipped:${confirmedAlphabetKey(alphabet)}`;
+    return isTextSamplePromptDismissed(
+      useSurveyAnswerStore.getState().steps[CHARACTERS_STEP_ID]?.answers[TEXT_SAMPLE_PROMPT_ANSWER_ID],
+      alphabet,
+    );
   }
 
   function handlePhaseBComplete(result: SurveyPhaseResult): void {
     const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
-    if (
-      marksLackingPairingEvidence(alphabet).length > 0 &&
-      !textSamplePromptDismissed(alphabet)
-    ) {
+    if (proposeTextSample(alphabet) !== null && !textSamplePromptDismissed(alphabet)) {
       setDeferredResult(result);
       return;
     }
@@ -411,20 +411,8 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   }
 
   function handlePromptSkip(): void {
-    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
-    const key = confirmedAlphabetKey(alphabet);
-    useSurveyAnswerStore.getState().saveAnswer(
-      CHARACTERS_STEP_ID,
-      TEXT_SAMPLE_PROMPT_ANSWER_ID,
-      {
-        value: `skipped:${key}`,
-        answerType: "select",
-        origin: "confirmed",
-        stage: "confirmed",
-        evidenceKey: key,
-        screenId: "text-sample-prompt",
-      },
-    );
+    const { answerId, answer } = textSampleSkipAnswer(draftConfirmedAlphabet(getCharacterInventoryValue()));
+    useSurveyAnswerStore.getState().saveAnswer(CHARACTERS_STEP_ID, answerId, answer);
     const done = deferredResult;
     setDeferredResult(null);
     if (done !== null) completeCharacters(done);
@@ -435,7 +423,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // deferred completion with the enriched alphabet.
   useEffect(() => {
     if (deferredResult === null) return;
-    if (marksLackingPairingEvidence(draftConfirmedAlphabet(draftValue)).length === 0) {
+    if (proposeTextSample(draftConfirmedAlphabet(draftValue)) === null) {
       setDeferredResult(null);
       completeCharacters(deferredResult);
     }
@@ -511,14 +499,12 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // place of PhaseB until the harvest covers the marks or the designer
   // skips. Back returns to the build list (Done re-fires the prompt).
   if (deferredResult !== null) {
-    const alphabet = draftConfirmedAlphabet(draftValue);
-    const lacking = marksLackingPairingEvidence(alphabet);
-    if (lacking.length > 0) {
-      const hadTextSample = alphabet.attestedStacks.some((s) => s.source === "text");
+    const proposal = proposeTextSample(draftConfirmedAlphabet(draftValue));
+    if (proposal !== null) {
       return (
         <MarksTextSamplePrompt
-          lackingMarks={lacking}
-          hadTextSample={hadTextSample}
+          lackingMarks={proposal.lackingMarks}
+          hadTextSample={proposal.hadTextSample}
           onBack={() => setDeferredResult(null)}
           onSkip={handlePromptSkip}
         />

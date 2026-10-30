@@ -15,9 +15,12 @@
 // every deadkey keeps a reachable trigger.
 
 import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
-import { listDeadkeys } from "@keyboard-studio/contracts";
+import { allocateDeadkeyId, listDeadkeys } from "@keyboard-studio/contracts";
 import { DEADKEY_OPTIONS } from "../deadkey/deadkeyTriggerOptions.ts";
 import { PATTERN_SWAP, deadkeyPairsOfSlots, isDeadkeyPatternId } from "./patternIds.ts";
+import { TRIGGER_KEY_CHARS } from "../deadkey/deadkeyTriggerOptions.ts";
+import { hex4 } from "../deadkey/deadkeyWrite.ts";
+import { resolvedVkeyOf, type KeyPickerResolution } from "../../lib/charInput.ts";
 
 /** Purpose key for characters with no combining mark (ɛ, Ɔ, ŋ …). */
 export const VARIANT_PURPOSE = "variant";
@@ -219,4 +222,115 @@ export function rememberedDeadkeyEscapes(
     }
   }
   return new Set(DEADKEY_ESCAPES);
+}
+
+// ---------------------------------------------------------------------------
+// The id + accentChar derivation is the second half of the seam:
+// `resolveS02DeadkeyIdentity` is the ONLY place an S-02 mint derives its
+// deadkeyName/accentChar. The manual deadkey Apply and the S-02 suggestion
+// accept both call it; the case-pair companion reuses the identity the
+// proposal captured (it must share the id, never mint a new one).
+//
+// Ids are numeric-only (hex4 for the deadkeyName slot): the "dead0" forced
+// derivation is gone — every mint goes through allocateDeadkeyId.
+//
+// One deadkey per trigger: a placement on a trigger the session already gave
+// a deadkey reuses that id rather than minting a second, unreachable one
+// (deadkeyPurpose.ts proposes the trigger by the mark the character adds).
+//
+// Honest seam note: allocateDeadkeyId(workingIr) alone is NOT enough. The
+// working IR does not carry this session's phase-C assignments
+// (recordAssignments stores them in phaseResults; the working IR only sees
+// setWorkingIR mutations), so a second S-02 mint in the same gallery visit
+// would re-mint the first one's id. allocateS02DeadkeyId additionally
+// reserves every numeric deadkeyName already minted in this session's
+// assignments and skips past them. The reservation is session-local; ids
+// minted by the Deadkeys step (committed through setWorkingIR) are visible
+// via the IR itself.
+// ---------------------------------------------------------------------------
+
+/**
+ * Numeric ids already minted as S-02 deadkeyName slots in this session's
+ * assignments. 1–8 hex chars count — the pipeline imposes no 0xffff cap,
+ * so a 5-digit session-minted id must still be reserved.
+ */
+function sessionMintedDeadkeyIds(
+  sessionAssignments: readonly MechanismAssignment[],
+): Set<number> {
+  const ids = new Set<number>();
+  for (const a of sessionAssignments) {
+    for (const m of a.mechanisms) {
+      if (!isDeadkeyPatternId(m.patternId)) continue;
+      const name = m.slotValues?.["deadkeyName"];
+      // 1–8 hex digits — matches the deadkey editors' parseIdText: the
+      // pipeline imposes no 0xffff cap, so a 5-digit session-minted id
+      // must still be reserved.
+      if (typeof name !== "string" || !/^[0-9a-fA-F]{1,8}$/.test(name)) continue;
+      const id = parseInt(name, 16);
+      if (!Number.isNaN(id)) ids.add(id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Allocate the numeric id for a NEW S-02 deadkey assignment: the engine's
+ * allocateDeadkeyId over the working IR, skipping past any ids already
+ * minted in this session's assignments (see the seam note above).
+ */
+function allocateS02DeadkeyId(
+  workingIr: KeyboardIR | null,
+  sessionAssignments: readonly MechanismAssignment[],
+): number {
+  // Mirrors the engine's LEGACY_ID_CEILING floor (0x2FFF) for the
+  // no-working-IR case — allocateDeadkeyId itself applies the same floor.
+  let id = workingIr !== null ? allocateDeadkeyId(workingIr) : 0x3000;
+  const reserved = sessionMintedDeadkeyIds(sessionAssignments);
+  while (reserved.has(id)) id += 1;
+  return id;
+}
+
+/** The identity half of an S-02 mint: numeric id + trigger literal. */
+export interface S02DeadkeyIdentity {
+  /** hex4 numeric id for the deadkeyName slot — never "dead0". */
+  deadkeyName: string;
+  /**
+   * The trigger key's literal character (double-tap escape output). For the
+   * 4 built-in trigger keys this is the key's character (e.g. ';' for
+   * K_COLON); for a custom trigger character, the resolved character itself.
+   */
+  accentChar: string;
+}
+
+/**
+ * Resolve the identity for a new S-02 deadkey assignment — the single seam
+ * the manual deadkey card and the S-02 suggestion accept derive
+ * deadkeyName/accentChar through. accentChar keeps the old convention (the
+ * trigger key's literal character).
+ *
+ * A trigger key carries ONE deadkey: when a session placement already put a
+ * deadkey on the resolved trigger, its id and accentChar are reused, so
+ * applyAssignments merges the two into one bases/output store pair (see
+ * deadkeyPurpose.ts). Only a trigger with no session deadkey mints a fresh id.
+ */
+export function resolveS02DeadkeyIdentity(params: {
+  /** Raw key-picker value (one of DEADKEY_OPTIONS or ""). */
+  triggerKey: string;
+  /** resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, …). */
+  triggerResolution: KeyPickerResolution;
+  workingIr: KeyboardIR | null;
+  sessionAssignments: readonly MechanismAssignment[];
+}): S02DeadkeyIdentity {
+  const { triggerKey, triggerResolution, workingIr, sessionAssignments } = params;
+  const vkey = resolvedVkeyOf(triggerResolution);
+  const existing = vkey !== null ? sessionDeadkeys(sessionAssignments).get(vkey) : undefined;
+  if (existing !== undefined) {
+    return { deadkeyName: existing.deadkeyName, accentChar: existing.accentChar };
+  }
+  const id = allocateS02DeadkeyId(workingIr, sessionAssignments);
+  const accentChar =
+    triggerResolution.kind === "customOk"
+      ? triggerResolution.char
+      : (TRIGGER_KEY_CHARS[triggerKey] ?? "");
+  return { deadkeyName: hex4(id), accentChar };
 }

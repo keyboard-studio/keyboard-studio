@@ -5,6 +5,7 @@ import {
   VARIANT_PURPOSE,
   deadkeyPurposeOf,
   proposeS02TriggerKey,
+  resolveS02DeadkeyIdentity,
   s02BaseClash,
   sessionDeadkeys,
 } from "./deadkeyPurpose.ts";
@@ -132,5 +133,38 @@ describe("s02BaseClash", () => {
     expect(
       s02BaseClash({ triggerKey: "K_COLON", baseLetter: "e", currentChar: "ě", sessionAssignments: session }),
     ).toBeNull();
+  });
+});
+
+describe("resolveS02DeadkeyIdentity", () => {
+  it("mints a fresh hex4 id and the trigger's literal character on an empty session", () => {
+    expect(
+      resolveS02DeadkeyIdentity({
+        triggerKey: "K_COLON",
+        triggerResolution: { kind: "key", vkey: "K_COLON" },
+        workingIr: null,
+        sessionAssignments: [],
+      }),
+    ).toEqual({ deadkeyName: "3000", accentChar: ";" });
+  });
+
+  it("skips ids already minted this session on a different trigger", () => {
+    const id = resolveS02DeadkeyIdentity({
+      triggerKey: "K_LBRKT",
+      triggerResolution: { kind: "key", vkey: "K_LBRKT" },
+      workingIr: null,
+      sessionAssignments: [dk("ǎ", "K_COLON", "3000", "a")],
+    });
+    expect(id).toEqual({ deadkeyName: "3001", accentChar: "[" });
+  });
+
+  it("reuses the id and accentChar of a deadkey already on the trigger", () => {
+    const id = resolveS02DeadkeyIdentity({
+      triggerKey: "K_COLON",
+      triggerResolution: { kind: "key", vkey: "K_COLON" },
+      workingIr: null,
+      sessionAssignments: [dk("ǎ", "K_COLON", "3000", "a")],
+    });
+    expect(id).toEqual({ deadkeyName: "3000", accentChar: ";" });
   });
 });

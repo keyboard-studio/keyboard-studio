@@ -47,54 +47,45 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type {
   AttestedStack,
-  ConfirmedAlphabet,
   GuardSpecification,
   MarksContextToleranceDecision,
   SurveyAnswer,
-  SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
+import { confirmedAlphabetKey, stackKey } from "@keyboard-studio/contracts";
 import {
-  confirmedAlphabetKey,
-  makeConfirmedAlphabet,
-  makeEmptyPlacementWorklist,
-  measureKeyBudget,
-  stackKey,
-} from "@keyboard-studio/contracts";
-import {
-  groupMarkClasses,
-  buildAttestationFold,
-  proposeAttachments,
-  nfcPostureOfInventory,
-  resolveOutputFormProposal,
-  resolveBackspaceProposal,
-  hasDecidablePairs,
-  computeMarkTreatmentPrefills,
-  buildPlacementWorklist,
-  expandCaseCounterpartAttachments,
-  expandCaseCounterpartPromotions,
-  deriveMarksComputedAxes,
-  detectStartMarkMechanism,
   promotableCharacters,
-  prunePromotions,
-  treatmentFor,
-  getEffectiveFacet,
-  CASING_FACET_ID,
-  type AttachmentProposal,
-  type MarkClass,
-  type MarksComputedAxes,
   type MarkTreatment,
-  type MarkTreatmentAnswer,
   type OutputForm,
   type PromotedComposedCharacter,
 } from "@keyboard-studio/engine";
 import type { BackspaceBehaviour, MarkInputOrder } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
+import { EMPTY_MARKS_VALUE, type MarksTreatmentValue } from "./marksValue.ts";
 import {
-  EMPTY_MARKS_VALUE,
-  type MarksCompletion,
-  type MarksTreatmentValue,
-} from "./marksValue.ts";
+  assembleMarksSeries,
+  attestedMultiMarkStacks,
+  buildMarksTreatmentValue,
+  computeMarksGate,
+  deriveMarksBasis,
+  deriveTreatmentPrefills,
+  expandAttachmentsForCase,
+  guardAnswerFor,
+  guardChoiceOf,
+  guardRecordForCommit,
+  guardSeedBehaviourFor,
+  guardSeedFor,
+  isCasedBaseKeyboard,
+  marksSeriesAnswers,
+  marksStationAnswers,
+  resolveOutputStation,
+  resolveStackingStation,
+  resolveToleranceDecision,
+  resolveTreatmentStation,
+  seriesResult,
+  visibleMarksStations,
+  type MarksStationState,
+} from "./marksSeriesValue.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
@@ -102,16 +93,11 @@ import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore, type SavedAnswer } from "../../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../../lib/questionRecorder.ts";
 import {
-  reconcile,
   marksAttachmentKey,
   marksClassTreatmentKey,
   marksMarkTreatmentKey,
   marksStackKey as marksStackEvidenceKey,
-  marksOutputFormKey,
-  marksBackspaceKey,
-  marksInputOrderKey,
   marksPromotedKey,
-  marksStackingAllowedKey,
 } from "../../steps/evidence.ts";
 import { ATTACHMENT_SPACE, deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
 import { reproposalCueMessage } from "../reproposalReason.ts";
@@ -127,19 +113,9 @@ import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
 import { GuardStation } from "./GuardStation.tsx";
 import {
-  DEFAULT_GUARD_BEHAVIOUR,
-  GUARD_BEHAVIOUR_QUESTION_ID,
-  detectImportedGuardBehaviour,
-  findGuardReevaluationItems,
-  makeGuardSpecification,
   type GuardBehaviour,
 } from "./guardSpecification.ts";
-import { buildContextToleranceProposal, buildNormalizationStepProposal } from "./contextToleranceProposal.ts";
-import {
-  CONTEXT_TOLERANCE_QUESTION_ID,
-  CONTEXT_TOLERANCE_SITES_QUESTION_ID,
-  SITE_ID_SEPARATOR,
-} from "../../decisions/contextToleranceIds.ts";
+import { toleranceProposalFor, toleranceStationShown } from "./contextToleranceProposal.ts";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -149,25 +125,11 @@ import {
 } from "../surveyStyles.ts";
 
 // ---------------------------------------------------------------------------
-// S0 — the computed gate (never rendered).
+// S0 — the computed gate (never rendered). Lives in marksSeriesValue.ts so a
+// headless caller runs the same one; re-exported for existing importers.
 // ---------------------------------------------------------------------------
 
-export interface MarksGateResult {
-  /** True iff the marks store is empty — the whole series is skipped (FR-005). */
-  skip: boolean;
-  /** The alphabet the series runs against (empty stores when none confirmed). */
-  alphabet: ConfirmedAlphabet;
-}
-
-/**
- * Compute the S0 gate from the session's merged alphabet. Recomputed whenever
- * the confirmed alphabet changes (US1 AC2: adding a marked character after a
- * skip makes the series reachable again on the next advance).
- */
-export function computeMarksGate(alphabet: ConfirmedAlphabet | undefined): MarksGateResult {
-  const resolved = alphabet ?? makeConfirmedAlphabet();
-  return { skip: resolved.marks.length === 0, alphabet: resolved };
-}
+export { computeMarksGate, type MarksGateResult } from "./marksSeriesValue.ts";
 
 // ---------------------------------------------------------------------------
 // Station sequencing — the pinned station ids, in series order.
@@ -196,86 +158,10 @@ export type AttachmentChecked = Record<string, Record<string, boolean>>;
 export { initialAttachmentChecked } from "./marksViews.ts";
 
 /**
- * A class needs an on-screen S2 confirmation only when there is a genuine
- * decision: more than one mark in the class, or any of its marks reaching
- * more than one base (attested or plausible). A trivially single-pair class
- * takes EVERY one of its answers from the proposal — treatment, promotion, and
- * order — without a screen (spec 052 FR-019; SC-002: the simple orthography
- * stays at two screens).
+ * Re-exported from marksSeriesValue.ts (the visible-station rule uses it, and a
+ * headless caller must run the same one).
  */
-export function classNeedsTreatmentScreen(
-  markClass: MarkClass,
-  proposals: AttachmentProposal[],
-): boolean {
-  if (markClass.marks.length > 1) return true;
-  return markClass.marks.some((mark) => {
-    const proposal = proposals.find((p) => p.mark === mark);
-    if (proposal === undefined) return false;
-    return Object.values(proposal.states).filter((s) => s !== "blocked").length > 1;
-  });
-}
-
-/**
- * The series' phase result: reported on completion (or on the S0 skip). The
- * chosen output form is now a real contract field (SurveyPhaseResult.marksOutputForm,
- * spec 071) — the marks-treatment module's apply reads the same payload off
- * the recorded decision value (spec 090 T023) to run the mark guards; carve's
- * needed-set derivation reads it off the merged session.
- *
- * spec 079 R-04: `answers` now carries every station's recorded answers (not
- * just the final one) — `decisionLogStore.append`'s identical-value no-op
- * means the earlier stations' answers, already recorded at their own Next,
- * cost nothing extra to repeat here; this is what stops the stacking answers
- * (F-1) and every other station's answers from being discarded on completion.
- */
-/**
- * The survey answers a context-tolerance decision records (spec 078 FR-007):
- * the outcome, plus the accepted rule ids when only some were accepted.
- * Provenance is derived at record time (decisions/contextToleranceProposal.ts).
- */
-export function contextToleranceAnswers(decision: MarksContextToleranceDecision): SurveyAnswer[] {
-  const answers: SurveyAnswer[] = [
-    { questionId: CONTEXT_TOLERANCE_QUESTION_ID, answerType: "select", value: decision.decision },
-  ];
-  if (decision.decision === "partial") {
-    answers.push({
-      questionId: CONTEXT_TOLERANCE_SITES_QUESTION_ID,
-      answerType: "text",
-      value: decision.acceptedSiteIds.join(SITE_ID_SEPARATOR),
-    });
-  }
-  return answers;
-}
-
-function seriesResult(
-  worklist = makeEmptyPlacementWorklist(),
-  outputForm?: OutputForm,
-  computedAxes?: MarksComputedAxes,
-  answers: SurveyAnswer[] = [],
-  contextTolerance?: MarksContextToleranceDecision,
-  backspace?: BackspaceBehaviour,
-): SurveyPhaseResult {
-  return {
-    phase: "C",
-    answers: contextTolerance !== undefined ? [...answers, ...contextToleranceAnswers(contextTolerance)] : answers,
-    ...(contextTolerance !== undefined ? { marksContextTolerance: contextTolerance } : {}),
-    marksWorklist: worklist,
-    ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
-    ...(backspace !== undefined ? { marksBackspace: backspace } : {}),
-    // spec 052 US4: the recorded treatment finally reaches strategy selection.
-    // `computedAxes` is an existing additive optional field merged into
-    // session.axes by mergePhaseResults — its OMISSION here was the defect, so
-    // this needs no contract change, only a producer.
-    ...(computedAxes !== undefined
-      ? {
-          computedAxes: {
-            diacriticBehavior: computedAxes.diacriticBehavior,
-            markInputOrder: computedAxes.markInputOrder,
-          },
-        }
-      : {}),
-  };
-}
+export { classNeedsTreatmentScreen, contextToleranceAnswers } from "./marksSeriesValue.ts";
 
 const STEP_ID = "marks";
 
@@ -343,17 +229,15 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // keyboard's OTHER attested scripts are. Opening the gate for "mixed" folds
   // exactly the cased subset and leaves caseless characters alone; it doesn't
   // require new filtering, because that's what these primitives already do.
-  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
-  const isCasedBase = casingValue === "cased" || casingValue === "mixed";
+  const isCasedBase = isCasedBaseKeyboard(startIr);
   // Attestation is case-symmetric behind the same gate: a mark seen only on a
   // capital must still pre-tick the lowercase row, the only one shown below,
   // and must still group with a sibling seen only on the lowercase letter.
-  const fold = useMemo(() => buildAttestationFold(isCasedBase, bcp47), [isCasedBase, bcp47]);
-  const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet, fold), [gate.alphabet, fold]);
-  const proposals = useMemo(
-    () => proposeAttachments(gate.alphabet, classes, fold),
-    [gate.alphabet, classes, fold],
+  const basis = useMemo(
+    () => deriveMarksBasis(gate.alphabet, isCasedBase, bcp47),
+    [gate.alphabet, isCasedBase, bcp47],
   );
+  const { classes, proposals, posture } = basis;
   // Marks questions offer only lowercase/caseless bases (spec 049, US1); the
   // uppercase counterpart's attachment is derived, not asked. The affordance
   // count is pinned to the folded lowercase view (SC-004), and the shared fold
@@ -366,7 +250,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     () => (isCasedBase ? casedBaseCount(gate.alphabet.bases, bcp47) : 0),
     [gate.alphabet, bcp47, isCasedBase],
   );
-  const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
 
   // --- S1 attachment: derived from the store via reconcile(), never useState ---
 
@@ -382,10 +265,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // asked only about lowercase bases, so every checked cased base additively
   // checks its uppercase counterpart (spec 049 US2 / FR-002).
   const expandedAttachments = useMemo(
-    () =>
-      isCasedBase
-        ? expandCaseCounterpartAttachments(gate.alphabet, attachmentChecked, bcp47)
-        : attachmentChecked,
+    () => expandAttachmentsForCase(gate.alphabet, attachmentChecked, isCasedBase, bcp47),
     [gate.alphabet, attachmentChecked, bcp47, isCasedBase],
   );
 
@@ -403,25 +283,12 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
-  // The single authoritative key-budget determination (spec 052 FR-016). Null
-  // when there is no base, or when the base binds no stock physical key at all —
-  // an unmeasured budget, which does not gate promotion (see the prefill's
-  // options JSDoc). Every other report of key availability in the product is a
-  // projection of this same measurement (SC-008).
-  const keyBudget = useMemo(
-    () => (startIr != null ? measureKeyBudget(startIr) : null),
-    [startIr],
-  );
-
+  // The marks-treatment prefills, including the single authoritative key-budget
+  // determination (spec 052 FR-016): every other report of key availability in
+  // the product is a projection of that same measurement (SC-008).
   const treatmentPrefills = useMemo(
-    () =>
-      computeMarkTreatmentPrefills(gate.alphabet, classes, proposals, {
-        startIr,
-        keyBudget,
-        attachments: expandedAttachments,
-        ...fold,
-      }),
-    [gate.alphabet, classes, proposals, startIr, keyBudget, expandedAttachments, fold],
+    () => deriveTreatmentPrefills({ alphabet: gate.alphabet, basis, startIr, expandedAttachments }),
+    [gate.alphabet, basis, startIr, expandedAttachments],
   );
 
   // What each class could promote — offered on lowercase/caseless bases only.
@@ -443,45 +310,26 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // --- S2 treatment: class/mark treatment, promotion, input order (all from
   // the store via reconcile()) ---
 
-  const classTreatment: Record<string, MarkTreatment> = {};
-  for (const prefill of treatmentPrefills) {
-    const markClass = classes.find((c) => c.id === prefill.classId);
-    const key = marksClassTreatmentKey(markClass?.marks ?? []);
-    const view = reconcile(
-      savedAnswers[`marks_treatment.class.${prefill.classId}`],
-      key,
-      prefill.recommended,
-    );
-    classTreatment[prefill.classId] = view.value as MarkTreatment;
-  }
-
-  const markTreatment: Record<string, MarkTreatment> = {};
-  for (const mark of gate.alphabet.marks) {
-    const markClass = classes.find((c) => c.marks.includes(mark));
-    if (markClass === undefined) continue;
-    const saved = savedAnswers[`marks_treatment.mark.${mark}`];
-    // A per-mark override exists only once the author sets one explicitly — an
-    // unsaved override falls through to the class answer via `treatmentFor`,
-    // never a proposal of its own.
-    if (saved === undefined) continue;
-    const key = marksMarkTreatmentKey(gate.alphabet, mark, markClass.id);
-    const view = reconcile(saved, key, saved.value as MarkTreatment, (v) => v);
-    markTreatment[mark] = view.value as MarkTreatment;
-  }
-
-  // spec 079 US3 item 5: keyed over the SAVED promoted list's own components'
-  // presence, not the whole alphabet (`marksKey`) — an unrelated letter
-  // addition must not flag every promotion (SC-003).
-  const savedPromotedAnswer = savedAnswers["marks_treatment.promoted"];
-  const savedPromoted = (savedPromotedAnswer?.value as string[] | undefined) ?? [];
-  const promotedKey = marksPromotedKey(gate.alphabet, savedPromoted);
-  const promotedView = reconcile(
-    savedPromotedAnswer,
-    promotedKey,
-    [] as string[],
-    (saved) => prunePromotions(gate.alphabet, saved, expandedAttachments),
-  );
-  const promoted = promotedView.value;
+  const treatmentStation = resolveTreatmentStation({
+    alphabet: gate.alphabet,
+    classes,
+    prefills: treatmentPrefills,
+    expandedAttachments,
+    importedOrder,
+    saved: savedAnswers,
+  });
+  const {
+    classTreatment,
+    markTreatment,
+    promoted,
+    inputOrder,
+    seededOrder,
+    prefilledFromImport,
+    orderKey,
+    orderExplicitlySet,
+    hasOwnKeyMark,
+    treatment,
+  } = treatmentStation;
 
   function handleClassTreatmentChange(classId: string, next: MarkTreatment): void {
     const markClass = classes.find((c) => c.id === classId);
@@ -528,40 +376,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
-  // Own-key resolution needs only class/mark treatment (never `inputOrder`
-  // itself), so it can be computed before the input-order answer below.
-  // Kept as the list (not a bare predicate): the input-order evidence key is
-  // keyed over exactly these marks. (#2297 removed S4's former use of this
-  // list — the output-form station no longer states the treatment outcome
-  // back, because its suggestion must not derive from treatment.)
-  const ownKeyMarks = gate.alphabet.marks.filter(
-    (mark) =>
-      treatmentFor(
-        mark,
-        { classTreatment, markTreatment, promoted, inputOrder: "postfix" },
-        classes,
-        treatmentPrefills,
-      ) === "own-key",
-  );
-
-  const hasOwnKeyMark = ownKeyMarks.length > 0;
-
-  // S2 — input order. Prefilled from the base keyboard's own behavior when
-  // available (detectMarkInputOrderFromImport seeds session.axes.markInputOrder).
-  const prefilledFromImport = importedOrder === "prefix" || importedOrder === "postfix";
-  const seededOrder: MarkInputOrder = prefilledFromImport
-    ? (importedOrder as MarkInputOrder)
-    : "postfix";
-  // spec 079 US3 item 5 / FR-012: an explicitly set order is carried forward
-  // via `adjust` while still applicable, and treated as `inactive` (kept, no
-  // flag) rather than `reproposed` once no mark has a key of its own to order
-  // — `currentKey = null` is `reconcile()`'s inactive signal.
-  const orderKey = hasOwnKeyMark ? marksInputOrderKey(ownKeyMarks) : null;
-  const savedOrder = savedAnswers["marks_treatment.input_order"];
-  const orderExplicitlySet = savedOrder !== undefined;
-  const orderView = reconcile(savedOrder, orderKey, seededOrder, (saved) => saved as MarkInputOrder);
-  const inputOrder = orderView.value;
-
   function handleInputOrderChange(next: MarkInputOrder): void {
     saveAnswer(STEP_ID, "marks_treatment.input_order", {
       value: next,
@@ -573,37 +387,17 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
-  const treatment: MarkTreatmentAnswer = { classTreatment, markTreatment, promoted, inputOrder };
-
   // --- S4 output form ---
 
-  const postureId = useMemo(
-    () =>
-      [...posture]
-        .map((p) => `${stackKey(p.stack)}:${p.hasReadyMadeForm ? 1 : 0}`)
-        .sort()
-        .join(","),
-    [posture],
+  // The form SUGGESTION derives from the input order alone, the backspace
+  // suggestion from the chosen form; see resolveOutputStation for the rules
+  // (#2297, #2302) and the evidence keys that re-propose them.
+  const outputStation = useMemo(
+    () => resolveOutputStation({ posture, inputOrder, saved: savedAnswers }),
+    [posture, inputOrder, savedAnswers],
   );
-  // #2297: the output-form SUGGESTION derives from the input order alone —
-  // never from treatment, never from the posture table. The saved answer is
-  // reconciled against the posture evidence key only, so neither an order
-  // change nor a treatment change can move a confirmed composition answer;
-  // and there is no clamp: ready-made stays a legal answer even when some
-  // pair has no ready-made form (those pairs fall back to base plus mark
-  // automatically — the old #1762 clamp implemented the FR-014 forcing
-  // #2297 removes).
-  const outputFormProposal = useMemo(
-    () => resolveOutputFormProposal(posture, inputOrder),
-    [posture, inputOrder],
-  );
-  const outputFormKey = marksOutputFormKey(postureId);
-  const outputFormView = reconcile(
-    savedAnswers["marks_output_form.form"],
-    outputFormKey,
-    outputFormProposal.form,
-  );
-  const outputForm = outputFormView.value as OutputForm;
+  const { postureId, outputFormProposal, outputFormKey, outputForm, backspaceProposal, backspaceKey, backspace } =
+    outputStation;
 
   function handleOutputFormChange(next: OutputForm): void {
     saveAnswer(STEP_ID, "marks_output_form.form", {
@@ -616,29 +410,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
-  // --- S4 backspace (#2302) ---
-  //
-  // Its own whole-keyboard answer at the same station, interrelated with
-  // the composition answer yet independent of it (Matthew's model,
-  // 2026-10-19). The SUGGESTION follows the chosen form — the consistent
-  // pairing (base-plus-mark ↔ peel, ready-made ↔ whole-stack) — and the
-  // author may override to the other behaviour; the engine generates the
-  // rules for the off-pairings at completion (pattern-apply/mark-guards).
-  // The evidence key carries the form, so changing the composition answer
-  // re-proposes the backspace answer against the new pairing (spec 079)
-  // rather than silently carrying the old confirmation across.
-  const backspaceProposal = useMemo(
-    () => resolveBackspaceProposal(outputForm),
-    [outputForm],
-  );
-  const backspaceKey = marksBackspaceKey(outputForm, postureId);
-  const backspaceView = reconcile(
-    savedAnswers["marks_output_form.backspace"],
-    backspaceKey,
-    backspaceProposal.behaviour,
-  );
-  const backspace = backspaceView.value as BackspaceBehaviour;
-
   function handleBackspaceChange(next: BackspaceBehaviour): void {
     saveAnswer(STEP_ID, "marks_output_form.backspace", {
       value: next,
@@ -650,58 +421,19 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     });
   }
 
-  // S5 — evidence: an attested >=2-mark stack, or two marks' reachable base
-  // sets overlapping (FR-018). Confirmed list defaults to the attested stacks
-  // (propose-then-confirm), never inferred from attachment rows (FR-019).
+  // S5 — stacking: evidence, the proposal and the confirmed list are resolved
+  // by resolveStackingStation (FR-018/FR-019).
   const multiMarkStacks = useMemo<AttestedStack[]>(
-    () => gate.alphabet.attestedStacks.filter((s) => s.marks.length >= 2),
+    () => attestedMultiMarkStacks(gate.alphabet),
     [gate.alphabet],
   );
-  const marksOverlap = useMemo(() => {
-    const reachable = proposals.map((p) =>
-      new Set(Object.entries(p.states).filter(([, s]) => s !== "blocked").map(([b]) => b)),
-    );
-    for (let i = 0; i < reachable.length; i++) {
-      for (let j = i + 1; j < reachable.length; j++) {
-        const a = reachable[i];
-        const b = reachable[j];
-        if (a !== undefined && b !== undefined && [...a].some((x) => b.has(x))) return true;
-      }
-    }
-    return false;
-  }, [proposals]);
-  const stackingEvidence = multiMarkStacks.length > 0 || marksOverlap;
-
-  // spec 079 US3 item 5: keyed over the SET of attested multi-mark stacks, not
-  // the whole alphabet (`marksKey`) — SC-003.
-  const stackingKey = marksStackingAllowedKey(multiMarkStacks.map((s) => stackKey(s)));
-  const stackingProposal = multiMarkStacks.length > 0;
-  const stackingAllowedView = reconcile(
-    savedAnswers["marks_stacking.allowed"],
-    stackingKey,
-    stackingProposal,
-  );
-  const stackingAllowed = stackingAllowedView.value as boolean;
-
-  const stacksConfirmed: Record<string, boolean> = {};
-  for (const stack of multiMarkStacks) {
-    const key = stackKey(stack);
-    const evidenceKey = marksStackEvidenceKey(gate.alphabet, stack.marks);
-    const view = reconcile(savedAnswers[`marks_stacking.stack.${key}`], evidenceKey, true);
-    stacksConfirmed[key] = view.value as boolean;
-  }
-
-  /**
-   * The attested stacks the author kept (spec 106): single-mark stacks always,
-   * a multi-mark stack only while stacking is allowed and that stack is ticked.
-   * The completion records these, so the guard allows, and the whole-stack
-   * backspace clears, exactly the stacks the stacking station confirmed.
-   */
-  function keptStacks(): AttestedStack[] {
-    return gate.alphabet.attestedStacks.filter(
-      (s) => s.marks.length < 2 || (stackingAllowed && stacksConfirmed[stackKey(s)] === true),
-    );
-  }
+  const { stackingEvidence, stackingKey, stackingProposal, stackingAllowed, stacksConfirmed } =
+    resolveStackingStation({
+      alphabet: gate.alphabet,
+      proposals,
+      multiMarkStacks,
+      saved: savedAnswers,
+    });
 
   function handleStackingAllowedChange(next: boolean): void {
     saveAnswer(STEP_ID, "marks_stacking.allowed", {
@@ -732,22 +464,9 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // The station's proposal, built from the latest analysis. `null` when there
   // is nothing to propose (no analysis yet, failed, or no fixable
   // rule; could-not-check items are never author-facing, not here either).
-  const toleranceProposal = useMemo(() => {
-    if (tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
-    if (tolerance.normalizationStep !== undefined) {
-      const ruleCount = tolerance.normalizationStep.ruleCount;
-      // The station's own intro, examples and disclosure carry the wording; the
-      // panel's description and the (hidden) site framing stay empty.
-      return buildNormalizationStepProposal({ ruleCount, framing: "", description: "" });
-    }
-    const fixable = new Set(tolerance.fixableRuleIds);
-    const addedRuleCount = tolerance.proposal.variants.filter((v) => fixable.has(v.sourceRuleId)).length;
-    return buildContextToleranceProposal({
-      fixableRuleIds: tolerance.fixableRuleIds,
-      findings: tolerance.report.findings,
-      addedRuleCount,
-      siteIds: tolerance.siteKeys,
-      text: {
+  const toleranceProposal = useMemo(
+    () =>
+      toleranceProposalFor(tolerance, {
         siteFraming: (line, key) =>
           t({ id: "marks.contextTolerance.station.site.label", message: `The ${key} key (rule on line ${line})` }),
         description: (added, sites) =>
@@ -758,9 +477,9 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
               other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
             }),
           }),
-      },
-    });
-  }, [tolerance, t]);
+      }),
+    [tolerance, t],
+  );
   const toleranceDisclosures = useMemo<Record<string, SiteDisclosure>>(() => {
     if (tolerance.status !== "ready") return {};
     const byMarker = tolerance.proposal.disclosures ?? {};
@@ -801,8 +520,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   useEffect(() => {
     setToleranceDecision((d) => (d !== null && d.fingerprint !== toleranceFingerprint ? null : d));
   }, [toleranceFingerprint]);
-  const showToleranceStation =
-    tolerance.status === "analysing" || toleranceProposal !== null;
+  const showToleranceStation = toleranceStationShown(tolerance, toleranceProposal);
 
   // --- guard specification (spec 104 FR-013) ---
   // The per-keyboard answer the guard station records into the decision
@@ -815,100 +533,40 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   const priorGuard = marksValue.guardSpecification ?? undefined;
   const authoringTrack = decisions["authoring-track"]?.value;
   const guardSeedBehaviour = useMemo(
-    () =>
-      // A CONFIRMED prior ends the question (the station shows it
-      // read-only); an UNCONFIRMED prior is this seed itself, recorded
-      // provisionally by an intermediate station commit — the seed signal
-      // must survive that, or the station loses its seeded presentation
-      // before it ever renders.
-      authoringTrack === "adapt" && !(priorGuard?.confirmed ?? false) && startIr != null
-        ? detectImportedGuardBehaviour(startIr)
-        : undefined,
+    () => guardSeedBehaviourFor({ authoringTrack, priorGuard, startIr }),
     [authoringTrack, priorGuard, startIr],
   );
-  const guardSeed = useMemo(
-    () =>
-      guardSeedBehaviour !== undefined
-        ? makeGuardSpecification({
-            behaviour: guardSeedBehaviour,
-            origin: "seeded-from-import",
-            confirmed: false,
-            supersedesRecord: null,
-          })
-        : undefined,
-    [guardSeedBehaviour],
-  );
+  const guardSeed = useMemo(() => guardSeedFor(guardSeedBehaviour), [guardSeedBehaviour]);
   const [guardAnswer, setGuardAnswer] = useState<GuardSpecification | null>(null);
   /** The behaviour the guard station displays: the author's pick, else the prior answer, else the seed, else the default. */
-  const guardChoice: GuardBehaviour =
-    guardAnswer?.behaviour ?? priorGuard?.behaviour ?? guardSeedBehaviour ?? DEFAULT_GUARD_BEHAVIOUR;
+  const guardChoice: GuardBehaviour = guardChoiceOf({
+    guardAnswer,
+    priorGuard,
+    seedBehaviour: guardSeedBehaviour,
+  });
 
-  /**
-   * The specification a commit point records: the author's station answer
-   * wins; a prior record is carried unchanged; a seed rides provisionally
-   * until the commit point IS the guard station's own Continue, which
-   * confirms it as-is. With neither, the default is recorded only at the
-   * guard station's own Continue — the author saw it selected and passed.
-   */
-  function guardRecordForCommit(station: MarksStationId): GuardSpecification | null {
-    if (guardAnswer !== null) return guardAnswer;
-    // A CONFIRMED prior carries unchanged. An unconfirmed prior is the
-    // provisional seed itself (an intermediate commit recorded it) — it
-    // must fall through to the seed branch, or passing the guard station
-    // would never confirm it.
-    if (priorGuard !== undefined && priorGuard.confirmed) return priorGuard;
-    if (guardSeed !== undefined) {
-      return station === "marks_guard"
-        ? makeGuardSpecification({
-            behaviour: guardSeed.behaviour,
-            origin: "seeded-from-import",
-            confirmed: true,
-            supersedesRecord: guardSeed,
-          })
-        : guardSeed;
-    }
-    if (station === "marks_guard") {
-      return makeGuardSpecification({
-        behaviour: DEFAULT_GUARD_BEHAVIOUR,
-        origin: "asked",
-        confirmed: true,
-        supersedesRecord: priorGuard ?? null,
-      });
-    }
-    return priorGuard ?? null;
+  function guardRecordFor(station: MarksStationId): GuardSpecification | null {
+    return guardRecordForCommit({ station, guardAnswer, priorGuard, guardSeed });
   }
 
   function handleGuardChange(behaviour: GuardBehaviour): void {
-    const origin: GuardSpecification["origin"] =
-      guardSeed !== undefined && priorGuard === undefined && behaviour === guardSeed.behaviour
-        ? "seeded-from-import"
-        : "asked";
-    setGuardAnswer(
-      makeGuardSpecification({
-        behaviour,
-        origin,
-        confirmed: true,
-        supersedesRecord: priorGuard ?? guardSeed ?? null,
-      }),
-    );
+    setGuardAnswer(guardAnswerFor({ behaviour, priorGuard, guardSeed }));
   }
 
   // --- visible stations, in series order (at most FOUR — FR-018/SC-003,
   // plus spec 078's context-tolerance station and spec 104's guard station) ---
-  const needsTreatmentScreen = classes.some((c) => classNeedsTreatmentScreen(c, proposals));
-  const visibleStations: MarksStationId[] = useMemo(() => {
-    const stations: MarksStationId[] = [];
-    if (proposals.length > 0) stations.push("marks_attachment");
-    if (needsTreatmentScreen) stations.push("marks_treatment");
-    if (hasDecidablePairs(posture)) stations.push("marks_output_form");
-    if (stackingEvidence) stations.push("marks_stacking");
-    if (showToleranceStation) stations.push("marks_context_tolerance");
-    // Only a mark with a key of its own can be tapped with no letter before
-    // it. Output form is not the test: a ready-made keyboard can still have
-    // mark keys (output composition is independent of placement).
-    if (hasOwnKeyMark) stations.push("marks_guard");
-    return stations;
-  }, [proposals, needsTreatmentScreen, posture, stackingEvidence, showToleranceStation, hasOwnKeyMark]);
+  const visibleStations: MarksStationId[] = useMemo(
+    () =>
+      visibleMarksStations({
+        proposals,
+        classes,
+        posture,
+        stackingEvidence,
+        showToleranceStation,
+        hasOwnKeyMark,
+      }),
+    [proposals, classes, posture, stackingEvidence, showToleranceStation, hasOwnKeyMark],
+  );
 
   // spec 079 FR-004/FR-023: the author's position inside the series lives in
   // the answer store, not local state — leaving and returning (or an
@@ -1036,110 +694,31 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // reference.
   const activeStation: MarksStationId = currentStation;
 
-  function acceptedBasesFor(mark: string): string[] {
-    const row = attachmentChecked[mark] ?? {};
-    return Object.entries(row)
-      .filter(([, v]) => v)
-      .map(([base]) => base);
-  }
+  /** Every station's answer state, for the answer records (marksStationAnswers). */
+  const stationState: MarksStationState = {
+    proposals,
+    attachmentChecked,
+    treatmentPrefills,
+    classTreatment,
+    markTreatment,
+    promoted,
+    inputOrder,
+    outputForm,
+    backspace,
+    multiMarkStacks,
+    stackingAllowed,
+    stacksConfirmed,
+    guardChoice,
+  };
 
-  /** This station's answers, in `recordQuestionAnswers`' shape (spec 079 R-04). */
+  /** This station's answers, in recordQuestionAnswers shape (spec 079 R-04). */
   function answersForStation(stationId: MarksStationId): SurveyAnswer[] {
-    switch (stationId) {
-      case "marks_attachment":
-        return proposals.map((p) => ({
-          questionId: `marks.marks_attachment.${p.mark}`,
-          answerType: "char-list",
-          value: acceptedBasesFor(p.mark),
-        }));
-      case "marks_treatment": {
-        const out: SurveyAnswer[] = [];
-        for (const prefill of treatmentPrefills) {
-          out.push({
-            questionId: `marks.marks_treatment.class.${prefill.classId}`,
-            answerType: "select",
-            value: classTreatment[prefill.classId] ?? prefill.recommended,
-          });
-        }
-        for (const [mark, value] of Object.entries(markTreatment)) {
-          out.push({
-            questionId: `marks.marks_treatment.mark.${mark}`,
-            answerType: "select",
-            value,
-          });
-        }
-        out.push({
-          questionId: "marks.marks_treatment.promoted",
-          answerType: "char-list",
-          value: promoted,
-        });
-        out.push({
-          questionId: "marks.marks_treatment.input_order",
-          answerType: "select",
-          value: inputOrder,
-        });
-        return out;
-      }
-      case "marks_output_form":
-        return [
-          { questionId: "marks.marks_output_form.form", answerType: "select", value: outputForm },
-          { questionId: "marks.marks_output_form.backspace", answerType: "select", value: backspace },
-        ];
-      case "marks_stacking": {
-        const confirmedKeys = multiMarkStacks
-          .map((s) => stackKey(s))
-          .filter((key) => stacksConfirmed[key] === true);
-        return [
-          { questionId: "marks.marks_stacking.allowed", answerType: "boolean", value: stackingAllowed },
-          { questionId: "marks.marks_stacking.stacks", answerType: "char-list", value: confirmedKeys },
-        ];
-      }
-      case "marks_guard": {
-        // spec 104 FR-013: the answer rides the completion like every
-        // other station's (R-04); the load-bearing record is the
-        // GuardSpecification in the decision value (recordValue).
-        return [{ questionId: GUARD_BEHAVIOUR_QUESTION_ID, answerType: "select", value: guardChoice }];
-      }
-      default:
-        return [];
-    }
+    return marksStationAnswers(stationId, stationState);
   }
 
   function complete(toleranceOverride?: ContextToleranceDecisionInput): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    // Assemble the FR-020 handoff. The stacking answer constrains the stack
-    // list downstream; the worklist's three groups cover every base and mark at
-    // least once with nothing unclassified (spec 052 SC-009, verified in engine
-    // tests). The attachment map is already case-expanded (spec 049 US2), and
-    // the promotion set gets the same additive treatment: promoting a lowercase
-    // marked character derives its uppercase counterpart rather than asking
-    // about it separately (spec 052 FR-023).
-    const worklist = buildPlacementWorklist({
-      alphabet: gate.alphabet,
-      classes,
-      attachments: expandedAttachments,
-      prefills: treatmentPrefills,
-      treatment: {
-        ...treatment,
-        promoted: isCasedBase
-          ? expandCaseCounterpartPromotions(gate.alphabet, treatment.promoted, bcp47)
-          : treatment.promoted,
-      },
-    });
-    // US4: project the recorded treatment onto A4/A3a so strategy selection can
-    // see the answer. Without this the survey builds a keyboard on two premises
-    // at once — the author's recorded treatment and an independently-derived
-    // diacritic-behaviour axis — with nothing detecting the contradiction.
-    const computedAxes = deriveMarksComputedAxes({
-      alphabet: gate.alphabet,
-      classes,
-      prefills: treatmentPrefills,
-      treatment,
-    });
-    // spec 079 R-04: every station's answers, not only the final one — the
-    // decision log already no-ops on an identical repeat.
-    const answers = visibleStations.flatMap((stationId) => answersForStation(stationId));
     const toleranceDecision = resolvedToleranceDecision(toleranceOverride);
     // The value mirrors the session merge's last-wins semantics for the
     // tolerance decision (contracts: mergePhaseResults keeps the prior
@@ -1152,75 +731,56 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     // decision value BEFORE reporting completion — the gallery host runs
     // the module's apply (the mark guards) as part of the record, at the
     // same commit point the retired reducer MARKS handler ran them. The
-    // R10 migration determination reads the pre-guard working IR here,
-    // the exact input the reducer read; MarksStepHost mirrors it into
-    // the session (apply has no session channel).
-    const workingIr = useWorkingCopyStore.getState().ir;
-    const migrationNeeded =
-      outputForm === "base-plus-mark" &&
-      workingIr !== null &&
-      detectStartMarkMechanism(workingIr) === "precomposed";
-    // spec 104 (US1 scenario 6): the landed specification re-evaluates
-    // marks minted before it existed — the contradictions are REPORTED in
-    // this completion payload (MarksStepHost mirrors them into the
-    // session), never silently re-minted here.
-    const guard = guardRecordForCommit(activeStation);
-    const guardReevaluation =
-      guard !== null && workingIr !== null ? findGuardReevaluationItems(workingIr, guard) : [];
-    recordValue(
-      answers,
-      { worklist, outputForm, backspace, stacks: keptStacks(), migrationNeeded, guardReevaluation },
+    // R10 migration determination reads the pre-guard working IR (the exact
+    // input the reducer read); MarksStepHost mirrors it into the session
+    // (apply has no session channel). The landed guard specification
+    // re-evaluates marks minted before it existed (spec 104 US1 scenario 6):
+    // the contradictions are REPORTED in this completion payload, never
+    // silently re-minted here. The assembly itself is assembleMarksSeries.
+    const assembled = assembleMarksSeries({
+      alphabet: gate.alphabet,
+      classes,
+      isCasedBase,
+      bcp47,
+      expandedAttachments,
+      treatment,
+      state: stationState,
+      visibleStations,
+      workingIr: useWorkingCopyStore.getState().ir,
+      guard: guardRecordFor(activeStation),
+      reportedTolerance: toleranceDecision,
       effectiveTolerance,
-      guard,
-    );
-    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision, backspace));
+    });
+    onMarksChange(assembled.value);
+    onComplete(assembled.result);
   }
 
   /**
-   * Record the marks-treatment decision value (spec 090 T023): the answer
-   * composite in record form, the completion payload (null unless the
-   * series is completing — an answer record after a completion therefore
-   * clears it, so a stale payload can never re-apply), and the
-   * context-tolerance decision the value currently carries.
+   * Record the marks-treatment decision value (spec 090 T023) at an
+   * intermediate commit point: the answer composite, no completion payload (an
+   * answer record after a completion therefore clears it, so a stale payload
+   * can never re-apply), and the context-tolerance decision the value
+   * currently carries.
    */
   function recordValue(
     stationAnswers: SurveyAnswer[],
-    completion: MarksCompletion | null,
     tolerance: MarksContextToleranceDecision | null,
     guard: GuardSpecification | null,
   ): void {
-    const answers: Record<string, string | string[] | boolean | undefined> = {};
-    for (const a of stationAnswers) answers[a.questionId] = a.value;
-    if (tolerance !== null) {
-      for (const a of contextToleranceAnswers(tolerance)) answers[a.questionId] = a.value;
-    }
-    onMarksChange({ answers, completion, contextTolerance: tolerance, guardSpecification: guard });
+    onMarksChange(buildMarksTreatmentValue(stationAnswers, null, tolerance, guard));
   }
 
-  /**
-   * The context-tolerance decision to report (spec 078). A decision taken on
-   * this pass wins. Otherwise a prior decision still valid for the current
-   * rules is carried forward unchanged (keeping its `appliedFingerprint`), so
-   * the phase result keeps it (FR-009). No analysis, or an author who moved
-   * on while it was still running, records nothing.
-   */
+  /** The context-tolerance decision to report (spec 078); see resolveToleranceDecision. */
   function resolvedToleranceDecision(
     override?: ContextToleranceDecisionInput,
   ): MarksContextToleranceDecision | undefined {
     // The station completes the series in the same event that records its
     // decision, before the state update lands, so it passes it explicitly.
-    const taken = override ?? toleranceDecision;
-    if (taken !== null) {
-      // Re-confirming the same outcome keeps the prior apply marker.
-      const same =
-        priorTolerance !== undefined &&
-        priorTolerance.fingerprint === taken.fingerprint &&
-        priorTolerance.decision === taken.decision &&
-        priorTolerance.acceptedSiteIds.join(SITE_ID_SEPARATOR) === taken.acceptedSiteIds.join(SITE_ID_SEPARATOR);
-      return same ? priorTolerance : taken;
-    }
-    if (priorTolerance !== undefined && priorTolerance.fingerprint === toleranceFingerprint) return priorTolerance;
-    return undefined;
+    return resolveToleranceDecision({
+      taken: override ?? toleranceDecision,
+      priorTolerance,
+      toleranceFingerprint,
+    });
   }
 
   /**
@@ -1377,10 +937,9 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       // after a completed pass, where this record is what clears the
       // stale completion (D-090-11).
       recordValue(
-        visibleStations.flatMap((stationId) => answersForStation(stationId)),
-        null,
+        marksSeriesAnswers(visibleStations, stationState),
         priorTolerance ?? null,
-        guardRecordForCommit(activeStation),
+        guardRecordFor(activeStation),
       );
       setPosition(STEP_ID, visibleStations[nextIndex]!);
     } else {

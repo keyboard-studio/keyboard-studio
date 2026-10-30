@@ -11,20 +11,30 @@
 // Paths are relative to packages/studio/src (studio modules) or are a package
 // specifier (`@keyboard-studio/engine`, `@keyboard-studio/contracts`).
 
-export interface InventoryEntry {
-  /** The exported function's name. */
-  fn: string;
-  /** Defining module: a studio src-relative path, or a package specifier. */
-  module: string;
-  /** Production files (studio src-relative) that import `fn`; at least one unless `provenBy` is set. */
-  callers: readonly string[];
-  /**
-   * For a composite no production file calls by name (a hook memoizes its
-   * pieces separately): the studio src-relative test that imports `fn` and
-   * proves it equal to the hook the UI calls. Only with an empty `callers`.
-   */
-  provenBy?: string;
-}
+import { flowStepsInventory } from "./inventory/flowSteps.ts";
+import { inventoryStepsInventory } from "./inventory/inventorySteps.ts";
+import { marksInventory } from "./inventory/marks.ts";
+import { carveInventory } from "./inventory/carve.ts";
+import { mechanismInventory } from "./inventory/mechanism.ts";
+import { phaseFInventory } from "./inventory/phaseF.ts";
+
+export type { InventoryEntry } from "./inventory/types.ts";
+import type { InventoryEntry } from "./inventory/types.ts";
+
+/**
+ * The step drivers' product functions (inventory/*.ts): proposals, rankings and
+ * the lifted handler functions. Only stepDrivers/ may import these
+ * (driftGuard.test.ts); the rest of the author is case input, the loop and
+ * reporting.
+ */
+export const PROPOSAL_INVENTORY: readonly InventoryEntry[] = [
+  ...flowStepsInventory,
+  ...inventoryStepsInventory,
+  ...marksInventory,
+  ...carveInventory,
+  ...mechanismInventory,
+  ...phaseFInventory,
+];
 
 export const INVENTORY: readonly InventoryEntry[] = [
   {
@@ -60,6 +70,10 @@ export const INVENTORY: readonly InventoryEntry[] = [
   // --- The decision record (053), as the zip and draft paths read it ---
   { fn: "snapshotDecisionRecord", module: "decisions/decisionLogStore.ts", callers: ["lib/serializeWorkingCopy.ts", "lib/draftPersistence.ts"] },
   { fn: "parseDecisionRecord", module: "@keyboard-studio/engine", callers: ["lib/draftPersistence.ts"] },
+  // --- Parity normalisation (parity.ts, research R8) ---
+  { fn: "effectiveEntries", module: "@keyboard-studio/contracts", callers: ["decisions/historyProposalSeed.ts"] },
+  { fn: "suggestionFingerprintOf", module: "survey/carve/carveValue.ts", callers: ["editors/carve/CarveGalleryV2.tsx"] },
+  ...PROPOSAL_INVENTORY,
 ];
 
 /**
@@ -72,7 +86,7 @@ export const REPLAY_MODULES: readonly string[] = [
   "test/decisionPointBases.ts",
   "test/recordToDecisionSet.ts",
   "test/sc004Harness.ts",
-  "test/decisionPointKnownGaps.ts",
+  "test/decisionPointKnownGaps.fixture.ts",
 ];
 
 /**

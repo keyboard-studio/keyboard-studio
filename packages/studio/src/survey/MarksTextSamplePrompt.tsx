@@ -18,7 +18,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { TextSampleAffordance } from "./TextSampleAffordance.tsx";
-import { displayChar } from "../lib/irToCarveNodes.ts";
+import { textSampleMarksLabel } from "./marksTextSample.ts";
 import {
   TEXT_MAIN,
   surveyPageColumn,
@@ -47,8 +47,9 @@ export function MarksTextSamplePrompt({
 }: MarksTextSamplePromptProps) {
   const { t } = useLingui();
   // Rendered on dotted-circle carriers so bare combining marks are visible
-  // (the same displayChar the build list uses for lone marks).
-  const marksText = lackingMarks.map((m) => displayChar(m)).join(" ");
+  // (the same displayChar the build list uses for lone marks; the rule lives
+  // in marksTextSample.ts beside the prompt's other decisions).
+  const marksText = textSampleMarksLabel(lackingMarks);
 
   return (
     <section

@@ -18,7 +18,7 @@
 import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
-import { confirmRebaseTo } from "../../lib/confirmRebase.ts";
+import { confirmStartKeyboard } from "./confirmStartKeyboard.ts";
 import type { SuggestTarget } from "../../lib/suggestStart.ts";
 import { StartResolution } from "../../editors/panels/StartResolution.tsx";
 
@@ -29,10 +29,10 @@ import { StartResolution } from "../../editors/panels/StartResolution.tsx";
  * file for the component, so the type must not also flow module → here
  * (a depcruise no-circular cycle; research addendum D-090-8).
  */
-export interface StartKeyboardValue {
-  id: string;
-  name: string;
-}
+// Defined beside the lifted confirm (spec 107 FR-040) so confirmStartKeyboard.ts
+// does not import this component back; re-exported for existing importers.
+export type { StartKeyboardValue } from "./confirmStartKeyboard.ts";
+import type { StartKeyboardValue } from "./confirmStartKeyboard.ts";
 
 /** The preview plumbing the wrapper hands the renderer via step-context extras. */
 export interface StartPreviewExtras {
@@ -52,12 +52,12 @@ export function StartKeyboardRenderer({ onChange }: DecisionRendererProps<StartK
 
   function handleConfirm(): void {
     if (previewedBase === null) return;
-    // F1 fix: resolve the rebase question SYNCHRONOUSLY, before any
-    // decision write. Cancel aborts here — nothing is recorded and the
-    // wizard stays on the picker (see the module comment above).
-    if (!confirmRebaseTo(previewedBase.id)) return;
-    onChange({ id: previewedBase.id, name: previewedBase.displayName });
-    step.onComplete({ base: previewedBase });
+    // The F1 rebase gate, the decision write and the completion result are
+    // survey/chooseStart/confirmStartKeyboard.ts; a Cancel returns null and
+    // the wizard stays on the picker (see the module comment above).
+    const result = confirmStartKeyboard(previewedBase, onChange);
+    if (result === null) return;
+    step.onComplete(result);
   }
 
   return (

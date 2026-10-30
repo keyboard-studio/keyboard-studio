@@ -44,6 +44,11 @@ import type {
 } from "@keyboard-studio/contracts";
 import { nonAlphabetConfirmedInventory } from "@keyboard-studio/contracts";
 
+/** The session loanword tier as a Set; empty when the session carries none. */
+export function loanwordSetOf(chars: readonly string[] | undefined): Set<string> {
+  return new Set(chars ?? []);
+}
+
 /**
  * True iff the worklist carries at least one classification (the same
  * content test `deriveCarveNeededSet` applies to decide it is not looking

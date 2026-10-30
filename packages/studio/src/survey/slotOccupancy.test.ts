@@ -9,6 +9,7 @@ import {
   buildSlotOccupancy,
   classifySlot,
   displacedFor,
+  displacementActions,
   isProducedOnOtherSlot,
   mechanismClaimedSlots,
   orthographyTier,
@@ -413,5 +414,16 @@ describe("mechanismClaimedSlots (spec 106 US4)", () => {
     expect(
       mechanismClaimedSlots({ patternId: "multi_char_sequence", strategyId: "S-03", slotValues: {} }),
     ).toEqual([]);
+  });
+});
+
+describe("displacementActions", () => {
+  it("offers the move first and leave second when one glyph is demoted", () => {
+    expect(displacementActions("demote-incumbent")).toEqual(["confirm-move", "leave"]);
+    expect(displacementActions("demote-incoming")).toEqual(["confirm-move", "leave"]);
+  });
+
+  it("makes keep-both the default for both-core, with demotion the explicit override", () => {
+    expect(displacementActions("both-core")).toEqual(["keep-both", "demote-displaced"]);
   });
 });

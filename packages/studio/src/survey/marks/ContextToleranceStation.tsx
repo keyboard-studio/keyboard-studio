@@ -22,6 +22,7 @@ import { FacetTransformPanel } from "../../components/facet-transform/FacetTrans
 import { ToleranceGapCases } from "../../lint/ContextToleranceNotice.tsx";
 import { mutedParaFlush } from "../surveyStyles.ts";
 import { NormalizationExamples, type NormalizationExample } from "./NormalizationExamples.tsx";
+import { decisionFromProposal } from "./contextToleranceProposal.ts";
 
 /** What FR-006 discloses for one site (engine `VariantDisclosure`, aggregated per rule). */
 export interface SiteDisclosure {
@@ -67,14 +68,8 @@ export interface ContextToleranceStationProps {
   onDecide: (decision: ContextToleranceDecisionInput) => void;
 }
 
-/** Map the panel's confirmed dispositions onto the decision shape. */
-export function decisionFromProposal(confirmed: TransformProposal, fingerprint: string): ContextToleranceDecisionInput {
-  const proposedSiteIds = confirmed.affectedSites.map((s) => s.siteId);
-  const acceptedSiteIds = confirmed.affectedSites.filter((s) => s.userDisposition === "accepted").map((s) => s.siteId);
-  const decision =
-    acceptedSiteIds.length === proposedSiteIds.length ? "accept" : acceptedSiteIds.length === 0 ? "decline" : "partial";
-  return { decision, acceptedSiteIds, proposedSiteIds, fingerprint };
-}
+// The mapping lives beside the proposal builder so the headless author calls the same one.
+export { decisionFromProposal };
 
 function declineDecision(proposal: TransformProposal, fingerprint: string): ContextToleranceDecisionInput {
   return {
