@@ -150,7 +150,7 @@ Each story phase ends with the same three gate tasks:
   - the S-01 builders (:2829-2845, :3323, :3408, :3709, :3736) write every code point of `currentChar`, not just the first;
   - the postfix mark-key flow emits a `postfix_compose` assignment, with stores derived from the attachment matrix rows (allowed pairs only).
 - [x] T034 [US3] Case counterparts: assert in `casePairCompanion.ts` tests that the companion output passes through the same form (FR-023).
-- [ ] T035 [US3] Gate. Record the R5 ruling text in the PR body. Commit `feat(engine): emitted output follows the output-form decision`, push, and open a PR.
+- [x] T035 [US3] Gate. Record the R5 ruling text in the PR body. Commit `feat(engine): emitted output follows the output-form decision`, push, and open a PR.
 
 ---
 
