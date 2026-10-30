@@ -25,6 +25,7 @@ import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { projectionInputFromState } from "./projectionInput.ts";
+import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
@@ -513,6 +514,7 @@ export async function projectWorkingCopyForOutput(
       assignments: sessionAssignments,
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
+      marksTreatment: getMarksTreatmentValue(),
       welcomeFolderFiles,
       ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
       // Anchor for step 3's "is the display name an EDIT?" test. The no-identity

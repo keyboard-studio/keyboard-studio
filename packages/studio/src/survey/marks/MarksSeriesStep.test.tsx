@@ -22,6 +22,8 @@ import {
   type SurveyAnswerSnapshot,
 } from "../../stores/surveyAnswerStore.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../../lib/questionRecorder.ts";
+import { getMarksTreatmentValue } from "./marksValue.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 
 const ACUTE = "́";
 
@@ -1788,5 +1790,65 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 106: the completion records only the stacks the author kept, because
+// the mark guard and the whole-stack backspace are generated from them.
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — recorded stacks follow the stacking station (spec 106)", () => {
+  const CIRC = "\u0302";
+  function seedStacked(): void {
+    useWorkingCopyStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    useDecisionStore.getState().reset();
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e"],
+        marks: [ACUTE, CIRC],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [CIRC] },
+          { base: "a", marks: [CIRC, ACUTE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
+  function walk(answerStacking: () => void): void {
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
+    });
+    for (let i = 0; i < 8 && onComplete.mock.calls.length === 0; i++) {
+      if (screen.queryByTestId("marks-stacking") !== null) answerStacking();
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-swallow"));
+      }
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    expect(onComplete).toHaveBeenCalled();
+  }
+
+  const recordedStacks = () => getMarksTreatmentValue()?.completion?.stacks ?? [];
+
+  it("keeps a confirmed multi-mark stack while stacking is allowed", () => {
+    seedStacked();
+    walk(() => {});
+    expect(recordedStacks()).toContainEqual({ base: "a", marks: [CIRC, ACUTE] });
+  });
+
+  it("drops multi-mark stacks once stacking is answered no, keeping single marks", () => {
+    seedStacked();
+    walk(() => fireEvent.click(screen.getByRole("radio", { name: /^No/ })));
+    expect(recordedStacks()).toEqual([
+      { base: "a", marks: [ACUTE] },
+      { base: "e", marks: [CIRC] },
+    ]);
   });
 });

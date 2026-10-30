@@ -101,10 +101,21 @@ export function reconciledAttachmentChecked(
       const view = reconcile(savedAnswers[answerId], key, state === "attested");
       row[base] = view.value;
     }
+    // The space column (spec 106 FR-013): not a base, never proposed, so it
+    // defaults to unticked and is never case-expanded.
+    const spaceId = `marks_attachment.${proposal.mark}|${ATTACHMENT_SPACE}`;
+    const spaceKey = marksAttachmentKey(alphabet, proposal.mark, ATTACHMENT_SPACE);
+    row[ATTACHMENT_SPACE] = reconcile(savedAnswers[spaceId], spaceKey, false).value;
     out[proposal.mark] = row;
   }
   return out;
 }
+
+/**
+ * The attachment row's space column key (spec 106 FR-013). Stored like a base,
+ * `marks_attachment.<mark>| `; the worklist maps it to `allowedContexts`.
+ */
+export const ATTACHMENT_SPACE = " ";
 
 export interface FlaggedMarksAnswer {
   readonly answerId: string;

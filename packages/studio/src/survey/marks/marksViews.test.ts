@@ -12,7 +12,12 @@ import { describe, it, expect } from "vitest";
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { groupMarkClasses, proposeAttachments } from "@keyboard-studio/engine";
 import type { SavedAnswer } from "../../steps/answerTypes.ts";
-import { reconciledAttachmentChecked, initialAttachmentChecked, deriveMarksFlags } from "./marksViews.ts";
+import {
+  ATTACHMENT_SPACE,
+  reconciledAttachmentChecked,
+  initialAttachmentChecked,
+  deriveMarksFlags,
+} from "./marksViews.ts";
 import { marksAttachmentKey, marksBackspaceKey } from "../../steps/evidence.ts";
 import { nfcPostureOfInventory } from "@keyboard-studio/engine";
 import { stackKey } from "@keyboard-studio/contracts";
@@ -60,7 +65,19 @@ describe("reconciledAttachmentChecked (spec 079 US3 item 4)", () => {
     const classes = groupMarkClasses(ALPHABET);
     const proposals = proposeAttachments(ALPHABET, classes);
     const reconciled = reconciledAttachmentChecked(ALPHABET, proposals, {});
-    expect(reconciled).toEqual(initialAttachmentChecked(proposals));
+    const initial = initialAttachmentChecked(proposals);
+    // Plus the space column, unticked (spec 106 FR-013).
+    expect(reconciled).toEqual(
+      Object.fromEntries(Object.entries(initial).map(([mark, row]) => [mark, { ...row, [ATTACHMENT_SPACE]: false }])),
+    );
+  });
+
+  it("reads a saved space-column tick (spec 106 FR-013)", () => {
+    const classes = groupMarkClasses(ALPHABET);
+    const proposals = proposeAttachments(ALPHABET, classes);
+    const key = marksAttachmentKey(ALPHABET, ACUTE, ATTACHMENT_SPACE);
+    const savedAnswers = { [`marks_attachment.${ACUTE}|${ATTACHMENT_SPACE}`]: savedAnswer(true, key) };
+    expect(reconciledAttachmentChecked(ALPHABET, proposals, savedAnswers)[ACUTE]?.[ATTACHMENT_SPACE]).toBe(true);
   });
 
   it("falls back to the proposal default when the saved key is stale (evidence changed)", () => {

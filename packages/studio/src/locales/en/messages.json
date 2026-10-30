@@ -1847,6 +1847,8 @@
   "survey.marks.attachment.rowGroupAriaLabel": "Letters that can carry {mark}",
   "survey.marks.attachment.rowHelpText": "Tick every letter this mark can sit on. Letters left unticked will not take this mark on your finished keyboard.",
   "survey.marks.attachment.sectionAriaLabel": "Which letters carry each mark",
+  "survey.marks.attachment.spaceAriaLabel": "{mark} can follow a space",
+  "survey.marks.attachment.spaceLabel": "after a space",
   "survey.marks.attachment.suggestedTag": "suggested",
   "survey.marks.demo.intro": "Press these to see what you would get.",
   "survey.marks.demo.keyAriaLabel": "Press the {cap} key",

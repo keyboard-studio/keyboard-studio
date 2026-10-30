@@ -624,11 +624,12 @@ export type {
 export {
   applyMarkGuards,
   MARKS_GUARD_GROUP,
+  MARKS_ALLOWED_STORE_PREFIX,
   MARKS_UNWRAP_FROM_STORE,
   MARKS_UNWRAP_TO_STORE,
   MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
-export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
+export type { BareMarkBehaviour, MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
 // spec 065 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
 // sanctioned door to the inherit-first proposer and the keycap judgement.

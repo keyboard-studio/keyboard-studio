@@ -129,6 +129,13 @@ export interface PlacementWorklist {
   markUnits: MarkUnit[];
   /** Combinations that must be unreachable by ordinary typing. */
   blockedCombinations: BlockedCombination[];
+  /**
+   * Per mark, the non-base contexts the author allowed it after (spec 106
+   * FR-013): today only U+0020, from the attachment station's space column.
+   * Never a base and never a blocked combination. Absent on worklists recorded
+   * before the column existed, which allow no extra context.
+   */
+  allowedContexts?: Record<string, string[]>;
 }
 
 /** Factory: an empty three-store alphabet. */

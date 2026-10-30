@@ -128,7 +128,7 @@ const MARKS_MODULE = {
   definition: { id: "marksTreatment" },
   provides: ["marks-treatment"],
   requires: ["character-inventory"],
-  writes: [["groups"], ["stores"]],
+  writes: [],
   apply: () => ({}),
 } as unknown as GalleryModule<MarksTreatmentValue>;
 
