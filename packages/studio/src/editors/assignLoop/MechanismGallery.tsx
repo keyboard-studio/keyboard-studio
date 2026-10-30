@@ -650,6 +650,7 @@ function GalleryPreviewWithPatterns({
       stage={stage}
       retry={retry}
       defaultOskMode="desktop"
+      allowTouch={false}
       heading={t({
         id: "editor.assignLoop.preview.heading",
         message: "Live preview",

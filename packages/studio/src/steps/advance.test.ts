@@ -11,7 +11,8 @@
 //   - adapt-track skips project_name (US2)
 
 import { describe, it, expect } from "vitest";
-import { advance, nextMainLineStepAfter, manifestIndexOf } from "./advance.ts";
+import { advance, nextMainLineStepAfter, manifestIndexOf, isTouchPreviewAvailable } from "./advance.ts";
+import { manifest as stepManifest } from "./manifest.ts";
 import { buildManifest, manifest, validateManifestShape } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
 import { deriveScreens } from "../decisions/deriveScreens.ts";
@@ -689,5 +690,22 @@ describe("spec 091 T021 — derived screens in the walk", () => {
       },
     });
     expect(recorded.next).toBe("touch");
+  });
+});
+
+describe("isTouchPreviewAvailable", () => {
+  it("is false for every step before the Touch gallery and true from it onward", () => {
+    const touchIdx = stepManifest.findIndex((s) => s.id === "touch");
+    expect(touchIdx).toBeGreaterThan(0);
+    stepManifest.forEach((s, i) => {
+      expect(isTouchPreviewAvailable(s.id)).toBe(i >= touchIdx);
+    });
+    expect(isTouchPreviewAvailable("characters")).toBe(false);
+    expect(isTouchPreviewAvailable("mechanisms")).toBe(false);
+    expect(isTouchPreviewAvailable("touch")).toBe(true);
+  });
+  it("keeps unrestricted behaviour for null/unknown ids", () => {
+    expect(isTouchPreviewAvailable(null)).toBe(true);
+    expect(isTouchPreviewAvailable("done")).toBe(true);
   });
 });
