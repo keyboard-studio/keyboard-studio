@@ -35,7 +35,7 @@ const fixtureRoot = resolve(here, "..", "..", DECISION_POINT_FIXTURE_DIR);
 const GATES: readonly GateId[] = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G8-start"];
 
 /** What each gap is waiting on. G6 is walk-only, so it has no row here. */
-type Owner = "US2" | "US3" | "US4" | "US5" | "US6" | "#2361" | "engine T_-key bug";
+type Owner = "US2" | "US3" | "US4" | "US5" | "US6" | "#2361" | "#2363";
 
 const AFTER_MARKS: readonly DecisionPoint[] = ["marks", "carve", "assignments", "caps", "tolerance"];
 const AFTER_ASSIGNMENTS: readonly DecisionPoint[] = ["assignments", "caps", "tolerance"];
@@ -66,7 +66,7 @@ const KNOWN_GAPS: readonly Gap[] = [
   // Not E5: the tolerance analysis itself throws on camazerty, because it hands
   // a rule keyed to a touch-only T_ key to the desktop simulator. The live
   // station calls the same analysis, so this is an engine defect of its own.
-  { gate: "G2", owner: "engine T_-key bug", bases: ["sil_cameroon_azerty"], points: ["tolerance"] },
+  { gate: "G2", owner: "#2363", bases: ["sil_cameroon_azerty"], points: ["tolerance"] },
   // nul/beep inside starting stores is deferred to keymanapp/keyboards#4181.
   { gate: "G8-start", owner: "#2361", bases: ["sil_cameroon_qwerty", "sil_cameroon_azerty"], points: DECISION_POINTS },
 ];
