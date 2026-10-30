@@ -1007,6 +1007,7 @@ export type {
   CarvePipelineResult,
   CarveKeycapRemovalInput,
   StoreSlotRemovalResult,
+  CascadedSlotRemoval,
   StoreSlotEditMode,
   StoreSlotBlockReason,
   StorePairingDescription,

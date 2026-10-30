@@ -33,6 +33,7 @@
   "carve.cell.suggestedDiscard": "supprimé, suggéré — cliquez pour le conserver",
   "carve.details.discardBlurb": "Si vous supprimez ce caractère, votre clavier cesse de le saisir. Tout élément ne produisant que ce caractère est supprimé ; tout élément commun avec un caractère que vous conservez reste en place. La suppression n'est pas définitive : vous pouvez à tout moment rétablir le caractère pour le faire réapparaître.",
   "carve.details.heading": "Détails du caractère",
+  "carve.details.pairedCascade": "",
   "carve.detailsCard.carve": "Carve",
   "carve.detailsCard.carvedBadge": "carved",
   "carve.detailsCard.empty": "Aucun caractère à afficher.",

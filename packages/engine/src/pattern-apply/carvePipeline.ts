@@ -23,7 +23,7 @@
 import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
 import { compileCarveSuppression } from "./carveSuppression.js";
 import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
-import { applyStoreSlotRemovals } from "./applyStoreSlotRemovals.js";
+import { applyStoreSlotRemovals, type CascadedSlotRemoval } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
 import { parseSlotId } from "./slotId.js";
 
@@ -59,6 +59,12 @@ export interface CarvePipelineInput {
 export interface CarvePipelineResult {
   ir: KeyboardIR;
   warnings: string[];
+  /**
+   * Partner characters the slot-removal stage dropped only because they are
+   * positionally paired with a slot the author chose (see
+   * {@link CascadedSlotRemoval}). Empty when no carve reached a paired store.
+   */
+  cascadedRemovals: CascadedSlotRemoval[];
 }
 
 /**
@@ -136,5 +142,9 @@ export function deriveCarvedIr(
   ]);
   const filtered = carveFilterIr(removalResult.ir, allWholeNodeIds);
 
-  return { ir: filtered, warnings: removalResult.warnings };
+  return {
+    ir: filtered,
+    warnings: removalResult.warnings,
+    cascadedRemovals: removalResult.cascaded,
+  };
 }

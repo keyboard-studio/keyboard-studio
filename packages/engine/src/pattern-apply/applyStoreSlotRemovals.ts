@@ -134,12 +134,38 @@ import { isPlusSeparator } from "../shared/rule-shape.js";
  * - `appliedCount` — number of individual store-item removals actually
  *                    performed (summed across every store in a coordinated
  *                    pair-set, not just the one the caller named).
+ * - `cascaded`     — structured, inspectable form of the pair-set cascade:
+ *                    one entry per (chosen slot, partner store) where a
+ *                    removal reached a character the caller did NOT name.
+ *                    See {@link CascadedSlotRemoval}.
  */
 export interface StoreSlotRemovalResult {
   ir: KeyboardIR;
   warnings: string[];
   notices: string[];
   appliedCount: number;
+  cascaded: CascadedSlotRemoval[];
+}
+
+/**
+ * One partner character removed only because it is positionally paired with a
+ * slot the author chose to remove (e.g. carving `a` in `comp-dia` also drops
+ * `à` from `composed`, tied by `any(composed) + [K_BKSP] > index(comp-dia,1)`).
+ * The cascade is required to keep every paired store the same length and
+ * aligned; this record is what lets a caller say so out loud.
+ *
+ * - `position`         — the shared item index in every member of the pair-set.
+ * - `chosen`           — a slot the caller named at `position` (store + char).
+ * - `partner`          — the store whose item at `position` went with it, and
+ *                        the character that was there.
+ *
+ * Only partners holding a character are reported; a nul filler or non-char
+ * partner has nothing an author would recognise as "lost".
+ */
+export interface CascadedSlotRemoval {
+  position: number;
+  chosen: { storeName: string; char: string };
+  partner: { storeName: string; char: string };
 }
 
 /**
@@ -743,9 +769,10 @@ export function applyStoreSlotRemovals(
 ): StoreSlotRemovalResult {
   const warnings: string[] = [];
   const notices: string[] = [];
+  const cascaded: CascadedSlotRemoval[] = [];
 
   if (slotIds.size === 0) {
-    return { ir: startIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0, cascaded };
   }
 
   // --- Parse and group slot ids by storeNodeId ----------------------------
@@ -771,7 +798,7 @@ export function applyStoreSlotRemovals(
 
   if (targetsByStore.size === 0) {
     // All ids were malformed.
-    return { ir: startIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0, cascaded };
   }
 
   const analysis = analyzeStores(startIr);
@@ -898,6 +925,25 @@ export function applyStoreSlotRemovals(
     }
 
     if (coordinated) {
+      for (const pos of [...validPositions].sort((a, b) => a - b)) {
+        let chosen: CascadedSlotRemoval["chosen"] | undefined;
+        for (const name of work.memberNames) {
+          if (!work.requestedByName.get(name)?.has(pos)) continue;
+          const item = analysis.storeByName.get(name)?.items[pos];
+          if (item?.kind === "char") {
+            chosen = { storeName: name, char: item.value };
+            break;
+          }
+        }
+        if (chosen === undefined) continue;
+        for (const name of work.memberNames) {
+          if (work.requestedByName.get(name)?.has(pos)) continue;
+          const item = analysis.storeByName.get(name)?.items[pos];
+          if (item?.kind === "char") {
+            cascaded.push({ position: pos, chosen, partner: { storeName: name, char: item.value } });
+          }
+        }
+      }
       notices.push(
         `[store-slot] coordinated removal across paired stores ${memberLabel()}: dropped ` +
           `${validPositions.size} position(s) from each to preserve index() alignment.`,
@@ -907,7 +953,7 @@ export function applyStoreSlotRemovals(
 
   if (replacedById.size === 0) {
     // Nothing survived the guards.
-    return { ir: startIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0, cascaded };
   }
 
   // --- Structural-sharing shallow copy of the IR --------------------------
@@ -917,5 +963,5 @@ export function applyStoreSlotRemovals(
     // groups, comments, raw, touchLayout, visualKeyboard passed through by reference.
   };
 
-  return { ir: newIr, warnings, notices, appliedCount };
+  return { ir: newIr, warnings, notices, appliedCount, cascaded };
 }
