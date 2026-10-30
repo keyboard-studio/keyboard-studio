@@ -48,3 +48,6 @@
 - Re-run 2026-10-30 after the owner follow-up "5 minutes is fine if needed": the PR-lane cap is set
   from T051's measurement plus about 50%, rounded up to a whole minute, at most 5 minutes; the set is
   cut only past 5 minutes for the step or 10 for the run. Zero open markers; all items checked.
+- Re-run 2026-10-30 after the ruling change "parallel required job": the PR lane is the `headless-author` job
+  (`needs: changes`, gated on `e2e`, required via the `main: CI + integrity` ruleset once it has run green on
+  `main`; FR-036, SC-002, T077), superseding "step inside `build`". Zero open markers; all items checked.

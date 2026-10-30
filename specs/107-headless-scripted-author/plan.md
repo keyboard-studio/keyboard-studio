@@ -18,16 +18,15 @@ Three run tiers share one runner:
 
 | Tier | What | Where | Budget |
 |---|---|---|---|
-| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, one step inside the `build` job | adds at most its `timeout-minutes` cap: T051's measurement + ~50%, rounded up to a whole minute, never above 5 min; whole PR run under 10 min, ideally ~6 (SC-002) |
+| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, the parallel job `headless-author` (`needs: changes`; gated on `e2e`), required via the ruleset | 0 wall time while within the `fast` + `build` chain (about 5.1 min); cap = T051's measurement + ~50%, rounded up, at most 5 min (SC-002) |
 | 32-case suite | the committed canonical case file `cases/harness-cases.json` (FR-035) | on demand, and nightly | under 10 min (SC-008) |
 | Wide sweep | eligible slice of `../keyboards` x profiles | weekly schedule, sharded; manual dispatch | not on PRs; failures filed as issues (FR-034) |
 
 Timing is measured, not estimated, for the replay half (research R1). The author half (proposal calls)
 does not exist yet, so its cost is an estimate with a stated ceiling that task T051 measures and that
-sets the step's cap: the measured step time (module load, about 25 s, plus the six cases) plus about 50%
-headroom, rounded up to a whole minute, at most 5 minutes. All six cases stay unless they would push the
-step past 5 minutes or the whole PR run past 10 (about 5.1 min today without the step); only then is the
-set cut, weakest shape first, both regression guards kept.
+sets the job's cap: the measured job time plus about 50% headroom, rounded up to a whole minute, at most
+5 minutes. All six cases stay unless the job would exceed 5 minutes; only then is the set cut, weakest
+shape first, both regression guards kept.
 
 ## Technical Context
 
@@ -48,7 +47,7 @@ The PR set runs as its own corpus-config invocation in CI (research R3).
 lifts of component logic into pure functions in the studio source.
 
 **Performance Goals**: SC-001 (one case under 60 s cold, under 5 s warm per further case); SC-002
-(PR lane is a `build` step with a measured cap, at most 5 min); SC-008 (32 cases under 10 min).
+(PR lane is a parallel job, no added wall time, at most 5 min); SC-008 (32 cases under 10 min).
 
 **Constraints**: no browser, dev server, port or network (FR-008); deterministic (FR-007); no
 re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
@@ -74,7 +73,7 @@ default.
 | VIII. House conventions | FLAG (minor) | No emoji in runner output. Issue numbers must not appear in shipped code or comments: the author reuses spec 106's `KNOWN_GAPS` table rather than adding its own issue-numbered owners; the spec 106 table already uses `#2361`/`#2363` as owner strings, which is spec 106's call. The scheduled workflow puts issue references only in issue bodies it files. |
 | IX. Decision registry | PASS | No new survey surface. Step order comes from the product's routing (`steps/advance.ts`, `steps/reducer.ts`, the journey runner), never a stored list (FR-002). Lifts keep the component as the only renderer. |
 | X. Defaults are proposals | PASS, one justified exception | The author confirms product proposals the way an author would, and records provenance as the UI does. The `zzq` placeholder is not a product proposal: it stands for an author typing a sequence, is recorded as `hand-set`, and is counted in every run report (Complexity Tracking). |
-| XI. Done means integrated | PASS, conditions | Done = PR set wired into required CI, scheduled workflow live, lifted functions called by their components. A lift with no production caller is unfinished. The carve code the FR-040 lift moves is on `main` since #2369, so no lift is parked. |
+| XI. Done means integrated | PASS, conditions | Done = PR set wired into required CI (the `headless-author` job added to the `main: CI + integrity` required checks, T077), scheduled workflow live, lifted functions called by their components. A lift with no production caller is unfinished. The carve code the FR-040 lift moves is on `main` since #2369, so no lift is parked. |
 
 **Personal data**: none — no new store, recipient, category, or telemetry. (The scheduled workflow
 files GitHub issues containing keyboard ids, gates and decision points only.)
@@ -132,7 +131,7 @@ packages/studio/src/test/headlessAuthor/
 └── driftGuard.test.ts              # FR-011 (no corpus needed; runs in the default config)
 
 packages/studio/src/...       # lifted pure functions next to their components (FR-040)
-.github/workflows/ci.yml      # one new step in the `build` job (PR events), timeout-minutes from T051 (<= 5)
+.github/workflows/ci.yml      # new `headless-author` job: needs: changes, if: e2e, timeout-minutes from T051 (<= 5)
 .github/workflows/headless-sweep.yml   # scheduled + dispatch: 32 cases nightly, wide sweep weekly
 scripts/file-sweep-issues.mjs # dedupe-and-file for sweep failures
 ```
@@ -150,7 +149,7 @@ they come from, as plain exported functions with their own unit tests.
 | 2 Foundational | case loader, walk policy, placeholder, run report, eligibility, routing loop over the journey runner's routing, replay hand-off | unit tests for each; the loop walks `basic_kbdus` with every driver stubbed to "default" and replay compiles | 1 |
 | 3 US1 (P1) | step drivers + the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism order, S-02 identity, displacement order, case-pair companion, marks series assembly, text sample); drift guard (FR-011) | `p1-whole-bafut-kbdus` runs headless, compiles, reports gates; byte-identical rerun; edge cases; drift guard green; lifted components' existing tests unchanged | 2 |
 | 4 US2 (P1) | parity against the 4 committed records + on-demand records; allow-list; stale report | 0 unexplained differences on the 4 records | 3 |
-| 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, a capped step in the `build` job, timing check | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
+| 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, the parallel `headless-author` job, timing check, then the owner's ruleset change (T077) | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
 | 6 US3 | 32-case suite over the committed canonical case file | 32 cases report gates, placeholders, displacements; under 10 min | 3 |
 | 7 US4b wide sweep + schedule | eligibility slice, sweep summary, `headless-sweep.yml`, issue filing | dispatch run completes, artifacts uploaded, a seeded failure files one issue and a rerun appends rather than duplicates | 6 |
 | 8 US5 closure | lift audit (every FR-040 rule lifted or listed), Playwright-only list (FR-042), any rule the drivers still reach through a component | every FR-040 row resolved; component tests and golden walk unchanged (SC-006) | 3 |
@@ -165,3 +164,4 @@ code outside `main`.
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
 | Art. X: the `zzq<hex>` placeholder is a value no product function proposes | Some decisions have neither a suggestion nor a default (a character the copied keyboard cannot place). A walk must still finish to reach the gates. It mirrors exactly what the Playwright harness types today, so parity with recorded walks holds. | Stopping the case at the first unproposed decision would hide every later gate failure; inventing a "better" scheme would break parity with the existing records and add a second placeholder convention. Each placeholder is recorded as `hand-set` and counted in the run report, so nothing is silent. |
+| A second CI job (`headless-author`) for the PR set | Zero wall-time cost: it needs only `changes`, so it runs beside the `fast` -> `build` chain (about 5.1 min) and adds nothing to PR wall time while it finishes within that chain (SC-002). It is required through the ruleset, so it still gates merges. | A step inside `build` reuses `build`'s install but lengthens the longest chain by its own run time on every PR; a job that `build` needs puts max(headless, `fast`) + `build` on the chain. Both cost wall time; the parallel job costs only runner minutes. |

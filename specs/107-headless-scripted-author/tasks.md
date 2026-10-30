@@ -127,14 +127,15 @@ it, add a unit test for the function, and leave the component's existing tests u
 
 **Goal**: the six-keyboard PR set runs on every PR without extending the critical path.
 
-**Independent Test**: quickstart 3; on a PR run the `build` job's headless-author step finishes inside the cap T051 set (at most 5 minutes) and the whole run stays under 10 minutes.
+**Independent Test**: quickstart 3; on a PR run the `headless-author` job runs beside `fast` -> `build`, finishes inside the cap T051 set (at most 5 minutes), and the whole run's wall time does not grow.
 
 - [ ] T048 [P] [US4] `HA/prSet.corpus.test.ts`: run every `prSet.json` entry in one vitest invocation; report gates, placeholders, displacements; expected failures only from spec 106 `KNOWN_GAPS`
 - [ ] T049 [P] [US4] `HA/prSetManifest.test.ts`: every FR-031 shape covered; every `regression-guard` entry has `guards`; at most 6 entries (research R1)
-- [ ] T050 [US4] Add one step to the existing `build` job in `.github/workflows/ci.yml` per research R3: `if: github.event_name == 'pull_request'`, placed after "Build workspace dependencies (PR path)" so it reuses `build`'s corpus checkout, install and `dist`; `timeout-minutes: 5` (the ceiling, provisional until T051); runs `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`. No new job, no `needs:` change, no ruleset change; the required `build` check covers it
-- [ ] T051 [US4] Measure the step on CI (module load plus the six cases) and the author's per-case cost from the PR set's `timingMs` (replaces research R1's 5 s budget); set the step's `timeout-minutes` in `.github/workflows/ci.yml` to the measured step time plus about 50% headroom, rounded up to a whole minute, at most 5; record the measurement and the cap in research.md R1/R3 and SC-002's figures in spec.md
-- [ ] T052 [US4] Check 3 PR runs against the cap T051 set and against the 10-minute whole-run total; record the step times and run totals in research.md R3. Cut the PR set only if keeping all six cases would push the step past 5 minutes or the whole PR run past 10 minutes (weakest shape first, keeping both regression guards), updating spec FR-031's table in the same change; otherwise keep all six. If a run exceeds the cap while still under 5 minutes, re-measure and re-set the cap by T051's rule
+- [ ] T050 [US4] Add a new job `headless-author` to `.github/workflows/ci.yml` per research R3: `needs: changes` only (do not add it to `build`'s `needs:`); `if: ${{ needs.changes.outputs.e2e == 'true' }}` (same gate as `e2e-desktop`); `timeout-minutes: 5` (the ceiling, provisional until T051); steps: checkout, the pinned corpus checkout copied from `build` (same pin), pnpm/Node setup, install, the cached SLDR/langtags fetches, `pnpm --filter "@keyboard-studio/studio^..." build`, then `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`. The job id and `name:` are both `headless-author` and must stay stable once required (T077)
+- [ ] T051 [US4] Measure the `headless-author` job on CI (total job time, plus the author's per-case cost from the PR set's `timingMs`, replacing research R1's 5 s budget); set the job's `timeout-minutes` in `.github/workflows/ci.yml` to the measured job time plus about 50% headroom, rounded up to a whole minute, at most 5; record the measurement and the cap in research.md R1/R3 and SC-002's figures in spec.md
+- [ ] T052 [US4] Check 3 PR runs: `headless-author` finishes inside the cap T051 set, finishes no later than the `fast` -> `build` chain (so PR wall time does not grow), and the whole run stays under 10 minutes; record job times and run totals in research.md R3. Cut the PR set only if the job would exceed 5 minutes (weakest shape first, keeping both regression guards), updating spec FR-031's table in the same change; otherwise keep all six. If a run exceeds the cap while still under 5 minutes, re-measure and re-set the cap by T051's rule
 - [ ] T053 [US4] SC-005: locally revert `sameGroupName` use in `packages/engine/src/codec/groupName.ts` callers, rebuild the engine, run the PR set; confirm the `bj_cree_woods` case fails with the duplicate-group compile error in under 60 s; restore; record the evidence in the phase commit message
+- [ ] T077 [US4] **Owner action (admin), after T050-T052 and after `headless-author` has run green on `main` at least once**: add `headless-author` to the required status checks of the `main: CI + integrity` ruleset (`gh api repos/{owner}/{repo}/rulesets` to find it; edit in the repository settings or via the API). A required check that has never reported blocks every PR, so this must not happen earlier. Record the date in the PR or a follow-up comment; from then on the job name must not change without updating the ruleset in the same change. (ID appended so existing IDs stay stable.)
 
 **Checkpoint**: PR lane green in CI within SC-002.
 
@@ -207,7 +208,7 @@ it, add a unit test for the function, and leave the component's existing tests u
 
 - Phase 1 → Phase 2 → Phase 3 (US1, MVP).
 - Phase 4 (US2) needs Phase 3.
-- Phase 5 (PR set + CI) needs Phase 4 (parity runs in the PR lane).
+- Phase 5 (PR set + CI) needs Phase 4 (parity runs in the PR lane). Its last task, T077, is an owner action taken only after the job has run green on `main`.
 - Phase 6 (US3) needs Phase 3 only; can run alongside Phases 4-5.
 - Phase 7 (wide sweep + schedule) needs Phase 6 (the `cases` tier) and Phase 5 (the PR set).
 - Phase 8 (US5 audit) needs Phase 3; can run alongside Phases 4-7.

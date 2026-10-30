@@ -41,11 +41,12 @@ Budget: **under 5 s per case** until task T051 measures it. With replay at under
 budgeted at 6 s.
 
 **Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x up to 6 s = about 31-61 s of test time,
-about 30 s if the author is as cheap as replay. The PR lane is a step inside `build` (R3) whose cap is
-T051's measurement plus about 50%, rounded up to a whole minute, at most 5 minutes (owner follow-up).
-At the estimate that is a 2-minute cap. The whole PR run (about 5.1 min today without the step) stays
-under 10 minutes and ideally around 6. All six cases stay unless they would push the step past
-5 minutes or the run past 10; a seventh shape replaces a weaker one (FR-031).
+about 30 s if the author is as cheap as replay. The PR lane is the parallel job `headless-author` (R3),
+which also pays its own checkout, corpus checkout, install and `contracts`/`engine` build (estimated
+1.5-2 min), so its total is about 2-3 min. That is inside the `fast` + `build` chain (about 5.1 min),
+so PR wall time does not grow. Its cap is T051's measurement plus about 50%, rounded up to a whole
+minute, at most 5 minutes. All six cases stay unless the job would exceed 5 minutes; a seventh shape
+replaces a weaker one (FR-031).
 
 **32-case suite (SC-008)**: 25 s + 32 x 6 s = about 3.6 min, under the 10-minute bound.
 
@@ -121,37 +122,45 @@ The group-name fix the `bj_cree_woods` guard protects is `sameGroupName`
 
 ## R3. Where the PR lane runs
 
-**Decision** (owner, 2026-10-30): **one step inside the existing `build` job** of
-`.github/workflows/ci.yml`, on `pull_request` events, placed after "Build workspace dependencies (PR
-path)" so the corpus checkout, install and `dist` it needs are already there. The step runs one vitest
-invocation and carries a `timeout-minutes` cap (set as below):
-`pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`.
-(`driftGuard.test.ts` is not a corpus file; the step names it explicitly, or a second short invocation
-under the default config runs it inside the same capped step.)
+**Decision** (owner ruling, 2026-10-30, superseding "step inside `build`" from earlier the same
+day): a new job **`headless-author`** in `.github/workflows/ci.yml`:
 
-**Rationale**: the `build` job already has the pinned corpus at `../keyboards`, the installed
-workspace and the built `contracts`/`engine` `dist`, so the step pays only vitest's module load (about
-25 s, R1) plus the cases. It is covered by the required `build` check, so no ruleset change. The PR
-critical path (`fast` then `build`, about 5.1 min measured on #2368's run) grows by at most the cap,
-never more than 5 min; the target is a whole PR run around 6 min, always under 10. The
-`timeout-minutes` cap makes an overrun fail the run loudly rather than grow it quietly.
+- `needs: changes` only. `build` does **not** need it, and no other job does.
+- `if: ${{ needs.changes.outputs.e2e == 'true' }}`, the same gate as `e2e-desktop`. The `e2e` output
+  is true for any non-Markdown change under `packages/studio/`, anything that sets `golden` (`packages/
+  engine/`, `packages/contracts/`, `ci.yml`, `package.json`, `pnpm-lock.yaml`), the `run-all-gates`
+  label, every non-PR event, and when the diff is unavailable (fail open). That is exactly the code the
+  author exercises, so no narrower output is needed. A job skipped by its `if:` reports as skipped, which
+  a required check accepts, so docs-only PRs are not blocked.
+- Its own steps: checkout, the pinned corpus checkout (same step and pin as `build`), pnpm/Node setup,
+  install from cache, the cached SLDR/langtags fetches, `pnpm --filter "@keyboard-studio/studio^..."
+  build`, then one vitest invocation:
+  `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`.
+- `timeout-minutes` on the job, set by T051 (below).
+- It gates merges once the owner adds `headless-author` to the required status checks of the
+  `main: CI + integrity` ruleset (T077), after it has run green on `main` at least once: a required check
+  that never reports blocks every PR. The job name must stay stable from then on.
 
-**Setting the cap** (owner follow-up, 2026-10-30: "5 minutes is fine if needed"): T050 lands the
-step with the ceiling, `timeout-minutes: 5`. T051 then measures the step on CI (module load plus the
-six cases) and sets the cap to that time plus about 50% headroom, rounded up to a whole minute, never
-above 5. At R1's estimate (about 30-60 s) that is 2 minutes. T052 checks three PR runs against that cap
-and against the 10-minute total.
+**Rationale**: GitHub runs jobs concurrently unless `needs:` chains them. On `main`, `ci.yml` is
+`changes` -> {`fast` -> `build` (`needs: [changes, fast]`), `e2e-desktop`, `e2e-mobile`, `e2e-golden`},
+so PR wall time is the longest chain: `fast` (about 2.1 min) + `build` (about 2.9 min), about 5.0-5.1
+min on #2368's run. A job that needs only `changes` runs beside that chain and adds no wall time while
+its own total stays within about 5 minutes. Its extra install and build cost runner minutes, not wall
+time.
 
-**When to cut the set**: only if keeping all six cases would push the step past 5 minutes or the whole
-PR run past 10 minutes. Otherwise all six stay. Cutting order: weakest shape first, both regression
-guards (`bj_cree_woods`, `basic_kbdfr`) kept.
+**Setting the cap** (owner follow-up, 2026-10-30: "5 minutes is fine if needed"): T050 lands the job
+with the ceiling, `timeout-minutes: 5`. T051 measures the job on CI and sets the cap to that time plus
+about 50% headroom, rounded up to a whole minute, never above 5. At R1's estimate (about 2-3 min) that
+is 4-5 minutes. T052 checks three PR runs against the cap and against the 10-minute whole-run total.
 
-**Alternatives considered**: (a) a separate `headless-author` job that `build` needs: rejected by the
-owner, it repeats `pnpm install` and the build (about a minute) and puts max(headless, `fast`) + `build`
-on the critical path. (b) Adding the files to `scripts/test-pr.mjs` `CURATED_CORE`: rejected, the
-default studio config excludes `*.corpus.test.ts`, the PR set needs the corpus config, and the cap
-would be shared with unrelated suites. (c) Path-gating the PR lane: rejected, the ruling makes the
-curated set required on every PR.
+**When to cut the set**: only if the job would exceed 5 minutes. Otherwise all six stay. Cutting order:
+weakest shape first, both regression guards (`bj_cree_woods`, `basic_kbdfr`) kept.
+
+**Alternatives considered**: (a) a step inside `build` (the earlier ruling): reuses `build`'s install,
+but lengthens the longest chain on every PR. (b) A job that `build` needs: puts max(headless, `fast`) +
+`build` on the chain. (c) Adding the files to `scripts/test-pr.mjs` `CURATED_CORE`: the default studio
+config excludes `*.corpus.test.ts`, the PR set needs the corpus config, and it would run inside
+`build`. (d) No path gate: wasted runner minutes on docs-only PRs, with no coverage gain.
 
 ## R4. Scheduled workflow (FR-034)
 

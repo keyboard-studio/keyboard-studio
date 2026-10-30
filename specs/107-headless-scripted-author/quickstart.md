@@ -35,14 +35,14 @@ Expect: 0 unexplained differences across the 4 committed records; stale allow-li
 
 ## 3. PR lane (what CI runs on every PR, SC-002)
 
-The same command the `build` job's capped step runs (`timeout-minutes` set by T051, at most 5):
+The same command the parallel `headless-author` job runs (`timeout-minutes` set by T051, at most 5):
 
 ```sh
 npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard
 ```
 
 Expect: 6 PR-set cases report every gate (expected failures named with their owner); wall time (including
-vitest's module load, about 25 s) well inside the step's cap. SC-005 check: revert `sameGroupName` in
+vitest's module load, about 25 s) well inside the job's cap. SC-005 check: revert `sameGroupName` in
 `packages/engine/src/codec/groupName.ts` locally, rebuild the engine, rerun; the `bj_cree_woods`
 case fails with a duplicate-group compile error.
 
