@@ -1,6 +1,6 @@
 # Feature Specification: Headless scripted author for decision walks
 
-**Feature Branch**: `107-headless-scripted-author` (cut from `origin/main`; implementation builds on the spec 106 US1 replay stack, see Assumptions)
+**Feature Branch**: `107-headless-scripted-author` (cut from `origin/main`, then stacked on `106-consistent-keyboard-output` by merge on 2026-10-30; see Dependencies)
 
 **Created**: 2026-10-30
 
@@ -59,7 +59,15 @@ product proposal, and it records that value's provenance the way the UI records 
 - Q: What does the author do at a step? → A: It calls the product's own proposal functions and applies the walk policy: accept the top suggestion, else the default, else a placeholder sequence (`zzq<hex>` with indicator `j`, exactly as the harness does today).
 - Q: May the author re-implement a proposal to avoid a component? → A: No. Logic it needs that lives only in a component or hook is lifted into a store action or a pure function that the component then calls. There is no behaviour change, and the component's existing tests stay green.
 - Q: What keeps Playwright? → A: UX and accessibility walks (the golden walk, the a11y specs), behaviour that is genuinely component-held, and the download wiring. The 32-case harness is retired for decision coverage.
-- Q: Is `fallbackPolicy` fixed here? → A: No. It is a known gap carried over: it is in no decision value and not in the record (see the `decisionPointFixture.ts` header). The author surfaces it and does not fix it.
+- Q: Is `fallbackPolicy` fixed here? → A: No. It is a known gap carried over: it is in no decision value and not in the record (see the `decisionPointFixture.ts` header). The author surfaces it and does not fix it. The fix is tracked as issue #2366.
+
+### Session 2026-10-30 (owner rulings, closed)
+
+- Q: Does 107 wait for spec 106's replay code to reach `main`, or stack on it? → A: It stacks. `107-headless-scripted-author` merges `origin/106-consistent-keyboard-output` (a merge, not a rebase, because 107 was already pushed). 107's PR targets that branch until PR #2362 merges. See Dependencies.
+- Q: Which slice runs in CI on a pull request (FR-031)? → A: A **minimal curated set** of keyboards chosen by shape, each with a recorded reason: a few simple ones, structurally different ones, and keyboards whose bugs were repaired, kept as regression guards. Adding a keyboard to this set is part of fixing a keyboard-specific bug. The wider sweep (the Latin codec-clean slice, the whole eligible corpus) is opt-in or scheduled, never required on a PR.
+- Q: What is the PR CI time budget? → A: Total PR CI wall time (the whole PR run, not just this spec's share) must finish in under 10 minutes, preferably under 5. Larger-corpus scans run occasionally (scheduled or on demand), never on PRs. See SC-002 (PR budget) and SC-009 (scheduled scan).
+- Q: Are walk zips (or more walk records) imported to cover parity? → A: No. The repo keeps the **framework** that produces walk records (the headless author, and the Playwright harness for UX walks) but does not commit walk zips to `main`. Parity runs against the decision records spec 106 already commits under `packages/studio/src/lib/__fixtures__/decision-points/records/`, plus any record a maintainer produces on demand with the framework. The zips stay on `km/2302-walk-zips`.
+- Q: Is `fallbackPolicy` fixed here? → A: No; it is tracked as issue #2366 (FR-060).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -105,9 +113,11 @@ decisions an author clicking through the UI with the walk policy would take.
 author could be walking a path no user can walk.
 
 **Independent Test**: Compare the author's DecisionSet with each recorded walk. That means the four
-records under `packages/studio/src/lib/__fixtures__/decision-points/records/`, plus every walk zip in
-`ks-2302-main/tools/testing-profiles-2302/zips/` that has a decision record. Compare per decision id
-and value. The test fails on any unexplained difference.
+records spec 106 commits under `packages/studio/src/lib/__fixtures__/decision-points/records/`, plus
+any decision record a maintainer produces on demand (a UX walk run with the Playwright harness) and
+hands to the parity run by path. On-demand records are inputs to a run, not repo fixtures: they are
+not committed, and no walk zip is imported. Compare per decision id and value. The test fails on any
+unexplained difference.
 
 **Acceptance Scenarios**:
 
@@ -124,10 +134,13 @@ the same per-case gate report the Playwright harness was meant to produce for sp
 the count of placeholder decisions. That report replaces the walk as the evidence for decision
 coverage.
 
+The 32-case suite is an **on-demand** (and scheduled) run, not a PR gate. It reads `cases.json` from a
+path the maintainer supplies. What runs on every PR is the minimal curated set (FR-031).
+
 **Why this priority**: This unblocks spec 106 US8 (T063/T064) without 32 browser walks.
 
 **Independent Test**: Run the 32-case suite. Every case reports G1-G8 and its placeholder count, and
-the suite finishes within the SC-002 budget.
+the suite finishes within the SC-008 budget.
 
 **Acceptance Scenarios**:
 
@@ -143,18 +156,27 @@ A maintainer can run the author over keyboards beyond the four recorded ones: an
 from `../keyboards` crossed with any profile. Engine defects that only some keyboards trigger, like
 the case-sensitive group merge, then show up across the corpus before any author meets them.
 
+Two tiers run the same sweep code (FR-031):
+
+- the **PR set**: a minimal curated set of keyboards chosen by shape, required on every PR and sized
+  to the PR budget (SC-002);
+- the **wide sweep**: the Latin codec-clean slice or the whole eligible corpus, run on a schedule or
+  on demand, never required on a PR. Its failures are filed as issues; they never block a PR.
+
 **Why this priority**: Breadth is what replay alone cannot give. It comes after US1-US3 because it
 reuses them unchanged.
 
-**Independent Test**: Run the sweep over the eligible slice. Every case either completes with a gate
-report or is skipped with a named reason. The sweep summary groups failures by gate and by first
-failing step.
+**Independent Test**: Run the PR set, then the wide sweep over the eligible slice. Every case either
+completes with a gate report or is skipped with a named reason. The sweep summary groups failures by
+gate and by first failing step.
 
 **Acceptance Scenarios**:
 
 1. **Given** the eligible slice (FR-031), **When** the sweep runs, **Then** each keyboard x profile yields a gate report or a named skip reason.
 2. **Given** a keyboard whose script routes to the "not yet supported" stub (CJK, Ethiopic), **When** swept, **Then** it is skipped with that reason. The author never forces a path the product does not offer.
 3. **Given** a sweep failure, **When** it is reported, **Then** the failing case can be re-run alone as a US1 case.
+4. **Given** a PR that fixes a keyboard-specific bug, **When** it lands, **Then** that keyboard is in the curated PR set with a reason naming the bug, so the PR set guards the fix from then on.
+5. **Given** a scheduled wide sweep that finds a failure, **When** it finishes, **Then** the failure is filed (or an existing issue updated) with the case, gate and decision point, and no PR is blocked by it.
 
 ---
 
@@ -188,7 +210,8 @@ than only on walk zips.
 needs a browser, but the gate set is useful without it.
 
 **Independent Test**: Run a case whose copied keyboard has a touch layout. G6 is reported from the
-headless bundle and agrees with the walk zip's touch layout for the same case.
+headless bundle. Where a maintainer has an on-demand walk of the same case, G6 agrees with that walk's touch
+layout; no walk zip is committed for this check.
 
 **Acceptance Scenarios**:
 
@@ -271,9 +294,11 @@ headless bundle and agrees with the walk zip's touch layout for the same case.
 
 **Parity (US2)**
 
-- **FR-020**: A parity test MUST compare the author's DecisionSet, per decision id and value, with every recorded walk available to the repo. That means:
-  - the four records in `decision-points/records/`;
-  - any walk record later copied in under the same provenance rules (`records/PROVENANCE.md`).
+- **FR-020**: A parity test MUST compare the author's DecisionSet, per decision id and value, with:
+  - the four records spec 106 commits in `decision-points/records/` (always, on every run that includes their keyboards);
+  - any decision record a maintainer produces on demand with the walk framework and passes to the run by path.
+
+  On-demand records are run inputs. They are not committed, and walk zips are not imported into the repo; the zips stay on `km/2302-walk-zips` (owner ruling, 2026-10-30). Growing the committed record set beyond spec 106's four is out of scope.
 - **FR-021**: Every difference MUST either be absent or carry an allow-list entry with three fields:
   - the decision id;
   - the reason;
@@ -285,14 +310,40 @@ headless bundle and agrees with the walk zip's touch layout for the same case.
 
 **Harness cases (US3)**
 
-- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner).
-- **FR-031**: A corpus sweep mode MUST run the author over any copied keyboard in `../keyboards` crossed with any profile. Which slice runs by default and in CI is open: [NEEDS CLARIFICATION: the sweep's default slice and where it runs. Options: (a) the 4 recorded bases x 8 profile variants only in CI, with the full Latin-script codec-clean slice opt-in or nightly; (b) a fixed sample of about 40 keyboards in CI; (c) the whole eligible corpus in CI.]
+- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner). The suite reads `cases.json` from a path the maintainer supplies and runs on demand or on the schedule (FR-034). It is not a PR gate.
+- **FR-031**: A corpus sweep mode MUST run the author over any copied keyboard in `../keyboards` crossed with any profile. It runs in two tiers (owner ruling, 2026-10-30):
+  - **PR set (required on every PR).** A minimal curated set of keyboards chosen by shape. Each entry is a committed case description (keyboard, profile, sample text, overrides) with a recorded reason. No walk zip or walk record is needed to run it. The set covers:
+    - a few **simple** keyboards (for example `basic_kbdus`);
+    - **structurally different** keyboards: deadkey-heavy, a shipped touch layout, `any()`/`index()` store pairs, read-only or opaque groups, mixed-case group names;
+    - **regression guards**: keyboards whose keyboard-specific bugs were repaired. The seeds are `bj_cree_woods` (a `group(Main)` duplicate-group merge, fixed in `502fb061`) and `basic_kbdfr` with Ewondo (S-02: three deadkeys on `K_COLON`, fixed in #2358).
+
+    Adding a keyboard to the PR set is part of fixing a keyboard-specific bug: the fix's PR adds the case and its reason. The set's size is bounded by the PR budget (SC-002), so a new entry that would break the budget replaces a weaker one of the same shape rather than growing the set.
+  - **Wide sweep (never required on a PR).** The Latin-script codec-clean slice, or the whole eligible corpus, crossed with the profiles. It runs on a schedule or on demand (FR-034).
+
+  The initial PR set, with its reasons, is:
+
+  | Keyboard | Profile | Shape and reason |
+  |---|---|---|
+  | `basic_kbdus` | `p1-whole-bafut-kbdus` | Simple: no deadkeys, no stores, one group. Has a committed walk record, so it also anchors parity (US2). |
+  | `basic_kbdfr` | `p1-whole-ewondo-kbdfr` | Regression guard: S-02 put three deadkeys on `K_COLON` (fixed in #2358). Also an AZERTY base with a `deadkeys` group. Has a committed walk record. |
+  | `bj_cree_woods` | a whole-alphabet profile (the plan names it) | Regression guard: `applyAssignments` merged `group(main)` into the declared `group(Main)`, a duplicate group that failed `kmcmplib` (fixed in `502fb061`). Also mixed-case group names, heavy `any()`/`index()` store pairs (about 70/58), an opaque `option-store-directive` fragment the codec preserves, a non-Latin script (Canadian syllabics), and no touch layout (G6 not applicable). |
+  | `sil_cameroon_qwerty` | `p4-unwrap-bafut-camqwerty` | Structural: a shipped touch layout with `any()`/`index()` pairs and a `deadkeys` group. Has a committed walk record. |
+  | `sil_cameroon_azerty` | `p4-unwrap-ewondo-camazerty` | Structural: deadkey-heavy (about 37 deadkey references). Carries the open tolerance-analysis throw (#2363) as an expected failure until that lands. Has a committed walk record. |
+  | `chechen_latin` | a whole-alphabet profile (the plan names it) | Structural: three `readonly` groups ahead of `group(main)`, which the codec keeps as fidelity-only groups, plus a shipped touch layout. |
+
+  The plan confirms each keyboard is codec-clean and that the set fits SC-002. A keyboard that fails either check is replaced by another of the same shape, and the reason column is updated.
 - **FR-032**: The sweep MUST skip, with a named reason, any keyboard that is:
   - missing;
   - not codec-clean;
   - routed to the "not yet supported" stub (CJK, Ethiopic);
   - outside the eligible slice.
 - **FR-033**: Spec 106 T063/T064 MUST be satisfiable from this suite's report, with no Playwright run. Spec 106 T065 (zero `it.fails` in the decision-point corpus test) remains a spec 106 gate.
+- **FR-034**: The wide sweep and the 32-case suite MUST run as a scheduled workflow, separate from the PR workflow. It also runs on manual dispatch. Each run MUST:
+  - publish its per-case gate report as a run artifact;
+  - file each new failure as a GitHub issue naming the case, gate and decision point, or add to the open issue for that same failure rather than filing a duplicate;
+  - never block, fail or gate a PR.
+
+  The plan fixes the cadence and the issue-filing rules.
 
 **Lifting component logic (US5)**
 
@@ -318,7 +369,7 @@ headless bundle and agrees with the walk zip's touch layout for the same case.
 
 **Known gap carried over**
 
-- **FR-060**: `fallbackPolicy` is not in any decision value and not in the decision record. The author MUST run with the store default, MUST report the value it used, and MUST NOT write it anywhere the record does not already carry it. Adding it to the record is out of scope here.
+- **FR-060**: `fallbackPolicy` is not in any decision value and not in the decision record. The author MUST run with the store default, MUST report the value it used, and MUST NOT write it anywhere the record does not already carry it. The gap is reported here and fixed by #2366; adding it to the record is out of scope for this spec. When #2366 lands, the author reads and writes it like any other decision, and the run report drops the entry.
 
 **Playwright's remaining role**
 
@@ -342,26 +393,35 @@ headless bundle and agrees with the walk zip's touch layout for the same case.
 
 ### Measurable Outcomes
 
-- **SC-001**: One case runs headlessly, end to end (author, replay, compile, gates), in under 60 seconds on a maintainer's machine, down from about 25 minutes for a Playwright walk.
-- **SC-002**: The 32 harness cases finish in under 10 minutes in one vitest run, with no browser, dev server or port, and fail 0 times out of 5 repeated runs for reasons other than a real gate failure. That means no flakiness.
+- **SC-001**: One case runs headlessly, end to end (author, replay, compile, gates), in under 60 seconds on a maintainer's machine from a cold vitest start, and adds under 5 seconds per further case in the same run. That is down from about 25 minutes for a Playwright walk. Baseline measured for the plan on 2026-10-30: the existing replay alone takes about 25 s of one-time module load and 0.06-1.0 s per fixture warm (the full-decision `tolerance` fixture: 0.08 s on `basic_kbdus`, 1.0 s on `sil_cameroon_azerty`).
+- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time, preferably under 5. This spec's PR share (the curated PR set of FR-031 plus parity on the committed records and the drift guard) MUST fit with headroom: it adds **at most 90 seconds** to the PR run's critical path, and 0 seconds if it runs in a job parallel to an existing longer one. The plan sizes the set from the measured per-case cost (about 25 s fixed plus under 5 s per case, so six cases is about 55 s). The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). The wide sweep and the 32-case suite never run on a PR.
 - **SC-003**: Parity holds on 100% of recorded walks: every decision equal, or explained by an allow-list entry. 0 unexplained differences, and 0 records edited.
 - **SC-004**: 100% of the suggestions and defaults the author uses come from product functions covered by the drift guard (FR-011). The author contains 0 copies of proposal logic.
-- **SC-005**: Re-introducing the `group(main)` vs `group(Main)` defect (reverting `502fb061`) makes the headless suite fail within its first affected case, in under 60 seconds.
+- **SC-005**: Re-introducing the `group(main)` vs `group(Main)` defect (reverting `502fb061`) makes the PR set fail on its `bj_cree_woods` case, in under 60 seconds.
 - **SC-006**: Every lifted rule (FR-040) leaves its component's existing tests and the golden walk unchanged: 0 re-baselines.
 - **SC-007**: Spec 106 T063/T064 close on this suite's report with 0 Playwright case walks.
+- **SC-008**: The 32 harness cases, run on demand, finish in under 10 minutes in one vitest run, with no browser, dev server or port, and fail 0 times out of 5 repeated runs for reasons other than a real gate failure.
+- **SC-009**: The scheduled wide sweep (FR-034) runs on its cadence without blocking any PR. Every failure it finds is filed or appended to an existing issue within that run, with the case, gate and decision point, and no failure it finds is lost.
 
 ## Out of scope
 
 - Changing what the product proposes, ranks or pre-selects. Spec 106 US8 owns pre-selection; this spec only consumes it.
 - Any `Pattern` schema change (Constitution Art. I).
 - LDML output; touch-first authoring (Decision 6); CJK and Ethiopic paths (stubbed and skipped).
-- Adding `fallbackPolicy` to the decision record.
+- Adding `fallbackPolicy` to the decision record (issue #2366).
+- Committing walk zips, or walk records beyond spec 106's four, to the repo. The zips stay on `km/2302-walk-zips`.
+- Running the wide sweep or the 32-case suite on PRs.
 - Retiring or editing the harness in `ks-2302-main`. That is a separate repo, and its retirement follows FR-070.
 - Editing spec 106 files.
 
+## Dependencies
+
+- **Stacked on spec 106.** 107 is stacked on `106-consistent-keyboard-output` (PR #2362), which carries spec 106 US1's replay pieces (`decisionPointFixture.ts`, `recordToDecisionSet.ts`, `consistencyGates.ts`, `decisionPoint.corpus.test.ts`). The branch merged `origin/106-consistent-keyboard-output` on 2026-10-30 (a merge, not a rebase, because 107 was already pushed). Until #2362 merges, 107's PR targets `106-consistent-keyboard-output`, not `main`. When #2362 merges, 107 retargets to whatever #2362 merged into.
+- **Not yet on the 106 base.** Two things this spec names live further up the 106 stack, on `km/106-carve-claimed`, and are not yet in `106-consistent-keyboard-output`: the group-name fix `502fb061` (needed by the `bj_cree_woods` regression guard and SC-005) and the carve "marked until Continue" code (`suggestionFingerprintOf`, `isUntouchedSuggestion`, `isMarkedRow`, `applySuggestion`, `handleSkip`; needed by the FR-040 carve lift). The plan orders the work so nothing depends on them until they reach the base.
+- **Issues.** #2363 (tolerance analysis throws on `sil_cameroon_azerty`), #2361 (`nul`/`beep` in starting stores), and #2366 (`fallbackPolicy` in the record) are owned elsewhere. The author reports them as expected, with their owner, and does not fix them.
+
 ## Assumptions
 
-- **Stacking.** Implementation needs spec 106 US1's replay pieces, which today exist only on the unmerged 106 stack (`106-consistent-keyboard-output`, PR #2362, and branches stacked on it). Implementation either waits for that to reach `main` or stacks on it; the plan says which. This spec document is cut from `origin/main`.
 - **Corpus.** `../keyboards` points at the keyboard-studio fork's `master`, as the decision-point suites already require. Cases skip with a reason when a keyboard is missing.
 - **Overrides.** The harness's `overwriteChar` / `overwriteKey` are the only override kind in the 32 cases. Further override kinds are added as cases need them, with the same precedence rule.
 - **Parity runs.** Parity runs on the same build that produced the record when that build is known (`records/PROVENANCE.md`). Otherwise the differences are explained against the record's build.

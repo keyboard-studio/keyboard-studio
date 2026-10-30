@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -34,5 +34,9 @@
 - This is a maintainer-facing test tool. Its users are studio maintainers, so naming the product
   functions it must call (FR-010) and the component rules it must lift (FR-040) is the requirement
   itself, the drift guard, and not implementation leakage. Kept deliberately, as in spec 106.
-- One marker remains (FR-031): the corpus sweep's default slice and where it runs. Resolve with
-  `/speckit-clarify` before `/speckit-plan`.
+- Re-run 2026-10-30 after the owner rulings: **zero** [NEEDS CLARIFICATION] markers remain and no
+  open questions are left. FR-031 is resolved (a minimal curated PR set chosen by shape, with the wide
+  sweep scheduled or on demand); the PR CI budget is SC-002 (whole PR run under 10 minutes, preferably
+  under 5); walk zips stay off `main` and parity runs on spec 106's committed records plus records
+  produced on demand (FR-020); `fallbackPolicy` is tracked by #2366 (FR-060); stacking on
+  `106-consistent-keyboard-output` is recorded under Dependencies.

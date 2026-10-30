@@ -42,6 +42,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | BU Phonetic | `bu_phonetic` | `fr`, `de`, `und-Latn`, `es` | J. Albert Bickford | `../keyboards/release/b/bu_phonetic` |
 | Bukawa | `bukawa` | `buk` | William Eckermann | `../keyboards/release/b/bukawa` |
 | Cabecar | `cabecar` | `cjp-Latn` | Victoria Quint | `../keyboards/release/c/cabecar` |
+| Chechen Latin | `chechen_latin` | `ce-Latn` | Chechen Language | `../keyboards/release/c/chechen_latin` |
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
