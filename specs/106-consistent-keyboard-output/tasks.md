@@ -158,15 +158,15 @@ Each story phase ends with the same three gate tasks:
 
 **Goal**: zero unreachable hints, approvable suggested discards, and needed punctuation never silently lost (FR-040 to FR-043). **Independent test**: G1 passes on every fixture at `carve` and later. **Branch**: `km/106-carve-claimed`.
 
-- [ ] T036 [P] [US4] Write tests in `packages/studio/src/lib/claimedInputs.test.ts`:
+- [x] T036 [P] [US4] Write tests in `packages/studio/src/lib/claimedInputs.test.ts`:
   - a plain override drops the base rule;
   - a Shift-only difference is kept;
   - a rule with preceding context, deadkey or `if()` survives;
   - removing the assignment restores the rule;
   - the S-02 trigger and the RALT escape are claimed;
   - the postfix mark key is claimed.
-- [ ] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
-- [ ] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
+- [x] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
+- [x] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
 - [ ] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
   - on the first visit, when the value's `suggestionFingerprint` does not match, apply `toggleRecommendedRows(primaryRows, true)` with provenance `derived`;
   - render those rows as "discarded, suggested — click to keep";

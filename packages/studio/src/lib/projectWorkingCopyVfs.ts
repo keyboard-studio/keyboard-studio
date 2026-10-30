@@ -14,6 +14,8 @@
 // Projection order (spec §12 "re-projected layers"):
 //   0. Touch layout     — inject Phase E touchLayoutJson into .keyman-touch-layout
 //   1. Carve deletions  — applyCarveToVfs (re-emits filtered IR into .kmn)
+//                         Also drops the starting rules an assignment shadows
+//                         (claimedInputs.ts, spec 106 US4) — per projection only.
 //   1.5 Carve keycaps   — applyCarveKeycapRemovalsToVfs (blanks carved chars off
 //                         .kvks / .keyman-touch-layout keycaps in place)
 //   1.6 Touch method deletions — applyTouchKeycapRemovalsToVfs (blanks/drops
@@ -129,6 +131,7 @@ import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
 import { markAttachmentsFromWorklist } from "./markAttachments.ts";
 import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
+import { claimedInputRuleIds } from "./claimedInputs.ts";
 
 /** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
 function safeFormViolations(
@@ -492,11 +495,23 @@ export function projectWorkingCopyVfs(
   // Union the aggregated pass over the incremental per-character union before
   // partitioning, so the .kmn slot pruning, the whole-node filter, and the
   // keycap projection below all consume the same pruned result (§11).
-  const effectiveItemIds = unionAggregatedCarveIds(
+  const aggregatedItemIds = unionAggregatedCarveIds(
     startIr,
     deletedItemIds,
     carveChars,
   );
+
+  // Spec 106 US4 (FR-040): starting rules an assignment shadows (same key,
+  // same modifiers, merged ahead of them in step 2) are dropped here, fresh
+  // every projection and never stored — removing the assignment restores
+  // them. They are plain removals, not carves: exempt from the fallback
+  // policy's suppression rewrite, and kept out of the keycap cascade (step
+  // 1.5), whose key the assignment itself still needs.
+  const claimedRuleIds = claimedInputRuleIds(startIr, assignments);
+  const effectiveItemIds =
+    claimedRuleIds.size === 0
+      ? aggregatedItemIds
+      : new Set([...aggregatedItemIds, ...claimedRuleIds]);
 
   const slotIds = new Set<string>();
   const wholeNodeItemIds = new Set<string>();
@@ -525,6 +540,16 @@ export function projectWorkingCopyVfs(
   // The slot partition above is kept for that legacy path and for the keycap
   // cascade (step 1.5), which is driven off startIr.
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
+  // The same set without the claimed-only rules (US4): the keycap cascade's
+  // input. A rule the author also carved stays in it.
+  const carvedWholeNodeIds =
+    claimedRuleIds.size === 0
+      ? allWholeNodeIds
+      : new Set(
+        [...allWholeNodeIds].filter(
+          (id) => !claimedRuleIds.has(id) || deletedNodeIds.has(id) || aggregatedItemIds.has(id),
+        ),
+      );
 
   // spec-014 T016c — carve IR-projection via the single mutate() write seam.
   //
@@ -588,7 +613,14 @@ export function projectWorkingCopyVfs(
       undefined,
       {
         ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
-        ...(suppressionExemptIds !== undefined ? { suppressionExemptIds } : {}),
+        ...(suppressionExemptIds !== undefined || claimedRuleIds.size > 0
+          ? {
+            suppressionExemptIds: new Set([
+              ...(suppressionExemptIds ?? []),
+              ...claimedRuleIds,
+            ]),
+          }
+          : {}),
         loud: carveLoud,
         // The pipeline's slot-removal warnings (blocked stores, skips) are
         // part of this projection's warning surface — the legacy path
@@ -647,7 +679,7 @@ export function projectWorkingCopyVfs(
   // case it is kept visibly inert ("does nothing"). Runs before Step 3.5 so a
   // subsequent assignment label re-populates a blanked keycap, and before
   // Step 4 so paths resolve against the pre-rename source/<keyboardId>.* filenames.
-  if (hasCarveEdit) {
+  if (carvedWholeNodeIds.size > 0 || slotIds.size > 0) {
     try {
       const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(
         vfs,
@@ -655,7 +687,7 @@ export function projectWorkingCopyVfs(
         startIr,
         {
           slotIds,
-          wholeNodeIds: allWholeNodeIds,
+          wholeNodeIds: carvedWholeNodeIds,
           // exactOptionalPropertyTypes: only pass the seam when non-empty —
           // an explicit undefined is not assignable to the optional field.
           ...(carveTouchKeepInert !== undefined && carveTouchKeepInert.size > 0

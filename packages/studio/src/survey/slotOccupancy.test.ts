@@ -226,6 +226,30 @@ describe("assignmentSlotKeys — slots derived from the RECORDED assignment (Cyc
     ]);
   });
 
+  it("names the whole NFC glyph of an NFD S-01 output, not its first code point", () => {
+    const a = assignment([
+      {
+        patternId: "simple_swap",
+        strategyId: "S-01",
+        slotValues: { kmnRules: "+ [K_QUOTE] > U+0061 U+030C" },
+      },
+    ]);
+    expect(assignmentSlotKeys(a)).toEqual([
+      { key: "K_QUOTE|", vkey: "K_QUOTE", modifiers: [], char: "ǎ" },
+    ]);
+  });
+
+  it("yields nothing for an S-01 output that is more than one grapheme", () => {
+    const a = assignment([
+      {
+        patternId: "simple_swap",
+        strategyId: "S-01",
+        slotValues: { kmnRules: "+ [K_QUOTE] > U+0061 U+0062" },
+      },
+    ]);
+    expect(assignmentSlotKeys(a)).toEqual([]);
+  });
+
   it("keys each line of a multi-line S-01 (CAPS quad shape) to its own slot", () => {
     const a = assignment([
       {

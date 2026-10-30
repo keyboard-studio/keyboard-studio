@@ -35,7 +35,7 @@ const fixtureRoot = resolve(here, "..", "..", DECISION_POINT_FIXTURE_DIR);
 const GATES: readonly GateId[] = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G8-start"];
 
 /** What each gap is waiting on. G6 is walk-only, so it has no row here. */
-type Owner = "US4" | "US5" | "US6" | "#2361" | "#2363";
+type Owner = "US5" | "US6" | "US8" | "#2361" | "#2363";
 
 const AFTER_ASSIGNMENTS: readonly DecisionPoint[] = ["assignments", "caps", "tolerance"];
 
@@ -51,9 +51,11 @@ interface Gap {
 // G5 everywhere pass today, because those fixtures do not yet contain the shape
 // the story fixes).
 const KNOWN_GAPS: readonly Gap[] = [
-  // E3: starting rules shadowed by assignments survive carve. Unreachable
-  // hints come from assignment shadowing, so G1 starts at `assignments`.
-  { gate: "G1", owner: "US4", bases: ["basic_kbdus", "basic_kbdfr"], points: AFTER_ASSIGNMENTS },
+  // Not E3 (US4 drops the starting rules assignments shadow): the kbdfr record
+  // predates the S-02 deadkey-purpose fix, so three session deadkeys share
+  // K_COLON and the later two triggers never fire. Records are copied, never
+  // edited (records/PROVENANCE.md); the US8 walk re-run replaces it.
+  { gate: "G1", owner: "US8", bases: ["basic_kbdfr"], points: AFTER_ASSIGNMENTS },
   // E5: contexts are not tolerant (camqwerty has one gap).
   { gate: "G2", owner: "US6", bases: ["sil_cameroon_qwerty"], points: ["tolerance"] },
   // Not E5: the tolerance analysis itself throws on camazerty, because it hands
@@ -131,17 +133,24 @@ const US2_DIFFS: RegExp[] = [
   /^\+ .*\(marks series\)$/,
   /^\+ match > use\(generated_marks_guard\) c generated: marks-series guard hop$/,
 ];
+const US3_DIFFS: RegExp[] = [
+  ...US2_DIFFS,
+  /^\+ dk\(3000\) \+ any\(dk_3000_bases\) > index\(dk_3000_bases, 2\) U\+030C$/,
+  /^- dk\(3000\) \+ any\(dk_3000_bases\) > index\(dk_3000_output, 2\)$/,
+  /^- store\(dk_3000_output\) 'ǎǍěĚ'$/,
+];
 const EXPECTED_DIFFS = {
   US1: [] as RegExp[],
   US2: US2_DIFFS,
-  US3: [
-    ...US2_DIFFS,
-    /^\+ dk\(3000\) \+ any\(dk_3000_bases\) > index\(dk_3000_bases, 2\) U\+030C$/,
-    /^- dk\(3000\) \+ any\(dk_3000_bases\) > index\(dk_3000_output, 2\)$/,
-    /^- store\(dk_3000_output\) 'ǎǍěĚ'$/,
+  US3: US3_DIFFS,
+  // US4: the starting rules the session's assignments shadow are dropped
+  // (they never fired; the walk's 14 unreachable-rule hints).
+  US4: [
+    ...US3_DIFFS,
+    /^- \+ \[K_(5|BKQUOTE|COLON|LBRKT|QUOTE|RBRKT|X)\] > U\+[0-9A-F]{4}$/,
   ],
 };
-const CURRENT_STORY = "US3" satisfies keyof typeof EXPECTED_DIFFS;
+const CURRENT_STORY = "US4" satisfies keyof typeof EXPECTED_DIFFS;
 
 // The zip may carry the walk harness's `zzq` placeholder assignments; both sides
 // are reduced to the same placeholder before comparing.
