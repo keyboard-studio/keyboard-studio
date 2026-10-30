@@ -17,7 +17,7 @@
   "content.pattern.context_sensitive_substitution.question.defaultOutput.prompt": "What does the trigger key produce when no special context character came immediately before it? This keeps the key working normally in all other cases.\n",
   "content.pattern.context_sensitive_substitution.question.triggerKey.prompt": "Which key (pressed after the context character) produces a different output depending on what came before it? Example: K_EQUAL for the = key.\n",
   "content.pattern.context_sensitive_substitution.title": "Context-sensitive key output",
-  "content.pattern.deadkey_single_tap.description": "Press an accent key (e.g. apostrophe), then a base letter — the accent key disappears and an accented character appears in its place. Pressing the accent key twice in a row produces the bare combining accent mark itself.\n",
+  "content.pattern.deadkey_single_tap.description": "Press an accent key (e.g. apostrophe), then a base letter — the accent key disappears and an accented character appears in its place. Pressing the accent key twice in a row, or the accent key then space, produces the bare combining accent mark itself.\n",
   "content.pattern.deadkey_single_tap.question.accentChar.prompt": "The bare accent mark emitted when the trigger key is pressed twice (e.g. U+0301 for combining acute, U+0300 for combining grave).\n",
   "content.pattern.deadkey_single_tap.question.accentedForms.prompt": "The accented forms in the same order as the base letters above. Example: áéíóúÁÉÍÓÚ\n",
   "content.pattern.deadkey_single_tap.question.baseLetters.prompt": "Which base letters take this accent? Type them without spaces. Example: aeiouAEIOU\n",

@@ -77,6 +77,7 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
+import { projectionInputFromState } from "../lib/projectionInput.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import {
@@ -278,8 +279,8 @@ export function useWorkingCopyTransform(
   // spec 078: the applied context-tolerance fix, replayed by the projection.
   // Replaced wholesale on every apply (never mutated), so its reference is a
   // correct memo key.
-  const contextToleranceOverlay = useWorkingCopyStore(
-    (s) => s.contextToleranceOverlay?.overlay ?? null,
+  const storeContextToleranceOverlay = useWorkingCopyStore(
+    (s) => s.contextToleranceOverlay,
   );
 
   // Effective touch layout JSON: the live-layout override's own in-progress
@@ -482,47 +483,37 @@ export function useWorkingCopyTransform(
           ? identityKeyboardId
           : undefined;
 
-      // spec 082 FR-018: merge disabled families' member rules into the
-      // deletion set. When nothing is disabled this passes the store's set
-      // through untouched, preserving the byte-identical no-op invariant for
-      // unedited working copies (the common path in the early-survey stages).
-      const effectiveDeletedItemIds =
-        disabledRuleIds.size === 0
-          ? deletedItemIds
-          : new Set([...deletedItemIds, ...disabledRuleIds]);
-
-      const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
-        vfs,
-        keyboardId,
-        ...(targetKeyboardId ? { targetKeyboardId } : {}),
-        startIr,
-        deletedNodeIds,
-        deletedItemIds: effectiveDeletedItemIds,
-        carveChars,
-        deletedTouchKeyIds,
-        fallbackPolicy,
-        // Disabled-family rules are removed outright, not carved: keep them
-        // out of the policy expansion.
-        ...(disabledRuleIds.size > 0 ? { suppressionExemptIds: disabledRuleIds } : {}),
-        // T020 (FR-023): keep-inert chars for carved touch keys. The store
-        // array is NFC-normalized at write time; the Set is the engine seam.
-        ...(carveTouchKeepInertChars.length > 0
-          ? { carveTouchKeepInert: new Set(carveTouchKeepInertChars) }
-          : {}),
-        keyEditOps,
-        deadkeyOps,
-        assignments: effectiveAssignments,
-        getPattern: (id) => patternMap?.get(id),
-        identity: identityArg,
-        ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
-        ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
-        contextToleranceOverlay,
-        // spec 082: project the rules step's working-IR additions (pack
-        // install, guard synthesis, Narrow). Null only while startIr is null,
-        // which already returned null above — the conditional spread keeps
-        // TS's narrowing honest.
-        ...(derivedRuleAdditions !== null ? { ruleAdditions: derivedRuleAdditions } : {}),
-      });
+      // spec 106 FR-005: the same store-derived input the download builds.
+      // Fields are read through the hook's own selectors so the memo keys
+      // below stay the single trigger for rebuilding this closure.
+      const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs(
+        projectionInputFromState(
+          {
+            startIr,
+            ir: workingIr,
+            deletedNodeIds,
+            deletedItemIds,
+            carveChars,
+            deletedTouchKeyIds,
+            disabledFamilyIds,
+            fallbackPolicy,
+            carveTouchKeepInert: carveTouchKeepInertChars,
+            deadkeyOverlay: { ops: deadkeyOps },
+            contextToleranceOverlay: storeContextToleranceOverlay,
+            touchLayoutJson: storeTouchLayoutJson,
+          },
+          {
+            vfs,
+            keyboardId,
+            ...(targetKeyboardId ? { targetKeyboardId } : {}),
+            assignments: effectiveAssignments,
+            getPattern: (id) => patternMap?.get(id),
+            identity: identityArg,
+            ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
+            ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
+          },
+        ),
+      );
 
       return {
         warnings: [...preWarnings, ...projectionWarnings],
@@ -549,6 +540,6 @@ export function useWorkingCopyTransform(
     touchLayoutJson,
     keyEditOpsKey,
     deadkeyOpsKey,
-    contextToleranceOverlay,
+    storeContextToleranceOverlay,
   ]);
 }

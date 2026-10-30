@@ -189,6 +189,8 @@ export interface UseCasePairCompanion {
   propose: (input: CasePairProposalInput) => boolean;
   /** Clear without recording anything. */
   dismiss: () => void;
+  /** Re-point a pending proposal raised for `from` at its replacement `to` (the same assignment, edited). */
+  rebase: (from: MechanismAssignment, to: MechanismAssignment) => void;
   /** Clear (the caller performs the record, if any). */
   clear: () => void;
 }
@@ -258,8 +260,15 @@ export function useCasePairCompanion(): UseCasePairCompanion {
 
   const dismiss = useCallback(() => setProposal(null), []);
   const clear = useCallback(() => setProposal(null), []);
+  const rebase = useCallback((from: MechanismAssignment, to: MechanismAssignment) => {
+    setProposal((current) =>
+      current !== null && current.mechanism !== "touch" && current.baseAssignment === from
+        ? { ...current, baseAssignment: to }
+        : current,
+    );
+  }, []);
 
-  return { proposal, propose, dismiss, clear };
+  return { proposal, propose, dismiss, clear, rebase };
 }
 
 // ---------------------------------------------------------------------------

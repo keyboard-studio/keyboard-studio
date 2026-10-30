@@ -1,0 +1,2408 @@
+{
+  "author-name": {
+    "id": "author-name",
+    "value": "Walk Author",
+    "provenance": "asked"
+  },
+  "authoring-track": {
+    "id": "authoring-track",
+    "value": "copy",
+    "provenance": "asked"
+  },
+  "base-keyboard": {
+    "id": "base-keyboard",
+    "value": {
+      "id": "basic_kbdus",
+      "name": "US Basic"
+    },
+    "provenance": "asked"
+  },
+  "carved-layout": {
+    "id": "carved-layout",
+    "value": {
+      "removals": []
+    },
+    "provenance": "asked"
+  },
+  "character-inventory": {
+    "id": "character-inventory",
+    "value": {
+      "chars": [
+        "a",
+        "A",
+        "b",
+        "B",
+        "d",
+        "D",
+        "e",
+        "E",
+        "ɛ",
+        "Ɛ",
+        "ə",
+        "Ə",
+        "f",
+        "F",
+        "g",
+        "G",
+        "h",
+        "H",
+        "i",
+        "I",
+        "ɨ",
+        "Ɨ",
+        "j",
+        "J",
+        "k",
+        "K",
+        "l",
+        "L",
+        "m",
+        "M",
+        "n",
+        "N",
+        "ŋ",
+        "Ŋ",
+        "o",
+        "O",
+        "ɔ",
+        "Ɔ",
+        "r",
+        "R",
+        "s",
+        "S",
+        "t",
+        "T",
+        "u",
+        "U",
+        "w",
+        "W",
+        "y",
+        "Y",
+        "z",
+        "Z",
+        "ꞌ",
+        "Ꞌ",
+        "̀",
+        "̂",
+        "̌",
+        "à",
+        "À",
+        "â",
+        "Â",
+        "è",
+        "È",
+        "ê",
+        "Ê",
+        "ì",
+        "Ì",
+        "î",
+        "Î",
+        "ò",
+        "Ò",
+        "ô",
+        "Ô",
+        "ù",
+        "Ù",
+        "û",
+        "Û",
+        "ŋ̂",
+        "ɔ́",
+        "ɔ̂",
+        "ə̀",
+        "ɛ́",
+        "ɛ̂",
+        "Á",
+        "á",
+        "É",
+        "é",
+        "Í",
+        "í",
+        "Ó",
+        "ó",
+        "Ú",
+        "ú",
+        "ě",
+        "Ě",
+        "ǎ",
+        "Ǎ",
+        "ə́",
+        "ə̂",
+        "ɨ̀"
+      ],
+      "bases": [
+        "a",
+        "A",
+        "b",
+        "B",
+        "d",
+        "D",
+        "e",
+        "E",
+        "ɛ",
+        "Ɛ",
+        "ə",
+        "Ə",
+        "f",
+        "F",
+        "g",
+        "G",
+        "h",
+        "H",
+        "i",
+        "I",
+        "ɨ",
+        "Ɨ",
+        "j",
+        "J",
+        "k",
+        "K",
+        "l",
+        "L",
+        "m",
+        "M",
+        "n",
+        "N",
+        "ŋ",
+        "Ŋ",
+        "o",
+        "O",
+        "ɔ",
+        "Ɔ",
+        "r",
+        "R",
+        "s",
+        "S",
+        "t",
+        "T",
+        "u",
+        "U",
+        "w",
+        "W",
+        "y",
+        "Y",
+        "z",
+        "Z",
+        "ꞌ",
+        "Ꞌ"
+      ],
+      "marks": [
+        "̀",
+        "̂",
+        "̌",
+        "́"
+      ],
+      "attestedStacks": [
+        {
+          "base": "a",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "A",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "a",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "A",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "e",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "E",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "e",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "E",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "i",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "I",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "i",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "I",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "o",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "O",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "o",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "O",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "u",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "U",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "u",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "U",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ŋ",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ɔ",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ɔ",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ə",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ɛ",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ɛ",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "A",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "a",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "E",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "e",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "I",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "i",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "O",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "o",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "U",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "u",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "e",
+          "marks": [
+            "̌"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "E",
+          "marks": [
+            "̌"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "a",
+          "marks": [
+            "̌"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "A",
+          "marks": [
+            "̌"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ə",
+          "marks": [
+            "́"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ə",
+          "marks": [
+            "̂"
+          ],
+          "source": "text"
+        },
+        {
+          "base": "ɨ",
+          "marks": [
+            "̀"
+          ],
+          "source": "text"
+        }
+      ],
+      "declaredRoles": {},
+      "numbers": [],
+      "punctuation": [],
+      "symbols": [],
+      "separators": [],
+      "controls": [],
+      "provenance": {
+        "a": "sldr",
+        "A": "sldr",
+        "b": "sldr",
+        "B": "sldr",
+        "d": "sldr",
+        "D": "sldr",
+        "e": "sldr",
+        "E": "sldr",
+        "ɛ": "sldr",
+        "Ɛ": "sldr",
+        "ə": "sldr",
+        "Ə": "sldr",
+        "f": "sldr",
+        "F": "sldr",
+        "g": "sldr",
+        "G": "sldr",
+        "h": "sldr",
+        "H": "sldr",
+        "i": "sldr",
+        "I": "sldr",
+        "ɨ": "sldr",
+        "Ɨ": "sldr",
+        "j": "sldr",
+        "J": "sldr",
+        "k": "sldr",
+        "K": "sldr",
+        "l": "sldr",
+        "L": "sldr",
+        "m": "sldr",
+        "M": "sldr",
+        "n": "sldr",
+        "N": "sldr",
+        "ŋ": "sldr",
+        "Ŋ": "sldr",
+        "o": "sldr",
+        "O": "sldr",
+        "ɔ": "sldr",
+        "Ɔ": "sldr",
+        "r": "sldr",
+        "R": "sldr",
+        "s": "sldr",
+        "S": "sldr",
+        "t": "sldr",
+        "T": "sldr",
+        "u": "sldr",
+        "U": "sldr",
+        "w": "sldr",
+        "W": "sldr",
+        "y": "sldr",
+        "Y": "sldr",
+        "z": "sldr",
+        "Z": "sldr",
+        "ꞌ": "sldr",
+        "Ꞌ": "sldr",
+        "̀": "sldr",
+        "̂": "sldr",
+        "̌": "sldr",
+        "à": "text",
+        "À": "text",
+        "â": "text",
+        "Â": "text",
+        "è": "text",
+        "È": "text",
+        "ê": "text",
+        "Ê": "text",
+        "ì": "text",
+        "Ì": "text",
+        "î": "text",
+        "Î": "text",
+        "ò": "text",
+        "Ò": "text",
+        "ô": "text",
+        "Ô": "text",
+        "ù": "text",
+        "Ù": "text",
+        "û": "text",
+        "Û": "text",
+        "ŋ̂": "text",
+        "ɔ́": "text",
+        "ɔ̂": "text",
+        "ə̀": "text",
+        "ɛ́": "text",
+        "ɛ̂": "text",
+        "Á": "text",
+        "á": "text",
+        "É": "text",
+        "é": "text",
+        "Í": "text",
+        "í": "text",
+        "Ó": "text",
+        "ó": "text",
+        "Ú": "text",
+        "ú": "text",
+        "ě": "text",
+        "Ě": "text",
+        "ǎ": "text",
+        "Ǎ": "text",
+        "ə́": "text",
+        "ə̂": "text",
+        "ɨ̀": "text"
+      },
+      "exemplarDigraphs": [
+        "gh",
+        "ts"
+      ],
+      "loanwordChars": [],
+      "rejected": [],
+      "proposalConfidence": {
+        "sldr": "unconfirmed",
+        "text": "approved"
+      },
+      "proposalRelease": {},
+      "exemplarMethodDeclined": false,
+      "seededProposals": [],
+      "selectedFont": "noto-sans",
+      "alphabetEvidenceKey": "bfd|Latn|Latn|basic_kbdus"
+    },
+    "provenance": "asked"
+  },
+  "deadkeys-defined": {
+    "id": "deadkeys-defined",
+    "value": {
+      "ops": []
+    },
+    "provenance": "asked"
+  },
+  "language-autonym": {
+    "id": "language-autonym",
+    "value": "Bafut",
+    "provenance": "asked"
+  },
+  "language-code": {
+    "id": "language-code",
+    "value": "bfd",
+    "provenance": "asked"
+  },
+  "language-name": {
+    "id": "language-name",
+    "value": "Bafut",
+    "provenance": "asked"
+  },
+  "marks-treatment": {
+    "id": "marks-treatment",
+    "value": {
+      "answers": {
+        "marks.marks_attachment.̀": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "ə",
+          "Ə",
+          "i",
+          "I",
+          "ɨ",
+          "Ɨ",
+          "o",
+          "O",
+          "u",
+          "U"
+        ],
+        "marks.marks_attachment.̂": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "ɛ",
+          "Ɛ",
+          "ə",
+          "Ə",
+          "i",
+          "I",
+          "ŋ",
+          "Ŋ",
+          "o",
+          "O",
+          "ɔ",
+          "Ɔ",
+          "u",
+          "U"
+        ],
+        "marks.marks_attachment.̌": [
+          "a",
+          "A",
+          "e",
+          "E"
+        ],
+        "marks.marks_attachment.́": [
+          "a",
+          "A",
+          "e",
+          "E",
+          "ɛ",
+          "Ɛ",
+          "ə",
+          "Ə",
+          "i",
+          "I",
+          "o",
+          "O",
+          "ɔ",
+          "Ɔ",
+          "u",
+          "U"
+        ],
+        "marks.marks_treatment.class.above-1": "own-key",
+        "marks.marks_treatment.class.above-2": "composed",
+        "marks.marks_treatment.promoted": [],
+        "marks.marks_treatment.input_order": "postfix",
+        "marks.marks_output_form.form": "base-plus-mark",
+        "marks.marks_output_form.backspace": "whole-stack",
+        "marks.marks_stacking.allowed": false,
+        "marks.marks_stacking.stacks": [],
+        "marks.marks_guard.behaviour": "swallow"
+      },
+      "completion": {
+        "worklist": {
+          "ownLetterUnits": [
+            "a",
+            "A",
+            "b",
+            "B",
+            "d",
+            "D",
+            "e",
+            "E",
+            "ɛ",
+            "Ɛ",
+            "ə",
+            "Ə",
+            "f",
+            "F",
+            "g",
+            "G",
+            "h",
+            "H",
+            "i",
+            "I",
+            "ɨ",
+            "Ɨ",
+            "j",
+            "J",
+            "k",
+            "K",
+            "l",
+            "L",
+            "m",
+            "M",
+            "n",
+            "N",
+            "ŋ",
+            "Ŋ",
+            "o",
+            "O",
+            "ɔ",
+            "Ɔ",
+            "r",
+            "R",
+            "s",
+            "S",
+            "t",
+            "T",
+            "u",
+            "U",
+            "w",
+            "W",
+            "y",
+            "Y",
+            "z",
+            "Z",
+            "ꞌ",
+            "Ꞌ",
+            "ǎ",
+            "Ǎ",
+            "ě",
+            "Ě"
+          ],
+          "markUnits": [
+            {
+              "mark": "̀",
+              "inputOrder": "postfix"
+            },
+            {
+              "mark": "̂",
+              "inputOrder": "postfix"
+            },
+            {
+              "mark": "́",
+              "inputOrder": "postfix"
+            }
+          ],
+          "blockedCombinations": [
+            {
+              "base": "b",
+              "mark": "̀"
+            },
+            {
+              "base": "B",
+              "mark": "̀"
+            },
+            {
+              "base": "d",
+              "mark": "̀"
+            },
+            {
+              "base": "D",
+              "mark": "̀"
+            },
+            {
+              "base": "ɛ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ɛ",
+              "mark": "̀"
+            },
+            {
+              "base": "f",
+              "mark": "̀"
+            },
+            {
+              "base": "F",
+              "mark": "̀"
+            },
+            {
+              "base": "g",
+              "mark": "̀"
+            },
+            {
+              "base": "G",
+              "mark": "̀"
+            },
+            {
+              "base": "h",
+              "mark": "̀"
+            },
+            {
+              "base": "H",
+              "mark": "̀"
+            },
+            {
+              "base": "j",
+              "mark": "̀"
+            },
+            {
+              "base": "J",
+              "mark": "̀"
+            },
+            {
+              "base": "k",
+              "mark": "̀"
+            },
+            {
+              "base": "K",
+              "mark": "̀"
+            },
+            {
+              "base": "l",
+              "mark": "̀"
+            },
+            {
+              "base": "L",
+              "mark": "̀"
+            },
+            {
+              "base": "m",
+              "mark": "̀"
+            },
+            {
+              "base": "M",
+              "mark": "̀"
+            },
+            {
+              "base": "n",
+              "mark": "̀"
+            },
+            {
+              "base": "N",
+              "mark": "̀"
+            },
+            {
+              "base": "ŋ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "̀"
+            },
+            {
+              "base": "ɔ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ɔ",
+              "mark": "̀"
+            },
+            {
+              "base": "r",
+              "mark": "̀"
+            },
+            {
+              "base": "R",
+              "mark": "̀"
+            },
+            {
+              "base": "s",
+              "mark": "̀"
+            },
+            {
+              "base": "S",
+              "mark": "̀"
+            },
+            {
+              "base": "t",
+              "mark": "̀"
+            },
+            {
+              "base": "T",
+              "mark": "̀"
+            },
+            {
+              "base": "w",
+              "mark": "̀"
+            },
+            {
+              "base": "W",
+              "mark": "̀"
+            },
+            {
+              "base": "y",
+              "mark": "̀"
+            },
+            {
+              "base": "Y",
+              "mark": "̀"
+            },
+            {
+              "base": "z",
+              "mark": "̀"
+            },
+            {
+              "base": "Z",
+              "mark": "̀"
+            },
+            {
+              "base": "ꞌ",
+              "mark": "̀"
+            },
+            {
+              "base": "Ꞌ",
+              "mark": "̀"
+            },
+            {
+              "base": "b",
+              "mark": "̂"
+            },
+            {
+              "base": "B",
+              "mark": "̂"
+            },
+            {
+              "base": "d",
+              "mark": "̂"
+            },
+            {
+              "base": "D",
+              "mark": "̂"
+            },
+            {
+              "base": "f",
+              "mark": "̂"
+            },
+            {
+              "base": "F",
+              "mark": "̂"
+            },
+            {
+              "base": "g",
+              "mark": "̂"
+            },
+            {
+              "base": "G",
+              "mark": "̂"
+            },
+            {
+              "base": "h",
+              "mark": "̂"
+            },
+            {
+              "base": "H",
+              "mark": "̂"
+            },
+            {
+              "base": "ɨ",
+              "mark": "̂"
+            },
+            {
+              "base": "Ɨ",
+              "mark": "̂"
+            },
+            {
+              "base": "j",
+              "mark": "̂"
+            },
+            {
+              "base": "J",
+              "mark": "̂"
+            },
+            {
+              "base": "k",
+              "mark": "̂"
+            },
+            {
+              "base": "K",
+              "mark": "̂"
+            },
+            {
+              "base": "l",
+              "mark": "̂"
+            },
+            {
+              "base": "L",
+              "mark": "̂"
+            },
+            {
+              "base": "m",
+              "mark": "̂"
+            },
+            {
+              "base": "M",
+              "mark": "̂"
+            },
+            {
+              "base": "n",
+              "mark": "̂"
+            },
+            {
+              "base": "N",
+              "mark": "̂"
+            },
+            {
+              "base": "r",
+              "mark": "̂"
+            },
+            {
+              "base": "R",
+              "mark": "̂"
+            },
+            {
+              "base": "s",
+              "mark": "̂"
+            },
+            {
+              "base": "S",
+              "mark": "̂"
+            },
+            {
+              "base": "t",
+              "mark": "̂"
+            },
+            {
+              "base": "T",
+              "mark": "̂"
+            },
+            {
+              "base": "w",
+              "mark": "̂"
+            },
+            {
+              "base": "W",
+              "mark": "̂"
+            },
+            {
+              "base": "y",
+              "mark": "̂"
+            },
+            {
+              "base": "Y",
+              "mark": "̂"
+            },
+            {
+              "base": "z",
+              "mark": "̂"
+            },
+            {
+              "base": "Z",
+              "mark": "̂"
+            },
+            {
+              "base": "ꞌ",
+              "mark": "̂"
+            },
+            {
+              "base": "Ꞌ",
+              "mark": "̂"
+            },
+            {
+              "base": "b",
+              "mark": "̌"
+            },
+            {
+              "base": "B",
+              "mark": "̌"
+            },
+            {
+              "base": "d",
+              "mark": "̌"
+            },
+            {
+              "base": "D",
+              "mark": "̌"
+            },
+            {
+              "base": "ɛ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ɛ",
+              "mark": "̌"
+            },
+            {
+              "base": "ə",
+              "mark": "̌"
+            },
+            {
+              "base": "Ə",
+              "mark": "̌"
+            },
+            {
+              "base": "f",
+              "mark": "̌"
+            },
+            {
+              "base": "F",
+              "mark": "̌"
+            },
+            {
+              "base": "g",
+              "mark": "̌"
+            },
+            {
+              "base": "G",
+              "mark": "̌"
+            },
+            {
+              "base": "h",
+              "mark": "̌"
+            },
+            {
+              "base": "H",
+              "mark": "̌"
+            },
+            {
+              "base": "i",
+              "mark": "̌"
+            },
+            {
+              "base": "I",
+              "mark": "̌"
+            },
+            {
+              "base": "ɨ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ɨ",
+              "mark": "̌"
+            },
+            {
+              "base": "j",
+              "mark": "̌"
+            },
+            {
+              "base": "J",
+              "mark": "̌"
+            },
+            {
+              "base": "k",
+              "mark": "̌"
+            },
+            {
+              "base": "K",
+              "mark": "̌"
+            },
+            {
+              "base": "l",
+              "mark": "̌"
+            },
+            {
+              "base": "L",
+              "mark": "̌"
+            },
+            {
+              "base": "m",
+              "mark": "̌"
+            },
+            {
+              "base": "M",
+              "mark": "̌"
+            },
+            {
+              "base": "n",
+              "mark": "̌"
+            },
+            {
+              "base": "N",
+              "mark": "̌"
+            },
+            {
+              "base": "ŋ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "̌"
+            },
+            {
+              "base": "o",
+              "mark": "̌"
+            },
+            {
+              "base": "O",
+              "mark": "̌"
+            },
+            {
+              "base": "ɔ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ɔ",
+              "mark": "̌"
+            },
+            {
+              "base": "r",
+              "mark": "̌"
+            },
+            {
+              "base": "R",
+              "mark": "̌"
+            },
+            {
+              "base": "s",
+              "mark": "̌"
+            },
+            {
+              "base": "S",
+              "mark": "̌"
+            },
+            {
+              "base": "t",
+              "mark": "̌"
+            },
+            {
+              "base": "T",
+              "mark": "̌"
+            },
+            {
+              "base": "u",
+              "mark": "̌"
+            },
+            {
+              "base": "U",
+              "mark": "̌"
+            },
+            {
+              "base": "w",
+              "mark": "̌"
+            },
+            {
+              "base": "W",
+              "mark": "̌"
+            },
+            {
+              "base": "y",
+              "mark": "̌"
+            },
+            {
+              "base": "Y",
+              "mark": "̌"
+            },
+            {
+              "base": "z",
+              "mark": "̌"
+            },
+            {
+              "base": "Z",
+              "mark": "̌"
+            },
+            {
+              "base": "ꞌ",
+              "mark": "̌"
+            },
+            {
+              "base": "Ꞌ",
+              "mark": "̌"
+            },
+            {
+              "base": "b",
+              "mark": "́"
+            },
+            {
+              "base": "B",
+              "mark": "́"
+            },
+            {
+              "base": "d",
+              "mark": "́"
+            },
+            {
+              "base": "D",
+              "mark": "́"
+            },
+            {
+              "base": "f",
+              "mark": "́"
+            },
+            {
+              "base": "F",
+              "mark": "́"
+            },
+            {
+              "base": "g",
+              "mark": "́"
+            },
+            {
+              "base": "G",
+              "mark": "́"
+            },
+            {
+              "base": "h",
+              "mark": "́"
+            },
+            {
+              "base": "H",
+              "mark": "́"
+            },
+            {
+              "base": "ɨ",
+              "mark": "́"
+            },
+            {
+              "base": "Ɨ",
+              "mark": "́"
+            },
+            {
+              "base": "j",
+              "mark": "́"
+            },
+            {
+              "base": "J",
+              "mark": "́"
+            },
+            {
+              "base": "k",
+              "mark": "́"
+            },
+            {
+              "base": "K",
+              "mark": "́"
+            },
+            {
+              "base": "l",
+              "mark": "́"
+            },
+            {
+              "base": "L",
+              "mark": "́"
+            },
+            {
+              "base": "m",
+              "mark": "́"
+            },
+            {
+              "base": "M",
+              "mark": "́"
+            },
+            {
+              "base": "n",
+              "mark": "́"
+            },
+            {
+              "base": "N",
+              "mark": "́"
+            },
+            {
+              "base": "ŋ",
+              "mark": "́"
+            },
+            {
+              "base": "Ŋ",
+              "mark": "́"
+            },
+            {
+              "base": "r",
+              "mark": "́"
+            },
+            {
+              "base": "R",
+              "mark": "́"
+            },
+            {
+              "base": "s",
+              "mark": "́"
+            },
+            {
+              "base": "S",
+              "mark": "́"
+            },
+            {
+              "base": "t",
+              "mark": "́"
+            },
+            {
+              "base": "T",
+              "mark": "́"
+            },
+            {
+              "base": "w",
+              "mark": "́"
+            },
+            {
+              "base": "W",
+              "mark": "́"
+            },
+            {
+              "base": "y",
+              "mark": "́"
+            },
+            {
+              "base": "Y",
+              "mark": "́"
+            },
+            {
+              "base": "z",
+              "mark": "́"
+            },
+            {
+              "base": "Z",
+              "mark": "́"
+            },
+            {
+              "base": "ꞌ",
+              "mark": "́"
+            },
+            {
+              "base": "Ꞌ",
+              "mark": "́"
+            }
+          ]
+        },
+        "outputForm": "base-plus-mark",
+        "backspace": "whole-stack",
+        "stacks": [
+          {
+            "base": "a",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "A",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "a",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "A",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "e",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "E",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "e",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "E",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "i",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "I",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "i",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "I",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "o",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "O",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "o",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "O",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "u",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "U",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "u",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "U",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ŋ",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ɔ",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ɔ",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ə",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ɛ",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ɛ",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "A",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "a",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "E",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "e",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "I",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "i",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "O",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "o",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "U",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "u",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "e",
+            "marks": [
+              "̌"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "E",
+            "marks": [
+              "̌"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "a",
+            "marks": [
+              "̌"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "A",
+            "marks": [
+              "̌"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ə",
+            "marks": [
+              "́"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ə",
+            "marks": [
+              "̂"
+            ],
+            "source": "text"
+          },
+          {
+            "base": "ɨ",
+            "marks": [
+              "̀"
+            ],
+            "source": "text"
+          }
+        ],
+        "migrationNeeded": false,
+        "guardReevaluation": []
+      },
+      "contextTolerance": null,
+      "guardSpecification": {
+        "recordId": "guard-specification:asked:swallow",
+        "behaviour": "swallow",
+        "origin": "asked",
+        "confirmed": true,
+        "recordedAt": 1793306638283,
+        "supersedes": null
+      }
+    },
+    "provenance": "asked"
+  },
+  "physical-layout": {
+    "id": "physical-layout",
+    "value": {
+      "assignments": [
+        {
+          "scope": "individual",
+          "target": "‘",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq2018",
+                "secondLetter": "j",
+                "collapsedChar": "‘"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "’",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "simple_swap",
+              "strategyId": "S-01",
+              "slotValues": {
+                "kmnRules": "+ [K_QUOTE] > U+2019"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "“",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "simple_swap",
+              "strategyId": "S-01",
+              "slotValues": {
+                "kmnRules": "+ [K_LBRKT] > U+201C"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "”",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "simple_swap",
+              "strategyId": "S-01",
+              "slotValues": {
+                "kmnRules": "+ [K_RBRKT] > U+201D"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ǎ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_COLON",
+                "deadkeyName": "3000",
+                "baseLetters": "a",
+                "accentedForms": "ǎ",
+                "accentChar": ";",
+                "escapes": "double-tap space altgr"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ǎ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_COLON",
+                "deadkeyName": "3000",
+                "baseLetters": "A",
+                "accentedForms": "Ǎ",
+                "accentChar": ";"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ě",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_COLON",
+                "deadkeyName": "3000",
+                "baseLetters": "e",
+                "accentedForms": "ě",
+                "accentChar": ";"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ě",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_COLON",
+                "deadkeyName": "3000",
+                "baseLetters": "E",
+                "accentedForms": "Ě",
+                "accentChar": ";"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ə",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq259",
+                "secondLetter": "j",
+                "collapsedChar": "ə"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ə",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq18f",
+                "secondLetter": "j",
+                "collapsedChar": "Ə"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ɛ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_BKQUOTE",
+                "deadkeyName": "3001",
+                "baseLetters": "e",
+                "accentedForms": "ɛ",
+                "accentChar": "`",
+                "escapes": "double-tap space altgr"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ɛ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_BKQUOTE",
+                "deadkeyName": "3001",
+                "baseLetters": "E",
+                "accentedForms": "Ɛ",
+                "accentChar": "`"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ɨ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "modifier_as_layer_switch",
+              "strategyId": "S-08",
+              "slotValues": {
+                "altgrKeyList": "[RALT K_I]",
+                "altgrOutputList": "ɨ"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ɨ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "modifier_as_layer_switch",
+              "strategyId": "S-08",
+              "slotValues": {
+                "altgrKeyList": "[SHIFT RALT K_I]",
+                "altgrOutputList": "Ɨ"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ŋ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "simple_swap",
+              "strategyId": "S-01",
+              "slotValues": {
+                "kmnRules": "+ [K_X] > U+014B"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "x",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "modifier_as_layer_switch",
+              "strategyId": "S-08",
+              "slotValues": {
+                "altgrKeyList": "[RALT K_X]",
+                "altgrOutputList": "x"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ŋ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq14a",
+                "secondLetter": "j",
+                "collapsedChar": "Ŋ"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ɔ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq254",
+                "secondLetter": "j",
+                "collapsedChar": "ɔ"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ɔ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "deadkey_single_tap",
+              "strategyId": "S-02",
+              "slotValues": {
+                "triggerKey": "K_BKQUOTE",
+                "deadkeyName": "3001",
+                "baseLetters": "O",
+                "accentedForms": "Ɔ",
+                "accentChar": "`"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "ꞌ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzqa78c",
+                "secondLetter": "j",
+                "collapsedChar": "ꞌ"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "Ꞌ",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzqa78b",
+                "secondLetter": "j",
+                "collapsedChar": "Ꞌ"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "̀",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "simple_swap",
+              "strategyId": "S-01",
+              "slotValues": {
+                "kmnRules": "+ [K_5] > U+0300"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "5",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "modifier_as_layer_switch",
+              "strategyId": "S-08",
+              "slotValues": {
+                "altgrKeyList": "[RALT K_5]",
+                "altgrOutputList": "5"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "́",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq301",
+                "secondLetter": "j",
+                "collapsedChar": "́"
+              }
+            }
+          ],
+          "source": "user"
+        },
+        {
+          "scope": "individual",
+          "target": "̂",
+          "modality": "physical",
+          "mechanisms": [
+            {
+              "patternId": "multi_char_sequence",
+              "strategyId": "S-03",
+              "slotValues": {
+                "firstLetterOut": "zzq302",
+                "secondLetter": "j",
+                "collapsedChar": "̂"
+              }
+            }
+          ],
+          "source": "user"
+        }
+      ]
+    },
+    "provenance": "asked"
+  },
+  "project-display-name": {
+    "id": "project-display-name",
+    "value": "Bafut",
+    "provenance": "asked"
+  },
+  "project-keyboard-id": {
+    "id": "project-keyboard-id",
+    "value": "bafut",
+    "provenance": "asked"
+  },
+  "punctuation-inventory": {
+    "id": "punctuation-inventory",
+    "value": {
+      "accepted": [
+        {
+          "char": "-",
+          "provenance": "derived"
+        },
+        {
+          "char": ",",
+          "provenance": "derived"
+        },
+        {
+          "char": ";",
+          "provenance": "derived"
+        },
+        {
+          "char": ":",
+          "provenance": "derived"
+        },
+        {
+          "char": "!",
+          "provenance": "derived"
+        },
+        {
+          "char": "?",
+          "provenance": "derived"
+        },
+        {
+          "char": ".",
+          "provenance": "derived"
+        },
+        {
+          "char": "‘",
+          "provenance": "derived"
+        },
+        {
+          "char": "’",
+          "provenance": "derived"
+        },
+        {
+          "char": "“",
+          "provenance": "derived"
+        },
+        {
+          "char": "”",
+          "provenance": "derived"
+        },
+        {
+          "char": "(",
+          "provenance": "derived"
+        },
+        {
+          "char": ")",
+          "provenance": "derived"
+        },
+        {
+          "char": "[",
+          "provenance": "derived"
+        },
+        {
+          "char": "]",
+          "provenance": "derived"
+        },
+        {
+          "char": "/",
+          "provenance": "derived"
+        },
+        {
+          "char": "\"",
+          "provenance": "extracted"
+        },
+        {
+          "char": "#",
+          "provenance": "extracted"
+        },
+        {
+          "char": "%",
+          "provenance": "extracted"
+        },
+        {
+          "char": "&",
+          "provenance": "extracted"
+        },
+        {
+          "char": "'",
+          "provenance": "extracted"
+        },
+        {
+          "char": "*",
+          "provenance": "extracted"
+        },
+        {
+          "char": "@",
+          "provenance": "extracted"
+        },
+        {
+          "char": "\\",
+          "provenance": "extracted"
+        },
+        {
+          "char": "_",
+          "provenance": "extracted"
+        },
+        {
+          "char": "{",
+          "provenance": "extracted"
+        },
+        {
+          "char": "}",
+          "provenance": "extracted"
+        }
+      ],
+      "declined": []
+    },
+    "provenance": "asked"
+  },
+  "retained-convenience-chars": {
+    "id": "retained-convenience-chars",
+    "value": {
+      "retained": [
+        {
+          "char": "c",
+          "provenance": "extracted"
+        },
+        {
+          "char": "C",
+          "provenance": "extracted"
+        },
+        {
+          "char": "p",
+          "provenance": "extracted"
+        },
+        {
+          "char": "P",
+          "provenance": "extracted"
+        },
+        {
+          "char": "q",
+          "provenance": "extracted"
+        },
+        {
+          "char": "Q",
+          "provenance": "extracted"
+        },
+        {
+          "char": "v",
+          "provenance": "extracted"
+        },
+        {
+          "char": "V",
+          "provenance": "extracted"
+        },
+        {
+          "char": "x",
+          "provenance": "extracted"
+        },
+        {
+          "char": "X",
+          "provenance": "extracted"
+        }
+      ],
+      "rejected": []
+    },
+    "provenance": "asked"
+  },
+  "rule-set": {
+    "id": "rule-set",
+    "value": {
+      "groups": [],
+      "stores": []
+    },
+    "provenance": "asked"
+  },
+  "target-script": {
+    "id": "target-script",
+    "value": "Latn",
+    "provenance": "asked"
+  },
+  "windows-layout": {
+    "id": "windows-layout",
+    "value": {
+      "layoutIds": [
+        "basic_kbdus"
+      ],
+      "origin": "confirmed"
+    },
+    "provenance": "asked"
+  }
+}

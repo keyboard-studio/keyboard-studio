@@ -816,3 +816,48 @@ describe("CharScrollStrip — loanword letters", () => {
     expect(screen.queryByTestId("char-scroll-loanword-0071")).toBeNull();
   });
 });
+
+describe("CharScrollStrip — composed row", () => {
+  // à = a + U+0300. The author gave ◌̀ its own key, so à is typed from its
+  // parts: it moves to the wrapping row and stays "!" until a path reaches it.
+  const renderComposed = (preAugmentSessionAwareSet: ReadonlySet<string>) =>
+    render(
+      <CharScrollStrip
+        chars={["a", "à"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+        preAugmentSessionAwareSet={preAugmentSessionAwareSet}
+        composedSet={new Set(["à"])}
+      />,
+    );
+
+  it("puts composed characters in a collapsed section with a yellow ! while a part is missing", () => {
+    renderComposed(new Set(["a"]));
+    const row = screen.getByTestId("char-scroll-composed-row");
+    expect(row.contains(screen.getByTestId("char-scroll-chip-00E0"))).toBe(true);
+    expect(row.contains(screen.getByTestId("char-scroll-chip-0061"))).toBe(false);
+    const pending = screen.getByTestId("char-scroll-badge-pending-00E0");
+    expect(pending.textContent).toBe("!");
+    expect(pending.getAttribute("aria-label")).toMatch(/waiting for its letter and marks/);
+    // Collapsed by default; the summary flags how many are still unreachable.
+    expect(row.hasAttribute("open")).toBe(false);
+    expect(screen.getByTestId("char-scroll-composed-summary-pending").textContent).toBe("! 1");
+  });
+
+  it("drops the ! once the letter and every mark are typeable", () => {
+    renderComposed(new Set(["a", "̀"]));
+    expect(screen.queryByTestId("char-scroll-badge-pending-00E0")).toBeNull();
+    expect(screen.getByTestId("char-scroll-badge-00E0").textContent).toBe("1");
+    expect(screen.queryByTestId("char-scroll-composed-summary-pending")).toBeNull();
+  });
+
+  it("renders a single row when composedSet is omitted", () => {
+    render(
+      <CharScrollStrip chars={["à"]} currentChar="à" onSelectChar={vi.fn()} assignments={[]} modality="physical" />,
+    );
+    expect(screen.queryByTestId("char-scroll-composed-row")).toBeNull();
+    expect(screen.getByTestId("char-scroll-badge-00E0").textContent).toBe("0");
+  });
+});
