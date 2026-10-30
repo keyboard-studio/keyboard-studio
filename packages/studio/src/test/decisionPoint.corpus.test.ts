@@ -35,9 +35,7 @@ const fixtureRoot = resolve(here, "..", "..", DECISION_POINT_FIXTURE_DIR);
 const GATES: readonly GateId[] = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G8-start"];
 
 /** What each gap is waiting on. G6 is walk-only, so it has no row here. */
-type Owner = "US5" | "US6" | "US8" | "#2361" | "#2363";
-
-const AFTER_ASSIGNMENTS: readonly DecisionPoint[] = ["assignments", "caps", "tolerance"];
+type Owner = "US5" | "US6" | "#2361" | "#2363";
 
 interface Gap {
   gate: GateId;
@@ -51,11 +49,6 @@ interface Gap {
 // G5 everywhere pass today, because those fixtures do not yet contain the shape
 // the story fixes).
 const KNOWN_GAPS: readonly Gap[] = [
-  // Not E3 (US4 drops the starting rules assignments shadow): the kbdfr record
-  // predates the S-02 deadkey-purpose fix, so three session deadkeys share
-  // K_COLON and the later two triggers never fire. Records are copied, never
-  // edited (records/PROVENANCE.md); the US8 walk re-run replaces it.
-  { gate: "G1", owner: "US8", bases: ["basic_kbdfr"], points: AFTER_ASSIGNMENTS },
   // E5: contexts are not tolerant (camqwerty has one gap).
   { gate: "G2", owner: "US6", bases: ["sil_cameroon_qwerty"], points: ["tolerance"] },
   // Not E5: the tolerance analysis itself throws on camazerty, because it hands
