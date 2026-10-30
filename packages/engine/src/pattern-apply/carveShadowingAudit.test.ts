@@ -416,7 +416,7 @@ describe("carve shadowing audit: fully-carved any() store", () => {
             charRule({
               nodeId: "consumer",
               context: [...ctx, { kind: "raw", text: "+" }, { kind: "any", storeRef: "ka" }],
-              output: [{ kind: "index", storeRef: "kb", offset: 1 }],
+              output: [{ kind: "index", storeRef: "kb", offset: ctx.length + 1 }],
             }),
           ],
         }),
@@ -448,6 +448,24 @@ describe("carve shadowing audit: fully-carved any() store", () => {
       expect(kmn).toMatch(/U\+0078 > context/);
       expect(kmn).toMatch(/U\+0079 > context/);
       expect(kmn).not.toMatch(/any\(ka\)/);
+    },
+    60_000,
+  );
+
+  it.each([
+    ["bare key", [] as IRRule["context"]],
+    ["deadkey context", [{ kind: "deadkey", id: 3 }] as IRRule["context"]],
+  ])(
+    "swallow, %s, one slot carved: no unreachable hint, carved key guarded",
+    async (_label, ctx) => {
+      const carved = deriveCarvedIr(fullCarveIr(ctx), {
+        deletedNodeIds: new Set(),
+        deletedItemIds: new Set(["store#ka#0", "store#kb#0"]),
+        fallbackPolicy: "swallow",
+      }).ir;
+      const kmn = emit(carved);
+      expect(await unreachableRuleTexts(kmn)).toEqual([]);
+      expect(kmn).toMatch(/U\+0078 > context/);
     },
     60_000,
   );
