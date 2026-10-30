@@ -734,3 +734,31 @@ describe("optionsForTouchLayerSlot", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// buildComboKeyMap — a rule that needs a deadkey in context is not what the
+// bare key types, so it must not label the key (deadkey escape `dk + [K_SPACE]`).
+// ---------------------------------------------------------------------------
+
+describe("buildComboKeyMap — deadkey-context rules", () => {
+  const dkRule = (ctxDeadkey: IRRule["context"][number], vkey: string, out: string): IRRule => ({
+    nodeId: freshId("rule"),
+    context: [ctxDeadkey, { kind: "vkey", name: vkey, modifiers: [] }],
+    output: [{ kind: "char", value: out }],
+  });
+
+  it.each([
+    ["numeric deadkey", { kind: "deadkey", id: 3000 } as const],
+    ["named deadkey", { kind: "namedDeadkey", name: "semi" } as const],
+  ])("skips a %s-context rule; the bare rule wins even when it comes later", (_label, dk) => {
+    const ir = makeMinimalIR([
+      makeGroup([dkRule(dk, "K_SPACE", ";"), makeRule("K_SPACE", [], " ")]),
+    ]);
+    expect(buildComboKeyMap(ir, []).get("K_SPACE")).toBe(" ");
+  });
+
+  it("does not label a key whose only rule is deadkey-gated", () => {
+    const ir = makeMinimalIR([makeGroup([dkRule({ kind: "deadkey", id: 1 }, "K_SPACE", ";")])]);
+    expect(buildComboKeyMap(ir, []).has("K_SPACE")).toBe(false);
+  });
+});

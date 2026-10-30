@@ -504,6 +504,11 @@ function extractRuleVkey(rule: IRRule): string | undefined {
   return undefined;
 }
 
+/** True when the rule's context requires a (numeric or named) deadkey. */
+function ruleContextHasDeadkey(rule: IRRule): boolean {
+  return rule.context.some((el) => el.kind === "deadkey" || el.kind === "namedDeadkey");
+}
+
 /**
  * Concatenate the *leading run* of consecutive `kind:"char"` output elements
  * (e.g. a digraph or a base+combining-mark sequence emitted as two literals)
@@ -818,6 +823,9 @@ export function buildComboKeyMap(
     for (const rule of group.rules) {
       const vkey = extractRuleVkey(rule);
       if (vkey) {
+        // A rule that needs a deadkey in context (`dk(1) + [K_SPACE] > ';'`)
+        // is not what the bare key types, so it must not label the key.
+        if (ruleContextHasDeadkey(rule)) continue;
         const canon = foldCasePairCombo(rule, group.rules);
         if (comboJoinKey(canon) !== targetKey) continue;
 
