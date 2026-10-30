@@ -87,3 +87,60 @@ describe("DemoPane host layout follows the layout step", () => {
     expect(select.value).toBe("azerty");
   });
 });
+
+describe("DemoPane compile diagnostics", () => {
+  const hint = (line: number) => ({
+    code: "KM_HINT_KMCMP_3154094" as const,
+    severity: "hint" as const,
+    layer: "A" as const,
+    message: "This rule will never be matched",
+    location: { file: "a.kmn", line },
+  });
+  const readyArtifact: RulesDemoArtifact = {
+    ...IDLE,
+    status: "ready",
+    diagnostics: [
+      ...Array.from({ length: 353 }, (_, i) => hint(i + 1)),
+      {
+        code: "KM_INFO_KMCMP_2125830" as const,
+        severity: "info" as const,
+        layer: "A" as const,
+        message: "min web engine",
+      },
+      {
+        code: "KM_WARN_KMCMP_4222977" as const,
+        severity: "warning" as const,
+        layer: "A" as const,
+        message: "web only",
+      },
+    ],
+  };
+
+  it("collapses 353 identical hints into one curated, counted row; codes stay out of the headline", () => {
+    render(
+      <DemoPane artifact={readyArtifact} ir={null} jsBytes={null} simulateImpl={() => ({}) as never} />,
+    );
+    const details = screen.getByTestId("rules-demo-warnings") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    const summary = details.querySelector("summary")?.textContent ?? "";
+    expect(summary).toContain("354");
+    expect(summary).not.toContain("KMCMP");
+    const rows = screen.getAllByTestId("rules-demo-diagnostic-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.textContent).toContain("Rules that can never fire");
+    expect(rows[0]?.textContent).toContain("353 rules repeat an earlier rule");
+    expect(details.textContent).not.toContain("2125830");
+  });
+
+  it("renders nothing when only info diagnostics remain", () => {
+    render(
+      <DemoPane
+        artifact={{ ...readyArtifact, diagnostics: readyArtifact.diagnostics.slice(353, 354) }}
+        ir={null}
+        jsBytes={null}
+        simulateImpl={() => ({}) as never}
+      />,
+    );
+    expect(screen.queryByTestId("rules-demo-warnings")).toBeNull();
+  });
+});
