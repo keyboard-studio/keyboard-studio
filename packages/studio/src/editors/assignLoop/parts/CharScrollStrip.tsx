@@ -131,6 +131,15 @@ export interface CharScrollStripProps {
    * alone). Optional (defaults to empty).
    */
   loanwordSet?: ReadonlySet<string>;
+  /**
+   * Composed characters the author chose NOT to give their own keys (their
+   * mark is typed on its own key or via a deadkey). They sit on a second,
+   * wrapping row below the strip, and until at least one path reaches them —
+   * the character itself, or its base letter and every mark — their badge is
+   * a yellow "!" (waiting on their parts) rather than a red 0. Optional
+   * (defaults to empty: a single row, as before).
+   */
+  composedSet?: ReadonlySet<string>;
 }
 
 /** Stable empty-set fallback for the two optional pre-augment set props above — avoids allocating a new Set every render when a caller omits them. */
@@ -154,6 +163,7 @@ export function CharScrollStrip({
   preAugmentSessionAwareSet = EMPTY_CHAR_SET,
   markedSet = EMPTY_CHAR_SET,
   loanwordSet = EMPTY_CHAR_SET,
+  composedSet = EMPTY_CHAR_SET,
 }: CharScrollStripProps) {
   const { t } = useLingui();
   // The current-char scroll-into-view below is smooth by default; reduced
@@ -334,7 +344,253 @@ export function CharScrollStrip({
     return map;
   }, [visibleChars, assignments, modality, baseDirectSet, preAugmentSessionAwareSet]);
 
+  // Composed characters (see the composedSet prop) move to the wrapping row.
+  const [primaryChars, composedChars] = useMemo(() => {
+    const primary: string[] = [];
+    const composed: string[] = [];
+    for (const c of visibleChars) (composedSet.has(c) ? composed : primary).push(c);
+    return [primary, composed];
+  }, [visibleChars, composedSet]);
+  const composedPendingCount = composedChars.filter(
+    (c) => (producerBadgeByChar.get(c)?.count ?? 0) === 0,
+  ).length;
+
+  const composedCount = composedChars.length;
+
   if (chars.length === 0) return null;
+
+  // One chip — shared by the scrolling primary row and the wrapping
+  // composed row below it. `pendingRow` chips badge an unreachable state as a
+  // yellow "!" (waiting on their parts) rather than a red 0.
+  function renderChip(c: string, pendingRow: boolean) {
+    const index = c === visibleChars[0] ? 0 : -1;
+    const hex = charHex(c);
+    // NFC identity (not raw `===`) — same rationale as
+    // visibleChars/hasSelectedVisible above.
+    const isSelected = currentChar !== null && sameCharIdentity(c, currentChar);
+    const isTabbable = isSelected || (!hasSelectedVisible && index === 0);
+    const badge = producerBadgeByChar.get(c) ?? {
+      count: 0,
+      hasDirect: false,
+      isComposable: false,
+      components: [],
+    };
+    const count = badge.count;
+    const badgeGood = count >= 1;
+    // Accessible name for the compose clause — codepoint-derived (per
+    // docs/accessibility.md #10), never the raw NFD component glyphs on
+    // their own: reuses the same toUPlusNotation helper this file
+    // already uses for every other codepoint-facing aria-label. Reuses
+    // `badge.components` (the exact decomposition `composableComponentsFor`
+    // already computed inside getProducerBadge) rather than re-running
+    // `c.normalize("NFD")` a second time here.
+    const composeComponentNames = badge.isComposable
+      ? badge.components.map((component) => toUPlusNotation(component)).join(", ")
+      : "";
+    // The badge's accessible name — the existing count clause, with a
+    // composition clause appended (never a second aria-live region;
+    // this rides the badge's own existing aria-label, D3-neutral — see
+    // this file's header comment).
+    const countAriaLabel = t({
+      id: "editor.assignLoop.charScroll.badgeAriaLabel",
+      message: plural(count, {
+        one: "# way produces this character",
+        other: "# ways produce this character",
+      }),
+    });
+    const badgeAriaLabel = badge.isComposable
+      ? `${countAriaLabel} ${t({
+          id: "editor.assignLoop.charScroll.badgeComposeClause",
+          message: `reachable by composing ${{ components: composeComponentNames }}`,
+        })}`
+      : countAriaLabel;
+    // A composed-row character no path reaches yet: not a gap to fill on its
+    // own key (the author chose not to), but waiting on its letter and marks.
+    // Amber is reserved for this one state — distinct from red (uncovered)
+    // and from the blue review flag.
+    const isPending = pendingRow && !badgeGood;
+    const pendingAriaLabel = t({
+      id: "editor.assignLoop.charScroll.badgePendingAriaLabel",
+      message: "Not typeable yet — waiting for its letter and marks to each have a key",
+    });
+    // Blue flag indicator (mechanism-gallery-progression follow-up) —
+    // `markedSet` is per-surface (markedForLaterDesktop/Touch), so a
+    // char marked on the OTHER surface never flags here. The flag is
+    // NEVER the only signal (docs/accessibility.md): the chip's own
+    // aria-label below gets an appended clause, not a replaced one, so
+    // a screen-reader user hears "marked for later review" alongside
+    // the existing codepoint-derived name rather than instead of it.
+    const isMarked = markedSet.has(c);
+    const chipBaseAriaLabel = t({
+      id: "editor.assignLoop.charScroll.chipAriaLabel",
+      message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+    });
+    const isLoanword = loanwordSet.has(c.normalize("NFC"));
+    const markedLabel = isMarked
+      ? `${chipBaseAriaLabel} ${t({
+          id: "editor.assignLoop.charScroll.chipMarkedClause",
+          message: "marked for later review",
+        })}`
+      : chipBaseAriaLabel;
+    const chipAriaLabel = isLoanword
+      ? `${markedLabel} ${t({
+          id: "editor.assignLoop.charScroll.chipLoanwordClause",
+          message: "loanword letter",
+        })}`
+      : markedLabel;
+    return (
+      <button
+        key={c}
+        type="button"
+        ref={(el) => {
+          if (el) chipRefs.current.set(c, el);
+          else chipRefs.current.delete(c);
+        }}
+        data-testid={`char-scroll-chip-${hex}`}
+        tabIndex={isTabbable ? 0 : -1}
+        aria-pressed={isSelected}
+        aria-label={chipAriaLabel}
+        onClick={() => onSelectChar(c)}
+        style={{
+          flexShrink: 0,
+          scrollSnapAlign: "start",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 4,
+          padding: isSelected ? "10px 12px" : "8px 10px",
+          background: isSelected ? "var(--app-accent-subtle)" : BG_CARD,
+          border: `1px solid ${isSelected ? ACCENT : BORDER}`,
+          borderRadius: 8,
+          cursor: "pointer",
+          fontFamily: FONT,
+        }}
+      >
+        <span
+          style={{
+            fontSize: isSelected ? 32 : 20,
+            lineHeight: 1,
+            fontFamily:
+              "ui-monospace, 'Cascadia Code', Consolas, monospace",
+            color: TEXT_MAIN,
+          }}
+        >
+          {displayChar(c)}
+        </span>
+        {isSelected && (
+          // Visible U+ notation on the grown/selected chip only — the
+          // per-char "character heading" card each gallery used to
+          // render below the strip is gone; this is its replacement.
+          // aria-hidden: the button's own aria-label above already
+          // states the notation, so this stays a sighted-only cue and
+          // is never announced a second time.
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: 11,
+              lineHeight: 1,
+              fontFamily:
+                "ui-monospace, 'Cascadia Code', Consolas, monospace",
+              color: TEXT_DIM,
+            }}
+          >
+            {toUPlusNotation(c)}
+          </span>
+        )}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+          <span
+            data-testid={isPending ? `char-scroll-badge-pending-${hex}` : `char-scroll-badge-${hex}`}
+            aria-label={isPending ? pendingAriaLabel : badgeAriaLabel}
+            style={isPending ? {
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 16,
+              padding: "0 5px",
+              borderRadius: 8,
+              fontSize: 10,
+              fontWeight: 700,
+              lineHeight: "16px",
+              background: "var(--app-warning-bg)",
+              border: "1px solid var(--app-warning-border)",
+              color: "var(--app-warning-text)",
+            } : {
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 16,
+              padding: "0 5px",
+              borderRadius: 8,
+              fontSize: 10,
+              fontWeight: 600,
+              lineHeight: "16px",
+              background: badgeGood ? GREEN_CHIP_BG : ERROR_BG,
+              // Composable chars get a DASHED border (never color
+              // alone) in addition to the `⊕` marker below — a shape
+              // distinction visible in grayscale. This span's own
+              // textContent stays the bare count digit(s) — the
+              // compose marker is a SIBLING span, not nested here, so
+              // a caller reading this badge's textContent for the
+              // count keeps getting exactly the number.
+              border: `1px ${badge.isComposable ? "dashed" : "solid"} ${
+                badgeGood ? GREEN_CHIP_BORDER : ERROR_RED
+              }`,
+              color: badgeGood ? GREEN_CHIP_TEXT : ERROR_RED,
+            }}
+          >
+            {isPending ? "!" : count}
+          </span>
+          {badge.isComposable && (
+            // Decorative — the badge span's own aria-label above
+            // already states the composition clause, so this is
+            // aria-hidden to avoid a double announcement (same pattern
+            // as the selected-chip U+ notation span above).
+            <span
+              data-testid={`char-scroll-badge-compose-${hex}`}
+              aria-hidden="true"
+              style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
+            >
+              ⊕
+            </span>
+          )}
+          {isMarked && (
+            // Decorative — the outer button's aria-label above already
+            // carries the appended "marked for later review" clause,
+            // so this glyph is aria-hidden to avoid a double
+            // announcement (same pattern as the compose marker above).
+            // BLUE (ACCENT, #6ea8fe — the same hue the mark-for-later
+            // button uses for its own UNMARKED state), never amber:
+            // amber is the composed row's "waiting on its parts" badge
+            // (see isPending), a coverage state, where the flag is a
+            // distinct axis ("deferred by the author"). ~7.8:1
+            // contrast against the galleries' dark page background
+            // (#0d1117) and the chip backgrounds (BG_CARD/#161b22,
+            // selected #0d2840) — comfortably AA (in fact AAA-normal-
+            // text) for this decorative-but-visible glyph.
+            <span
+              data-testid={`char-scroll-badge-marked-${hex}`}
+              aria-hidden="true"
+              style={{ fontSize: 10, lineHeight: 1, color: ACCENT }}
+            >
+              ⚑
+            </span>
+          )}
+        </span>
+        {isLoanword && (
+          // Decorative — the button's aria-label above already carries
+          // the appended "loanword letter" clause.
+          <span
+            data-testid={`char-scroll-loanword-${hex}`}
+            aria-hidden="true"
+            style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
+          >
+            {t({ id: "editor.assignLoop.charScroll.loanwordTag", message: "loanword" })}
+          </span>
+        )}
+      </button>
+    );
+  }
+
 
   return (
     <>
@@ -412,213 +668,61 @@ export function CharScrollStrip({
             entirely — `hasSelectedVisible` (computed above) guards that by
             making the FIRST visible chip the tab stop whenever nothing else
             is selected. */}
-        {visibleChars.map((c, index) => {
-          const hex = charHex(c);
-          // NFC identity (not raw `===`) — same rationale as
-          // visibleChars/hasSelectedVisible above.
-          const isSelected = currentChar !== null && sameCharIdentity(c, currentChar);
-          const isTabbable = isSelected || (!hasSelectedVisible && index === 0);
-          const badge = producerBadgeByChar.get(c) ?? {
-            count: 0,
-            hasDirect: false,
-            isComposable: false,
-            components: [],
-          };
-          const count = badge.count;
-          const badgeGood = count >= 1;
-          // Accessible name for the compose clause — codepoint-derived (per
-          // docs/accessibility.md #10), never the raw NFD component glyphs on
-          // their own: reuses the same toUPlusNotation helper this file
-          // already uses for every other codepoint-facing aria-label. Reuses
-          // `badge.components` (the exact decomposition `composableComponentsFor`
-          // already computed inside getProducerBadge) rather than re-running
-          // `c.normalize("NFD")` a second time here.
-          const composeComponentNames = badge.isComposable
-            ? badge.components.map((component) => toUPlusNotation(component)).join(", ")
-            : "";
-          // The badge's accessible name — the existing count clause, with a
-          // composition clause appended (never a second aria-live region;
-          // this rides the badge's own existing aria-label, D3-neutral — see
-          // this file's header comment).
-          const countAriaLabel = t({
-            id: "editor.assignLoop.charScroll.badgeAriaLabel",
-            message: plural(count, {
-              one: "# way produces this character",
-              other: "# ways produce this character",
-            }),
-          });
-          const badgeAriaLabel = badge.isComposable
-            ? `${countAriaLabel} ${t({
-                id: "editor.assignLoop.charScroll.badgeComposeClause",
-                message: `reachable by composing ${{ components: composeComponentNames }}`,
-              })}`
-            : countAriaLabel;
-          // Blue flag indicator (mechanism-gallery-progression follow-up) —
-          // `markedSet` is per-surface (markedForLaterDesktop/Touch), so a
-          // char marked on the OTHER surface never flags here. The flag is
-          // NEVER the only signal (docs/accessibility.md): the chip's own
-          // aria-label below gets an appended clause, not a replaced one, so
-          // a screen-reader user hears "marked for later review" alongside
-          // the existing codepoint-derived name rather than instead of it.
-          const isMarked = markedSet.has(c);
-          const chipBaseAriaLabel = t({
-            id: "editor.assignLoop.charScroll.chipAriaLabel",
-            message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
-          });
-          const isLoanword = loanwordSet.has(c.normalize("NFC"));
-          const markedLabel = isMarked
-            ? `${chipBaseAriaLabel} ${t({
-                id: "editor.assignLoop.charScroll.chipMarkedClause",
-                message: "marked for later review",
-              })}`
-            : chipBaseAriaLabel;
-          const chipAriaLabel = isLoanword
-            ? `${markedLabel} ${t({
-                id: "editor.assignLoop.charScroll.chipLoanwordClause",
-                message: "loanword letter",
-              })}`
-            : markedLabel;
-          return (
-            <button
-              key={c}
-              type="button"
-              ref={(el) => {
-                if (el) chipRefs.current.set(c, el);
-                else chipRefs.current.delete(c);
-              }}
-              data-testid={`char-scroll-chip-${hex}`}
-              tabIndex={isTabbable ? 0 : -1}
-              aria-pressed={isSelected}
-              aria-label={chipAriaLabel}
-              onClick={() => onSelectChar(c)}
-              style={{
-                flexShrink: 0,
-                scrollSnapAlign: "start",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 4,
-                padding: isSelected ? "10px 12px" : "8px 10px",
-                background: isSelected ? "var(--app-accent-subtle)" : BG_CARD,
-                border: `1px solid ${isSelected ? ACCENT : BORDER}`,
-                borderRadius: 8,
-                cursor: "pointer",
-                fontFamily: FONT,
-              }}
-            >
+        {primaryChars.map((c) => renderChip(c, false))}
+      </div>
+      {composedChars.length > 0 && (
+        // Composed forms the author chose not to give their own keys, in a
+        // collapsed disclosure (native <details>: keyboard-operable and
+        // announced as expandable without extra ARIA). The summary carries a
+        // yellow "!" while any of them is still unreachable, so the section
+        // can stay closed until there is something to check.
+        <details data-testid="char-scroll-composed-row" style={{ flexShrink: 0 }}>
+          <summary
+            data-testid="char-scroll-composed-summary"
+            style={{ cursor: "pointer", fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+          >
+            <Trans id="editor.assignLoop.charScroll.composedRowHeading">
+              Composed characters ({composedCount}) — typed from a letter and its marks
+            </Trans>
+            {composedPendingCount > 0 && (
               <span
+                data-testid="char-scroll-composed-summary-pending"
+                aria-label={t({
+                  id: "editor.assignLoop.charScroll.composedSummaryPendingAriaLabel",
+                  message: plural(composedPendingCount, {
+                    one: "# not typeable yet",
+                    other: "# not typeable yet",
+                  }),
+                })}
                 style={{
-                  fontSize: isSelected ? 32 : 20,
-                  lineHeight: 1,
-                  fontFamily:
-                    "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                  color: TEXT_MAIN,
+                  marginLeft: 8,
+                  padding: "0 6px",
+                  borderRadius: 8,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  lineHeight: "16px",
+                  display: "inline-block",
+                  background: "var(--app-warning-bg)",
+                  border: "1px solid var(--app-warning-border)",
+                  color: "var(--app-warning-text)",
                 }}
               >
-                {displayChar(c)}
+                ! {composedPendingCount}
               </span>
-              {isSelected && (
-                // Visible U+ notation on the grown/selected chip only — the
-                // per-char "character heading" card each gallery used to
-                // render below the strip is gone; this is its replacement.
-                // aria-hidden: the button's own aria-label above already
-                // states the notation, so this stays a sighted-only cue and
-                // is never announced a second time.
-                <span
-                  aria-hidden="true"
-                  style={{
-                    fontSize: 11,
-                    lineHeight: 1,
-                    fontFamily:
-                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                    color: TEXT_DIM,
-                  }}
-                >
-                  {toUPlusNotation(c)}
-                </span>
-              )}
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-                <span
-                  data-testid={`char-scroll-badge-${hex}`}
-                  aria-label={badgeAriaLabel}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 16,
-                    padding: "0 5px",
-                    borderRadius: 8,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    lineHeight: "16px",
-                    background: badgeGood ? GREEN_CHIP_BG : ERROR_BG,
-                    // Composable chars get a DASHED border (never color
-                    // alone) in addition to the `⊕` marker below — a shape
-                    // distinction visible in grayscale. This span's own
-                    // textContent stays the bare count digit(s) — the
-                    // compose marker is a SIBLING span, not nested here, so
-                    // a caller reading this badge's textContent for the
-                    // count keeps getting exactly the number.
-                    border: `1px ${badge.isComposable ? "dashed" : "solid"} ${
-                      badgeGood ? GREEN_CHIP_BORDER : ERROR_RED
-                    }`,
-                    color: badgeGood ? GREEN_CHIP_TEXT : ERROR_RED,
-                  }}
-                >
-                  {count}
-                </span>
-                {badge.isComposable && (
-                  // Decorative — the badge span's own aria-label above
-                  // already states the composition clause, so this is
-                  // aria-hidden to avoid a double announcement (same pattern
-                  // as the selected-chip U+ notation span above).
-                  <span
-                    data-testid={`char-scroll-badge-compose-${hex}`}
-                    aria-hidden="true"
-                    style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
-                  >
-                    ⊕
-                  </span>
-                )}
-                {isMarked && (
-                  // Decorative — the outer button's aria-label above already
-                  // carries the appended "marked for later review" clause,
-                  // so this glyph is aria-hidden to avoid a double
-                  // announcement (same pattern as the compose marker above).
-                  // BLUE (ACCENT, #6ea8fe — the same hue the mark-for-later
-                  // button uses for its own UNMARKED state), never amber:
-                  // amber here would collide with the badge's own
-                  // uncovered/RED-vs-covered/GREEN palette read as a THIRD
-                  // status color, where the flag is a distinct axis
-                  // ("deferred by the author"), not a coverage state. ~7.8:1
-                  // contrast against the galleries' dark page background
-                  // (#0d1117) and the chip backgrounds (BG_CARD/#161b22,
-                  // selected #0d2840) — comfortably AA (in fact AAA-normal-
-                  // text) for this decorative-but-visible glyph.
-                  <span
-                    data-testid={`char-scroll-badge-marked-${hex}`}
-                    aria-hidden="true"
-                    style={{ fontSize: 10, lineHeight: 1, color: ACCENT }}
-                  >
-                    ⚑
-                  </span>
-                )}
-              </span>
-              {isLoanword && (
-                // Decorative — the button's aria-label above already carries
-                // the appended "loanword letter" clause.
-                <span
-                  data-testid={`char-scroll-loanword-${hex}`}
-                  aria-hidden="true"
-                  style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
-                >
-                  {t({ id: "editor.assignLoop.charScroll.loanwordTag", message: "loanword" })}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+            )}
+          </summary>
+          <div
+            role="group"
+            aria-label={t({
+              id: "editor.assignLoop.charScroll.composedRowAriaLabel",
+              message: "Composed characters, typed from a letter and its marks",
+            })}
+            style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 }}
+          >
+            {composedChars.map((c) => renderChip(c, true))}
+          </div>
+        </details>
+      )}
       {visibleChars.length < chars.length && (
         <div style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT, marginTop: -4 }}>
           <Trans id="editor.assignLoop.charScroll.truncatedNote">

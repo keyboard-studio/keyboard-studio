@@ -71,6 +71,8 @@ export interface UseDisplacementProposal {
   dismiss: () => void;
   /** Clear without recording a dismissal (caller confirmed, or stale). */
   clear: () => void;
+  /** Re-point a pending proposal raised for `from` at its replacement `to` (the same assignment, edited). */
+  rebase: (from: MechanismAssignment, to: MechanismAssignment) => void;
 }
 
 function dismissalKey(p: {
@@ -114,6 +116,11 @@ export function useDisplacementProposal(): UseDisplacementProposal {
   }, []);
 
   const clear = useCallback(() => setProposal(null), []);
+  const rebase = useCallback((from: MechanismAssignment, to: MechanismAssignment) => {
+    setProposal((current) =>
+      current !== null && current.baseAssignment === from ? { ...current, baseAssignment: to } : current,
+    );
+  }, []);
 
-  return { proposal, propose, dismiss, clear };
+  return { proposal, propose, dismiss, clear, rebase };
 }

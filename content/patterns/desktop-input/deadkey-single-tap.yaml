@@ -7,7 +7,8 @@ title: "Tap-and-add accent"
 description: >
   Press an accent key (e.g. apostrophe), then a base letter — the accent key
   disappears and an accented character appears in its place. Pressing the
-  accent key twice in a row produces the bare combining accent mark itself.
+  accent key twice in a row, or the accent key then space, produces the bare
+  combining accent mark itself.
 category: desktop
 appliesTo: []
 priority: 1
@@ -53,6 +54,7 @@ kmnFragment: |
 
   dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
   dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+  dk({{deadkeyName}}) + [K_SPACE] > '{{accentChar}}'
   + [{{triggerKey}}] > dk({{deadkeyName}})
 
 touchLayoutFragment: |
@@ -77,6 +79,9 @@ tests:
   - input: ["K_QUOTE", "K_QUOTE"]
     expectedOutput: "́"
     description: "double-tap trigger emits the bare combining acute (U+0301)"
+  - input: ["K_QUOTE", "K_SPACE"]
+    expectedOutput: "́"
+    description: "trigger then space emits the same escape as the double-tap (sil_cameroon_qwerty)"
   - input: ["K_A"]
     expectedOutput: "a"
     description: "plain a without deadkey produces a unchanged"
@@ -168,6 +173,7 @@ skeleton:
 
     dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
     dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+    dk({{deadkeyName}}) + [K_SPACE] > '{{accentChar}}'
     + [{{triggerKey}}] > dk({{deadkeyName}})
 
   parameters:
