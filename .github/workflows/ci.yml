@@ -632,19 +632,19 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      # PR lane: the quick slice only. Spec 104 walk 1 is selected by its
-      # describe title ("spec 104 walk 1:"), never by line number, so edits
-      # above it cannot retarget the filter. Both commands always run and the
-      # step fails if either did; a title that matches nothing makes
-      # Playwright exit non-zero ("No tests found"), so a rename fails loudly.
+      # PR lane: the quick slice only, in ONE command so one results.json
+      # feeds the summary step. The positional args pick the three spec
+      # files; --grep then narrows touch-key-identity to spec 104 walk 1 by
+      # describe title (never by line number). Playwright tests --grep
+      # against the project name, file name, describe titles and test title
+      # joined by spaces, so the boot-smoke and decision-store-reload
+      # alternatives match every test in those files by file name, and no
+      # touch-key-identity title contains either string. A grep that matches
+      # nothing makes Playwright exit non-zero ("No tests found").
       - name: Playwright (PR quick slice - boot-smoke + decision-store-reload + spec 104 walk 1)
         id: pw_pr
         if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          rc=0
-          pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload || rc=1
-          pnpm --filter @keyboard-studio/studio test:e2e --project=desktop touch-key-identity --grep "spec 104 walk 1:" || rc=1
-          exit $rc
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload touch-key-identity --grep "boot-smoke|decision-store-reload|spec 104 walk 1:"
 
       # Full set (nightly schedule, push to main, workflow_dispatch):
       # boot-smoke + copy-edit + spec 088 live gate + spec 104 walks.

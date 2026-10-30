@@ -299,7 +299,7 @@ run on the schedule, not on pull requests.
 
 | Where | `e2e desktop` runs | Approx. time |
 |---|---|---|
-| Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity --grep "spec 104 walk 1:"`, selected by title) | about 3 min |
+| Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity`, narrowed by `--grep "boot-smoke|decision-store-reload|spec 104 walk 1:"`; one command, so one results summary) | about 3 min |
 | Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks) | about 17 min |
 
 - **Path gate.** On a pull request `e2e desktop` is skipped unless the `changes` job's `e2e`
