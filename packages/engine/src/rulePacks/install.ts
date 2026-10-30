@@ -37,6 +37,7 @@ import {
   type RulePack,
 } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
+import { sameGroupName } from "../codec/groupName.js";
 
 /** Thrown by {@link installPack} / {@link uninstallPack} on invalid input. */
 export class RulePackInstallError extends Error {
@@ -309,7 +310,7 @@ export function installPack(ir: KeyboardIR, pack: RulePack): InstallPackResult {
         `cannot install pack "${validPack.id}": the keyboard's key-handling group is read-only`,
       );
     }
-    if (groups.some((g) => g.name === "main")) {
+    if (groups.some((g) => sameGroupName(g.name, "main"))) {
       throw new RulePackInstallError(
         `cannot install pack "${validPack.id}": a group named "main" already exists and is not the key-handling group`,
       );

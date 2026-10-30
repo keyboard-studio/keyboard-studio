@@ -47,6 +47,7 @@ import { effectiveMechanisms } from "@keyboard-studio/contracts";
 import type { Pattern } from "@keyboard-studio/contracts";
 import type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 import { substituteSlots } from "./substitute.js";
+import { sameGroupName } from "../codec/groupName.js";
 import {
   applyOutputFormSeam,
   DEADKEY_PATTERN,
@@ -336,7 +337,7 @@ function parseFragment(fragmentText: string): ParsedFragment {
   if (bareRules.length > 0) {
     // Check whether there's already a group(main) in the fragment groups;
     // if so, prepend the bare rules into it; otherwise create a new one.
-    const mainIdx = groups.findIndex((g) => g.name === "main");
+    const mainIdx = groups.findIndex((g) => sameGroupName(g.name, "main"));
     if (mainIdx !== -1) {
       groups[mainIdx]!.bodyLines.unshift(...bareRules);
     } else {
@@ -813,7 +814,7 @@ export function applyAssignments(
   for (const frag of allFragments) {
     for (const fragGroup of frag.groups) {
       const baseGroupIdx = baseParsed.groups.findIndex(
-        (g) => g.name === fragGroup.name
+        (g) => sameGroupName(g.name, fragGroup.name)
       );
       if (baseGroupIdx !== -1) {
         // Merge into existing group.

@@ -8,6 +8,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { emit } from "../../codec/emit.js";
 import { computeSha256Hex } from "../../codec/hash.js";
+import { sameGroupName } from "../../codec/groupName.js";
 import { NORMALIZATION_GROUP, NORMALIZATION_STEP_GENERATOR_VERSION } from "./constants.js";
 import { applyNormalizationStep, entryNameOf, removeNormalizationStep } from "./insert.js";
 import { buildNormalizationMaps } from "./maps.js";
@@ -60,9 +61,9 @@ export async function proposeNormalizationStep(
   }
   const base = removeNormalizationStep(ir);
   // The keyboard's own group already holds the generated name.
-  if (base.groups.some((g) => g.name === NORMALIZATION_GROUP)) return refused("name-collision", NORMALIZATION_GROUP);
+  if (base.groups.some((g) => sameGroupName(g.name, NORMALIZATION_GROUP))) return refused("name-collision", NORMALIZATION_GROUP);
   const entry = entryNameOf(base);
-  const entryGroup = base.groups.find((g) => g.name === entry);
+  const entryGroup = base.groups.find((g) => sameGroupName(g.name, entry));
   if (entryGroup === undefined || entryGroup.readonly) {
     return refused("opaque-entry", entry);
   }
