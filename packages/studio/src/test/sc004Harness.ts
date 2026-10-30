@@ -55,7 +55,7 @@ export function announceSc004Skip(label: string, skipTest: (name: string) => voi
 }
 
 /** The package's files as the base browser would hand them over (no build/ output). */
-function loadVfs(kb: (typeof KEYBOARDS)[number]): VirtualFS {
+export function loadVfs(kb: { id: string; group: string }): VirtualFS {
   const rootDir = join(CORPUS, kb.group, kb.id);
   const files: { path: string; content: string | Uint8Array; isBinary: boolean }[] = [];
   const isBinary = (p: string) => /\.(ico|png|jpg|jpeg|gif|kmx|kvk|ttf|woff2?)$/i.test(p);

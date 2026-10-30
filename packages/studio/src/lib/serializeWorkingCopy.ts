@@ -24,7 +24,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
+import { projectionInputFromState } from "./projectionInput.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
@@ -245,7 +245,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { startVfs, startIr, startKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startDocCssTexts, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr, contextToleranceOverlay } = state;
+  const { startVfs, startIr, startKeyboard, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startDocCssTexts, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr } = state;
 
   // Not-instantiated guard.
   if (startVfs === null || startIr === null || startKeyboard === null) {
@@ -502,35 +502,25 @@ export async function projectWorkingCopyForOutput(
 
   // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
   //    the final rename pass when the author picked a different id.
-  const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
-    vfs: clonedVfs,
-    keyboardId,
-    targetKeyboardId: outputKeyboardId,
-    startIr,
-    deletedNodeIds,
-    deletedItemIds,
-    carveChars,
-    deletedTouchKeyIds,
-    assignments: sessionAssignments,
-    getPattern: (id) => patternCache.get(id),
-    identity: identityForProjection,
-    touchLayoutJson,
-    welcomeFolderFiles,
-    ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
-    // spec 083: the committed deadkey lifecycle overlay, replayed at step
-    // 1.8 so the download carries the same deadkey edits the preview does.
-    deadkeyOps: state.deadkeyOverlay.ops,
-    // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
-    // fallback above sets identityForProjection.displayName to this same value,
-    // so they compare equal and the base's &NAME store is left byte-identical.
-    baseDisplayName: startKeyboard.displayName,
-    // spec 078: the same applied context-tolerance fix the preview replays.
-    contextToleranceOverlay: contextToleranceOverlay?.overlay ?? null,
-    // spec 082: the same rules-step additions the preview projects — the
-    // download must contain exactly what the OSK compiled (pack install,
-    // guard synthesis, Narrow).
-    ruleAdditions: deriveRuleAdditions(workingIr, startIr),
-  });
+  // spec 106 FR-005: every store-derived field comes from the same
+  // projectionInputFromState the preview uses, so the download carries the
+  // fallback policy, disabled families and keep-inert set the OSK compiled.
+  const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs(
+    projectionInputFromState({ ...state, startIr }, {
+      vfs: clonedVfs,
+      keyboardId,
+      targetKeyboardId: outputKeyboardId,
+      assignments: sessionAssignments,
+      getPattern: (id) => patternCache.get(id),
+      identity: identityForProjection,
+      welcomeFolderFiles,
+      ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
+      // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
+      // fallback above sets identityForProjection.displayName to this same value,
+      // so they compare equal and the base's &NAME store is left byte-identical.
+      baseDisplayName: startKeyboard.displayName,
+    }),
+  );
 
   // The projector's own report of what id the VFS actually ended up under is
   // the single source of truth for the result's keyboardId — not a second,
