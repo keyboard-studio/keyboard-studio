@@ -49,6 +49,7 @@ const deadkeySlotIR = (): KeyboardIR =>
             nodeId: "paired",
             context: [
               { kind: "deadkey", id: 3 },
+              { kind: "raw", text: "+" },
               { kind: "any", storeRef: "dkf003b" },
             ],
             output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],

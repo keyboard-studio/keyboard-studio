@@ -361,4 +361,40 @@ describe("carve suppression — Layer B shadowing audit (T021)", () => {
     },
     60_000,
   );
+
+  it(
+    "positionally paired stores carved at the same index emit no unreachable duplicate guard",
+    async () => {
+      const ir = makeTestIR(
+        [
+          irGroup({
+            nodeId: "group#main",
+            name: "main",
+            rules: [
+              charRule({
+                nodeId: "paired",
+                context: [
+                  { kind: "deadkey", id: 3 },
+                  { kind: "raw", text: "+" },
+                  { kind: "any", storeRef: "ka" },
+                ],
+                output: [{ kind: "index", storeRef: "kb", offset: 1 }],
+              }),
+            ],
+          }),
+        ],
+        [
+          charStore({ nodeId: "store#ka", name: "ka", chars: ["x", "y"] }),
+          charStore({ nodeId: "store#kb", name: "kb", chars: ["p", "q"] }),
+        ],
+      );
+      const introduced = await newlyUnreachable({
+        name: "paired-double-carve",
+        ir,
+        dispositions: [blockDisposition("store#ka#0"), blockDisposition("store#kb#0")],
+      });
+      expect(introduced).toEqual([]);
+    },
+    60_000,
+  );
 });

@@ -20,7 +20,7 @@ const ir = (): KeyboardIR =>
           vkeyRule({ nodeId: "bare", vkey: "K_A", output: "a" }),
           charRule({
             nodeId: "dk",
-            context: [{ kind: "deadkey", id: 3 }, { kind: "any", storeRef: "dkf003b" }],
+            context: [{ kind: "deadkey", id: 3 }, { kind: "raw", text: "+" }, { kind: "any", storeRef: "dkf003b" }],
             output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],
           }),
         ],
@@ -88,5 +88,50 @@ describe("deriveCarvedIr fallbackPolicy", () => {
       }).ir;
     expect(rules(run("swallow")).some((r) => r.nodeId.startsWith("gen-carve-guard-"))).toBe(true);
     expect(rules(run("pass-through")).some((r) => r.nodeId.startsWith("gen-carve-guard-"))).toBe(false);
+  });
+
+  // Camqwerty-like: composed / comp-dia are positionally tied by a rule whose
+  // composed side sits in the CONTEXT (left of `+`).
+  const camIr = (): KeyboardIR =>
+    makeTestIR({
+      stores: [
+        charStore({ nodeId: "store#composed", name: "composed", chars: ["a", "e", "o"] }),
+        charStore({ nodeId: "store#compdia", name: "comp-dia", chars: ["à", "è", "ò"] }),
+      ],
+      groups: [
+        irGroup({
+          nodeId: "group#main",
+          rules: [
+            charRule({
+              nodeId: "bksp",
+              context: [
+                { kind: "any", storeRef: "composed" },
+                { kind: "raw", text: "+" },
+                { kind: "vkey", name: "K_BKSP", modifiers: [] },
+              ],
+              output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+            }),
+          ],
+        }),
+      ],
+    });
+
+  it("swallow: carving a slot in only one paired store keeps alignment and emits no carved char", () => {
+    // Carve only comp-dia#1 (the real walk did this for some slots).
+    const { ir: out } = deriveCarvedIr(camIr(), {
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["store#compdia#1"]),
+      fallbackPolicy: "swallow",
+    });
+    const chars = (name: string) =>
+      out.stores.find((s) => s.name === name)!.items.map((i) => (i.kind === "char" ? i.value : "?"));
+    // Coordinated drop: same index removed from both stores; still aligned.
+    expect(chars("composed")).toEqual(["a", "o"]);
+    expect(chars("comp-dia")).toEqual(["à", "ò"]);
+    // No rule references any carved character (composed "e" / comp-dia "è").
+    const carved = ["e", "è"];
+    const text = JSON.stringify(rules(out));
+    for (const c of carved) expect(text).not.toContain(`"value":"${c}"`);
+    expect(rules(out).map((r) => r.nodeId)).toEqual(["bksp"]);
   });
 });

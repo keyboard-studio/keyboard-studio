@@ -219,9 +219,19 @@ function compileSlotGuards(
       if (!nextGroup) continue;
       group.rules.forEach((rule, originalIndex) => {
         if (rule.ownedByBehaviour !== undefined) return;
+        // Key position only: a guard exists to stop a KEYSTROKE falling
+        // through to the base keyboard once the slot is removed. An any()
+        // left of the `+` separator matches already-typed text; the carved
+        // char can no longer be typed, so a rule keyed on it protects nothing
+        // (and would break e.g. Backspace after a pasted char). No `+` means
+        // no key element, hence no guard.
+        const plusIdx = rule.context.findIndex((el) => el.kind === "raw" && el.text === "+");
+        if (plusIdx === -1) return;
         const occurrences: number[] = [];
         rule.context.forEach((el, contextIdx) => {
-          if (el.kind === "any" && selectorChars.has(el.storeRef)) occurrences.push(contextIdx);
+          if (contextIdx > plusIdx && el.kind === "any" && selectorChars.has(el.storeRef)) {
+            occurrences.push(contextIdx);
+          }
         });
         occurrences.forEach((contextIdx, occNum) => {
           const anyEl = rule.context[contextIdx];
@@ -237,6 +247,20 @@ function compileSlotGuards(
           const guardContext: ContextElement[] = rule.context.map((el, idx) =>
             idx === contextIdx ? { kind: "char", value: selectorChar } : el,
           );
+          // Dedupe by emitted LHS, not nodeId: positionally paired stores
+          // carved at the same index (or two consuming rules sharing an LHS
+          // after substitution) would otherwise yield identical guards, and
+          // every copy after the first is an unreachable rule.
+          const lhsKey = JSON.stringify(guardContext);
+          if (
+            nextGroup.rules.some(
+              (r) =>
+                r.ownedByBehaviour === CARVE_SUPPRESSION_OWNER &&
+                JSON.stringify(r.context) === lhsKey,
+            )
+          ) {
+            return;
+          }
           const verb = suppressionVerb(guardContext);
           const guard: IRRule = {
             nodeId: guardNodeId,
