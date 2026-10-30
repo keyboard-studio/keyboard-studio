@@ -37,7 +37,9 @@ import { stubKmnVfs } from "../test/workingCopy.ts";
  * IR exercising all three T015 carve shapes in one group:
  * - `rule#blockMe`: bare vkey rule, block disposition → suppression rewrite.
  * - `store#dkt003b#1`: store slot, block disposition → guard synthesized
- *   ahead of the paired `any()` rule, slot nulled by the pipeline.
+ *   ahead of the paired `dk(3) + any()` rule, slot nulled by the pipeline.
+ *   The `+` puts the `any()` in the key position; only key-side slots get a
+ *   guard (a context-side slot is just removed).
  * - `lead`: untouched control rule.
  */
 function carvePipelineFixture(): KeyboardIR {
@@ -64,6 +66,7 @@ function carvePipelineFixture(): KeyboardIR {
             nodeId: "paired",
             context: [
               { kind: "deadkey", id: 3 },
+              { kind: "raw", text: "+" },
               { kind: "any", storeRef: "dkf003b" },
             ],
             output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],
@@ -176,6 +179,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
     expect(guard.ownedByBehaviour).toBe("carve-suppression");
     expect(guard.context).toEqual([
       { kind: "deadkey", id: 3 },
+      { kind: "raw", text: "+" },
       { kind: "char", value: "E" },
     ]);
     expect(rules[guardIndex + 1]!.nodeId).toBe("paired");
