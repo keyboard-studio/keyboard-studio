@@ -158,26 +158,26 @@ Each story phase ends with the same three gate tasks:
 
 **Goal**: zero unreachable hints, approvable suggested discards, and needed punctuation never silently lost (FR-040 to FR-043). **Independent test**: G1 passes on every fixture at `carve` and later. **Branch**: `km/106-carve-claimed`.
 
-- [ ] T036 [P] [US4] Write tests in `packages/studio/src/lib/claimedInputs.test.ts`:
+- [x] T036 [P] [US4] Write tests in `packages/studio/src/lib/claimedInputs.test.ts`:
   - a plain override drops the base rule;
   - a Shift-only difference is kept;
   - a rule with preceding context, deadkey or `if()` survives;
   - removing the assignment restores the rule;
   - the S-02 trigger and the RALT escape are claimed;
   - the postfix mark key is claimed.
-- [ ] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
-- [ ] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
-- [ ] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
+- [x] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
+- [x] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
+- [x] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
   - on the first visit, when the value's `suggestionFingerprint` does not match, apply `toggleRecommendedRows(primaryRows, true)` with provenance `derived`;
   - render those rows as "discarded, suggested — click to keep";
   - `editors/adapters/carveAdapter.tsx` (:28-40) records `carved-layout` with provenance `default` while only derived items exist, and `asked` once the author has toggled anything;
   - add en/fr i18n entries;
   - add a component test.
-- [ ] T040 [US4] Needed punctuation.
+- [x] T040 [US4] Needed punctuation.
   1. Write a fixture test: Bafut kbdus with `'` → `’` must raise the demotion proposal.
   2. Diagnose which gate in `maybeRaiseDisplacement` (`MechanismGallery.tsx:2224-2304`) skips it, and fix it.
   3. Record a decline in `carved-layout.displacedDeclined` (`useDisplacementProposal.ts` dismiss path).
-- [ ] T041 [US4] Gate: G1 = 0 on all fixtures. Commit `fix(studio): carve drops starting rules that assignments claimed`, push, and open a PR.
+- [x] T041 [US4] Gate: G1 = 0 on all fixtures. Commit `fix(studio): carve drops starting rules that assignments claimed`, push, and open a PR.
 
 ---
 
@@ -311,3 +311,13 @@ The 2026-10-29 advisor review (Fable) found 11 issues: 1 blocker, 6 major and 4 
 2026-10-29: the user pointed to keymanapp/keyboards#4181. `nul`/`beep` are illegal inside stores under the 19.0 compiler. As a result, FR-014, gate G8, research R11 and tasks T070-T073 were added (foundational: they run before the fixtures, because two walk bases carry illegal stores). The R3 "no beep" wording was corrected: beep exists in IR, codec and simulator; only the marks decision lacks a beep option.
 
 2026-10-29 (later): the method for `nul`/`beep` inside starting stores is deferred to the outcome of keymanapp/keyboards#4181, tracked in #2361. T070-T072 are blocked. Generated stores and rules (no `nul`/`beep` in stores; `nul` over `beep` in rules) remain decided.
+
+2026-10-30 (US4): rulings and deviations recorded during implementation.
+- **Punctuation is never core** (owner ruling, T040). The walk's lost `'` was a both-core standoff: the punctuation step had put `'` in the inventory, and "Keep both" only dismissed. `orthographyTier` now ranks every digit, punctuation mark and symbol as convenience, so an overwritten `'` gets the "move to AltGr" proposal. A script that writes a letter with an apostrophe records it as U+02BC, which stays core.
+- **Declines live in `physical-layout`, not `carved-layout`** (T040 step 3; R6 preferred carve). The decline happens in the gallery step, and writing an upstream decision from a later step would rewrite it.
+- **Claimed inputs are group(main) only and gated on mergeable mechanisms** (T038, advisor review). Assignments merge only into `main`; a mechanism step 2 would skip claims nothing.
+- **Duplicate inputs are a studio bug, not a carve job** (owner ruling). Two rules with the same input in one group hide all but the first. US4 drops only starting rules an assignment replaces; session-vs-session and starting-vs-starting duplicates must be prevented where they are created, not deduplicated in the projection. Known generators: two S-02 deadkeys on one trigger (fixed at record time by #2358; older drafts still carry it), "Keep both" on a both-core displacement, and hand-chosen triggers colliding with S-01/S-08. A guard at the assignment-record seam is proposed as a follow-up story.
+- **kbdfr re-recorded, not left as a gap** (owner ruling, T041). Its round-3 record predated the S-02 fix (three deadkeys on K_COLON). The Ewondo kbdfr case was re-walked on this branch (502fb061) and its record copied unedited; K_COLON now carries one deadkey and G1 passes, so the KNOWN_GAPS row is gone. Only the camqwerty and camazerty records still predate the S-02 fix.
+- **Group names match case-insensitively** (found by the T041 e2e run). bj_cree_woods declares `group(Main)`; once "." and "_" were placed (punctuation ruling), `applyAssignments` appended a second `group(main)` and kmcmplib rejected the keyboard. Fixed in its own commit, 502fb061 (`sameGroupName`, plus the same check in rule-pack install and the normalization step). The INDEXSTORELONG hint seen at the same time is in the starting keyboard and was not the cause.
+- **US8 T063/T064 depend on spec 107** (headless scripted author, branch `107-headless-scripted-author`). The 32 harness cases move to a headless vitest run; the walk zips stay on `km/2302-walk-zips`, never on main. T065 stays here.
+- **Suggested discards are marked, not removed, until Continue** (owner ruling, T039, Art. X). The default is discard, but carve only marks the suggested characters; clicking one keeps it (and clicking again re-marks it). Continue on the carve screen is the confirmation that applies the marked ones as `derived` removals; Skip keeps them all; Back changes nothing. An earlier build that applied the default on arrival was rejected.

@@ -1188,3 +1188,76 @@ describe("applyAssignments — deadkey_single_tap cross-name trigger collision (
     expect(kmn).toContain("store(dk_acute_output) 'áé'");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Group names are case-insensitive in Keyman: a fragment's `group(main)` must
+// merge into a base keyboard's `group(Main)` rather than append a duplicate
+// group that kmcmplib rejects.
+// ---------------------------------------------------------------------------
+
+describe("applyAssignments — case-insensitive group-name merge", () => {
+  const BASE_CAPITAL_MAIN =
+    "store(&VERSION) '10.0'\n" +
+    "begin Unicode > use(Main)\n" +
+    "\n" +
+    "group(Main) using keys\n" +
+    "\n" +
+    "+ [K_A] > 'a'\n";
+
+  const RULES_PATTERN: Pattern = makePattern({
+    id: "case_group_rules_pattern",
+    title: "Case group rules (test fixture)",
+    description: "Fragment declaring a lowercase group(main).",
+    category: "substitute",
+    appliesTo: [],
+    questions: [{ id: "kmnRules", prompt: "rules", answerType: "text" }],
+    kmnFragment: "group(main) using keys\n{{kmnRules}}\n",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "",
+    reviewDate: "2026-01-01",
+  });
+
+  const BARE_PATTERN: Pattern = makePattern({
+    ...RULES_PATTERN,
+    id: "case_bare_rules_pattern",
+    kmnFragment: "{{kmnRules}}\n",
+  });
+
+  function assign(patternId: string): MechanismAssignment {
+    return {
+      scope: "individual",
+      target: "b",
+      modality: "physical",
+      mechanisms: [{ patternId, slotValues: { kmnRules: "+ [K_B] > 'b'" } }],
+    };
+  }
+
+  for (const pattern of [RULES_PATTERN, BARE_PATTERN]) {
+    it(`merges into group(Main) without a duplicate (${pattern.id})`, () => {
+      const { kmn } = applyAssignments([assign(pattern.id)], makeResolver([pattern]), BASE_CAPITAL_MAIN);
+      const { ir } = parseKmn(kmn, "case-group-test");
+      expect(ir.groups).toHaveLength(1);
+      expect(ir.groups[0]?.name).toBe("Main");
+      expect(kmn).toMatch(/group\(Main\) using keys/);
+      expect(kmn).not.toMatch(/group\(main\)/);
+      expect(kmn).toContain("+ [K_B] > 'b'");
+      expect(kmn).toContain("+ [K_A] > 'a'");
+    });
+  }
+
+  it("folds bare rules into a fragment's group(Main) block (one group, base header kept)", () => {
+    const mixed: Pattern = makePattern({
+      ...RULES_PATTERN,
+      id: "case_bare_plus_group_pattern",
+      kmnFragment: "+ [K_C] > 'c'\ngroup(Main) using keys\n{{kmnRules}}\n",
+    });
+    const { kmn } = applyAssignments([assign(mixed.id)], makeResolver([mixed]), BASE_CAPITAL_MAIN);
+    const { ir } = parseKmn(kmn, "case-group-bare-test");
+    expect(ir.groups).toHaveLength(1);
+    expect(ir.groups[0]?.name).toBe("Main");
+    expect(kmn).toContain("+ [K_C] > 'c'");
+    expect(kmn).toContain("+ [K_B] > 'b'");
+  });
+});

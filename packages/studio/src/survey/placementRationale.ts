@@ -122,7 +122,6 @@ import {
   classifySlot,
   orthographyTier,
   slotKeyFor,
-  tierForNeedKind,
   type NeedSets,
   type OrthographyTier,
   type SlotNeedKind,
@@ -478,7 +477,7 @@ export function scoreCandidate(
   // have, is what would be needed to rank Ñ against N.
   const incomingTier = orthographyTier(char, ctx);
   const incumbentTier =
-    incumbent !== null ? tierForNeedKind(incumbent.need) : null;
+    incumbent !== null ? orthographyTier(incumbent.char, ctx) : null;
   let demotion: DemotionPlan | null = null;
   if (incumbent !== null) {
     const raltSlotKey = slotKeyFor(candidate.vkey, ["RALT"]);

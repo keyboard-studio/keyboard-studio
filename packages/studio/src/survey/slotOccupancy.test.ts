@@ -10,6 +10,8 @@ import {
   classifySlot,
   displacedFor,
   isProducedOnOtherSlot,
+  mechanismClaimedSlots,
+  orthographyTier,
   slotKeyFor,
   type NeedSets,
 } from "./slotOccupancy.ts";
@@ -226,6 +228,30 @@ describe("assignmentSlotKeys — slots derived from the RECORDED assignment (Cyc
     ]);
   });
 
+  it("names the whole NFC glyph of an NFD S-01 output, not its first code point", () => {
+    const a = assignment([
+      {
+        patternId: "simple_swap",
+        strategyId: "S-01",
+        slotValues: { kmnRules: "+ [K_QUOTE] > U+0061 U+030C" },
+      },
+    ]);
+    expect(assignmentSlotKeys(a)).toEqual([
+      { key: "K_QUOTE|", vkey: "K_QUOTE", modifiers: [], char: "ǎ" },
+    ]);
+  });
+
+  it("yields nothing for an S-01 output that is more than one grapheme", () => {
+    const a = assignment([
+      {
+        patternId: "simple_swap",
+        strategyId: "S-01",
+        slotValues: { kmnRules: "+ [K_QUOTE] > U+0061 U+0062" },
+      },
+    ]);
+    expect(assignmentSlotKeys(a)).toEqual([]);
+  });
+
   it("keys each line of a multi-line S-01 (CAPS quad shape) to its own slot", () => {
     const a = assignment([
       {
@@ -321,5 +347,71 @@ describe("classifySlot / displacedFor", () => {
     expect(isProducedOnOtherSlot(occ2, "'", "K_QUOTE|")).toBe(true);
     expect(isProducedOnOtherSlot(occ, "'", "K_QUOTE|")).toBe(false);
     void noNeeds;
+  });
+});
+
+describe("orthographyTier", () => {
+  const needs: NeedSets = {
+    confirmedInventory: new Set(["ə", "ʼ", "'", "’", "5"]),
+    baseProducedSet: new Set(["a", "'", "-"]),
+  };
+
+  it("an inventory letter is core, including the modifier-letter apostrophe ʼ", () => {
+    expect(orthographyTier("ə", needs)).toBe("core");
+    expect(orthographyTier("ʼ", needs)).toBe("core");
+  });
+
+  it("inventory punctuation and digits are convenience, never core (spec 106 FR-043)", () => {
+    expect(orthographyTier("'", needs)).toBe("convenience");
+    expect(orthographyTier("’", needs)).toBe("convenience");
+    expect(orthographyTier("5", needs)).toBe("convenience");
+  });
+
+  it("base-produced characters outside the inventory are convenience; the rest none", () => {
+    expect(orthographyTier("-", needs)).toBe("convenience");
+    expect(orthographyTier("q", needs)).toBe("none");
+  });
+});
+
+describe("mechanismClaimedSlots (spec 106 US4)", () => {
+  it("an S-08 claims every keystroke of a multi-key list, whatever its outputs", () => {
+    const slots = mechanismClaimedSlots({
+      patternId: "modifier_as_layer_switch",
+      strategyId: "S-08",
+      slotValues: { altgrKeyList: "[RALT K_E] [RALT SHIFT K_E]", altgrOutputList: "éÉ" },
+    });
+    expect(slots).toEqual([
+      { vkey: "K_E", modifiers: ["RALT"] },
+      { vkey: "K_E", modifiers: ["SHIFT", "RALT"] },
+    ]);
+  });
+
+  it("an S-02 claims its trigger, and RALT trigger only with the altgr escape", () => {
+    const dk = (escapes?: string) => ({
+      patternId: "deadkey_single_tap",
+      strategyId: "S-02" as const,
+      slotValues: { triggerKey: "K_COLON", ...(escapes !== undefined ? { escapes } : {}) },
+    });
+    expect(mechanismClaimedSlots(dk())).toEqual([{ vkey: "K_COLON", modifiers: [] }]);
+    expect(mechanismClaimedSlots(dk("double-tap space altgr"))).toEqual([
+      { vkey: "K_COLON", modifiers: [] },
+      { vkey: "K_COLON", modifiers: ["RALT"] },
+    ]);
+  });
+
+  it("postfix_compose claims its mark key only with the bare escape", () => {
+    const pc = (escapes: string) => ({
+      patternId: "postfix_compose",
+      strategyId: "S-03" as const,
+      slotValues: { markKey: "K_5", escapes },
+    });
+    expect(mechanismClaimedSlots(pc("bare"))).toEqual([{ vkey: "K_5", modifiers: [] }]);
+    expect(mechanismClaimedSlots(pc(""))).toEqual([]);
+  });
+
+  it("a plain S-03 sequence claims nothing", () => {
+    expect(
+      mechanismClaimedSlots({ patternId: "multi_char_sequence", strategyId: "S-03", slotValues: {} }),
+    ).toEqual([]);
   });
 });

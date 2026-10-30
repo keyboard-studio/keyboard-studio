@@ -18,6 +18,15 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 /** The physical-layout decision value (data-model.md). */
 export interface PhysicalLayoutValue {
   assignments: MechanismAssignment[];
+  /**
+   * Displacements the author declined (spec 106 FR-043): each entry is
+   * `displaced|vkey|sorted-modifiers|incoming`, a still-needed character
+   * left without a new key. Only declines whose incoming character still
+   * has an assignment are recorded: removing that assignment ends the
+   * displacement. Absent when there are none, so values recorded before
+   * the field existed are unchanged.
+   */
+  displacedDeclined?: string[];
 }
 
 /**
@@ -39,13 +48,21 @@ export interface PhysicalLayoutValue {
  */
 export function physicalLayoutValueFromPhaseResults(
   phaseResults: Parameters<typeof selectDesktopAssignments>[0],
+  displacedDeclined: readonly string[] = [],
 ): PhysicalLayoutValue {
-  return { assignments: [...selectDesktopAssignments(phaseResults)] };
+  const assignments = [...selectDesktopAssignments(phaseResults)];
+  const targets = new Set(assignments.map((a) => a.target));
+  const live = displacedDeclined
+    .filter((key) => targets.has(key.slice(key.lastIndexOf("|") + 1)))
+    .sort();
+  return {
+    assignments,
+    ...(live.length > 0 ? { displacedDeclined: live } : {}),
+  };
 }
 
 /** The physical-layout value from the live working copy. */
 export function currentPhysicalLayoutValue(): PhysicalLayoutValue {
-  return physicalLayoutValueFromPhaseResults(
-    useWorkingCopyStore.getState().phaseResults,
-  );
+  const s = useWorkingCopyStore.getState();
+  return physicalLayoutValueFromPhaseResults(s.phaseResults, s.displacedDeclined);
 }

@@ -24,6 +24,7 @@ import { MechanismGallery } from "./MechanismGallery.tsx";
 import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
 import type { DisplacementProposal } from "./useDisplacementProposal.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { currentPhysicalLayoutValue } from "../../survey/assignLoop/physicalLayoutValue.ts";
 import {
   createVirtualFS,
   makePlacementMap,
@@ -192,6 +193,9 @@ describe("MechanismGallery — displacement demotion proposal (#2300)", () => {
     expect(
       getPhaseCPhysicalAssignments().find((a) => a.target === "'"),
     ).toBeUndefined();
+    // Spec 106 FR-043: the decline is a recorded decision, not component state.
+    expect(useWorkingCopyStore.getState().displacedDeclined).toEqual(["'|K_QUOTE||ə"]);
+    expect(currentPhysicalLayoutValue().displacedDeclined).toEqual(["'|K_QUOTE||ə"]);
   });
 
   it("double-assign on K_QUOTE: a second character on the taken combo raises a BOTH-CORE proposal naming the first character", async () => {
@@ -305,6 +309,58 @@ describe("MechanismGallery — both-core displacement (steer 2)", () => {
     expect(
       getPhaseCPhysicalAssignments().find((a) => a.target === "Ñ"),
     ).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 106 T040 (FR-043): the Bafut kbdus walk. The punctuation step put '
+// in the confirmed inventory, so ’ onto ' was a both-core standoff whose
+// "Keep both" left ' shadowed with no key. Punctuation is never core
+// (owner ruling 2026-10-29): the ordinary demotion proposal is raised.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — needed punctuation is never silently lost (spec 106 T040)", () => {
+  it("’ onto the ' key proposes moving ' to AltGr even when ' is in the inventory", async () => {
+    const map: PlacementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+2019", // ’
+          candidates: [
+            {
+              vkey: "K_QUOTE",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 21,
+              confidence: 0.6,
+            },
+          ],
+        },
+      ],
+    });
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([groupWithQuote()]) });
+    seedInventory(["’", "'"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={map} />,
+        { withStepNav: true },
+      );
+    });
+
+    await selectChar("char-scroll-chip-2019", "’");
+    await acceptSuggestion();
+
+    await waitFor(() => {
+      expect(displacementBanner().textContent).toMatch(/Move ' to AltGr/);
+    });
+    expect(displacementBanner().textContent).not.toMatch(/frequency data/);
   });
 });
 
