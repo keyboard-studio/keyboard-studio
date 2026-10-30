@@ -221,6 +221,38 @@ describe("applyMarkGuards — compiled behaviour", () => {
   }, 60_000);
 });
 
+describe("applyMarkGuards — format version for notany()+context()", () => {
+  const kmnAt = (version: string): string =>
+    [
+      'store(&NAME) "Guard fixture"',
+      `store(&VERSION) '${version}'`,
+      "store(&TARGETS) 'any'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      '+ [K_A] > "a"',
+      "",
+    ].join("\n");
+  const wl = worklist({
+    ownLetterUnits: ["a"],
+    markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+  });
+
+  it.each([
+    ["10.0", "14.0"],
+    ["13.0", "14.0"],
+    ["14.0", "14.0"],
+    ["17.0", "17.0"],
+  ])("a keyboard declaring &VERSION %s compiles with the guard and ends at %s", async (declared, expected) => {
+    const { ir } = parse(kmnAt(declared), "guards");
+    const guarded = applyMarkGuards(ir, wl, "base-plus-mark");
+    const version = guarded.ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === "VERSION");
+    expect(chars(version).join("")).toBe(expected);
+    const vfs = createVirtualFS([{ path: "source/guards.kmn", content: emit(guarded.ir), isBinary: false }]);
+    const compiled = await compile(vfs, "guards");
+    expect(compiled.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal")).toEqual([]);
+  }, 60_000);
+});
+
 describe("applyMarkGuards — idempotency (spec 106 T016)", () => {
   it("is idempotent over its own emitted .kmn parsed back (the projection's path)", () => {
     const wl = worklist({ ownLetterUnits: ["a", "k"], blockedCombinations: [{ base: "k", mark: ACUTE }] });
