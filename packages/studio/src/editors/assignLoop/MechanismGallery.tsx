@@ -79,7 +79,7 @@ import type {
   PlacementMap,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
+import { toUPlusNotation, toUPlusSequence, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -114,6 +114,7 @@ import {
   collectCompositionMethod,
   type ModifierToken,
   type CharContributors,
+  OUTPUT_FORM_SEAM_PATTERN_IDS,
 } from "@keyboard-studio/engine";
 import {
   useKeyboardArtifact,
@@ -231,6 +232,7 @@ import {
 import {
   PATTERN_SEQUENCE,
   PATTERN_DEADKEY,
+  isDeadkeyPatternId,
   PATTERN_SWAP,
   PATTERN_RALT,
   isSequenceAssignmentForChar,
@@ -321,7 +323,8 @@ function methodLabel(
 ): string {
   const sv = ref.slotValues ?? {};
   switch (ref.patternId) {
-    case "deadkey_single_tap": {
+    case "deadkey_single_tap":
+    case "deadkey_single_tap_nfd": {
       const label = resolveMessage(
         i18n,
         msg({
@@ -471,7 +474,7 @@ function sessionMintedDeadkeyIds(
   const ids = new Set<number>();
   for (const a of sessionAssignments) {
     for (const m of a.mechanisms) {
-      if (m.patternId !== PATTERN_DEADKEY) continue;
+      if (!isDeadkeyPatternId(m.patternId)) continue;
       const name = m.slotValues?.["deadkeyName"];
       // 1–8 hex digits — matches the deadkey editors' parseIdText: the
       // pipeline imposes no 0xffff cap, so a 5-digit session-minted id
@@ -2029,6 +2032,7 @@ export function MechanismGallery({
         // assignment.
         const ids = new Set<string>(ranked.map((m) => m.patternId));
         ids.add(PATTERN_DEADKEY);
+        for (const id of OUTPUT_FORM_SEAM_PATTERN_IDS) ids.add(id);
         ids.add(PATTERN_SWAP);
         ids.add(PATTERN_RALT);
         // PATTERN_SEQUENCE — the sequence builder now records real
@@ -2334,7 +2338,7 @@ export function MechanismGallery({
    *  placement (it carries an `escapes` slot). */
   const raiseDeadkeyEscapes = useCallback((assignment: MechanismAssignment) => {
     const sv = assignment.mechanisms.find(
-      (m) => m.patternId === PATTERN_DEADKEY && typeof m.slotValues?.["escapes"] === "string",
+      (m) => isDeadkeyPatternId(m.patternId) && typeof m.slotValues?.["escapes"] === "string",
     )?.slotValues;
     if (sv === undefined) return;
     setEscapePrompt({
@@ -2353,7 +2357,7 @@ export function MechanismGallery({
       else escapes.delete(escape);
       const value = formatDeadkeyEscapes(escapes);
       const carriesEscapes = (m: MechanismRef) =>
-        m.patternId === PATTERN_DEADKEY &&
+        isDeadkeyPatternId(m.patternId) &&
         m.slotValues?.["deadkeyName"] === deadkeyName &&
         typeof m.slotValues?.["escapes"] === "string";
       const next = sessionAssignments.map((a) => {
@@ -2828,12 +2832,6 @@ export function MechanismGallery({
     // takes no slot (a deadkey composes on top of a base keystroke and
     // shadows nothing) and yields no slot entries there.
     if (entry.strategyId === "S-01") {
-      const cp =
-        currentChar
-          .codePointAt(0)
-          ?.toString(16)
-          .toUpperCase()
-          .padStart(4, "0") ?? "0000";
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -2842,7 +2840,9 @@ export function MechanismGallery({
           {
             patternId: PATTERN_SWAP,
             strategyId: "S-01",
-            slotValues: { kmnRules: `+ [${vkey}] > U+${cp}` },
+            // Every code point: a character with no single ready-made form
+            // (ɛ̌) is a base plus its mark, and both must reach the rule.
+            slotValues: { kmnRules: `+ [${vkey}] > ${toUPlusSequence(currentChar)}` },
           },
         ],
         source: "user",
@@ -3007,7 +3007,7 @@ export function MechanismGallery({
               a.target === counterpart &&
               a.mechanisms.some(
                 (m) =>
-                  m.patternId === PATTERN_DEADKEY &&
+                  isDeadkeyPatternId(m.patternId) &&
                   m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
               ),
           ),
@@ -3284,7 +3284,7 @@ export function MechanismGallery({
               a.target === counterpart &&
               a.mechanisms.some(
                 (m) =>
-                  m.patternId === PATTERN_DEADKEY &&
+                  isDeadkeyPatternId(m.patternId) &&
                   m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
               ),
           ),

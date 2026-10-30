@@ -3,6 +3,7 @@ import type { PosturePair } from "./nfc-posture-of-inventory.js";
 import {
   hasDecidablePairs,
   nativeBackspaceBehaviour,
+  outputFormString,
   outputStringForStack,
   resolveBackspaceProposal,
   resolveOutputFormProposal,
@@ -147,5 +148,22 @@ describe("resolveBackspaceProposal (#2302: the suggestion follows the chosen com
       expect(explanation).toContain("You can choose");
       expect(explanation).not.toMatch(/unicode|normalization/i);
     }
+  });
+});
+
+describe("outputFormString (spec 106 FR-020: the emission seam for any output)", () => {
+  it("decomposes a precomposed character fully under base-plus-mark", () => {
+    expect(outputFormString("ǎ", "base-plus-mark")).toBe("a\u030C");
+    expect(outputFormString("ṑ", "base-plus-mark")).toBe("o\u0304\u0300");
+  });
+
+  it("composes under ready-made, and leaves a combination with no single character as base plus mark", () => {
+    expect(outputFormString("a\u030C", "ready-made")).toBe("ǎ");
+    expect(outputFormString("\u025B\u030C", "ready-made")).toBe("\u025B\u030C");
+  });
+
+  it("returns the input untouched when no output form is recorded", () => {
+    expect(outputFormString("a\u030C", undefined)).toBe("a\u030C");
+    expect(outputFormString("ǎ", undefined)).toBe("ǎ");
   });
 });

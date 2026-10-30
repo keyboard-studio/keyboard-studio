@@ -93,6 +93,20 @@ export function outputStringForStack(
 }
 
 /**
+ * Any emitted string under the recorded policy — the seam generated rules
+ * pass every output slot through (spec 106 FR-020). Unlike
+ * {@link outputStringForStack}, the input may itself be precomposed (an
+ * assignment's target `ǎ`), so base-plus-mark decomposes it fully (NFD).
+ * Ready-made composes as far as single characters exist (NFC). `undefined`
+ * (no decision yet) returns `s` untouched, so a keyboard whose author never
+ * reached the marks series emits exactly what it did before.
+ */
+export function outputFormString(s: string, outputForm: OutputForm | undefined): string {
+  if (outputForm === undefined) return s;
+  return s.normalize(outputForm === "base-plus-mark" ? "NFD" : "NFC");
+}
+
+/**
  * Resolve the output-form SUGGESTION from the author's input-order answer
  * and the posture table. First-match on the order only:
  *

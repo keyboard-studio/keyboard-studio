@@ -32,6 +32,12 @@ description: >
   '+' separator elements removed; index() offsets count positions in that
   cleaned context. (Generalised in #2233 — before it, both shipped matchers
   found zero families on sil_euro_latin and sil_pan_africa_mnemonic.)
+  NFD (base-plus-mark) form, classic context only: a fan-out whose output is
+  index() into the SAME store as its any() (self-indexing, no output store)
+  followed by one or more combining-mark chars lifts to patternId
+  deadkey_single_tap_nfd with a markChars slot (the mark sequence) and no
+  accentedForms slot. Code-level (s02-families.ts nfdMarks); not expressible
+  in the predicate DSL below, which describes the parallel-store form.
 
 # ---------------------------------------------------------------------------
 # IR predicate

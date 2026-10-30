@@ -21,6 +21,7 @@
 import type { Pattern, MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
@@ -283,9 +284,11 @@ export async function projectWorkingCopyForOutput(
   if (sessionAssignments.length > 0) {
     const patternLibrary = getPatternLibraryService();
     const patternIds = [
-      ...new Set(
-        sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
-      ),
+      ...new Set([
+        ...sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
+        // The output-form seam swaps in these shapes at emit time (spec 106 US3).
+        ...OUTPUT_FORM_SEAM_PATTERN_IDS,
+      ]),
     ];
     await Promise.all(
       patternIds.map(async (id) => {

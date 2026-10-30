@@ -41,7 +41,12 @@
 //                         rule pair for a freshly assigned character) is
 //                         Phase 6/touchRuleSynthesis.ts, not this pass —
 //                         see the step's own comment below for the seam.
-//   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
+//   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns).
+//                         With a marks decision recorded, the output form and
+//                         the mark attachment matrix ride along so every
+//                         emitted string follows the one form (spec 106 US3);
+//                         a uniformity scan then warns on wrong-form text the
+//                         assignments introduced
 //   2.5 Layer propagation — propagateDesktopLayersToTouch (surfaces S-08
 //                         generalized modifier-combo layers onto the
 //                         .keyman-touch-layout written by step 0; no-op when
@@ -122,6 +127,22 @@ import {
 
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
+import { markAttachmentsFromWorklist } from "./markAttachments.ts";
+import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
+
+/** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
+function safeFormViolations(
+  kmn: string | undefined,
+  keyboardId: string,
+  form: OutputForm,
+): Set<string> | undefined {
+  if (kmn === undefined) return undefined;
+  try {
+    return formViolations(kmn, keyboardId, form);
+  } catch {
+    return undefined;
+  }
+}
 import {
   spliceRuleAdditions,
   hasRuleAdditions,
@@ -822,13 +843,35 @@ export function projectWorkingCopyVfs(
     (a) => a.modality === "physical",
   );
   if (physicalAssignments.length > 0) {
-    const assignResult = applyAssignmentsToVfs(
-      vfs,
-      keyboardId,
-      physicalAssignments,
-      getPattern,
-    );
+    // Spec 106 US3: the recorded output form reaches the engine here, so every
+    // string the assignments emit follows it (FR-020..FR-023). Stored
+    // assignments stay form-independent; the engine picks the shape.
+    const formOptions =
+      marksGuards !== null
+        ? {
+            outputForm: marksGuards.outputForm,
+            markAttachments: markAttachmentsFromWorklist(marksGuards.worklist),
+          }
+        : undefined;
+    const kmnPathForForm = `source/${keyboardId}.kmn`;
+    const violationsBefore =
+      marksGuards !== null
+        ? safeFormViolations(readVfsText(vfs, kmnPathForForm), keyboardId, marksGuards.outputForm)
+        : undefined;
+    const assignResult =
+      formOptions === undefined
+        ? applyAssignmentsToVfs(vfs, keyboardId, physicalAssignments, getPattern)
+        : applyAssignmentsToVfs(vfs, keyboardId, physicalAssignments, getPattern, formOptions);
     warnings.push(...assignResult.warnings);
+    // Plan P2.4 uniformity assertion: wrong-form text the assignments added
+    // (runs already wrong before step 2 belong to the starting keyboard).
+    if (marksGuards !== null && violationsBefore !== undefined) {
+      const after = safeFormViolations(readVfsText(vfs, kmnPathForForm), keyboardId, marksGuards.outputForm);
+      if (after !== undefined) {
+        const warning = outputFormWarning(violationsBefore, after, marksGuards.outputForm);
+        if (warning !== undefined) warnings.push(warning);
+      }
+    }
 
     // spec-014 T017 — add-gallery IR projection via the single mutate() seam.
     //

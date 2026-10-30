@@ -102,6 +102,7 @@ import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
+import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
@@ -1183,6 +1184,8 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
     );
     if (ids.size === 0) return;
+    // The output-form seam swaps in these shapes at emit time (spec 106 US3).
+    for (const id of OUTPUT_FORM_SEAM_PATTERN_IDS) ids.add(id);
     const svc = getPatternLibraryService();
     Promise.all([...ids].map((id) => svc.getById(id)))
       .then((patterns) => {

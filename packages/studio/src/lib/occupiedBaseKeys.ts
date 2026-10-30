@@ -64,7 +64,8 @@ function candidateRefs(ir: KeyboardIR): MechanismRef[] {
         continue;
       }
 
-      // deadkey_single_tap shape: a deadkey marker followed by the literal
+      // deadkey_single_tap shape (the form-independent write shape; a ref read
+      // back from a decomposed keyboard is the same S-02 to every reader): a deadkey marker followed by the literal
       // base-letter character being matched.
       const ctx1 = rule.context[1];
       if (

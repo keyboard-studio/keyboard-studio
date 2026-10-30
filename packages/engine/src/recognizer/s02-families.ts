@@ -135,14 +135,31 @@ export interface S02FanOutMatch {
   prefixChar: string | null;
   baseStoreRef: string;
   outStoreRef: string;
+  /**
+   * Set only for the NFD (base-plus-mark) form: the trailing combining-mark
+   * chars emitted after a SELF-indexing index() (index() into the same store
+   * as the any(), classic [dk, any] context). Absent for the parallel-store form.
+   */
+  nfdMarks?: string[];
 }
 
 export function matchS02FanOut(rule: IRRule): S02FanOutMatch | null {
-  if (rule.output.length !== 1) return null;
-  const out = rule.output[0]!;
-  if (out.kind !== "index") return null;
+  const out = rule.output[0];
+  if (out === undefined || out.kind !== "index") return null;
   const cleaned = cleanedContext(rule);
   if (cleaned === null) return null;
+
+  // Output is exactly one index() (parallel-store form), or — NFD form — one
+  // index() followed by one or more combining-mark chars (checked below
+  // against the self-indexing store once the any() is known).
+  let nfdMarks: string[] | undefined;
+  if (rule.output.length > 1) {
+    nfdMarks = [];
+    for (const el of rule.output.slice(1)) {
+      if (el.kind !== "char") return null;
+      nfdMarks.push(el.value);
+    }
+  }
 
   // The any() must be the terminal element; index()'s offset must equal its
   // 1-indexed cleaned position (the sole any() in the context).
@@ -156,14 +173,18 @@ export function matchS02FanOut(rule: IRRule): S02FanOutMatch | null {
   if (cleaned.length === 2) {
     const dk = cleaned[0]!;
     if (dk.kind !== "deadkey") return null;
+    // NFD form: self-indexing (output store is the any() store).
+    if (nfdMarks !== undefined && out.storeRef !== anyEl.storeRef) return null;
     return {
       rule,
       deadkeyId: dk.id,
       prefixChar: null,
       baseStoreRef: anyEl.storeRef,
       outStoreRef: out.storeRef,
+      ...(nfdMarks !== undefined ? { nfdMarks } : {}),
     };
   }
+  if (nfdMarks !== undefined) return null; // NFD form is classic-only
   if (cleaned.length === 3) {
     const prefix = cleaned[0]!;
     const dk = cleaned[1]!;
@@ -239,6 +260,11 @@ export interface S02Family {
   hasBeep: boolean;
   /** patternId suffix after the `#`: the full cluster key. */
   idSuffix: string;
+  /**
+   * NFD (base-plus-mark) family: the combining-mark chars the fan-out emits
+   * after index(base, 2). baseStore === outStore. Lifts to deadkey_single_tap_nfd.
+   */
+  nfdMarks?: string[];
 }
 
 export function s02IdSuffix(family: {
@@ -273,6 +299,7 @@ interface FamilyAcc {
   baseStoreRef: string;
   outStoreRef: string;
   fanOuts: IRRule[];
+  nfdMarks?: string[];
 }
 
 export function findS02Families(ir: KeyboardIR): S02Family[] {
@@ -299,7 +326,7 @@ export function findS02Families(ir: KeyboardIR): S02Family[] {
       if (!isCandidate(rule)) continue;
       const fanOut = matchS02FanOut(rule);
       if (fanOut === null) continue;
-      const key = `${group.name}|${fanOut.deadkeyId}|${fanOut.prefixChar ?? ""}|${fanOut.baseStoreRef}>${fanOut.outStoreRef}`;
+      const key = `${group.name}|${fanOut.deadkeyId}|${fanOut.prefixChar ?? ""}|${fanOut.baseStoreRef}>${fanOut.outStoreRef}|${(fanOut.nfdMarks ?? []).join("")}`;
       let acc = accByKey.get(key);
       if (acc === undefined) {
         acc = {
@@ -309,6 +336,7 @@ export function findS02Families(ir: KeyboardIR): S02Family[] {
           baseStoreRef: fanOut.baseStoreRef,
           outStoreRef: fanOut.outStoreRef,
           fanOuts: [],
+          ...(fanOut.nfdMarks !== undefined ? { nfdMarks: fanOut.nfdMarks } : {}),
         };
         accByKey.set(key, acc);
         accOrder.push(acc);
@@ -386,6 +414,7 @@ export function findS02Families(ir: KeyboardIR): S02Family[] {
       triggersOwned: (familyCountByDkId.get(v.deadkeyId) ?? 0) === 1,
       ...(primaryTrigger !== undefined ? { primaryTrigger } : {}),
       hasBeep,
+      ...(v.nfdMarks !== undefined ? { nfdMarks: v.nfdMarks } : {}),
       idSuffix: s02IdSuffix({
         groupName: v.group.name,
         deadkeyId: v.deadkeyId,
@@ -413,10 +442,12 @@ export function buildS02Fragment(slotValues: Record<string, string>): string {
     slotValues["triggerStore"] !== undefined
       ? "+ any({{triggerStore}}) > dk({{deadkeyName}})"
       : "+ [{{triggerKey}}] > dk({{deadkeyName}})";
-  const lines = [
-    triggerLine,
-    "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)",
-  ];
+  // NFD (base-plus-mark) family: self-indexing store, marks as trailing chars.
+  const fanOutLine =
+    slotValues["markChars"] !== undefined
+      ? "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{baseLetters}}, 2) {{markChars}}"
+      : "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)";
+  const lines = [triggerLine, fanOutLine];
   if (slotValues["accentChar"] !== undefined) {
     lines.push("dk({{deadkeyName}}) + [{{triggerKey}}] > {{accentChar}}");
   }

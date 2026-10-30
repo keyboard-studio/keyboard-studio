@@ -31,6 +31,12 @@ export function toUPlusNotation(char: string): string {
   return "U+" + toHex4(cp);
 }
 
+/** Every code point of `s` as space-separated `U+XXXX` — a rule output that
+ *  is a base plus its marks keeps all of them (`a` U+030C → `U+0061 U+030C`). */
+export function toUPlusSequence(s: string): string {
+  return [...s].map((c) => "U+" + toHex4(c.codePointAt(0)!)).join(" ");
+}
+
 /** General_Category test for a single code point: Lu/Ll/Lo/Lt/Lm (any letter). */
 const IS_LETTER_CP = /^\p{L}$/u;
 

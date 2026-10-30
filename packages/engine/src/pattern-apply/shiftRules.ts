@@ -27,7 +27,7 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { toUPlusSequence } from "@keyboard-studio/contracts";
 
 const MNEMONIC_STORE_NAME = "MNEMONICLAYOUT";
 
@@ -110,7 +110,7 @@ export function buildShiftRuleLines(
   shiftChar: string,
   opts: { capsHandling: boolean },
 ): string[] {
-  const cp = toUPlusNotation(shiftChar);
+  const cp = toUPlusSequence(shiftChar);
   if (!opts.capsHandling) {
     return [`+ [SHIFT ${vkey}] > ${cp}`];
   }
@@ -144,7 +144,7 @@ export function buildStartRuleLines(
   baseChar: string,
   opts: { capsHandling: boolean },
 ): string[] {
-  const cp = toUPlusNotation(baseChar);
+  const cp = toUPlusSequence(baseChar);
   if (!opts.capsHandling) {
     return [`+ [${vkey}] > ${cp}`];
   }
@@ -178,8 +178,8 @@ export function buildCasePairRuleLines(
   shiftChar: string,
   opts: { capsHandling: boolean },
 ): string[] {
-  const baseCp = toUPlusNotation(baseChar);
-  const shiftCp = toUPlusNotation(shiftChar);
+  const baseCp = toUPlusSequence(baseChar);
+  const shiftCp = toUPlusSequence(shiftChar);
   if (!opts.capsHandling) {
     return [`+ [${vkey}] > ${baseCp}`, `+ [SHIFT ${vkey}] > ${shiftCp}`];
   }

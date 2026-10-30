@@ -145,6 +145,14 @@ carve + caps, fixture/compile/simulate infra) and one km-keyman ruling. Line num
   form; also fix the studio builders `buildStartRuleLines` / `buildShiftRuleLines` /
   `buildCasePairRuleLines` (:3323, :3408, :3709, :3736) to write all code points.
 
+**Amended at build (2026-10-29, km-keyman approved):** the studio does not pick the pattern id.
+Stored assignments stay form-independent (`deadkey_single_tap` with NFC `accentedForms`), and
+the engine seam (`pattern-apply/outputFormSeam.ts`) chooses the emitted shape at emit time, so
+changing the output-form answer later rewrites no assignment. Multi-code-point pairs that do not
+fit the one-mark NFD shape get one self-indexing store per mark sequence, not per-pair rules.
+Postfix compose is likewise derived in the engine from an S-01 lone-mark key plus the attachment
+matrix.
+
 ## R5. km-keyman ruling (FR-021) — binding, recorded 2026-10-29
 
 **Status: approved with conditions.**

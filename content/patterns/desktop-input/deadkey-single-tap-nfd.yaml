@@ -1,0 +1,184 @@
+# deadkey-single-tap-nfd.yaml
+# Spec 106 US3 (R5): the S-02 deadkey under the base-plus-mark output form.
+# One self-indexing store, the mark as a literal; no output store (index alignment).
+
+id: deadkey_single_tap_nfd
+title: "Tap-and-add accent (base plus mark)"
+description: >
+  Press an accent key (e.g. apostrophe), then a base letter — the accent key
+  disappears and the letter appears followed by a combining mark. Pressing the
+  accent key twice in a row, or the accent key then space, produces the bare
+  combining mark itself. Use this form when the keyboard writes each accented
+  letter as the base letter plus a combining mark (decomposed).
+category: desktop
+appliesTo: []
+priority: 1
+group_visibility: any
+strategyId: "S-02"
+combinesWith: ["S-04"]
+
+questions:
+  - id: triggerKey
+    prompt: "Which key starts the accent? (e.g. apostrophe, backtick, caret)"
+    answerType: key-name
+    default: "K_QUOTE"
+
+  - id: deadkeyName
+    prompt: >
+      Internal name for this deadkey state (e.g. "caron", "acute", "circum").
+      Use letters and underscores only — it becomes a KMN identifier.
+    answerType: text
+    default: "caron"
+
+  - id: baseLetters
+    prompt: >
+      Which base letters take this accent? Type them without spaces.
+      Example: aeiouAEIOU
+    answerType: char-list
+
+  - id: markChars
+    prompt: >
+      The combining mark (or marks) added after the base letter
+      (e.g. U+030C for combining caron).
+    answerType: char-list
+    default: "̌"
+
+  - id: accentChar
+    prompt: >
+      The bare accent mark emitted when the trigger key is pressed twice
+      (e.g. U+030C for combining caron).
+    answerType: char-single
+    default: "̌"
+
+kmnFragment: |
+  store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'
+
+  dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_bases, 2) '{{markChars}}'
+  dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+  dk({{deadkeyName}}) + [K_SPACE] > '{{accentChar}}'
+  + [{{triggerKey}}] > dk({{deadkeyName}})
+
+touchLayoutFragment: |
+  {
+    "sk": [
+      { "id": "{{accentChar}}", "text": "{{accentChar}}" }
+    ]
+  }
+
+reorderRules: null
+
+tests:
+  - input: ["K_QUOTE", "K_A"]
+    expectedOutput: "ǎ"
+    description: "apostrophe + a produces a followed by combining caron"
+  - input: ["K_QUOTE", "SHIFT K_A"]
+    expectedOutput: "Ǎ"
+    description: "apostrophe + shift a produces A followed by combining caron (cased bases share one store)"
+  - input: ["K_QUOTE", "K_E"]
+    expectedOutput: "ě"
+    description: "apostrophe + e produces e followed by combining caron"
+  - input: ["K_QUOTE", "K_QUOTE"]
+    expectedOutput: "̌"
+    description: "double-tap trigger emits the bare combining caron"
+  - input: ["K_QUOTE", "K_SPACE"]
+    expectedOutput: "̌"
+    description: "trigger then space emits the same bare mark as the double-tap"
+  - input: ["K_QUOTE", "K_X"]
+    expectedOutput: "x"
+    description: "a base letter outside the store falls through to plain x"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/c/cabecar"
+  - "release/w/winchus"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-10-29"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "base-plus-mark deadkeys are rare in the corpus; cabecar and winchus are the cited exemplars"
+
+provenance:
+  - keyboard: "release/c/cabecar/source/cabecar.kmn"
+    line: 290
+    rule: |
+      dk(nasal) any(baseVowels) > index(baseVowels, 2) U+0331
+    note: >
+      The deadkey indexes back into its own base store and appends the mark as a
+      literal; there is no output store. Offset 2 is correct because the deadkey
+      counts as context position 1. Stacked marks follow the same shape (lines 283-294).
+  - keyboard: "release/w/winchus/source/winchus.kmn"
+    line: 507
+    rule: |
+      dk(00b4) any(decompuestos) > index(decompuestos,2) U+0301
+    note: >
+      h and H have no precomposed acute, so the base plus the mark is the only
+      form; the same self-indexing store.
+
+demo:
+  filled_kmn: |
+    c Demo: Single-tap deadkey, base plus combining caron
+    c Press ' then a base letter to add a combining caron after it.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Deadkey Caron Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    store(dk_caron_bases) 'aAeE'
+
+    dk(caron) + any(dk_caron_bases) > index(dk_caron_bases, 2) U+030C
+    dk(caron) + [K_QUOTE] > U+030C
+    dk(caron) + [K_SPACE] > U+030C
+    + [K_QUOTE] > dk(caron)
+
+  sample_keys:
+    - keys: ["'", "a"]
+      output: "ǎ"
+      note: "apostrophe then a — a plus combining caron"
+    - keys: ["'", "e"]
+      output: "ě"
+      note: "apostrophe then e — e plus combining caron"
+    - keys: ["'", "'"]
+      output: "̌"
+      note: "apostrophe twice — bare combining caron"
+
+  sample_output: >
+    Type ' then a to get a with a caron (a plus U+030C).
+    Type ' then e to get e with a caron.
+    Type '' (apostrophe twice) to get the bare combining caron.
+
+skeleton:
+  kmn_template: |
+    store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'
+
+    dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_bases, 2) '{{markChars}}'
+    dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+    dk({{deadkeyName}}) + [K_SPACE] > '{{accentChar}}'
+    + [{{triggerKey}}] > dk({{deadkeyName}})
+
+  parameters:
+    - id: triggerKey
+      description: >
+        Virtual-key name for the accent trigger key (e.g. K_QUOTE). The user
+        presses this first; it produces no visible output until the next key.
+    - id: deadkeyName
+      description: >
+        Internal identifier for this deadkey state. Must be a valid KMN
+        identifier — letters and underscores only, unique per deadkey.
+    - id: baseLetters
+      description: >
+        The base characters that accept this accent, as a plain string without
+        spaces (e.g. "aAeE"). Cased bases share this one store.
+    - id: markChars
+      description: >
+        The combining mark sequence appended after the base (e.g. U+030C).
+    - id: accentChar
+      description: >
+        The bare combining mark emitted when the trigger key is pressed twice or
+        followed by space, so the trigger punctuation can still be typed.
