@@ -119,6 +119,16 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   // corpus carries 2.0) and 1.10's pin was corrected in the same change.
   "KM_LINT_KPJ_FORMAT_OUTDATED",
   "KM_LINT_KPJ_VERSION_BUMPED",
+  // Group A2 file-inventory twins (check-file-inventory): post-hoc checks
+  // of the scaffolder-bake file guarantees — 1.7b/1.8b/1.11b/1.12b/
+  // 3.1b/6.1b/6.3b. Pure VFS path-list checks, no parsing.
+  "KM_LINT_KEYBOARD_INFO_PRESENT",
+  "KM_LINT_DOCS_SUBFOLDER_DUPLICATES",
+  "KM_LINT_KPJ_USER_PRESENT",
+  "KM_LINT_BUILD_FOLDER_PRESENT",
+  "KM_LINT_HISTORY_MD_ABSENT",
+  "KM_LINT_README_HTM_ABSENT",
+  "KM_LINT_WELCOME_HTM_ABSENT",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).

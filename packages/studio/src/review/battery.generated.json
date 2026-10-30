@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-10-30T21:47:42.990Z",
- "catalogSize": 149,
+ "generatedAt": "2026-10-30T22:14:23.151Z",
+ "catalogSize": 156,
  "byBand": {
-  "layer-c-enforce": 67,
+  "layer-c-enforce": 74,
   "scaffolder-bake": 40,
   "yellow-survey": 32,
   "red-checklist": 10
  },
- "implementedCount": 59,
+ "implementedCount": 66,
  "notImplemented": [
   "1.1-no-files-outside-keyboard-folder",
   "9.1-font-license-nonempty",
@@ -106,6 +106,21 @@
    }
   },
   {
+   "id": "1.7b-no-keyboard-info-file",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.7: no `keyboard.info` file is present in the keyboard folder. The scaffolder never emits one (1.7); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KEYBOARD_INFO_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "1.8-no-duplicate-docs-subfolder",
    "band": "scaffolder-bake",
    "section": "1. Repository hygiene",
@@ -114,6 +129,21 @@
     "kind": "scaffolderRule",
     "id": "omit-docs-subfolder"
    }
+  },
+  {
+   "id": "1.8b-no-duplicate-docs-subfolder",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.8: no `docs/` (or similar) subfolder holds duplicate HISTORY / README / INSTALL files. The scaffolder never creates one (1.8); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DOCS_SUBFOLDER_DUPLICATES"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "1.9-no-duplicate-source-files",
@@ -167,6 +197,21 @@
    }
   },
   {
+   "id": "1.11b-no-kpj-user-committed",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.11: no `.kpj.user` file is committed. The scaffolder never emits per-user IDE state (1.11); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_USER_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "1.12-no-build-folder-committed",
    "band": "scaffolder-bake",
    "section": "1. Repository hygiene",
@@ -175,6 +220,21 @@
     "kind": "scaffolderRule",
     "id": "gitignore-build-folder"
    }
+  },
+  {
+   "id": "1.12b-no-build-folder-committed",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.12: no `build/` folder contents are committed. The scaffolder never commits build output (1.12); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_BUILD_FOLDER_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "1.13-no-stray-scratch-files",
@@ -299,6 +359,21 @@
     "kind": "scaffolderRule",
     "id": "create-history-md"
    }
+  },
+  {
+   "id": "3.1b-history-file-exists",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "Post-hoc check of 3.1: a `HISTORY.md` exists at the keyboard root. The scaffolder always emits one (3.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "3.2-history-header-sensible",
@@ -555,6 +630,21 @@
    }
   },
   {
+   "id": "6.1b-readme-htm-exists",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "Post-hoc check of 6.1: `readme.htm` exists in `source/`. The scaffolder always emits one (6.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_HTM_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "6.2-readme-htm-short",
    "band": "yellow-survey",
    "section": "6. Documentation files (`source/`)",
@@ -573,6 +663,21 @@
     "kind": "scaffolderRule",
     "id": "create-welcome-htm"
    }
+  },
+  {
+   "id": "6.3b-welcome-htm-exists",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "Post-hoc check of 6.3: `welcome.htm` exists in `source/` (flat or the `source/welcome/` folder convention). The scaffolder always emits one (6.3); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_WELCOME_HTM_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "6.4-welcome-htm-describes-usage",

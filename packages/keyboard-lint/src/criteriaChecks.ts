@@ -86,6 +86,7 @@ import {
   checkKpjFormatOutdated,
   checkKpjVersionBumped,
 } from "./checks/criteria/check-kpj.js";
+import { checkFileInventory } from "./checks/criteria/check-file-inventory.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -189,6 +190,12 @@ export function runCriteriaChecks(
     findings.push(...checkKpjFormatOutdated(kpjFacts));
     findings.push(...checkKpjVersionBumped(kpjFacts));
   }
+
+  // 1.7b / 1.8b / 1.11b / 1.12b / 3.1b / 6.1b / 6.3b — the file-inventory
+  // twins: pure VFS path-list checks, no parsing. They run in both modes;
+  // for a studio-built keyboard the scaffolder guarantees them, so the
+  // twins double-verify rather than newly constrain.
+  findings.push(...checkFileInventory(filePaths));
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.
