@@ -12,8 +12,10 @@
 //      This is why suppression runs FIRST, not last: the task text's
 //      "filter → slot removals → suppression" order would starve the guard
 //      synthesis of its selector chars.)
-//   2. Slot removals — applyStoreSlotRemovals replaces carved store slots
-//      with nul fillers on the suppressed IR. Suppression-owned guard rules
+//   2. Slot removals — applyStoreSlotRemovals drops carved store slots on the
+//      suppressed IR; a store left empty is removed with the rules that
+//      reference it (re-derived from the start IR each time, so un-carve
+//      needs no restoration record for this stage). Suppression-owned guard rules
 //      are rules, not store entries, so they are unaffected.
 //   3. Whole-node filter — carveFilterIr drops deleted nodes. Rules carrying
 //      ownedByBehaviour (suppression output) are never filter targets: the
@@ -59,6 +61,11 @@ export interface CarvePipelineInput {
 export interface CarvePipelineResult {
   ir: KeyboardIR;
   warnings: string[];
+  /**
+   * Informational slot-removal messages, e.g. which rules were removed because
+   * every slot of a store they reference was carved. Never a problem.
+   */
+  notices: string[];
   /**
    * Partner characters the slot-removal stage dropped only because they are
    * positionally paired with a slot the author chose (see
@@ -145,6 +152,7 @@ export function deriveCarvedIr(
   return {
     ir: filtered,
     warnings: removalResult.warnings,
+    notices: removalResult.notices,
     cascadedRemovals: removalResult.cascaded,
   };
 }
