@@ -41,10 +41,11 @@ Budget: **under 5 s per case** until task T051 measures it. With replay at under
 budgeted at 6 s.
 
 **Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x up to 6 s = about 31-61 s of test time,
-about 30 s if the author is as cheap as replay. The PR lane is a step inside `build` capped at 60 s
-(R3; owner ruling), so the critical path (`fast` then `build`, about 5.1 min measured on #2368's run)
-grows by at most 60 s. Six cases is the ceiling at the 5 s author budget; T051 measures the real cost
-and the set is cut to fit if needed. A seventh shape replaces a weaker one (FR-031).
+about 30 s if the author is as cheap as replay. The PR lane is a step inside `build` (R3) whose cap is
+T051's measurement plus about 50%, rounded up to a whole minute, at most 5 minutes (owner follow-up).
+At the estimate that is a 2-minute cap. The whole PR run (about 5.1 min today without the step) stays
+under 10 minutes and ideally around 6. All six cases stay unless they would push the step past
+5 minutes or the run past 10; a seventh shape replaces a weaker one (FR-031).
 
 **32-case suite (SC-008)**: 25 s + 32 x 6 s = about 3.6 min, under the 10-minute bound.
 
@@ -123,7 +124,7 @@ The group-name fix the `bj_cree_woods` guard protects is `sameGroupName`
 **Decision** (owner, 2026-10-30): **one step inside the existing `build` job** of
 `.github/workflows/ci.yml`, on `pull_request` events, placed after "Build workspace dependencies (PR
 path)" so the corpus checkout, install and `dist` it needs are already there. The step runs one vitest
-invocation and carries `timeout-minutes: 1`:
+invocation and carries a `timeout-minutes` cap (set as below):
 `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`.
 (`driftGuard.test.ts` is not a corpus file; the step names it explicitly, or a second short invocation
 under the default config runs it inside the same capped step.)
@@ -131,13 +132,19 @@ under the default config runs it inside the same capped step.)
 **Rationale**: the `build` job already has the pinned corpus at `../keyboards`, the installed
 workspace and the built `contracts`/`engine` `dist`, so the step pays only vitest's module load (about
 25 s, R1) plus the cases. It is covered by the required `build` check, so no ruleset change. The PR
-critical path (`fast` then `build`, about 5.1 min measured on #2368's run) grows by at most 60 s, to
-about 6 min. `timeout-minutes: 1` makes an overrun fail the run loudly rather than grow it quietly.
+critical path (`fast` then `build`, about 5.1 min measured on #2368's run) grows by at most the cap,
+never more than 5 min; the target is a whole PR run around 6 min, always under 10. The
+`timeout-minutes` cap makes an overrun fail the run loudly rather than grow it quietly.
 
-**Sizing inside the cap**: 60 s - about 25 s module load = about 35 s for cases. Replay is 0.04-0.8 s
-per case (R1); the author's proposal calls are budgeted under 5 s per case until T051 measures them.
-Six cases fit at that budget. If T051 measures more, the set is cut (weakest shape first), never the
-cap raised.
+**Setting the cap** (owner follow-up, 2026-10-30: "5 minutes is fine if needed"): T050 lands the
+step with the ceiling, `timeout-minutes: 5`. T051 then measures the step on CI (module load plus the
+six cases) and sets the cap to that time plus about 50% headroom, rounded up to a whole minute, never
+above 5. At R1's estimate (about 30-60 s) that is 2 minutes. T052 checks three PR runs against that cap
+and against the 10-minute total.
+
+**When to cut the set**: only if keeping all six cases would push the step past 5 minutes or the whole
+PR run past 10 minutes. Otherwise all six stay. Cutting order: weakest shape first, both regression
+guards (`bj_cree_woods`, `basic_kbdfr`) kept.
 
 **Alternatives considered**: (a) a separate `headless-author` job that `build` needs: rejected by the
 owner, it repeats `pnpm install` and the build (about a minute) and puts max(headless, `fast`) + `build`

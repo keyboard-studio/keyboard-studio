@@ -41,7 +41,10 @@
   produced on demand (FR-020); `fallbackPolicy` is tracked by #2366 (FR-060); stacking on
   `106-consistent-keyboard-output` is recorded under Dependencies.
 - Re-run 2026-10-30 after two further owner rulings: the PR lane is one step inside `build`, capped
-  at 60 s (SC-002; the "new job" question is closed), and the harness case definitions are committed as
+  (SC-002; the "new job" question is closed), and the harness case definitions are committed as
   the canonical copy (FR-035; no sparse checkout from `km/2302-walk-zips`). The generated-layout build
   side effect is closed by #2370. Still **zero** [NEEDS CLARIFICATION] markers and no open questions;
   every item above stays checked.
+- Re-run 2026-10-30 after the owner follow-up "5 minutes is fine if needed": the PR-lane cap is set
+  from T051's measurement plus about 50%, rounded up to a whole minute, at most 5 minutes; the set is
+  cut only past 5 minutes for the step or 10 for the run. Zero open markers; all items checked.

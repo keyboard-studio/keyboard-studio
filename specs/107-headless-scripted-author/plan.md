@@ -18,15 +18,16 @@ Three run tiers share one runner:
 
 | Tier | What | Where | Budget |
 |---|---|---|---|
-| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, one step inside the `build` job | at most 60 s added to the critical path (about 5.1 min measured on #2368's run), enforced by `timeout-minutes: 1` (SC-002) |
+| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, one step inside the `build` job | adds at most its `timeout-minutes` cap: T051's measurement + ~50%, rounded up to a whole minute, never above 5 min; whole PR run under 10 min, ideally ~6 (SC-002) |
 | 32-case suite | the committed canonical case file `cases/harness-cases.json` (FR-035) | on demand, and nightly | under 10 min (SC-008) |
 | Wide sweep | eligible slice of `../keyboards` x profiles | weekly schedule, sharded; manual dispatch | not on PRs; failures filed as issues (FR-034) |
 
 Timing is measured, not estimated, for the replay half (research R1). The author half (proposal calls)
 does not exist yet, so its cost is an estimate with a stated ceiling that task T051 measures and that
-gates the PR set's size. The 60 s cap includes vitest's one-time module load (about 25 s measured), which
-leaves about 35 s for cases: six cases fit if the author costs under about 5 s per case. If T051 measures
-more, the set is cut to fit the cap (weakest shape first), never the cap raised.
+sets the step's cap: the measured step time (module load, about 25 s, plus the six cases) plus about 50%
+headroom, rounded up to a whole minute, at most 5 minutes. All six cases stay unless they would push the
+step past 5 minutes or the whole PR run past 10 (about 5.1 min today without the step); only then is the
+set cut, weakest shape first, both regression guards kept.
 
 ## Technical Context
 
@@ -47,7 +48,7 @@ The PR set runs as its own corpus-config invocation in CI (research R3).
 lifts of component logic into pure functions in the studio source.
 
 **Performance Goals**: SC-001 (one case under 60 s cold, under 5 s warm per further case); SC-002
-(PR lane is a `build` step capped at 60 s); SC-008 (32 cases under 10 min).
+(PR lane is a `build` step with a measured cap, at most 5 min); SC-008 (32 cases under 10 min).
 
 **Constraints**: no browser, dev server, port or network (FR-008); deterministic (FR-007); no
 re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
@@ -131,7 +132,7 @@ packages/studio/src/test/headlessAuthor/
 └── driftGuard.test.ts              # FR-011 (no corpus needed; runs in the default config)
 
 packages/studio/src/...       # lifted pure functions next to their components (FR-040)
-.github/workflows/ci.yml      # one new step in the `build` job (PR events), timeout-minutes: 1
+.github/workflows/ci.yml      # one new step in the `build` job (PR events), timeout-minutes from T051 (<= 5)
 .github/workflows/headless-sweep.yml   # scheduled + dispatch: 32 cases nightly, wide sweep weekly
 scripts/file-sweep-issues.mjs # dedupe-and-file for sweep failures
 ```
