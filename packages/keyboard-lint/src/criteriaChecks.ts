@@ -93,6 +93,10 @@ import {
   checkTextContent,
   type TextContentFacts,
 } from "./checks/criteria/check-text-content.js";
+import {
+  checkAttribution,
+  checkRepoContext,
+} from "./checks/criteria/check-repo-context.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -294,6 +298,16 @@ export function runCriteriaChecks(
   findings.push(
     ...checkTextContent(resolveTextFacts(fs, filePaths, keyboardId, keyboardIR, input)),
   );
+
+  // 1.2b / 1.3b / 1.4b / 19.1b / 19.2b + Group C — the /review-only
+  // repo-context checks: pure functions of the ReviewContext. Absent on
+  // the authored and Compare surfaces (those never see the repo); the
+  // assembly names the missing context for the four repo codes.
+  if (input.reviewContext !== undefined) {
+    const repoFacts = { keyboardId, review: input.reviewContext };
+    findings.push(...checkRepoContext(repoFacts));
+    findings.push(...checkAttribution(repoFacts));
+  }
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.

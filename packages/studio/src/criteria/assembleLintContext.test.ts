@@ -354,6 +354,18 @@ describe("assembleLintContext", () => {
       // the finding itself, not a missing input).
       KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
       KM_LINT_PHP_CLOSING_TAGS: "the help .php",
+      // The fixture passes no reviewContext (/review-only), so the four
+      // repo-context codes are honestly named missing (Group A2 Batch 5
+      // + Group C). The §19 rows are applicability-gated, not
+      // input-gated.
+      KM_LINT_REPO_PLACEMENT_BAD:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_ROOT_SOURCE:
+        "the repository context (repo path and file list)",
+      KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
     });
   });
 
@@ -480,6 +492,18 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       KM_LINT_WELCOME_LANG_MISMATCH: "source/welcome.htm",
       KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
       KM_LINT_PHP_CLOSING_TAGS: "the help .php",
+      // The fixture passes no reviewContext (/review-only), so the four
+      // repo-context codes are honestly named missing (Group A2 Batch 5
+      // + Group C). The §19 rows are applicability-gated, not
+      // input-gated.
+      KM_LINT_REPO_PLACEMENT_BAD:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_ROOT_SOURCE:
+        "the repository context (repo path and file list)",
+      KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
     });
 
     const findings = await new KeyboardLintEngine().lintWithContext(

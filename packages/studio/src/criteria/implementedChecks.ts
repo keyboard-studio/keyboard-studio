@@ -165,6 +165,17 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_PHP_HEADER_BAD",
   "KM_LINT_PHP_STYLE_OUTSIDE",
   "KM_LINT_PHP_CLOSING_TAGS",
+  // Group A2 Batch 5 repo-context twins (check-repo-context): post-hoc
+  // checks of the scaffolder-bake repo guarantees — 1.2b/1.3b/1.4b/
+  // 19.1b/19.2b — plus the Group C extraneous-files check, which maps to
+  // the existing layer-c row 1.1 (no twin needed). Pure functions of the
+  // ReviewContext; /review-only.
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_ROOT_SOURCE",
+  "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_PR_ATTRIBUTION_BAD",
+  "KM_LINT_HISTORY_ATTRIBUTION_BAD",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).

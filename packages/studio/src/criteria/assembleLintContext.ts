@@ -64,6 +64,7 @@ import type {
   CriteriaLintInput,
   CriteriaPlacement,
   LinguistInventory,
+  ReviewContext,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { CLDR_TERRITORY_CURRENCY } from "@keyboard-studio/contracts";
@@ -146,6 +147,20 @@ const KPS_METADATA_TWIN_CODES = [
 ];
 
 /**
+ * Group A2 Batch 5 repo-context codes (1.2b/1.3b/1.4b) + the Group C
+ * extraneous-files code (1.1). All four need the reviewContext (repo
+ * path + tree/PR file list); without it each is a named missing input.
+ * (19.1b/19.2b are gated by the adaptation signal instead — see
+ * applicability.ts.)
+ */
+const REPO_CONTEXT_CODES = [
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_ROOT_SOURCE",
+  "KM_LINT_FILES_OUTSIDE_FOLDER",
+];
+
+/**
  * Batch 1 codes whose checks read the parsed keyboard IR. When the .kmn
  * is missing or unparseable these cannot run, so each is named in
  * contextMissing with the missing-IR reason rather than passing
@@ -193,6 +208,13 @@ const MISSING_KPS_TARGETS = "the .kps package file's declared target list";
 export interface AssembleLintContextInput {
   vfs: VirtualFS;
   keyboardId: string;
+  /**
+   * Repository context for the /review-only checks (Batch 5 + Group C).
+   * The /review host sets this; the authored and Compare hosts never do
+   * (they never see the repo). Absent means the four repo-context codes
+   * are named missing, never judged.
+   */
+  reviewContext?: ReviewContext;
   /**
    * A structured linguist inventory, when the caller already has one.
    * The authored host does NOT pass it here: it builds the inventory
@@ -434,6 +456,9 @@ export function assembleLintContext(
     kpsDetailsLicense,
     kpsFollowKeyboardVersion,
     kpsDescription,
+    ...(input.reviewContext !== undefined
+      ? { reviewContext: input.reviewContext }
+      : {}),
     contrastiveRegionAttested: input.contrastiveRegionAttested ?? false,
     ...(kpsDisplayName !== undefined ? { kpsDisplayName } : {}),
     placement: input.placement ?? "release",
@@ -532,6 +557,23 @@ export function assembleLintContext(
   if (!hasPhp) {
     contextMissing["KM_LINT_PHP_STYLE_OUTSIDE"] = "the help .php";
     contextMissing["KM_LINT_PHP_CLOSING_TAGS"] = "the help .php";
+  }
+
+  // Group A2 Batch 5 + Group C: without a reviewContext the repo-context
+  // checks cannot run — name the missing context for the four repo codes.
+  // (19.1b/19.2b are gated by the adaptation signal instead.)
+  if (input.reviewContext === undefined) {
+    for (const code of REPO_CONTEXT_CODES) {
+      contextMissing[code] = "the repository context (repo path and file list)";
+    }
+  }
+  // 19.2b needs HISTORY.md text; without the file the row cannot be
+  // judged (its absence is not the 19.2 violation — that's 3.1b's).
+  if (
+    input.reviewContext !== undefined &&
+    input.reviewContext.historyMd === undefined
+  ) {
+    contextMissing["KM_LINT_HISTORY_ATTRIBUTION_BAD"] = "HISTORY.md";
   }
   if (keyboardIR !== undefined && kpsTargets.length === 0) {
     // §8.13 has nothing to compare without a declared .kps target list

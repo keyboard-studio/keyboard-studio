@@ -14,6 +14,13 @@
   "scaffolderRule": "place-under-release-or-experimental"
  },
  {
+  "id": "1.2b-keyboard-under-release-or-experimental",
+  "section": "1. Repository hygiene",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 1.2: the keyboard folder lives under `release/` or `experimental/`. The scaffolder always places it there (1.2); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_REPO_PLACEMENT_BAD"
+ },
+ {
   "id": "1.3-keyboard-under-organizing-folder",
   "section": "1. Repository hygiene",
   "band": "scaffolder-bake",
@@ -21,11 +28,25 @@
   "scaffolderRule": "place-under-organizing-subfolder"
  },
  {
+  "id": "1.3b-keyboard-under-organizing-folder",
+  "section": "1. Repository hygiene",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 1.3: the keyboard sits under an organizing subfolder (`release/<org>/<id>`). The scaffolder always places it there (1.3); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_REPO_NO_ORGANIZING_FOLDER"
+ },
+ {
   "id": "1.4-no-source-files-at-repo-root",
   "section": "1. Repository hygiene",
   "band": "scaffolder-bake",
   "description": "No source files placed at the repository root",
   "scaffolderRule": "no-root-source-files"
+ },
+ {
+  "id": "1.4b-no-source-files-at-repo-root",
+  "section": "1. Repository hygiene",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 1.4: no source files are placed at the repository root. The scaffolder never places them there (1.4); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_REPO_ROOT_SOURCE"
  },
  {
   "id": "1.5-keyboard-id-not-already-used",
@@ -1286,10 +1307,24 @@
   "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block (adapted-from path, commit SHA, round-trip status, opaque feature inventory). Auto-enforced by the output service at PR submission time."
  },
  {
+  "id": "19.1b-import-attribution-in-pr-body",
+  "section": "19. Import output",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 19.1: when a keyboard was adapted from a release keyboard, the PR body includes the attribution block (adapted-from path, commit SHA, round-trip status). Not applicable without an adaptation signal. This is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_PR_ATTRIBUTION_BAD"
+ },
+ {
   "id": "19.2-import-attribution-in-history-md",
   "section": "19. Import output",
   "band": "scaffolder-bake",
   "scaffolderRule": "emit-import-attribution-history-bullet",
   "description": "When a keyboard was adapted from a release/ keyboard, HISTORY.md must contain an 'Adapted from <sourcePath>' bullet under the 1.0 entry. Auto-enforced by the scaffolder at emit time (D14, mandatory carrier)."
+ },
+ {
+  "id": "19.2b-import-attribution-in-history-md",
+  "section": "19. Import output",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 19.2: when a keyboard was adapted from a release keyboard, HISTORY.md contains an 'Adapted from <sourcePath>' bullet. Not applicable without an adaptation signal. This is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_HISTORY_ATTRIBUTION_BAD"
  }
 ]

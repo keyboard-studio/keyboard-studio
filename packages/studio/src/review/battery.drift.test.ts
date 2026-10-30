@@ -41,7 +41,7 @@ describe("review battery drift", () => {
 
   it("covers every catalog criterion exactly once", () => {
     const fresh = regenerate() as { catalogSize: number; criteria: Array<{ id: string }> };
-    expect(fresh.catalogSize).toBe(183);
+    expect(fresh.catalogSize).toBe(188);
     const ids = fresh.criteria.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
