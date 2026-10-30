@@ -436,11 +436,13 @@ describe("carve shadowing audit: fully-carved any() store", () => {
     "swallow, %s: no unreachable hint; every carved key still swallowed",
     async (_label, ctx) => {
       const ir = fullCarveIr(ctx);
-      const carved = deriveCarvedIr(ir, {
+      const { ir: carved, warnings } = deriveCarvedIr(ir, {
         deletedNodeIds: new Set(),
         deletedItemIds: allIds,
         fallbackPolicy: "swallow",
-      }).ir;
+      });
+      // With the consumer gone the stores may empty: no refuse-to-empty warning.
+      expect(warnings.filter((w) => w.includes("refusing"))).toEqual([]);
       const kmn = emit(carved);
       expect(await unreachableRuleTexts(kmn)).toEqual([]);
       // Each carved key keeps its own guard (swallowed, not host fall-through)
