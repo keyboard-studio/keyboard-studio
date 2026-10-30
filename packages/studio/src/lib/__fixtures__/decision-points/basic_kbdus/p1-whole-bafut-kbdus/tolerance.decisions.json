@@ -1759,15 +1759,7 @@
         "migrationNeeded": false,
         "guardReevaluation": []
       },
-      "contextTolerance": null,
-      "guardSpecification": {
-        "recordId": "guard-specification:asked:swallow",
-        "behaviour": "swallow",
-        "origin": "asked",
-        "confirmed": true,
-        "recordedAt": 1793306638283,
-        "supersedes": null
-      }
+      "contextTolerance": null
     },
     "provenance": "asked"
   },
