@@ -420,25 +420,28 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
     expect(screen.queryByRole('region', { name: 'Suggested to discard' })).toBeNull();
   });
 
-  it('starts with every recommended character discarded, and the bulk toggle restores and re-discards', async () => {
+  it('starts with every recommended character marked (not yet removed); the bulk toggle keeps and re-marks', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set(['a']));
     renderGalleryV2(makeFixtureIR());
 
-    await screen.findByTestId('carve-v2-suggested-group');
-    // Spec 106 FR-042: the suggestion is applied as the default on arrival.
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    const group = await screen.findByTestId('carve-v2-suggested-group');
+    // Spec 106 FR-042: marked by default, removed only on Continue.
+    const cell = () => within(group).getByRole('button', { name: /^C — U\+0043/ });
+    expect(cell().getAttribute('aria-pressed')).toBe('true');
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
 
     const toggleAll = screen.getByTestId('carve-v2-suggested-toggle-all');
     expect(toggleAll.textContent).toBe('Restore all');
 
     fireEvent.click(toggleAll);
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
+    expect(cell().getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toMatch(/Discard all/);
 
     fireEvent.click(screen.getByTestId('carve-v2-suggested-toggle-all'));
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    expect(cell().getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toBe('Restore all');
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
   });
 
   // -------------------------------------------------------------------------
@@ -636,10 +639,11 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     const candidateCell = within(suggestedGroup).getByRole('button', { name: /^ç — U\+00E7/ });
     expect(candidateCell).not.toBeNull();
 
-    // Discarded by the suggested default; one click keeps it.
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(true);
-    fireEvent.click(candidateCell);
+    // Marked by the suggested default (nothing removed yet); one click keeps it.
+    expect(candidateCell.getAttribute('aria-pressed')).toBe('true');
     expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(false);
+    fireEvent.click(candidateCell);
+    expect(candidateCell.getAttribute('aria-pressed')).toBe('false');
   });
 
   // -------------------------------------------------------------------------
@@ -691,10 +695,11 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     });
     expect(candidateCell).not.toBeNull();
 
-    // Discarded by the suggested default; one click keeps it.
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(true);
-    fireEvent.click(candidateCell);
+    // Marked by the suggested default (nothing removed yet); one click keeps it.
+    expect(candidateCell.getAttribute('aria-pressed')).toBe('true');
     expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(false);
+    fireEvent.click(candidateCell);
+    expect(candidateCell.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('does not claim a blocked combination is produced by an advanced rule', async () => {
@@ -1038,62 +1043,7 @@ describe('CarveGalleryV2 — no fallback controls; plain carve review', () => {
 // overridden on a revisit; a default that stops being suggested is restored.
 // ---------------------------------------------------------------------------
 
-describe('CarveGalleryV2 — suggested discards as the default (spec 106 T039)', () => {
-  it('discards the suggested rows on the first visit, as derived removals labelled "click to keep"', async () => {
-    mockFixtureContributors();
-    neededCharsResult.set(new Set(['a']));
-    renderGalleryV2(makeFixtureIR());
-
-    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
-    const cell = within(suggestedGroup).getByRole('button', {
-      name: 'C — U+0043, discarded, suggested — click to keep',
-    });
-    expect(cell.getAttribute('aria-pressed')).toBe('true');
-
-    const suggestion = useWorkingCopyStore.getState().carveSuggestion;
-    const value = currentCarvedLayoutValue();
-    expect(value.removals.length).toBeGreaterThan(0);
-    expect(value.removals.every((r) => r.provenance === 'derived')).toBe(true);
-    expect(value.suggestionFingerprint).toBe('["C"]');
-    expect(isUntouchedSuggestion(value, suggestion)).toBe(true);
-  });
-
-  it('a Keep makes the decision asked, and survives an unmount/remount', async () => {
-    mockFixtureContributors();
-    neededCharsResult.set(new Set(['a']));
-    const first = renderGalleryV2(makeFixtureIR());
-
-    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
-    fireEvent.click(within(suggestedGroup).getByRole('button', { name: /^C — U\+0043/ }));
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
-    expect(
-      isUntouchedSuggestion(currentCarvedLayoutValue(), useWorkingCopyStore.getState().carveSuggestion),
-    ).toBe(false);
-    first.unmount();
-
-    render(<CarveGalleryV2 onComplete={vi.fn()} />);
-    await screen.findByTestId('carve-v2-suggested-group');
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
-  });
-
-  it('restores a default that is no longer suggested (the author kept the letter for convenience)', async () => {
-    mockFixtureContributors();
-    neededCharsResult.set(new Set(['a']));
-    renderGalleryV2(makeFixtureIR());
-
-    await screen.findByTestId('carve-v2-suggested-group');
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
-
-    act(() => {
-      useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: ['C'] });
-    });
-
-    await waitFor(() => expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false));
-    expect(currentCarvedLayoutValue().removals).toEqual([]);
-  });
-});
-
-describe('CarveGalleryV2 — the suggested default stands only once confirmed (spec 106 T039)', () => {
+describe('CarveGalleryV2 — suggested discards are marked, applied on Continue (spec 106 T039)', () => {
   function renderWithNav() {
     const vfs = createVirtualFS();
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
@@ -1103,59 +1053,110 @@ describe('CarveGalleryV2 — the suggested default stands only once confirmed (s
     return { onBack, onComplete };
   }
 
-  it('Back before Continue withdraws the unconfirmed default', async () => {
+  it('marks the suggested rows without removing anything until Continue', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    const { onComplete } = renderWithNav();
+
+    const group = await screen.findByTestId('carve-v2-suggested-group');
+    const cell = within(group).getByRole('button', {
+      name: 'C — U+0043, marked to discard when you continue — click to keep',
+    });
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
+    expect(currentCarvedLayoutValue().removals).toEqual([]);
+
+    fireEvent.click(screen.getByTestId('carve-continue'));
+    expect(onComplete).toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    const value = currentCarvedLayoutValue();
+    expect(value.removals.length).toBeGreaterThan(0);
+    expect(value.removals.every((r) => r.provenance === 'derived')).toBe(true);
+    expect(value.suggestionFingerprint).toBe('["C"]');
+    expect(isUntouchedSuggestion(value, useWorkingCopyStore.getState().carveSuggestion)).toBe(true);
+  });
+
+  it('Back removes nothing and keeps the marks', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set(['a']));
     const { onBack } = renderWithNav();
     await screen.findByTestId('carve-v2-suggested-group');
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
 
     fireEvent.click(screen.getByTestId('carve-back'));
     expect(onBack).toHaveBeenCalled();
     expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
-    expect(useWorkingCopyStore.getState().carveSuggestion).toBeNull();
   });
 
-  it('Continue confirms the default; a later Back leaves it in place', async () => {
+  it('a kept row is not discarded on Continue, the decision is asked, and the keep survives a remount', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set(['a']));
-    const { onComplete } = renderWithNav();
-    await screen.findByTestId('carve-v2-suggested-group');
+    renderWithNav();
+    const group = await screen.findByTestId('carve-v2-suggested-group');
 
+    fireEvent.click(within(group).getByRole('button', { name: /^C — U\+0043/ }));
+    expect(useWorkingCopyStore.getState().carveSuggestion?.kept).toEqual(['C']);
     fireEvent.click(screen.getByTestId('carve-continue'));
-    expect(onComplete).toHaveBeenCalled();
-    const cs = useWorkingCopyStore.getState().carveSuggestion;
-    expect(cs?.confirmed).toEqual(cs?.derived);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
+    expect(
+      isUntouchedSuggestion(currentCarvedLayoutValue(), useWorkingCopyStore.getState().carveSuggestion),
+    ).toBe(false);
 
-    fireEvent.click(screen.getByTestId('carve-back'));
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    cleanup();
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+    const again = await screen.findByTestId('carve-v2-suggested-group');
+    expect(within(again).getByRole('button', { name: /^C — U\+0043/ }).getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('a suggestion arriving after Continue is withdrawn by Back; the approved rows stay', async () => {
+  it('clicking a kept row marks it again', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderGalleryV2(makeFixtureIR());
+    const group = await screen.findByTestId('carve-v2-suggested-group');
+    const cell = () => within(group).getByRole('button', { name: /^C — U\+0043/ });
+
+    fireEvent.click(cell());
+    expect(cell().getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(cell());
+    expect(cell().getAttribute('aria-pressed')).toBe('true');
+    expect(useWorkingCopyStore.getState().carveSuggestion?.kept).toEqual([]);
+  });
+
+  it('after Continue, clicking an applied default restores and keeps it, and the decision becomes asked', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderWithNav();
+    const group = await screen.findByTestId('carve-v2-suggested-group');
+    fireEvent.click(screen.getByTestId('carve-continue'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    expect(
+      within(group).getByRole('button', { name: 'C — U+0043, discarded, suggested — click to keep' }),
+    ).not.toBeNull();
+
+    fireEvent.click(within(group).getByRole('button', { name: /^C — U\+0043/ }));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
+    expect(within(group).getByRole('button', { name: /^C — U\+0043/ }).getAttribute('aria-pressed')).toBe('false');
+    expect(
+      isUntouchedSuggestion(currentCarvedLayoutValue(), useWorkingCopyStore.getState().carveSuggestion),
+    ).toBe(false);
+  });
+
+  it('a default that is no longer suggested is restored on the next Continue', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set(['a']));
     renderWithNav();
     await screen.findByTestId('carve-v2-suggested-group');
     fireEvent.click(screen.getByTestId('carve-continue'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
 
-    const real = recommendedRemovalCharsMock.getMockImplementation();
-    recommendedRemovalCharsMock.mockImplementation(() => [makeRow('C', ['r-shiftc']), makeRow('a', ['r-a'])]);
-    try {
-      // Any session change re-derives the suggestion set; 'a' is new to it.
-      act(() => {
-        useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: ['z'] });
-      });
-      await waitFor(() => expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true));
-
-      fireEvent.click(screen.getByTestId('carve-back'));
-      expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
-      expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
-    } finally {
-      recommendedRemovalCharsMock.mockImplementation(real!);
-    }
+    act(() => {
+      useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: ['C'] });
+    });
+    await waitFor(() => expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull());
+    fireEvent.click(screen.getByTestId('carve-continue'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
   });
 
-  it('Skip keeps everything and confirms an empty default', async () => {
+  it('Skip keeps every suggested character', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set(['a']));
     renderWithNav();
@@ -1163,7 +1164,7 @@ describe('CarveGalleryV2 — the suggested default stands only once confirmed (s
 
     fireEvent.click(screen.getByTestId('carve-skip'));
     expect(currentCarvedLayoutValue().removals).toEqual([]);
-    expect(useWorkingCopyStore.getState().carveSuggestion?.confirmed).toEqual([]);
+    expect(useWorkingCopyStore.getState().carveSuggestion?.kept).toEqual(['C']);
   });
 
   it('the adapter records carved-layout as default when untouched, asked after a Keep', async () => {
@@ -1182,21 +1183,5 @@ describe('CarveGalleryV2 — the suggested default stands only once confirmed (s
     fireEvent.click(within(group).getByRole('button', { name: /^C — U\+0043/ }));
     fireEvent.click(screen.getByTestId('carve-continue'));
     expect(useDecisionStore.getState().decisions['carved-layout']?.provenance).toBe('asked');
-  });
-
-  it("a row the author kept and discarded again is the author's, not the suggestion's", async () => {
-    mockFixtureContributors();
-    neededCharsResult.set(new Set(['a']));
-    renderGalleryV2(makeFixtureIR());
-    const group = await screen.findByTestId('carve-v2-suggested-group');
-
-    fireEvent.click(within(group).getByRole('button', { name: /^C — U\+0043/ }));
-    fireEvent.click(within(group).getByRole('button', { name: /^C — U\+0043/ }));
-    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
-
-    const value = currentCarvedLayoutValue();
-    expect(value.removals.every((r) => r.provenance === 'asked')).toBe(true);
-    expect(isUntouchedSuggestion(value, useWorkingCopyStore.getState().carveSuggestion)).toBe(false);
-    expect(within(group).getByRole('button', { name: 'C — U+0043, discarded' })).not.toBeNull();
   });
 });

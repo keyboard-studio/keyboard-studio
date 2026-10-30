@@ -153,7 +153,12 @@ export function isUntouchedSuggestion(
   value: CarvedLayoutValue,
   suggestion: CarveSuggestionApplied | null,
 ): boolean {
-  if (suggestion === null || suggestion.touched === true || suggestion.derived.length === 0) {
+  if (
+    suggestion === null ||
+    suggestion.touched === true ||
+    (suggestion.kept ?? []).length > 0 ||
+    suggestion.derived.length === 0
+  ) {
     return false;
   }
   return (

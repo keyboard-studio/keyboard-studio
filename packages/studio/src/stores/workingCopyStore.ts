@@ -347,17 +347,20 @@ export type { IdentityPatch } from "./identityPatch.ts";
 // ---------------------------------------------------------------------------
 
 /**
- * The suggested discards the carve gallery applied by default (spec 106
- * FR-042): the fingerprint of the suggestion set, and the removal keys
- * (`kind:id`, survey/carve/carveValue.ts `removalKey`) that applying it added.
+ * The carve gallery's suggested-discard default (spec 106 FR-042). Suggested
+ * characters are only MARKED for discard until the author continues:
+ * `kept` holds the ones the author chose to keep instead, and `derived`
+ * the removal keys (`kind:id`, survey/carve/carveValue.ts `removalKey`)
+ * that Continue applied for the marked ones. `fingerprint` is the
+ * suggestion set at that Continue.
  */
 export interface CarveSuggestionApplied {
   fingerprint: string;
   derived: string[];
-  /** True once the author restored anything (keep, restore all, undo). */
+  /** Suggested characters (NFC) the author chose to keep. */
+  kept?: string[];
+  /** True once the author restored an applied default (keep, restore all, undo). */
   touched?: boolean;
-  /** The derived removal keys the author approved by continuing past carve. */
-  confirmed?: string[];
 }
 
 /**
@@ -375,12 +378,7 @@ function pruneCarveSuggestion(
     ...ids.flatMap((id) => [`item:${id}`, `node:${id}`]),
     ...chars.map((c) => `char:${c.normalize("NFC")}`),
   ]);
-  return {
-    ...cs,
-    derived: cs.derived.filter((k) => !gone.has(k)),
-    ...(cs.confirmed !== undefined ? { confirmed: cs.confirmed.filter((k) => !gone.has(k)) } : {}),
-    touched: true,
-  };
+  return { ...cs, derived: cs.derived.filter((k) => !gone.has(k)), touched: true };
 }
 
 export interface WorkingCopyState {
@@ -723,12 +721,10 @@ export interface WorkingCopyState {
   declineDisplacement: (key: string) => void;
 
   /**
-   * The carve gallery's suggested discards, once applied as a default on
-   * its first visit (spec 106 FR-042): the suggestion fingerprint and the
-   * removal keys applying it added. The gallery re-applies only when the
-   * fingerprint changes, so a returning author's Keep is never overridden;
-   * the carved-layout value reads `derived` provenance from it. Null until
-   * a suggestion has been applied.
+   * The carve gallery's suggested-discard default (spec 106 FR-042): which
+   * suggested characters the author kept, and which removals Continue
+   * applied for the marked ones. The carved-layout value reads `derived`
+   * provenance from it. Null until the author first acts on carve.
    */
   carveSuggestion: CarveSuggestionApplied | null;
 
@@ -2021,7 +2017,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       carveSuggestion:
         s.carveSuggestion === null
           ? null
-          : { ...s.carveSuggestion, derived: [], confirmed: [], touched: true },
+          : { ...s.carveSuggestion, derived: [], touched: true },
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),

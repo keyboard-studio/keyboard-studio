@@ -204,7 +204,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     // confirm. No search box to narrow through (#1619 AC4 removed it).
     const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
     await expect(targetCell).toBeVisible();
-    // Spec 106 FR-042: a suggested discard arrives already discarded.
+    // Spec 106 FR-042: a suggested discard arrives marked (Continue applies it).
     if ((await targetCell.getAttribute("aria-pressed")) !== "true") {
       await targetCell.click();
     }
@@ -360,7 +360,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     await expect(carveGallery).toBeVisible({ timeout: 30_000 });
 
     // Confirm the target cell is present and kept — the "nothing carved"
-    // control path. Spec 106 FR-042: if it arrived as a suggested discard
+    // control path. Spec 106 FR-042: if it arrived marked as a suggested discard
     // (the carve default), one click keeps it.
     const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`).first();
     await expect(targetCell).toBeVisible();
