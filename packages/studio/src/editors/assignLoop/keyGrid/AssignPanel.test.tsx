@@ -26,7 +26,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
-import type { GuardSpecification, IRRule, KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { IRRule, KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS, TOUCH_JOIN_STORES } from "@keyboard-studio/contracts/fixtures";
 import { touchKeyAddress } from "@keyboard-studio/engine";
@@ -95,16 +95,6 @@ function withCapsHandlingFor(ir: KeyboardIR, keyId: string): KeyboardIR {
   };
 }
 
-/** Spec 104 FR-013: the guard path exists only under a "swallow" specification. */
-const SWALLOW_SPEC: GuardSpecification = {
-  recordId: "guard-specification:asked:swallow",
-  behaviour: "swallow",
-  origin: "asked",
-  confirmed: true,
-  recordedAt: 1,
-  supersedes: null,
-};
-
 function defaultProps(overrides: {
   ir?: KeyboardIR;
   ruleIndex?: TouchKeyRuleIndex;
@@ -112,7 +102,6 @@ function defaultProps(overrides: {
   selectedCell?: KeyGridCellViewModel | null;
   repertoire?: readonly string[];
   capsHandled?: boolean;
-  guardSpecification?: GuardSpecification;
   onCommit?: (result: AssignPanelCommitResult) => void;
 } = {}) {
   const ir = overrides.ir ?? makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true });
@@ -126,9 +115,6 @@ function defaultProps(overrides: {
     inventoryChars: [],
     capsHandled: overrides.capsHandled ?? false,
     repertoire: overrides.repertoire ?? [" ", ".", ","],
-    ...(overrides.guardSpecification !== undefined
-      ? { guardSpecification: overrides.guardSpecification }
-      : {}),
     onCommit: overrides.onCommit ?? vi.fn(),
   };
 }
@@ -226,9 +212,9 @@ describe("AssignPanel — the field accepts either form", () => {
 
 describe("AssignPanel — the combining-mark guard path (US2 AS4)", () => {
   it("renders the guard rule immediately before the producing rule, reusing the existing guard store", () => {
-    // Spec 104 FR-013 supersedes spec 063's always-guarded default: this
-    // path is reached under a recorded "swallow" guard specification.
-    const props = defaultProps({ guardSpecification: SWALLOW_SPEC });
+    // #2374: the guard pair shows for a combining mark whose "start of
+    // line" box is unticked (the default — no box map here).
+    const props = defaultProps();
     render(<AssignPanel {...props} />);
 
     fireEvent.change(charField(), { target: { value: "U+0300" } });
@@ -244,7 +230,7 @@ describe("AssignPanel — the combining-mark guard path (US2 AS4)", () => {
 
   it("says plainly when no guard store can be minted, rather than offering a write that will fail", () => {
     const ir = withoutGuardStore(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
-    const props = defaultProps({ ir, ruleIndex: buildTouchKeyRuleIndex(ir), layout: ir.touchLayout, repertoire: [], guardSpecification: SWALLOW_SPEC });
+    const props = defaultProps({ ir, ruleIndex: buildTouchKeyRuleIndex(ir), layout: ir.touchLayout, repertoire: [] });
     render(<AssignPanel {...props} />);
 
     fireEvent.change(charField(), { target: { value: "U+0300" } });

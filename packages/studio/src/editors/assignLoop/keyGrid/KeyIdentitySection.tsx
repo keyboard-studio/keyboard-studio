@@ -14,8 +14,9 @@
  *      fallback-supplied productions marked — inside a disclosure CLOSED BY
  *      DEFAULT (FR-025: panel height is a functional constraint);
  *  (c) the identity-decision provenance: the spine records for this key,
- *      the guard specification when one governs it, and the transplant
- *      record when its rules were copied from a physical key.
+ *      the start-of-line box state when the key types a combining mark,
+ *      and the transplant record when its rules were copied from a
+ *      physical key.
  *
  * Plus the FR-029 action (T020b): when the view model offers a re-link
  * (a completed transplant whose arm 0 holds again), the author can invoke
@@ -237,29 +238,22 @@ export function KeyIdentitySection({ info, onRelink }: KeyIdentitySectionProps) 
         </table>
       </details>
 
-      {/* The guard specification, when one governs this keyboard's marks. */}
-      {info.guard !== undefined && (
+      {/* The key's combining-mark "start of line" box state (#2374): the
+          per-mark replacement for the retired guard specification. Present
+          only when the key types a combining mark and the caller supplied
+          the box map. */}
+      {info.bareMarkAllowed !== undefined && (
         <>
           <span style={PANEL_LABEL_STYLE}>
-            {i18n._("editor.assignLoop.keyGrid.identity.guardLabel")}
+            {i18n._("editor.assignLoop.keyGrid.identity.startOfLineLabel")}
           </span>
           <span style={PANEL_SPAN_STYLE}>
             {/* Ternary outside i18n._ — see the hostsLabel note above:
                 the extractor cannot see ids chosen inside the call. */}
-            {info.guard.behaviour === "emit"
-              ? i18n._("editor.assignLoop.keyGrid.identity.guardValue.emit")
-              : i18n._("editor.assignLoop.keyGrid.identity.guardValue.swallow")}
+            {info.bareMarkAllowed
+              ? i18n._("editor.assignLoop.keyGrid.identity.startOfLineValue.allowed")
+              : i18n._("editor.assignLoop.keyGrid.identity.startOfLineValue.blocked")}
           </span>
-          {info.guard.origin === "seeded-from-import" && (
-            <span style={PANEL_HINT_STYLE}>
-              {i18n._("editor.assignLoop.keyGrid.identity.guardSeeded")}
-            </span>
-          )}
-          {!info.guard.confirmed && (
-            <span style={PANEL_HINT_STYLE}>
-              {i18n._("editor.assignLoop.keyGrid.identity.guardUnconfirmed")}
-            </span>
-          )}
         </>
       )}
 

@@ -135,12 +135,17 @@ export function latestLive<T extends { recordId: string; supersedes: string | nu
  * replacement for the keyboard-wide guard specification): the box is
  * unticked, or the mark has no box at all (a late-added mark with no
  * survey row takes the unticked default — guarded, blocked).
+ *
+ * The mark may arrive in keycap form (dotted circle + mark, e.g. "◌̀");
+ * the box map is keyed by the bare mark, so the dotted circle is stripped
+ * before the lookup — otherwise a ticked box would silently never apply.
  */
 export function swallowGuardInForce(
   mark: string,
   bareMarkAllowedByMark?: BareMarkAllowedByMark,
 ): boolean {
-  return bareMarkAllowedByMark?.[mark] !== true;
+  const bare = mark.replace(/\u25CC/g, "");
+  return bareMarkAllowedByMark?.[bare] !== true;
 }
 
 /** Append a repair proposal, superseding the live proposal for the same key. */
