@@ -632,13 +632,19 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      # PR lane: the quick slice only. `touch-key-identity.spec.ts:264` is
-      # spec 104 walk 1 (file:line filter; if that test moves, Playwright
-      # finds nothing and the step fails loudly rather than skipping).
+      # PR lane: the quick slice only. Spec 104 walk 1 is selected by its
+      # describe title ("spec 104 walk 1:"), never by line number, so edits
+      # above it cannot retarget the filter. Both commands always run and the
+      # step fails if either did; a title that matches nothing makes
+      # Playwright exit non-zero ("No tests found"), so a rename fails loudly.
       - name: Playwright (PR quick slice - boot-smoke + decision-store-reload + spec 104 walk 1)
         id: pw_pr
         if: ${{ github.event_name == 'pull_request' }}
-        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload touch-key-identity.spec.ts:264
+        run: |
+          rc=0
+          pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload || rc=1
+          pnpm --filter @keyboard-studio/studio test:e2e --project=desktop touch-key-identity --grep "spec 104 walk 1:" || rc=1
+          exit $rc
 
       # Full set (nightly schedule, push to main, workflow_dispatch):
       # boot-smoke + copy-edit + spec 088 live gate + spec 104 walks.
