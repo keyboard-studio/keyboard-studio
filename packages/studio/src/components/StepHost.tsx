@@ -34,7 +34,6 @@ import type { ReactNode, CSSProperties } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { diffWorkToDo } from "../steps/workToDo.ts";
 import { useWorkToDo } from "../hooks/useWorkToDo.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
@@ -46,20 +45,12 @@ import {
   type ActiveStepId,
 } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { getDecisionSnapshot, selectTouchSeedSource, selectTrack, useDecisionStore } from "../stores/decisionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
-import type { DecisionId } from "../decisions/decisionTypes.ts";
 import { manifest as defaultManifest } from "../steps/manifest.ts";
 import type { EditorStep, Step } from "../steps/types.ts";
-import {
-  applyDecisionEffects,
-  applyStepCompletion,
-  recordAnswersAsDecisions,
-  recordStepCompletion,
-  type ReducerDeps,
-} from "../steps/reducer.ts";
-import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
+import type { ReducerDeps } from "../steps/reducer.ts";
+import { completeStep } from "../lib/completeStep.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
 import { JumpContext, type JumpToScreen } from "../lib/jumpContext.ts";
@@ -82,21 +73,6 @@ import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 import type { SurveyContext } from "../steps/types.ts";
 import { ACCENT, ERROR_RED, TEXT_DIM, BORDER } from "../ui/theme.ts";
 import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
-
-// ---------------------------------------------------------------------------
-// isSurveyPhaseResult — shape guard for the generic completion path.
-// Guards recordPhase + applyDecisionEffects — these are only called when
-// the result is SurveyPhaseResult-shaped (phase: string, answers: array).
-// ---------------------------------------------------------------------------
-
-function isSurveyPhaseResult(r: unknown): r is SurveyPhaseResult {
-  return (
-    typeof r === "object" &&
-    r !== null &&
-    typeof (r as { phase?: unknown }).phase === "string" &&
-    Array.isArray((r as { answers?: unknown }).answers)
-  );
-}
 
 // ---------------------------------------------------------------------------
 // StepHostProps
@@ -521,70 +497,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // never wrong.
     pendingBeforeRef.current = { workToDo, visited: useSurveySessionStore.getState().visited };
 
-    // 1. If SurveyPhaseResult-shaped: recordPhase, record the completion's
-    //    decisions, then run their effects (spec 089 contract A6 — recording
-    //    precedes applying, so an apply composes from a decision set that
-    //    includes its own completion's records).
-    if (isSurveyPhaseResult(result)) {
-      // spec 079 D-4: the step owns its own answers within the phase slot.
-      recordPhase(result, { stepId: resolvedStep.id });
-      // Spec 088 FR-003 (contract C-2): the same completion writes one
-      // decision record per provided decision into the decision store.
-      recordAnswersAsDecisions(result, resolvedStep.id, reducerDeps);
-      // Spec 089 FR-001/FR-002: run each answered module's apply()
-      // unconditionally through the checked patch sink.
-      applyDecisionEffects(result, reducerDeps);
-      // Spec 093 T009: the recorded change recalculates its downstream
-      // closure and the working copy is rebuilt by replay from the
-      // checkpoint before the first changed decision — the rebuilt
-      // state installs over the incremental applies above, so what the
-      // author continues from is the derived working copy. A no-op when
-      // the host wired no rebuild (pre-093 behaviour) or when this
-      // completion recorded no decisions.
-      if (reducerDeps.rebuildFromDecisions !== undefined) {
-        const changed: DecisionId[] = [];
-        for (const answer of result.answers) {
-          const mod = questionRegistry[answer.questionId];
-          if (mod?.provides !== undefined) changed.push(...mod.provides);
-        }
-        if (changed.length > 0) reducerDeps.rebuildFromDecisions(changed);
-      }
-    }
-
-    // 2. If step has reducer side effects: applyStepCompletion.
-    //    Data-driven via STEPS_WITH_APPLY_COMPLETION (R7 effect table).
-    if (STEPS_WITH_APPLY_COMPLETION.has(resolvedStep.id)) {
-      applyStepCompletion(resolvedStep.id, result, reducerDeps);
-    }
-
-    // 2b. Decision audit (spec 053). AFTER the reducer, so an editor step's
-    //     summary reads the working-copy state the step's own side effects just
-    //     produced. Called for every step — unlike step 2 this is deliberately
-    //     NOT gated on the effect table, because FR-001 records every survey
-    //     answer, and most question steps have no reducer side effect at all.
-    //     A no-op when no recorder is injected (see ReducerDeps.recordDecision).
-    recordStepCompletion(resolvedStep.id, result, reducerDeps);
-
-    // 3. Pure advance policy → next step + optional signals.
-    //    Read the track and identity support from the decision snapshot —
-    //    NOT from a render-time closure: the completion above has just
-    //    recorded this step's decisions, so the snapshot already holds the
-    //    post-completion values.
-    // Spec 088 FR-004/FR-005: routing reads the decision store. The track
-    // and seed values are selectors over the store snapshot (the session
-    // fields they used to be read from are deleted), and the snapshot
-    // itself is the gate set advance() evaluates.
-    const decisions = getDecisionSnapshot();
-    // resolvedStep.id is StepBase.id (string). The manifest guarantees all step
-    // ids are valid ActiveStepId values, so the cast is safe. advance() is
-    // defined in advance.ts with a local ActiveStepId mirror — not imported from
-    // stores/ (depcruise boundary preserved).
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
-      decisions,
-      selectedTrack: selectTrack(decisions),
-      identitySupported: deriveIdentityResult(decisions)?.supported ?? true,
-      touchSeedSource: selectTouchSeedSource(decisions),
+    // 1-3. The generic completion path (record, effects, reducer, audit,
+    //      advance policy) — lifted into lib/completeStep.ts (spec 107
+    //      FR-040) so the headless author runs the same code.
+    const outcome = completeStep(resolvedStep.id, result, reducerDeps, {
+      recordPhase,
       allCharactersImplemented,
     });
 

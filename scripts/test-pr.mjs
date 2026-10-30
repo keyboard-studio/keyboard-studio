@@ -52,6 +52,8 @@ const CURATED_CORE = {
     "src/survey/PhaseFContactSeed.integration.test.tsx",
     "src/steps/stepOrder.parity.test.ts",
     "tests/survey/flow-parity.test.ts",
+    // Spec 107 FR-014: the headless-author non-divergence boundary runs on every PR.
+    "src/test/headlessAuthor/boundary.test.ts",
   ],
 };
 

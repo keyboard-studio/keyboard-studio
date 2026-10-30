@@ -96,7 +96,9 @@ export type FailureKind =
   | "placeholder-clash"
   | "network-required"
   | "scaffold-failed"
-  | "compile-failed";
+  | "compile-failed"
+  // The routing stayed on a step (the Phase F hard gate refusing to advance).
+  | "step-blocked";
 
 export interface RunFailure {
   step: string;

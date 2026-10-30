@@ -19,5 +19,195 @@
 // mock, direct store write or second step list. boundary.test.ts and the
 // depcruise rule `product-not-to-headless-author` enforce this.
 //
+// The walk: instantiate the copied keyboard exactly as the decision-point
+// replay does, then from `identity` hand each step to its driver and complete
+// it through lib/completeStep.ts -- the code StepHost's onComplete runs, with
+// the reducer deps StudioShell injects (lib/studioReducerDeps.ts) -- and move
+// the session to whatever step `advance` names. No step list: the order is the
+// product's routing. After the last step, the decisions the walk recorded go to
+// spec 106's replay (buildDecisionPointFixture: rebuild, download path,
+// compile, gates), the one projection (FR-005).
+//
 // Playwright-only (FR-042): none yet.
-export {};
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { DecisionPoint } from "../decisionPointBases.ts";
+import { parseKps } from "@keyboard-studio/engine";
+import { manifest } from "../../steps/manifest.ts";
+import { bindManifest, useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { getDecisionSnapshot } from "../../stores/decisionStore.ts";
+import { completeStep } from "../../lib/completeStep.ts";
+import { deriveInventoryCoverageGate } from "../../lib/inventoryDiff.ts";
+import {
+  clearTouchSeedChoice,
+  createStudioRecordDecision,
+  createStudioReducerDeps,
+  createStudioSnapshotter,
+} from "../../lib/studioReducerDeps.ts";
+import { buildDecisionPointFixture, instantiate, type DecisionPointFixtureSpec } from "../decisionPointFixture.ts";
+import { ownerOf } from "../decisionPointKnownGaps.ts";
+import { CORPUS } from "../sc004Harness.ts";
+import type { AuthorRun, Case, RunFailure } from "./caseTypes.ts";
+import { eligibility, type Slice } from "./eligibility.ts";
+import { createRunReport } from "./runReport.ts";
+import { readRunRecord } from "./recordWriter.ts";
+import { resetAuthorStores } from "./resetStores.ts";
+import type { DriverContext, StepDrivers } from "./stepDrivers/types.ts";
+import { identityDrivers } from "./stepDrivers/identity.ts";
+import { windowsLayoutDrivers } from "./stepDrivers/windowsLayout.ts";
+import { trackDrivers } from "./stepDrivers/track.ts";
+import { inventoryDrivers } from "./stepDrivers/inventory.ts";
+import { marksDrivers } from "./stepDrivers/marks.ts";
+import { convenienceDrivers } from "./stepDrivers/convenience.ts";
+import { carveDrivers } from "./stepDrivers/carve.ts";
+import { mechanismDrivers } from "./stepDrivers/mechanism.ts";
+import { touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
+import { capsDrivers } from "./stepDrivers/caps.ts";
+
+export interface AuthorRunOptions {
+  /** Eligibility slice for sweeps. Default: no slice filter (US1). */
+  slice?: Slice;
+  /** Decision point the gates are evaluated at. Default: every decision (`tolerance`). */
+  stopAfter?: DecisionPoint;
+}
+
+/** Dispatch by manifest step id. Which step comes next is the routing's call, never this table's. */
+const DRIVERS: StepDrivers = {
+  ...identityDrivers,
+  ...windowsLayoutDrivers,
+  ...trackDrivers,
+  ...inventoryDrivers,
+  ...marksDrivers,
+  ...convenienceDrivers,
+  ...carveDrivers,
+  ...mechanismDrivers,
+  ...touchSeedDrivers,
+  ...capsDrivers,
+};
+
+const TERMINALS = new Set(["done", "unsupported"]);
+
+/** The routing visits each step a bounded number of times; more means it is stuck. */
+const MAX_STEP_VISITS = 64;
+
+class StepFailure extends Error {
+  constructor(readonly failure: RunFailure) {
+    super(failure.detail);
+  }
+}
+
+const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** Script and display name as the product's .kps reader gives them (case fields win). */
+function kpsInfo(c: Case): { script: string; displayName: string } {
+  const kps = parseKps(readFileSync(join(CORPUS, c.group, c.base, "source", `${c.base}.kps`), "utf8"));
+  return { script: c.script ?? kps.script ?? "", displayName: kps.displayName || c.base };
+}
+
+async function walk(ctx: DriverContext): Promise<void> {
+  const reducerDeps = createStudioReducerDeps({
+    instantiateFromStart: useWorkingCopyStore.getState().instantiateFromStart,
+    clearTouchSeedChoice,
+    recordDecision: createStudioRecordDecision(createStudioSnapshotter()),
+  });
+
+  let step: string = useSurveySessionStore.getState().activeStepId;
+  for (let visits = 0; !TERMINALS.has(step); visits++) {
+    if (visits >= MAX_STEP_VISITS) {
+      throw new StepFailure({ step, kind: "step-blocked", detail: `routing did not finish in ${MAX_STEP_VISITS} steps` });
+    }
+    const driver = DRIVERS[step];
+    if (driver === undefined) {
+      throw new StepFailure({ step, kind: "step-blocked", detail: `no driver for step "${step}"` });
+    }
+
+    let result: unknown;
+    try {
+      result = await driver(ctx);
+    } catch (e) {
+      if (e instanceof StepFailure) throw e;
+      throw new StepFailure({ step, kind: "proposal-threw", detail: message(e) });
+    }
+
+    const wc = useWorkingCopyStore.getState();
+    const outcome = completeStep(step, result, reducerDeps, {
+      recordPhase: wc.recordPhase,
+      allCharactersImplemented: !deriveInventoryCoverageGate(wc).blocked,
+    });
+    if (outcome.next === step) {
+      throw new StepFailure({ step, kind: "step-blocked", detail: `advance() stayed on "${step}"` });
+    }
+
+    // StepHost steps 4-5: the session moves on through its own actions.
+    const session = useSurveySessionStore.getState();
+    session.advance(outcome.next);
+    if (outcome.setCharactersSubStage !== undefined) session.setCharactersSubStage(outcome.setCharactersSubStage);
+    step = outcome.next;
+  }
+}
+
+export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promise<AuthorRun> {
+  resetAuthorStores();
+  const report = createRunReport(useWorkingCopyStore.getState().fallbackPolicy);
+  const base = { caseId: c.id, gates: [], report: report.report };
+
+  try {
+    const elig = eligibility(c.base, opts.slice ?? "all-eligible");
+    if (!elig.eligible) return { ...base, outcome: "skipped", skipReason: elig.reason };
+
+    const authorStart = performance.now();
+    const { script, displayName } = kpsInfo(c);
+    const spec: DecisionPointFixtureSpec = {
+      base: c.base,
+      group: elig.group,
+      script,
+      displayName,
+      track: c.track,
+      point: opts.stopAfter ?? "tolerance",
+      decisions: {},
+    };
+
+    let startIr;
+    try {
+      bindManifest(manifest);
+      startIr = instantiate(spec);
+    } catch (e) {
+      return { ...base, outcome: "failed", failure: { step: "choose_base", kind: "scaffold-failed", detail: message(e) } };
+    }
+
+    try {
+      await walk({ case: c, startIr, report });
+    } catch (e) {
+      if (e instanceof StepFailure) return { ...base, outcome: "failed", failure: e.failure };
+      throw e;
+    }
+    const decisions = getDecisionSnapshot();
+    const record = readRunRecord();
+    const replayStart = performance.now();
+
+    let fx;
+    try {
+      fx = await buildDecisionPointFixture({ ...spec, decisions });
+    } catch (e) {
+      return {
+        ...base,
+        outcome: "failed",
+        record,
+        decisions,
+        failure: { step: "output", kind: "compile-failed", detail: message(e) },
+      };
+    }
+    const end = performance.now();
+    report.setTiming({ author: Math.round(replayStart - authorStart), replay: Math.round(end - replayStart) });
+    for (const g of fx.gates) {
+      const owner = g.pass ? undefined : ownerOf(c.base, spec.point, g.gate);
+      if (owner !== undefined) report.addKnownGap({ gate: g.gate, owner });
+    }
+
+    return { ...base, outcome: "completed", record, decisions, bundle: fx.bundle, gates: fx.gates };
+  } finally {
+    resetAuthorStores();
+  }
+}

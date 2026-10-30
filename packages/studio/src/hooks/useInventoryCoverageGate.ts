@@ -20,11 +20,8 @@
 import { useMemo } from "react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useInventoryDiff } from "./useInventoryDiff.ts";
-import {
-  inventoryCoverageGate,
-  selectDesktopAssignments,
-  type InventoryCoverageGate,
-} from "../lib/unimplementedInventory.ts";
+import { selectDesktopAssignments, type InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
+import { coverageGateFrom } from "../lib/inventoryDiff.ts";
 
 export function useInventoryCoverageGate(): InventoryCoverageGate {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -50,12 +47,9 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
 
   return useMemo(
     () =>
-      inventoryCoverageGate({
-        desktopAssignments,
-        lettersToAdd,
+      coverageGateFrom(desktopAssignments, { lettersToAdd, producedSet }, {
         touchLayoutJson,
         confirmedInventory,
-        desktopProducedSet: producedSet,
         ...(alphabet !== undefined ? { alphabet } : {}),
         ...(marksWorklist !== undefined ? { marksWorklist } : {}),
       }),

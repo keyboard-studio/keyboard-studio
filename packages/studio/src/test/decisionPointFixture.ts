@@ -36,7 +36,7 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { resetRebuildTrail, rebuildWorkingCopyFromStores } from "../decisions/rebuildWorkingCopy.ts";
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
-import { buildOutputBundle } from "../lib/buildOutputBundle.ts";
+import { buildOutputBundle, type OutputBundle } from "../lib/buildOutputBundle.ts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { analyseContextTolerance } from "../lib/contextToleranceAnalysis.ts";
 import { applyContextToleranceDecision } from "../lib/contextToleranceApply.ts";
@@ -69,6 +69,8 @@ export interface DecisionPointFixture {
   simulate(keys: SimKeyInput[], seed?: SimulatorContextSeed): SimulationResult;
   /** The starting keyboard's IR, for fidelity comparisons. */
   startIr: KeyboardIR;
+  /** The download-path bundle the gates were checked on (spec 107 FR-006). */
+  bundle: OutputBundle;
 }
 
 function resetStores(): void {
@@ -81,8 +83,9 @@ function resetStores(): void {
 /**
  * Instantiate the way the open-base run does: the loader's asset clean-up, parse,
  * pattern recognition and the base's touch layout, then the track's entry point.
+ * Shared with the headless author (spec 107 T013), which instantiates the same way.
  */
-function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
+export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
   const vfs = loadVfs({ id: spec.base, group: spec.group });
   const kmnPath = `source/${spec.base}.kmn`;
   const fetched = readVfsText(vfs, kmnPath);
@@ -218,5 +221,6 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     gates,
     simulate: (keys, seed) => simulate(compiled, keys, seed),
     startIr,
+    bundle,
   };
 }
