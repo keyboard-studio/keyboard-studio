@@ -7,13 +7,14 @@
 // VFS the author downloads. It never calls projectWorkingCopyVfs with
 // hand-built options, so a fixture cannot drift from the product.
 //
-// Limitation recorded here: `fallbackPolicy` is in no decision value and not in
-// the record (survey/carve/carveValue.ts), so every fixture runs with the store
-// default. A walk that changed it is not reproduced.
+// `fallbackPolicy` is in no decision value (survey/carve/carveValue.ts), so a
+// spec carries it separately. A spec that omits it runs with the store default,
+// which is what every recorded walk before this field ran with.
 
 import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import type {
   CompileResult,
+  FallbackPolicy,
   KeyboardIR,
   MechanismAssignment,
   SimKeyInput,
@@ -59,6 +60,8 @@ export interface DecisionPointFixtureSpec {
   point: DecisionPoint;
   /** Already cut at `point` (see recordToDecisionSet). */
   decisions: DecisionSet;
+  /** The keyboard-wide carve fallback policy the walk ended with. Default: the store's. */
+  fallbackPolicy?: FallbackPolicy;
 }
 
 export interface DecisionPointFixture {
@@ -179,6 +182,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
 
   // 5. install what replay leaves elsewhere.
   installUnreplayedSlices(spec.decisions);
+  if (spec.fallbackPolicy !== undefined) useWorkingCopyStore.getState().setFallbackPolicy(spec.fallbackPolicy);
   if (spec.point === "tolerance") await installToleranceOverlay(spec.decisions);
 
   // 6. the real download path.
