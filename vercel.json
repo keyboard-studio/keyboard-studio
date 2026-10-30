@@ -4,15 +4,42 @@
   "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "outputDirectory": "packages/studio/dist",
   "rewrites": [
-    { "source": "/oauth/exchange", "destination": "/api/oauth/exchange" },
-    { "source": "/oauth/refresh", "destination": "/api/oauth/refresh" },
-    { "source": "/oauth/google/exchange", "destination": "/api/oauth/google/exchange" },
-    { "source": "/oauth/health", "destination": "/api/oauth/health" },
-    { "source": "/submit/managed-pr", "destination": "/api/submit/managed-pr" },
-    { "source": "/drafts/content", "destination": "/api/drafts/content" },
-    { "source": "/drafts", "destination": "/api/drafts" },
-    { "source": "/report/crash/retract", "destination": "/api/report/crash-retract" },
-    { "source": "/report/crash", "destination": "/api/report/crash" },
+    {
+      "source": "/oauth/exchange",
+      "destination": "/api/oauth/exchange"
+    },
+    {
+      "source": "/oauth/refresh",
+      "destination": "/api/oauth/refresh"
+    },
+    {
+      "source": "/oauth/google/exchange",
+      "destination": "/api/oauth/google/exchange"
+    },
+    {
+      "source": "/oauth/health",
+      "destination": "/api/oauth/health"
+    },
+    {
+      "source": "/submit/managed-pr",
+      "destination": "/api/submit/managed-pr"
+    },
+    {
+      "source": "/drafts/content",
+      "destination": "/api/drafts/content"
+    },
+    {
+      "source": "/drafts",
+      "destination": "/api/drafts"
+    },
+    {
+      "source": "/report/crash/retract",
+      "destination": "/api/report/crash-retract"
+    },
+    {
+      "source": "/report/crash",
+      "destination": "/api/report/crash"
+    },
     {
       "source": "/kbd-proxy/:path*",
       "destination": "https://raw.githubusercontent.com/keyboard-studio/keyboards/master/:path*"
@@ -21,15 +48,31 @@
       "source": "/local-kbd-proxy/:path*",
       "destination": "https://raw.githubusercontent.com/keyboard-studio/keyboards/master/:path*"
     },
-    { "source": "/assets/:path*", "destination": "/assets/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/assets/:path*",
+      "destination": "/assets/:path*"
+    },
+    {
+      "source": "/review-proxy/:owner/:repo/:sha/:path*",
+      "destination": "https://raw.githubusercontent.com/:owner/:repo/:sha/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" }
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'"
+        }
       ]
     }
   ]

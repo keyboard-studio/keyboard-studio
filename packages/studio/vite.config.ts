@@ -71,6 +71,14 @@ export default defineConfig({
         rewrite: (path) =>
           path.replace(/^\/kbd-proxy/, "/keyboard-studio/keyboards/master"),
       },
+      // /review Health Check: sha-pinned snapshot fetches —
+      // /review-proxy/<owner>/<repo>/<sha>/<path> → raw.githubusercontent.
+      // Mirrors the vercel.json prod rewrite so dev/prod stay consistent.
+      "/review-proxy": {
+        target: "https://raw.githubusercontent.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/review-proxy/, ""),
+      },
     },
   },
 });

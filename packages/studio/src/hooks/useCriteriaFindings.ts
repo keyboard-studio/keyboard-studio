@@ -76,21 +76,8 @@ import { useDocumentationFindings } from "./useDocumentationFindings.ts";
  * first: their `origin: "upstream"` reclassification is preserved if the
  * engine ever reports the same problem.
  */
-export function mergeLintFindings(
-  ...groups: readonly (readonly LintFinding[])[]
-): LintFinding[] {
-  const seen = new Set<string>();
-  const merged: LintFinding[] = [];
-  for (const group of groups) {
-    for (const finding of group) {
-      const key = `${finding.code}\0${finding.message}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(finding);
-    }
-  }
-  return merged;
-}
+import { mergeLintFindings } from "../criteria/mergeFindings.ts";
+export { mergeLintFindings };
 
 export interface CriteriaFindings {
   /** Doc + engine findings, merged and deduped by (code, message). */
