@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Headless scripted author for decision walks",
+  "branch": "107-headless-scripted-author",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-30T16:27:02.401Z"
+    }
+  ],
+  "telemetryInstanceId": "a001690e-6f0c-4ed0-9733-e255e6e3184f"
+}

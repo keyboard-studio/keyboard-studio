@@ -1,0 +1,369 @@
+# Feature Specification: Headless scripted author for decision walks
+
+**Feature Branch**: `107-headless-scripted-author` (cut from `origin/main`; implementation builds on the spec 106 US1 replay stack, see Assumptions)
+
+**Created**: 2026-10-30
+
+**Status**: Draft
+
+**Input**: User description: "A headless AUTHOR that produces the decisions a walk makes. At each step it calls the product's own proposal and suggestion functions and applies the walk policy (accept the top suggestion, else the default, else a placeholder sequence), writes the decisions into the stores, then hands off to the existing headless replay. It replaces the 32-case Playwright harness for decision coverage."
+
+## Context
+
+Decision records (the `.studio/decision-record.json` a walk leaves) come only from Playwright UI
+walks today. The harness lives outside this repo, in
+`ks-2302-main/tools/testing-profiles-2302`:
+
+- `harness/cases.json` holds the 32 cases (4 copied keyboards x 4 profiles x 2 backspace answers).
+- `harness/run-zip.mjs` drives one case through `scripts/phase{1,2,3,4}.template.js`.
+
+One case takes about 25 minutes, needs a dev server and a free port, and is flaky under load. On
+2026-10-30 a walk spent hours surfacing a pure engine defect: `applyAssignments` merged `group(main)`
+into a keyboard that declares `group(Main)` case-sensitively, so a duplicate group failed `kmcmplib`
+(fixed in `502fb061` on `km/106-carve-claimed`). A headless run would have caught it in seconds.
+
+Spec 106 US1 already supplies headless **replay**. Given a recorded DecisionSet it seeds the real
+studio stores, rebuilds the working copy, runs the real download path, compiles, simulates and
+checks consistency gates G1-G8. The pieces are:
+
+- `packages/studio/src/test/decisionPointFixture.ts`
+- `recordToDecisionSet.ts`
+- `decisionPointBases.ts`
+- `consistencyGates.ts`
+- `decisionPoint.corpus.test.ts`
+- `packages/studio/scripts/genDecisionPoints.ts`
+
+Spec 032's `packages/studio/src/test/journey-runner.ts` already walks the product's own step routing
+headlessly. Neither one **produces** decisions. Replay only covers the 4 recorded copied keyboards,
+and a new keyboard or profile still needs a 25-minute browser walk before it can be replayed.
+
+This spec adds the missing half: a **headless scripted author**. It is a test tool. It changes
+nothing an author sees, and it follows Constitution v2 Art. X: every value it writes comes from a
+product proposal, and it records that value's provenance the way the UI records it.
+
+### Relationship to spec 106
+
+- Spec 106 US8 tasks **T063** (harness: drop the `zzq` path, port the gates, add the G6 touch diff)
+  and **T064** (run the 32 cases) **depend on this spec**. Once this spec's US1-US3 land, the 32 cases
+  run through the headless author instead of the Playwright harness. Their evidence is the headless
+  run's per-case gate report, not walk zips.
+- Spec 106 **T065** (the T013 corpus test has zero `it.fails` left) **stays in spec 106**. This spec
+  neither owns nor relaxes that gate.
+- This spec does not edit any spec 106 file. The dependency is recorded here, and spec 106's tasks are
+  updated in a spec 106 change.
+
+## Clarifications
+
+### Session 2026-10-30 (carried from the request, closed)
+
+- Q: What does the author do at a step? → A: It calls the product's own proposal functions and applies the walk policy: accept the top suggestion, else the default, else a placeholder sequence (`zzq<hex>` with indicator `j`, exactly as the harness does today).
+- Q: May the author re-implement a proposal to avoid a component? → A: No. Logic it needs that lives only in a component or hook is lifted into a store action or a pure function that the component then calls. There is no behaviour change, and the component's existing tests stay green.
+- Q: What keeps Playwright? → A: UX and accessibility walks (the golden walk, the a11y specs), behaviour that is genuinely component-held, and the download wiring. The 32-case harness is retired for decision coverage.
+- Q: Is `fallbackPolicy` fixed here? → A: No. It is a known gap carried over: it is in no decision value and not in the record (see the `decisionPointFixture.ts` header). The author surfaces it and does not fix it.
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - One case, headless, from a case description (Priority: P1)
+
+A maintainer describes a case the way `harness/cases.json` does:
+
+- the copied keyboard (id and group) and the track;
+- the language identity (English name, autonym, code, script);
+- the marks profile (input order, output form, backspace answer);
+- the sample text;
+- any overrides, such as "overwrite `ŋ` onto `K_X`".
+
+They run it in vitest. The headless author walks every step the product would show, makes each
+decision by the walk policy, writes them into the real stores, and hands off to the existing replay.
+The maintainer gets three things back: a decision record in the shape the UI writes, the output
+bundle, and the G1-G8 gate results. It needs no browser, no dev server and no port.
+
+**Why this priority**: This is the whole point. Without it, every new keyboard or profile still costs
+a 25-minute flaky walk before anything can be checked. It would have caught the `group(Main)` defect
+in seconds.
+
+**Independent Test**: Run `p1-whole-bafut-kbdus` headlessly. It completes, the bundle compiles, the
+gates are reported per gate, and a second run produces a byte-identical record and bundle.
+
+**Acceptance Scenarios**:
+
+1. **Given** a case description, **When** the author runs it, **Then** it produces a decision record, a DecisionSet, the output bundle and the gate results, with no browser.
+2. **Given** a case whose override assigns `ŋ` to `K_X`, **When** the author reaches `ŋ` in the mechanism step, **Then** it applies "Assign to a key" on `K_X` and resolves any displacement proposal with the harness order (confirm the move, else keep both, else leave it).
+3. **Given** a step where no suggestion and no default exist, **When** the author reaches it, **Then** it uses the placeholder sequence and counts it in the run report.
+4. **Given** the same case run twice, **When** the outputs are compared, **Then** the record (minus timestamps), the DecisionSet and the bundle are identical.
+5. **Given** a copied keyboard the codec cannot parse, or one missing from `../keyboards`, **When** the case runs, **Then** it is skipped with a named reason and never passes silently.
+
+---
+
+### User Story 2 - The author matches the UI (parity) (Priority: P1)
+
+For every case that has a recorded UI walk, the headless author's decisions equal the recorded ones.
+Every difference is listed in a reviewed allow-list with a reason. That proves the author takes the
+decisions an author clicking through the UI with the walk policy would take.
+
+**Why this priority**: Without parity, a green headless run proves nothing about the product. The
+author could be walking a path no user can walk.
+
+**Independent Test**: Compare the author's DecisionSet with each recorded walk. That means the four
+records under `packages/studio/src/lib/__fixtures__/decision-points/records/`, plus every walk zip in
+`ks-2302-main/tools/testing-profiles-2302/zips/` that has a decision record. Compare per decision id
+and value. The test fails on any unexplained difference.
+
+**Acceptance Scenarios**:
+
+1. **Given** a recorded walk, **When** the author runs the same case on the same build, **Then** every decision id the walk recorded has an equal value from the author, or an allow-list entry with a reason.
+2. **Given** a record that predates a product change (for example the round-3 records, which predate the S-02 deadkey-purpose fix), **When** compared, **Then** the difference is explained by an allow-list entry naming that change, never by editing the record.
+3. **Given** an allow-list entry whose difference no longer occurs, **When** parity runs, **Then** the stale entry is reported so it can be removed.
+
+---
+
+### User Story 3 - The 32 harness cases run headless (Priority: P2)
+
+The 32 cases of `harness/cases.json` run as a vitest suite through the headless author. They produce
+the same per-case gate report the Playwright harness was meant to produce for spec 106 T063/T064, plus
+the count of placeholder decisions. That report replaces the walk as the evidence for decision
+coverage.
+
+**Why this priority**: This unblocks spec 106 US8 (T063/T064) without 32 browser walks.
+
+**Independent Test**: Run the 32-case suite. Every case reports G1-G8 and its placeholder count, and
+the suite finishes within the SC-002 budget.
+
+**Acceptance Scenarios**:
+
+1. **Given** the 32 case descriptions, **When** the suite runs, **Then** each case reports every gate, every placeholder decision it made, and every displacement action it took.
+2. **Given** a gate that fails on a case, **When** the suite reports it, **Then** the report names the case, the gate and the decision point, which is enough to reproduce it with one command.
+3. **Given** a gap that spec 106 already tracks as an expected failure, **When** the suite runs, **Then** it is reported as expected, with its owning story, and it does not hide new failures.
+
+---
+
+### User Story 4 - Corpus sweep: any copied keyboard x profile (Priority: P2)
+
+A maintainer can run the author over keyboards beyond the four recorded ones: any copied keyboard
+from `../keyboards` crossed with any profile. Engine defects that only some keyboards trigger, like
+the case-sensitive group merge, then show up across the corpus before any author meets them.
+
+**Why this priority**: Breadth is what replay alone cannot give. It comes after US1-US3 because it
+reuses them unchanged.
+
+**Independent Test**: Run the sweep over the eligible slice. Every case either completes with a gate
+report or is skipped with a named reason. The sweep summary groups failures by gate and by first
+failing step.
+
+**Acceptance Scenarios**:
+
+1. **Given** the eligible slice (FR-031), **When** the sweep runs, **Then** each keyboard x profile yields a gate report or a named skip reason.
+2. **Given** a keyboard whose script routes to the "not yet supported" stub (CJK, Ethiopic), **When** swept, **Then** it is skipped with that reason. The author never forces a path the product does not offer.
+3. **Given** a sweep failure, **When** it is reported, **Then** the failing case can be re-run alone as a US1 case.
+
+---
+
+### User Story 5 - Lift component-held decision logic (Priority: P2)
+
+Every rule the author needs that lives only in a React component or hook is moved into a store action
+or a pure function. The component then calls that function, so the UI and the author share one
+implementation. Nothing changes for the author at the keyboard.
+
+**Why this priority**: Logic that lives only in components blocks headless testing. Copying it into
+the test author would recreate the drift this spec exists to remove.
+
+**Independent Test**: For each lifted rule, the component's existing tests stay green unchanged, the
+golden walk does not need re-baselining, and a unit test calls the lifted function directly.
+
+**Acceptance Scenarios**:
+
+1. **Given** carve's "marked until Continue" semantics (the spec 106 FR-042 ruling), **When** they are lifted, **Then** the UI's Continue and the author's Continue both call one function, and both record the same removals and the same suggestion state. Today this logic is `isMarkedRow`, `applySuggestion` and `handleSkip` in `packages/studio/src/editors/carve/CarveGalleryV2.tsx`, plus the provenance rule in `editors/adapters/carveAdapter.tsx`.
+2. **Given** the mechanism card's suggestion order and pre-selection (`orderedVisibleSuggestions` in `MechanismGallery.tsx`, pre-selected by spec 106 T062), **When** lifted, **Then** the author's "top suggestion" is the chip the UI shows first.
+3. **Given** a rule that the author needs and that cannot be lifted without a behaviour change, **When** that happens, **Then** the step is listed as Playwright-only with its reason, and the author does not copy the rule.
+
+---
+
+### User Story 6 - Touch default layers checked headlessly (Priority: P3)
+
+The author also completes the touch-seed step through the product's own seeding function. Gate G6
+(no alphabet letter missing from any touch `default` layer) is then evaluated headlessly, rather
+than only on walk zips.
+
+**Why this priority**: G6 is walk-only in spec 106. Making it headless closes the last gate that still
+needs a browser, but the gate set is useful without it.
+
+**Independent Test**: Run a case whose copied keyboard has a touch layout. G6 is reported from the
+headless bundle and agrees with the walk zip's touch layout for the same case.
+
+**Acceptance Scenarios**:
+
+1. **Given** a copied keyboard with a touch layout, **When** the author confirms the touch seed source with the product's proposal, **Then** the bundle carries the seeded layout and G6 is evaluated.
+2. **Given** a copied keyboard with no touch layout, **When** the case runs, **Then** G6 is reported as not applicable, not as passed.
+
+### Edge Cases
+
+- **Proposal function throws.** Some cases make a product proposal throw; for example, the tolerance analysis on `sil_cameroon_azerty` hands a touch-only `T_` rule to the desktop simulator. The case reports the throw at that step and decision point and fails. The author never substitutes a default for a thrown proposal.
+- **Step skips itself.** A step the product auto-completes (a caseless alphabet at caps, an empty mechanism diff, no marks) is passed the way the product passes it. The author does not write a decision the product would not write.
+- **Displacement chains.** An override displaces a character that a later step needs. The author resolves each displacement proposal once, in harness order, and records each action.
+- **Placeholder clash.** The placeholder sequence `zzq<hex>` collides with an existing sequence in the copied keyboard. The case reports the collision; the author does not invent a second placeholder scheme.
+- **Missing decision.** A decision the record cannot carry (`fallbackPolicy`) runs with the store default, and the run report says so.
+- **Proposal depends on network data.** Exemplars, langtags and SLDR data are read from the pinned prebuild data only. A case whose proposal would need a network fetch fails with that reason.
+- **Proposal changes over time.** A product change alters a proposal, so parity breaks on recorded cases. The parity report names the decision id and both values. Fixing it is either an allow-list entry citing the change or a re-recorded walk; the author is never adjusted to match an old record.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+**Case input and run (US1)**
+
+- **FR-001**: The author MUST take a case description with the same fields as
+  `harness/cases.json`, plus the copied keyboard's group and track:
+  - `id`;
+  - copied keyboard id (`base`) and group;
+  - track;
+  - `english`, `autonym`, `code`, script;
+  - `inputOrder`, `outputForm`, `backspace`, `backspaceOnDiagonal`;
+  - `sampleText`;
+  - overrides (`overwriteChar` / `overwriteKey`, and any later override kind).
+
+  It MUST be able to read `cases.json` directly.
+- **FR-002**: The author MUST visit steps in the order the product's own step routing yields, by reusing the routing that spec 032's journey runner drives (`steps/advance.ts`, `steps/reducer.ts`, the survey runner's exported routing). It MUST NOT use a hard-coded step list.
+- **FR-003**: At each decision, the author MUST apply the walk policy in this order:
+  1. accept the top suggestion the product offers;
+  2. else apply the product's default;
+  3. else enter the placeholder sequence `zzq` + the lowercase hex code points of the character, with indicator `j`.
+
+  Case overrides take precedence over the policy, for the decisions they name.
+- **FR-004**: The author MUST write each decision through the same store actions the UI uses, with the provenance the UI would record for that action:
+  - an untouched default stays `default`;
+  - an accepted or chosen value is `asked`.
+
+  It MUST state how its 088 DecisionSet provenance maps to the 053 record's vocabulary (Constitution Art. III).
+- **FR-005**: After the last step, the author MUST hand off to the existing replay (`buildDecisionPointFixture`'s path: `rebuildWorkingCopyFromStores`, `buildOutputBundle`, compile, `checkConsistencyGates`). It MUST NOT add a second projection or compile path.
+- **FR-006**: The author MUST return:
+  - a decision record that `parseDecisionRecord` accepts and `recordToDecisionSet` folds;
+  - the DecisionSet;
+  - the output bundle;
+  - per-gate results;
+  - a run report listing every placeholder, every displacement action, every skipped step and the `fallbackPolicy` value used.
+- **FR-007**: Runs MUST be deterministic. The same case on the same build MUST yield an identical record (ignoring timestamps), DecisionSet and bundle.
+- **FR-008**: The author MUST need no browser, no dev server, no network and no port. It MUST run under the studio corpus vitest config, as the decision-point suites do.
+
+**Drift guard (all stories)**
+
+- **FR-010**: The author MUST obtain every suggestion and default by calling the product's own functions. It MUST NOT re-implement any of them. The functions known today are:
+
+  | Step | Product functions |
+  |---|---|
+  | Identity prefill | `defaultsFor` (`packages/studio/src/lib/langtagsDefaults.ts`), `deriveScriptPrefill` (`lib/scriptAxes.ts`) |
+  | Windows layout | `proposeWindowsLayout` (`lib/windowsLayouts.ts`) |
+  | Track | `proposeTrack` (`lib/proposeTrack.ts`), recorded for comparison when the case names the track |
+  | Character inventory | `suggestMissingChars` (`lib/services.ts`) over `suggestMissingCharacters` (engine `character-discovery/suggestMissing.ts`), with exemplars from the pinned data (`loadExemplars`, `character-discovery/cldr.ts`) |
+  | Marks attachment and treatment | `proposeAttachments` (engine `marks/attachment-proposals.ts`), `computeMarkTreatmentPrefills` (`marks/treatment-prefill.ts`) |
+  | Output form and backspace | `resolveOutputFormProposal`, `resolveBackspaceProposal` (`marks/output-form-policy.ts`) |
+  | Context tolerance | `analyseContextTolerance` (`lib/contextToleranceAnalysis.ts`), `applyContextToleranceDecision` (`lib/contextToleranceApply.ts`), `proposeNormalizationStep` (engine `pattern-apply/normalization-step`) |
+  | Convenience characters | `computeConvenienceGate` (`survey/convenience/convenienceGate.ts`) with `deriveCarveNeededSet` (engine `marks/carve-needed-set.ts`) |
+  | Carve | `recommendedRemovalChars` (`lib/irToCarveNodes.ts`), `suggestionFingerprintOf` and `isUntouchedSuggestion` (`survey/carve/carveValue.ts`), and the lifted Continue rule (FR-040) |
+  | Mechanism placement | `buildPlacementSeeds` and `getRankedSuggestionsForChar` (`survey/placementSeeds.ts`) |
+  | Displacement | `displacedFor` and `orthographyTier` (`survey/slotOccupancy.ts`) |
+  | S-02 purpose trigger | `proposeS02TriggerKey` and `deadkeyPurposeOf` (`editors/assignLoop/deadkeyPurpose.ts`) |
+  | Case-pair companion | the logic behind `useCasePairCompanion` (`editors/assignLoop/casePairCompanion.ts`, lifted per FR-040) |
+  | Caps handling | the `caps-handling` proposal that spec 106 US5 adds, once it lands. Until then the step is absent and the module default applies, as `recordToDecisionSet` already assumes. |
+
+  The plan MUST confirm each entry against the code and name any function this table missed.
+- **FR-011**: A drift-guard test MUST fail when one of the FR-010 functions is renamed, removed, or no longer called by the UI component that renders its suggestion, so a proposal the UI uses cannot silently drop out of the author.
+- **FR-012**: The author MUST NOT change what the product proposes. Any change to a proposal is out of scope (see Out of scope).
+
+**Parity (US2)**
+
+- **FR-020**: A parity test MUST compare the author's DecisionSet, per decision id and value, with every recorded walk available to the repo. That means:
+  - the four records in `decision-points/records/`;
+  - any walk record later copied in under the same provenance rules (`records/PROVENANCE.md`).
+- **FR-021**: Every difference MUST either be absent or carry an allow-list entry with three fields:
+  - the decision id;
+  - the reason;
+  - the product change or record age that explains it.
+
+  An unexplained difference fails the test. Records are never edited to make parity pass.
+- **FR-022**: Allow-list entries whose difference no longer reproduces MUST be reported as stale.
+- **FR-023**: The parity comparison MUST state how it treats values that are inherently run-specific (timestamps, fingerprints, generated ids). Each MUST be either normalised by a named rule or compared exactly.
+
+**Harness cases (US3)**
+
+- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner).
+- **FR-031**: A corpus sweep mode MUST run the author over any copied keyboard in `../keyboards` crossed with any profile. Which slice runs by default and in CI is open: [NEEDS CLARIFICATION: the sweep's default slice and where it runs. Options: (a) the 4 recorded bases x 8 profile variants only in CI, with the full Latin-script codec-clean slice opt-in or nightly; (b) a fixed sample of about 40 keyboards in CI; (c) the whole eligible corpus in CI.]
+- **FR-032**: The sweep MUST skip, with a named reason, any keyboard that is:
+  - missing;
+  - not codec-clean;
+  - routed to the "not yet supported" stub (CJK, Ethiopic);
+  - outside the eligible slice.
+- **FR-033**: Spec 106 T063/T064 MUST be satisfiable from this suite's report, with no Playwright run. Spec 106 T065 (zero `it.fails` in the decision-point corpus test) remains a spec 106 gate.
+
+**Lifting component logic (US5)**
+
+- **FR-040**: Each rule the author needs that lives only in a component or hook MUST move to a store action or pure function, and the component MUST call it. Known rules:
+  - **Carve "marked until Continue" (spec 106 FR-042).** `isMarkedRow`, `applySuggestion` and `handleSkip` in `CarveGalleryV2.tsx`, plus the provenance choice in `carveAdapter.tsx`.
+  - **Mechanism card suggestion order and pre-selection.** `orderedVisibleSuggestions` in `MechanismGallery.tsx`, with spec 106 T062's pre-selection.
+  - **S-02 deadkey identity resolution.** `resolveS02DeadkeyIdentity` in `MechanismGallery.tsx`.
+  - **Displacement banner action order.** `DisplacementProposalBanner.tsx` with `MechanismGallery.tsx`.
+  - **Case-pair companion acceptance.** The `useCasePairCompanion` hook.
+  - **Marks series assembly.** How the marks-series value is assembled from the station answers (`MarksSeriesStep.tsx`, `OutputFormStation.tsx`).
+  - **Text-sample proposal and confirm.** `MarksTextSamplePrompt.tsx`.
+- **FR-041**: Each lift MUST be behaviour-preserving:
+  - the component's existing tests pass unchanged;
+  - the golden walk needs no re-baseline;
+  - the lifted function has its own unit test.
+
+  A lift MUST NOT add a second author-truth store (spec 105).
+- **FR-042**: A rule that cannot be lifted without a behaviour change MUST be listed as Playwright-only with its reason, and its decision is recorded as not covered by the author.
+
+**Touch (US6)**
+
+- **FR-050**: The author SHOULD complete the touch-seed step with the product's seed proposal (`deriveSeedLayout` in `lib/buildTouchLayoutJson.ts`, and the seed-source step's default). G6 SHOULD then be evaluated on the headless bundle. A keyboard with no touch layout reports G6 as not applicable.
+
+**Known gap carried over**
+
+- **FR-060**: `fallbackPolicy` is not in any decision value and not in the decision record. The author MUST run with the store default, MUST report the value it used, and MUST NOT write it anywhere the record does not already carry it. Adding it to the record is out of scope here.
+
+**Playwright's remaining role**
+
+- **FR-070**: After this spec, Playwright keeps the following:
+  - UX and accessibility walks (the golden walk, the a11y specs);
+  - component-held behaviour listed under FR-042;
+  - the download wiring (the Output tab, `emit-download`, and the saved zip).
+
+  The 32-case harness is no longer required for decision coverage. Retiring it from `ks-2302-main` is a harness-repo change, not a change in this repo.
+
+### Key Entities
+
+- **Case**: one row in the shape of `harness/cases.json`. It names the copied keyboard, the language identity, the marks profile, the sample text and the overrides.
+- **Walk policy**: the ordered rule the author applies at each decision. Overrides come first, then the top suggestion, then the default, then the placeholder.
+- **Author run**: one case through the author. It yields the decision record, DecisionSet, bundle, gate results and run report.
+- **Run report**: the placeholders, displacement actions, skipped steps, known gaps and `fallbackPolicy` of one run.
+- **Parity allow-list**: reviewed entries that explain each difference between an author run and a recorded walk. Each entry carries a decision id, a reason and the explaining change.
+- **Lifted rule**: a decision rule moved out of a component into a store action or pure function, called by both the UI and the author.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: One case runs headlessly, end to end (author, replay, compile, gates), in under 60 seconds on a maintainer's machine, down from about 25 minutes for a Playwright walk.
+- **SC-002**: The 32 harness cases finish in under 10 minutes in one vitest run, with no browser, dev server or port, and fail 0 times out of 5 repeated runs for reasons other than a real gate failure. That means no flakiness.
+- **SC-003**: Parity holds on 100% of recorded walks: every decision equal, or explained by an allow-list entry. 0 unexplained differences, and 0 records edited.
+- **SC-004**: 100% of the suggestions and defaults the author uses come from product functions covered by the drift guard (FR-011). The author contains 0 copies of proposal logic.
+- **SC-005**: Re-introducing the `group(main)` vs `group(Main)` defect (reverting `502fb061`) makes the headless suite fail within its first affected case, in under 60 seconds.
+- **SC-006**: Every lifted rule (FR-040) leaves its component's existing tests and the golden walk unchanged: 0 re-baselines.
+- **SC-007**: Spec 106 T063/T064 close on this suite's report with 0 Playwright case walks.
+
+## Out of scope
+
+- Changing what the product proposes, ranks or pre-selects. Spec 106 US8 owns pre-selection; this spec only consumes it.
+- Any `Pattern` schema change (Constitution Art. I).
+- LDML output; touch-first authoring (Decision 6); CJK and Ethiopic paths (stubbed and skipped).
+- Adding `fallbackPolicy` to the decision record.
+- Retiring or editing the harness in `ks-2302-main`. That is a separate repo, and its retirement follows FR-070.
+- Editing spec 106 files.
+
+## Assumptions
+
+- **Stacking.** Implementation needs spec 106 US1's replay pieces, which today exist only on the unmerged 106 stack (`106-consistent-keyboard-output`, PR #2362, and branches stacked on it). Implementation either waits for that to reach `main` or stacks on it; the plan says which. This spec document is cut from `origin/main`.
+- **Corpus.** `../keyboards` points at the keyboard-studio fork's `master`, as the decision-point suites already require. Cases skip with a reason when a keyboard is missing.
+- **Overrides.** The harness's `overwriteChar` / `overwriteKey` are the only override kind in the 32 cases. Further override kinds are added as cases need them, with the same precedence rule.
+- **Parity runs.** Parity runs on the same build that produced the record when that build is known (`records/PROVENANCE.md`). Otherwise the differences are explained against the record's build.
+- **Proposals in flight.** Proposal functions that spec 106 is still adding (caps handling, US5; top-candidate pre-selection, US8) are consumed when they land. Until then the author follows today's product behaviour for those steps.
+- **Gates.** The G1-G8 definitions stay owned by spec 106's `consistencyGates.ts`. This spec reuses them unchanged.
