@@ -89,12 +89,66 @@ import {
 import { checkFileInventory } from "./checks/criteria/check-file-inventory.js";
 import { checkKpsListing } from "./checks/criteria/check-kps-listing.js";
 import { checkKpsMetadata } from "./checks/criteria/check-kps-metadata.js";
+import {
+  checkTextContent,
+  type TextContentFacts,
+} from "./checks/criteria/check-text-content.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
 function readText(fs: VirtualFS, path: string): string | undefined {
   const content = fs.get(path)?.content;
   return typeof content === "string" ? content : undefined;
+}
+
+/** Find a VFS path by case-insensitive exact match, or undefined. */
+function findPath(
+  filePaths: readonly string[],
+  wanted: string,
+): string | undefined {
+  const lower = wanted.toLowerCase();
+  return filePaths.find((p) => p.toLowerCase() === lower);
+}
+
+/**
+ * Resolve the Group A2 text-content twin inputs (Batch 4) from the judged
+ * VFS: the doc texts, the help .php, and the primary BCP47 tag (from the
+ * parsed .kmn IR, falling back to the .kps language list).
+ */
+function resolveTextFacts(
+  fs: VirtualFS,
+  filePaths: readonly string[],
+  keyboardId: string,
+  keyboardIR: KeyboardIR | undefined,
+  input: CriteriaLintInput,
+): TextContentFacts {
+  const licensePath = findPath(filePaths, "LICENSE.md");
+  const readmeMdPath = findPath(filePaths, "README.md");
+  const readmeHtmPath = findPath(filePaths, "source/readme.htm");
+  const welcomeHtmPath =
+    findPath(filePaths, "source/welcome.htm") ??
+    findPath(filePaths, "source/welcome/welcome.htm");
+  const phpPath = filePaths.find((p) => p.toLowerCase().endsWith(".php"));
+  const kmnFilePath = kmnPath(keyboardId);
+  const primaryBcp47 =
+    keyboardIR?.header.bcp47[0] ?? input.kpsLanguages[0] ?? undefined;
+  return {
+    keyboardId,
+    ...(licensePath !== undefined
+      ? { licenseMd: readText(fs, licensePath) } : {}),
+    ...(readText(fs, kmnFilePath) !== undefined
+      ? { kmn: readText(fs, kmnFilePath) } : {}),
+    ...(input.kpsText !== undefined ? { kps: input.kpsText } : {}),
+    ...(readmeMdPath !== undefined
+      ? { readmeMd: readText(fs, readmeMdPath) } : {}),
+    ...(readmeHtmPath !== undefined
+      ? { readmeHtm: readText(fs, readmeHtmPath) } : {}),
+    ...(welcomeHtmPath !== undefined
+      ? { welcomeHtm: readText(fs, welcomeHtmPath) } : {}),
+    ...(phpPath !== undefined
+      ? { php: readText(fs, phpPath), phpPath } : {}),
+    ...(primaryBcp47 !== undefined ? { primaryBcp47 } : {}),
+  };
 }
 
 /**
@@ -232,6 +286,14 @@ export function runCriteriaChecks(
       }),
     );
   }
+
+  // 4.1b / 4.5b / 4.6b / 5.2b / 5.3b / 5.5b / 5.6b / 6.6b / 7.11b /
+  // 11.1b / 11.3b / 11.4b — the text-content twins: pure functions of the
+  // judged texts. Missing source files are the assembly's contextMissing
+  // (except 11.1b, where the .php's existence is the criterion).
+  findings.push(
+    ...checkTextContent(resolveTextFacts(fs, filePaths, keyboardId, keyboardIR, input)),
+  );
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.

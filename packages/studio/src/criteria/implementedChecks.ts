@@ -150,6 +150,21 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_KPS_DETAILS_UNSELECTED",
   "KM_LINT_KPS_FOLLOW_VERSION_UNSET",
   "KM_LINT_KPS_DESCRIPTION_EMPTY",
+  // Group A2 text-content twins (check-text-content): post-hoc checks of
+  // the scaffolder-bake text guarantees — 4.1b/4.5b/4.6b/5.2b/5.3b/5.5b/
+  // 5.6b/6.6b/7.11b/11.1b/11.3b/11.4b. Pure functions of the judged texts.
+  "KM_LINT_COPYRIGHT_ABSENT",
+  "KM_LINT_COPYRIGHT_SYNTAX",
+  "KM_LINT_COPYRIGHT_YEAR_EMBEDDED",
+  "KM_LINT_VERSION_IN_DOCS",
+  "KM_LINT_COPYRIGHT_IN_DOCS",
+  "KM_LINT_README_KEYMAN_LINK_ABSENT",
+  "KM_LINT_README_HELP_LINK_ABSENT",
+  "KM_LINT_WELCOME_LANG_MISMATCH",
+  "KM_LINT_AUTHOR_IN_KMN",
+  "KM_LINT_PHP_HEADER_BAD",
+  "KM_LINT_PHP_STYLE_OUTSIDE",
+  "KM_LINT_PHP_CLOSING_TAGS",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).

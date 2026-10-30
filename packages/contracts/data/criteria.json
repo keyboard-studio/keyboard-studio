@@ -238,6 +238,13 @@
   "scaffolderRule": "set-copyright-with-year"
  },
  {
+  "id": "4.1b-copyright-present-with-year",
+  "section": "4. `LICENSE.md` (copyright)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 4.1: a copyright statement with year(s) is present in LICENSE.md. The scaffolder always writes one (4.1); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_COPYRIGHT_ABSENT"
+ },
+ {
   "id": "4.2-copyright-year-range-if-multiyear",
   "section": "4. `LICENSE.md` (copyright)",
   "band": "yellow-survey",
@@ -266,11 +273,25 @@
   "scaffolderRule": "set-copyright-syntax"
  },
  {
+  "id": "4.5b-copyright-syntax-exact",
+  "section": "4. `LICENSE.md` (copyright)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 4.5: the LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax ((C) matched case-insensitively — the MIT template uses (c)). The scaffolder always writes it (4.5); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_COPYRIGHT_SYNTAX"
+ },
+ {
   "id": "4.6-copyright-year-not-in-kmn-or-kps",
   "section": "4. `LICENSE.md` (copyright)",
   "band": "scaffolder-bake",
   "description": "Copyright year is not embedded in the `.kmn` or `.kps` copyright strings",
   "scaffolderRule": "strip-copyright-year-from-kmn-kps"
+ },
+ {
+  "id": "4.6b-copyright-year-not-in-kmn-or-kps",
+  "section": "4. `LICENSE.md` (copyright)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 4.6: no copyright year is embedded in the .kmn or .kps copyright strings. The scaffolder never embeds one (4.6); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_COPYRIGHT_YEAR_EMBEDDED"
  },
  {
   "id": "4.7-copyright-holder-consistent-across-files",
@@ -301,11 +322,25 @@
   "scaffolderRule": "strip-version-from-docs"
  },
  {
+  "id": "5.2b-no-version-in-readme-or-docs",
+  "section": "5. `README.md`",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 5.2: no version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: any X.Y[.Z] pattern). The scaffolder never embeds one (5.2); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_VERSION_IN_DOCS"
+ },
+ {
   "id": "5.3-no-copyright-in-readme-or-docs",
   "section": "5. `README.md`",
   "band": "scaffolder-bake",
   "description": "No copyright year/statement in README.md, readme.htm, or welcome.htm",
   "scaffolderRule": "strip-copyright-from-docs"
+ },
+ {
+  "id": "5.3b-no-copyright-in-readme-or-docs",
+  "section": "5. `README.md`",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 5.3: no copyright year/statement is in README.md, readme.htm, or welcome.htm. The scaffolder never writes one there (5.3); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_COPYRIGHT_IN_DOCS"
  },
  {
   "id": "5.4-readme-description-sensible",
@@ -322,11 +357,25 @@
   "scaffolderRule": "set-readme-keyman-home-link"
  },
  {
+  "id": "5.5b-readme-keyman-home-link",
+  "section": "5. `README.md`",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 5.5: README.md links to https://keyman.com/keyboards/<id>. The scaffolder always writes it (5.5); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_README_KEYMAN_LINK_ABSENT"
+ },
+ {
   "id": "5.6-readme-help-link",
   "section": "5. `README.md`",
   "band": "scaffolder-bake",
   "description": "README.md includes link to `http://help.keyman.com/keyboard/<file_name>`",
   "scaffolderRule": "set-readme-help-link"
+ },
+ {
+  "id": "5.6b-readme-help-link",
+  "section": "5. `README.md`",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 5.6: README.md links to http(s)://help.keyman.com/keyboard/<id>. The scaffolder always writes it (5.6); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_README_HELP_LINK_ABSENT"
  },
  {
   "id": "5.7-readme-targets-match-kmn",
@@ -390,6 +439,13 @@
   "band": "scaffolder-bake",
   "description": "`<html lang=\"...\">` attribute in `welcome.htm` matches the keyboard's primary BCP47 tag",
   "scaffolderRule": "set-welcome-htm-lang-attribute"
+ },
+ {
+  "id": "6.6b-welcome-htm-lang-attribute",
+  "section": "6. Documentation files (`source/`)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 6.6: the welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag. The scaffolder always sets it (6.6); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_WELCOME_LANG_MISMATCH"
  },
  {
   "id": "6.7-welcome-htm-not-political",
@@ -481,6 +537,13 @@
   "band": "scaffolder-bake",
   "description": "Author name belongs in the `.kps`, not in a `.kmn` Author store",
   "scaffolderRule": "move-author-from-kmn-to-kps"
+ },
+ {
+  "id": "7.11b-author-in-kps-not-kmn",
+  "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 7.11: the author name is in the .kps, not in a .kmn Author store. The scaffolder never writes store(&Author) (7.11); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_AUTHOR_IN_KMN"
  },
  {
   "id": "7.12-pua-in-experimental",
@@ -882,6 +945,13 @@
   "scaffolderRule": "create-php-with-header"
  },
  {
+  "id": "11.1b-php-exists-with-header",
+  "section": "11. Online help (`source/help/<name>.php`)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 11.1: the <name>.php help file exists and has the proper PHP header (<?php + the /* Name: ... */ block). The scaffolder always emits it (11.1); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_PHP_HEADER_BAD"
+ },
+ {
   "id": "11.2-php-osk-all-layers",
   "section": "11. Online help (`source/help/<name>.php`)",
   "band": "layer-c-enforce",
@@ -896,11 +966,25 @@
   "scaffolderRule": "php-move-style-to-header"
  },
  {
+  "id": "11.3b-php-style-inside-header",
+  "section": "11. Online help (`source/help/<name>.php`)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 11.3: all style information (<style> tags) is inside the PHP header block, not outside it. The scaffolder keeps it there (11.3); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_PHP_STYLE_OUTSIDE"
+ },
+ {
   "id": "11.4-php-no-closing-body-html",
   "section": "11. Online help (`source/help/<name>.php`)",
   "band": "scaffolder-bake",
   "description": "`.php` does not contain closing `</body>` or `</html>` tags",
   "scaffolderRule": "php-strip-closing-tags"
+ },
+ {
+  "id": "11.4b-php-no-closing-body-html",
+  "section": "11. Online help (`source/help/<name>.php`)",
+  "band": "layer-c-enforce",
+  "description": "Post-hoc check of 11.4: the .php has no closing </body> or </html> tags. The scaffolder never emits them (11.4); this is the only check covering a foreign keyboard.",
+  "lintRuleId": "KM_LINT_PHP_CLOSING_TAGS"
  },
  {
   "id": "11.5-php-htm-html-wellformed",

@@ -492,6 +492,47 @@ export function assembleLintContext(
       contextMissing[code] = MISSING_KPS;
     }
   }
+
+  // Group A2 text-content twins (Batch 4): name the missing doc inputs.
+  // 11.1b is excluded — the help .php's existence is the criterion, so
+  // its absence is a finding, never a missing input.
+  const loweredPaths = new Set(paths.map((p) => p.toLowerCase()));
+  const hasLicense = loweredPaths.has("license.md");
+  const hasReadmeMd = loweredPaths.has("readme.md");
+  const hasReadmeHtm = loweredPaths.has("source/readme.htm");
+  const hasWelcomeHtm =
+    loweredPaths.has("source/welcome.htm") ||
+    loweredPaths.has("source/welcome/welcome.htm");
+  const hasPhp = [...loweredPaths].some((p) => p.endsWith(".php"));
+  const hasKmn = [...loweredPaths].some((p) => p.endsWith(".kmn"));
+  if (!hasLicense) {
+    contextMissing["KM_LINT_COPYRIGHT_ABSENT"] = "LICENSE.md";
+    contextMissing["KM_LINT_COPYRIGHT_SYNTAX"] = "LICENSE.md";
+  }
+  if (!hasKmn && (kpsPath === undefined || kpsText === undefined)) {
+    contextMissing["KM_LINT_COPYRIGHT_YEAR_EMBEDDED"] =
+      "the .kmn source and the .kps package file";
+  }
+  if (!hasReadmeMd && !hasReadmeHtm && !hasWelcomeHtm && !hasPhp) {
+    contextMissing["KM_LINT_VERSION_IN_DOCS"] = "the documentation files";
+  }
+  if (!hasReadmeMd && !hasReadmeHtm && !hasWelcomeHtm) {
+    contextMissing["KM_LINT_COPYRIGHT_IN_DOCS"] = "the documentation files";
+  }
+  if (!hasReadmeMd) {
+    contextMissing["KM_LINT_README_KEYMAN_LINK_ABSENT"] = "README.md";
+    contextMissing["KM_LINT_README_HELP_LINK_ABSENT"] = "README.md";
+  }
+  if (!hasWelcomeHtm) {
+    contextMissing["KM_LINT_WELCOME_LANG_MISMATCH"] = "source/welcome.htm";
+  }
+  if (!hasKmn) {
+    contextMissing["KM_LINT_AUTHOR_IN_KMN"] = "the .kmn source";
+  }
+  if (!hasPhp) {
+    contextMissing["KM_LINT_PHP_STYLE_OUTSIDE"] = "the help .php";
+    contextMissing["KM_LINT_PHP_CLOSING_TAGS"] = "the help .php";
+  }
   if (keyboardIR !== undefined && kpsTargets.length === 0) {
     // §8.13 has nothing to compare without a declared .kps target list
     // (no .kps, or a .kps with no <Targets> element): name the missing
