@@ -1,0 +1,66 @@
+[
+  {
+    "caseId": "p1-whole-bafut-kbdus",
+    "shape": ["simple"],
+    "reason": "No deadkeys, no stores, one group. Has a committed walk record (kbdus.json), so it also anchors parity."
+  },
+  {
+    "caseId": "p1-whole-ewondo-kbdfr",
+    "shape": ["regression-guard", "deadkey-heavy"],
+    "reason": "S-02 put three deadkeys on K_COLON; also an AZERTY base with a deadkeys group. Has a committed walk record (kbdfr.json).",
+    "guards": "#2358 (S-02 deadkey purpose)"
+  },
+  {
+    "case": {
+      "id": "pr-whole-cree-woods",
+      "profile": 1,
+      "backspace": "whole",
+      "backspaceOnDiagonal": false,
+      "inputOrder": "postfix",
+      "outputForm": "base-plus-mark",
+      "lang": "cree",
+      "base": "bj_cree_woods",
+      "group": "bj",
+      "track": "copy",
+      "script": "Cans",
+      "english": "Cree",
+      "autonym": "Cree",
+      "code": "cr",
+      "sampleText": "ᑴ"
+    },
+    "shape": ["regression-guard", "mixed-case-group", "any-index", "opaque-group", "non-latin"],
+    "reason": "applyAssignments merged group(main) into the declared group(Main): a duplicate group that failed kmcmplib. Also about 70/58 any()/index() store pairs, an opaque option-store-directive fragment, Canadian syllabics, and no touch layout (G6 not applicable). Sample text from source/welcome/welcome.htm.",
+    "guards": "502fb061 (sameGroupName)"
+  },
+  {
+    "caseId": "p4-unwrap-bafut-camqwerty",
+    "shape": ["touch-layout", "any-index"],
+    "reason": "A shipped touch layout with any()/index() pairs and a deadkeys group. Has a committed walk record (camqwerty.json)."
+  },
+  {
+    "caseId": "p4-unwrap-ewondo-camazerty",
+    "shape": ["deadkey-heavy"],
+    "reason": "About 37 deadkey references. Carries the open tolerance-analysis throw (spec 106 KNOWN_GAPS owner #2363) as an expected failure. Has a committed walk record (camazerty.json)."
+  },
+  {
+    "case": {
+      "id": "pr-whole-chechen-latin",
+      "profile": 1,
+      "backspace": "whole",
+      "backspaceOnDiagonal": false,
+      "inputOrder": "postfix",
+      "outputForm": "base-plus-mark",
+      "lang": "chechen",
+      "base": "chechen_latin",
+      "group": "c",
+      "track": "copy",
+      "script": "Latn",
+      "english": "Chechen",
+      "autonym": "Noxçiyn mott",
+      "code": "ce",
+      "sampleText": "Noxçiyn mott"
+    },
+    "shape": ["readonly-group", "touch-layout"],
+    "reason": "Three readonly groups ahead of group(main), which the codec keeps as fidelity-only groups, plus a shipped touch layout. Sample text from README.md."
+  }
+]
