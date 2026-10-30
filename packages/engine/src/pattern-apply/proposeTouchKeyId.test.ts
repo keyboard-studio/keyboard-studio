@@ -69,16 +69,17 @@ interface ClassRow {
 const CLASS_TABLE: readonly ClassRow[] = [
   { row: 1, name: "plain character", chars: "ø", expect: "proposal", path: "unicode-default" },
   {
-    // Spec 104 FR-013 supersedes this row's spec 065 expectation: the
-    // default request carries no guard specification, so the mark mints
-    // U_ (arm d), not guarded T_. With a "swallow" specification the row
-    // is "combining-mark-guard" again — pinned in the FR-013 describe
-    // block below.
+    // #2374 replaces spec 104 FR-013's keyboard-wide guard specification
+    // with the mark's per-mark "start of line" box: the default request
+    // carries no box value (a late-added mark with no survey row takes the
+    // unticked default), so the mark mints guarded T_ (arm d′), not U_.
+    // With a ticked box the row is "unicode-default" again — pinned in
+    // the #2374 describe block below.
     row: 2,
     name: "combining mark",
     chars: "́",
     expect: "proposal",
-    path: "unicode-default",
+    path: "combining-mark-guard",
   },
   {
     row: 3,
@@ -334,22 +335,18 @@ describe("proposeTouchKeyId — spec 104 (FR-010 / FR-013)", () => {
     expect(proposal.because).toEqual({ kind: "minted" });
   });
 
-  it("threads the guard specification to the minter: 'swallow' mints a guarded T_ mark", () => {
-    const proposal = proposeTouchKeyId(
-      req("̀", {
-        guardSpecification: {
-          recordId: "guard-test",
-          behaviour: "swallow",
-          origin: "asked",
-          confirmed: true,
-          recordedAt: 0,
-          supersedes: null,
-        },
-      }),
-    );
+  it("threads the per-mark box to the minter: unticked mints a guarded T_ mark (#2374)", () => {
+    const proposal = proposeTouchKeyId(req("̀", { bareMarkAllowed: false }));
     expect(proposal.path).toBe("combining-mark-guard");
     expect(proposal.id).toBe("T_0300");
     expect(proposal.guardRequired).toBe(true);
+  });
+
+  it("threads the per-mark box to the minter: ticked mints a plain U_ mark (#2374)", () => {
+    const proposal = proposeTouchKeyId(req("̀", { bareMarkAllowed: true }));
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.id).toBe("U_0300");
+    expect(proposal.guardRequired).toBe(false);
   });
 
   it("threads &VERSION to the minter: a string at 15.0 mints a multi-segment U_", () => {

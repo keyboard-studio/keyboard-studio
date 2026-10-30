@@ -9,7 +9,6 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { GuardSpecification } from "./decisionRecord.js";
 import { makeTestIR } from "./fixtures/keyboard-ir.js";
 import { charRule, charStore, irGroup, touchKey, vkeyRule } from "./fixtures/ir-builders.js";
 import type { KeyboardIR, TouchKeyIR } from "./keyboard-ir.js";
@@ -380,16 +379,6 @@ describe("resolveTouchProduction — none / layerSwitch / emulation / unclassifi
 // decideKeyIdForm — the contracts §2 table, one row per arm
 // ---------------------------------------------------------------------------
 
-const GUARD_SWALLOW: GuardSpecification = {
-  recordId: "g1",
-  behaviour: "swallow",
-  origin: "asked",
-  confirmed: true,
-  recordedAt: 0,
-  supersedes: null,
-};
-const GUARD_EMIT: GuardSpecification = { ...GUARD_SWALLOW, recordId: "g2", behaviour: "emit" };
-
 describe("decideKeyIdForm — contracts §2 arms", () => {
   const cases: readonly {
     name: string;
@@ -486,30 +475,36 @@ describe("decideKeyIdForm — contracts §2 arms", () => {
       destination: { form: "T_", action: "mint-with-rules" },
     },
     {
-      name: "arm d: combining mark, no guard specified — U_",
+      name: "arm d′: combining mark with no box value — unticked default, guarded T_",
       input: { roles: ["producer"], isCombiningMark: true, plainOutput: "̀" },
-      arm: "d",
-      destination: { form: "U_", action: "mint", output: "̀" },
+      arm: "d′",
+      destination: { form: "T_", action: "mint-with-rules" },
     },
     {
-      name: "arm d: mark with an emit guard specification needs no guard — U_",
+      name: "arm d: mark with a ticked start-of-line box needs no guard — U_",
       input: {
         roles: ["producer"],
         isCombiningMark: true,
         plainOutput: "̀",
-        guardSpecification: GUARD_EMIT,
+        bareMarkAllowed: true,
       },
       arm: "d",
       destination: { form: "U_", action: "mint", output: "̀" },
     },
     {
-      name: "arm d′: mark with a swallow guard specification — arm (a), guard from the specification",
+      name: "arm d′: mark with an unticked start-of-line box — arm (a), guarded T_",
       input: {
         roles: ["producer"],
         isCombiningMark: true,
         plainOutput: "̀",
-        guardSpecification: GUARD_SWALLOW,
+        bareMarkAllowed: false,
       },
+      arm: "d′",
+      destination: { form: "T_", action: "mint-with-rules" },
+    },
+    {
+      name: "arm d′: mark with no box (late-added, no survey row) — unticked default, guarded T_",
+      input: { roles: ["producer"], isCombiningMark: true, plainOutput: "̀" },
       arm: "d′",
       destination: { form: "T_", action: "mint-with-rules" },
     },
@@ -520,7 +515,7 @@ describe("decideKeyIdForm — contracts §2 arms", () => {
         isCombiningMark: true,
         deadkeyComposedMark: true,
         plainOutput: "́",
-        guardSpecification: GUARD_SWALLOW,
+        bareMarkAllowed: false,
       },
       arm: "d″",
       destination: { form: "T_", action: "mint-with-rules" },
