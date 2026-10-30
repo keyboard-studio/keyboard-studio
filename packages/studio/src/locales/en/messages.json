@@ -1635,6 +1635,7 @@
   "rules.demo.inputLabel": "Type here, watch what happens",
   "rules.demo.lede": "Type below and watch what each keystroke does — the stored code points, the rendered result, and the rule that fired.",
   "rules.demo.noEnrichment": "The simulator didn't name fired rules for this run, so rows show before/after output instead. (Pending: the SimulationStep.firedRule enrichment.)",
+  "rules.demo.outputPreviewLabel": "Output preview",
   "rules.demo.simFailed": "Simulation failed: {simError}",
   "rules.demo.technicalDetails": "Technical details",
   "rules.demo.unreachableBody": "{0, plural, one {# rule repeats an earlier rule for the same keystroke and will not be used. Your keyboard still types the same.} other {# rules repeat an earlier rule for the same keystroke and will not be used. Your keyboard still types the same.}}",

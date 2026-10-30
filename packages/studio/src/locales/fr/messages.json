@@ -1635,6 +1635,7 @@
   "rules.demo.inputLabel": "Écris ici, regarde ce qui se passe",
   "rules.demo.lede": "Tapez ci-dessous et observez ce que fait chaque frappe : les points de code enregistrés, le résultat affiché et la règle qui s'est déclenchée.",
   "rules.demo.noEnrichment": "Le simulateur n'a pas indiqué les règles déclenchées pour cette exécution ; les lignes affichent donc à la place les résultats avant et après. (En attente : l'enrichissement SimulationStep.firedRule.)",
+  "rules.demo.outputPreviewLabel": "",
   "rules.demo.simFailed": "Échec de la simulation : {simError}",
   "rules.demo.technicalDetails": "",
   "rules.demo.unreachableBody": "",

@@ -4,9 +4,16 @@
 // `layout_family` answer.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { DemoPane } from "./DemoPane.tsx";
+import type { DemoSimulate } from "./demoSimulation.ts";
+import type {
+  CompileResult,
+  SimKeyInput,
+  SimulationResult,
+  SimulationStep,
+} from "@keyboard-studio/contracts";
 import type { RulesDemoArtifact } from "../../stores/rulesDemoArtifactStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
@@ -142,5 +149,99 @@ describe("DemoPane compile diagnostics", () => {
       />,
     );
     expect(screen.queryByTestId("rules-demo-warnings")).toBeNull();
+  });
+});
+
+describe("DemoPane output preview (#2384)", () => {
+  const READY: RulesDemoArtifact = {
+    status: "ready",
+    jsBlobUrl: null,
+    keyboardId: "demo",
+    diagnostics: [],
+    errorStep: null,
+    errorMessage: null,
+  };
+  const BYTES = new TextEncoder().encode("// compiled keyboard");
+
+  /** The typed US-key name back to the typed char (K_A -> "a"). */
+  function charOfKey(key: SimKeyInput): string {
+    return key.vkey.startsWith("K_") && key.vkey.length === 3
+      ? key.vkey.slice(2).toLowerCase()
+      : "";
+  }
+
+  /** Fake simulate: Greek vowels stand in for rule-transformed output. */
+  function transformingSimulate(): DemoSimulate {
+    const greek: Record<string, string> = { a: "α", b: "β", c: "γ" };
+    return (_compiled: CompileResult, keys: SimKeyInput[]): SimulationResult => {
+      let out = "";
+      const trace: SimulationStep[] = keys.map((input) => {
+        out += greek[charOfKey(input)] ?? "";
+        return { input, outputAfter: out, pendingDeadkeys: [], beep: false };
+      });
+      return { finalOutput: out, trace };
+    };
+  }
+
+  /** Fake simulate: every keystroke is swallowed — the keyboard emits nothing. */
+  function swallowingSimulate(): DemoSimulate {
+    return (_compiled: CompileResult, keys: SimKeyInput[]): SimulationResult => ({
+      finalOutput: "",
+      trace: keys.map((input) => ({
+        input,
+        outputAfter: "",
+        pendingDeadkeys: [],
+        beep: false,
+      })),
+    });
+  }
+
+  function renderPreviewPane(simulateImpl: DemoSimulate) {
+    render(
+      <DemoPane artifact={READY} ir={null} jsBytes={BYTES} simulateImpl={simulateImpl} />,
+    );
+    return screen.getByTestId("rules-demo-input") as HTMLInputElement;
+  }
+
+  it("shows the transformed output in a preview box while the typing box keeps the raw keystrokes", () => {
+    const input = renderPreviewPane(transformingSimulate());
+    fireEvent.change(input, { target: { value: "ab" } });
+    // The typing box is untouched: it still shows the raw keystrokes.
+    expect(input.value).toBe("ab");
+    const preview = screen.getByTestId("rules-demo-output-preview");
+    expect(preview.textContent).toBe("αβ");
+    // The preview and the play-by-play trace agree on the same run.
+    expect(screen.getByTestId("rules-demo-trace")).not.toBeNull();
+    const lastRow = screen.getByTestId("rules-demo-row-1");
+    expect(lastRow.textContent).toContain("β");
+  });
+
+  it("updates the preview as each keystroke lands", () => {
+    const input = renderPreviewPane(transformingSimulate());
+    fireEvent.change(input, { target: { value: "a" } });
+    expect(screen.getByTestId("rules-demo-output-preview").textContent).toBe("α");
+    fireEvent.change(input, { target: { value: "abc" } });
+    expect(screen.getByTestId("rules-demo-output-preview").textContent).toBe("αβγ");
+  });
+
+  it("shows the empty-output marker when the keyboard emits nothing", () => {
+    const input = renderPreviewPane(swallowingSimulate());
+    fireEvent.change(input, { target: { value: "a" } });
+    expect(input.value).toBe("a");
+    expect(screen.getByTestId("rules-demo-output-preview").textContent).toBe("—");
+  });
+
+  it("renders no preview box before anything is typed", () => {
+    renderPreviewPane(transformingSimulate());
+    expect(screen.queryByTestId("rules-demo-output-preview")).toBeNull();
+  });
+
+  it("renders no preview box while the artifact is not ready", () => {
+    render(
+      <DemoPane artifact={IDLE} ir={null} jsBytes={null} simulateImpl={transformingSimulate()} />,
+    );
+    const input = screen.getByTestId("rules-demo-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "ab" } });
+    expect(screen.queryByTestId("rules-demo-output-preview")).toBeNull();
   });
 });
