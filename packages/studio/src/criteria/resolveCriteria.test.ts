@@ -2,7 +2,7 @@
 //
 // These run against the real catalog (ALL_CRITERIA) with baseline facts
 // that make every criterion applicable, so the counts pin the band logic
-// itself: 40 scaffolder-bake + 60 implemented layer-c checks resolve Met
+// itself: 40 scaffolder-bake + 70 implemented layer-c checks resolve Met
 // in authored mode with no findings, 14 layer-c criteria are honestly
 // Not yet checkable, and the yellow/red bands wait on the author/human.
 
@@ -61,27 +61,27 @@ const ALL_STATUSES: readonly CriterionStatus[] = [
 ];
 
 describe("resolveCriteria — authored baseline", () => {
-  it("resolves all 156 rows in catalog order with the pinned counts", () => {
+  it("resolves all 166 rows in catalog order with the pinned counts", () => {
     const result = resolveCriteria(makeInput());
 
-    expect(result.rows).toHaveLength(156);
-    expect(result.total).toBe(156);
+    expect(result.rows).toHaveLength(166);
+    expect(result.total).toBe(166);
     expect(result.rows.map((r) => r.criterion.id)).toEqual(
       ALL_CRITERIA.map((c) => c.id),
     );
 
-    // 40 scaffolder-bake + 60 implemented layer-c checks pass; the other
+    // 40 scaffolder-bake + 70 implemented layer-c checks pass; the other
     // 14 layer-c criteria have no check yet; yellow waits on the author
     // and red on a human.
     expect(result.counts).toEqual({
-      met: 100,
+      met: 110,
       "not-met": 0,
       "not-applicable": 0,
       "needs-author": 32,
       "needs-human": 10,
       "not-yet-checkable": 14,
     });
-    expect(result.resolvedCount).toBe(100);
+    expect(result.resolvedCount).toBe(110);
   });
 
   it("gives every row exactly one status and bandCounts that agree with counts", () => {
@@ -91,7 +91,7 @@ describe("resolveCriteria — authored baseline", () => {
       expect(ALL_STATUSES).toContain(row.status);
     }
     const counted = Object.values(result.counts).reduce((a, b) => a + b, 0);
-    expect(counted).toBe(156);
+    expect(counted).toBe(166);
 
     for (const status of ALL_STATUSES) {
       const bandTotal = Object.values(result.bandCounts).reduce(
@@ -101,7 +101,7 @@ describe("resolveCriteria — authored baseline", () => {
       expect(bandTotal).toBe(result.counts[status]);
     }
     expect(result.bandCounts["scaffolder-bake"].met).toBe(40);
-    expect(result.bandCounts["layer-c-enforce"].met).toBe(60);
+    expect(result.bandCounts["layer-c-enforce"].met).toBe(70);
     expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(14);
     expect(result.bandCounts["yellow-survey"]["needs-author"]).toBe(32);
     expect(result.bandCounts["red-checklist"]["needs-human"]).toBe(10);
@@ -116,12 +116,12 @@ describe("resolveCriteria — authored baseline", () => {
 });
 
 describe("resolveCriteria — foreign baseline", () => {
-  it("resolves only the 60 implemented layer-c checks and offers no controls", () => {
+  it("resolves only the 70 implemented layer-c checks and offers no controls", () => {
     const result = resolveCriteria(makeInput({ mode: "foreign" }));
 
-    expect(result.rows).toHaveLength(156);
+    expect(result.rows).toHaveLength(166);
     expect(result.counts).toEqual({
-      met: 60,
+      met: 70,
       "not-met": 0,
       "not-applicable": 0,
       "needs-author": 32,
@@ -129,7 +129,7 @@ describe("resolveCriteria — foreign baseline", () => {
       // 40 foreign scaffolder-bake rows join the 14 unimplemented checks.
       "not-yet-checkable": 54,
     });
-    expect(result.resolvedCount).toBe(60);
+    expect(result.resolvedCount).toBe(70);
     for (const row of result.rows) {
       expect(row.controls).toBeNull();
     }
@@ -165,9 +165,9 @@ describe("resolveCriteria — layer-c findings", () => {
     expect(evidence.lines).toContain(finding.hint);
 
     const result = resolveCriteria(makeInput({ lintFindings: [finding] }));
-    expect(result.counts.met).toBe(99);
+    expect(result.counts.met).toBe(109);
     expect(result.counts["not-met"]).toBe(1);
-    expect(result.resolvedCount).toBe(100);
+    expect(result.resolvedCount).toBe(110);
   });
 
   it("dedupes an identical finding reported twice (doc + engine)", () => {
@@ -221,7 +221,7 @@ describe("resolveCriteria — missing lint context", () => {
     );
 
     const result = resolveCriteria(input);
-    expect(result.counts.met).toBe(99);
+    expect(result.counts.met).toBe(109);
     expect(result.counts["not-yet-checkable"]).toBe(15);
   });
 });

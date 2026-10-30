@@ -129,6 +129,19 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_HISTORY_MD_ABSENT",
   "KM_LINT_README_HTM_ABSENT",
   "KM_LINT_WELCOME_HTM_ABSENT",
+  // Group A2 .kps-listing twins (check-kps-listing): post-hoc checks of
+  // the scaffolder-bake package-listing guarantees — 8.1b–8.6b /
+  // 8.8b–8.11b. Pure functions of the .kps <File> names.
+  "KM_LINT_KPS_KMX_ABSENT",
+  "KM_LINT_KPS_KVK_ABSENT",
+  "KM_LINT_KPS_JS_ABSENT",
+  "KM_LINT_KPS_LICENSE_ABSENT",
+  "KM_LINT_KPS_README_ABSENT",
+  "KM_LINT_KPS_WELCOME_ABSENT",
+  "KM_LINT_KPS_PHP_LISTED",
+  "KM_LINT_KPS_HELP_LISTED",
+  "KM_LINT_KPS_SOURCE_LISTED",
+  "KM_LINT_KPS_JSON_LISTED",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).

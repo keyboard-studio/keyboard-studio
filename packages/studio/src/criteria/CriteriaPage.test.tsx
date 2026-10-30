@@ -155,7 +155,7 @@ describe("CriteriaPage — header and rows agree", () => {
     ]);
   });
 
-  it("over the real catalog: 156 rows, header counts sum to the rows", () => {
+  it("over the real catalog: 166 rows, header counts sum to the rows", () => {
     const result = resolveCriteria({
       criteria: ALL_CRITERIA,
       mode: "authored",
@@ -165,15 +165,16 @@ describe("CriteriaPage — header and rows agree", () => {
     });
     render(<CriteriaPage result={result} mode="authored" />);
 
-    expect(screen.getAllByTestId("criteria-row")).toHaveLength(156);
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(166);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
-      // 100 = the pre-KPJ-pair 91 plus 1.10b/2.7 (Matthew's 2026-10-14
-      // ruling) plus the /review Group A2 file-inventory twins' 7 checks:
-      // with no findings supplied, each implemented layer-c row resolves Met.
-      "100 of 156 criteria resolved",
+      // 110 = the pre-KPJ-pair 91 plus 1.10b/2.7 (Matthew's 2026-10-14
+      // ruling) plus the /review Group A2 file-inventory twins' 7 checks
+      // plus the .kps-listing twins' 10 checks: with no findings supplied,
+      // each implemented layer-c row resolves Met.
+      "110 of 166 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
-    expect(counted).toBe(156);
+    expect(counted).toBe(166);
   });
 });
 
@@ -523,7 +524,7 @@ describe("CriteriaPage — identifiers guard", () => {
     assertClean("collapsed");
 
     for (const row of screen.getAllByTestId("criteria-row")) expandRow(row);
-    expect(screen.getAllByTestId("criteria-row-evidence")).toHaveLength(156);
+    expect(screen.getAllByTestId("criteria-row-evidence")).toHaveLength(166);
     assertClean("expanded");
 
     // Sanity: the exception is real — at least one implemented check's id

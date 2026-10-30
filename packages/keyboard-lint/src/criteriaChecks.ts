@@ -87,6 +87,7 @@ import {
   checkKpjVersionBumped,
 } from "./checks/criteria/check-kpj.js";
 import { checkFileInventory } from "./checks/criteria/check-file-inventory.js";
+import { checkKpsListing } from "./checks/criteria/check-kps-listing.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -196,6 +197,19 @@ export function runCriteriaChecks(
   // for a studio-built keyboard the scaffolder guarantees them, so the
   // twins double-verify rather than newly constrain.
   findings.push(...checkFileInventory(filePaths));
+
+  // 8.1b–8.6b / 8.8b–8.11b — the .kps-listing twins: pure functions of the
+  // .kps <File> names. An absent .kps never reaches here — the assembly
+  // names it in contextMissing for all ten codes.
+  if (kpsPath !== "") {
+    findings.push(
+      ...checkKpsListing({
+        fileNames: input.kpsFileNames,
+        hasTouchLayout,
+        kpsPath,
+      }),
+    );
+  }
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.

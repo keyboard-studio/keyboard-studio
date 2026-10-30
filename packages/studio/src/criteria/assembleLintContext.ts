@@ -111,6 +111,25 @@ const MISSING_IR = "the parsed keyboard source for this keyboard";
 const MISSING_INVENTORY = "the linguist inventory for this keyboard";
 const MISSING_KVKS = "the .kvks visual keyboard file";
 const MISSING_KPJ = "the .kpj project file";
+const MISSING_KPS = "the .kps package file";
+
+/**
+ * Group A2 .kps-listing twin codes (8.1b–8.6b / 8.8b–8.11b). All ten read
+ * the .kps <File> names; with no .kps in the judged VFS every one is a
+ * named missing input, never a verdict.
+ */
+const KPS_LISTING_TWIN_CODES = [
+  "KM_LINT_KPS_KMX_ABSENT",
+  "KM_LINT_KPS_KVK_ABSENT",
+  "KM_LINT_KPS_JS_ABSENT",
+  "KM_LINT_KPS_LICENSE_ABSENT",
+  "KM_LINT_KPS_README_ABSENT",
+  "KM_LINT_KPS_WELCOME_ABSENT",
+  "KM_LINT_KPS_PHP_LISTED",
+  "KM_LINT_KPS_HELP_LISTED",
+  "KM_LINT_KPS_SOURCE_LISTED",
+  "KM_LINT_KPS_JSON_LISTED",
+];
 
 /**
  * Batch 1 codes whose checks read the parsed keyboard IR. When the .kmn
@@ -426,6 +445,15 @@ export function assembleLintContext(
     // rather than letting either pass on an unread file.
     contextMissing[KPJ_FORMAT_OUTDATED_CODE] = MISSING_KPJ;
     contextMissing[KPJ_VERSION_BUMPED_CODE] = MISSING_KPJ;
+  }
+  if (kpsPath === undefined || kpsText === undefined) {
+    // No .kps in the judged VFS (or none readable as text): none of the
+    // .kps-listing twin rows (8.1b–8.6b / 8.8b–8.11b) can be judged —
+    // name the missing file for all ten rather than letting any pass
+    // on an unread package.
+    for (const code of KPS_LISTING_TWIN_CODES) {
+      contextMissing[code] = MISSING_KPS;
+    }
   }
   if (keyboardIR !== undefined && kpsTargets.length === 0) {
     // §8.13 has nothing to compare without a declared .kps target list
