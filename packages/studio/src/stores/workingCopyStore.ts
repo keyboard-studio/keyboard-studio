@@ -346,6 +346,38 @@ export type { IdentityPatch } from "./identityPatch.ts";
 // State interface
 // ---------------------------------------------------------------------------
 
+/**
+ * The suggested discards the carve gallery applied by default (spec 106
+ * FR-042): the fingerprint of the suggestion set, and the removal keys
+ * (`kind:id`, survey/carve/carveValue.ts `removalKey`) that applying it added.
+ */
+export interface CarveSuggestionApplied {
+  fingerprint: string;
+  derived: string[];
+  /** True once the author restored anything (keep, restore all, undo). */
+  touched?: boolean;
+  /** True once the author continued past carve: the default is approved. */
+  confirmed?: boolean;
+}
+
+/**
+ * The applied carve suggestion after the author restored `ids` / `chars`:
+ * those removals are the author's from now on, so they leave `derived`, and
+ * the suggestion is marked touched (spec 106 FR-042: `asked` provenance).
+ */
+function pruneCarveSuggestion(
+  cs: CarveSuggestionApplied | null,
+  ids: readonly string[],
+  chars: readonly string[],
+): CarveSuggestionApplied | null {
+  if (cs === null) return null;
+  const gone = new Set([
+    ...ids.flatMap((id) => [`item:${id}`, `node:${id}`]),
+    ...chars.map((c) => `char:${c.normalize("NFC")}`),
+  ]);
+  return { ...cs, derived: cs.derived.filter((k) => !gone.has(k)), touched: true };
+}
+
 export interface WorkingCopyState {
   // -- Instantiation mode (spec §8 v1.3.0) ------------------------------------
   /**
@@ -674,7 +706,7 @@ export interface WorkingCopyState {
 
   /**
    * Declined displacement proposals (spec 106 FR-043): each entry is
-   * `displaced|vkey|sorted-modifiers`, written when the author leaves a
+   * `displaced|vkey|sorted-modifiers|incoming`, written when the author leaves a
    * displaced character without a new key ("Leave it" / "Keep both"). The
    * gallery does not re-propose a declined displacement, and the
    * physical-layout decision records the list, so the loss is a recorded
@@ -684,6 +716,19 @@ export interface WorkingCopyState {
 
   /** Record one declined displacement (idempotent). */
   declineDisplacement: (key: string) => void;
+
+  /**
+   * The carve gallery's suggested discards, once applied as a default on
+   * its first visit (spec 106 FR-042): the suggestion fingerprint and the
+   * removal keys applying it added. The gallery re-applies only when the
+   * fingerprint changes, so a returning author's Keep is never overridden;
+   * the carved-layout value reads `derived` provenance from it. Null until
+   * a suggestion has been applied.
+   */
+  carveSuggestion: CarveSuggestionApplied | null;
+
+  /** Record the applied carve suggestion (replaces wholesale). */
+  setCarveSuggestion: (applied: CarveSuggestionApplied | null) => void;
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
@@ -1548,6 +1593,7 @@ function freshInstantiationTail() {
     fallbackPolicy: DEFAULT_FALLBACK_POLICY,
     carveTouchKeepInert: [],
     displacedDeclined: [],
+    carveSuggestion: null,
     // Spec 104 identity records are per-working-copy too: a fresh start
     // has no severances, no transplants and no guard answer yet.
     keyIdentityDecisions: [],
@@ -1642,6 +1688,7 @@ export type WorkingCopyData = Omit<
   | "setFallbackPolicy"
   | "setCarveTouchKeepInert"
   | "declineDisplacement"
+  | "setCarveSuggestion"
   | "recordPhase"
   | "recordAssignments"
   | "setIrAxes"
@@ -1737,6 +1784,7 @@ const INITIAL_STATE: WorkingCopyData = {
   fallbackPolicy: DEFAULT_FALLBACK_POLICY,
   carveTouchKeepInert: [],
   displacedDeclined: [],
+  carveSuggestion: null,
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
@@ -1882,6 +1930,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           deletedItemIds: nextItems,
           carveChars: nextCarveChars,
           undoStack: nextUndoStack,
+          carveSuggestion: pruneCarveSuggestion(
+            s.carveSuggestion,
+            [...last.nodeIds, ...last.itemIds],
+            [...undoneChars],
+          ),
         };
       }
     }),
@@ -1959,7 +2012,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // undoStack — otherwise a committed key edit would be left applied with no
   // remaining way to undo it.
   keepAll: () =>
-    set({
+    set((s) => ({
+      carveSuggestion:
+        s.carveSuggestion === null
+          ? null
+          : { ...s.carveSuggestion, derived: [], touched: true },
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
@@ -1968,7 +2025,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       keyEditOverlay: { ops: [] },
       carveTouchKeepInert: [],
       deadkeyOverlay: { ops: [] },
-    }),
+    })),
 
   restoreAll: () => get().keepAll(),
 
@@ -2037,6 +2094,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         deletedItemIds: nextItems,
         carveChars: nextCarveChars,
         undoStack: nextUndoStack,
+        carveSuggestion: pruneCarveSuggestion(s.carveSuggestion, ids, restoredChars),
       };
     });
   },
@@ -2049,6 +2107,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // comparison stays exact.
   setCarveTouchKeepInert: (chars) =>
     set({ carveTouchKeepInert: chars.map((c) => c.normalize("NFC")) }),
+
+  setCarveSuggestion: (applied) => set({ carveSuggestion: applied }),
 
   declineDisplacement: (key) =>
     set((s) =>

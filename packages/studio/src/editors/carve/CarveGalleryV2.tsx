@@ -7,10 +7,11 @@
 // cascades through the shared workingCopyStore actions
 // (cascadeDelete/cascadeRestore) — no gallery-specific write path.
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
+import { currentCarvedLayoutValue, removalKey } from '../../survey/carve/carveValue.ts';
 import { resolveCarvedCombos } from '../../lib/carvedCombo.ts';
 import { ReviewCarvedKeysDialog } from './ReviewCarvedKeys.tsx';
 import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
@@ -138,7 +139,9 @@ function isRowDiscarded(row: RecommendedRemovalChar, isItemDeleted: (id: string)
   return ids.every((id) => isItemDeleted(id));
 }
 
-type CellFlag = 'discarded' | 'suggested' | 'yours' | null;
+// 'suggested-discard': discarded by the gallery's suggested default (spec 106
+// FR-042), not by the author — one click keeps it.
+type CellFlag = 'discarded' | 'suggested-discard' | 'suggested' | 'yours' | null;
 
 interface CharacterCellButtonProps {
   cell: CharacterCell;
@@ -162,6 +165,8 @@ interface CharacterCellButtonProps {
  * length, gave the grid ragged, uneven cells.
  */
 function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onToggle }: CharacterCellButtonProps) {
+  const { t } = useLingui();
+  const suggestedDiscard = t({ id: "carve.cell.suggestedDiscard", message: "discarded, suggested — click to keep" });
   return (
     <button
       type="button"
@@ -169,7 +174,10 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
       onFocus={onSelect}
       onClick={onToggle}
       aria-pressed={discarded}
-      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${discarded ? ', discarded' : ''}`}
+      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${
+        flag === 'suggested-discard' ? `, ${suggestedDiscard}` : discarded ? ', discarded' : ''
+      }`}
+      {...(flag === 'suggested-discard' ? { title: suggestedDiscard } : {})}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: '10px 4px 8px', borderRadius: 8, cursor: 'pointer',
@@ -235,13 +243,15 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           // surface-2 cell) — a real failure, not a thin-margin pass. Muted
           // clears every theme/background combination this cell can render.
           color:
-            flag === 'discarded'
+            flag === 'discarded' || flag === 'suggested-discard'
               ? 'var(--app-text-muted)'
               : flag === 'suggested'
                 ? 'var(--app-warning-text)'
                 : 'var(--app-success-text)',
         }}>
-          {flag}
+          {flag === 'suggested-discard'
+            ? t({ id: "carve.cell.flag.suggestedDiscard", message: "suggested" })
+            : flag}
         </span>
       )}
     </button>
@@ -260,6 +270,8 @@ interface RecommendedGroupCardProps {
   rows: RecommendedRemovalChar[];
   cellsByCh: ReadonlyMap<string, CharacterCell>;
   isItemDeleted: (id: string) => boolean;
+  /** True for a row the gallery's suggested default discarded (spec 106 FR-042). */
+  isDerivedRow?: (row: RecommendedRemovalChar) => boolean;
   onToggleRow: (row: RecommendedRemovalChar) => void;
   onBulkToggle: (discard: boolean) => void;
   discardAllLabel: (count: number) => string;
@@ -292,7 +304,7 @@ interface RecommendedGroupCardProps {
  */
 function RecommendedGroupCard({
   testId, toggleAllTestId, regionAriaLabel, topBorderColor, chipBackground, chipColor, heading, body,
-  rows, cellsByCh, isItemDeleted, onToggleRow, onBulkToggle, discardAllLabel, restoreAllLabel,
+  rows, cellsByCh, isItemDeleted, isDerivedRow, onToggleRow, onBulkToggle, discardAllLabel, restoreAllLabel,
   selectedCh, onSelectCh, collapsible, destructiveBulkButton,
 }: RecommendedGroupCardProps) {
   if (rows.length === 0) return null;
@@ -415,7 +427,7 @@ function RecommendedGroupCard({
                     cell={cell}
                     discarded={discarded}
                     isSelected={selectedCh === cell.ch}
-                    flag={discarded ? 'discarded' : 'suggested'}
+                    flag={discarded ? (isDerivedRow?.(row) === true ? 'suggested-discard' : 'discarded') : 'suggested'}
                     onSelect={() => onSelectCh(cell.ch)}
                     onToggle={() => onToggleRow(row)}
                   />
@@ -768,8 +780,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [orthographyNeededSet, retainedSet],
   );
 
+  // False while the needed set or the IR is still loading: `recommended` is
+  // then an empty placeholder, not "nothing to suggest".
+  const recommendationReady = instantiationMode !== null && hasSignal && ir !== null;
   const recommended = useMemo(
-    () => (instantiationMode !== null && hasSignal && ir
+    () => (recommendationReady && ir
       ? recommendedRemovalChars({
         ir,
         needed: neededSet,
@@ -778,7 +793,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
         blockCandidateChars,
       })
       : []),
-    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
+    [ir, recommendationReady, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
   );
   // irToCharacterView's internal lookup key is always NFC-normalized
   // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on
@@ -861,6 +876,69 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       cascadeRestore(ids, rows.flatMap((row) => row.caseGroup ?? [row.ch]));
     }
   }, [cascadeDelete, cascadeRestore]);
+
+  // Spec 106 FR-042: the suggested discards are the default. On the first
+  // visit they are applied as `derived` removals, shown as "discarded,
+  // suggested — click to keep", and approved by Continue. The applied
+  // fingerprint lives in the working copy. When the suggestion set changes
+  // (the author kept a letter at the convenience question, say), defaults
+  // that are no longer suggested are restored and only NEWLY suggested rows
+  // are applied, so a returning author's Keep is never overridden.
+  const carveSuggestion = useWorkingCopyStore((s) => s.carveSuggestion);
+  const setCarveSuggestion = useWorkingCopyStore((s) => s.setCarveSuggestion);
+  const suggestionFingerprint = useMemo(
+    () => primaryRows.map((r) => r.ch.normalize('NFC')).sort().join(' '),
+    [primaryRows],
+  );
+  useEffect(() => {
+    if (!recommendationReady) return;
+    const applied = useWorkingCopyStore.getState().carveSuggestion;
+    if (applied?.fingerprint === suggestionFingerprint) return;
+    if (applied === null && primaryRows.length === 0) return;
+
+    const currentIds = new Set(primaryRows.flatMap(recommendedRowIds));
+    const currentChars = new Set(
+      primaryRows.flatMap((r) => (r.caseGroup ?? [r.ch]).map((c) => c.normalize('NFC'))),
+    );
+    const isCurrent = (key: string): boolean => {
+      const id = key.slice(key.indexOf(':') + 1);
+      return key.startsWith('char:') ? currentChars.has(id) : currentIds.has(id);
+    };
+    const kept = (applied?.derived ?? []).filter(isCurrent);
+    const stale = (applied?.derived ?? []).filter((k) => !isCurrent(k));
+    if (stale.length > 0) {
+      const ids = stale.filter((k) => !k.startsWith('char:')).map((k) => k.slice(k.indexOf(':') + 1));
+      const chars = stale.filter((k) => k.startsWith('char:')).map((k) => k.slice('char:'.length));
+      cascadeRestore(ids, chars);
+    }
+
+    const previouslySuggested = new Set(applied?.fingerprint.split(' ').filter((c) => c !== '') ?? []);
+    const before = new Set(currentCarvedLayoutValue().removals.map(removalKey));
+    toggleRecommendedRows(
+      primaryRows.filter(
+        (r) => !previouslySuggested.has(r.ch.normalize('NFC')) && !isRowDiscarded(r, isItemDeleted),
+      ),
+      true,
+    );
+    const added = currentCarvedLayoutValue().removals.map(removalKey).filter((k) => !before.has(k));
+    // The effect's own restores are not author actions: keep the prior touched state.
+    setCarveSuggestion({
+      fingerprint: suggestionFingerprint,
+      derived: [...kept, ...added],
+      ...(applied?.touched === true ? { touched: true } : {}),
+    });
+  }, [recommendationReady, primaryRows, suggestionFingerprint, toggleRecommendedRows, cascadeRestore, isItemDeleted, setCarveSuggestion]);
+  const derivedIds = useMemo(
+    () => new Set((carveSuggestion?.derived ?? []).map((k) => k.slice(k.indexOf(':') + 1))),
+    [carveSuggestion],
+  );
+  const isDerivedRow = useCallback(
+    (row: RecommendedRemovalChar) => {
+      const ids = recommendedRowIds(row);
+      return ids.length > 0 && ids.every((id) => derivedIds.has(id));
+    },
+    [derivedIds],
+  );
 
   const [selectedCh, setSelectedCh] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>('category');
@@ -1074,12 +1152,37 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // Skip and Continue wait for the IR — there is nothing to keep or carve yet.
   // The nav ids are the ones Carve v1 used, restored so their existing
   // translations come back (FR-044).
+  // Spec 106 FR-042 / Art. X: the suggested default stands only once the
+  // author continues. Continue (or Skip) confirms it; Back before that
+  // withdraws the unconfirmed default, so leaving carve backwards never
+  // carries removals nobody approved. The next visit proposes it again.
+  const confirmSuggestion = useCallback(() => {
+    const cs = useWorkingCopyStore.getState().carveSuggestion;
+    if (cs !== null && cs.confirmed !== true) setCarveSuggestion({ ...cs, confirmed: true });
+  }, [setCarveSuggestion]);
+  const handleBack = useCallback(() => {
+    const cs = useWorkingCopyStore.getState().carveSuggestion;
+    if (cs !== null && cs.confirmed !== true) {
+      const strip = (k: string): string => k.slice(k.indexOf(':') + 1);
+      cascadeRestore(
+        cs.derived.filter((k) => !k.startsWith('char:')).map(strip),
+        cs.derived.filter((k) => k.startsWith('char:')).map(strip),
+      );
+      setCarveSuggestion(null);
+    }
+    onBack?.();
+  }, [cascadeRestore, setCarveSuggestion, onBack]);
+  const handleContinue = useCallback(() => {
+    confirmSuggestion();
+    onComplete();
+  }, [confirmSuggestion, onComplete]);
+
   const backAction =
     onBack !== undefined
       ? {
           back: {
             label: t({ id: 'editor.carve.backButton', message: '← Back' }),
-            onClick: onBack,
+            onClick: handleBack,
             testId: 'carve-back',
           },
         }
@@ -1091,12 +1194,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           ...backAction,
           secondary: {
             label: t({ id: 'editor.carve.skipButton', message: 'Skip' }),
-            onClick: () => { keepAll(); onComplete(); },
+            onClick: () => { keepAll(); confirmSuggestion(); onComplete(); },
             testId: 'carve-skip',
           },
           forward: {
             label: t({ id: 'editor.carve.continueButton', message: 'Continue →' }),
-            onClick: onComplete,
+            onClick: handleContinue,
             testId: 'carve-continue',
           },
         },
@@ -1351,6 +1454,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 rows={primaryRows}
                 cellsByCh={cellsByCh}
                 isItemDeleted={isItemDeleted}
+                isDerivedRow={isDerivedRow}
                 onToggleRow={toggleRowDecide}
                 onBulkToggle={(discard) => toggleRowsDecide(primaryRows, discard)}
                 discardAllLabel={(count) => t({ id: "carve.recommended.discardAll", message: `Discard all ${count}` })}

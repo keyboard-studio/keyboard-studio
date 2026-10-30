@@ -7,9 +7,29 @@ import type {
   IRRule,
   MechanismAssignment,
   MechanismRef,
+  Pattern,
 } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import { claimedInputRuleIds } from "./claimedInputs.ts";
+import { claimedInputRuleIds as claimedWith } from "./claimedInputs.ts";
+
+/** A stand-in pattern whose fragment uses `slot` as a required placeholder. */
+function stub(slot: string): Pattern {
+  return { kmnFragment: `{{${slot}}}`, questions: [{ id: slot }] } as unknown as Pattern;
+}
+const PATTERNS: Record<string, Pattern> = {
+  simple_swap: stub("kmnRules"),
+  deadkey_single_tap: stub("triggerKey"),
+  postfix_compose: stub("markKey"),
+  modifier_as_layer_switch: stub("altgrKeyList"),
+};
+const getPattern = (id: string): Pattern | undefined => PATTERNS[id];
+
+function claimedInputRuleIds(
+  ir: Parameters<typeof claimedWith>[0],
+  assignments: Parameters<typeof claimedWith>[1],
+): Set<string> {
+  return claimedWith(ir, assignments, getPattern);
+}
 
 function vkey(name: string, modifiers: string[] = []): ContextElement {
   return { kind: "vkey", name, modifiers };
@@ -132,6 +152,14 @@ describe("claimedInputRuleIds", () => {
   it("an unknown modifier on the starting rule claims nothing", () => {
     const odd = rule("r-odd", [vkey("K_QUOTE", ["FUNKY"])]);
     expect(claimedInputRuleIds(ir([odd]), [swap("+ [K_QUOTE] > U+2019")]).size).toBe(0);
+  });
+
+  it("an assignment step 2 would skip claims nothing (unknown pattern, missing required slot)", () => {
+    const unknown = assignment({ patternId: "no_such_pattern", strategyId: "S-01", slotValues: { kmnRules: "+ [K_QUOTE] > U+2019" } });
+    expect(claimedInputRuleIds(ir(), [unknown]).size).toBe(0);
+    const noTrigger = assignment({ patternId: "deadkey_single_tap", strategyId: "S-02", slotValues: { deadkeyName: "x" } });
+    expect(claimedInputRuleIds(ir(), [noTrigger]).size).toBe(0);
+    expect(claimedWith(ir(), [swap("+ [K_QUOTE] > U+2019")], () => undefined).size).toBe(0);
   });
 
   it("an S-08 claims every keystroke in its key list", () => {

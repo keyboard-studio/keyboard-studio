@@ -507,7 +507,7 @@ export function projectWorkingCopyVfs(
   // them. They are plain removals, not carves: exempt from the fallback
   // policy's suppression rewrite, and kept out of the keycap cascade (step
   // 1.5), whose key the assignment itself still needs.
-  const claimedRuleIds = claimedInputRuleIds(startIr, assignments);
+  const claimedRuleIds = claimedInputRuleIds(startIr, assignments, getPattern);
   const effectiveItemIds =
     claimedRuleIds.size === 0
       ? aggregatedItemIds

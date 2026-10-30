@@ -167,7 +167,7 @@ Each story phase ends with the same three gate tasks:
   - the postfix mark key is claimed.
 - [x] T037 [US4] Extend `mechanismSlotEntries` in `packages/studio/src/survey/slotOccupancy.ts` (:202) with S-02 (the trigger, plus `RALT trigger` when `escapes` has `altgr`) and `postfix_compose` (the mark key). Also fix S-01 parsing (:215), which reads only the first `U+XXXX` of a rule's RHS: an NFD S-01 output must yield the full NFC-normalised char. Audit callers (`buildSlotOccupancy`, `maybeRaiseDisplacement`) for behaviour changes and keep their tests green.
 - [x] T038 [US4] Implement `claimedInputRuleIds(startIr, assignments)` in `packages/studio/src/lib/claimedInputs.ts` and union the result into `effectiveItemIds` in step 1 of `projectWorkingCopyVfs.ts` (~:446-462), per projection only.
-- [ ] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
+- [x] T039 [US4] Suggested discards as an approvable default, in `packages/studio/src/editors/carve/CarveGalleryV2.tsx` (:771, :846-863, :1342-1361) and `survey/carve/carveValue.ts`:
   - on the first visit, when the value's `suggestionFingerprint` does not match, apply `toggleRecommendedRows(primaryRows, true)` with provenance `derived`;
   - render those rows as "discarded, suggested — click to keep";
   - `editors/adapters/carveAdapter.tsx` (:28-40) records `carved-layout` with provenance `default` while only derived items exist, and `asked` once the author has toggled anything;

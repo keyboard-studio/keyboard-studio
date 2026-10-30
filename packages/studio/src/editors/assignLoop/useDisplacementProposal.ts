@@ -78,13 +78,18 @@ export interface UseDisplacementProposal {
   rebase: (from: MechanismAssignment, to: MechanismAssignment) => void;
 }
 
-/** The `displacedDeclined` key: displaced glyph, vkey, sorted modifiers. */
+/**
+ * The `displacedDeclined` key: displaced glyph, vkey, sorted modifiers, and
+ * the incoming character. The incoming character is part of it so that a
+ * different character later displacing the same glyph is proposed afresh.
+ */
 function dismissalKey(p: {
   displacedChar: string;
+  incomingChar: string;
   vkey: string;
   modifiers: readonly string[];
 }): string {
-  return `${p.displacedChar}|${p.vkey}|${[...p.modifiers].sort().join(",")}`;
+  return `${p.displacedChar}|${p.vkey}|${[...p.modifiers].sort().join(",")}|${p.incomingChar}`;
 }
 
 export function useDisplacementProposal(): UseDisplacementProposal {

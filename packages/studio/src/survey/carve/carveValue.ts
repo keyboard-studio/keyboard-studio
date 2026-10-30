@@ -10,7 +10,12 @@
 // renderer so the two surfaces never compute different values (the
 // currentRuleSetValue precedent).
 
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import {
+  useWorkingCopyStore,
+  type CarveSuggestionApplied,
+} from "../../stores/workingCopyStore.ts";
+
+export type { CarveSuggestionApplied };
 
 /**
  * One removal-set item (RULED, T003 / owner ruling 2026-10-06): flat
@@ -35,6 +40,12 @@ export interface CarveRemovalItem {
  */
 export interface CarvedLayoutValue {
   removals: CarveRemovalItem[];
+  /**
+   * The suggested-discard set the gallery applied as a default on its first
+   * visit (spec 106 FR-042), as a fingerprint. Absent when no suggestion was
+   * ever applied, so values recorded before the field existed are unchanged.
+   */
+  suggestionFingerprint?: string;
 }
 
 /** The overlay slices the value snapshots — a structural subset of the
@@ -44,6 +55,11 @@ export interface CarveOverlaySnapshot {
   deletedItemIds: ReadonlySet<string>;
   disabledFamilyIds: ReadonlySet<string>;
   carveChars: ReadonlySet<string>;
+}
+
+/** One removal item's identity across the four id spaces. */
+export function removalKey(item: Pick<CarveRemovalItem, "kind" | "id">): string {
+  return `${item.kind}:${item.id}`;
 }
 
 const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family", "char"];
@@ -57,14 +73,11 @@ const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family
  * reach the same overlay by different click orders record the same
  * value.
  *
- * Per-item provenance is `asked` for every item, deliberately: in the
- * live flow every overlay removal is an author action (the gallery's
- * cascadeDelete/keepAll/restoreAll handlers and the assign loop's
- * cascadeDelete route) — no proposal-acceptance or starting-point
- * seeding path writes the overlay today, so `derived` / `extracted`
- * items cannot be produced honestly yet. Those values become real
- * when the seeding paths land (092 live extraction); inventing the
- * split at record time would fabricate provenance.
+ * Per-item provenance is `asked` for an author action, and `derived` for
+ * a removal the gallery applied as its suggested default (spec 106
+ * FR-042) — the items in `suggestion.derived`. No starting-point seeding
+ * path writes the overlay today, so `extracted` cannot be produced
+ * honestly yet; it becomes real when 092 live extraction lands.
  *
  * Reconstructibility (ruling D-090-30 condition (i)): the snapshot
  * covers every overlay component that can be non-trivial at carve
@@ -76,7 +89,9 @@ const KIND_ORDER: readonly CarveRemovalItem["kind"][] = ["node", "item", "family
  */
 export function carvedLayoutValueFromOverlay(
   overlay: CarveOverlaySnapshot,
+  suggestion: CarveSuggestionApplied | null = null,
 ): CarvedLayoutValue {
+  const derived = new Set(suggestion?.derived ?? []);
   const sets: Record<CarveRemovalItem["kind"], ReadonlySet<string>> = {
     node: overlay.deletedNodeIds,
     item: overlay.deletedItemIds,
@@ -86,19 +101,44 @@ export function carvedLayoutValueFromOverlay(
   const removals: CarveRemovalItem[] = [];
   for (const kind of KIND_ORDER) {
     for (const id of [...sets[kind]].sort()) {
-      removals.push({ kind, id, provenance: "asked" });
+      const provenance = derived.has(removalKey({ kind, id })) ? "derived" : "asked";
+      removals.push({ kind, id, provenance });
     }
   }
-  return { removals };
+  return suggestion === null
+    ? { removals }
+    : { removals, suggestionFingerprint: suggestion.fingerprint };
+}
+
+/**
+ * True while the value holds exactly the suggested default and nothing the
+ * author changed: every derived removal is still there and no other removal
+ * exists. The carved-layout decision is then `default`-provenance (spec 106
+ * FR-042); any keep, extra discard or restore makes it `asked`.
+ */
+export function isUntouchedSuggestion(
+  value: CarvedLayoutValue,
+  suggestion: CarveSuggestionApplied | null,
+): boolean {
+  if (suggestion === null || suggestion.touched === true || suggestion.derived.length === 0) {
+    return false;
+  }
+  return (
+    value.removals.length === suggestion.derived.length &&
+    value.removals.every((r) => r.provenance === "derived")
+  );
 }
 
 /** The carved-layout value from the live working copy's carve overlay. */
 export function currentCarvedLayoutValue(): CarvedLayoutValue {
   const s = useWorkingCopyStore.getState();
-  return carvedLayoutValueFromOverlay({
-    deletedNodeIds: s.deletedNodeIds,
-    deletedItemIds: s.deletedItemIds,
-    disabledFamilyIds: s.disabledFamilyIds,
-    carveChars: s.carveChars,
-  });
+  return carvedLayoutValueFromOverlay(
+    {
+      deletedNodeIds: s.deletedNodeIds,
+      deletedItemIds: s.deletedItemIds,
+      disabledFamilyIds: s.disabledFamilyIds,
+      carveChars: s.carveChars,
+    },
+    s.carveSuggestion,
+  );
 }

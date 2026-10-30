@@ -27,8 +27,12 @@
 //     `[NCAPS K_A]` and `[CAPS K_A]`.
 //   - The rule's output does not matter: a shadowed starting deadkey
 //     trigger is dropped too (its dk() compositions are kept, FR-041).
+//   - A mechanism claims only when step 2 will actually merge it, by the
+//     same gates applyAssignments uses (pattern resolves, fragment is
+//     non-empty, every required slot has a value). One it would skip with a
+//     warning must not take the starting rule down with it.
 
-import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
+import type { KeyboardIR, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
 import { mechanismClaimedSlots } from "../survey/slotOccupancy.ts";
 
@@ -62,6 +66,24 @@ function keystrokeOf(vkey: string, modifiers: readonly string[]): Keystroke | nu
   };
 }
 
+type MechanismLike = MechanismAssignment["mechanisms"][number];
+
+/** True when applyAssignments will emit this mechanism's fragment. */
+function willMerge(
+  mech: MechanismLike,
+  getPattern: (id: string) => Pattern | undefined,
+): boolean {
+  const pattern = getPattern(mech.patternId);
+  if (pattern === undefined || pattern.kmnFragment.trim() === "") return false;
+  const slots = mech.slotValues ?? {};
+  return pattern.questions.every(
+    (q) =>
+      q.required === false ||
+      !pattern.kmnFragment.includes(`{{${q.id}}}`) ||
+      slots[q.id] !== undefined,
+  );
+}
+
 function covers(claim: Keystroke, rule: Keystroke): boolean {
   return (
     claim.vkey === rule.vkey &&
@@ -73,11 +95,12 @@ function covers(claim: Keystroke, rule: Keystroke): boolean {
 /**
  * The nodeIds of the starting rules in `startIr` that this session's
  * physical assignments shadow. See the module doc for what is (and is
- * deliberately not) claimed.
+ * deliberately not) claimed. `getPattern` is the projection's resolver.
  */
 export function claimedInputRuleIds(
   startIr: KeyboardIR,
   assignments: ReadonlyArray<MechanismAssignment>,
+  getPattern: (id: string) => Pattern | undefined,
 ): Set<string> {
   const ids = new Set<string>();
   const main = startIr.groups.find((g) => g.name === "main");
@@ -87,6 +110,7 @@ export function claimedInputRuleIds(
   for (const assignment of assignments) {
     if (assignment.modality !== "physical") continue;
     for (const mech of assignment.mechanisms) {
+      if (!willMerge(mech, getPattern)) continue;
       for (const slot of mechanismClaimedSlots(mech)) {
         const k = keystrokeOf(slot.vkey, slot.modifiers);
         if (k !== null) claims.push(k);

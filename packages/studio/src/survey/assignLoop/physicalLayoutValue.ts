@@ -20,9 +20,11 @@ export interface PhysicalLayoutValue {
   assignments: MechanismAssignment[];
   /**
    * Displacements the author declined (spec 106 FR-043): each entry is
-   * `displaced|vkey|sorted-modifiers`, a still-needed character left
-   * without a new key. Absent when there are none, so values recorded
-   * before the field existed are unchanged.
+   * `displaced|vkey|sorted-modifiers|incoming`, a still-needed character
+   * left without a new key. Only declines whose incoming character still
+   * has an assignment are recorded: removing that assignment ends the
+   * displacement. Absent when there are none, so values recorded before
+   * the field existed are unchanged.
    */
   displacedDeclined?: string[];
 }
@@ -48,9 +50,14 @@ export function physicalLayoutValueFromPhaseResults(
   phaseResults: Parameters<typeof selectDesktopAssignments>[0],
   displacedDeclined: readonly string[] = [],
 ): PhysicalLayoutValue {
+  const assignments = [...selectDesktopAssignments(phaseResults)];
+  const targets = new Set(assignments.map((a) => a.target));
+  const live = displacedDeclined
+    .filter((key) => targets.has(key.slice(key.lastIndexOf("|") + 1)))
+    .sort();
   return {
-    assignments: [...selectDesktopAssignments(phaseResults)],
-    ...(displacedDeclined.length > 0 ? { displacedDeclined: [...displacedDeclined].sort() } : {}),
+    assignments,
+    ...(live.length > 0 ? { displacedDeclined: live } : {}),
   };
 }
 

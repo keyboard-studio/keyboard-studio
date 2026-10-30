@@ -27,6 +27,8 @@
   "base.readiness.opaque": "Editable — some advanced rules will be kept as-is",
   "base.readiness.parseErr": "Can't be used as a starting point in the studio yet — pick another keyboard",
   "base.readiness.technicalLabel": "Technical status: {technicalLabel}",
+  "carve.cell.flag.suggestedDiscard": "suggested",
+  "carve.cell.suggestedDiscard": "discarded, suggested — click to keep",
   "carve.details.discardBlurb": "If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.",
   "carve.details.heading": "Character details",
   "carve.detailsCard.carve": "Discard",

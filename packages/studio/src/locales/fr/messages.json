@@ -27,6 +27,8 @@
   "base.readiness.opaque": "Modifiable — certaines règles avancées seront conservées telles quelles",
   "base.readiness.parseErr": "On ne peut pas encore s'en servir comme point de départ en studio — choisissez un autre clavier",
   "base.readiness.technicalLabel": "État technique : {technicalLabel}",
+  "carve.cell.flag.suggestedDiscard": "suggéré",
+  "carve.cell.suggestedDiscard": "supprimé, suggéré — cliquez pour le conserver",
   "carve.details.discardBlurb": "Si vous supprimez ce caractère, votre clavier cesse de le saisir. Tout élément ne produisant que ce caractère est supprimé ; tout élément commun avec un caractère que vous conservez reste en place. La suppression n'est pas définitive : vous pouvez à tout moment rétablir le caractère pour le faire réapparaître.",
   "carve.details.heading": "Détails du caractère",
   "carve.detailsCard.carve": "Carve",

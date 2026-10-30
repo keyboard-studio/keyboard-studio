@@ -194,8 +194,8 @@ describe("MechanismGallery — displacement demotion proposal (#2300)", () => {
       getPhaseCPhysicalAssignments().find((a) => a.target === "'"),
     ).toBeUndefined();
     // Spec 106 FR-043: the decline is a recorded decision, not component state.
-    expect(useWorkingCopyStore.getState().displacedDeclined).toEqual(["'|K_QUOTE|"]);
-    expect(currentPhysicalLayoutValue().displacedDeclined).toEqual(["'|K_QUOTE|"]);
+    expect(useWorkingCopyStore.getState().displacedDeclined).toEqual(["'|K_QUOTE||ə"]);
+    expect(currentPhysicalLayoutValue().displacedDeclined).toEqual(["'|K_QUOTE||ə"]);
   });
 
   it("double-assign on K_QUOTE: a second character on the taken combo raises a BOTH-CORE proposal naming the first character", async () => {
