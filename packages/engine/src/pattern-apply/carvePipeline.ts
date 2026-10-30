@@ -17,6 +17,8 @@
 //      reference it (re-derived from the start IR each time, so un-carve
 //      needs no restoration record for this stage). Suppression-owned guard rules
 //      are rules, not store entries, so they are unaffected.
+//   4. Deadkey prune — a deadkey the carve left unconsumed (consumed
+//      in the start IR, by nothing in the carved IR) is stripped from every output (see carveDeadkeyPrune.ts).
 //   3. Whole-node filter — carveFilterIr drops deleted nodes. Rules carrying
 //      ownedByBehaviour (suppression output) are never filter targets: the
 //      filter must not undo the compiler's in-place block rewrite, and
@@ -27,6 +29,7 @@ import { compileCarveSuppression } from "./carveSuppression.js";
 import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
 import { applyStoreSlotRemovals, type CascadedSlotRemoval } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
+import { pruneCarveUnusedDeadkeys } from "./carveDeadkeyPrune.js";
 import { parseSlotId } from "./slotId.js";
 
 /**
@@ -149,10 +152,17 @@ export function deriveCarvedIr(
   ]);
   const filtered = carveFilterIr(removalResult.ir, allWholeNodeIds);
 
+  // Stage 4 — prune deadkeys the carve left unconsumed (and the arming rules
+  // that only existed to set them). Runs last so it sees every removal.
+  const pruned = pruneCarveUnusedDeadkeys(startIr, filtered, {
+    swallow: input.fallbackPolicy === "swallow",
+    loud: input.loud === true,
+  });
+
   return {
-    ir: filtered,
+    ir: pruned.ir,
     warnings: removalResult.warnings,
-    notices: removalResult.notices,
+    notices: [...removalResult.notices, ...pruned.notices],
     cascadedRemovals: removalResult.cascaded,
   };
 }

@@ -124,7 +124,7 @@ interface RuleLocation {
   rule: IRRule;
 }
 
-function stampOwnership(rule: IRRule, output: OutputElement[]): IRRule {
+export function stampOwnership(rule: IRRule, output: OutputElement[]): IRRule {
   // FR-002: the two ownership markers are mutually exclusive on one rule.
   const { ownedByPattern: _dropped, ...rest } = rule;
   return { ...structuredClone(rest), output, ownedByBehaviour: CARVE_SUPPRESSION_OWNER };
