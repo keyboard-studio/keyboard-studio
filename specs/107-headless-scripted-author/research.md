@@ -51,7 +51,7 @@ replaces a weaker one (FR-031).
 **32-case suite (SC-008)**: 25 s + 32 x 6 s = about 3.6 min, under the 10-minute bound.
 
 **Wide sweep (FR-034)**: about 608 parseable keyboards (`docs/import-corpus.json`: 496 `clean`, 112
-`clean-with-opaque`; 313 `round-trip-divergence` are skipped as not codec-clean) x 2 profiles x 6 s is
+`clean-with-opaque`; under the amended R6 the 301 `round-trip-divergence` keyboards that parse completely are eligible too, 887 in all) x 2 profiles x 6 s is
 about 2 h single-runner, about 30 min on a 4-way shard matrix. The Latin slice is smaller.
 
 **Alternatives considered**: estimating without measuring (rejected: the ruling asks for a measured
@@ -207,9 +207,19 @@ makes US1's record unlike any UI walk and pushes every parity difference into th
 ## R6. Eligibility without try/catch around parse (Art. II)
 
 **Decision**: `eligibility.ts` decides before scaffolding: keyboard present under `../keyboards`;
-status in `docs/import-corpus.json` is `clean` or `clean-with-opaque`; script not routed to the CJK or
-Ethiopic stub (from the product's own three-group routing); inside the requested slice. A keyboard that
-passes eligibility and then fails to scaffold is a **failure**, not a skip.
+the codec parses it completely (`docs/import-corpus.json`: no `parseErrors` and Layer A'
+`i1ParseComplete: true`); script not routed to the CJK or Ethiopic stub (from the product's own
+three-group routing); inside the requested slice. A keyboard that passes eligibility and then fails to
+scaffold is a **failure**, not a skip.
+
+**Amended 2026-10-30 (owner ruling, option A).** The first version also required import status `clean`
+or `clean-with-opaque`. That excluded every `round-trip-divergence` keyboard, including three of the
+six PR-set keyboards (`basic_kbdfr`, `sil_cameroon_qwerty`, `sil_cameroon_azerty`) that spec 106's
+replay already compiles. Round-trip divergence means parse-then-emit gives a structurally different
+`.kmn`; byte-identical round-trip is out of scope for v1, and Art. II's concern is a starting point the
+codec cannot parse. "Codec-clean" in this spec therefore means **parses completely**. On the
+2026-10-30 `import-corpus.json` that is 887 of 921 keyboards (34 have an incomplete parse; none fail
+to parse).
 
 **Rationale**: Art. II forbids try/catch around `parse()` in the scaffold; deciding up front keeps the
 product path honest and makes "skipped" mean only "not eligible".

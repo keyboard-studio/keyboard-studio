@@ -1,34 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { eligibility, type EligibilityDeps } from "./eligibility.ts";
 
-const table: Record<string, { group?: string; status?: string; script?: string }> = {
-  ok_latin: { group: "o", status: "clean", script: "Latn" },
-  ok_opaque: { group: "o", status: "clean-with-opaque", script: "Latn" },
-  ok_cyrl: { group: "o", status: "clean", script: "Cyrl" },
-  diverges: { group: "d", status: "round-trip-divergence", script: "Latn" },
-  amharic: { group: "e", status: "clean", script: "Ethi" },
-  mandarin: { group: "z", status: "clean", script: "Hans" },
+// `parses`: the codec parses it completely (no parse errors, I1 complete).
+const table: Record<string, { group?: string; parses?: boolean; script?: string }> = {
+  ok_latin: { group: "o", parses: true, script: "Latn" },
+  ok_cyrl: { group: "o", parses: true, script: "Cyrl" },
+  // round-trip-divergence still parses completely: eligible.
+  diverges: { group: "d", parses: true, script: "Latn" },
+  partial: { group: "p", parses: false, script: "Latn" },
+  amharic: { group: "e", parses: true, script: "Ethi" },
+  mandarin: { group: "z", parses: true, script: "Hans" },
   unlisted: { group: "u", script: "Latn" },
 };
 
 const deps: EligibilityDeps = {
   groupOf: (b) => table[b]?.group,
-  importStatus: (b) => table[b]?.status,
+  parsesCompletely: (b) => table[b]?.parses,
   scriptOf: (b) => table[b]?.script,
 };
 
 describe("eligibility", () => {
-  it("accepts clean and clean-with-opaque keyboards", () => {
+  it("accepts any keyboard the codec parses completely, round-trip divergent or not", () => {
     expect(eligibility("ok_latin", "all-eligible", deps)).toEqual({ eligible: true, group: "o" });
-    expect(eligibility("ok_opaque", undefined, deps)).toEqual({ eligible: true, group: "o" });
+    expect(eligibility("diverges", undefined, deps)).toEqual({ eligible: true, group: "d" });
   });
 
   it("skips: missing", () => {
     expect(eligibility("nope", "all-eligible", deps)).toEqual({ eligible: false, reason: "missing" });
   });
 
-  it("skips: not-codec-clean (divergent or unlisted)", () => {
-    expect(eligibility("diverges", "all-eligible", deps)).toEqual({ eligible: false, reason: "not-codec-clean" });
+  it("skips: not-codec-clean (incomplete parse or unlisted)", () => {
+    expect(eligibility("partial", "all-eligible", deps)).toEqual({ eligible: false, reason: "not-codec-clean" });
     expect(eligibility("unlisted", "all-eligible", deps)).toEqual({ eligible: false, reason: "not-codec-clean" });
   });
 

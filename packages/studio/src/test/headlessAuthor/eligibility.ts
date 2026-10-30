@@ -3,9 +3,18 @@
 // fails to scaffold is a failure, never a skip. There is no try/catch around
 // parse() or the scaffold anywhere in the author.
 //
-// Order: present under the corpus root; import-corpus status clean or
-// clean-with-opaque; script not routed to the CJK/Ethiopic stub by the
-// product's own routing (isExcludedScript); inside the requested slice.
+// Order: present under the corpus root; the codec parses it completely
+// (docs/import-corpus.json: no parse errors and Layer A' I1 parse-complete);
+// script not routed to the CJK/Ethiopic stub by the product's own routing
+// (isExcludedScript); inside the requested slice.
+//
+// Parse completeness, not round-trip status, is what Art. II protects: a
+// starting point the codec cannot parse fails the whole scaffold. A
+// `round-trip-divergence` keyboard parses fully and only emits a structurally
+// different .kmn (byte-identical round-trip is out of scope for v1); spec 106's
+// replay already compiles three of them (basic_kbdfr, sil_cameroon_qwerty,
+// sil_cameroon_azerty). The skip reason keeps its id, `not-codec-clean`, and
+// means "the codec does not parse it completely" (owner ruling, 2026-10-30).
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -24,22 +33,27 @@ export type Slice = "all-eligible" | "latin" | { ids: readonly string[] };
 export interface EligibilityDeps {
   /** The directory under the corpus root holding `<base>/`, or undefined when absent. */
   groupOf?: (base: string) => string | undefined;
-  /** The `docs/import-corpus.json` status for `base`, or undefined when unlisted. */
-  importStatus?: (base: string) => string | undefined;
+  /**
+   * Whether the codec parses `base` completely, per `docs/import-corpus.json`
+   * (no parse errors, I1 parse-complete); undefined when unlisted.
+   */
+  parsesCompletely?: (base: string) => boolean | undefined;
   /** The keyboard's script as the product's .kps reader derives it. */
   scriptOf?: (base: string, group: string) => string | undefined;
 }
 
-let importStatusCache: Map<string, string> | undefined;
+let parseCache: Map<string, boolean> | undefined;
 
-function defaultImportStatus(base: string): string | undefined {
-  if (importStatusCache === undefined) {
+function defaultParsesCompletely(base: string): boolean | undefined {
+  if (parseCache === undefined) {
     const doc = JSON.parse(readFileSync(IMPORT_CORPUS_PATH, "utf8")) as {
-      keyboards: { keyboardId: string; status: string }[];
+      keyboards: { keyboardId: string; parseErrors: unknown[]; layerAPrime?: { i1ParseComplete?: boolean } }[];
     };
-    importStatusCache = new Map(doc.keyboards.map((k) => [k.keyboardId, k.status]));
+    parseCache = new Map(
+      doc.keyboards.map((k) => [k.keyboardId, k.parseErrors.length === 0 && k.layerAPrime?.i1ParseComplete === true]),
+    );
   }
-  return importStatusCache.get(base);
+  return parseCache.get(base);
 }
 
 function defaultScriptOf(base: string, group: string): string | undefined {
@@ -58,8 +72,7 @@ export function eligibility(
   const group = (deps.groupOf ?? ((b: string) => lookupGroup(b)))(base);
   if (group === undefined) return no("missing");
 
-  const status = (deps.importStatus ?? defaultImportStatus)(base);
-  if (status !== "clean" && status !== "clean-with-opaque") return no("not-codec-clean");
+  if ((deps.parsesCompletely ?? defaultParsesCompletely)(base) !== true) return no("not-codec-clean");
 
   const script = (deps.scriptOf ?? defaultScriptOf)(base, group);
   if (script !== undefined && isExcludedScript(script)) return no("unsupported-script-stub");
