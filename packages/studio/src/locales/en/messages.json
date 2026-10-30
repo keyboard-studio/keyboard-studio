@@ -33,6 +33,7 @@
   "carve.cell.suggestedDiscard": "discarded, suggested — click to keep",
   "carve.details.discardBlurb": "If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.",
   "carve.details.heading": "Character details",
+  "carve.details.pairedCascade": "Discarding {chosen} also discards {alsoRemoved}. They are paired in a keyboard rule (for example, Backspace turns one back into the other), so they can only go together.",
   "carve.detailsCard.carve": "Discard",
   "carve.detailsCard.carvedBadge": "discarded",
   "carve.detailsCard.empty": "No characters to show.",
