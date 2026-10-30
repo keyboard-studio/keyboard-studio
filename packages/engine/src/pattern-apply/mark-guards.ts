@@ -123,6 +123,22 @@ function isGeneratedStore(name: string): boolean {
   );
 }
 
+/** Lowest `&VERSION` at which the guard's `notany(...)` + `context(n)` rules compile. */
+export const GUARD_MIN_FORMAT_VERSION = "14.0";
+
+/** `&VERSION` store raised to {@link GUARD_MIN_FORMAT_VERSION} when lower; any other store untouched. */
+function withMinimumFormatVersion(store: IRStore): IRStore {
+  if (!store.isSystem || store.name.toUpperCase() !== "VERSION") return store;
+  const declared = store.items.map((i) => (i.kind === "char" ? i.value : "?")).join("");
+  const [major, minor] = declared.split(".").map((n) => Number.parseInt(n, 10));
+  const [minMajor, minMinor] = GUARD_MIN_FORMAT_VERSION.split(".").map((n) => Number.parseInt(n, 10)) as [number, number];
+  const atLeast =
+    major !== undefined && !Number.isNaN(major) &&
+    (major > minMajor || (major === minMajor && (minor ?? 0) >= minMinor));
+  if (atLeast) return store;
+  return { ...store, items: [...GUARD_MIN_FORMAT_VERSION].map((value) => ({ kind: "char" as const, value })) };
+}
+
 /** Whether an output element is any `use(...)` group transition (structured or raw). */
 function isAnyUseGroupOutput(el: { kind: string; text?: string }): boolean {
   if (el.kind === "useGroup") return true;
@@ -435,7 +451,15 @@ export function applyMarkGuards(
         // lets the hop be re-added whole, comment included.
         .filter((r) => !(r.matchKind === "match" && r.output.length === 0)),
     }));
-  const stores = ir.stores.filter((s) => !isGeneratedStore(s.name));
+  const stores = ir.stores
+    .filter((s) => !isGeneratedStore(s.name))
+    // `context()` after `notany()` compiles only at &VERSION 14.0+ (kmcmplib
+    // KM_ERROR_KMCMP_5251171), and the guard rules use exactly that. A
+    // starting keyboard declaring an older format version (basic_kbdfr: 10.0)
+    // would otherwise fail to compile once the guard is generated. Owner
+    // ruling: this raise is automatic, an exception to the "author's separate
+    // decision" rule keyIdMinting.ts states for touch-key ids.
+    .map((s) => (guard !== null && guard.stores.length > 0 ? withMinimumFormatVersion(s) : s));
   if (guard !== null) stores.push(...guard.stores);
 
   const entry = entryGroupOf(groups);
