@@ -1,0 +1,73 @@
+# Quickstart: Headless scripted author (spec 107)
+
+How to run each tier and what green looks like. Contracts:
+[author-api.md](contracts/author-api.md), [case-and-report.md](contracts/case-and-report.md),
+[scheduled-sweep.md](contracts/scheduled-sweep.md).
+
+## Prerequisites
+
+- Node >= 22.19.0, pnpm 9; `pnpm install` then `pnpm build` (prebuild fetches pinned data and needs
+  `../keyboards`).
+- `../keyboards` points at the keyboard-studio fork's `master`. In a git worktree under
+  `.claude/worktrees/<name>`, `../keyboards` resolves to `.claude/worktrees/keyboards`; point it at the
+  real corpus (a junction or symlink) or every corpus test skips (locally) or fails (CI).
+
+All commands below run from `packages/studio`.
+
+## 1. One case (US1, SC-001)
+
+```sh
+KS_AUTHOR_CASE=p1-whole-bafut-kbdus npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/authorCase
+```
+
+Expect: `[OK] p1-whole-bafut-kbdus gates=...`, the case runs twice and the determinism assertion
+passes; wall time under 60 s from cold.
+
+## 2. Parity (US2, SC-003)
+
+```sh
+npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/parity
+# plus on-demand records (not committed):
+KS_PARITY_RECORDS=/path/to/records npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/parity
+```
+
+Expect: 0 unexplained differences across the 4 committed records; stale allow-list entries listed.
+
+## 3. PR lane (what CI runs on every PR, SC-002)
+
+```sh
+npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity
+npx vitest run src/test/headlessAuthor/driftGuard
+```
+
+Expect: 6 PR-set cases report every gate (expected failures named with their owner); total test time
+about 1 min. SC-005 check: revert `sameGroupName` in
+`packages/engine/src/codec/groupName.ts` locally, rebuild the engine, rerun; the `bj_cree_woods`
+case fails with a duplicate-group compile error.
+
+## 4. The 32 harness cases (US3, SC-008; on demand)
+
+```sh
+git show origin/km/2302-walk-zips:tools/testing-profiles-2302/harness/cases.json > /tmp/cases.json
+KS_AUTHOR_CASES=/tmp/cases.json npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/harnessCases
+```
+
+Expect: 32 lines, each with gates, placeholder count and displacement actions; under 10 min.
+
+## 5. Wide sweep (US4; scheduled, or on demand)
+
+```sh
+KS_AUTHOR_SWEEP=latin KS_AUTHOR_SHARD=1/4 npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/sweep
+```
+
+Or dispatch the `Headless sweep` workflow with `tier=latin`. Expect a summary grouped by gate and first
+failing step; skips grouped by reason. In CI, new failures are filed as `headless-sweep` issues.
+
+## 6. Lifted rules (US5, SC-006)
+
+```sh
+npx vitest run src/editors/carve src/editors/assignLoop src/survey/marks
+npx playwright test e2e/golden-walk.spec.ts   # verify mode; no re-baseline
+```
+
+Expect: the components' existing tests pass unchanged and the golden walk needs no re-capture.

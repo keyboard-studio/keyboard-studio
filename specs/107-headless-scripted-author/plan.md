@@ -1,0 +1,162 @@
+# Implementation Plan: Headless scripted author for decision walks
+
+**Branch**: `107-headless-scripted-author` (based on `main` after the spec 106 stack merged; PR targets `main`) | **Date**: 2026-10-30 | **Spec**: [spec.md](spec.md)
+
+**Input**: Feature specification from [specs/107-headless-scripted-author/spec.md](spec.md)
+
+## Summary
+
+Add a test-only **headless author** under `packages/studio/src/test/headlessAuthor/`. Given a case
+description (the `harness/cases.json` shape), it walks the steps the product's own routing yields,
+takes each decision by the walk policy (override, else top suggestion, else default, else the `zzq`
+placeholder), writes it through the store actions the UI uses, and hands off to spec 106's replay
+(`rebuildWorkingCopyFromStores` → `buildOutputBundle` → compile → `checkConsistencyGates`). Every
+suggestion comes from a product function; logic that lives only in a component is lifted into a pure
+function the component then calls.
+
+Three run tiers share one runner:
+
+| Tier | What | Where | Budget |
+|---|---|---|---|
+| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, a job parallel to `fast` | 0 s added to the critical path (about 5.6 min after #2368); at most 60 s if it ever must (SC-002) |
+| 32-case suite | `harness/cases.json`, read from a supplied path | on demand, and nightly | under 10 min (SC-008) |
+| Wide sweep | eligible slice of `../keyboards` x profiles | weekly schedule, sharded; manual dispatch | not on PRs; failures filed as issues (FR-034) |
+
+Timing is measured, not estimated, for the replay half (research R1). The author half (proposal calls)
+does not exist yet, so its cost is an estimate with a stated ceiling that task T060 measures and that
+gates the PR set's size.
+
+## Technical Context
+
+**Language/Version**: TypeScript 5 (repo pin), Node >= 22.19.0 (measured on Node 24.11.0)
+
+**Primary Dependencies**: the studio's own stores (zustand), `@keyboard-studio/engine` (codec,
+proposals, compiler service with `kmcmplib` WASM), spec 106 replay modules in
+`packages/studio/src/test/`; vitest 4 with jsdom. No new runtime dependency.
+
+**Storage**: none at runtime. Reports are written as test artifacts by the scheduled workflow only.
+
+**Testing**: vitest under `packages/studio/vitest.corpus.config.ts` (the author needs `../keyboards`).
+The PR set runs as its own corpus-config invocation in CI (research R3).
+
+**Target Platform**: Node in CI (`ubuntu-latest`) and maintainers' machines (Windows included).
+
+**Project Type**: test tooling inside the `@keyboard-studio/studio` package, plus behaviour-preserving
+lifts of component logic into pure functions in the studio source.
+
+**Performance Goals**: SC-001 (one case under 60 s cold, under 5 s warm per further case); SC-002
+(PR lane finishes inside `fast`'s wall time, 0 s on the critical path); SC-008 (32 cases under 10 min).
+
+**Constraints**: no browser, dev server, port or network (FR-008); deterministic (FR-007); no
+re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
+(owner ruling).
+
+**Scale/Scope**: 6 PR-set cases; 32 harness cases; wide sweep over about 608 codec-parseable keyboards
+(`docs/import-corpus.json`: 496 `clean` + 112 `clean-with-opaque`), narrowed to the Latin slice by
+default.
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-checked after Phase 1 design (below).*
+
+| Article | Verdict | Notes |
+|---|---|---|
+| I. Pattern schema locked | PASS | No `Pattern` or contracts type change. The author reads `cases.json`-shaped input that lives in test code. |
+| II. KeyboardIR spine | PASS, with a design rule | The author drives the real scaffold, so a base the codec cannot parse fails the scaffold. The sweep MUST decide eligibility **before** scaffolding (from `docs/import-corpus.json` status plus a probe parse in the eligibility step), never by wrapping `parse()` or the scaffold in try/catch (research R6). |
+| III. State model | PASS, mapping stated | The author writes the 088 DecisionSet through store actions and leaves a 053 record; the provenance mapping is in [data-model.md](data-model.md#provenance-mapping-088--053) (FR-004). It adds no second author-truth store (spec 105). |
+| IV. Validator layering, one D3 cycle | PASS | The author calls replay's compile once per case; it adds no timer and no parallel validation path. |
+| V. VirtualFS only | PASS | The studio code path still writes nothing to host disk; only test runners write report files. |
+| VI. Team boundaries | PASS | Engine team: studio test tooling, studio components (lifts), CI workflow. No content-team artefact changes (pattern library, survey text, gallery ordering). Lifts move code, never wording or order. |
+| VII. Out of scope | PASS | CJK/Ethiopic are skipped with the stub's reason (FR-032); no touch-first authoring; US6 only seeds touch through the existing desktop-to-touch path. |
+| VIII. House conventions | FLAG (minor) | No emoji in runner output. Issue numbers must not appear in shipped code or comments: the author reuses spec 106's `KNOWN_GAPS` table rather than adding its own issue-numbered owners; the spec 106 table already uses `#2361`/`#2363` as owner strings, which is spec 106's call. The scheduled workflow puts issue references only in issue bodies it files. |
+| IX. Decision registry | PASS | No new survey surface. Step order comes from the product's routing (`steps/advance.ts`, `steps/reducer.ts`, the journey runner), never a stored list (FR-002). Lifts keep the component as the only renderer. |
+| X. Defaults are proposals | PASS, one justified exception | The author confirms product proposals the way an author would, and records provenance as the UI does. The `zzq` placeholder is not a product proposal: it stands for an author typing a sequence, is recorded as `hand-set`, and is counted in every run report (Complexity Tracking). |
+| XI. Done means integrated | PASS, conditions | Done = PR set wired into required CI, scheduled workflow live, lifted functions called by their components. A lift with no production caller is unfinished. The carve code the FR-040 lift moves is on `main` since #2369, so no lift is parked. |
+
+**Personal data**: none — no new store, recipient, category, or telemetry. (The scheduled workflow
+files GitHub issues containing keyboard ids, gates and decision points only.)
+
+**Post-design re-check (after Phase 1)**: unchanged. The data model adds test-only types; the
+contracts are test-runner interfaces and a CI workflow contract. No article verdict moved.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/107-headless-scripted-author/
+├── spec.md
+├── plan.md              # this file
+├── research.md          # R1-R10: timing, function inventory, CI placement, cadence, ...
+├── data-model.md        # Case, walk policy, run report, parity allow-list, PR-set entry, provenance mapping
+├── quickstart.md        # how to run each tier and what "green" looks like
+├── contracts/
+│   ├── author-api.md        # runAuthorCase() and the run result
+│   ├── case-and-report.md   # case JSON, PR-set manifest, run report, sweep summary
+│   └── scheduled-sweep.md   # the scheduled workflow: cadence, artifacts, issue filing
+├── checklists/requirements.md
+└── tasks.md             # /speckit-tasks output
+```
+
+### Source Code (repository root)
+
+```text
+packages/studio/src/test/headlessAuthor/
+├── caseTypes.ts              # Case, Override, PrSetEntry (test-only types)
+├── loadCases.ts              # reads cases.json-shaped input and the PR-set manifest
+├── walkPolicy.ts             # override > top suggestion > default > placeholder
+├── placeholder.ts            # zzq<hex> + indicator j; clash detection
+├── stepDrivers/              # one driver per step; each calls product functions only
+│   ├── identity.ts  windowsLayout.ts  track.ts  inventory.ts  marks.ts
+│   ├── outputForm.ts  tolerance.ts  convenience.ts  carve.ts  mechanism.ts
+│   ├── displacement.ts  caps.ts  touchSeed.ts
+├── runAuthorCase.ts          # routing loop -> drivers -> replay hand-off -> result
+├── runReport.ts              # placeholders, displacements, skips, known gaps, fallbackPolicy
+├── recordWriter.ts           # 053 record via the UI's recording path
+├── eligibility.ts            # missing / not codec-clean / stub-routed / outside slice
+├── parity.ts                 # DecisionSet vs record diff, normalisation, allow-list, stale check
+├── parityAllowList.ts        # reviewed entries
+├── prSet.json                # the curated PR set: case + reason per keyboard
+├── driftGuard.ts             # FR-010 function inventory for the drift-guard test
+├── authorCase.corpus.test.ts       # US1 cases (determinism, edge cases)
+├── parity.corpus.test.ts           # US2
+├── prSet.corpus.test.ts            # PR tier (US4 PR set) + SC-005 guard
+├── harnessCases.corpus.test.ts     # US3, opt-in via KS_AUTHOR_CASES
+├── sweep.corpus.test.ts            # US4 wide sweep, opt-in via KS_AUTHOR_SWEEP
+└── driftGuard.test.ts              # FR-011 (no corpus needed; runs in the default config)
+
+packages/studio/src/...       # lifted pure functions next to their components (FR-040)
+.github/workflows/ci.yml      # new `headless-author` job, parallel to `fast`; `build` needs it
+.github/workflows/headless-sweep.yml   # scheduled + dispatch: 32 cases nightly, wide sweep weekly
+scripts/file-sweep-issues.mjs # dedupe-and-file for sweep failures
+```
+
+**Structure Decision**: everything that is only for testing lives beside spec 106's replay in
+`packages/studio/src/test/headlessAuthor/`, so it shares `decisionPointFixture.ts` and
+`consistencyGates.ts` without exporting test code from the package. Lifts land next to the component
+they come from, as plain exported functions with their own unit tests.
+
+## Phasing (each phase independently green; US1 first)
+
+| Phase | Content | Green means | Depends on |
+|---|---|---|---|
+| 1 Setup | folder, types, PR-set manifest skeleton, corpus-config wiring | typecheck + empty suites discovered | none |
+| 2 Foundational | case loader, walk policy, placeholder, run report, eligibility, routing loop over the journey runner's routing, replay hand-off | unit tests for each; the loop walks `basic_kbdus` with every driver stubbed to "default" and replay compiles | 1 |
+| 3 US1 (P1) | step drivers + the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism order, S-02 identity, displacement order, case-pair companion, marks series assembly, text sample); drift guard (FR-011) | `p1-whole-bafut-kbdus` runs headless, compiles, reports gates; byte-identical rerun; edge cases; drift guard green; lifted components' existing tests unchanged | 2 |
+| 4 US2 (P1) | parity against the 4 committed records + on-demand records; allow-list; stale report | 0 unexplained differences on the 4 records | 3 |
+| 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, `headless-author` CI job, timing check | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
+| 6 US3 | 32-case suite (opt-in path) | 32 cases report gates, placeholders, displacements; under 10 min | 3 |
+| 7 US4b wide sweep + schedule | eligibility slice, sweep summary, `headless-sweep.yml`, issue filing | dispatch run completes, artifacts uploaded, a seeded failure files one issue and a rerun appends rather than duplicates | 6 |
+| 8 US5 closure | lift audit (every FR-040 rule lifted or listed), Playwright-only list (FR-042), any rule the drivers still reach through a component | every FR-040 row resolved; component tests and golden walk unchanged (SC-006) | 3 |
+| 9 US6 (P3) | touch seed driver, G6 headless, N/A reporting | G6 evaluated on camqwerty/camazerty; N/A on `bj_cree_woods` | 3 |
+| 10 Polish | SC runs (timing, 5x flake, SC-005), docs/tooling.md section, spec 106 hand-off note | all SC evidence recorded | all |
+
+Phase 5 can start as soon as Phase 4 is green, in parallel with Phases 6 and 8. No phase is gated on
+code outside `main`.
+
+## Complexity Tracking
+
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|---|---|---|
+| Art. X: the `zzq<hex>` placeholder is a value no product function proposes | Some decisions have neither a suggestion nor a default (a character the copied keyboard cannot place). A walk must still finish to reach the gates. It mirrors exactly what the Playwright harness types today, so parity with recorded walks holds. | Stopping the case at the first unproposed decision would hide every later gate failure; inventing a "better" scheme would break parity with the existing records and add a second placeholder convention. Each placeholder is recorded as `hand-set` and counted in the run report, so nothing is silent. |
+| A second CI job for the PR set | Keeps the PR set off the critical path (SC-002, owner budget; the critical path is already about 5.6 min, over the preferred 5). | A step inside `build` adds about 60-90 s to the critical path; kept only as the fallback if the parallel job ever outlasts `fast` (research R3), and then capped at 60 s. |
