@@ -77,7 +77,9 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
-import { projectionInputFromState } from "../lib/projectionInput.ts";
+import { marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import {
@@ -281,6 +283,16 @@ export function useWorkingCopyTransform(
   // correct memo key.
   const storeContextToleranceOverlay = useWorkingCopyStore(
     (s) => s.contextToleranceOverlay,
+  );
+  // spec 106 FR-010: the marks decision the projection's step 2.6 generates
+  // the guards from. Re-recorded for unrelated sub-fields (the tolerance
+  // station), so the memo keys on the guard input's content, not the value.
+  const marksTreatment = useDecisionStore(
+    (s) => s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined,
+  );
+  const marksGuardsKey = useMemo(
+    () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
+    [marksTreatment],
   );
 
   // Effective touch layout JSON: the live-layout override's own in-progress
@@ -509,6 +521,7 @@ export function useWorkingCopyTransform(
             assignments: effectiveAssignments,
             getPattern: (id) => patternMap?.get(id),
             identity: identityArg,
+            marksTreatment,
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
@@ -541,5 +554,6 @@ export function useWorkingCopyTransform(
     keyEditOpsKey,
     deadkeyOpsKey,
     storeContextToleranceOverlay,
+    marksGuardsKey,
   ]);
 }

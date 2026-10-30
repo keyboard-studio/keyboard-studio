@@ -8,6 +8,12 @@
 // every store-derived field from projectionInputFromState, and a field added
 // here reaches both paths at once.
 //
+// The marks-treatment decision value is the one decision the projection reads
+// (spec 106 FR-010: the mark guards are generated in step 2.6, never in the
+// working IR). It is a required extra so neither caller can forget it: the
+// download reads it with getMarksTreatmentValue(), the preview through a
+// decision-store selector.
+//
 // What stays with the caller (ProjectionExtras) is what is genuinely
 // call-site specific: the VFS it projects onto, the resolved ids, the pattern
 // lookup, the identity overlay it has already resolved, and the download-only
@@ -27,7 +33,12 @@ import type {
 } from "@keyboard-studio/contracts";
 import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { WorkingCopyState } from "../stores/workingCopyStore.ts";
-import type { IdentityOverlay, ProjectWorkingCopyVfsInput } from "./projectWorkingCopyVfs.ts";
+import type {
+  IdentityOverlay,
+  MarksGuardsInput,
+  ProjectWorkingCopyVfsInput,
+} from "./projectWorkingCopyVfs.ts";
+import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 
@@ -55,6 +66,8 @@ export interface ProjectionExtras {
   assignments: ReadonlyArray<MechanismAssignment>;
   getPattern: (id: string) => Pattern | undefined;
   identity: IdentityOverlay | null;
+  /** The recorded marks-treatment value, or undefined when none is recorded. */
+  marksTreatment: MarksTreatmentValue | undefined;
   baseDisplayName?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
@@ -65,11 +78,27 @@ export interface ProjectionExtras {
   };
 }
 
+/**
+ * Step 2.6's input from the marks-treatment value: null until the series
+ * completes. The bare-mark answer is the guard specification's behaviour.
+ */
+export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): MarksGuardsInput | null {
+  const completion = value?.completion;
+  if (completion === undefined || completion === null) return null;
+  return {
+    worklist: completion.worklist,
+    outputForm: completion.outputForm,
+    ...(completion.backspace !== undefined ? { backspace: completion.backspace } : {}),
+    ...(completion.stacks !== undefined ? { stacks: completion.stacks } : {}),
+    ...(value?.guardSpecification != null ? { bareMarkBehaviour: value.guardSpecification.behaviour } : {}),
+  };
+}
+
 export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
-  const { liveLayoutOverride, ...callSite } = extras;
+  const { liveLayoutOverride, marksTreatment, ...callSite } = extras;
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
@@ -95,6 +124,7 @@ export function projectionInputFromState(
     keyEditOps: liveLayoutOverride?.keyEditOps ?? [],
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
+    marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     ruleAdditions: deriveRuleAdditions(state.ir, state.startIr),
   };

@@ -210,6 +210,28 @@ describe("buildPlacementWorklist (spec 052 FR-005/FR-006, SC-009)", () => {
     return { ...makeMarkTreatmentAnswer("postfix"), ...over };
   }
 
+  it("maps a ticked space column to allowedContexts, never to a unit or a blocked pair (spec 106 FR-013)", () => {
+    const worklist = buildPlacementWorklist({
+      alphabet,
+      classes,
+      attachments: { ...attachments, [ACUTE]: { ...attachments[ACUTE], " ": true } },
+      prefills: [],
+      treatment: answer({ classTreatment: { [acuteClassId]: "own-key", [cedillaClassId]: "composed" } }),
+    });
+    expect(worklist.allowedContexts).toEqual({ [ACUTE]: [" "] });
+    expect(worklist.ownLetterUnits).not.toContain(" ");
+    expect(worklist.blockedCombinations.some((b) => b.base === " ")).toBe(false);
+    // Unticked (or absent): no allowedContexts at all, the pre-106 shape.
+    const plain = buildPlacementWorklist({
+      alphabet,
+      classes,
+      attachments,
+      prefills: [],
+      treatment: answer({ classTreatment: { [acuteClassId]: "own-key", [cedillaClassId]: "composed" } }),
+    });
+    expect(plain).not.toHaveProperty("allowedContexts");
+  });
+
   it("classifies mark units (with input order), composed units, and blocked pairs", () => {
     const worklist = buildPlacementWorklist({
       alphabet,

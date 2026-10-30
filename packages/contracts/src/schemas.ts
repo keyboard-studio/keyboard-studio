@@ -640,6 +640,7 @@ export const PlacementWorklistSchema = z.object({
   ownLetterUnits: z.array(z.string()),
   markUnits: z.array(MarkUnitSchema),
   blockedCombinations: z.array(BlockedCombinationSchema),
+  allowedContexts: z.record(z.string(), z.array(z.string())).optional(),
 });
 
 // The S4 whole-keyboard output-form decision (spec 071). Carried on

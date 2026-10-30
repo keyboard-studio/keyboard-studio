@@ -36,7 +36,7 @@
 //                         in the SAME projection (contracts/
 //                         key-edit-overlay.md §6.2, R10.2 — the working IR
 //                         is never emitted into the artifact, so this pass
-//                         cannot be inherited from applyMarkGuards). Rule
+//                         cannot be inherited from the working IR). Rule
 //                         SYNTHESIS policy (minting a new producing/guard
 //                         rule pair for a freshly assigned character) is
 //                         Phase 6/touchRuleSynthesis.ts, not this pass —
@@ -46,6 +46,12 @@
 //                         generalized modifier-combo layers onto the
 //                         .keyman-touch-layout written by step 0; no-op when
 //                         the VFS has no touch layout file)
+//   2.6 Mark guards     — applyMarkGuards from the recorded marks-treatment
+//                         decision (spec 106 FR-010/FR-011): the guard group
+//                         and the backspace rules. The only place they are
+//                         generated; after 2 so they see assignment rules,
+//                         before 2.7 because that step repoints the entry group
+//   2.7 Context tolerance — applyContextToleranceOverlay (spec 078)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
@@ -69,9 +75,13 @@
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
 import type {
+  AttestedStack,
+  BackspaceBehaviour,
   KeyboardIR,
+  OutputForm,
   PackageFontSet,
   Pattern,
+  PlacementWorklist,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
@@ -97,8 +107,10 @@ import {
   collectLayerCombosInUse,
   applyIdentityToKps,
   applyContextToleranceOverlay,
+  applyMarkGuards,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
+import type { BareMarkBehaviour } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
@@ -280,6 +292,12 @@ export interface ProjectWorkingCopyVfsInput {
    */
   baseDisplayName?: string;
   /**
+   * The recorded marks-treatment decision's guard inputs (spec 106 FR-010),
+   * generated into the .kmn by step 2.6. Absent or `null` when the marks
+   * series has not completed.
+   */
+  marksGuards?: MarksGuardsInput | null;
+  /**
    * The applied context-tolerance fix (spec 078): verified generated rules,
    * replayed by step 2.7. Absent or `null` when no fix is applied.
    */
@@ -296,6 +314,15 @@ export interface ProjectWorkingCopyVfsInput {
    * `.kmn`, never rewrite the no-edit fast path.
    */
   ruleAdditions?: DerivedRuleAdditions;
+}
+
+/** Step 2.6's input: the marks completion payload plus the bare-mark answer. */
+export interface MarksGuardsInput {
+  worklist: PlacementWorklist;
+  outputForm: OutputForm;
+  backspace?: BackspaceBehaviour;
+  stacks?: readonly AttestedStack[];
+  bareMarkBehaviour?: BareMarkBehaviour;
 }
 
 /**
@@ -403,6 +430,7 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     baseDisplayName,
+    marksGuards = null,
     contextToleranceOverlay = null,
     ruleAdditions,
   } = input;
@@ -884,6 +912,42 @@ export function projectWorkingCopyVfs(
             `[project-working-copy] desktop-to-touch layer propagation skipped: ${msg}`,
           );
         }
+      }
+    }
+  }
+
+  // Step 2.6: Mark guards (spec 106 FR-010/FR-011). The marks decision's
+  // guard group and backspace rules are generated here and nowhere else:
+  // the working IR never reaches the artifact (see step 1.7b), so a guard
+  // generated only there would be missing from the preview and the zip.
+  // After step 2 so the guards see the assignment rules; before step 2.7,
+  // whose replay repoints the entry group the guard hop is added to.
+  // applyMarkGuards strips and rebuilds its own artifacts, so a starting
+  // keyboard that already carries them is not doubled; the .kmn is only
+  // re-emitted when the IR changed.
+  if (marksGuards !== null) {
+    const kmnPathForGuards = `source/${keyboardId}.kmn`;
+    const kmnTextForGuards = readVfsText(vfs, kmnPathForGuards);
+    if (kmnTextForGuards !== undefined) {
+      try {
+        const parsedForGuards = parseKmn(kmnTextForGuards, keyboardId).ir;
+        const guarded = applyMarkGuards(
+          parsedForGuards,
+          marksGuards.worklist,
+          marksGuards.outputForm,
+          marksGuards.backspace ?? "peel",
+          marksGuards.stacks ?? [],
+          marksGuards.bareMarkBehaviour ?? "swallow",
+        );
+        if (guarded.ir !== parsedForGuards) vfs.set(kmnPathForGuards, emitKmn(guarded.ir), false);
+        if (guarded.guardHopSkipped === true) {
+          warnings.push(
+            "[project-working-copy] mark guards not reached: the entry group's match rule already ends in another use()",
+          );
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] mark guard projection skipped: ${msg}`);
       }
     }
   }

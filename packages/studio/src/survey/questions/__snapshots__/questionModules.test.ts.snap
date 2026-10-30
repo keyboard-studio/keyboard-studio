@@ -202,7 +202,7 @@ exports[`live question modules > gallery/helpDocs.ts > definition contract 1`] =
 
 exports[`live question modules > gallery/invisiblesInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores]"`;
+exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/physicalLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 

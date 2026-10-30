@@ -113,7 +113,7 @@ import {
   marksPromotedKey,
   marksStackingAllowedKey,
 } from "../../steps/evidence.ts";
-import { deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
+import { ATTACHMENT_SPACE, deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
 import { reproposalCueMessage } from "../reproposalReason.ts";
 import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
@@ -691,6 +691,18 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     stacksConfirmed[key] = view.value as boolean;
   }
 
+  /**
+   * The attested stacks the author kept (spec 106): single-mark stacks always,
+   * a multi-mark stack only while stacking is allowed and that stack is ticked.
+   * The completion records these, so the guard allows, and the whole-stack
+   * backspace clears, exactly the stacks the stacking station confirmed.
+   */
+  function keptStacks(): AttestedStack[] {
+    return gate.alphabet.attestedStacks.filter(
+      (s) => s.marks.length < 2 || (stackingAllowed && stacksConfirmed[stackKey(s)] === true),
+    );
+  }
+
   function handleStackingAllowedChange(next: boolean): void {
     saveAnswer(STEP_ID, "marks_stacking.allowed", {
       value: next,
@@ -1157,7 +1169,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       guard !== null && workingIr !== null ? findGuardReevaluationItems(workingIr, guard) : [];
     recordValue(
       answers,
-      { worklist, outputForm, backspace, stacks: gate.alphabet.attestedStacks, migrationNeeded, guardReevaluation },
+      { worklist, outputForm, backspace, stacks: keptStacks(), migrationNeeded, guardReevaluation },
       effectiveTolerance,
       guard,
     );
@@ -1237,6 +1249,15 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
               screenId: "marks_attachment",
             });
           }
+          const spaceTicked = attachmentChecked[proposal.mark]?.[ATTACHMENT_SPACE] ?? false;
+          saveAnswer(STEP_ID, `marks_attachment.${proposal.mark}|${ATTACHMENT_SPACE}`, {
+            value: spaceTicked,
+            answerType: "boolean",
+            origin: spaceTicked ? "overturned" : "confirmed",
+            stage: "confirmed",
+            evidenceKey: marksAttachmentKey(gate.alphabet, proposal.mark, ATTACHMENT_SPACE),
+            screenId: "marks_attachment",
+          });
         }
         break;
       case "marks_treatment":
