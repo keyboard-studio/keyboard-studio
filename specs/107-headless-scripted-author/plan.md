@@ -14,6 +14,18 @@ placeholder), writes it through the store actions the UI uses, and hands off to 
 suggestion comes from a product function; logic that lives only in a component is lifted into a pure
 function the component then calls.
 
+**Governing rule (spec FR-013 to FR-017, SC-010): the author bypasses the UI and nothing else.**
+Below the UI it runs the product's own unmodified code, at the seam the UI calls. Its own code is only
+case input, the walk policy's choice, the `zzq` typing and reporting. The rule is enforced from the
+first line of author code, not added at the end:
+
+- `HA/boundary.test.ts` lands in Phase 2, before any step driver. It allows only inventoried product
+  imports and fails on mocks and direct store writes.
+- The depcruise rule `product-not-to-headless-author` keeps product code from depending on the author.
+
+When the author cannot reach something, the plan's only moves are lift (FR-040) or Playwright-only
+(FR-042).
+
 Three run tiers share one runner:
 
 | Tier | What | Where | Budget |
@@ -49,8 +61,9 @@ lifts of component logic into pure functions in the studio source.
 **Performance Goals**: SC-001 (one case under 60 s cold, under 5 s warm per further case); SC-002
 (PR lane is a parallel job, no added wall time, at most 5 min); SC-008 (32 cases under 10 min).
 
-**Constraints**: no browser, dev server, port or network (FR-008); deterministic (FR-007); no
-re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
+**Constraints**: the author bypasses the UI only and cannot diverge from product code below it
+(FR-013 to FR-017; boundary test + depcruise rule, SC-010); no browser, dev server, port or network
+(FR-008); deterministic (FR-007); no re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
 (owner ruling).
 
 **Scale/Scope**: 6 PR-set cases; 32 harness cases; wide sweep over about 608 codec-parseable keyboards
@@ -123,6 +136,7 @@ packages/studio/src/test/headlessAuthor/
 ├── parityAllowList.ts        # reviewed entries
 ├── prSet.json                # the curated PR set: case id (or inline case) + reason per keyboard
 ├── driftGuard.ts             # FR-010 function inventory for the drift-guard test
+├── boundary.test.ts          # FR-014/FR-016: inventoried imports only, no mocks, no direct store writes, no KS_AUTHOR in product (default config)
 ├── authorCase.corpus.test.ts       # US1 cases (determinism, edge cases)
 ├── parity.corpus.test.ts           # US2
 ├── prSet.corpus.test.ts            # PR tier (US4 PR set) + SC-005 guard
@@ -131,6 +145,7 @@ packages/studio/src/test/headlessAuthor/
 └── driftGuard.test.ts              # FR-011 (no corpus needed; runs in the default config)
 
 packages/studio/src/...       # lifted pure functions next to their components (FR-040)
+.dependency-cruiser.cjs       # new rule `product-not-to-headless-author` (FR-016)
 .github/workflows/ci.yml      # new `headless-author` job: needs: changes, if: e2e, timeout-minutes from T051 (<= 5)
 .github/workflows/headless-sweep.yml   # scheduled + dispatch: 32 cases nightly, wide sweep weekly
 scripts/file-sweep-issues.mjs # dedupe-and-file for sweep failures
@@ -146,7 +161,7 @@ they come from, as plain exported functions with their own unit tests.
 | Phase | Content | Green means | Depends on |
 |---|---|---|---|
 | 1 Setup | folder, types, canonical `cases/harness-cases.json` + `PROVENANCE.md` (FR-035), PR-set manifest skeleton, corpus-config wiring | typecheck + empty suites discovered | none |
-| 2 Foundational | case loader, walk policy, placeholder, run report, eligibility, routing loop over the journey runner's routing, replay hand-off | unit tests for each; the loop walks `basic_kbdus` with every driver stubbed to "default" and replay compiles | 1 |
+| 2 Foundational | **boundary test + depcruise rule first** (FR-014, FR-016), then case loader, walk policy, placeholder, run report, eligibility, routing loop over the journey runner's routing, replay hand-off | boundary test and depcruise green over every `HA/` file; unit tests for each; the loop walks `basic_kbdus` with every driver taking the default through the step's own store action, and replay compiles | 1 |
 | 3 US1 (P1) | step drivers + the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism order, S-02 identity, displacement order, case-pair companion, marks series assembly, text sample); drift guard (FR-011) | `p1-whole-bafut-kbdus` runs headless, compiles, reports gates; byte-identical rerun; edge cases; drift guard green; lifted components' existing tests unchanged | 2 |
 | 4 US2 (P1) | parity against the 4 committed records + on-demand records; allow-list; stale report | 0 unexplained differences on the 4 records | 3 |
 | 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, the parallel `headless-author` job, timing check, then the owner's ruleset change (T077) | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
@@ -154,7 +169,7 @@ they come from, as plain exported functions with their own unit tests.
 | 7 US4b wide sweep + schedule | eligibility slice, sweep summary, `headless-sweep.yml`, issue filing | dispatch run completes, artifacts uploaded, a seeded failure files one issue and a rerun appends rather than duplicates | 6 |
 | 8 US5 closure | lift audit (every FR-040 rule lifted or listed), Playwright-only list (FR-042), any rule the drivers still reach through a component | every FR-040 row resolved; component tests and golden walk unchanged (SC-006) | 3 |
 | 9 US6 (P3) | touch seed driver, G6 headless, N/A reporting | G6 evaluated on camqwerty/camazerty; N/A on `bj_cree_woods` | 3 |
-| 10 Polish | SC runs (timing, 5x flake, SC-005), docs/tooling.md section, spec 106 hand-off note | all SC evidence recorded | all |
+| 10 Polish | SC runs (timing, 5x flake, SC-005, SC-010 mutation check), docs/tooling.md section, spec 106 hand-off note | all SC evidence recorded | all |
 
 Phase 5 can start as soon as Phase 4 is green, in parallel with Phases 6 and 8. No phase is gated on
 code outside `main`.

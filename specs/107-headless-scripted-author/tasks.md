@@ -27,7 +27,7 @@ phase's gates are green, message naming the tasks it closes (`spec 107 T0NN-T0NN
 
 **Purpose**: the folder, the types and the PR-set skeleton.
 
-- [ ] T001 Create `packages/studio/src/test/headlessAuthor/` with an `index.ts`-free layout per plan.md (no barrel; test files import modules directly) and a short header comment in `HA/runAuthorCase.ts` stating it is test-only and must call product functions only (FR-010)
+- [ ] T001 Create `packages/studio/src/test/headlessAuthor/` with an `index.ts`-free layout per plan.md (no barrel; test files import modules directly) and a short header comment in `HA/runAuthorCase.ts` stating the governing rule: test-only; it bypasses the UI and nothing else; its own code is only case input, the walk-policy choice, the `zzq` typing and reporting; anything it cannot reach is lifted (FR-040) or listed Playwright-only (FR-042), never re-stated (FR-013)
 - [ ] T002 [P] Define `Case`, `Override`, `PrSetEntry`, `Shape`, `PolicyStep`, `RunReport`, `AuthorRun`, `ParityAllowEntry`, `SweepSummary` in `HA/caseTypes.ts` exactly as [data-model.md](data-model.md)
 - [ ] T003 [P] Create `HA/prSet.json` with the six FR-031 entries (`basic_kbdus`, `basic_kbdfr` Ewondo, `bj_cree_woods`, `sil_cameroon_qwerty`, `sil_cameroon_azerty`, `chechen_latin`), each with `shape`, `reason` and, for regression guards, `guards`. The four harness keyboards reference their case by `caseId` in the canonical `HA/cases/harness-cases.json` (T076): `p1-whole-bafut-kbdus`, `p1-whole-ewondo-kbdfr`, `p4-unwrap-bafut-camqwerty`, `p4-unwrap-ewondo-camazerty`. `bj_cree_woods` (`cr`, `Cans`) and `chechen_latin` (`ce-Latn`, `Latn`) carry an inline whole-alphabet case with sample text from the keyboard's own `welcome.htm`/README
 - [ ] T076 [P] Commit the canonical harness case definitions (FR-035): write `git show origin/km/2302-walk-zips:tools/testing-profiles-2302/harness/cases.json` byte for byte to `HA/cases/harness-cases.json`, and `HA/cases/PROVENANCE.md` naming the source branch `km/2302-walk-zips`, commit `a4bd8591be30360e06ec4c6b88812f5376d84548` (the last commit touching that file), the source path, the copy date, the rule that this copy is canonical (the PR set and the scheduled run read it; case changes are made here), and the follow-up for the harness owner to read from or sync from it. Do not edit `km/2302-walk-zips`. (ID appended so existing IDs stay stable.)
@@ -42,9 +42,15 @@ phase's gates are green, message naming the tasks it closes (`spec 107 T0NN-T0NN
 **Purpose**: load, decide, walk, hand off. Every step driver is still a stub returning "use the
 default" at the end of this phase.
 
+**Non-divergence first.** T078 and T079 land before any other `HA/` source in this phase, so the
+boundary holds from the first line of author code (FR-013 to FR-016).
+
+- [ ] T078 [P] Add the depcruise rule `product-not-to-headless-author` to `.dependency-cruiser.cjs`: `from` any `packages/*/src` path not under `src/test/`, `to` `packages/studio/src/test/headlessAuthor/`, severity `error` (FR-016); confirm `pnpm lint` runs it. (ID appended so existing IDs stay stable.)
+- [ ] T079 [P] Implement `HA/boundary.test.ts` (default vitest config, so it runs in the ordinary unit-test step on every PR regardless of the `headless-author` job's path gate) per FR-014/FR-016: scan every `HA/**/*.ts` source; fail on (a) an import of studio source outside `src/test/`, `@keyboard-studio/engine` or `@keyboard-studio/contracts` that is not in `HA/driftGuard.ts`'s inventory with a production caller (spec 106 replay modules in `src/test/` allowed by name); (b) `vi.mock`/`vi.doMock`/`vi.spyOn`/`vi.stubGlobal`; (c) `setState(` or assignment through `getState()`, except the single per-case reset function allow-listed by file and name; (d) an inventory entry that no `HA/` driver imports (two-sided inventory: a proposal pasted in place of its import fails even when verbatim); and scan `packages/*/src` outside `src/test/` for `KS_AUTHOR` or an import of `headlessAuthor`. Each failure names the file, line and the rule (FR-013) it breaks. Starts with an empty inventory; T040 and T066 grow it. (ID appended so existing IDs stay stable.)
+
 - [ ] T005 [P] Implement `loadCases(path = HA/cases/harness-cases.json)` and `loadPrSet()` in `HA/loadCases.ts`: accept the harness shape unchanged (including `profile`, `lang`, `overwriteChar`/`overwriteKey`) plus optional `group`/`track`/`script`, reject unknown fields, look up `group` from the corpus when absent; `loadPrSet()` resolves each `caseId` against the canonical file and fails on an unknown id or an entry with both `caseId` and `case`
 - [ ] T006 [P] Unit-test `HA/loadCases.ts` in `HA/loadCases.test.ts` against a 3-row fixture in the harness shape and a malformed row
-- [ ] T007 [P] Implement the walk policy in `HA/walkPolicy.ts`: `override` > `top-suggestion` > `default` > `placeholder`, returning a `PolicyStep`; no proposal logic of its own (it receives the product's suggestions and default as arguments)
+- [ ] T007 [P] Implement the walk policy in `HA/walkPolicy.ts`: `override` > `top-suggestion` > `default` > `placeholder`, returning a `PolicyStep`; no proposal logic of its own (it receives the product's suggestions and default as arguments). It returns which offered option to take; it never builds a decision value (except the placeholder) and never writes one. The driver applies the choice through the function the UI control's handler calls (FR-015)
 - [ ] T008 [P] Implement `placeholderFor(char, startIr)` in `HA/placeholder.ts`: `zzq` + lowercase hex code points, indicator `j`; detect a clash with an existing sequence in the copied keyboard and return a `placeholder-clash` failure
 - [ ] T009 [P] Unit-test `HA/walkPolicy.ts` and `HA/placeholder.ts` in `HA/walkPolicy.test.ts` (precedence order, placeholder text for a multi-code-point character, clash)
 - [ ] T010 [P] Implement `RunReport` accumulation in `HA/runReport.ts` (placeholders, displacements, skipped steps, known gaps, `fallbackPolicy`, `timingMs`) and the ASCII console line format from [contracts/case-and-report.md](contracts/case-and-report.md)
@@ -82,6 +88,11 @@ it, add a unit test for the function, and leave the component's existing tests u
 
 ### Step drivers (each calls only the functions research R2 lists for its step)
 
+Every driver is glue only: read what the product offers, let the walk policy pick, apply the pick
+through the UI handler's function (FR-015). A driver that needs an `if` the UI does not have is
+reporting a missing lift. Stop and lift (FR-040) or list it (FR-042); never write the branch
+(FR-017).
+
 - [ ] T026 [P] [US1] Identity driver in `HA/stepDrivers/identity.ts`: `defaultsFor` (`lib/langtagsDefaults.ts:130`), `deriveScriptPrefill` (`lib/scriptAxes.ts:110`); case fields are overrides
 - [ ] T027 [P] [US1] Windows-layout and track drivers in `HA/stepDrivers/windowsLayout.ts` and `HA/stepDrivers/track.ts`: `proposeWindowsLayout` (`lib/windowsLayouts.ts:134`); `proposeTrack` (`lib/proposeTrack.ts:78`) recorded for comparison when the case names the track
 - [ ] T028 [P] [US1] Inventory driver in `HA/stepDrivers/inventory.ts`: `suggestMissingChars` (`lib/services.ts:308`) over pinned exemplars; `derivePlacementInventory`/`deriveTreatmentFilteredChars` (`lib/placementInventory.ts:79`/`:189`); a proposal needing the network fails with `network-required`
@@ -99,7 +110,7 @@ it, add a unit test for the function, and leave the component's existing tests u
 - [ ] T037 [US1] Same file: a step with no suggestion and no default uses the placeholder and counts it (acceptance 3)
 - [ ] T038 [US1] Same file: run the case twice; record minus timestamps, DecisionSet and bundle bytes are identical (acceptance 4, FR-007)
 - [ ] T039 [US1] Same file: missing keyboard and a `round-trip-divergence` keyboard skip with named reasons; a proposal throw (the tolerance analysis on `sil_cameroon_azerty`) fails at that step (acceptance 5, edge cases)
-- [ ] T040 [US1] Implement the drift guard in `HA/driftGuard.ts` (the research R2 inventory: function, module, production caller file) and `HA/driftGuard.test.ts`: each function still exported, each caller file still imports it, and no `HA/` file outside `stepDrivers/` imports a proposal module (FR-011, SC-004)
+- [ ] T040 [US1] Implement the drift guard in `HA/driftGuard.ts` (the research R2 inventory: function, module, production caller file) and `HA/driftGuard.test.ts`: each function still exported, each caller file (a component or store, the seam the UI calls) still imports it, and no `HA/` file outside `stepDrivers/` imports a proposal module (FR-011, SC-004). This inventory is the allow-list T079's boundary test reads: a product function with no production caller cannot be inventoried, so the author can call only what the UI calls (FR-014)
 
 **Checkpoint**: US1 green; SC-001 timing recorded from the run report's `timingMs`.
 
@@ -117,7 +128,7 @@ it, add a unit test for the function, and leave the component's existing tests u
 - [ ] T044 [US2] Same file: compare the record's 053 agency against the author's per the provenance mapping in [data-model.md](data-model.md#provenance-mapping-088--053)
 - [ ] T045 [US2] Same file: report stale allow-list entries (FR-022) as a failing assertion listing them
 - [ ] T046 [US2] Same file: when `KS_PARITY_RECORDS` names a directory, also compare every `*.json` record in it (on-demand records, never committed)
-- [ ] T047 [US2] Triage every difference on the 4 records: fix the author when it diverges from the product; otherwise add an allow-list entry naming the product change or record age (camqwerty/camazerty predate S-02, per `records/PROVENANCE.md`)
+- [ ] T047 [US2] Triage every difference on the 4 records per FR-017. Where the author diverges from the product, fix it **only** by making the author call the product as the UI does, lifting the rule (FR-040), or listing it Playwright-only (FR-042). Never add a conditional, constant or computed value to the author to close a difference. Otherwise add an allow-list entry naming the product change or record age (camqwerty/camazerty predate S-02, per `records/PROVENANCE.md`)
 
 **Checkpoint**: SC-003 holds on the committed records.
 
@@ -175,7 +186,7 @@ it, add a unit test for the function, and leave the component's existing tests u
 
 **Independent Test**: the audit table is complete and SC-006 evidence is recorded.
 
-- [ ] T064 [US5] Audit every driver in `HA/stepDrivers/` for logic reached through a component or hook rather than a lifted function; lift any found (same rules as T018-T024)
+- [ ] T064 [US5] Audit every driver in `HA/stepDrivers/` for logic reached through a component or hook rather than a lifted function, and for any branch, constant or computed value the UI does not have (FR-013, FR-017); lift any found (same rules as T018-T024)
 - [ ] T065 [US5] Add a "Playwright-only" table (rule, component, reason) to the header comment of `HA/runAuthorCase.ts` for any rule that cannot be lifted without a behaviour change, and mark those decisions as not covered in the run report (FR-042); empty table if none
 - [ ] T066 [US5] Extend `HA/driftGuard.ts` with every lifted function and its component caller (T018-T024, T064)
 - [ ] T067 [US5] SC-006: run the golden walk in verify mode (`npx playwright test e2e/golden-walk.spec.ts`) and the touched components' tests; 0 re-baselines; record the result in the phase commit message
@@ -201,6 +212,7 @@ it, add a unit test for the function, and leave the component's existing tests u
 - [ ] T073 [P] Note in the PR body (not in spec 106 files) that spec 106 T063/T064 can close on the T057 report, per this spec's "Relationship to spec 106"
 - [ ] T074 Run `pnpm lint` (includes `test-antipattern-lint` and `spec-number-lint`) and `pnpm --filter @keyboard-studio/studio typecheck`; fix findings
 - [ ] T075 Run `/speckit-analyze` over spec, plan and tasks before `/speckit-implement`'s final pass; resolve findings
+- [ ] T080 SC-010 mutation check, one local run per mutation, each reverted afterwards: (1) replace a driver's import of a proposal function (e.g. `proposeWindowsLayout`) with a verbatim copy of it; (2) add a `vi.mock` of a product module to an `HA/` file; (3) add a direct `setState` on a decision store in a driver; (4) import an `HA/` module from a product file. Confirm T079's boundary test fails on (1) (rule d), (2) (rule b) and (3) (rule c), and T078's depcruise rule fails on (4). Record the four failures in the phase commit message. (ID appended so existing IDs stay stable.)
 
 ---
 
@@ -220,7 +232,7 @@ No phase depends on code outside `main` (the spec 106 stack is merged).
 ## Parallel opportunities
 
 - Phase 1: T002, T003, T076.
-- Phase 2: T005-T012 are separate files; T013-T017 are sequential.
+- Phase 2: T078 and T079 first (in parallel); then T005-T012 are separate files; T013-T017 are sequential.
 - Phase 3: the seven lifts T018-T024 are separate components; drivers T026-T031 and T033 are separate files once the lifts they use exist (T031 needs T018; T029 needs T023-T024; T032 needs T019-T022).
 - Phase 4: T041, T042.
 - Phase 5: T048, T049.

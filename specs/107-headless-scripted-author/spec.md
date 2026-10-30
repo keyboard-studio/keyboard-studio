@@ -42,6 +42,46 @@ This spec adds the missing half: a **headless scripted author**. It is a test to
 nothing an author sees, and it follows Constitution v2 Art. X: every value it writes comes from a
 product proposal, and it records that value's provenance the way the UI records it.
 
+### Governing rule: the author bypasses the UI and nothing else
+
+**The headless author is the product with the React rendering layer removed. It MUST NOT be able
+to diverge from the product's code below the UI.** This rule governs every other requirement in
+this spec. Where any requirement, plan step or task reads otherwise, this rule wins.
+
+Everything below the UI runs as the product's own code, called unmodified, at the same seam the UI
+calls it:
+
+- step routing;
+- proposals, ranking and pre-selection;
+- store actions and provenance;
+- validation;
+- the working-copy rebuild;
+- projection, compile and output.
+
+The author may contain only four things:
+
+1. **Case input**: reading a case description.
+2. **The click**: choosing one of the options the product offered, by the walk policy, and applying
+   it through the same function the UI control's handler calls.
+3. **The typing**: the placeholder text the harness types where nothing is offered (`zzq<hex>`). It
+   stands for keyboard input from an author, not a product value.
+4. **Reporting**: what it chose, skipped and observed.
+
+Anything else in the author is a defect, however small and however well tested. That covers a
+re-stated rule, a compensating branch, a shim, a stub, a mock of a product module, a direct store
+write, a second step list, or a "headless" flag in product code. The **only** legal response when
+the author cannot reach a behaviour without the UI is one of:
+
+- **lift** it into product code that the UI then calls (US5, FR-040);
+- **list** it as Playwright-only (FR-042).
+
+The same holds when the author and the UI disagree (a parity difference). The fix is never author
+logic. Either the author is made to call the product exactly as the UI does, or the product changed
+and the record is explained (FR-021).
+
+This is enforced by tests, not by review discipline: FR-013 to FR-017 and SC-010. A change that
+would let the author diverge MUST fail CI on the PR that makes it.
+
 ### Relationship to spec 106
 
 - Spec 106 US8 tasks **T063** (harness: drop the `zzq` path, port the gates, add the G6 touch diff)
@@ -71,6 +111,7 @@ product proposal, and it records that value's provenance the way the UI records 
 - Q: Is `fallbackPolicy` fixed here? → A: No; it is tracked as issue #2366 (FR-060).
 - Q: Does the PR lane run in its own CI job or inside `build`? → A: In its own job, `headless-author`, running in parallel and required (owner ruling, 2026-10-30, superseding an earlier "step inside `build`" ruling the same day). GitHub runs jobs concurrently unless `needs:` chains them; on `main`, `ci.yml` is `changes` -> {`fast` -> `build`, `e2e-desktop`, `e2e-mobile`, `e2e-golden`}, so PR wall time is the longest chain, `fast` (about 2.1 min) + `build` (about 2.9 min), about 5.0-5.1 min on #2368's run. A step inside `build` would lengthen that chain; a job that needs only `changes` runs beside it and adds no wall time while its own total time stays within about 5 minutes. `headless-author` has `needs: changes` only, and `build` does not need it. It pays its own install and build (runner minutes, not wall time). It gates merges by being added to the required status checks of the `main: CI + integrity` ruleset, an owner action taken after the job has run green on `main` at least once (a required check that never reports blocks every PR). Once required, the job name must not change. See SC-002 and FR-036.
 - Q: How large may the PR lane's cap be? → A: Owner follow-up, 2026-10-30: "5 minutes is fine if needed." The cap is not a fixed 60 s: it is `timeout-minutes` set from T051's measurement of the job plus about 50% headroom, rounded up to a whole minute, hard ceiling 5. All six PR-set keyboards stay unless the job would exceed 5 minutes; only then is the set cut, weakest shape first, both regression guards kept.
+- Q: May the headless route diverge from the backend codebase in any way? → A: No (owner ruling, 2026-10-30). "We are only bypassing the UI." The author is the product minus React rendering, and divergence must be structurally impossible, not just discouraged: see the governing rule under Context, FR-013 to FR-017 and SC-010.
 - Q: Where do the harness case definitions live? → A: In this repo (owner, 2026-10-30), committed once from `km/2302-walk-zips` with their provenance, at `packages/studio/src/test/headlessAuthor/cases/harness-cases.json`. It is a case description, not a zip or a record, so it fits "keep the framework, no zips on main". That copy is canonical: the PR set and the scheduled run read it, and the Playwright harness should read from it or be synced from it (a follow-up for the harness owner; `km/2302-walk-zips` is not edited here). See FR-035.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -271,7 +312,44 @@ layout; no walk zip is committed for this check.
 - **FR-007**: Runs MUST be deterministic. The same case on the same build MUST yield an identical record (ignoring timestamps), DecisionSet and bundle.
 - **FR-008**: The author MUST need no browser, no dev server, no network and no port. It MUST run under the studio corpus vitest config, as the decision-point suites do.
 
-**Drift guard (all stories)**
+**Non-divergence and drift guard (all stories; governing)**
+
+- **FR-013**: The author MUST bypass the UI rendering layer and nothing else (the governing rule
+  under Context). Every behaviour below the UI MUST run as the product's own unmodified code, called
+  at the seam the UI calls it from. The author's own code MUST be limited to case input, the walk
+  policy's choice among product-offered options, the placeholder text, and reporting.
+- **FR-014**: A **boundary test** (`HA/boundary.test.ts`, default vitest config, so it runs on every
+  PR) MUST statically scan every file under `packages/studio/src/test/headlessAuthor/` and fail on
+  any of the following:
+  - an import of product code (studio source outside `src/test/`, `@keyboard-studio/engine`,
+    `@keyboard-studio/contracts`) that is not in the drift-guard inventory (FR-011) with a named
+    production caller. Spec 106's replay modules in `src/test/` are the only other permitted
+    imports. **The author calls only what the UI calls.**
+  - any `vi.mock`, `vi.doMock`, `vi.spyOn` or `vi.stubGlobal`. Spec 106's replay mocks nothing, so
+    the author path mocks nothing.
+  - any direct store write (`setState`, assignment through `getState()`). The one exception is the
+    per-case reset (contract guarantee 4), which lives in one named function the test allow-lists
+    by file and name.
+  - an inventory entry not imported by **both** its production caller and an `HA/` driver. The
+    inventory is two-sided, so a proposal pasted into a driver in place of its import fails, even
+    when the copy is verbatim.
+- **FR-015**: The walk policy MUST apply its choice through the same function the UI control's
+  handler calls: the chip click, the Continue, the banner action, the confirm. It MUST NOT write the
+  resulting value itself. Where that function is inside a component today, it is lifted first
+  (FR-040).
+- **FR-016**: Product code MUST NOT know the author exists. No file under `packages/*/src` outside
+  `src/test/` may import from `src/test/headlessAuthor/` (a depcruise rule, `product-not-to-headless-author`).
+  No product file may branch on an author or headless flag or read a `KS_AUTHOR*` variable (checked
+  by the boundary test). No product export may exist only so the author can skip a step or a
+  validation.
+- **FR-017**: When the author and the product disagree, the fix MUST be on the product side or the
+  record side, never in author logic:
+  - make the author call the product exactly as the UI does;
+  - lift the rule (FR-040), or list it as Playwright-only (FR-042);
+  - or explain a product change against an old record with an allow-list entry (FR-021).
+
+  A change that adds a conditional, a constant or a computed value to the author to make a run
+  pass, rather than calling a product function, violates FR-013.
 
 - **FR-010**: The author MUST obtain every suggestion and default by calling the product's own functions. It MUST NOT re-implement any of them. The functions known today are:
 
@@ -397,6 +475,7 @@ layout; no walk zip is committed for this check.
 - **Run report**: the placeholders, displacement actions, skipped steps, known gaps and `fallbackPolicy` of one run.
 - **Parity allow-list**: reviewed entries that explain each difference between an author run and a recorded walk. Each entry carries a decision id, a reason and the explaining change.
 - **Lifted rule**: a decision rule moved out of a component into a store action or pure function, called by both the UI and the author.
+- **Author boundary**: the line the boundary test enforces between the author (case input, the click, the typing, reporting) and the product (everything below the UI). Only inventoried product functions cross it, and only in one direction.
 
 ## Success Criteria *(mandatory)*
 
@@ -411,6 +490,13 @@ layout; no walk zip is committed for this check.
 - **SC-007**: Spec 106 T063/T064 close on this suite's report with 0 Playwright case walks.
 - **SC-008**: The 32 harness cases, run on demand, finish in under 10 minutes in one vitest run, with no browser, dev server or port, and fail 0 times out of 5 repeated runs for reasons other than a real gate failure.
 - **SC-009**: The scheduled wide sweep (FR-034) runs on its cadence without blocking any PR. Every failure it finds is filed or appended to an existing issue within that run, with the case, gate and decision point, and no failure it finds is lost.
+- **SC-010**: Divergence cannot land unnoticed. The boundary test (FR-014) and the depcruise rule
+  (FR-016) run on every PR and report 0 violations. A deliberate mutation check, run once and
+  recorded, shows each of these fails CI:
+  - a proposal function copied into `HA/`;
+  - a `vi.mock` of a product module in `HA/`;
+  - a direct `setState` on a decision store in `HA/`;
+  - a product file importing from `HA/`.
 
 ## Out of scope
 
