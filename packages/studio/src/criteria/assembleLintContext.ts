@@ -72,6 +72,7 @@ import {
   parseKps,
   parseKpsFiles,
   parseKpsFontRefs,
+  parseKpsPackageDetails,
   parseKvks,
 } from "@keyboard-studio/engine";
 import type { LintContext } from "@keymanapp/keyboard-lint";
@@ -129,6 +130,19 @@ const KPS_LISTING_TWIN_CODES = [
   "KM_LINT_KPS_HELP_LISTED",
   "KM_LINT_KPS_SOURCE_LISTED",
   "KM_LINT_KPS_JSON_LISTED",
+];
+
+/**
+ * Group A2 .kps-metadata twin codes (10.1b/10.2b/10.7b/10.8b/10.9b). All
+ * five read the .kps package-tab selections; with no .kps in the judged
+ * VFS every one is a named missing input, never a verdict.
+ */
+const KPS_METADATA_TWIN_CODES = [
+  "KM_LINT_KPS_FONT_UNSELECTED",
+  "KM_LINT_KPS_LANGUAGES_UNSELECTED",
+  "KM_LINT_KPS_DETAILS_UNSELECTED",
+  "KM_LINT_KPS_FOLLOW_VERSION_UNSET",
+  "KM_LINT_KPS_DESCRIPTION_EMPTY",
 ];
 
 /**
@@ -337,12 +351,28 @@ export function assembleLintContext(
   let kpsTargets: string[] = [];
   let kpsDisplayName: string | undefined;
   let script = "Latn";
+  // Group A2 .kps-metadata twins (10.1b/10.2b/10.7b/10.8b/10.9b): the
+  // package-tab selections, defaulting to unselected when the .kps is
+  // absent (the absent case is named in contextMissing below).
+  let kpsFontSelected = "";
+  let kpsDetailsReadme = "";
+  let kpsDetailsWelcome = "";
+  let kpsDetailsLicense = "";
+  let kpsFollowKeyboardVersion = false;
+  let kpsDescription = "";
   if (kpsText !== undefined) {
     try {
       const meta = parseKps(kpsText);
       kpsLanguages = meta.languages;
       kpsDisplayName = meta.displayName;
       script = meta.script;
+      const details = parseKpsPackageDetails(kpsText);
+      kpsFontSelected = details.fontSelected;
+      kpsDetailsReadme = details.readmeFile;
+      kpsDetailsWelcome = details.welcomeFile;
+      kpsDetailsLicense = details.licenseFile;
+      kpsFollowKeyboardVersion = details.followKeyboardVersion;
+      kpsDescription = details.description;
       // §8.13 compares DECLARED targets. parseKps defaults an absent
       // <Targets> element to ["windows"]; passing that default through
       // would manufacture a disagreement the package never declared,
@@ -398,6 +428,12 @@ export function assembleLintContext(
     kpsLanguages,
     kpsTargets,
     kpsFontFamilies,
+    kpsFontSelected,
+    kpsDetailsReadme,
+    kpsDetailsWelcome,
+    kpsDetailsLicense,
+    kpsFollowKeyboardVersion,
+    kpsDescription,
     contrastiveRegionAttested: input.contrastiveRegionAttested ?? false,
     ...(kpsDisplayName !== undefined ? { kpsDisplayName } : {}),
     placement: input.placement ?? "release",
@@ -448,10 +484,11 @@ export function assembleLintContext(
   }
   if (kpsPath === undefined || kpsText === undefined) {
     // No .kps in the judged VFS (or none readable as text): none of the
-    // .kps-listing twin rows (8.1b–8.6b / 8.8b–8.11b) can be judged —
-    // name the missing file for all ten rather than letting any pass
-    // on an unread package.
-    for (const code of KPS_LISTING_TWIN_CODES) {
+    // .kps-listing twin rows (8.1b–8.6b / 8.8b–8.11b) or the .kps-metadata
+    // twin rows (10.1b/10.2b/10.7b/10.8b/10.9b) can be judged — name the
+    // missing file for all fifteen rather than letting any pass on an
+    // unread package.
+    for (const code of [...KPS_LISTING_TWIN_CODES, ...KPS_METADATA_TWIN_CODES]) {
       contextMissing[code] = MISSING_KPS;
     }
   }

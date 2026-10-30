@@ -142,6 +142,14 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_KPS_HELP_LISTED",
   "KM_LINT_KPS_SOURCE_LISTED",
   "KM_LINT_KPS_JSON_LISTED",
+  // Group A2 .kps-metadata twins (check-kps-metadata): post-hoc checks of
+  // the scaffolder-bake package-tab selections — 10.1b/10.2b/10.7b/
+  // 10.8b/10.9b. Pure functions of the pre-parsed .kps details.
+  "KM_LINT_KPS_FONT_UNSELECTED",
+  "KM_LINT_KPS_LANGUAGES_UNSELECTED",
+  "KM_LINT_KPS_DETAILS_UNSELECTED",
+  "KM_LINT_KPS_FOLLOW_VERSION_UNSET",
+  "KM_LINT_KPS_DESCRIPTION_EMPTY",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).

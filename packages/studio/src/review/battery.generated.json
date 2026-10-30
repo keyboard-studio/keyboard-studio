@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-10-30T22:23:00.106Z",
- "catalogSize": 166,
+ "generatedAt": "2026-10-30T22:26:25.669Z",
+ "catalogSize": 171,
  "byBand": {
-  "layer-c-enforce": 84,
+  "layer-c-enforce": 89,
   "scaffolder-bake": 40,
   "yellow-survey": 32,
   "red-checklist": 10
  },
- "implementedCount": 76,
+ "implementedCount": 81,
  "notImplemented": [
   "1.1-no-files-outside-keyboard-folder",
   "9.1-font-license-nonempty",
@@ -1402,6 +1402,21 @@
    }
   },
   {
+   "id": "10.1b-kps-font-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.1: a font is selected in the .kps Keyboards tab when a font is included in the package files. The scaffolder always selects it then (10.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FONT_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
    "id": "10.2-kps-language-tags-selected",
    "band": "scaffolder-bake",
    "section": "10. Package metadata (`.kps`)",
@@ -1410,6 +1425,21 @@
     "kind": "scaffolderRule",
     "id": "kps-select-language-tags"
    }
+  },
+  {
+   "id": "10.2b-kps-language-tags-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.2: language tag(s) are selected in the .kps Keyboards tab. The scaffolder always selects them (10.2); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_LANGUAGES_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
   },
   {
    "id": "10.3-kps-tags-minimal",
@@ -1467,6 +1497,21 @@
    }
   },
   {
+   "id": "10.7b-kps-details-files-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.7: readme.htm, welcome.htm, and LICENSE.md are selected in the .kps Details tab. The scaffolder always selects them (10.7); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_DETAILS_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
    "id": "10.8-kps-follow-keyboard-version",
    "band": "scaffolder-bake",
    "section": "10. Package metadata (`.kps`)",
@@ -1477,6 +1522,21 @@
    }
   },
   {
+   "id": "10.8b-kps-follow-keyboard-version",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.8: \"Follow keyboard version\" is selected in the .kps Details tab. The scaffolder always selects it (10.8); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FOLLOW_VERSION_UNSET"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
    "id": "10.9-kps-description-nonempty",
    "band": "scaffolder-bake",
    "section": "10. Package metadata (`.kps`)",
@@ -1485,6 +1545,21 @@
     "kind": "scaffolderRule",
     "id": "kps-set-description"
    }
+  },
+  {
+   "id": "10.9b-kps-description-nonempty",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.9: the .kps description is present and non-empty. The scaffolder always fills it (10.9); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_DESCRIPTION_EMPTY"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
   },
   {
    "id": "10.10-kps-description-meaningful",

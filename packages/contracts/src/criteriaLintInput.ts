@@ -108,4 +108,28 @@ export interface CriteriaLintInput {
    * handoff as `kpsText` for criterion 15.3.
    */
   kpjText?: string;
+  /**
+   * .kps Keyboards-tab font selection (engine parseKpsPackageDetails):
+   * the first non-empty `<OSKFont>` / `<DisplayFont>`. Empty when no
+   * font is selected (Group A2, criterion 10.1b).
+   */
+  kpsFontSelected: string;
+  /**
+   * .kps Details-tab selections (engine parseKpsPackageDetails): the
+   * `<Options>` ReadMeFile / WelcomeFile / LicenseFile texts. Empty
+   * when unselected (Group A2, criterion 10.7b).
+   */
+  kpsDetailsReadme: string;
+  kpsDetailsWelcome: string;
+  kpsDetailsLicense: string;
+  /**
+   * A `<FollowKeyboardVersion>` element is present under the .kps
+   * `<Options>` (engine parseKpsPackageDetails; Group A2, 10.8b).
+   */
+  kpsFollowKeyboardVersion: boolean;
+  /**
+   * The .kps `<Info><Description>` text (engine parseKpsPackageDetails).
+   * Empty when absent (Group A2, criterion 10.9b).
+   */
+  kpsDescription: string;
 }

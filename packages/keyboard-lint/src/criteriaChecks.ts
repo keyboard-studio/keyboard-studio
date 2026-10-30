@@ -88,6 +88,7 @@ import {
 } from "./checks/criteria/check-kpj.js";
 import { checkFileInventory } from "./checks/criteria/check-file-inventory.js";
 import { checkKpsListing } from "./checks/criteria/check-kps-listing.js";
+import { checkKpsMetadata } from "./checks/criteria/check-kps-metadata.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -201,12 +202,33 @@ export function runCriteriaChecks(
   // 8.1b–8.6b / 8.8b–8.11b — the .kps-listing twins: pure functions of the
   // .kps <File> names. An absent .kps never reaches here — the assembly
   // names it in contextMissing for all ten codes.
+  // 10.1b / 10.2b / 10.7b / 10.8b / 10.9b — the .kps-metadata twins: pure
+  // functions of the pre-parsed package-tab details. Same absent-.kps
+  // gate via the assembly's contextMissing.
   if (kpsPath !== "") {
     findings.push(
       ...checkKpsListing({
         fileNames: input.kpsFileNames,
         hasTouchLayout,
         kpsPath,
+      }),
+    );
+    const normNames = input.kpsFileNames.map((n) =>
+      n.trim().replace(/\\/g, "/").toLowerCase(),
+    );
+    findings.push(
+      ...checkKpsMetadata({
+        kpsPath,
+        fontSelected: input.kpsFontSelected,
+        fontsInFiles: normNames.some(
+          (n) => n.endsWith(".ttf") || n.endsWith(".otf"),
+        ),
+        languages: input.kpsLanguages,
+        detailsReadme: input.kpsDetailsReadme,
+        detailsWelcome: input.kpsDetailsWelcome,
+        detailsLicense: input.kpsDetailsLicense,
+        followKeyboardVersion: input.kpsFollowKeyboardVersion,
+        description: input.kpsDescription,
       }),
     );
   }
