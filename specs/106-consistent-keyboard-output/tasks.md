@@ -177,7 +177,7 @@ Each story phase ends with the same three gate tasks:
   1. Write a fixture test: Bafut kbdus with `'` → `’` must raise the demotion proposal.
   2. Diagnose which gate in `maybeRaiseDisplacement` (`MechanismGallery.tsx:2224-2304`) skips it, and fix it.
   3. Record a decline in `carved-layout.displacedDeclined` (`useDisplacementProposal.ts` dismiss path).
-- [ ] T041 [US4] Gate: G1 = 0 on all fixtures. Commit `fix(studio): carve drops starting rules that assignments claimed`, push, and open a PR.
+- [x] T041 [US4] Gate: G1 = 0 on all fixtures. Commit `fix(studio): carve drops starting rules that assignments claimed`, push, and open a PR.
 
 ---
 
@@ -317,5 +317,7 @@ The 2026-10-29 advisor review (Fable) found 11 issues: 1 blocker, 6 major and 4 
 - **Declines live in `physical-layout`, not `carved-layout`** (T040 step 3; R6 preferred carve). The decline happens in the gallery step, and writing an upstream decision from a later step would rewrite it.
 - **Claimed inputs are group(main) only and gated on mergeable mechanisms** (T038, advisor review). Assignments merge only into `main`; a mechanism step 2 would skip claims nothing.
 - **Duplicate inputs are a studio bug, not a carve job** (owner ruling). Two rules with the same input in one group hide all but the first. US4 drops only starting rules an assignment replaces; session-vs-session and starting-vs-starting duplicates must be prevented where they are created, not deduplicated in the projection. Known generators: two S-02 deadkeys on one trigger (fixed at record time by #2358; older drafts still carry it), "Keep both" on a both-core displacement, and hand-chosen triggers colliding with S-01/S-08. A guard at the assignment-record seam is proposed as a follow-up story.
-- **kbdfr G1 stays a visible gap** (T041). Its record predates the S-02 fix (three deadkeys on K_COLON). Records are copied, never edited; the US8 walk re-run replaces it. G1 passes on basic_kbdus at every point from assignments onward.
+- **kbdfr re-recorded, not left as a gap** (owner ruling, T041). Its round-3 record predated the S-02 fix (three deadkeys on K_COLON). The Ewondo kbdfr case was re-walked on this branch (502fb061) and its record copied unedited; K_COLON now carries one deadkey and G1 passes, so the KNOWN_GAPS row is gone. Only the camqwerty and camazerty records still predate the S-02 fix.
+- **Group names match case-insensitively** (found by the T041 e2e run). bj_cree_woods declares `group(Main)`; once "." and "_" were placed (punctuation ruling), `applyAssignments` appended a second `group(main)` and kmcmplib rejected the keyboard. Fixed in its own commit, 502fb061 (`sameGroupName`, plus the same check in rule-pack install and the normalization step). The INDEXSTORELONG hint seen at the same time is in the starting keyboard and was not the cause.
+- **US8 T063/T064 depend on spec 107** (headless scripted author, branch `107-headless-scripted-author`). The 32 harness cases move to a headless vitest run; the walk zips stay on `km/2302-walk-zips`, never on main. T065 stays here.
 - **Suggested discards are marked, not removed, until Continue** (owner ruling, T039, Art. X). The default is discard, but carve only marks the suggested characters; clicking one keeps it (and clicking again re-marks it). Continue on the carve screen is the confirmation that applies the marked ones as `derived` removals; Skip keeps them all; Back changes nothing. An earlier build that applied the default on arrival was rejected.

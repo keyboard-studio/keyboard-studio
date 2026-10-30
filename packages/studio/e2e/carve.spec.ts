@@ -56,7 +56,7 @@
 // the same pinned version already vetted for @keyboard-studio/engine's own
 // zip writer, not a new library introduction).
 
-import { test, expect } from "playwright/test";
+import { test, expect, type Page } from "playwright/test";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
@@ -160,6 +160,19 @@ declare global {
 // Spec
 // ---------------------------------------------------------------------------
 
+/**
+ * Spec 106 FR-042: carve arrives with every suggested character MARKED for
+ * discard, and Continue applies the marks. This walk's alphabet is a single
+ * character, so nearly the whole keyboard is suggested; keep every
+ * suggestion first so the walk carves only what the test chooses.
+ */
+async function keepAllSuggestions(page: Page): Promise<void> {
+  const toggleAll = page.getByTestId("carve-v2-suggested-toggle-all");
+  if (!(await toggleAll.isVisible().catch(() => false))) return;
+  if ((await toggleAll.innerText()).trim() === "Restore all") await toggleAll.click();
+  await expect(toggleAll).toHaveText(/Discard all/);
+}
+
 test.describe("Carve gallery (v2) — discard one character, verify IR + emitted .kmn", () => {
   test("discarding U+14EC in the carve gallery removes both producing rules from the deleted-item IR state and from the emitted .kmn", async ({ page }) => {
     // ?e2e=1 is the runtime override for installE2eHook() (src/lib/e2eHook.ts)
@@ -202,13 +215,16 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     // deleted until you continue", CarveGalleryV2.tsx's own header copy),
     // unlike v1's rule-level two-step raw-remove-anyway/raw-confirm-remove
     // confirm. No search box to narrow through (#1619 AC4 removed it).
+    await keepAllSuggestions(page);
     const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
     await expect(targetCell).toBeVisible();
-    // Spec 106 FR-042: a suggested discard arrives marked (Continue applies it).
-    if ((await targetCell.getAttribute("aria-pressed")) !== "true") {
-      await targetCell.click();
-    }
+    await expect(targetCell).toHaveAttribute("aria-pressed", "false");
+
+    // A suggested character is marked by this click and discarded by Continue
+    // (spec 106 FR-042), so the IR checkpoint follows Continue.
+    await targetCell.click();
     await expect(targetCell).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("carve-continue").click();
 
     // ---------------------------------------------------------------------
     // AC2 checkpoint 1: the IR reflects the deletion.
@@ -236,8 +252,6 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
         `expected ${ruleId} still listed in the live (pre-carve-filter) IR`,
       ).toBe(true);
     }
-
-    await page.getByTestId("carve-continue").click();
 
     // Spec 083: the deadkeys step sits between carve and rules — walk
     // through it (this walk defines no deadkeys).
@@ -360,13 +374,10 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     await expect(carveGallery).toBeVisible({ timeout: 30_000 });
 
     // Confirm the target cell is present and kept — the "nothing carved"
-    // control path. Spec 106 FR-042: if it arrived marked as a suggested discard
-    // (the carve default), one click keeps it.
-    const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`).first();
+    // control path: every suggestion is kept, and the target is not clicked.
+    await keepAllSuggestions(page);
+    const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
     await expect(targetCell).toBeVisible();
-    if ((await targetCell.getAttribute("aria-pressed")) === "true") {
-      await targetCell.click();
-    }
     await expect(targetCell).toHaveAttribute("aria-pressed", "false");
 
     await expect
