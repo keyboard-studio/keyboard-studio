@@ -336,8 +336,9 @@ describe("emit — quoted store values", () => {
   // when a rule consumes the (now-empty) store via any() — that combination
   // compiles with a warning-level "zero characters" diagnostic and produces
   // NO .kmx artifact at all. The pattern-apply "drop" edit class (see
-  // applyStoreSlotRemovals) refuses to empty a store that is any()-referenced,
-  // but allows it for unreferenced stores, matching this evidence. This test
+  // applyStoreSlotRemovals) removes a store emptied by a carve together with
+  // the rules that reference it, so a real carve never hands emit() an empty
+  // any()-consumed store. This test
   // pins emit()'s own behavior for any caller that hands it an empty store.
   it("emits a bare `store(name) ` line (trailing space, no value) for an emptied store", () => {
     const out = emit(makeUserStoreIR("emptied", []));

@@ -357,11 +357,11 @@ describe("applyStoreSlotRemovals — multi-position splice safety", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Would-empty refusal
+// 4. Emptying an any()-consumed store removes it and the rules that reference it
 // ---------------------------------------------------------------------------
 
-describe("applyStoreSlotRemovals — would-empty refusal", () => {
-  it("refuses to empty a single any()-referenced store: IR unchanged, not counted, warns with the oracle-based message", () => {
+describe("applyStoreSlotRemovals — emptied any() store is removed with its rules", () => {
+  it("emptying a single any()-referenced store removes the store and its rule, with a notice and no refusal warning", () => {
     const store: IRStore = {
       nodeId: "s#last",
       name: "lastStore",
@@ -376,48 +376,85 @@ describe("applyStoreSlotRemovals — would-empty refusal", () => {
     const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
     const ir = makeTestIR([group], [store]);
 
-    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
-      ir,
-      new Set(["s#last#0"]),
-    );
+    const { ir: result, warnings, notices, appliedCount, removedRules, removedStores } =
+      applyStoreSlotRemovals(ir, new Set(["s#last#0"]));
 
-    expect(appliedCount).toBe(0);
-    const resultStore = result.stores.find((s) => s.nodeId === "s#last");
-    expect(resultStore).toBe(store);
-    expect(
-      warnings.some((w) =>
-        w.includes(
-          'refusing to empty store "lastStore" - a store consumed by any() compiles to a keyboard that silently fails to build when empty; remove the whole store and its rules instead',
-        ),
-      ),
-    ).toBe(true);
+    expect(appliedCount).toBe(1);
+    expect(result.stores.find((s) => s.nodeId === "s#last")).toBeUndefined();
+    expect(result.groups[0]?.rules).toEqual([]);
+    expect(removedRules).toEqual([{ groupNodeId: "g#0", ruleNodeId: "rule#0" }]);
+    expect(removedStores).toEqual(["lastStore"]);
+    expect(warnings.some((w) => w.includes("refusing"))).toBe(false);
+    expect(notices.some((n) => n.includes("lastStore") && n.includes("rule#0"))).toBe(true);
+    // startIr is never mutated.
+    expect(ir.groups[0]?.rules).toHaveLength(1);
+    expect(ir.stores).toHaveLength(1);
   });
 
-  it("refuses a COORDINATED drop that would empty either member of a cross-paired pair-set when one is any()-consumed — no partial application", () => {
-    // A one-element cross-pair: dropping the sole position would empty BOTH
-    // dkt (index target) and dkf (any()-consumed) — refuse entirely.
+  it("a COORDINATED drop that empties a cross-paired pair-set removes both stores and the rule", () => {
     const outStore = makeOutputStore("store#dkt", "dktX", [{ kind: "char", value: "z" }]);
     const inStore = makeInputStore("store#dkf", "dkfX", ["a"]);
     const group = makeParallelStoreGroup("group#main", "rule#0", 0x003b, "dkfX", "dktX");
     const ir = makeTestIR([group], [outStore, inStore]);
 
-    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+    const { ir: result, warnings, removedStores } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkt#0"]),
     );
 
-    expect(appliedCount).toBe(0);
-    // No partial application: NEITHER store changed, by reference.
-    expect(result.stores.find((s) => s.nodeId === "store#dkt")).toBe(outStore);
-    expect(result.stores.find((s) => s.nodeId === "store#dkf")).toBe(inStore);
-    expect(
-      warnings.some(
-        (w) => w.includes("refusing coordinated removal") && w.includes("dkfX") && w.includes("dktX"),
-      ),
-    ).toBe(true);
+    expect(result.stores).toEqual([]);
+    expect(result.groups[0]?.rules).toEqual([]);
+    expect(removedStores).toEqual(["dkfX", "dktX"]);
+    expect(warnings.some((w) => w.includes("refusing"))).toBe(false);
   });
 
-  it("applies emptying an UNREFERENCED store: drop goes through, items[] ends up empty, no refusal warning", () => {
+  it("a partner padded with trailing nul is removed too when the any() input store empties", () => {
+    const inStore = makeInputStore("store#dkf", "dkfX", ["a", "b"]);
+    const outStore = makeOutputStore("store#dkt", "dktX", [
+      { kind: "char", value: "A" },
+      { kind: "char", value: "B" },
+      { kind: "raw", text: "nul" },
+    ]);
+    const group = makeParallelStoreGroup("group#main", "rule#0", 0x003b, "dkfX", "dktX");
+    const ir = makeTestIR([group], [inStore, outStore]);
+
+    const { ir: result, removedStores } = applyStoreSlotRemovals(
+      ir,
+      new Set(["store#dkf#0", "store#dkf#1"]),
+    );
+
+    expect(result.stores).toEqual([]);
+    expect(result.groups[0]?.rules).toEqual([]);
+    expect(removedStores).toEqual(["dkfX", "dktX"]);
+  });
+
+  it("a rule that references the emptied store alongside other context is removed too", () => {
+    const store = makeInputStore("store#ka", "ka", ["a"]);
+    const other = makeInputStore("store#kc", "kc", ["q", "r"]);
+    const rule: IRRule = {
+      nodeId: "rule#multi",
+      context: [
+        { kind: "any", storeRef: "kc" },
+        { kind: "raw", text: "+" },
+        { kind: "any", storeRef: "ka" },
+      ],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const keep: IRRule = {
+      nodeId: "rule#keep",
+      context: [{ kind: "any", storeRef: "kc" }],
+      output: [{ kind: "char", value: "y" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule, keep], readonly: false };
+    const ir = makeTestIR([group], [store, other]);
+
+    const { ir: result } = applyStoreSlotRemovals(ir, new Set(["store#ka#0"]));
+
+    expect(result.groups[0]?.rules.map((r) => r.nodeId)).toEqual(["rule#keep"]);
+    expect(result.stores.map((s) => s.name)).toEqual(["kc"]);
+  });
+
+  it("emptying an UNREFERENCED store drops it: no empty store is emitted, no refusal warning", () => {
     const store: IRStore = {
       nodeId: "s#orphanlast",
       name: "orphanLastStore",
@@ -433,8 +470,7 @@ describe("applyStoreSlotRemovals — would-empty refusal", () => {
 
     expect(appliedCount).toBe(1);
     expect(warnings.some((w) => w.includes("refusing"))).toBe(false);
-    const resultStore = result.stores.find((s) => s.nodeId === "s#orphanlast");
-    expect(resultStore!.items).toEqual([]);
+    expect(result.stores).toEqual([]);
   });
 
   it("dropping all-but-one char in an any()-referenced store still applies (only the empty-result batch is refused)", () => {

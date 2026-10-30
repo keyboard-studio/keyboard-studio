@@ -17,6 +17,7 @@ import {
   unconditionalScaffoldRenameStores,
   conditionalScaffoldRenameStores,
 } from "../shared/siblingAssetStores.js";
+import { pruneUnusedDeadkeys } from "../shared/pruneUnusedDeadkeys.js";
 
 export interface ScaffoldIRIdentity {
   keyboardId: string;
@@ -267,6 +268,18 @@ export function ensureCasedKeysStore(ir: KeyboardIR, group: RoutingGroup): void 
 }
 
 /**
+ * Prune deadkeys the copied keyboard emits but never consumes: strip their
+ * `dk()` outputs; a rule left with no output is removed (no fallback policy
+ * exists at scaffold time, and an arming key nothing reads is one the base
+ * keyboard should handle). Fails closed on opaque fragments; see
+ * {@link pruneUnusedDeadkeys}.
+ */
+export function pruneUnusedDeadkeysInPlace(ir: KeyboardIR): void {
+  const { ir: pruned } = pruneUnusedDeadkeys(ir, { onEmptied: () => null });
+  ir.groups = pruned.groups;
+}
+
+/**
  * Run the full IR-native template-cleanup + identity-propagation pipeline.
  * Returns the same IR instance, mutated in place — matches the §8 step 3
  * contract that the scaffolder is an IR→IR transform.
@@ -275,6 +288,7 @@ export function scaffoldIR(ir: KeyboardIR, opts: ScaffoldIROptions): KeyboardIR 
   stripCapsRules(ir);
   removeCapsContextElements(ir);
   ensureCasedKeysStore(ir, opts.group);
+  pruneUnusedDeadkeysInPlace(ir);
   resetIdentity(ir, opts.identity);
   return ir;
 }

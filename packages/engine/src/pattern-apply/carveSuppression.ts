@@ -124,7 +124,7 @@ interface RuleLocation {
   rule: IRRule;
 }
 
-function stampOwnership(rule: IRRule, output: OutputElement[]): IRRule {
+export function stampOwnership(rule: IRRule, output: OutputElement[]): IRRule {
   // FR-002: the two ownership markers are mutually exclusive on one rule.
   const { ownedByPattern: _dropped, ...rest } = rule;
   return { ...structuredClone(rest), output, ownedByBehaviour: CARVE_SUPPRESSION_OWNER };
@@ -308,13 +308,13 @@ function compileSlotGuards(
 /**
  * Remove consumer rules that the slot guards have made wholly unreachable.
  *
- * When EVERY item of an `any()` store is carved, the pipeline refuses to
- * empty the store (a store consumed by `any()` that compiles empty fails the
- * build), so the carved chars stay in it and the per-char guards, which sit
- * ahead of the consumer, match every key the consumer's `any()` could take.
- * The consumer can then never fire; kmcmplib reports it as an unreachable
+ * When EVERY item of an `any()` store is carved, the per-char guards sit
+ * ahead of the consumer and match every key the consumer's `any()` could
+ * take, so the consumer can never fire; kmcmplib reports it as an unreachable
  * rule. The guards already swallow each key, so dropping the dead consumer
- * changes no behaviour and keeps the swallow semantics.
+ * changes no behaviour and keeps the swallow semantics. (The slot-removal
+ * stage then drops the emptied stores; any other rule still referencing them
+ * goes with them, so nothing is removed twice.)
  *
  * Only key-position (right of `+`) occurrences count, matching guard
  * synthesis. A consumer carrying its own rule disposition is left to the
