@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { failureKey, failuresByKey, fileIssues, issueTitle, mergeReports } from "./file-sweep-issues.mjs";
+import { failureKey, failuresByKey, fileIssues, issueTitle, mergeReports, reproduceCommand } from "./file-sweep-issues.mjs";
 
 const fail = (over = {}) => ({
   caseId: "sweep-kb1-p1-whole",
@@ -88,4 +88,29 @@ test("an open issue with a different key does not match", () => {
 
 test("walk failures use the studio area", () => {
   assert.match(issueTitle(fail({ gate: "proposal-threw", decisionPoint: "carve" })), /^bug\(studio\): /);
+});
+
+test("an in-progress entry left by a killed shard merges as a hung failure and is filed", () => {
+  const hung = { caseId: "sweep-kb1-p1-whole", base: "kb1", profile: 1, backspace: "whole", status: "in-progress", gate: "hung", decisionPoint: "attribution", detail: "killed" };
+  const m = mergeReports([report([hung, { caseId: "a", status: "ok" }])]);
+  const c = m.cases.find((x) => x.caseId === hung.caseId);
+  assert.equal(c.status, "failed");
+  assert.equal(c.gate, "hung");
+  assert.deepEqual(m.summary.cases, { completed: 1, skipped: 0, failed: 1 });
+  assert.deepEqual(m.summary.byGate, { hung: [hung.caseId] });
+  assert.deepEqual(m.summary.byFirstFailingStep, { attribution: [hung.caseId] });
+  assert.equal(failureKey(c), "[headless-sweep] kb1 p1-whole hung @ attribution");
+
+  const { gh, calls } = stubGh([]);
+  const res = fileIssues(m, { gh, runUrl: "u", date: "2026-01-01" });
+  assert.deepEqual(res, [{ key: "[headless-sweep] kb1 p1-whole hung @ attribution", action: "create" }]);
+  const create = calls.find((a) => a[1] === "create");
+  const body = create[create.indexOf("--body") + 1];
+  assert.ok(body.includes(reproduceCommand("latin", hung.caseId)));
+  assert.match(body, /KS_AUTHOR_TRACE=1/);
+});
+
+test("an in-progress entry with no recorded step still keys as hung @ unknown", () => {
+  const m = mergeReports([report([{ caseId: "x", base: "kb2", profile: 1, backspace: "whole", status: "in-progress" }])]);
+  assert.equal(failureKey(m.cases[0]), "[headless-sweep] kb2 p1-whole hung @ unknown");
 });

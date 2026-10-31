@@ -6,6 +6,12 @@
 //   KS_AUTHOR_SHARD=k/n                    run only shard k of n (default 1/1)
 //   KS_AUTHOR_ONLY=<caseId>                re-run one swept case alone
 //   KS_AUTHOR_REPORT_DIR=<dir>             where headless-report-<tier>-<shard>.json is written
+//   KS_AUTHOR_CASE_TIMEOUT_MS=<ms>         per-case test timeout (default 180000)
+//   KS_AUTHOR_TRACE=1                      per-step [TRACE] lines on stderr (runAuthorCase.ts)
+//
+// The report is rewritten before each case (that case as `in-progress`, with the step it
+// reached) and after it, so a shard killed by a hang still leaves a report naming the case.
+// A leftover `in-progress` entry is a `hung` failure to the merge (file-sweep-issues.mjs).
 //
 // `latin` and `eligible` cross the eligible keyboards with two profile variants
 // (profile 1, both backspace answers). `cases` is the nightly tier: the 32
@@ -33,7 +39,11 @@ export interface SweepEntry {
   base: string;
   profile: number;
   backspace: string;
-  status: "ok" | "failed" | "skipped" | "known-gap";
+  /**
+   * `in-progress` is written before a case runs and replaced when it finishes; one left in a
+   * report means the shard was killed on it, and the merge counts it as a `hung` failure.
+   */
+  status: "ok" | "failed" | "skipped" | "known-gap" | "in-progress";
   skipReason?: SkipReason;
   /** The failing gate id, or the failure kind when no gate ran. */
   gate?: string;
@@ -49,6 +59,8 @@ export interface SweepEntry {
 const TIER_RAW = process.env.KS_AUTHOR_SWEEP;
 const SHARD_RAW = process.env.KS_AUTHOR_SHARD ?? "1/1";
 const ONLY = process.env.KS_AUTHOR_ONLY;
+/** Per-case test timeout; an asynchronous hang or a very slow keyboard ends the case here. */
+const CASE_TIMEOUT_MS = Number(process.env.KS_AUTHOR_CASE_TIMEOUT_MS ?? "180000");
 
 function parseShard(raw: string): { k: number; n: number } {
   const m = /^(\d+)\/(\d+)$/.exec(raw);
@@ -190,7 +202,7 @@ export function summarise(tier: string, shard: string, entries: readonly SweepEn
       summary.cases.skipped++;
       const reason = e.skipReason ?? "missing";
       (summary.skips[reason] ??= []).push(e.caseId);
-    } else if (e.status === "failed") {
+    } else if (e.status === "failed" || e.status === "in-progress") {
       summary.cases.failed++;
       const gate = (e.gate ?? "unknown") as keyof SweepSummary["byGate"];
       (summary.byGate[gate] ??= []).push(e.caseId);
@@ -221,14 +233,66 @@ if (TIER_RAW === undefined || TIER_RAW === "") {
     const runnable = ONLY === undefined ? planned.runnable : planned.runnable.filter((c) => c.id === ONLY);
     const entries: SweepEntry[] = ONLY === undefined ? [...planned.skipped] : [];
 
-    afterAll(() => {
-      const shardName = `${shard.k}of${shard.n}`;
-      const summary = summarise(tier, `${shard.k}/${shard.n}`, entries);
-      const dir = process.env.KS_AUTHOR_REPORT_DIR ?? process.cwd();
+    const shardName = `${shard.k}of${shard.n}`;
+    const dir = process.env.KS_AUTHOR_REPORT_DIR ?? process.cwd();
+    const file = join(dir, `headless-report-${tier}-${shardName}.json`);
+    // Entries are serialised once when they finish, so the per-step rewrite stays cheap.
+    const finished: { caseId: string; json: string }[] = entries.map((e) => ({ caseId: e.caseId, json: JSON.stringify(e) }));
+    let current: SweepEntry | undefined;
+
+    const finish = (entry: SweepEntry): void => {
+      entries.push(entry);
+      finished.push({ caseId: entry.caseId, json: JSON.stringify(entry) });
+    };
+    /** A test that timed out never reached finish(): that is a hang, reported as one. */
+    const abandoned = new Set<string>();
+    const timedOut = (e: SweepEntry): SweepEntry => {
+      abandoned.add(e.caseId);
+      return {
+        ...e,
+        status: "failed",
+        detail: `the test timed out while running step ${e.decisionPoint ?? "unknown"} (see KS_AUTHOR_TRACE)`,
+      };
+    };
+
+    /** Rewrite the whole shard report: finished cases plus the one in progress, if any. */
+    const writeReport = (): void => {
+      const all = current === undefined ? entries : [...entries, current];
+      const summary = summarise(tier, `${shard.k}/${shard.n}`, all);
+      const rows = [...finished];
+      if (current !== undefined) rows.push({ caseId: current.caseId, json: JSON.stringify(current) });
+      rows.sort((a, b) => a.caseId.localeCompare(b.caseId));
       mkdirSync(dir, { recursive: true });
-      const sorted = [...entries].sort((a, b) => a.caseId.localeCompare(b.caseId));
-      const file = join(dir, `headless-report-${tier}-${shardName}.json`);
-      writeFileSync(file, JSON.stringify({ tier, shard: shardName, summary, cases: sorted }, null, 2), "utf8");
+      const head = JSON.stringify({ tier, shard: shardName, summary });
+      writeFileSync(file, head.slice(0, -1) + ',"cases":[' + rows.map((r) => r.json).join(",") + "]}", "utf8");
+    };
+
+    /** The case about to run: on disk before it starts, so a killed shard still names it. */
+    const begin = (c: Case): void => {
+      if (current !== undefined) finish(timedOut(current));
+      current = {
+        caseId: c.id,
+        base: c.base,
+        profile: c.profile,
+        backspace: c.backspace,
+        status: "in-progress",
+        gate: "hung",
+        decisionPoint: "unknown",
+        detail: "the shard ended while this case was running (a hang or a kill); re-run with KS_AUTHOR_TRACE=1",
+      };
+      writeReport();
+    };
+    const step = (id: string): void => {
+      if (current === undefined) return;
+      current = { ...current, decisionPoint: id };
+      writeReport();
+    };
+
+    afterAll(() => {
+      if (current !== undefined) finish(timedOut(current));
+      current = undefined;
+      const summary = summarise(tier, `${shard.k}/${shard.n}`, entries);
+      writeReport();
 
       const line = (title: string, group: Record<string, string[] | undefined>): void => {
         for (const [key, ids] of Object.entries(group)) console.log(`  ${title} ${key}: ${ids?.length ?? 0}`);
@@ -249,8 +313,9 @@ if (TIER_RAW === undefined || TIER_RAW === "") {
     for (const c of runnable) {
       it(c.id, async () => {
         let entry: SweepEntry;
+        begin(c);
         try {
-          const run = await runAuthorCase(c);
+          const run = await runAuthorCase(c, { onStep: step });
           console.log(formatCaseLine(run));
           entry = classify(c, run);
         } catch (e) {
@@ -268,9 +333,13 @@ if (TIER_RAW === undefined || TIER_RAW === "") {
             detail,
           };
         }
-        entries.push(entry);
+        // The test already timed out and was reported as hung; the walk finished (or died) later.
+        if (abandoned.has(c.id)) return;
+        current = undefined;
+        finish(entry);
+        writeReport();
         expect(entry.status === "failed" ? `${entry.gate} @ ${entry.decisionPoint}: ${entry.detail}` : "ok").toBe("ok");
-      }, 180_000);
+      }, CASE_TIMEOUT_MS);
     }
   });
 }

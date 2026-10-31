@@ -23,6 +23,17 @@ check.
 - a `summarise` job merging shards into `headless-report-<tier>.json` and writing a job summary
   table (by gate, by first failing step, skips by reason).
 
+## Hangs
+
+A case can loop synchronously, which no vitest timeout interrupts. So the sweep rewrites
+`headless-report-<tier>-<shard>.json` before every case (that case as `status: "in-progress"`,
+`gate: "hung"`, `decisionPoint` the step it last reached) and after it. A shard killed by the job
+timeout leaves that file; the `Sweep` step has its own `timeout-minutes` (105) below the job's 120 so
+the upload and the `summarise` job still run. The merge turns an `in-progress` entry into a `failed`
+one with gate `hung`, keyed `[headless-sweep] <keyboard> <profile> hung @ <step>`; the issue body adds
+the `KS_AUTHOR_TRACE=1` hint (per-step `[TRACE] <case> step <id> start|end <ms>` on stderr; a `start`
+with no `end` names the hung step). A test that times out (an interruptible hang) is the same failure.
+
 ## Issue filing (`scripts/file-sweep-issues.mjs`)
 
 - Key: `[headless-sweep] <keyboard> <profile> <gate> @ <decision point>`.

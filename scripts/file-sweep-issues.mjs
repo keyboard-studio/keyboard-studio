@@ -28,6 +28,22 @@ function profileName(c) {
   return `p${c.profile}-${c.backspace}`;
 }
 
+/**
+ * An `in-progress` entry left in a shard report means the shard was killed while
+ * running that case (a synchronous hang the runner cannot interrupt). It is a
+ * failure with gate `hung`, at the step the sweep last recorded.
+ */
+export function normaliseCase(c) {
+  if (c.status !== "in-progress") return c;
+  return {
+    ...c,
+    status: "failed",
+    gate: "hung",
+    decisionPoint: c.decisionPoint ?? "unknown",
+    detail: c.detail ?? "the shard ended while this case was running (a hang or a kill)",
+  };
+}
+
 /** Merge shard reports of one tier into a single report. */
 export function mergeReports(reports) {
   if (reports.length === 0) throw new Error("no shard reports to merge");
@@ -35,7 +51,7 @@ export function mergeReports(reports) {
   const cases = [];
   for (const r of reports) {
     if (r.tier !== tier) throw new Error(`mixed tiers in one merge: ${tier} and ${r.tier}`);
-    cases.push(...r.cases);
+    cases.push(...r.cases.map(normaliseCase));
   }
   cases.sort((a, b) => (a.caseId < b.caseId ? -1 : a.caseId > b.caseId ? 1 : 0));
   const summary = { tier, cases: { completed: 0, skipped: 0, failed: 0 }, byGate: {}, byFirstFailingStep: {}, skips: {} };
@@ -122,6 +138,9 @@ function issueBody(tier, key, cases, runUrl, date) {
     "```",
     first.detail ?? "no detail",
     "```",
+    ...(first.gate === "hung"
+      ? ["", "`hung`: the case never finished (a synchronous loop, or a kill). Re-run it with `KS_AUTHOR_TRACE=1` under a `timeout`; the last `[TRACE] ... start` with no `end` is the step."]
+      : []),
     "",
     "Reproduce:",
     "",

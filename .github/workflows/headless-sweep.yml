@@ -150,7 +150,11 @@ jobs:
       - name: Build studio dependencies
         run: pnpm --filter "@keyboard-studio/studio^..." build
 
+      # Ends the step before the 120-minute job limit so the report upload below
+      # (and then the summarise job) still run; the sweep rewrites its report
+      # before every case, so a hang leaves the case it was on in the file.
       - name: Sweep
+        timeout-minutes: 105
         env:
           KS_AUTHOR_SWEEP: ${{ needs.plan.outputs.tier }}
           KS_AUTHOR_SHARD: ${{ matrix.shard }}
