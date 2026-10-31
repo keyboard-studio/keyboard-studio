@@ -79,6 +79,7 @@ import { checkTouchLayoutFontMismatch } from "./checks/criteria/check-touch-font
 import {
   checkVersionFormat,
   checkVersionLeadingZero,
+  checkVersionBumpRequired,
   checkVersionNotIncremented,
   checkVersionVPrefix,
 } from "./checks/criteria/check-version.js";
@@ -345,6 +346,7 @@ export function runCriteriaChecks(
     // The authored host judges this from instantiation state (assembly
     // verdict); the resolver defers to this check in foreign mode.
     collect(checkVersionNotIncremented(keyboardIR, input.reviewContext));
+    collect(checkVersionBumpRequired(keyboardIR, input.reviewContext));
     collect(checkIdContainsKeyboard(keyboardIR, input.kpsDisplayName));
     collect(
       checkDisplayNameUnderscore(keyboardIR, input.kpsDisplayName),
