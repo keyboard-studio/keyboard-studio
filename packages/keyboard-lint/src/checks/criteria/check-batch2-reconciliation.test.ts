@@ -32,29 +32,43 @@ function irWithOutput(value: string): KeyboardIR {
 
 describe("checkPuaNotInExperimental (7.12)", () => {
   it("flags PUA output in release/ placement", () => {
-    const findings = checkPuaNotInExperimental(irWithOutput("\u{E001}"), "release");
+    const { findings } = checkPuaNotInExperimental(
+      irWithOutput("\u{E001}"),
+      "release",
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_PUA_NOT_IN_EXPERIMENTAL");
   });
 
-  it("passes PUA output in experimental/ and non-PUA output anywhere", () => {
-    expect(
-      checkPuaNotInExperimental(irWithOutput("\u{E001}"), "experimental"),
-    ).toEqual([]);
-    expect(checkPuaNotInExperimental(irWithOutput("a"), "release")).toEqual([]);
+  it("passes PUA output in experimental/, naming the codepoints", () => {
+    const { findings, verified } = checkPuaNotInExperimental(
+      irWithOutput("\u{E001}"),
+      "experimental",
+    );
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["In experimental/; PUA codepoints: U+E001."]);
+  });
+
+  it("passes non-PUA output anywhere, noting the absence", () => {
+    const { findings, verified } = checkPuaNotInExperimental(
+      irWithOutput("a"),
+      "release",
+    );
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["No PUA codepoints in the produced output."]);
   });
 });
 
 describe("checkPuaFontDisplayMap (7.14)", () => {
   it("flags PUA output + bundled font + no &DISPLAYMAP", () => {
-    const findings = checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
+    const { findings } = checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
       hasBundledFont: true,
     });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_PUA_FONT_NO_DISPLAYMAP");
   });
 
-  it("passes when a &DISPLAYMAP store is declared", () => {
+  it("passes when a &DISPLAYMAP store is declared, naming it", () => {
     const ir = makeTestIR({
       header: { keyboardId: "demo" },
       stores: [
@@ -82,18 +96,26 @@ describe("checkPuaFontDisplayMap (7.14)", () => {
       ],
     });
     expect(displayMapReference(ir)).toBe("demo.json");
-    expect(checkPuaFontDisplayMap(ir, { hasBundledFont: true })).toEqual([]);
+    const { findings, verified } = checkPuaFontDisplayMap(ir, {
+      hasBundledFont: true,
+    });
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["Found: store(&DISPLAYMAP) -> demo.json."]);
   });
 
-  it("is silent without PUA output, and without a bundled font", () => {
-    expect(
-      checkPuaFontDisplayMap(irWithOutput("a"), { hasBundledFont: true }),
-    ).toEqual([]);
-    expect(
-      checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
-        hasBundledFont: false,
-      }),
-    ).toEqual([]);
+  it("is moot without PUA output, and without a bundled font", () => {
+    const noPua = checkPuaFontDisplayMap(irWithOutput("a"), {
+      hasBundledFont: true,
+    });
+    expect(noPua.findings).toEqual([]);
+    expect(noPua.verified).toEqual([
+      "No PUA codepoints in the produced output.",
+    ]);
+    const noFont = checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
+      hasBundledFont: false,
+    });
+    expect(noFont.findings).toEqual([]);
+    expect(noFont.verified).toEqual(["No bundled font."]);
   });
 });
 
@@ -118,7 +140,7 @@ describe("checkRedundantTouchLayouts (7.19)", () => {
   };
 
   it("flags identical phone and tablet layouts", () => {
-    const findings = checkRedundantTouchLayouts(TL, "source/demo.keyman-touch-layout");
+    const { findings } = checkRedundantTouchLayouts(TL, "source/demo.keyman-touch-layout");
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_REDUNDANT_TOUCH_LAYOUTS");
   });
@@ -128,12 +150,12 @@ describe("checkRedundantTouchLayouts (7.19)", () => {
       platforms: [platform("phone", ["default"]), platform("tablet", ["default", "shift"])],
       nodeIds: [],
     };
-    expect(checkRedundantTouchLayouts(byId, "x")).toEqual([]);
+    expect(checkRedundantTouchLayouts(byId, "x").findings).toEqual([]);
     const byText: TouchLayoutIR = {
       platforms: [platform("phone", ["default"], "a"), platform("tablet", ["default"], "b")],
       nodeIds: [],
     };
-    expect(checkRedundantTouchLayouts(byText, "x")).toEqual([]);
+    expect(checkRedundantTouchLayouts(byText, "x").findings).toEqual([]);
   });
 
   it("is silent when only one platform exists", () => {
@@ -141,7 +163,7 @@ describe("checkRedundantTouchLayouts (7.19)", () => {
       platforms: [platform("phone", ["default"])],
       nodeIds: [],
     };
-    expect(checkRedundantTouchLayouts(phoneOnly, "x")).toEqual([]);
+    expect(checkRedundantTouchLayouts(phoneOnly, "x").findings).toEqual([]);
   });
 });
 
@@ -158,7 +180,7 @@ describe("checkKpsTargetsMatch (8.13)", () => {
         kpsTargets: ["windows", "web"],
         kpsFileNames: ["..\\build\\demo.kmx", "..\\build\\demo.js"],
         kpsPath: KPS,
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
@@ -169,12 +191,12 @@ describe("checkKpsTargetsMatch (8.13)", () => {
         kpsTargets: ["windows", "macosx", "linux", "web", "mobile", "tablet"],
         kpsFileNames: [],
         kpsPath: KPS,
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
   it("flags a declared-target disagreement in each direction", () => {
-    const findings = checkKpsTargetsMatch({
+    const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["windows", "web"]),
       kpsTargets: ["windows", "mobile"],
       kpsFileNames: [],
@@ -187,7 +209,7 @@ describe("checkKpsTargetsMatch (8.13)", () => {
   });
 
   it("flags a shipped .js with no web-capable target declared", () => {
-    const findings = checkKpsTargetsMatch({
+    const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["windows"]),
       kpsTargets: ["windows"],
       kpsFileNames: ["..\\build\\demo.js"],
@@ -198,7 +220,7 @@ describe("checkKpsTargetsMatch (8.13)", () => {
   });
 
   it("flags a shipped .kmx with no desktop target declared", () => {
-    const findings = checkKpsTargetsMatch({
+    const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["web"]),
       kpsTargets: ["web"],
       kpsFileNames: ["..\\build\\demo.kmx"],

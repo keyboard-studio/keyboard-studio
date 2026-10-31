@@ -12,7 +12,12 @@
 // surfaced through the IR-dependent rows' missing-context reasons.
 
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 const STORE_LINE = /^\s*store\s*\(/i;
 
@@ -52,14 +57,17 @@ function lineHasUnbalancedString(rhs: string): boolean {
 }
 
 /** 7.10 — one finding per store line whose string literals are unbalanced. */
-export function checkStoreSyntax(kmnText: string, path: string): LintFinding[] {
-  const findings: LintFinding[] = [];
+export function checkStoreSyntax(kmnText: string, path: string): CheckResult {
+  const code = "KM_LINT_STORE_SYNTAX_INVALID";
+  const offenderFindings: LintFinding[] = [];
+  let storeLines = 0;
   const lines = kmnText.split(/\r?\n/);
   lines.forEach((line, idx) => {
     if (!STORE_LINE.test(line)) return;
+    storeLines += 1;
     const close = line.indexOf(")");
     if (close === -1) {
-      findings.push(
+      offenderFindings.push(
         criteriaFinding({
           code: "KM_LINT_STORE_SYNTAX_INVALID",
           file: path,
@@ -70,7 +78,7 @@ export function checkStoreSyntax(kmnText: string, path: string): LintFinding[] {
       return;
     }
     if (lineHasUnbalancedString(line.slice(close + 1))) {
-      findings.push(
+      offenderFindings.push(
         criteriaFinding({
           code: "KM_LINT_STORE_SYNTAX_INVALID",
           file: path,
@@ -80,5 +88,10 @@ export function checkStoreSyntax(kmnText: string, path: string): LintFinding[] {
       );
     }
   });
-  return findings;
+  if (offenderFindings.length > 0) return checkFailed(code, offenderFindings);
+  if (storeLines === 0)
+    return checkPassed(code, ["No store declarations to check."]);
+  return checkPassed(code, [
+    `Checked ${storeLines} store declaration line(s): all string literals balanced.`,
+  ]);
 }

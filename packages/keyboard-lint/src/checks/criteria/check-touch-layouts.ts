@@ -12,8 +12,13 @@
 // judges, and a font difference between the platforms is criterion
 // 7.20's finding on its own row.
 
-import type { LintFinding, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 /** Canonical string form of one platform's layers, for comparison. */
 function canonicalLayers(platform: TouchLayoutIR["platforms"][number]): string {
@@ -31,13 +36,21 @@ function canonicalLayers(platform: TouchLayoutIR["platforms"][number]): string {
 export function checkRedundantTouchLayouts(
   touchLayout: TouchLayoutIR,
   touchLayoutPath: string,
-): LintFinding[] {
+): CheckResult {
+  const code = "KM_LINT_REDUNDANT_TOUCH_LAYOUTS";
   const phone = touchLayout.platforms.find((p) => p.id === "phone");
   const tablet = touchLayout.platforms.find((p) => p.id === "tablet");
-  if (phone === undefined || tablet === undefined) return [];
-  if (phone.layers.length === 0) return [];
-  if (canonicalLayers(phone) !== canonicalLayers(tablet)) return [];
-  return [
+  if (phone === undefined || tablet === undefined)
+    return checkPassed(code, [
+      `Only ${phone === undefined ? "tablet" : "phone"} platform present: nothing redundant.`,
+    ]);
+  if (phone.layers.length === 0)
+    return checkPassed(code, ["Phone layout has no layers: nothing redundant."]);
+  if (canonicalLayers(phone) !== canonicalLayers(tablet))
+    return checkPassed(code, [
+      `Phone (${phone.layers.length} layer(s)) and tablet (${tablet.layers.length} layer(s)) layouts differ.`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_REDUNDANT_TOUCH_LAYOUTS",
       file: touchLayoutPath,
@@ -45,5 +58,5 @@ export function checkRedundantTouchLayouts(
         "The phone and tablet touch layouts are identical; one of them is redundant.",
       hint: "Remove the duplicate platform layout — Keyman uses the remaining layout for both form factors.",
     }),
-  ];
+  ]);
 }

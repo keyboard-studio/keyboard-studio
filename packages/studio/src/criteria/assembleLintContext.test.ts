@@ -224,7 +224,7 @@ describe("assembleLintContext", () => {
     });
     expect(ctx.criteriaInput?.kpsTargets).toEqual([]);
     expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBe(
-      "the .kps package file's declared target list",
+      "a <Targets> list in the .kps (the package does not declare targets)",
     );
   });
 
@@ -244,6 +244,60 @@ describe("assembleLintContext", () => {
     });
     expect(ctx.criteriaInput?.kpsTargets).toEqual(["windows", "web"]);
     expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBeUndefined();
+  });
+
+  it("KPJ pair: a root .kpj crosses into the criteria input and names nothing missing", () => {
+    const kpj =
+      "<KeymanDeveloperProject><Options><Version>2.0</Version></Options></KeymanDeveloperProject>";
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `${KEYBOARD_ID}.kpj`, content: kpj, isBinary: false },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx, contextMissing } = assembleLintContext({
+      vfs,
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(ctx.criteriaInput?.kpjPath).toBe(`${KEYBOARD_ID}.kpj`);
+    expect(ctx.criteriaInput?.kpjText).toBe(kpj);
+    expect(contextMissing.KM_LINT_KPJ_FORMAT_OUTDATED).toBeUndefined();
+    expect(contextMissing.KM_LINT_KPJ_VERSION_BUMPED).toBeUndefined();
+  });
+
+  it("KPJ pair: a VFS with no .kpj names both codes context-missing (never a silent pass)", () => {
+    const { ctx, contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(ctx.criteriaInput?.kpjPath).toBeUndefined();
+    expect(contextMissing.KM_LINT_KPJ_FORMAT_OUTDATED).toBe(
+      "the .kpj project file",
+    );
+    expect(contextMissing.KM_LINT_KPJ_VERSION_BUMPED).toBe(
+      "the .kpj project file",
+    );
+  });
+
+  it("KPJ pair: an outdated .kpj produces the 1.10b finding through the engine run, not 2.7", async () => {
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      {
+        path: `${KEYBOARD_ID}.kpj`,
+        content:
+          "<KeymanDeveloperProject><Options><Version>1.0</Version></Options></KeymanDeveloperProject>",
+        isBinary: false,
+      },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
+      vfs,
+      KEYBOARD_ID,
+      ctx,
+    );
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_LINT_KPJ_FORMAT_OUTDATED");
+    expect(codes).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
   });
 
   it("never sets docLintInput (doc findings arrive via the existing path)", () => {
@@ -278,12 +332,118 @@ describe("assembleLintContext", () => {
       // The fixture .kps declares no <Targets> element, so §8.13's
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
-        "the .kps package file's declared target list",
-      // The fixture VFS carries no .kpj, so both KPJ checks' input is
-      // honestly named missing (spec 084 KPJ pair, ruling B).
+        "a <Targets> list in the .kps (the package does not declare targets)",
+      // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
+      // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
       KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
+      // The fixture VFS carries no LICENSE.md, so both copyright-text
+      // twin inputs are honestly named missing (Group A2 Batch 4).
+      KM_LINT_COPYRIGHT_ABSENT: "LICENSE.md",
+      KM_LINT_COPYRIGHT_SYNTAX: "LICENSE.md",
+      // The fixture VFS carries no README.md / readme.htm /
+      // welcome.htm / .php, so the doc-text twin inputs are honestly
+      // named missing (Group A2 Batch 4).
+      KM_LINT_VERSION_IN_DOCS: "the documentation files",
+      KM_LINT_COPYRIGHT_IN_DOCS: "the documentation files",
+      KM_LINT_README_KEYMAN_LINK_ABSENT: "README.md",
+      KM_LINT_README_HELP_LINK_ABSENT: "README.md",
+      KM_LINT_WELCOME_LANG_MISMATCH: "source/welcome.htm",
+      // The fixture VFS carries no help .php, so the .php-content twin
+      // inputs are honestly named missing (11.1b's existence check is
+      // the finding itself, not a missing input).
+      KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
+      KM_LINT_PHP_CLOSING_TAGS: "the help .php",
+      // The fixture passes no reviewContext (/review-only), so the six
+      // repo-context codes are honestly named missing (Group A2 Batch 5
+      // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
+      // input-gated.
+      KM_LINT_REPO_PLACEMENT_BAD:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_ROOT_SOURCE:
+        "the repository context (repo path and file list)",
+      KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_DUPLICATE_KEYBOARD_ID:
+        "the repository context (repo path and file list)",
+      KM_LINT_VERSION_NOT_INCREMENTED:
+        "the repository context (repo path and file list)",
     });
+  });
+
+  it("1.5: a PR reviewContext without the base lookup names it context-missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+      },
+    });
+    expect(contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"]).toBe(
+      "the PR base-commit keyboard-ID lookup",
+    );
+  });
+
+  it("1.5: a PR reviewContext with the base lookup names nothing missing for 1.5", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        idConflictAtBase: { baseSha: "abc1234", existingTiers: [] },
+      },
+    });
+    expect(contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"]).toBeUndefined();
+  });
+
+  it("1.5: a non-PR reviewContext needs no base lookup", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "release/c/criteria_fixture",
+        treePaths: ["release/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: false,
+      },
+    });
+    expect(contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"]).toBeUndefined();
+  });
+
+  it("2.6: a PR reviewContext without the base version names it context-missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        idConflictAtBase: { baseSha: "abc1234", existingTiers: [] },
+      },
+    });
+    expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBe(
+      "the PR base-commit .kmn version",
+    );
+  });
+
+  it("2.6: a PR reviewContext with the base version names nothing missing for 2.6", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        idConflictAtBase: { baseSha: "abc1234", existingTiers: [] },
+        baseKmnVersion: { baseSha: "abc1234", version: "1.0" },
+      },
+    });
+    expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBeUndefined();
   });
 
   it("without a .kmn, degrades: no IR and the missing input is named", () => {
@@ -361,7 +521,7 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       keyboardId: KEYBOARD_ID,
     });
 
-    const findings = await new KeyboardLintEngine().lintWithContext(
+    const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
       vfs,
       KEYBOARD_ID,
       ctx,
@@ -392,14 +552,42 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // The fixture .kps declares no <Targets> element, so §8.13's
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
-        "the .kps package file's declared target list",
-      // The fixture VFS carries no .kpj, so both KPJ checks' input is
-      // honestly named missing (spec 084 KPJ pair, ruling B).
+        "a <Targets> list in the .kps (the package does not declare targets)",
+      // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
+      // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
       KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
+      // The fixture VFS carries no LICENSE.md / README.md / readme.htm /
+      // welcome.htm / .php, so the Group A2 Batch 4 text-twin inputs are
+      // honestly named missing (11.1b's existence check is the finding).
+      KM_LINT_COPYRIGHT_ABSENT: "LICENSE.md",
+      KM_LINT_COPYRIGHT_SYNTAX: "LICENSE.md",
+      KM_LINT_VERSION_IN_DOCS: "the documentation files",
+      KM_LINT_COPYRIGHT_IN_DOCS: "the documentation files",
+      KM_LINT_README_KEYMAN_LINK_ABSENT: "README.md",
+      KM_LINT_README_HELP_LINK_ABSENT: "README.md",
+      KM_LINT_WELCOME_LANG_MISMATCH: "source/welcome.htm",
+      KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
+      KM_LINT_PHP_CLOSING_TAGS: "the help .php",
+      // The fixture passes no reviewContext (/review-only), so the six
+      // repo-context codes are honestly named missing (Group A2 Batch 5
+      // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
+      // input-gated.
+      KM_LINT_REPO_PLACEMENT_BAD:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_ROOT_SOURCE:
+        "the repository context (repo path and file list)",
+      KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_DUPLICATE_KEYBOARD_ID:
+        "the repository context (repo path and file list)",
+      KM_LINT_VERSION_NOT_INCREMENTED:
+        "the repository context (repo path and file list)",
     });
 
-    const findings = await new KeyboardLintEngine().lintWithContext(
+    const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
       vfs,
       KEYBOARD_ID,
       ctx,

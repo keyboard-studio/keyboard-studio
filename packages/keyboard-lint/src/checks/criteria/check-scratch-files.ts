@@ -11,8 +11,13 @@
 // flagged (fixtures and test data are judged by human review, not by a
 // name scan pretending to certainty).
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { baseNameLower, criteriaFinding } from "./_shared.js";
+import {
+  baseNameLower,
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 /** File names / suffixes that mark an artefact, not a shipped source. */
 const SCRATCH_SUFFIXES: readonly string[] = [
@@ -53,15 +58,18 @@ export function isScratchPath(path: string): boolean {
 /** 1.13 foreign arm — one finding naming every scratch artefact found. */
 export function checkStrayScratchFiles(
   filePaths: readonly string[],
-): LintFinding[] {
+): CheckResult {
   const offenders = filePaths.filter(isScratchPath);
-  if (offenders.length === 0) return [];
-  return [
+  if (offenders.length === 0)
+    return checkPassed("KM_LINT_STRAY_SCRATCH_FILES", [
+      `Scanned ${filePaths.length} file(s): no scratch or test artefacts.`,
+    ]);
+  return checkFailed("KM_LINT_STRAY_SCRATCH_FILES", [
     criteriaFinding({
       code: "KM_LINT_STRAY_SCRATCH_FILES",
       file: offenders[0]!,
       message: `The keyboard folder contains stray scratch/test file(s): ${offenders.join(", ")}.`,
       hint: "Remove scratch, backup, and test files from the keyboard folder before submitting.",
     }),
-  ];
+  ]);
 }

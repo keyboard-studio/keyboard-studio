@@ -1,0 +1,2411 @@
+{
+ "generatedAt": "2026-10-31T06:43:19.421Z",
+ "catalogSize": 188,
+ "byBand": {
+  "layer-c-enforce": 106,
+  "scaffolder-bake": 40,
+  "yellow-survey": 32,
+  "red-checklist": 10
+ },
+ "implementedCount": 99,
+ "notImplemented": [
+  "9.1-font-license-nonempty",
+  "9.2-font-license-open-identifier",
+  "9.4-shared-font-in-shared-folder",
+  "15.2-new-keyboard-created-in-release",
+  "15.4-deprecated-md-created",
+  "15.5-php-title-includes-deprecated",
+  "16.2-partner-keyboards-csv-updated"
+ ],
+ "precertified": [
+  "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_STRAY_SCRATCH_FILES"
+ ],
+ "criteria": [
+  {
+   "id": "1.1-no-files-outside-keyboard-folder",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No files modified outside the keyboard's own folder",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_FILES_OUTSIDE_FOLDER"
+   },
+   "implemented": true,
+   "precertified": true,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "1.2-keyboard-under-release-or-experimental",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "Keyboard folder lives under `release/` or `experimental/`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "place-under-release-or-experimental"
+   }
+  },
+  {
+   "id": "1.2b-keyboard-under-release-or-experimental",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "The keyboard folder lives under `release/` or `experimental/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REPO_PLACEMENT_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "1.3-keyboard-under-organizing-folder",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "Keyboard sits under an alphabetic or org-code organizing subfolder, not at the root of `release/`/`experimental/`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "place-under-organizing-subfolder"
+   }
+  },
+  {
+   "id": "1.3b-keyboard-under-organizing-folder",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "The keyboard sits under an organizing subfolder (`release/<org>/<id>`).",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REPO_NO_ORGANIZING_FOLDER"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "1.4-no-source-files-at-repo-root",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "No source files placed at the repository root",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "no-root-source-files"
+   }
+  },
+  {
+   "id": "1.4b-no-source-files-at-repo-root",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No source files are placed at the repository root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REPO_ROOT_SOURCE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "1.5-keyboard-id-not-already-used",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "The keyboard ID (folder name) is not already used in `experimental/`, `legacy/`, or `release/`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DUPLICATE_KEYBOARD_ID"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "1.6-id-does-not-contain-keyboard",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Keyboard ID, folder name, and display name do not contain the word \"keyboard\"",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_ID_CONTAINS_KEYBOARD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-identity.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-identity.ts"
+   ]
+  },
+  {
+   "id": "1.7-no-keyboard-info-file",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "No `keyboard.info` file in the keyboard folder",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "omit-keyboard-info-file"
+   }
+  },
+  {
+   "id": "1.7b-no-keyboard-info-file",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No `keyboard.info` file is present in the keyboard folder.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KEYBOARD_INFO_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "1.8-no-duplicate-docs-subfolder",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "No `docs/` or similar subfolder containing duplicate HISTORY/README/INSTALL files",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "omit-docs-subfolder"
+   }
+  },
+  {
+   "id": "1.8b-no-duplicate-docs-subfolder",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No `docs/` (or similar) subfolder holds duplicate HISTORY / README / INSTALL files.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DOCS_SUBFOLDER_DUPLICATES"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "1.9-no-duplicate-source-files",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No duplicate copies of the same source file inside the keyboard folder",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DUPLICATE_SOURCE_FILES"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-duplicate-files.ts"
+   ]
+  },
+  {
+   "id": "1.10-kpj-current-format",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "`.kpj` file uses the current/newest project-file format (the scaffolder template bakes the current `.kpj` schema version — the `<Options><Version>2.0</Version>` element form; re-pinned 2026-10-14 by Matthew's ruling: the earlier `version=\"10.0\"` note was a data defect, the keyboards corpus carries 2.0; bump this note when the format moves). Covers newly scaffolded keyboards only; an adapted keyboard's imported `.kpj` is not regenerated by the scaffolder — see 1.10b for that path.",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "set-kpj-current-format"
+   }
+  },
+  {
+   "id": "1.10b-kpj-format-adapted",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "The `.kpj` file uses the current project-file schema version.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_FORMAT_OUTDATED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kpj.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-kpj.ts"
+   ]
+  },
+  {
+   "id": "1.11-no-kpj-user-committed",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "No `.kpj.user` file committed",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "gitignore-kpj-user"
+   }
+  },
+  {
+   "id": "1.11b-no-kpj-user-committed",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No `.kpj.user` file is committed.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_USER_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "1.12-no-build-folder-committed",
+   "band": "scaffolder-bake",
+   "section": "1. Repository hygiene",
+   "description": "No `build/` folder contents committed",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "gitignore-build-folder"
+   }
+  },
+  {
+   "id": "1.12b-no-build-folder-committed",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No `build/` folder contents are committed.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_BUILD_FOLDER_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "1.13-no-stray-scratch-files",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "No stray scratch or test files in the keyboard folder",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_STRAY_SCRATCH_FILES"
+   },
+   "implemented": true,
+   "precertified": true,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-scratch-files.ts"
+   ]
+  },
+  {
+   "id": "2.1-version-bumped-if-package-changed",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "If any file that ships in the package was modified, the keyboard version was bumped",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_NOT_BUMPED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "2.2-version-not-required-if-only-nonpackage",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "If only non-package files were modified, a version bump is not required",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_SPURIOUS_VERSION_BUMP"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "2.3-version-numeric-dot-separated",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "Version number is dot-separated and entirely numeric (SemVer or CalVer)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_FORMAT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
+  },
+  {
+   "id": "2.4-no-leading-zero-in-version-component",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "No version component has a leading zero",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_LEADING_ZERO"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
+  },
+  {
+   "id": "2.5-no-v-prefix-or-labels",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "Version has no `v` prefix and no non-numeric labels",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_V_PREFIX"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
+  },
+  {
+   "id": "2.6-new-version-strictly-greater",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "New version is strictly greater than the previously deployed version",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_NOT_INCREMENTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
+  },
+  {
+   "id": "2.7-kpj-version-not-bumped",
+   "band": "layer-c-enforce",
+   "section": "2. Version bumping",
+   "description": "The `.kpj` file's `<Version>` field has not been bumped (it's the file-format version, not keyboard version)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_VERSION_BUMPED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kpj.ts"
+   ]
+  },
+  {
+   "id": "3.1-history-file-exists",
+   "band": "scaffolder-bake",
+   "section": "3. `HISTORY.md`",
+   "description": "`HISTORY.md` file exists",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "create-history-md"
+   }
+  },
+  {
+   "id": "3.1b-history-file-exists",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "A `HISTORY.md` exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "3.2-history-header-sensible",
+   "band": "yellow-survey",
+   "section": "3. `HISTORY.md`",
+   "description": "HISTORY.md header is sensible",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "history-header-sensible"
+   }
+  },
+  {
+   "id": "3.3-history-recent-change-at-top",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "Most recent change entry is at the top of the file",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_ORDER"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-3-3-history-order.ts"
+   ]
+  },
+  {
+   "id": "3.4-history-cumulative",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "HISTORY.md is cumulative — prior entries are preserved, not overwritten",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_TRUNCATED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-3-4-history-cumulative.ts"
+   ]
+  },
+  {
+   "id": "3.5-history-entry-format",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "Each entry follows `<version> (<YYYY-MM-DD>)` format underlined with hyphens and bullet items",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_ENTRY_FORMAT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-3-5-history-entry-format.ts"
+   ]
+  },
+  {
+   "id": "3.6-history-version-matches-kmn",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "Top HISTORY.md entry version matches the version in the `.kmn` file",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_VERSION_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-3-6-7-1-version-match.ts"
+   ]
+  },
+  {
+   "id": "3.7-history-bullets-no-deleted-files",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "HISTORY.md bullets do not reference files that no longer exist in the keyboard",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_STALE_FILE_REFS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-3-7-history-stale-refs.ts"
+   ]
+  },
+  {
+   "id": "4.1-copyright-present-with-year",
+   "band": "scaffolder-bake",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Copyright statement is present with year(s)",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "set-copyright-with-year"
+   }
+  },
+  {
+   "id": "4.1b-copyright-present-with-year",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "A copyright statement with year(s) is present in LICENSE.md.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "4.2-copyright-year-range-if-multiyear",
+   "band": "yellow-survey",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "If updated across multiple years, copyright uses a year range",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "copyright-year-range-multiyear"
+   }
+  },
+  {
+   "id": "4.3-copyright-holder-is-authorized",
+   "band": "red-checklist",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Copyright holder is the author or a legal entity they are authorized to claim",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "4.4-org-legal-name-current",
+   "band": "yellow-survey",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "If an organization is named, its current legal name is used",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "copyright-org-legal-name"
+   }
+  },
+  {
+   "id": "4.5-copyright-syntax-exact",
+   "band": "scaffolder-bake",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Copyright line follows exact syntax: `Copyright (C) <year> <holder>`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "set-copyright-syntax"
+   }
+  },
+  {
+   "id": "4.5b-copyright-syntax-exact",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "The LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_SYNTAX"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "4.6-copyright-year-not-in-kmn-or-kps",
+   "band": "scaffolder-bake",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Copyright year is not embedded in the `.kmn` or `.kps` copyright strings",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "strip-copyright-year-from-kmn-kps"
+   }
+  },
+  {
+   "id": "4.6b-copyright-year-not-in-kmn-or-kps",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "No copyright year is embedded in the .kmn or .kps copyright strings.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_YEAR_EMBEDDED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "4.7-copyright-holder-consistent-across-files",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Copyright holder name is identical across `LICENSE.md`, `.kmn`, `.kps`, `README.md`, and `HISTORY.md`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_HOLDER_INCONSISTENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-4-7-copyright-holder.ts"
+   ]
+  },
+  {
+   "id": "4.8-year-range-starts-at-original",
+   "band": "yellow-survey",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "If a year range is used, it starts at the original year and extends to the current year",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "copyright-year-range-starts-at-original"
+   }
+  },
+  {
+   "id": "5.1-readme-good-header",
+   "band": "yellow-survey",
+   "section": "5. `README.md`",
+   "description": "README.md has a good header",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "readme-header-quality"
+   }
+  },
+  {
+   "id": "5.2-no-version-in-readme-or-docs",
+   "band": "scaffolder-bake",
+   "section": "5. `README.md`",
+   "description": "No version number embedded in README.md, readme.htm, welcome.htm, or help .php",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "strip-version-from-docs"
+   }
+  },
+  {
+   "id": "5.2b-no-version-in-readme-or-docs",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "No version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: any X.Y[.Z] pattern).",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_IN_DOCS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "5.3-no-copyright-in-readme-or-docs",
+   "band": "scaffolder-bake",
+   "section": "5. `README.md`",
+   "description": "No copyright year/statement in README.md, readme.htm, or welcome.htm",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "strip-copyright-from-docs"
+   }
+  },
+  {
+   "id": "5.3b-no-copyright-in-readme-or-docs",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "No copyright year/statement is in README.md, readme.htm, or welcome.htm.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_IN_DOCS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "5.4-readme-description-sensible",
+   "band": "yellow-survey",
+   "section": "5. `README.md`",
+   "description": "README.md description makes sense",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "readme-description-quality"
+   }
+  },
+  {
+   "id": "5.5-readme-keyman-home-link",
+   "band": "scaffolder-bake",
+   "section": "5. `README.md`",
+   "description": "README.md includes link to `https://keyman.com/keyboards/<file_name>`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "set-readme-keyman-home-link"
+   }
+  },
+  {
+   "id": "5.5b-readme-keyman-home-link",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "README.md links to https://keyman.com/keyboards/<id>.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_KEYMAN_LINK_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "5.6-readme-help-link",
+   "band": "scaffolder-bake",
+   "section": "5. `README.md`",
+   "description": "README.md includes link to `http://help.keyman.com/keyboard/<file_name>`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "set-readme-help-link"
+   }
+  },
+  {
+   "id": "5.6b-readme-help-link",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "README.md links to http(s)://help.keyman.com/keyboard/<id>.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_HELP_LINK_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "5.7-readme-targets-match-kmn",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "Targets listed in README.md match those in the `.kmn`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_TARGETS_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-5-7-readme-targets.ts"
+   ]
+  },
+  {
+   "id": "6.1-readme-htm-exists",
+   "band": "scaffolder-bake",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`readme.htm` exists in `source/`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "create-readme-htm"
+   }
+  },
+  {
+   "id": "6.1b-readme-htm-exists",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`readme.htm` exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_HTM_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "6.2-readme-htm-short",
+   "band": "yellow-survey",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`readme.htm` content is short — just a brief description",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "readme-htm-length-appropriate"
+   }
+  },
+  {
+   "id": "6.3-welcome-htm-exists",
+   "band": "scaffolder-bake",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`welcome.htm` exists in `source/`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "create-welcome-htm"
+   }
+  },
+  {
+   "id": "6.3b-welcome-htm-exists",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`welcome.htm` exists in `source/` (flat or the `source/welcome/` folder convention).",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_WELCOME_HTM_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "6.4-welcome-htm-describes-usage",
+   "band": "yellow-survey",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`welcome.htm` describes how to use the keyboard",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "welcome-htm-describes-usage"
+   }
+  },
+  {
+   "id": "6.5-welcome-htm-no-install-instructions",
+   "band": "yellow-survey",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`welcome.htm` does not include instructions for installing Keyman — references help URLs instead",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "welcome-htm-no-install-instructions"
+   }
+  },
+  {
+   "id": "6.6-welcome-htm-lang-attribute",
+   "band": "scaffolder-bake",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`<html lang=\"...\">` attribute in `welcome.htm` matches the keyboard's primary BCP47 tag",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "set-welcome-htm-lang-attribute"
+   }
+  },
+  {
+   "id": "6.6b-welcome-htm-lang-attribute",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_WELCOME_LANG_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "6.7-welcome-htm-not-political",
+   "band": "yellow-survey",
+   "section": "6. Documentation files (`source/`)",
+   "description": "`welcome.htm` content is not political or self-promoting",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "welcome-htm-not-political"
+   }
+  },
+  {
+   "id": "7.1-kmn-version-matches-history",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "`.kmn` version matches `HISTORY.md` top entry",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KMN_VERSION_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-3-6-7-1-version-match.ts"
+   ]
+  },
+  {
+   "id": "7.2-targets-any-alone",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "`.kmn` targets line uses `any` alone, not combined with individual platform names",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TARGETS_ANY_NOT_ALONE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-targets.ts"
+   ]
+  },
+  {
+   "id": "7.3-targets-no-unsupported-mobile",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "`.kmn` targets do not include `mobile` unless a touch layout exists",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TARGETS_MOBILE_WITHOUT_TOUCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-targets.ts"
+   ]
+  },
+  {
+   "id": "7.4-modifier-names-consistent",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Modifier key names consistent across `.kmn`, `.kvks`, and `.keyman-touch-layout`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_MODIFIER_NAME_INCONSISTENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-modifiers.ts"
+   ]
+  },
+  {
+   "id": "7.5-ralt-usealtgr-tag",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "If keyboard uses RALT, the `.kvks` includes the `usealtgr` tag",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_RALT_MISSING_USEALTGR"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kvks.ts"
+   ]
+  },
+  {
+   "id": "7.6-compiles-no-errors-no-warnings",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Keyboard compiles with no errors and no warnings (source review pass; stricter than 7.21 which checks errors only)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COMPILE_HAS_WARNINGS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "7.7-display-name-no-underscores",
+   "band": "yellow-survey",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Keyboard display name is a readable phrase that describes the keyboard (judgment half; the mechanical underscore check is 7.7a)",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "display-name-readable"
+   }
+  },
+  {
+   "id": "7.7a-display-name-no-underscores-lint",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Keyboard display name contains no literal underscore characters (mechanical half of 7.7; the readability judgment stays with 7.7)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DISPLAY_NAME_UNDERSCORE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-identity.ts"
+   ]
+  },
+  {
+   "id": "7.8-rtl-flag-matches-script",
+   "band": "yellow-survey",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "RTL flag in `.kmn`/`.kps` matches the script's actual writing direction",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "rtl-flag-matches-script"
+   }
+  },
+  {
+   "id": "7.9-bitmap-not-template-placeholder",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "`store(&BITMAP)` references the actual keyboard `.ico`, not a placeholder like `qaa.ico`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_BITMAP_PLACEHOLDER"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-bitmap.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-bitmap.ts"
+   ]
+  },
+  {
+   "id": "7.10-kmn-stores-balanced-syntax",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "All `.kmn` string-literal stores have balanced quotes and valid syntax",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_STORE_SYNTAX_INVALID"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-store-syntax.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-store-syntax.ts"
+   ]
+  },
+  {
+   "id": "7.11-author-in-kps-not-kmn",
+   "band": "scaffolder-bake",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Author name belongs in the `.kps`, not in a `.kmn` Author store",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "move-author-from-kmn-to-kps"
+   }
+  },
+  {
+   "id": "7.11b-author-in-kps-not-kmn",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "The author name is in the .kps, not in a .kmn Author store.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_AUTHOR_IN_KMN"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "7.12-pua-in-experimental",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "If keyboard uses PUA codepoints, it is in `experimental/` (source review pass; see also 13.1 which checks the same condition from the encoding/script angle)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PUA_NOT_IN_EXPERIMENTAL"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-produced-set.ts"
+   ]
+  },
+  {
+   "id": "7.13-pua-documentation",
+   "band": "yellow-survey",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "If keyboard uses PUA codepoints, documentation explicitly states characters/script are not in Unicode",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "pua-documentation-present"
+   }
+  },
+  {
+   "id": "7.14-pua-font-displaymap",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "If keyboard ships a PUA-encoded font, `.kmn` includes `store(&DISPLAYMAP)` path",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PUA_FONT_NO_DISPLAYMAP"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-produced-set.ts"
+   ]
+  },
+  {
+   "id": "7.15-osk-reviewed",
+   "band": "yellow-survey",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "OSK has been reviewed for rules, output characters, and layout consistency",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "osk-reviewed"
+   }
+  },
+  {
+   "id": "7.16-kvks-not-blank",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "The `.kvks` on-screen keyboard layout is populated, not blank",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KVKS_BLANK"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kvks.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-kvks.ts"
+   ]
+  },
+  {
+   "id": "7.17-osk-font-selected",
+   "band": "yellow-survey",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "If a special font is needed for output characters, an appropriate font is selected in the OSK",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "osk-font-appropriate"
+   }
+  },
+  {
+   "id": "7.18-touch-layout-reviewed",
+   "band": "yellow-survey",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Touch layout reviewed for layers, output, and fingering",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "touch-layout-reviewed"
+   }
+  },
+  {
+   "id": "7.19-identical-phone-tablet-deduplicated",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "If both phone and tablet touch layouts are identical, removal of one was requested",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REDUNDANT_TOUCH_LAYOUTS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-touch-layouts.ts"
+   ]
+  },
+  {
+   "id": "7.20-same-font-phone-tablet",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Same font is selected for phone and tablet layouts",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_LAYOUT_FONT_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-touch-font.ts"
+   ]
+  },
+  {
+   "id": "7.21-compiles-no-errors",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Keyboard compiles with no errors (build-output context; errors only, not warnings — see 7.6 for the stricter source-review check)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COMPILE_ERRORS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "8.1-kps-includes-kmx",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Compiled `.kmx` is listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-include-kmx"
+   }
+  },
+  {
+   "id": "8.1b-kps-includes-kmx",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "A compiled `.kmx` is listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_KMX_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.2-kps-includes-kvk",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Compiled `.kvk` is listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-include-kvk"
+   }
+  },
+  {
+   "id": "8.2b-kps-includes-kvk",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "A compiled `.kvk` is listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_KVK_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.3-kps-includes-js-if-mobile",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Compiled `.js` is listed if a mobile layout exists",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-include-js-if-mobile"
+   }
+  },
+  {
+   "id": "8.3b-kps-includes-js-if-mobile",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "A compiled `.js` is listed in the `.kps` package when the keyboard has a touch layout.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_JS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.4-kps-includes-license-md",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "`LICENSE.md` is listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-include-license-md"
+   }
+  },
+  {
+   "id": "8.4b-kps-includes-license-md",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "`LICENSE.md` is listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_LICENSE_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.5-kps-includes-readme-htm",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "`readme.htm` is listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-include-readme-htm"
+   }
+  },
+  {
+   "id": "8.5b-kps-includes-readme-htm",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "`readme.htm` is listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_README_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.6-kps-includes-welcome-and-graphics",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "`welcome.htm` and associated graphics are listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-include-welcome-and-graphics"
+   }
+  },
+  {
+   "id": "8.6b-kps-includes-welcome-and-graphics",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "`welcome.htm` and associated graphics are listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_WELCOME_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.7-kps-includes-required-fonts",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "All required fonts referenced by the `.kmn` and touch layout are listed in the `.kps` (family-level presence check; full typeface — Bold/Italic — completeness is best-effort, not mechanically guaranteed)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FONT_MISSING"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-fonts.ts"
+   ]
+  },
+  {
+   "id": "8.8-kps-no-php-file",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No `.php` help file listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-exclude-php-file"
+   }
+  },
+  {
+   "id": "8.8b-kps-no-php-file",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No `.php` help file is listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_PHP_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.9-kps-no-help-folder-files",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No files from the `help/` folder listed in the `.kps` package",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-exclude-help-folder"
+   }
+  },
+  {
+   "id": "8.9b-kps-no-help-folder-files",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No files from the `help/` folder are listed in the `.kps` package.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_HELP_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.10-kps-no-uncompiled-sources",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No uncompiled sources (.kmn, .ico, .kvks, .keyman-touch-layout, .kps) listed in the `.kps`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-exclude-uncompiled-sources"
+   }
+  },
+  {
+   "id": "8.10b-kps-no-uncompiled-sources",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No uncompiled sources (.kmn, .ico, .kvks, .keyman-touch-layout, .kps) are listed in the `.kps`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_SOURCE_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.11-kps-no-displaymap-json",
+   "band": "scaffolder-bake",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No font display-map `.json` files listed in the `.kps`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-exclude-displaymap-json"
+   }
+  },
+  {
+   "id": "8.11b-kps-no-displaymap-json",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No font display-map `.json` files are listed in the `.kps`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_JSON_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
+   "id": "8.12-kps-no-industry-fonts",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "No industry fonts (Arial, Times, Tahoma, etc.) in the package",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_INDUSTRY_FONT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-package-fonts.ts"
+   ]
+  },
+  {
+   "id": "8.13-kps-targets-match-compiled",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Targets declared in `.kmn` match compiled files listed in the `.kps`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_TARGETS_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-targets.ts"
+   ]
+  },
+  {
+   "id": "9.1-font-license-nonempty",
+   "band": "layer-c-enforce",
+   "section": "9. Font licensing",
+   "description": "Every bundled font has a non-empty license field in the `.kps`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_FONT_LICENSE_EMPTY"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "9.2-font-license-open-identifier",
+   "band": "layer-c-enforce",
+   "section": "9. Font licensing",
+   "description": "Font license identifier matches a known Open license (OFL, GPL, MIT, Apache, CC-BY, etc.)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_FONT_LICENSE_NOT_OPEN"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "9.3-font-license-genuinely-open",
+   "band": "yellow-survey",
+   "section": "9. Font licensing",
+   "description": "Font license text/spirit is genuinely Open, not just labeled \"freeware\"",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "font-license-genuinely-open"
+   }
+  },
+  {
+   "id": "9.4-shared-font-in-shared-folder",
+   "band": "layer-c-enforce",
+   "section": "9. Font licensing",
+   "description": "If a font is used by more than one keyboard, it lives under `shared/fonts`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_SHARED_FONT_WRONG_LOCATION"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "9.5-shared-font-current-path",
+   "band": "red-checklist",
+   "section": "9. Font licensing",
+   "description": "Shared font path points to the current/newest shared-fonts location, not a deprecated duplicate",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "9.6-no-woff-fonts",
+   "band": "layer-c-enforce",
+   "section": "9. Font licensing",
+   "description": "No `.woff` or web-only font formats in keyboard packages",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_WOFF_FONT_IN_PACKAGE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-package-fonts.ts"
+   ]
+  },
+  {
+   "id": "9.7-pua-font-submitted-to-skeyman",
+   "band": "yellow-survey",
+   "section": "9. Font licensing",
+   "description": "If an experimental keyboard ships a PUA font, the font has been submitted to `s.keyman.com`",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "pua-font-submitted-to-skeyman"
+   }
+  },
+  {
+   "id": "10.1-kps-font-selected",
+   "band": "scaffolder-bake",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Font is selected in the `.kps` Keyboards tab if a font is included in Files",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-select-font"
+   }
+  },
+  {
+   "id": "10.1b-kps-font-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "A font is selected in the .kps Keyboards tab when a font is included in the package files.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FONT_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
+   "id": "10.2-kps-language-tags-selected",
+   "band": "scaffolder-bake",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Language tag(s) are selected in the `.kps` Keyboards tab",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-select-language-tags"
+   }
+  },
+  {
+   "id": "10.2b-kps-language-tags-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Language tag(s) are selected in the .kps Keyboards tab.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_LANGUAGES_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
+   "id": "10.3-kps-tags-minimal",
+   "band": "yellow-survey",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Language tags are minimal — no unnecessary script/region subtags",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "lang-tags-minimal"
+   }
+  },
+  {
+   "id": "10.4-kps-unusual-tag-flagged",
+   "band": "yellow-survey",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "If the tag is new or unusual, it is flagged for possible submission to langtags/Ethnologue",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "unusual-lang-tag-flagged"
+   }
+  },
+  {
+   "id": "10.5-kps-conlang-flagged",
+   "band": "yellow-survey",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "If keyboard is for a constructed language, it is flagged for special review",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "conlang-flagged-for-review"
+   }
+  },
+  {
+   "id": "10.6-kps-numeric-region-flagged",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "If the language tag includes numeric regional codes, it is flagged for special review",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_NUMERIC_REGION_TAG"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-bcp47.ts"
+   ]
+  },
+  {
+   "id": "10.7-kps-details-files-selected",
+   "band": "scaffolder-bake",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "`readme.htm`, `welcome.htm`, and `LICENSE.md` are selected in the `.kps` Details tab License field",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-select-details-files"
+   }
+  },
+  {
+   "id": "10.7b-kps-details-files-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Readme.htm, welcome.htm, and LICENSE.md are selected in the .kps Details tab.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_DETAILS_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
+   "id": "10.8-kps-follow-keyboard-version",
+   "band": "scaffolder-bake",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "\"Follow keyboard version\" is selected in the `.kps` Details tab",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-set-follow-keyboard-version"
+   }
+  },
+  {
+   "id": "10.8b-kps-follow-keyboard-version",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "\"Follow keyboard version\" is selected in the .kps Details tab.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FOLLOW_VERSION_UNSET"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
+   "id": "10.9-kps-description-nonempty",
+   "band": "scaffolder-bake",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Description field is present and non-empty in the `.kps`",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "kps-set-description"
+   }
+  },
+  {
+   "id": "10.9b-kps-description-nonempty",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "The .kps description is present and non-empty.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_DESCRIPTION_EMPTY"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
+   "id": "10.10-kps-description-meaningful",
+   "band": "yellow-survey",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Description is meaningful (becomes the keyboard home page content)",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "kps-description-meaningful"
+   }
+  },
+  {
+   "id": "10.11-kps-no-spelling-errors",
+   "band": "yellow-survey",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "No spelling errors in user-facing `.kps` text fields (Description, Author name, WebSite text)",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "kps-text-no-spelling-errors"
+   }
+  },
+  {
+   "id": "11.1-php-exists-with-header",
+   "band": "scaffolder-bake",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "`<name>.php` file exists and has the proper PHP header",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "create-php-with-header"
+   }
+  },
+  {
+   "id": "11.1b-php-exists-with-header",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "The <name>.php help file exists and has the proper PHP header (<?php + the /* Name: ... */ block).",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_HEADER_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "11.2-php-osk-all-layers",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "If using OSK syntax, all desktop and mobile layers are listed in `data-states` (complementary to 11.6 — see that entry for the direction split)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-2-osk-layers.ts"
+   ]
+  },
+  {
+   "id": "11.3-php-style-inside-header",
+   "band": "scaffolder-bake",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "All style information is inside the PHP header, not outside it",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "php-move-style-to-header"
+   }
+  },
+  {
+   "id": "11.3b-php-style-inside-header",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "All style information (<style> tags) is inside the PHP header block, not outside it.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_STYLE_OUTSIDE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "11.4-php-no-closing-body-html",
+   "band": "scaffolder-bake",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "`.php` does not contain closing `</body>` or `</html>` tags",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "php-strip-closing-tags"
+   }
+  },
+  {
+   "id": "11.4b-php-no-closing-body-html",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "The .php has no closing </body> or </html> tags.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_CLOSING_TAGS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
+   "id": "11.5-php-htm-html-wellformed",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "HTML in `welcome.htm` and `.php` is well-formed — balanced tags, proper headings, no unclosed elements (in-browser check via DOMParser)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HTML_NOT_WELL_FORMED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-5-html-wellformed.ts"
+   ]
+  },
+  {
+   "id": "11.6-php-osk-data-states-all-layers",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "`.php` `data-states` attribute lists every layer defined in the `.kmn` and touch layout (complementary to 11.2: 11.2 catches layers missing from `data-states` — under-documentation; 11.6 catches `data-states` values naming layers that don't exist — phantom layers)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_DATA_STATES_INCOMPLETE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-6-data-states.ts"
+   ]
+  },
+  {
+   "id": "11.7-php-pagename-format",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "`.php` `pagename` follows the standard help-site format",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_PAGENAME_FORMAT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-7-pagename-format.ts"
+   ]
+  },
+  {
+   "id": "11.8-php-osk-image-constrained",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "OSK graphics either use Keyman-generated form or custom images have width constraints",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-8-osk-image.ts"
+   ]
+  },
+  {
+   "id": "11.9-php-htm-body-parity",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "`welcome.htm` and `.php` body content are identical after stripping headers and normalizing whitespace",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_HTM_BODY_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-9-body-parity.ts"
+   ]
+  },
+  {
+   "id": "11.10-php-htm-style-parity",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "CSS in `welcome.htm` and `.php` are identical modulo non-rendering whitespace",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_HTM_STYLE_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/docs/check-11-10-style-parity.ts"
+   ]
+  },
+  {
+   "id": "12.1-bcp47-tag-correct",
+   "band": "yellow-survey",
+   "section": "12. Language tagging (BCP47)",
+   "description": "BCP47 tag is correct for the language and script",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "bcp47-tag-correct"
+   }
+  },
+  {
+   "id": "12.2-no-iso-639-5-codes",
+   "band": "layer-c-enforce",
+   "section": "12. Language tagging (BCP47)",
+   "description": "No ISO 639-5 collective language codes used",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_ISO_639_5_LANG_CODE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-bcp47.ts"
+   ]
+  },
+  {
+   "id": "12.3-no-numeric-region-unless-contrastive",
+   "band": "layer-c-enforce",
+   "section": "12. Language tagging (BCP47)",
+   "description": "No numeric regional codes unless explicitly contrastive",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-bcp47.ts"
+   ]
+  },
+  {
+   "id": "12.4-no-001-region",
+   "band": "layer-c-enforce",
+   "section": "12. Language tagging (BCP47)",
+   "description": "Region code `001` is never used in BCP47 tags",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REGION_001_TAG"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-bcp47.ts"
+   ]
+  },
+  {
+   "id": "12.5-script-mismatch-flagged",
+   "band": "yellow-survey",
+   "section": "12. Language tagging (BCP47)",
+   "description": "If a language uses a different script than what langtags currently records, the mismatch is flagged",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "script-mismatch-flagged"
+   }
+  },
+  {
+   "id": "12.6-script-mismatch-submitted-to-langtags",
+   "band": "red-checklist",
+   "section": "12. Language tagging (BCP47)",
+   "description": "A flagged script mismatch has been submitted to langtags",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "13.1-pua-keyboard-in-experimental",
+   "band": "layer-c-enforce",
+   "section": "13. Encoding / script issues",
+   "description": "PUA codepoint use means keyboard is in `experimental/` (encoding/script context; see also 7.12 which checks the same condition during source review)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PUA_KEYBOARD_PLACEMENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-produced-set.ts"
+   ]
+  },
+  {
+   "id": "13.2-pua-notices-in-docs",
+   "band": "yellow-survey",
+   "section": "13. Encoding / script issues",
+   "description": "PUA codepoint use means explicit PUA notices appear in readme.htm, welcome.htm, .php, and .kps description",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "pua-notices-in-docs"
+   }
+  },
+  {
+   "id": "13.3-no-unencoded-script-codepoint-reuse",
+   "band": "yellow-survey",
+   "section": "13. Encoding / script issues",
+   "description": "Keyboard does not reuse existing codepoints for unencoded scripts; if it does, warnings are in place",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "unencoded-script-codepoint-reuse"
+   }
+  },
+  {
+   "id": "13.4-no-math-latin-lookalikes",
+   "band": "layer-c-enforce",
+   "section": "13. Encoding / script issues",
+   "description": "No mathematical Latin look-alike characters (U+1D400-U+1D7FF) in keyboard output",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_MATH_LATIN_LOOKALIKE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-produced-set.ts"
+   ]
+  },
+  {
+   "id": "13.5-math-latin-not-spoofing",
+   "band": "yellow-survey",
+   "section": "13. Encoding / script issues",
+   "description": "If math-Latin or other Latin look-alikes are present, the use case does not look like spoofing",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "math-latin-not-spoofing"
+   }
+  },
+  {
+   "id": "14.1-third-party-patch-author-consulted",
+   "band": "red-checklist",
+   "section": "14. Authorship / change provenance",
+   "description": "If a third party submits a patch to an existing keyboard, the original author was consulted and approved",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "15.1-relicense-permission-granted",
+   "band": "red-checklist",
+   "section": "15. Deprecating a keyboard",
+   "description": "Original author has granted permission to relicense under MIT",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "15.2-new-keyboard-created-in-release",
+   "band": "layer-c-enforce",
+   "section": "15. Deprecating a keyboard",
+   "description": "New keyboard has been created in `release/` (renamed if needed)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DEPRECATED_RELEASE_COPY_MISSING"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "15.3-legacy-listed-as-deprecated-in-kps",
+   "band": "layer-c-enforce",
+   "section": "15. Deprecating a keyboard",
+   "description": "Legacy package ID is listed in the new keyboard's `.kps` Related packages as Deprecated",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-deprecated-kps.ts"
+   ]
+  },
+  {
+   "id": "15.4-deprecated-md-created",
+   "band": "layer-c-enforce",
+   "section": "15. Deprecating a keyboard",
+   "description": "A `DEPRECATED.md` file exists in the legacy keyboard's folder naming the replacement",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DEPRECATED_MD_MISSING"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "15.5-php-title-includes-deprecated",
+   "band": "layer-c-enforce",
+   "section": "15. Deprecating a keyboard",
+   "description": "The deprecated keyboard's help `.php` title includes \"(deprecated)\"",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DEPRECATED_PHP_TITLE_MISSING"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "16.1-partner-notes-followed",
+   "band": "yellow-survey",
+   "section": "16. Partner-organization packages",
+   "description": "Partner package's \"note for keyboard maintainers\" has been followed",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "partner-notes-followed"
+   }
+  },
+  {
+   "id": "16.2-partner-keyboards-csv-updated",
+   "band": "layer-c-enforce",
+   "section": "16. Partner-organization packages",
+   "description": "Keyboard version has been updated in the partner's `keyboards.csv` under `oem/`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_OEM_CSV_NOT_UPDATED"
+   },
+   "implemented": false,
+   "precertified": false,
+   "checkFiles": []
+  },
+  {
+   "id": "17.1-build-trigger-pr-comments-resolved",
+   "band": "red-checklist",
+   "section": "17. Build trigger",
+   "description": "Author has resolved all PR comments before triggering a TeamCity build",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "17.2-new-author-local-pull",
+   "band": "red-checklist",
+   "section": "17. Build trigger",
+   "description": "For a new author's first PR, the PR was pulled locally and checked thoroughly",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "17.3-build-issues-fed-back",
+   "band": "red-checklist",
+   "section": "17. Build trigger",
+   "description": "After the build runs, any issues it catches that local review missed were fed back to the author",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "18.1-longpress-within-limit",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "No touch long-press menu offers more than 8 options (warning), and none exceeds the hard cap of 10",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_WARN_LONGPRESS_OVERSIZE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/check-18-1-longpress.ts"
+   ]
+  },
+  {
+   "id": "18.2-touch-rows-within-range",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Touch layout uses 4-5 rows on phone and 5 rows on tablet",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_WARN_TOUCH_ROW_COUNT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/check-18-2-touch-rows.ts"
+   ]
+  },
+  {
+   "id": "18.3-keys-per-row-within-range",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Touch layout uses at most 10 keys per row on phone and 13 on tablet",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_WARN_TOUCH_KEYS_PER_ROW"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts"
+   ]
+  },
+  {
+   "id": "18.4-control-keys-stable-across-layers",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Backspace, Enter, and other control keys do not move or resize across touch layers",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_WARN_CONTROL_KEY_DRIFT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/check-18-4-control-key-drift.ts"
+   ]
+  },
+  {
+   "id": "18.5-layer-switch-toggles-back",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Every layer-switch key has a corresponding key that toggles back to the previous layer",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_WARN_LAYER_SWITCH_NO_RETURN"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/check-18-5-layer-switch-return.ts"
+   ]
+  },
+  {
+   "id": "18.6-inventory-fully-covered",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Every character in the confirmed linguist inventory is produced by some reachable input sequence in the draft keyboard",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_INVENTORY_UNCOVERED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/check-18-6-inventory-coverage.ts"
+   ]
+  },
+  {
+   "id": "18.7-mandated-currency-present",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "The locale's mandated currency symbol (from CLDR) is reachable on the keyboard",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_MANDATED_CHAR_MISSING"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-currency.ts"
+   ]
+  },
+  {
+   "id": "18.8-character-set-is-minimal",
+   "band": "yellow-survey",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "The character set was kept focused - extra characters were resisted and each addition was deliberate",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "discus-minimal-charset"
+   }
+  },
+  {
+   "id": "18.9-rare-chars-discoverable",
+   "band": "yellow-survey",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Rare characters are findable without experimentation, not buried on deep long-press menus alone",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "discus-rare-chars-discoverable"
+   }
+  },
+  {
+   "id": "18.10-frequent-chars-reachable",
+   "band": "yellow-survey",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Frequently used characters sit on easy-to-reach positions consistent with the script's structure",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "discus-frequent-chars-reachable"
+   }
+  },
+  {
+   "id": "18.11-tested-with-real-users",
+   "band": "red-checklist",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "The layout has been tested with real target users before submission",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "18.12-meets-legal-accessibility-requirements",
+   "band": "red-checklist",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale",
+   "hook": {
+    "kind": "preSubmitChecklistText"
+   }
+  },
+  {
+   "id": "19.1-import-attribution-in-pr-body",
+   "band": "scaffolder-bake",
+   "section": "19. Import output",
+   "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block (adapted-from path, commit SHA, round-trip status, opaque feature inventory). Auto-enforced by the output service at PR submission time.",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "emit-import-attribution-block"
+   }
+  },
+  {
+   "id": "19.1b-import-attribution-in-pr-body",
+   "band": "layer-c-enforce",
+   "section": "19. Import output",
+   "description": "The PR body includes the import attribution block.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PR_ATTRIBUTION_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "19.2-import-attribution-in-history-md",
+   "band": "scaffolder-bake",
+   "section": "19. Import output",
+   "description": "When a keyboard was adapted from a release/ keyboard, HISTORY.md must contain an 'Adapted from <sourcePath>' bullet under the 1.0 entry. Auto-enforced by the scaffolder at emit time (D14, mandatory carrier).",
+   "hook": {
+    "kind": "scaffolderRule",
+    "id": "emit-import-attribution-history-bullet"
+   }
+  },
+  {
+   "id": "19.2b-import-attribution-in-history-md",
+   "band": "layer-c-enforce",
+   "section": "19. Import output",
+   "description": "HISTORY.md contains the 'Adapted from' entry.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_ATTRIBUTION_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  }
+ ]
+}

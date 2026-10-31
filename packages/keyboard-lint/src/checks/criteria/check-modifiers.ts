@@ -39,7 +39,13 @@ import type {
   LintFinding,
   TouchLayoutIR,
 } from "@keyboard-studio/contracts";
-import { criteriaFinding, kmnPath } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 export type ModifierFamily = "shift" | "ctrl" | "alt" | "caps";
 export type ModifierSide = "left" | "right" | "any";
@@ -186,7 +192,8 @@ export function checkModifierNamesConsistent(input: {
   ir: KeyboardIR;
   kvks?: KvksIR;
   touchLayout?: TouchLayoutIR;
-}): LintFinding[] {
+}): CheckResult {
+  const code = "KM_LINT_MODIFIER_NAME_INCONSISTENT";
   const sources: Array<{ name: string; usage: SourceUsage }> = [
     { name: ".kmn", usage: kmnUsage(input.ir) },
   ];
@@ -197,22 +204,36 @@ export function checkModifierNamesConsistent(input: {
     sources.push({ name: "touch layout", usage: touchUsage(input.touchLayout) });
   }
 
-  const findings: LintFinding[] = [];
+  const offenderFindings: LintFinding[] = [];
+  const verified: string[] = [];
   for (const family of Object.keys(FAMILY_LABEL) as ModifierFamily[]) {
     const present = sources.filter((s) => s.usage.byFamily.has(family));
-    if (present.length < 2) continue;
+    if (present.length === 0) continue;
+    const spellings = present
+      .map(
+        (s) =>
+          `${s.name}: ${[...s.usage.byFamily.get(family)!.spellings].sort().join(", ")}`,
+      )
+      .join("; ");
+    if (present.length < 2) {
+      verified.push(`${FAMILY_LABEL[family]}: ${spellings} — single source, nothing to compare.`);
+      continue;
+    }
     const allSides = new Set<ModifierSide>();
     for (const s of present) {
       for (const side of s.usage.byFamily.get(family)!.sides) allSides.add(side);
     }
-    if (allSides.size < 2) continue;
+    if (allSides.size < 2) {
+      verified.push(`${FAMILY_LABEL[family]}: ${spellings} — consistent.`);
+      continue;
+    }
     const detail = present
       .map(
         (s) =>
           `${s.name} uses ${[...s.usage.byFamily.get(family)!.spellings].sort().join(", ")}`,
       )
       .join("; ");
-    findings.push(
+    offenderFindings.push(
       criteriaFinding({
         code: "KM_LINT_MODIFIER_NAME_INCONSISTENT",
         file: kmnPath(input.ir.header.keyboardId),
@@ -221,5 +242,8 @@ export function checkModifierNamesConsistent(input: {
       }),
     );
   }
-  return findings;
+  if (offenderFindings.length > 0) return checkFailed(code, offenderFindings);
+  if (verified.length === 0)
+    return checkPassed(code, ["No modifier keys used in any source."]);
+  return checkPassed(code, verified);
 }

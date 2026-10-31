@@ -89,6 +89,143 @@ function indexFindings(
   return byCode;
 }
 
+/**
+ * Build reviewer context lines for yellow/red criteria in foreign mode.
+ * These rows need human judgment, but we can surface relevant automated
+ * context to decide from. Returns the context lines, or empty if none
+ * available for this criterion.
+ *
+ * Data sources:
+ * - input.verifiedByCode: verified lines from related implemented checks
+ * - input.facts: keyboard facts (fonts, etc.)
+ * - _findingsByCode: findings from related checks (currently unused)
+ */
+function reviewerContext(
+  criterionId: string,
+  input: CriteriaInput,
+  _findingsByCode: Map<string, readonly LintFinding[]>,
+): string[] {
+  const verified = input.verifiedByCode;
+  const getVerified = (code: string): string[] =>
+    verified?.get(code) ?? [];
+
+  switch (criterionId) {
+    // --- PUA-related ---
+    case "7.13-pua-documentation":
+    case "13.2-pua-notices-in-docs": {
+      const pua = getVerified("KM_LINT_PUA_KEYBOARD_PLACEMENT");
+      if (pua.length > 0) return ["PUA status:", ...pua];
+      return ["No PUA codepoints found (check 13.1)."];
+    }
+    case "9.7-pua-font-submitted-to-skeyman": {
+      const pua = getVerified("KM_LINT_PUA_KEYBOARD_PLACEMENT");
+      const fonts = input.facts.bundledFonts ?? [];
+      const lines = [...pua];
+      if (fonts.length > 0) lines.push(`Bundled fonts: ${fonts.join(", ")}`);
+      return lines.length > 0 ? lines : ["No PUA codepoints; no bundled fonts."];
+    }
+
+    // --- Copyright-related ---
+    case "4.2-copyright-year-range-if-multiyear":
+    case "4.4-org-legal-name-current":
+    case "4.8-year-range-starts-at-original": {
+      const copy = getVerified("KM_LINT_COPYRIGHT_SYNTAX");
+      if (copy.length > 0) return ["Copyright line:", ...copy];
+      return [];
+    }
+    case "4.3-copyright-holder-is-authorized": {
+      const copy = getVerified("KM_LINT_COPYRIGHT_SYNTAX");
+      const author = getVerified("KM_LINT_AUTHOR_IN_KMN");
+      return [...copy, ...author];
+    }
+
+    // --- Description/readme-related ---
+    // README.md / .kps description text not available in resolver input;
+    // would need file content plumbing. Noted for future work.
+    case "5.1-readme-good-header":
+    case "5.4-readme-description-sensible":
+    case "10.10-kps-description-meaningful":
+    case "10.11-kps-no-spelling-errors":
+      return [];
+
+    // --- Tags/BCP47-related ---
+    // Tag values not available in resolver input; would need kps parsing
+    // plumbed through. Noted for future work.
+    case "10.3-kps-tags-minimal":
+    case "10.4-kps-unusual-tag-flagged":
+    case "10.5-kps-conlang-flagged":
+    case "12.1-bcp47-tag-correct":
+    case "12.5-script-mismatch-flagged":
+    case "12.6-script-mismatch-submitted-to-langtags":
+      return [];
+
+    // --- Font-related ---
+    case "9.3-font-license-genuinely-open": {
+      const fonts = input.facts.bundledFonts ?? [];
+      if (fonts.length > 0) return [`Bundled fonts: ${fonts.join(", ")}`];
+      return ["No bundled fonts."];
+    }
+    case "9.5-shared-font-current-path": {
+      // Shared font path not in verified; would need .kps parsing.
+      // Noted for future work.
+      return [];
+    }
+
+    // --- Display name / RTL ---
+    // Display name value not in verified; RTL flag needs .kmn/.kps parsing.
+    // Noted for future work.
+    case "7.7-display-name-no-underscores":
+    case "7.8-rtl-flag-matches-script":
+      return [];
+
+    // --- Touch/OSK-related ---
+    case "7.15-osk-reviewed":
+    case "7.17-osk-font-selected":
+    case "7.18-touch-layout-reviewed":
+    case "18.8-character-set-is-minimal":
+    case "18.9-rare-chars-discoverable":
+    case "18.10-frequent-chars-reachable": {
+      const rows = getVerified("KM_WARN_TOUCH_ROW_COUNT");
+      const longpress = getVerified("KM_WARN_LONGPRESS_OVERSIZE");
+      return [...rows, ...longpress];
+    }
+
+    // --- History ---
+    case "3.2-history-header-sensible": {
+      return [];
+    }
+
+    // --- Welcome/readme.htm ---
+    case "6.2-readme-htm-short":
+    case "6.4-welcome-htm-describes-usage":
+    case "6.5-welcome-htm-no-install-instructions":
+    case "6.7-welcome-htm-not-political": {
+      return [];
+    }
+
+    // --- Red checklist ---
+    case "14.1-third-party-patch-author-consulted":
+    case "15.1-relicense-permission-granted":
+    case "16.1-partner-notes-followed":
+    case "17.1-build-trigger-pr-comments-resolved":
+    case "17.3-build-issues-fed-back":
+    case "18.11-tested-with-real-users":
+    case "18.12-meets-legal-accessibility-requirements": {
+      // Truly manual; no automated context available
+      return [];
+    }
+    case "13.3-no-unencoded-script-codepoint-reuse":
+    case "13.5-math-latin-not-spoofing": {
+      const pua = getVerified("KM_LINT_PUA_KEYBOARD_PLACEMENT");
+      if (pua.length > 0) return ["PUA status:", ...pua];
+      return [];
+    }
+
+    default:
+      return [];
+  }
+}
+
 function resolveRow(
   criterion: Criterion,
   input: CriteriaInput,
@@ -246,11 +383,17 @@ function resolveRow(
         criterion,
         status: "met",
         controls: null,
-        evidence: () => ({
-          kind: "lint-pass",
-          lines: ["This check ran and reported no problems."],
-          lintRuleId,
-        }),
+        evidence: (): EvidenceModel => {
+          const verified = input.verifiedByCode?.get(lintRuleId) ?? [];
+          return {
+            kind: "lint-pass",
+            lines:
+              verified.length > 0
+                ? verified
+                : ["This check ran and reported no problems."],
+            lintRuleId,
+          };
+        },
       });
     }
 
@@ -284,10 +427,17 @@ function resolveRow(
         criterion,
         status: "needs-author",
         controls: input.mode === "authored" ? "attest" : null,
-        evidence: () => ({
-          kind: "needs-author",
-          lines: ["No attestation has been recorded for this criterion yet."],
-        }),
+        evidence: () => {
+          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const lines = ["No attestation has been recorded for this criterion yet."];
+          if (context.length > 0) {
+            lines.push("", "Reviewer context:", ...context);
+          }
+          return {
+            kind: "needs-author",
+            lines,
+          };
+        },
       };
     }
 
@@ -313,10 +463,17 @@ function resolveRow(
         criterion,
         status: "needs-human",
         controls: input.mode === "authored" ? "confirm" : null,
-        evidence: () => ({
-          kind: "needs-human",
-          lines: [checklistText],
-        }),
+        evidence: () => {
+          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const lines = [checklistText];
+          if (context.length > 0) {
+            lines.push("", "Reviewer context:", ...context);
+          }
+          return {
+            kind: "needs-human",
+            lines,
+          };
+        },
       };
     }
   }

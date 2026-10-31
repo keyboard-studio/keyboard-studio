@@ -11,9 +11,14 @@
 //      a catalog criterion's lintRuleId.
 //   2. ASSEMBLY_SYNTHESIZED_CODES below: codes no lint check emits,
 //      produced by a named synthesis in the criteria assembly (the
-//      compile-result severity mapping in compileMapping.ts). This is
-//      an explicit named set, not a weakening of the scan: every code
-//      here must name its synthesis, and the test pins the set exactly.
+//      compile-result severity mapping in compileMapping.ts, and the
+//      instantiation-state verdicts in assemblyVerdicts.ts for the
+//      codes that have no lint producer). This is an explicit named
+//      set, not a weakening of the scan: every code here must name
+//      its synthesis, and the test pins the set exactly. (§1.5's
+//      KM_LINT_DUPLICATE_KEYBOARD_ID is deliberately absent: it has
+//      both a lint producer for foreign mode and an authored-mode
+//      assembly verdict.)
 //
 // Warning: adding a lint check means adding its code here in the same
 // change. Until a code is listed here, its criterion honestly resolves
@@ -22,11 +27,19 @@
 /**
  * Codes produced by a named synthesis in the criteria assembly rather
  * than by a keyboard-lint check: §§7.6/7.21 map the host's compile
- * result by diagnostic severity (compileMapping.ts), and §§1.5/2.1/
- * 2.2/2.6 are verdicts computed from the instantiation state
+ * result by diagnostic severity (compileMapping.ts), and §§2.1/2.2/2.6
+ * are verdicts computed from the instantiation state
  * (assemblyVerdicts.ts, Batch 3). Precertified codes (precertify.ts)
  * are NOT here — precertification is a separate resolver mechanism,
  * not an implemented check.
+ *
+ * §1.5 (KM_LINT_DUPLICATE_KEYBOARD_ID) and §2.6
+ * (KM_LINT_VERSION_NOT_INCREMENTED) are NOT here: each has a lint
+ * producer (checkKeyboardIdConflict's PR base-commit ID lookup;
+ * checkVersionNotIncremented's base-commit version comparison) for
+ * foreign mode, alongside its authored-mode assembly verdict —
+ * the scanner finds their `code:` literals, so listing them here would
+ * trip the drift guard's "no lint producer" assertion.
  *
  * Also NOT here, deliberately (Batch 5): KM_LINT_FONT_LICENSE_EMPTY
  * and KM_LINT_FONT_LICENSE_NOT_OPEN (§§9.1/9.2). No lint check emits
@@ -38,10 +51,8 @@
 export const ASSEMBLY_SYNTHESIZED_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
-  "KM_LINT_DUPLICATE_KEYBOARD_ID",
   "KM_LINT_VERSION_NOT_BUMPED",
   "KM_LINT_SPURIOUS_VERSION_BUMP",
-  "KM_LINT_VERSION_NOT_INCREMENTED",
 ]);
 
 /** Lint codes with a real check behind them, mapped to catalog criteria. */
@@ -112,16 +123,75 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
   "KM_LINT_KPS_FONT_MISSING",
   "KM_LINT_MANDATED_CHAR_MISSING",
-  // Spec 084 KPJ pair — checks in checks/criteria/check-kpj.ts
-  // (1.10b legacy .kpj form, 2.7 format-marker state changed vs the
-  // base). Ruling B (2026-10-14): structural form — the reader's
-  // facts are the <Options><Version> marker state, never a pinned
-  // version constant.
+  // Spec 084 KPJ pair — one reader (check-kpj) pins the judged .kpj's
+  // <Options><Version> to criterion 1.10's current format from both
+  // directions. The constant was settled by Matthew's 2026-10-14
+  // ruling: 2.0 (the catalog's earlier 10.0 was a data defect; the
+  // corpus carries 2.0) and 1.10's pin was corrected in the same change.
   "KM_LINT_KPJ_FORMAT_OUTDATED",
   "KM_LINT_KPJ_VERSION_BUMPED",
+  // Group A2 file-inventory twins (check-file-inventory): post-hoc checks
+  // of the scaffolder-bake file guarantees — 1.7b/1.8b/1.11b/1.12b/
+  // 3.1b/6.1b/6.3b. Pure VFS path-list checks, no parsing.
+  "KM_LINT_KEYBOARD_INFO_PRESENT",
+  "KM_LINT_DOCS_SUBFOLDER_DUPLICATES",
+  "KM_LINT_KPJ_USER_PRESENT",
+  "KM_LINT_BUILD_FOLDER_PRESENT",
+  "KM_LINT_HISTORY_MD_ABSENT",
+  "KM_LINT_README_HTM_ABSENT",
+  "KM_LINT_WELCOME_HTM_ABSENT",
+  // Group A2 .kps-listing twins (check-kps-listing): post-hoc checks of
+  // the scaffolder-bake package-listing guarantees — 8.1b–8.6b /
+  // 8.8b–8.11b. Pure functions of the .kps <File> names.
+  "KM_LINT_KPS_KMX_ABSENT",
+  "KM_LINT_KPS_KVK_ABSENT",
+  "KM_LINT_KPS_JS_ABSENT",
+  "KM_LINT_KPS_LICENSE_ABSENT",
+  "KM_LINT_KPS_README_ABSENT",
+  "KM_LINT_KPS_WELCOME_ABSENT",
+  "KM_LINT_KPS_PHP_LISTED",
+  "KM_LINT_KPS_HELP_LISTED",
+  "KM_LINT_KPS_SOURCE_LISTED",
+  "KM_LINT_KPS_JSON_LISTED",
+  // Group A2 .kps-metadata twins (check-kps-metadata): post-hoc checks of
+  // the scaffolder-bake package-tab selections — 10.1b/10.2b/10.7b/
+  // 10.8b/10.9b. Pure functions of the pre-parsed .kps details.
+  "KM_LINT_KPS_FONT_UNSELECTED",
+  "KM_LINT_KPS_LANGUAGES_UNSELECTED",
+  "KM_LINT_KPS_DETAILS_UNSELECTED",
+  "KM_LINT_KPS_FOLLOW_VERSION_UNSET",
+  "KM_LINT_KPS_DESCRIPTION_EMPTY",
+  // Group A2 text-content twins (check-text-content): post-hoc checks of
+  // the scaffolder-bake text guarantees — 4.1b/4.5b/4.6b/5.2b/5.3b/5.5b/
+  // 5.6b/6.6b/7.11b/11.1b/11.3b/11.4b. Pure functions of the judged texts.
+  "KM_LINT_COPYRIGHT_ABSENT",
+  "KM_LINT_COPYRIGHT_SYNTAX",
+  "KM_LINT_COPYRIGHT_YEAR_EMBEDDED",
+  "KM_LINT_VERSION_IN_DOCS",
+  "KM_LINT_COPYRIGHT_IN_DOCS",
+  "KM_LINT_README_KEYMAN_LINK_ABSENT",
+  "KM_LINT_README_HELP_LINK_ABSENT",
+  "KM_LINT_WELCOME_LANG_MISMATCH",
+  "KM_LINT_AUTHOR_IN_KMN",
+  "KM_LINT_PHP_HEADER_BAD",
+  "KM_LINT_PHP_STYLE_OUTSIDE",
+  "KM_LINT_PHP_CLOSING_TAGS",
+  // Group A2 Batch 5 repo-context twins (check-repo-context): post-hoc
+  // checks of the scaffolder-bake repo guarantees — 1.2b/1.3b/1.4b/
+  // 19.1b/19.2b — plus the Group C extraneous-files check, which maps to
+  // the existing layer-c row 1.1 (no twin needed). Pure functions of the
+  // ReviewContext; /review-only.
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_ROOT_SOURCE",
+  "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_PR_ATTRIBUTION_BAD",
+  "KM_LINT_HISTORY_ATTRIBUTION_BAD",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
-  // instantiation-state verdicts (assemblyVerdicts.ts).
+  // instantiation-state verdicts (assemblyVerdicts.ts). §§1.5/2.6 keep
+  // their authored-mode assembly verdicts AND their foreign-mode lint
+  // checks (checkKeyboardIdConflict, checkVersionNotIncremented).
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
   "KM_LINT_DUPLICATE_KEYBOARD_ID",

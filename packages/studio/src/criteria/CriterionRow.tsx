@@ -25,7 +25,16 @@ import { msg } from "@lingui/core/macro";
 
 import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
-import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+import {
+  ACCENT,
+  BORDER,
+  ERROR_TEXT,
+  FONT,
+  FONT_MONO,
+  SUCCESS_ACCENT,
+  TEXT_DIM,
+  WARNING,
+} from "../ui/theme.ts";
 import type {
   AttestationAnswer,
   CriteriaMode,
@@ -53,6 +62,16 @@ export interface CriterionRowProps {
   ) => void;
   /** §§9.1/9.2 (Batch 5): remove one font's license attestation. */
   onClearFontLicense?: (fontName: string) => void;
+  /**
+   * GitHub link context: when present, "File: <path>" evidence lines become
+   * links to the file at the pinned sha (open in new tab).
+   */
+  githubLink?: { owner: string; repo: string; sha: string } | null;
+  /**
+   * /review severity override ("met" | "warning" | "error"), set by the
+   * health report. When present, the status label is color-coded.
+   */
+  severity?: "met" | "warning" | "error" | "hidden";
 }
 
 /**
@@ -125,6 +144,14 @@ const controlButtonStyle: React.CSSProperties = {
 
 const evidenceLineStyle: React.CSSProperties = { margin: "0 0 4px", color: TEXT_DIM };
 
+const evidenceCodeStyle: React.CSSProperties = {
+  fontFamily: FONT_MONO,
+  fontSize: 12,
+  background: "var(--app-bg-inset)",
+  padding: "1px 4px",
+  borderRadius: 3,
+};
+
 export function CriterionRow({
   row,
   mode,
@@ -136,6 +163,8 @@ export function CriterionRow({
   onClearContrastive,
   onAttestFontLicense,
   onClearFontLicense,
+  githubLink,
+  severity,
 }: CriterionRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -161,11 +190,58 @@ export function CriterionRow({
     <>
       {model.lines.map((line, index) => (
         <p key={index} style={evidenceLineStyle}>
-          {line}
+          {renderEvidenceLine(line, index)}
         </p>
       ))}
     </>
   );
+
+  /**
+   * Linkify "File: <path>" evidence lines to the GitHub blob at the pinned
+   * sha (opens in a new tab). Only in hosts that pass githubLink (/review).
+   * Values (quoted strings, paths) render in monospace code style.
+   */
+  const renderEvidenceLine = (line: string, _index: number): React.ReactNode => {
+    // Helper: wrap quoted strings in <code>
+    const withCode = (text: string): React.ReactNode[] => {
+      const parts = text.split(/("[^"]*")/g);
+      return parts.map((part, i) =>
+        part.startsWith('"') && part.endsWith('"') && part.length > 1 ? (
+          <code key={i} style={evidenceCodeStyle}>
+            {part}
+          </code>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      );
+    };
+
+    if (githubLink) {
+      const m = /^File: (.+)$/.exec(line);
+      if (m) {
+        const path = m[1]!;
+        const url = `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${path}`;
+        return (
+          <>
+            File:{" "}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: ACCENT, fontFamily: FONT_MONO, fontSize: 12 }}
+            >
+              {path}
+            </a>
+          </>
+        );
+      }
+    }
+    // Wrap quoted values in code style
+    if (line.includes('"')) {
+      return <>{withCode(line)}</>;
+    }
+    return line;
+  };
 
   // The check that produced a layer-c verdict, named inside the evidence
   // only — the one identifier the page deliberately shows (plan §6).
@@ -277,7 +353,19 @@ export function CriterionRow({
         </span>
         <span
           data-testid="criteria-row-status"
-          style={{ fontSize: 11, color: TEXT_DIM, whiteSpace: "nowrap" }}
+          style={{
+            fontSize: 11,
+            whiteSpace: "nowrap",
+            fontWeight: severity ? 600 : undefined,
+            color:
+              severity === "met"
+                ? SUCCESS_ACCENT
+                : severity === "warning"
+                  ? WARNING
+                  : severity === "error"
+                    ? ERROR_TEXT
+                    : TEXT_DIM,
+          }}
         >
           {criterionStatusLabel(row.status, i18n)}
         </span>

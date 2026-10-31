@@ -9,8 +9,9 @@
 //   Compile gate  -> 18.6 KM_LINT_INVENTORY_UNCOVERED (also needs keyboardIR + inventory — use lintWithContext)
 //   Submit        -> all of the above
 //   18.7 KM_LINT_MANDATED_CHAR_MISSING (implemented — see checks/criteria/check-currency.ts)
-//   1.10b KM_LINT_KPJ_FORMAT_OUTDATED + 2.7 KM_LINT_KPJ_VERSION_BUMPED (implemented —
-//        see checks/criteria/check-kpj.ts; structural .kpj form per ruling B, no numeric pin)
+//   1.10b KM_LINT_KPJ_FORMAT_OUTDATED + 2.7 KM_LINT_KPJ_VERSION_BUMPED -> implemented in
+//        criteriaChecks (spec 084 KPJ pair — compare the judged .kpj's <Options><Version>
+//        against criterion 1.10's pinned current format, re-pinned to 2.0 by ruling)
 //
 // The locked LintEngineService.lint() interface runs 18.1–18.5 only (no compiled artefacts
 // needed). Callers that have a KeyboardIR + LinguistInventory (e.g. the compile gate)
@@ -28,7 +29,7 @@ import { lintWithContext, type LintContext } from "./lintContext.js";
  */
 export class KeyboardLintEngine implements LintEngineService {
   async lint(fs: VirtualFS, keyboardId: string): Promise<LintFinding[]> {
-    return lintWithContext(fs, keyboardId, {});
+    return (await lintWithContext(fs, keyboardId, {})).findings;
   }
 
   /**
@@ -36,9 +37,17 @@ export class KeyboardLintEngine implements LintEngineService {
    * in `ctx` (18.6 desktop and/or 18.6 touch — see LintContext). Exposed as an
    * engine method so callers holding a single engine instance (e.g.
    * useTouchLint) can route through it without importing the standalone
-   * `lintWithContext` function directly.
+   * `lintWithContext` function directly. Also returns per-code verified
+   * details for the met-case evidence.
    */
-  async lintWithContext(fs: VirtualFS, keyboardId: string, ctx: LintContext): Promise<LintFinding[]> {
+  async lintWithContext(
+    fs: VirtualFS,
+    keyboardId: string,
+    ctx: LintContext,
+  ): Promise<{
+    findings: LintFinding[];
+    verifiedByCode: Map<string, string[]>;
+  }> {
     return lintWithContext(fs, keyboardId, ctx);
   }
 }

@@ -247,3 +247,50 @@ export function parseKpsFontRefs(xml: string): KpsFontRefs {
     stylesheets: dedup(stylesheetPaths),
   };
 }
+
+/**
+ * Package-tab selections extracted from a .kps XML file: the Keyboards
+ * tab's font selection, the Details tab's file selections, the
+ * FollowKeyboardVersion flag, and the Info description.
+ *
+ * Returned by {@link parseKpsPackageDetails}; consumed by the criteria
+ * assembly for the Group A2 .kps-metadata twins (10.1b/10.2b/10.7b/
+ * 10.8b/10.9b). Kept separate from {@link KpsMetadata} so the gallery
+ * hot path pays no cost for it. Regex-based like the rest of this
+ * file — no XML DOM, no entity expansion.
+ */
+export interface KpsPackageDetails {
+  /** First non-empty `<OSKFont>` / `<DisplayFont>` in `<Keyboards>`. */
+  fontSelected: string;
+  /** `<Options><ReadMeFile>` text (the Details tab's readme selection). */
+  readmeFile: string;
+  /** `<Options><WelcomeFile>` text (the Details tab's welcome selection). */
+  welcomeFile: string;
+  /** `<Options><LicenseFile>` text (the Details tab's license selection). */
+  licenseFile: string;
+  /** A `<FollowKeyboardVersion>` element is present under `<Options>`. */
+  followKeyboardVersion: boolean;
+  /** `<Info><Description>` text (value-attribute or text-content form). */
+  description: string;
+}
+
+/** Extract one text-content element's trimmed text, or "" when absent. */
+function extractElementText(xml: string, tag: string): string {
+  const m = new RegExp(`<${tag}\\s*>([^<]*)<\\/${tag}>`, "i").exec(xml);
+  return (m?.[1] ?? "").trim();
+}
+
+export function parseKpsPackageDetails(xml: string): KpsPackageDetails {
+  const keyboards = /<Keyboards\s*>([\s\S]*?)<\/Keyboards\s*>/i.exec(xml)?.[1] ?? "";
+  const options = /<Options\s*>([\s\S]*?)<\/Options\s*>/i.exec(xml)?.[1] ?? "";
+  const oskFont = extractElementText(keyboards, "OSKFont");
+  const displayFont = extractElementText(keyboards, "DisplayFont");
+  return {
+    fontSelected: oskFont !== "" ? oskFont : displayFont,
+    readmeFile: extractElementText(options, "ReadMeFile"),
+    welcomeFile: extractElementText(options, "WelcomeFile"),
+    licenseFile: extractElementText(options, "LicenseFile"),
+    followKeyboardVersion: /<FollowKeyboardVersion[\s/>]/i.test(options),
+    description: extractInfoValue(xml, "Description", ""),
+  };
+}

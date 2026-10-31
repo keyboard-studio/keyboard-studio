@@ -48,6 +48,17 @@ export interface CriteriaPageProps {
   onClearFontLicense?: (fontName: string) => void;
   /** A statement of what was judged (e.g. the preview caveat in foreign mode). */
   judgedNote?: string;
+  /**
+   * GitHub link context for the /review report: when present, "File: <path>"
+   * evidence lines become links to the file at the pinned sha (open in new tab).
+   */
+  githubLink?: { owner: string; repo: string; sha: string } | null;
+  /**
+   * Optional per-criterion severity override for the /review report
+   * ("met" | "warning" | "error"), keyed by criterion id. When present,
+   * the row's status label is color-coded by severity.
+   */
+  severityMap?: Record<string, "met" | "warning" | "error" | "hidden">;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -123,6 +134,8 @@ export function CriteriaPage({
   onAttestFontLicense,
   onClearFontLicense,
   judgedNote,
+  githubLink,
+  severityMap,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
   const groups = groupBySection(result.rows);
@@ -176,6 +189,9 @@ export function CriteriaPage({
                     key={row.criterion.id}
                     row={row}
                     mode={mode}
+                    {...(severityMap?.[row.criterion.id] !== undefined
+                      ? { severity: severityMap[row.criterion.id] }
+                      : {})}
                     {...(onAttest !== undefined ? { onAttest } : {})}
                     {...(onClearAttestation !== undefined ? { onClearAttestation } : {})}
                     {...(onConfirm !== undefined ? { onConfirm } : {})}
@@ -184,6 +200,7 @@ export function CriteriaPage({
                     {...(onClearContrastive !== undefined ? { onClearContrastive } : {})}
                     {...(onAttestFontLicense !== undefined ? { onAttestFontLicense } : {})}
                     {...(onClearFontLicense !== undefined ? { onClearFontLicense } : {})}
+                    {...(githubLink !== undefined ? { githubLink } : {})}
                   />
                 ))}
               </ul>

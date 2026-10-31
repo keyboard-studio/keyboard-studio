@@ -24,7 +24,7 @@ describe("regionSubtagOf", () => {
 describe("checkNumericRegionTag (10.6)", () => {
   it("flags a 3-digit region subtag in either tag source", () => {
     expect(tagUsesNumericRegion("es-419")).toBe(true);
-    const findings = checkNumericRegionTag(["ewo-CM", "es-419"], "demo");
+    const { findings } = checkNumericRegionTag(["ewo-CM", "es-419"], "demo");
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPS_NUMERIC_REGION_TAG");
     expect(findings[0]!.message).toContain("es-419");
@@ -32,11 +32,11 @@ describe("checkNumericRegionTag (10.6)", () => {
   });
 
   it("passes alpha-2 regions and regionless tags", () => {
-    expect(checkNumericRegionTag(["ewo-CM", "fr", "en-US"], "demo")).toEqual([]);
+    expect(checkNumericRegionTag(["ewo-CM", "fr", "en-US"], "demo").findings).toEqual([]);
   });
 
   it("region 001 is a numeric region too (12.4 flags it separately)", () => {
-    const findings = checkNumericRegionTag(["und-001"], "demo");
+    const { findings } = checkNumericRegionTag(["und-001"], "demo");
     expect(findings).toHaveLength(1);
   });
 });

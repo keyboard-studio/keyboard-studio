@@ -52,7 +52,7 @@ function fixtureIR() {
 
 describe("runCriteriaChecks via lintWithContext", () => {
   it("emits nothing extra when no CriteriaLintInput was assembled", async () => {
-    const findings = await lintWithContext(fixtureVfs(), ID, {
+    const { findings: findings } = await lintWithContext(fixtureVfs(), ID, {
       keyboardIR: fixtureIR(),
     });
     const codes = findings.map((f) => f.code);
@@ -61,7 +61,7 @@ describe("runCriteriaChecks via lintWithContext", () => {
   });
 
   it("runs the Batch 1 checks when a CriteriaLintInput is present", async () => {
-    const findings = await lintWithContext(fixtureVfs(), ID, {
+    const { findings: findings } = await lintWithContext(fixtureVfs(), ID, {
       keyboardIR: fixtureIR(),
       criteriaInput: fixtureInput(),
     });
@@ -80,14 +80,14 @@ describe("runCriteriaChecks via lintWithContext", () => {
       { path: "source/help/kb.css", content: "img { width: 100%; }", isBinary: false },
       { path: "source/welcome/kb.css", content: "img { width: 100%; }", isBinary: false },
     ]);
-    const withInput = await lintWithContext(vfs, ID, {
+    const { findings: withInput } = await lintWithContext(vfs, ID, {
       keyboardIR: fixtureIR(),
       criteriaInput: fixtureInput(),
     });
     expect(withInput.map((f) => f.code)).toContain(
       "KM_LINT_DUPLICATE_SOURCE_FILES",
     );
-    const without = await lintWithContext(vfs, ID, { keyboardIR: fixtureIR() });
+    const { findings: without } = await lintWithContext(vfs, ID, { keyboardIR: fixtureIR() });
     expect(without.map((f) => f.code)).not.toContain(
       "KM_LINT_DUPLICATE_SOURCE_FILES",
     );
@@ -97,12 +97,12 @@ describe("runCriteriaChecks via lintWithContext", () => {
     const ir = makeTestIR({
       header: { keyboardId: ID, targets: ["windows", "web"] },
     });
-    const fired = await lintWithContext(fixtureVfs(), ID, {
+    const { findings: fired } = await lintWithContext(fixtureVfs(), ID, {
       keyboardIR: ir,
       criteriaInput: fixtureInput({ kpsTargets: ["windows"] }),
     });
     expect(fired.map((f) => f.code)).toContain("KM_LINT_KPS_TARGETS_MISMATCH");
-    const silent = await lintWithContext(fixtureVfs(), ID, {
+    const { findings: silent } = await lintWithContext(fixtureVfs(), ID, {
       keyboardIR: ir,
       criteriaInput: fixtureInput({ kpsTargets: [] }),
     });
@@ -120,7 +120,7 @@ describe("runCriteriaChecks via lintWithContext", () => {
       { path: `source/${ID}.kmn`, content: KMN, isBinary: false },
       { path: `source/${ID}.keyman-touch-layout`, content: layout, isBinary: false },
     ]);
-    const findings = await lintWithContext(vfs, ID, {
+    const { findings: findings } = await lintWithContext(vfs, ID, {
       keyboardIR: fixtureIR(),
       criteriaInput: fixtureInput(),
     });
@@ -148,7 +148,7 @@ describe("runCriteriaChecks via lintWithContext", () => {
         },
       ],
     });
-    const findings = await lintWithContext(fixtureVfs(), ID, {
+    const { findings: findings } = await lintWithContext(fixtureVfs(), ID, {
       keyboardIR: ir,
       criteriaInput: fixtureInput({ kpsFontRefs: ["..\\shared\\F.ttf"] }),
     });
@@ -157,18 +157,65 @@ describe("runCriteriaChecks via lintWithContext", () => {
     expect(codes).toContain("KM_LINT_PUA_FONT_NO_DISPLAYMAP");
   });
 
+  it("KPJ pair: an older .kpj format fires only 1.10b through the real runner", async () => {
+    const { findings: findings } = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput({
+        kpjPath: `${ID}.kpj`,
+        kpjText:
+          "<KeymanDeveloperProject><Options><Version>1.0</Version></Options></KeymanDeveloperProject>",
+      }),
+    });
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_LINT_KPJ_FORMAT_OUTDATED");
+    expect(codes).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+  });
+
+  it("KPJ pair: a bumped .kpj format fires only 2.7; 2.0 fires neither; no .kpj supplied fires neither", async () => {
+    const { findings: bumped } = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput({
+        kpjPath: `${ID}.kpj`,
+        kpjText:
+          "<KeymanDeveloperProject><Options><Version>3.0</Version></Options></KeymanDeveloperProject>",
+      }),
+    });
+    expect(bumped.map((f) => f.code)).toContain("KM_LINT_KPJ_VERSION_BUMPED");
+    expect(bumped.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPJ_FORMAT_OUTDATED",
+    );
+
+    const { findings: current } = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput({
+        kpjPath: `${ID}.kpj`,
+        kpjText:
+          "<KeymanDeveloperProject><Options><Version>2.0</Version></Options></KeymanDeveloperProject>",
+      }),
+    });
+    expect(current.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPJ_FORMAT_OUTDATED",
+    );
+    expect(current.map((f) => f.code)).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+
+    const { findings: absent } = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput(),
+    });
+    expect(absent.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPJ_FORMAT_OUTDATED",
+    );
+    expect(absent.map((f) => f.code)).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+  });
+
   it("runs the scratch scan only when the input asks for it (foreign arm)", async () => {
     const vfs = createVirtualFS([
       { path: `source/${ID}.kmn`, content: KMN, isBinary: false },
       { path: "notes.txt.bak", content: "x", isBinary: false },
     ]);
-    const authored = await lintWithContext(vfs, ID, {
+    const { findings: authored } = await lintWithContext(vfs, ID, {
       criteriaInput: fixtureInput({ scratchScan: false }),
     });
     expect(authored.map((f) => f.code)).not.toContain(
       "KM_LINT_STRAY_SCRATCH_FILES",
     );
-    const foreign = await lintWithContext(vfs, ID, {
+    const { findings: foreign } = await lintWithContext(vfs, ID, {
       criteriaInput: fixtureInput({ scratchScan: true }),
     });
     expect(foreign.map((f) => f.code)).toContain("KM_LINT_STRAY_SCRATCH_FILES");

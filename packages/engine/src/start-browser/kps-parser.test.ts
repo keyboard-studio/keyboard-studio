@@ -335,3 +335,58 @@ describe("parseKpsFontRefs", () => {
     });
   });
 });
+
+describe("parseKpsPackageDetails", () => {
+  const xml = `
+    <KeymanPackage>
+      <Keyboards>
+        <Keyboard>
+          <ID>x</ID>
+          <OSKFont>..\\fonts\\a.ttf</OSKFont>
+          <DisplayFont></DisplayFont>
+          <Languages><Language ID="am">Amharic</Language></Languages>
+        </Keyboard>
+      </Keyboards>
+      <Options>
+        <ReadMeFile>..\\readme.htm</ReadMeFile>
+        <WelcomeFile>welcome\\welcome.htm</WelcomeFile>
+        <LicenseFile>..\\LICENSE.md</LicenseFile>
+        <FollowKeyboardVersion/>
+      </Options>
+      <Info>
+        <Description value="A test keyboard."/>
+      </Info>
+    </KeymanPackage>`;
+
+  it("extracts the package-tab selections", async () => {
+    const { parseKpsPackageDetails } = await import("./kps-parser.js");
+    const d = parseKpsPackageDetails(xml);
+    expect(d.fontSelected).toBe("..\\fonts\\a.ttf");
+    expect(d.readmeFile).toBe("..\\readme.htm");
+    expect(d.welcomeFile).toBe("welcome\\welcome.htm");
+    expect(d.licenseFile).toBe("..\\LICENSE.md");
+    expect(d.followKeyboardVersion).toBe(true);
+    expect(d.description).toBe("A test keyboard.");
+  });
+
+  it("defaults to unselected on a minimal package", async () => {
+    const { parseKpsPackageDetails } = await import("./kps-parser.js");
+    const d = parseKpsPackageDetails("<KeymanPackage></KeymanPackage>");
+    expect(d.fontSelected).toBe("");
+    expect(d.readmeFile).toBe("");
+    expect(d.welcomeFile).toBe("");
+    expect(d.licenseFile).toBe("");
+    expect(d.followKeyboardVersion).toBe(false);
+    expect(d.description).toBe("");
+  });
+
+  it("prefers OSKFont over DisplayFont", async () => {
+    const { parseKpsPackageDetails } = await import("./kps-parser.js");
+    const d = parseKpsPackageDetails(`
+      <Keyboards><Keyboard>
+        <OSKFont></OSKFont>
+        <DisplayFont>d.ttf</DisplayFont>
+      </Keyboard></Keyboards>`);
+    expect(d.fontSelected).toBe("d.ttf");
+  });
+});

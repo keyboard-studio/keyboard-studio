@@ -22,8 +22,15 @@
 // case, not a finding here (this check is only called with a non-empty
 // kps target list, or not called).
 
-import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
-import { baseNameLower, criteriaFinding, kmnPath } from "./_shared.js";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
+import {
+  baseNameLower,
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 const ALL_TARGETS: readonly string[] = [
   "windows",
@@ -63,7 +70,8 @@ export function checkKpsTargetsMatch(input: {
   kpsTargets: readonly string[];
   kpsFileNames: readonly string[];
   kpsPath: string;
-}): LintFinding[] {
+}): CheckResult {
+  const code = "KM_LINT_KPS_TARGETS_MISMATCH";
   const kmnTargets = expandTargets(input.ir.header.targets);
   const kpsTargets = expandTargets(input.kpsTargets);
   const problems: string[] = [];
@@ -96,13 +104,21 @@ export function checkKpsTargetsMatch(input: {
     );
   }
 
-  if (problems.length === 0) return [];
-  return [
+  if (problems.length === 0) {
+    const shipped = [
+      ...(shipsJs ? [".js"] : []),
+      ...(shipsKmx ? [".kmx"] : []),
+    ];
+    return checkPassed(code, [
+      `.kmn targets: ${[...kmnTargets].sort().join(" ") || "(none)"}; .kps targets: ${[...kpsTargets].sort().join(" ") || "(none)"}; ships: ${shipped.length > 0 ? shipped.join(", ") : "no compiled builds"} — all agree.`,
+    ]);
+  }
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_TARGETS_MISMATCH",
       file: input.kpsPath !== "" ? input.kpsPath : kmnPath(input.ir.header.keyboardId),
       message: `Package targets do not agree: ${problems.join("; ")}.`,
       hint: "Make the .kmn &TARGETS, the .kps <Targets>, and the compiled files listed in the .kps describe the same platforms.",
     }),
-  ];
+  ]);
 }

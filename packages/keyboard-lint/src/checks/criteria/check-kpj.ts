@@ -1,83 +1,147 @@
-// Checks 1.10b / 2.7 — the KPJ pair (spec 084, Matthew's ruling B,
-// 2026-10-14: structural form, the numeric version pin dropped).
+// Checks 1.10b / 2.7 — the .kpj project-file format version pair
+// (spec 084 KPJ pair, landed under Matthew's 2026-10-14 ruling).
 //
-// One reader (the engine's parseKpjForm, whose facts cross into this
-// package via CriteriaLintInput — see contracts' KpjFormFacts) feeds
-// two findings:
+//   1.10b KM_LINT_KPJ_FORMAT_OUTDATED — <Options><Version> older than current
+//   2.7   KM_LINT_KPJ_VERSION_BUMPED  — <Options><Version> newer than current
 //
-//   1.10b KM_LINT_KPJ_FORMAT_OUTDATED — the judged .kpj is in the
-//         legacy project-file form: no <Options><Version> format
-//         marker, its project driven by the <Files> list. Modern =
-//         the marker is present (upstream: the element is implicit
-//         in the legacy form and required from format 2.0 onward).
-//         The loader carries an imported .kpj forward as-is and
-//         never regenerates it, so an adaptation that starts from a
-//         legacy base ships a legacy .kpj unless it is migrated —
-//         docs/criteria.md §1.10: older formats should be migrated
-//         when the keyboard is touched.
+// One reader, one constant, two findings: together the pair pins the
+// judged .kpj's format version to equality with the current format —
+// older is a stale project file (1.10b), newer means the file-format
+// version was bumped alongside (or ahead of) the keyboard (2.7), and
+// exactly current passes both.
 //
-//   2.7   KM_LINT_KPJ_VERSION_BUMPED — the judged .kpj's format-
-//         marker state differs from the base keyboard's: the marker
-//         was added, removed, or its value changed by the adaptation.
-//         The <Version> element is the project-FILE format version,
-//         not the keyboard version (docs/criteria.md §2.7, from the
-//         upstream review record), and the scaffolder's carry-
-//         forward never touches it — any difference is the finding.
-//         The comparison is state-to-state, never against a pinned
-//         constant (the constant is what ruling B removed: 1.10's
-//         "10.0" is the .kvks header version and occurs in no .kpj).
+// The constant is criterion 1.10's pin, re-pinned to 2.0 by Matthew's
+// ruling of 2026-10-14: the catalog previously said `version="10.0"`,
+// a data defect — every .kpj in the keyboards corpus carries
+// <Version>2.0</Version> (11 of 12 local files; the twelfth predates
+// the element entirely), and the studio never authors the value, it
+// inherits the base keyboard's .kpj verbatim.
 //
-// Absence honesty: facts that are not there produce no findings —
-// the assembly names the missing input in contextMissing instead
-// (no .kpj in the judged VFS for 1.10b; no base .kpj for 2.7, which
-// is every foreign judgment), so those rows resolve Not yet
-// checkable rather than passing on an unrun comparison. A legacy
-// base carried forward UNCHANGED is exactly the split the criteria
-// intend: 1.10b fires (the form is stale) and 2.7 passes (nothing
-// was bumped).
+// Source: the judged VFS's root <id>.kpj text, handed over raw via
+// CriteriaLintInput (the same handoff as kpsText for 15.3) and read in
+// the parseKpjFlags regex style. An ABSENT .kpj never reaches these
+// checks — the criteria assembly names it in contextMissing so both
+// rows resolve Not yet checkable, never a fabricated verdict. A
+// PRESENT .kpj with no <Version> element (the pre-versioned project
+// shape) is outdated by construction for 1.10b and un-bumped for 2.7.
 
-import type { KpjFormFacts, LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
-/** Plain-language name of one file's format-marker state, for messages. */
-function markerState(facts: KpjFormFacts): string {
-  return facts.versionElement === null
-    ? "no <Options><Version> marker (legacy implicit form)"
-    : `<Options><Version>${facts.versionElement}</Version>`;
+/** The current .kpj project-file format version (criterion 1.10's pin). */
+export const KPJ_CURRENT_FORMAT_VERSION = "2.0";
+
+const OPTIONS_BLOCK = /<Options\s*>([\s\S]*?)<\/Options\s*>/i;
+const VERSION_ELEMENT = /<Version\s*>\s*([^<]*?)\s*<\/Version\s*>/i;
+
+/**
+ * Read the .kpj format version: the `<Version>` element inside
+ * `<Options>` (falling back to a document-level `<Version>` when the
+ * file has no Options block — `<FileVersion>` never matches, it is a
+ * different element). Undefined when the file carries no format
+ * version at all.
+ */
+export function parseKpjFormatVersion(kpjText: string): string | undefined {
+  const scope = OPTIONS_BLOCK.exec(kpjText)?.[1] ?? kpjText;
+  const m = VERSION_ELEMENT.exec(scope);
+  if (m === null) return undefined;
+  const version = (m[1] ?? "").trim();
+  return version === "" ? undefined : version;
 }
 
-/** 1.10b — the judged .kpj is in the legacy project-file form → finding. */
-export function checkKpjFormatAdapted(
-  kpj: KpjFormFacts | undefined,
-  kpjPath: string,
-): LintFinding[] {
-  if (kpj === undefined) return [];
-  if (kpj.form === "modern") return [];
-  return [
+/**
+ * Numeric dot-compare of two version strings: negative when `a` is
+ * older than `b`, positive when newer, 0 when equal. Missing trailing
+ * components count as 0 ("2" == "2.0"). A side with a non-numeric
+ * component cannot be ordered numerically; it then compares by raw
+ * string, so only an exact match reads as equal.
+ */
+export function compareKpjVersions(a: string, b: string): number {
+  const pa = a.split(".");
+  const pb = b.split(".");
+  const numeric = (parts: string[]): number[] | undefined => {
+    const out: number[] = [];
+    for (const p of parts) {
+      if (!/^\d+$/.test(p)) return undefined;
+      out.push(Number(p));
+    }
+    return out;
+  };
+  const na = numeric(pa);
+  const nb = numeric(pb);
+  if (na === undefined || nb === undefined) {
+    return a === b ? 0 : a < b ? -1 : 1;
+  }
+  const len = Math.max(na.length, nb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (na[i] ?? 0) - (nb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+export interface KpjFacts {
+  /** Raw .kpj text, when the file exists in the judged VFS. */
+  kpjText?: string;
+  /** VFS path of the judged .kpj (finding location). */
+  kpjPath?: string;
+}
+
+/** 1.10b — the .kpj format version is older than the current format. */
+export function checkKpjFormatOutdated(facts: KpjFacts): CheckResult {
+  const code = "KM_LINT_KPJ_FORMAT_OUTDATED";
+  if (facts.kpjText === undefined || facts.kpjPath === undefined)
+    return checkPassed(code, ["No .kpj text supplied to check."]);
+  const version = parseKpjFormatVersion(facts.kpjText);
+  if (version === undefined) {
+    return checkFailed(code, [
+      criteriaFinding({
+        code: "KM_LINT_KPJ_FORMAT_OUTDATED",
+        file: facts.kpjPath,
+        message:
+          "The .kpj project file carries no <Options><Version> element — it predates the versioned project-file format.",
+        hint: `Open the project in a current Keyman Developer so it is rewritten in the current format (<Version>${KPJ_CURRENT_FORMAT_VERSION}</Version>).`,
+      }),
+    ]);
+  }
+  if (compareKpjVersions(version, KPJ_CURRENT_FORMAT_VERSION) >= 0)
+    return checkPassed(code, [
+      `Format version "${version}" (current: ${KPJ_CURRENT_FORMAT_VERSION}).`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPJ_FORMAT_OUTDATED",
-      file: kpjPath,
-      message:
-        "This keyboard's .kpj is in the legacy project-file form: it has no <Options><Version> format marker and its project is driven by its <Files> list.",
-      hint: "Migrate the .kpj to the current Options-based form (declare the format with an <Options><Version> element) when the keyboard is next touched; the scaffolder carries an imported .kpj forward as-is and never regenerates it.",
+      file: facts.kpjPath,
+      message: `The .kpj project file format version "${version}" is older than the current format "${KPJ_CURRENT_FORMAT_VERSION}".`,
+      hint: `Open the project in a current Keyman Developer so it is rewritten at format version ${KPJ_CURRENT_FORMAT_VERSION}.`,
     }),
-  ];
+  ]);
 }
 
-/** 2.7 — the judged .kpj's format-marker state differs from the base's → finding. */
-export function checkKpjVersionNotBumped(
-  kpj: KpjFormFacts | undefined,
-  baseKpj: KpjFormFacts | undefined,
-  kpjPath: string,
-): LintFinding[] {
-  if (kpj === undefined || baseKpj === undefined) return [];
-  if (kpj.versionElement === baseKpj.versionElement) return [];
-  return [
+/** 2.7 — the .kpj format version was bumped past the current format. */
+export function checkKpjVersionBumped(facts: KpjFacts): CheckResult {
+  const code = "KM_LINT_KPJ_VERSION_BUMPED";
+  if (facts.kpjText === undefined || facts.kpjPath === undefined)
+    return checkPassed(code, ["No .kpj text supplied to check."]);
+  const version = parseKpjFormatVersion(facts.kpjText);
+  if (version === undefined)
+    return checkPassed(code, [
+      "No <Version> element: not bumped past the current format (outdated is 1.10b's finding).",
+    ]);
+  if (compareKpjVersions(version, KPJ_CURRENT_FORMAT_VERSION) <= 0)
+    return checkPassed(code, [
+      `Format version "${version}" (current: ${KPJ_CURRENT_FORMAT_VERSION}): not bumped.`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPJ_VERSION_BUMPED",
-      file: kpjPath,
-      message: `The .kpj format marker changed during adaptation: the base keyboard has ${markerState(baseKpj)}, this keyboard has ${markerState(kpj)}.`,
-      hint: "The .kpj <Version> element is the project-file format version, not the keyboard version — carry the base keyboard's marker forward unchanged.",
+      file: facts.kpjPath,
+      message: `The .kpj project file format version "${version}" is newer than the current format "${KPJ_CURRENT_FORMAT_VERSION}" — the file-format version must not be bumped with the keyboard version.`,
+      hint: `Leave the .kpj <Options><Version> at the current file-format version (${KPJ_CURRENT_FORMAT_VERSION}); bump only the keyboard version.`,
     }),
-  ];
+  ]);
 }

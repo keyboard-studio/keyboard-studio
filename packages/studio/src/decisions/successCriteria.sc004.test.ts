@@ -112,9 +112,15 @@ describe.skipIf(!sc004GatesEnabled)("SC-004: a completed adapt flow passes the s
 
       // G7 Layer C (touch + joined structural checks, desktop IR present)
       const layerC = blocking(
-        await new KeyboardLintEngine().lintWithContext(projected!.vfs, projected!.keyboardId, {
-          keyboardIR: parseKmn(kmnOutText!, projected!.keyboardId).ir,
-        }),
+        (
+          await new KeyboardLintEngine().lintWithContext(
+            projected!.vfs,
+            projected!.keyboardId,
+            {
+              keyboardIR: parseKmn(kmnOutText!, projected!.keyboardId).ir,
+            },
+          )
+        ).findings,
       );
       if (layerC.length > 0) failures.push(`G7 Layer C:\n${fmt(layerC)}`);
 

@@ -14,8 +14,12 @@
 // resolver's §15 applicability gate — when not deprecated, §15 already
 // resolves Not applicable and this check stays silent).
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 /**
  * The legacy package IDs a .kps lists as deprecated: every
@@ -38,11 +42,17 @@ export function checkDeprecatedKpsLinkage(
   kpsText: string | undefined,
   deprecationInPlay: boolean,
   kpsPath: string,
-): LintFinding[] {
-  if (!deprecationInPlay) return [];
+): CheckResult {
+  if (!deprecationInPlay)
+    return checkPassed("KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING", [
+      "No deprecation in play: linkage check is moot.",
+    ]);
   const ids = kpsText === undefined ? [] : deprecatedRelatedPackageIds(kpsText);
-  if (ids.length > 0) return [];
-  return [
+  if (ids.length > 0)
+    return checkPassed("KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING", [
+      `Deprecated package(s) linked: ${ids.join(", ")}.`,
+    ]);
+  return checkFailed("KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING", [
     criteriaFinding({
       code: "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING",
       file: kpsPath,
@@ -50,5 +60,5 @@ export function checkDeprecatedKpsLinkage(
         'This keyboard deprecates a legacy keyboard, but its .kps Related packages list no package with Relationship="deprecates".',
       hint: 'Add a <RelatedPackage ID="<legacy package id>" Relationship="deprecates"/> entry to the .kps.',
     }),
-  ];
+  ]);
 }

@@ -83,6 +83,13 @@ export interface CriteriaFacts {
   /** The package bundles a font. */
   fontBundled: boolean;
   /**
+   * The keyboard shows adaptation signals (the /review host sets this
+   * from the PR body / HISTORY.md): the §19 attribution rows apply only
+   * to keyboards adapted from a release keyboard. Absent/false means no
+   * signal — the rows resolve Not applicable, never a silent pass.
+   */
+  isAdaptation?: boolean;
+  /**
    * The bundled fonts' file names (basenames, sorted) — the inventory
    * the §9 license rows judge (Batch 5). Empty when no font is
    * bundled; optional for facts assembled before Batch 5.
@@ -117,6 +124,11 @@ export interface CriteriaInput {
   criteria: readonly Criterion[];
   mode: CriteriaMode;
   lintFindings: readonly LintFinding[];
+  /**
+   * Per-code verified details from the checks, for the met-case
+   * "Show details". Absent codes fall back to the generic pass line.
+   */
+  verifiedByCode?: Map<string, string[]>;
   record: CriteriaRecordInput;
   facts: CriteriaFacts;
   /**
