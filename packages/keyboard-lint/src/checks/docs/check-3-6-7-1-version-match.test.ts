@@ -11,12 +11,11 @@ function makeInput(historyMd: string | undefined, keyboardVersion: string) {
 
 describe("checkHistoryVersionMatch (3.6/7.1 KM_LINT_HISTORY_VERSION_MISMATCH / KM_LINT_KMN_VERSION_MISMATCH)", () => {
   it("passes when the top HISTORY entry matches the .kmn version", () => {
-    expect(checkHistoryVersionMatch(makeInput("## 1.2 (2024-03-01)\n* Added shift layer.\n", "1.2"))).toEqual([]);
+    expect(checkHistoryVersionMatch(makeInput("## 1.2 (2024-03-01)\n* Added shift layer.\n", "1.2")).findings).toEqual([]);
   });
 
   it("emits both codes exactly once each on mismatch, naming both versions", () => {
-    const findings = checkHistoryVersionMatch(makeInput("## 1.2 (2024-03-01)\n* Added shift layer.\n", "1.3"));
-    expect(findings).toHaveLength(2);
+    const findings = checkHistoryVersionMatch(makeInput("## 1.2 (2024-03-01)\n* Added shift layer.\n", "1.3")).findings;    expect(findings).toHaveLength(2);
     const history = findings.find((f) => f.code === "KM_LINT_HISTORY_VERSION_MISMATCH");
     const kmn = findings.find((f) => f.code === "KM_LINT_KMN_VERSION_MISMATCH");
     expect(history).toBeDefined();
@@ -30,6 +29,6 @@ describe("checkHistoryVersionMatch (3.6/7.1 KM_LINT_HISTORY_VERSION_MISMATCH / K
   });
 
   it("returns [] when history-md is absent", () => {
-    expect(checkHistoryVersionMatch(makeInput(undefined, "1.0"))).toEqual([]);
+    expect(checkHistoryVersionMatch(makeInput(undefined, "1.0")).findings).toEqual([]);
   });
 });

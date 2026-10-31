@@ -5,8 +5,9 @@
 // the dependency-free tag-balance scanner in `_shared.ts` rather than
 // DOMParser (spec 080 research R7 — see that module's header for why).
 
-import type { DocLintInput, DocMemberId, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput, DocMemberId } from "@keyboard-studio/contracts";
 import { docMemberPath, findUnbalancedTags, stripPhpHeader } from "./_shared.js";
+import { checkFailed, checkPassed, mergeResults, type CheckResult } from "../criteria/_shared.js";
 
 const CHECKED_MEMBERS: readonly DocMemberId[] = ["welcome-htm", "help-php"];
 
@@ -17,27 +18,39 @@ const CHECKED_MEMBERS: readonly DocMemberId[] = ["welcome-htm", "help-php"];
  * @param input - Documentation check input (uses `members["welcome-htm"]`
  *   and `members["help-php"]`).
  */
-export function checkHtmlWellFormed(input: DocLintInput): LintFinding[] {
-  const findings: LintFinding[] = [];
+export function checkHtmlWellFormed(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_HTML_NOT_WELL_FORMED";
+  const results: CheckResult[] = [];
   for (const member of CHECKED_MEMBERS) {
     const raw = input.members[member];
-    if (raw === undefined) continue;
+    const path = docMemberPath(member, input.keyboardId);
+    if (raw === undefined) {
+      results.push(checkPassed(code, []));
+      continue;
+    }
     // The help page's PHP header block is not HTML; scan the body only, the
     // same way the 11.9 / 11.10 body checks do.
     const text = member === "help-php" ? stripPhpHeader(raw) : raw;
     const unbalanced = findUnbalancedTags(text);
-    if (unbalanced.length === 0) continue;
+    if (unbalanced.length === 0) {
+      results.push(checkPassed(code, ["File: " + path, "HTML well-formed."]));
+      continue;
+    }
 
-    const path = docMemberPath(member, input.keyboardId);
     const tags = [...new Set(unbalanced.map((u) => u.tag))].join(", ");
-    findings.push({
-      code: "KM_LINT_HTML_NOT_WELL_FORMED",
-      severity: "warning",
-      layer: "C",
-      message: `${path} has unbalanced or unclosed HTML element(s): ${tags}.`,
-      location: { file: path, line: 1 },
-      hint: `Check that every opening tag (${tags}) in ${path} has a matching, properly nested closing tag.`,
-    });
+    results.push(
+      checkFailed(code, [
+        {
+          code: "KM_LINT_HTML_NOT_WELL_FORMED",
+          severity: "warning",
+          layer: "C",
+          message: `${path} has unbalanced or unclosed HTML element(s): ${tags}.`,
+          location: { file: path, line: 1 },
+          hint: `Check that every opening tag (${tags}) in ${path} has a matching, properly nested closing tag.`,
+        },
+      ]),
+    );
   }
-  return findings;
+  const merged = mergeResults(...results);
+  return { code, findings: merged.findings, verified: merged.verifiedByCode.get(code) ?? [] };
 }

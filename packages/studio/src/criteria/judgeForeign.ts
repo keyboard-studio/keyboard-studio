@@ -136,11 +136,11 @@ export async function judgeForeignKeyboard(
       ? { reviewContext: options.reviewContext }
       : {}),
   });
-  const docFindings = runDocChecks(
+  const { findings: docFindings, verifiedByCode: docVerified } = runDocChecks(
     collectDocLintInputFromVfs(vfs, keyboardId, displayName),
   );
   let engineFindings: LintFinding[] = [];
-  let verifiedByCode = new Map<string, string[]>();
+  let verifiedByCode = new Map<string, string[]>(docVerified);
   try {
     const engine = await new KeyboardLintEngine().lintWithContext(
       vfs,
@@ -148,7 +148,7 @@ export async function judgeForeignKeyboard(
       ctx,
     );
     engineFindings = engine.findings;
-    verifiedByCode = engine.verifiedByCode;
+    for (const [k, v] of engine.verifiedByCode) verifiedByCode.set(k, v);
   } catch {
     engineFindings = [];
   }

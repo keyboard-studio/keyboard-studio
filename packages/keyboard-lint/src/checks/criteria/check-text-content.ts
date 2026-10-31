@@ -160,8 +160,11 @@ export function checkVersionInDocs(facts: TextContentFacts): CheckResult {
     ["source/welcome.htm", facts.welcomeHtm],
     [facts.phpPath ?? "help .php", facts.php],
   ];
+  // Strip HTML tags: a version in markup (e.g. <meta>) is not a hardcoded
+  // version in the visible documentation text.
+  const stripTags = (t: string) => t.replace(/<[^>]*>/g, " ");
   const hits = docs.filter(
-    ([, text]) => text !== undefined && VERSION_LIKE.test(text),
+    ([, text]) => text !== undefined && VERSION_LIKE.test(stripTags(text)),
   );
   const present = docs.filter(([, t]) => t !== undefined).map(([n]) => n);
   if (hits.length === 0) {
@@ -169,15 +172,21 @@ export function checkVersionInDocs(facts: TextContentFacts): CheckResult {
       return checkPassed(code, ["No documentation files to check."]);
     return checkPassed(code, [`Checked: ${present.join(", ")}.`]);
   }
-  const versionMatch = hits[0]![1]!.match(VERSION_LIKE);
+  const versionMatch = stripTags(hits[0]![1]!).match(VERSION_LIKE);
   const version = versionMatch ? versionMatch[0] : "";
+  // Find the full original line containing the version (for the code block)
+  const fullLine = hits[0]![1]!
+    .split("\n")
+    .find((l) => VERSION_LIKE.test(stripTags(l)))
+    ?.trim();
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_VERSION_IN_DOCS",
       file: hits[0]![0],
       message:
         `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.` +
-        (version ? ` Found: "${version}"` : ""),
+        (version ? ` Found: "${version}"` : "") +
+        (fullLine ? `\nLine: "${fullLine}"` : ""),
       hint: "Remove the hardcoded version from the documentation; the package version is the single source of truth.",
     }),
   ]);

@@ -805,7 +805,7 @@ describe("spec 080 FR-018 — documentation findings never block shippability", 
           "<?php $pagename = 'Wrong'; $pagetitle = $pagename; require_once('header.php'); ?><html><body><p>Different body.</p></body></html>",
       },
       deletedFilenames: [],
-    });
+    }).findings;
     expect(docFindings.length).toBeGreaterThan(0);
     expect(docFindings.every((f) => f.severity === "warning" && f.layer === "C")).toBe(true);
     const mfest: readonly Step[] = [

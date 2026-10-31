@@ -17,8 +17,9 @@
 // A `height` attribute alone is NOT a width constraint — the
 // criterion's words — so height-only images are reported.
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 interface ImgTag {
   raw: string;
@@ -84,12 +85,17 @@ function cssConstrains(cssTexts: readonly string[], classes: string[]): boolean 
  * @param input - Documentation check input (uses `members["help-php"]`
  *   and the optional `cssTexts`).
  */
-export function checkOskImageConstrained(input: DocLintInput): LintFinding[] {
+export function checkOskImageConstrained(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED";
   const text = input.members["help-php"];
-  if (text === undefined) return [];
+  if (text === undefined) return checkPassed(code, ["No help.php to check."]);
 
   const tags = parseImgTags(text);
-  if (tags.length === 0) return [];
+  if (tags.length === 0)
+    return checkPassed(code, [
+      "File: " + docMemberPath("help-php", input.keyboardId),
+      "No custom images — nothing to constrain.",
+    ]);
 
   const cssTexts = input.cssTexts ?? [];
   const unconstrained = tags.filter(
@@ -98,13 +104,17 @@ export function checkOskImageConstrained(input: DocLintInput): LintFinding[] {
       !t.styleHasWidth &&
       !cssConstrains(cssTexts, t.classes),
   );
-  if (unconstrained.length === 0) return [];
-
   const path = docMemberPath("help-php", input.keyboardId);
+  if (unconstrained.length === 0)
+    return checkPassed(code, [
+      "File: " + path,
+      `All ${tags.length} image${tags.length === 1 ? "" : "s"} width-constrained.`,
+    ]);
+
   const named = unconstrained
     .map((t) => (t.src !== "" ? `"${t.src}"` : "an image with no src"))
     .join(", ");
-  return [
+  return checkFailed(code, [
     {
       code: "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED",
       severity: "warning",
@@ -113,5 +123,5 @@ export function checkOskImageConstrained(input: DocLintInput): LintFinding[] {
       location: { file: path, line: 1 },
       hint: "Give each custom image a width (a width attribute, an inline style, or a CSS class rule in the bundled stylesheet) so it cannot overflow the help page.",
     },
-  ];
+  ]);
 }

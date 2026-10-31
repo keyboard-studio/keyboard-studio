@@ -369,11 +369,18 @@ function resolveRow(
           controls: null,
           evidence: (): EvidenceModel => ({
             kind: "lint-finding",
-            lines: findings.flatMap((finding) =>
-              finding.hint
-                ? [finding.message, finding.hint]
-                : [finding.message],
-            ),
+            lines: findings.flatMap((finding) => {
+              const fileLine = finding.location
+                ? `File: ${finding.location.file}#L${finding.location.line}`
+                : null;
+              // Split message on newlines so multi-line messages (e.g. with
+              // a full source line) render as separate paragraphs.
+              const msgLines = finding.message.split("\n");
+              const parts = finding.hint
+                ? [...msgLines, finding.hint]
+                : msgLines;
+              return fileLine ? [fileLine, ...parts] : parts;
+            }),
             lintRuleId,
             findings,
           }),

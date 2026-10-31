@@ -18,22 +18,22 @@ function input(php: string | undefined, cssTexts?: string[]): DocLintInput {
 
 describe("checkOskImageConstrained (11.8)", () => {
   it("is silent when the help page has no member text, and when it has no images (Keyman-generated data-states form)", () => {
-    expect(checkOskImageConstrained(input(undefined))).toEqual([]);
+    expect(checkOskImageConstrained(input(undefined)).findings).toEqual([]);
     expect(
       checkOskImageConstrained(
         input(`<div id='osk' data-states='default shift'></div>`),
-      ),
+      ).findings,
     ).toEqual([]);
   });
 
   it("passes images constrained by a width attribute or an inline style", () => {
     expect(
-      checkOskImageConstrained(input(`<img src="a.png" width="600" />`)),
+      checkOskImageConstrained(input(`<img src="a.png" width="600" />`)).findings,
     ).toEqual([]);
     expect(
       checkOskImageConstrained(
         input(`<img src="a.png" style="max-width: 100%" />`),
-      ),
+      ).findings,
     ).toEqual([]);
   });
 
@@ -42,21 +42,19 @@ describe("checkOskImageConstrained (11.8)", () => {
       input(`<img src="chart.png" class="full" />`, [
         ".full { width: 98%; min-width: 700px; }",
       ]),
-    );
-    expect(findings).toEqual([]);
+    ).findings;    expect(findings).toEqual([]);
   });
 
   it("passes all images when a global img rule constrains them", () => {
     expect(
       checkOskImageConstrained(
         input(`<img src="a.png" />`, ["img { max-width: 100%; }"]),
-      ),
+      ).findings,
     ).toEqual([]);
   });
 
   it("flags a bare custom image with no constraint anywhere", () => {
-    const findings = checkOskImageConstrained(input(`<img src="globe.png" />`));
-    expect(findings).toHaveLength(1);
+    const findings = checkOskImageConstrained(input(`<img src="globe.png" />`)).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED");
     expect(findings[0]!.message).toContain("globe.png");
   });
@@ -64,8 +62,7 @@ describe("checkOskImageConstrained (11.8)", () => {
   it("flags a height-only image: height is not a width constraint", () => {
     const findings = checkOskImageConstrained(
       input(`<img src="keys.png" height="300" />`),
-    );
-    expect(findings).toHaveLength(1);
+    ).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]!.message).toContain("keys.png");
   });
 
@@ -75,8 +72,7 @@ describe("checkOskImageConstrained (11.8)", () => {
         `<img src="ok.png" class="full" /><img src="bad.png" class="left" />`,
         [".full { width: 98%; } .left { float: left; }"],
       ),
-    );
-    expect(findings).toHaveLength(1);
+    ).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]!.message).toContain("bad.png");
     expect(findings[0]!.message).not.toContain("ok.png");
   });
@@ -86,7 +82,6 @@ describe("checkOskImageConstrained (11.8)", () => {
       input(`<img src="a.png" class="full" />`, [
         "/* .full { width: 98%; } */ .full { color: red; }",
       ]),
-    );
-    expect(findings).toHaveLength(1);
+    ).findings;    expect(findings).toHaveLength(1);
   });
 });

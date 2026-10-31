@@ -3,8 +3,9 @@
 // `.php` body content are identical after stripping headers and normalizing
 // whitespace" (spec 080 US7-3).
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, normalizeDocBody } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 /**
  * Check that the welcome page and the help page render the same body
@@ -14,15 +15,21 @@ import { docMemberPath, normalizeDocBody } from "./_shared.js";
  * @param input - Documentation check input (uses `members["welcome-htm"]`
  *   and `members["help-php"]`).
  */
-export function checkBodyParity(input: DocLintInput): LintFinding[] {
+export function checkBodyParity(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_PHP_HTM_BODY_MISMATCH";
   const welcome = input.members["welcome-htm"];
   const help = input.members["help-php"];
-  if (welcome === undefined || help === undefined) return [];
-
-  if (normalizeDocBody(welcome) === normalizeDocBody(help)) return [];
+  if (welcome === undefined || help === undefined)
+    return checkPassed(code, ["welcome.htm or help.php absent — nothing to compare."]);
 
   const path = docMemberPath("help-php", input.keyboardId);
-  return [
+  if (normalizeDocBody(welcome) === normalizeDocBody(help))
+    return checkPassed(code, [
+      "File: " + path,
+      "welcome.htm and help.php bodies match after normalization.",
+    ]);
+
+  return checkFailed(code, [
     {
       code: "KM_LINT_PHP_HTM_BODY_MISMATCH",
       severity: "warning",
@@ -31,5 +38,5 @@ export function checkBodyParity(input: DocLintInput): LintFinding[] {
       location: { file: path, line: 1 },
       hint: `Keep the welcome page and help page body content identical — only the help page's header (and the welcome page's own layout images) may differ.`,
     },
-  ];
+  ]);
 }

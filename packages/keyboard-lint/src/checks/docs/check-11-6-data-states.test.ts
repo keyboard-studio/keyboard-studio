@@ -12,22 +12,21 @@ function makeInput(helpPhp: string | undefined, layerIds: string[]) {
 describe("checkDataStatesComplete (11.6 KM_LINT_PHP_DATA_STATES_INCOMPLETE)", () => {
   it("passes when data-states names only real layers", () => {
     const helpPhp = '<span data-states="default,shift"></span>';
-    expect(checkDataStatesComplete(makeInput(helpPhp, ["default", "shift"]))).toEqual([]);
+    expect(checkDataStatesComplete(makeInput(helpPhp, ["default", "shift"])).findings).toEqual([]);
   });
 
   it("passes when data-states is absent entirely", () => {
-    expect(checkDataStatesComplete(makeInput("<html></html>", ["default"]))).toEqual([]);
+    expect(checkDataStatesComplete(makeInput("<html></html>", ["default"])).findings).toEqual([]);
   });
 
   it("fires when data-states names a phantom layer", () => {
     const helpPhp = '<span data-states="default,phantom"></span>';
-    const findings = checkDataStatesComplete(makeInput(helpPhp, ["default"]));
-    expect(findings).toHaveLength(1);
+    const findings = checkDataStatesComplete(makeInput(helpPhp, ["default"])).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe("KM_LINT_PHP_DATA_STATES_INCOMPLETE");
     expect(findings[0]?.message).toContain("phantom");
   });
 
   it("returns [] when help-php is absent", () => {
-    expect(checkDataStatesComplete(makeInput(undefined, ["default"]))).toEqual([]);
+    expect(checkDataStatesComplete(makeInput(undefined, ["default"])).findings).toEqual([]);
   });
 });

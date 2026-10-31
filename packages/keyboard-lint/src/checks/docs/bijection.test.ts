@@ -58,7 +58,7 @@ describe("documentation check bijection (spec 080 SC-007 / FR-019)", () => {
   });
 
   it("the shared clean fixture produces zero documentation findings", () => {
-    const findings = runDocChecks(CLEAN_DOC_LINT_INPUT);
+    const findings = runDocChecks(CLEAN_DOC_LINT_INPUT).findings;
     expect(findings).toEqual([]);
   });
 
@@ -66,10 +66,10 @@ describe("documentation check bijection (spec 080 SC-007 / FR-019)", () => {
     const brokenFixture = BROKEN_DOC_LINT_FIXTURES[code];
     expect(brokenFixture, `no broken fixture registered for ${code}`).toBeDefined();
 
-    const brokenFindings = runDocChecks(brokenFixture!).filter((f) => f.code === code);
+    const brokenFindings = runDocChecks(brokenFixture!).findings.filter((f) => f.code === code);
     expect(brokenFindings).toHaveLength(1);
 
-    const cleanFindings = runDocChecks(CLEAN_DOC_LINT_INPUT).filter((f) => f.code === code);
+    const cleanFindings = runDocChecks(CLEAN_DOC_LINT_INPUT).findings.filter((f) => f.code === code);
     expect(cleanFindings).toHaveLength(0);
   });
 });

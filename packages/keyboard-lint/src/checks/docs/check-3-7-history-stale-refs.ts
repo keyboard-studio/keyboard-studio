@@ -3,8 +3,9 @@
 // bullets do not reference files that no longer exist in the keyboard."
 // Fires per bullet that names a filename in `deletedFilenames`.
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 /**
  * Check that no HISTORY.md bullet references a since-deleted file.
@@ -12,14 +13,23 @@ import { docMemberPath, parseHistoryEntries } from "./_shared.js";
  * @param input - Documentation check input (uses `members["history-md"]`
  *   and `deletedFilenames`).
  */
-export function checkHistoryStaleFileRefs(input: DocLintInput): LintFinding[] {
+export function checkHistoryStaleFileRefs(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_HISTORY_STALE_FILE_REFS";
   const text = input.members["history-md"];
-  if (text === undefined || input.deletedFilenames.length === 0) return [];
+  const code_path = docMemberPath("history-md", input.keyboardId);
+  if (text === undefined) return checkPassed(code, ["No HISTORY.md to check."]);
+  if (input.deletedFilenames.length === 0)
+    return checkPassed(code, [
+      "File: " + code_path,
+      "No deleted files to check references against.",
+    ]);
 
-  const path = docMemberPath("history-md", input.keyboardId);
-  const findings: LintFinding[] = [];
+  const path = code_path;
+  const findings: import("@keyboard-studio/contracts").LintFinding[] = [];
+  let bulletCount = 0;
   for (const entry of parseHistoryEntries(text)) {
     for (const bullet of entry.bullets) {
+      bulletCount++;
       const deleted = input.deletedFilenames.find((f) => bullet.includes(f));
       if (deleted === undefined) continue;
       findings.push({
@@ -32,5 +42,10 @@ export function checkHistoryStaleFileRefs(input: DocLintInput): LintFinding[] {
       });
     }
   }
-  return findings;
+  if (findings.length === 0)
+    return checkPassed(code, [
+      "File: " + path,
+      `All ${bulletCount} bullet file reference${bulletCount === 1 ? "" : "s"} resolve.`,
+    ]);
+  return checkFailed(code, findings);
 }

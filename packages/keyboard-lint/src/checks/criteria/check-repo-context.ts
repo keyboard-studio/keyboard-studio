@@ -129,7 +129,7 @@ export function checkFilesOutsideFolder(
   });
   if (hits.length === 0)
     return checkPassed(code, [
-      `All keyboard files are under ${facts.review.repoPath}/.`,
+      `Checked ${tree.length} file(s): all under ${facts.review.repoPath}/.`,
     ]);
   return checkFailed(code, [
     criteriaFinding({

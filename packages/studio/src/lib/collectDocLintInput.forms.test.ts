@@ -47,10 +47,10 @@ async function lintProjected(fixture: DocFixture, answers: HelpDocsAnswers | nul
 
 describe.each(DOC_FIXTURES.map((f) => [f.id, f] as const))("Layer C docs checks on %s", (_id, fixture) => {
   it("report no findings with no answers", async () => {
-    expect((await lintProjected(fixture, null)).map((f) => `${f.code}: ${f.message}`)).toEqual([]);
+    expect((await lintProjected(fixture, null)).findings.map((f) => `${f.code}: ${f.message}`)).toEqual([]);
   });
 
   it("report no findings with every answer given", async () => {
-    expect((await lintProjected(fixture, FULL_ANSWERS)).map((f) => `${f.code}: ${f.message}`)).toEqual([]);
+    expect((await lintProjected(fixture, FULL_ANSWERS)).findings.map((f) => `${f.code}: ${f.message}`)).toEqual([]);
   });
 });

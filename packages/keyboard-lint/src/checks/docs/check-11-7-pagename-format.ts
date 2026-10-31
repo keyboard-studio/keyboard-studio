@@ -4,8 +4,9 @@
 // match the help-header contract's form for the keyboard's display name
 // (contracts/help-header.md).
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, expectedPagename, parsePagename } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 /**
  * Check that the help page's `$pagename` matches the standard help-site
@@ -14,18 +15,24 @@ import { docMemberPath, expectedPagename, parsePagename } from "./_shared.js";
  * @param input - Documentation check input (uses `members["help-php"]`
  *   and `displayName`).
  */
-export function checkPagenameFormat(input: DocLintInput): LintFinding[] {
+export function checkPagenameFormat(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_PHP_PAGENAME_FORMAT";
   const text = input.members["help-php"];
-  if (text === undefined) return [];
+  if (text === undefined) return checkPassed(code, ["No help.php to check."]);
 
   const actual = parsePagename(text);
-  if (actual === null) return [];
+  if (actual === null)
+    return checkPassed(code, [
+      "File: " + docMemberPath("help-php", input.keyboardId),
+      "No $pagename assignment — nothing to check.",
+    ]);
 
   const expected = expectedPagename(input.displayName);
-  if (actual === expected) return [];
-
   const path = docMemberPath("help-php", input.keyboardId);
-  return [
+  if (actual === expected)
+    return checkPassed(code, ["File: " + path, `$pagename is "${actual}".`]);
+
+  return checkFailed(code, [
     {
       code: "KM_LINT_PHP_PAGENAME_FORMAT",
       severity: "warning",
@@ -34,5 +41,5 @@ export function checkPagenameFormat(input: DocLintInput): LintFinding[] {
       location: { file: path, line: 1 },
       hint: `Set $pagename to "${expected}" — the display name, plus " Keyboard Help" (or " Help" if the name already ends in "Keyboard").`,
     },
-  ];
+  ]);
 }

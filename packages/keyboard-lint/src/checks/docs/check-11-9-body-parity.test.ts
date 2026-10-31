@@ -13,7 +13,7 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
       "welcome-htm": "<html><body><p>Welcome to Test</p></body></html>",
       "help-php": "<?php\n  $pagename = 'Test Help';\n?>\n<p>Welcome to Test</p>",
     };
-    expect(checkBodyParity(makeInput(members))).toEqual([]);
+    expect(checkBodyParity(makeInput(members)).findings).toEqual([]);
   });
 
   it("passes when the welcome page's Keyboard Layout section is the only difference", () => {
@@ -22,7 +22,7 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
         '<html><body><p>Welcome to Test</p><h2>Keyboard Layout</h2><p><img src="a.svg"></p></body></html>',
       "help-php": "<p>Welcome to Test</p>",
     };
-    expect(checkBodyParity(makeInput(members))).toEqual([]);
+    expect(checkBodyParity(makeInput(members)).findings).toEqual([]);
   });
 
   it("fires when the bodies genuinely differ", () => {
@@ -30,15 +30,14 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
       "welcome-htm": "<html><body><p>Welcome to Test</p></body></html>",
       "help-php": "<p>Something totally different.</p>",
     };
-    const findings = checkBodyParity(makeInput(members));
-    expect(findings).toHaveLength(1);
+    const findings = checkBodyParity(makeInput(members)).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe("KM_LINT_PHP_HTM_BODY_MISMATCH");
     expect(findings[0]?.location?.file).toBe("source/help/test_kbd.php");
   });
 
   it("returns [] when either member is absent", () => {
-    expect(checkBodyParity(makeInput({ "welcome-htm": "<p>Hi</p>" }))).toEqual([]);
-    expect(checkBodyParity(makeInput({ "help-php": "<p>Hi</p>" }))).toEqual([]);
+    expect(checkBodyParity(makeInput({ "welcome-htm": "<p>Hi</p>" })).findings).toEqual([]);
+    expect(checkBodyParity(makeInput({ "help-php": "<p>Hi</p>" })).findings).toEqual([]);
   });
 
   it("ignores doctype declarations and HTML comments (non-rendering chrome)", () => {
@@ -47,7 +46,7 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
         "<!DOCTYPE html><html><body><!-- a note --><p>Welcome to Test</p></body></html>",
       "help-php": "<p>Welcome to Test</p>",
     };
-    expect(checkBodyParity(makeInput(members))).toEqual([]);
+    expect(checkBodyParity(makeInput(members)).findings).toEqual([]);
   });
 
   it("treats .htm and .php sibling links as the same delivery container", () => {
@@ -57,7 +56,7 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
       "help-php":
         '<?php\n$pagename = "Test Help";\n?>\n<p>See <a href="layout-us-en.php">all combinations</a>.</p>',
     };
-    expect(checkBodyParity(makeInput(members))).toEqual([]);
+    expect(checkBodyParity(makeInput(members)).findings).toEqual([]);
   });
 
   it("still fires when .htm/.php link basenames differ", () => {
@@ -66,6 +65,6 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
         '<html><body><a href="layout-us-en.htm">x</a></body></html>',
       "help-php": '<a href="layout-uk-en.php">x</a>',
     };
-    expect(checkBodyParity(makeInput(members))).toHaveLength(1);
+    expect(checkBodyParity(makeInput(members)).findings).toHaveLength(1);
   });
 });
