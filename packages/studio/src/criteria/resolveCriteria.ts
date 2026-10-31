@@ -369,11 +369,15 @@ function resolveRow(
           controls: null,
           evidence: (): EvidenceModel => ({
             kind: "lint-finding",
-            lines: findings.flatMap((finding) =>
-              finding.hint
+            lines: findings.flatMap((finding) => {
+              const fileLine = finding.location
+                ? `File: ${finding.location.file}#L${finding.location.line}`
+                : null;
+              const parts = finding.hint
                 ? [finding.message, finding.hint]
-                : [finding.message],
-            ),
+                : [finding.message];
+              return fileLine ? [fileLine, ...parts] : parts;
+            }),
             lintRuleId,
             findings,
           }),

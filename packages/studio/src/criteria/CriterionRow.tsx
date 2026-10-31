@@ -217,10 +217,15 @@ export function CriterionRow({
     };
 
     if (githubLink) {
-      const m = /^File: (.+)$/.exec(line);
+      // File: <path> or File: <path>#L<line>
+      const m = /^File: ([^#]+)(#L(\d+))?$/.exec(line);
       if (m) {
         const path = m[1]!;
-        const url = `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${path}`;
+        const lineNum = m[3];
+        const url =
+          `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${path}` +
+          (lineNum ? `#L${lineNum}` : "");
+        const display = lineNum ? `${path}#L${lineNum}` : path;
         return (
           <>
             File:{" "}
@@ -230,7 +235,7 @@ export function CriterionRow({
               rel="noopener noreferrer"
               style={{ color: ACCENT, fontFamily: FONT_MONO, fontSize: 12 }}
             >
-              {path}
+              {display}
             </a>
           </>
         );
