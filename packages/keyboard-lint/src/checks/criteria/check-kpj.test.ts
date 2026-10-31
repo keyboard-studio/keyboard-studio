@@ -66,7 +66,7 @@ describe("compareKpjVersions", () => {
 
 describe("checkKpjFormatOutdated (1.10b)", () => {
   it("flags an older format version, naming found vs current", () => {
-    const findings = checkKpjFormatOutdated({ kpjText: OLDER, kpjPath: KPJ_PATH });
+    const { findings } = checkKpjFormatOutdated({ kpjText: OLDER, kpjPath: KPJ_PATH });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPJ_FORMAT_OUTDATED");
     expect(findings[0]!.message).toContain('"1.0"');
@@ -75,48 +75,48 @@ describe("checkKpjFormatOutdated (1.10b)", () => {
   });
 
   it("flags a present .kpj with no <Version> element as predating the format", () => {
-    const findings = checkKpjFormatOutdated({ kpjText: NO_VERSION, kpjPath: KPJ_PATH });
+    const { findings } = checkKpjFormatOutdated({ kpjText: NO_VERSION, kpjPath: KPJ_PATH });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPJ_FORMAT_OUTDATED");
     expect(findings[0]!.message).toContain("no <Options><Version> element");
   });
 
   it("passes the current format and a newer one", () => {
-    expect(checkKpjFormatOutdated({ kpjText: CURRENT, kpjPath: KPJ_PATH })).toEqual([]);
-    expect(checkKpjFormatOutdated({ kpjText: BUMPED, kpjPath: KPJ_PATH })).toEqual([]);
+    expect(checkKpjFormatOutdated({ kpjText: CURRENT, kpjPath: KPJ_PATH }).findings).toEqual([]);
+    expect(checkKpjFormatOutdated({ kpjText: BUMPED, kpjPath: KPJ_PATH }).findings).toEqual([]);
   });
 
   it("is silent without facts (the absent .kpj is the assembly's named missing input)", () => {
-    expect(checkKpjFormatOutdated({})).toEqual([]);
-    expect(checkKpjFormatOutdated({ kpjPath: KPJ_PATH })).toEqual([]);
-    expect(checkKpjFormatOutdated({ kpjText: OLDER })).toEqual([]);
+    expect(checkKpjFormatOutdated({}).findings).toEqual([]);
+    expect(checkKpjFormatOutdated({ kpjPath: KPJ_PATH }).findings).toEqual([]);
+    expect(checkKpjFormatOutdated({ kpjText: OLDER }).findings).toEqual([]);
   });
 });
 
 describe("checkKpjVersionBumped (2.7)", () => {
   it("flags a format version newer than the current format", () => {
-    const findings = checkKpjVersionBumped({ kpjText: BUMPED, kpjPath: KPJ_PATH });
+    const { findings } = checkKpjVersionBumped({ kpjText: BUMPED, kpjPath: KPJ_PATH });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPJ_VERSION_BUMPED");
     expect(findings[0]!.message).toContain('"3.0"');
   });
 
   it("passes the current format, an older one, and a version-less file", () => {
-    expect(checkKpjVersionBumped({ kpjText: CURRENT, kpjPath: KPJ_PATH })).toEqual([]);
-    expect(checkKpjVersionBumped({ kpjText: OLDER, kpjPath: KPJ_PATH })).toEqual([]);
-    expect(checkKpjVersionBumped({ kpjText: NO_VERSION, kpjPath: KPJ_PATH })).toEqual([]);
+    expect(checkKpjVersionBumped({ kpjText: CURRENT, kpjPath: KPJ_PATH }).findings).toEqual([]);
+    expect(checkKpjVersionBumped({ kpjText: OLDER, kpjPath: KPJ_PATH }).findings).toEqual([]);
+    expect(checkKpjVersionBumped({ kpjText: NO_VERSION, kpjPath: KPJ_PATH }).findings).toEqual([]);
   });
 
   it("is silent without facts", () => {
-    expect(checkKpjVersionBumped({})).toEqual([]);
+    expect(checkKpjVersionBumped({}).findings).toEqual([]);
   });
 });
 
 describe("the pair together", () => {
   it("pins equality: exactly one fires per direction, neither at 2.0", () => {
     const run = (text: string) => [
-      ...checkKpjFormatOutdated({ kpjText: text, kpjPath: KPJ_PATH }),
-      ...checkKpjVersionBumped({ kpjText: text, kpjPath: KPJ_PATH }),
+      ...checkKpjFormatOutdated({ kpjText: text, kpjPath: KPJ_PATH }).findings,
+      ...checkKpjVersionBumped({ kpjText: text, kpjPath: KPJ_PATH }).findings,
     ].map((f) => f.code);
     expect(run(OLDER)).toEqual(["KM_LINT_KPJ_FORMAT_OUTDATED"]);
     expect(run(BUMPED)).toEqual(["KM_LINT_KPJ_VERSION_BUMPED"]);

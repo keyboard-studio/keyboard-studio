@@ -140,7 +140,7 @@ describe("checkRedundantTouchLayouts (7.19)", () => {
   };
 
   it("flags identical phone and tablet layouts", () => {
-    const findings = checkRedundantTouchLayouts(TL, "source/demo.keyman-touch-layout");
+    const { findings } = checkRedundantTouchLayouts(TL, "source/demo.keyman-touch-layout");
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_REDUNDANT_TOUCH_LAYOUTS");
   });
@@ -150,12 +150,12 @@ describe("checkRedundantTouchLayouts (7.19)", () => {
       platforms: [platform("phone", ["default"]), platform("tablet", ["default", "shift"])],
       nodeIds: [],
     };
-    expect(checkRedundantTouchLayouts(byId, "x")).toEqual([]);
+    expect(checkRedundantTouchLayouts(byId, "x").findings).toEqual([]);
     const byText: TouchLayoutIR = {
       platforms: [platform("phone", ["default"], "a"), platform("tablet", ["default"], "b")],
       nodeIds: [],
     };
-    expect(checkRedundantTouchLayouts(byText, "x")).toEqual([]);
+    expect(checkRedundantTouchLayouts(byText, "x").findings).toEqual([]);
   });
 
   it("is silent when only one platform exists", () => {
@@ -163,7 +163,7 @@ describe("checkRedundantTouchLayouts (7.19)", () => {
       platforms: [platform("phone", ["default"])],
       nodeIds: [],
     };
-    expect(checkRedundantTouchLayouts(phoneOnly, "x")).toEqual([]);
+    expect(checkRedundantTouchLayouts(phoneOnly, "x").findings).toEqual([]);
   });
 });
 
@@ -180,7 +180,7 @@ describe("checkKpsTargetsMatch (8.13)", () => {
         kpsTargets: ["windows", "web"],
         kpsFileNames: ["..\\build\\demo.kmx", "..\\build\\demo.js"],
         kpsPath: KPS,
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
@@ -191,12 +191,12 @@ describe("checkKpsTargetsMatch (8.13)", () => {
         kpsTargets: ["windows", "macosx", "linux", "web", "mobile", "tablet"],
         kpsFileNames: [],
         kpsPath: KPS,
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
   it("flags a declared-target disagreement in each direction", () => {
-    const findings = checkKpsTargetsMatch({
+    const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["windows", "web"]),
       kpsTargets: ["windows", "mobile"],
       kpsFileNames: [],
@@ -209,7 +209,7 @@ describe("checkKpsTargetsMatch (8.13)", () => {
   });
 
   it("flags a shipped .js with no web-capable target declared", () => {
-    const findings = checkKpsTargetsMatch({
+    const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["windows"]),
       kpsTargets: ["windows"],
       kpsFileNames: ["..\\build\\demo.js"],
@@ -220,7 +220,7 @@ describe("checkKpsTargetsMatch (8.13)", () => {
   });
 
   it("flags a shipped .kmx with no desktop target declared", () => {
-    const findings = checkKpsTargetsMatch({
+    const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["web"]),
       kpsTargets: ["web"],
       kpsFileNames: ["..\\build\\demo.kmx"],

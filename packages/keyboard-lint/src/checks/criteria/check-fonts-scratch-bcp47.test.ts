@@ -27,12 +27,12 @@ describe("checkTouchLayoutFontMismatch (7.20)", () => {
       checkTouchLayoutFontMismatch(
         touchLayout("Charis SIL", "Charis SIL"),
         TL_PATH,
-      ),
+      ).findings,
     ).toEqual([]);
   });
 
   it("flags differing phone and tablet fonts", () => {
-    const findings = checkTouchLayoutFontMismatch(
+    const { findings } = checkTouchLayoutFontMismatch(
       touchLayout("Charis SIL", "Gentium"),
       TL_PATH,
     );
@@ -42,10 +42,10 @@ describe("checkTouchLayoutFontMismatch (7.20)", () => {
 
   it("is silent when only one platform declares a font", () => {
     expect(
-      checkTouchLayoutFontMismatch(touchLayout("Charis SIL"), TL_PATH),
+      checkTouchLayoutFontMismatch(touchLayout("Charis SIL"), TL_PATH).findings,
     ).toEqual([]);
     expect(
-      checkTouchLayoutFontMismatch(touchLayout(undefined, "Gentium"), TL_PATH),
+      checkTouchLayoutFontMismatch(touchLayout(undefined, "Gentium"), TL_PATH).findings,
     ).toEqual([]);
   });
 });
@@ -63,12 +63,12 @@ describe("checkIndustryFonts (8.12)", () => {
       checkIndustryFonts({
         ...base,
         kpsFileNames: ["..\\source\\CharisSIL.ttf"],
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
   it("flags an industry font file in the .kps list", () => {
-    const findings = checkIndustryFonts({
+    const { findings } = checkIndustryFonts({
       ...base,
       kpsFileNames: ["..\\source\\Arial.ttf"],
     });
@@ -77,7 +77,7 @@ describe("checkIndustryFonts (8.12)", () => {
   });
 
   it("flags an industry family string even when the file was renamed", () => {
-    const findings = checkIndustryFonts({
+    const { findings } = checkIndustryFonts({
       ...base,
       kvksFontFamily: "Times New Roman",
     });
@@ -86,7 +86,7 @@ describe("checkIndustryFonts (8.12)", () => {
   });
 
   it("flags Tahoma among the touch layout fonts", () => {
-    const findings = checkIndustryFonts({ ...base, touchFonts: ["Tahoma"] });
+    const { findings } = checkIndustryFonts({ ...base, touchFonts: ["Tahoma"] });
     expect(findings).toHaveLength(1);
   });
 });
@@ -94,18 +94,18 @@ describe("checkIndustryFonts (8.12)", () => {
 describe("checkWoffInPackage (9.6)", () => {
   it("passes a package with only .ttf fonts", () => {
     expect(
-      checkWoffInPackage(["source/CharisSIL.ttf"], ["CharisSIL.ttf"], KPS_PATH),
+      checkWoffInPackage(["source/CharisSIL.ttf"], ["CharisSIL.ttf"], KPS_PATH).findings,
     ).toEqual([]);
   });
 
   it("flags a .woff2 in the VFS inventory", () => {
-    const findings = checkWoffInPackage(["source/font.woff2"], [], KPS_PATH);
+    const { findings } = checkWoffInPackage(["source/font.woff2"], [], KPS_PATH);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_WOFF_FONT_IN_PACKAGE");
   });
 
   it("flags a .woff named only in the .kps file list", () => {
-    const findings = checkWoffInPackage(
+    const { findings } = checkWoffInPackage(
       [],
       ["..\\source\\font.woff"],
       KPS_PATH,
@@ -122,12 +122,12 @@ describe("checkStrayScratchFiles (1.13 foreign arm)", () => {
         "source/demo.kps",
         "HISTORY.md",
         "README.md",
-      ]),
+      ]).findings,
     ).toEqual([]);
   });
 
   it("flags backup and scratch artefacts, naming them", () => {
-    const findings = checkStrayScratchFiles([
+    const { findings } = checkStrayScratchFiles([
       "source/demo.kmn",
       "source/demo.kmn.bak",
       "test.txt",
@@ -144,18 +144,18 @@ describe("checkStrayScratchFiles (1.13 foreign arm)", () => {
       checkStrayScratchFiles(
         ["source/protest_keyboard.kmn", "docs/latest.md"],
         "demo",
-      ),
+      ).findings,
     ).toEqual([]);
   });
 });
 
 describe("checkRegion001 (12.4)", () => {
   it("passes ordinary language-region tags", () => {
-    expect(checkRegion001(["en-US", "ewo-CM", "fr"], "demo")).toEqual([]);
+    expect(checkRegion001(["en-US", "ewo-CM", "fr"], "demo").findings).toEqual([]);
   });
 
   it("flags a tag with region subtag 001", () => {
-    const findings = checkRegion001(["es-001"], "demo");
+    const { findings } = checkRegion001(["es-001"], "demo");
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_REGION_001_TAG");
     expect(findings[0]!.message).toContain("es-001");
@@ -164,7 +164,7 @@ describe("checkRegion001 (12.4)", () => {
   it("does not flag 001 as a primary language subtag position artifact", () => {
     // "001" alone is not a tag shape parseKps/IR would produce; a
     // three-digit EXTENSION later in the tag is still region-position here.
-    const findings = checkRegion001(["de-001"], "demo");
+    const { findings } = checkRegion001(["de-001"], "demo");
     expect(findings).toHaveLength(1);
   });
 });

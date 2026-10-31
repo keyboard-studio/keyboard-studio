@@ -37,24 +37,24 @@ describe("deprecatedRelatedPackageIds", () => {
 describe("checkDeprecatedKpsLinkage (15.3)", () => {
   it("passes when the .kps lists a legacy package as deprecated", () => {
     expect(
-      checkDeprecatedKpsLinkage(KPS_WITH_DEPRECATES, true, KPS_PATH),
+      checkDeprecatedKpsLinkage(KPS_WITH_DEPRECATES, true, KPS_PATH).findings,
     ).toEqual([]);
   });
 
   it("fires when a deprecation is in play but no linkage is listed", () => {
-    const findings = checkDeprecatedKpsLinkage(KPS_WITHOUT, true, KPS_PATH);
+    const { findings } = checkDeprecatedKpsLinkage(KPS_WITHOUT, true, KPS_PATH);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING");
   });
 
   it("fires when a deprecation is in play and there is no .kps at all", () => {
-    expect(checkDeprecatedKpsLinkage(undefined, true, KPS_PATH)).toHaveLength(
+    expect(checkDeprecatedKpsLinkage(undefined, true, KPS_PATH).findings).toHaveLength(
       1,
     );
   });
 
   it("stays silent when no deprecation is in play (§15 is Not applicable there)", () => {
-    expect(checkDeprecatedKpsLinkage(KPS_WITHOUT, false, KPS_PATH)).toEqual([]);
-    expect(checkDeprecatedKpsLinkage(undefined, false, KPS_PATH)).toEqual([]);
+    expect(checkDeprecatedKpsLinkage(KPS_WITHOUT, false, KPS_PATH).findings).toEqual([]);
+    expect(checkDeprecatedKpsLinkage(undefined, false, KPS_PATH).findings).toEqual([]);
   });
 });

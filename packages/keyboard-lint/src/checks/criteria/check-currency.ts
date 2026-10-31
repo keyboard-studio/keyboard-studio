@@ -13,9 +13,15 @@
 // reason — never a guessed mandate. A tag with no region subtag
 // mandates nothing and is silent here.
 
-import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { CLDR_TERRITORY_CURRENCY } from "@keyboard-studio/contracts";
-import { criteriaFinding, kmnPath } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 import { regionSubtagOf } from "./check-bcp47.js";
 import { producedCharacters } from "./check-produced-set.js";
 
@@ -67,21 +73,37 @@ export function checkMandatedCurrencyChars(
   ir: KeyboardIR,
   tags: readonly string[],
   keyboardId: string,
-): LintFinding[] {
+): CheckResult {
   const gaps = mandatedCurrencyGaps(ir, tags);
-  if (gaps.length === 0) return [];
+  if (gaps.length === 0) {
+    const regions = [
+      ...new Set(
+        tags
+          .map((t) => regionSubtagOf(t))
+          .filter((r): r is string => r !== undefined)
+          .map((r) => r.toUpperCase()),
+      ),
+    ].sort();
+    if (regions.length === 0)
+      return checkPassed("KM_LINT_MANDATED_CHAR_MISSING", [
+        "No region subtags in the tags: no currency mandate.",
+      ]);
+    return checkPassed("KM_LINT_MANDATED_CHAR_MISSING", [
+      `All currency symbols producible for region(s): ${regions.join(", ")}.`,
+    ]);
+  }
   const detail = gaps
     .map(
       (g) =>
         `${g.region} (${g.currencyCode} "${g.symbol}": missing ${g.missingChars.join(", ")})`,
     )
     .join("; ");
-  return [
+  return checkFailed("KM_LINT_MANDATED_CHAR_MISSING", [
     criteriaFinding({
       code: "KM_LINT_MANDATED_CHAR_MISSING",
       file: kmnPath(keyboardId),
       message: `The keyboard cannot produce the mandated currency character(s) for its region(s): ${detail}.`,
       hint: "Add the currency symbol's characters to the keyboard's output (or correct the region subtag).",
     }),
-  ];
+  ]);
 }

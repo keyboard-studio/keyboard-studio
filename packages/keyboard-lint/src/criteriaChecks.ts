@@ -209,42 +209,38 @@ export function runCriteriaChecks(
 
   // 1.13 foreign arm — authored mode precertifies this and never scans.
   if (input.scratchScan) {
-    findings.push(...checkStrayScratchFiles(filePaths));
+    collect(checkStrayScratchFiles(filePaths));
   }
 
   // 1.9 — duplicate source files (same basename, identical content)
   // anywhere in the judged folder.
-  findings.push(...checkDuplicateSourceFiles(fs));
+  collect(checkDuplicateSourceFiles(fs));
 
   // 7.10 — raw .kmn text scan; runs even when the IR failed to parse.
   const kmnText = readText(fs, kmnPath(keyboardId));
   if (kmnText !== undefined) {
-    findings.push(...checkStoreSyntax(kmnText, kmnPath(keyboardId)));
+    collect(checkStoreSyntax(kmnText, kmnPath(keyboardId)));
   }
 
   // 7.16 — a present .kvks that parses to nothing (the absent case is
   // the assembly's contextMissing, not a finding).
   if (input.kvksPath !== undefined) {
-    findings.push(...checkKvksBlank(input.kvks, input.kvksPath));
+    collect(checkKvksBlank(input.kvks, input.kvksPath));
   }
 
   // 7.20 — phone vs tablet font, from this package's touch-layout parse.
   // 7.19 — phone vs tablet layouts identical (same parse).
   if (touchLayout !== undefined) {
-    findings.push(
-      ...checkTouchLayoutFontMismatch(touchLayout, touchLayoutPath(keyboardId)),
-    );
-    findings.push(
-      ...checkRedundantTouchLayouts(touchLayout, touchLayoutPath(keyboardId)),
-    );
+    collect(checkTouchLayoutFontMismatch(touchLayout, touchLayoutPath(keyboardId)));
+    collect(checkRedundantTouchLayouts(touchLayout, touchLayoutPath(keyboardId)));
   }
 
   // 8.12 / 9.6 — package font scans over .kps facts + the VFS inventory.
   const touchFonts = (touchLayout?.platforms ?? [])
     .map((p) => p.font)
     .filter((f): f is string => f !== undefined);
-  findings.push(
-    ...checkIndustryFonts({
+  collect(
+    checkIndustryFonts({
       kpsFileNames: input.kpsFileNames,
       kpsFontRefs: input.kpsFontRefs,
       ...(input.kvks?.fontFamily !== undefined
@@ -254,12 +250,12 @@ export function runCriteriaChecks(
       kpsPath,
     }),
   );
-  findings.push(...checkWoffInPackage(filePaths, input.kpsFileNames, kpsPath));
+  collect(checkWoffInPackage(filePaths, input.kpsFileNames, kpsPath));
 
   // 15.3 — the judged keyboard's own .kps Related packages linkage
   // (gated inside the check on deprecationInPlay).
-  findings.push(
-    ...checkDeprecatedKpsLinkage(
+  collect(
+    checkDeprecatedKpsLinkage(
       input.kpsText,
       input.deprecationInPlay,
       kpsPath,
@@ -275,8 +271,8 @@ export function runCriteriaChecks(
       ...(input.kpjText !== undefined ? { kpjText: input.kpjText } : {}),
       kpjPath: input.kpjPath,
     };
-    findings.push(...checkKpjFormatOutdated(kpjFacts));
-    findings.push(...checkKpjVersionBumped(kpjFacts));
+    collect(checkKpjFormatOutdated(kpjFacts));
+    collect(checkKpjVersionBumped(kpjFacts));
   }
 
   // 1.7b / 1.8b / 1.11b / 1.12b / 3.1b / 6.1b / 6.3b — the file-inventory
@@ -341,53 +337,53 @@ export function runCriteriaChecks(
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.
-    findings.push(...checkVersionFormat(keyboardIR));
-    findings.push(...checkVersionLeadingZero(keyboardIR));
-    findings.push(...checkVersionVPrefix(keyboardIR));
-    findings.push(...checkIdContainsKeyboard(keyboardIR, input.kpsDisplayName));
-    findings.push(
-      ...checkDisplayNameUnderscore(keyboardIR, input.kpsDisplayName),
+    collect(checkVersionFormat(keyboardIR));
+    collect(checkVersionLeadingZero(keyboardIR));
+    collect(checkVersionVPrefix(keyboardIR));
+    collect(checkIdContainsKeyboard(keyboardIR, input.kpsDisplayName));
+    collect(
+      checkDisplayNameUnderscore(keyboardIR, input.kpsDisplayName),
     );
-    findings.push(...checkTargetsAnyAlone(keyboardIR));
-    findings.push(
-      ...checkTargetsMobileWithoutTouch(keyboardIR, hasTouchLayout),
+    collect(checkTargetsAnyAlone(keyboardIR));
+    collect(
+      checkTargetsMobileWithoutTouch(keyboardIR, hasTouchLayout),
     );
 
     // 7.5 — RALT chords vs the .kvks usealtgr flag.
-    findings.push(
-      ...checkRaltMissingUsealtgr(keyboardIR, input.kvks, input.kvksPath),
+    collect(
+      checkRaltMissingUsealtgr(keyboardIR, input.kvks, input.kvksPath),
     );
 
     // 7.9 — &BITMAP reference vs placeholder / package inventory.
-    findings.push(...checkBitmapPlaceholder(keyboardIR, filePaths));
+    collect(checkBitmapPlaceholder(keyboardIR, filePaths));
 
     // 12.4 — region 001 across IR tags + the .kps language list.
-    findings.push(
-      ...checkRegion001(
+    collect(
+      checkRegion001(
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
       ),
     );
 
     // 10.6 — any 3-digit M.49 region subtag across the same tag set.
-    findings.push(
-      ...checkNumericRegionTag(
+    collect(
+      checkNumericRegionTag(
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
       ),
     );
 
     // 12.2 — ISO 639-5 collective code as a tag's language subtag.
-    findings.push(
-      ...checkIso6395Collective(
+    collect(
+      checkIso6395Collective(
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
       ),
     );
 
     // 12.3 — numeric region without the contrastive attestation.
-    findings.push(
-      ...checkNumericRegionContrastive(
+    collect(
+      checkNumericRegionContrastive(
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
         input.contrastiveRegionAttested,
@@ -396,8 +392,8 @@ export function runCriteriaChecks(
 
     // 8.7 — a font family the keyboard uses with no bundled font of
     // that family (bundled families extracted at assembly time).
-    findings.push(
-      ...checkKpsFontMissing({
+    collect(
+      checkKpsFontMissing({
         ...(input.kvks !== undefined ? { kvks: input.kvks } : {}),
         ...(touchLayout !== undefined ? { touchLayout } : {}),
         bundledFamilies: input.kpsFontFamilies,
@@ -408,8 +404,8 @@ export function runCriteriaChecks(
     // 18.7 — mandated currency characters for the tags' regions must
     // be producible (regions without CLDR data are named
     // context-missing by the assembly, never guessed here).
-    findings.push(
-      ...checkMandatedCurrencyChars(
+    collect(
+      checkMandatedCurrencyChars(
         keyboardIR,
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
@@ -417,8 +413,8 @@ export function runCriteriaChecks(
     );
 
     // 7.4 — modifier-name consistency across .kmn / .kvks / touch.
-    findings.push(
-      ...checkModifierNamesConsistent({
+    collect(
+      checkModifierNamesConsistent({
         ir: keyboardIR,
         ...(input.kvks !== undefined ? { kvks: input.kvks } : {}),
         ...(touchLayout !== undefined ? { touchLayout } : {}),
@@ -431,8 +427,8 @@ export function runCriteriaChecks(
     // for that case — an undeclared list is not a disagreement (the
     // assembly names it context-missing instead).
     if (input.kpsTargets.length > 0) {
-      findings.push(
-        ...checkKpsTargetsMatch({
+      collect(
+        checkKpsTargetsMatch({
           ir: keyboardIR,
           kpsTargets: input.kpsTargets,
           kpsFileNames: input.kpsFileNames,

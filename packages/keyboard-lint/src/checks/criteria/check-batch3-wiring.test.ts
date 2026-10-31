@@ -14,7 +14,7 @@ import {
 
 describe("checkIso6395Collective (12.2)", () => {
   it("flags a collective code used as a language", () => {
-    const findings = checkIso6395Collective(["aus", "ewo-CM"], "demo");
+    const { findings } = checkIso6395Collective(["aus", "ewo-CM"], "demo");
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_ISO_639_5_LANG_CODE");
     expect(findings[0]!.message).toContain("aus");
@@ -23,30 +23,30 @@ describe("checkIso6395Collective (12.2)", () => {
 
   it("matches case-insensitively on the primary subtag only", () => {
     expect(primaryLanguageSubtag("AUS-AU")).toBe("aus");
-    expect(checkIso6395Collective(["AUS"], "demo")).toHaveLength(1);
+    expect(checkIso6395Collective(["AUS"], "demo").findings).toHaveLength(1);
     // A collective code in a non-primary position is not the language.
-    expect(checkIso6395Collective(["en-aus"], "demo")).toEqual([]);
+    expect(checkIso6395Collective(["en-aus"], "demo").findings).toEqual([]);
   });
 
   it("passes individual language codes", () => {
-    expect(checkIso6395Collective(["ewo", "fra", "eng-US"], "demo")).toEqual([]);
+    expect(checkIso6395Collective(["ewo", "fra", "eng-US"], "demo").findings).toEqual([]);
   });
 });
 
 describe("checkNumericRegionContrastive (12.3)", () => {
   it("flags a numeric region with no attestation", () => {
-    const findings = checkNumericRegionContrastive(["es-419"], "demo", false);
+    const { findings } = checkNumericRegionContrastive(["es-419"], "demo", false);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE");
   });
 
   it("passes a numeric region with the author's attestation", () => {
-    expect(checkNumericRegionContrastive(["es-419"], "demo", true)).toEqual([]);
+    expect(checkNumericRegionContrastive(["es-419"], "demo", true).findings).toEqual([]);
   });
 
   it("passes when no tag uses a numeric region, attested or not", () => {
-    expect(checkNumericRegionContrastive(["ewo-CM"], "demo", false)).toEqual([]);
-    expect(checkNumericRegionContrastive(["ewo-CM"], "demo", true)).toEqual([]);
+    expect(checkNumericRegionContrastive(["ewo-CM"], "demo", false).findings).toEqual([]);
+    expect(checkNumericRegionContrastive(["ewo-CM"], "demo", true).findings).toEqual([]);
   });
 });
 
@@ -77,12 +77,12 @@ describe("checkKpsFontMissing (8.7)", () => {
         kvks: kvks("Andika Afr"),
         bundledFamilies: ["andika afr"],
         keyboardId: "demo",
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
   it("flags a required family with no bundled font", () => {
-    const findings = checkKpsFontMissing({
+    const { findings } = checkKpsFontMissing({
       kvks: kvks("Andika Afr"),
       bundledFamilies: ["Charis SIL"],
       keyboardId: "demo",
@@ -98,10 +98,10 @@ describe("checkKpsFontMissing (8.7)", () => {
         kvks: kvks("Andika Afr"),
         bundledFamilies: [],
         keyboardId: "demo",
-      }),
+      }).findings,
     ).toHaveLength(1);
     expect(
-      checkKpsFontMissing({ kvks: kvks(), bundledFamilies: [], keyboardId: "demo" }),
+      checkKpsFontMissing({ kvks: kvks(), bundledFamilies: [], keyboardId: "demo" }).findings,
     ).toEqual([]);
   });
 });
@@ -131,7 +131,7 @@ describe("checkMandatedCurrencyChars (18.7)", () => {
   it("passes when the region's currency symbol is producible", () => {
     // Cameroon: XAF, symbol "FCFA" — all ASCII letters.
     expect(mandatedCurrencyGaps(irProducing("FCFA"), ["ewo-CM"])).toEqual([]);
-    expect(checkMandatedCurrencyChars(irProducing("FCFA"), ["ewo-CM"], "demo")).toEqual([]);
+    expect(checkMandatedCurrencyChars(irProducing("FCFA"), ["ewo-CM"], "demo").findings).toEqual([]);
   });
 
   it("flags the missing constituent characters by region", () => {
@@ -140,7 +140,7 @@ describe("checkMandatedCurrencyChars (18.7)", () => {
     expect(gaps).toHaveLength(1);
     expect(gaps[0]).toMatchObject({ region: "GH", currencyCode: "GHS", symbol: "GH₵" });
     expect(gaps[0]!.missingChars).toEqual(["₵"]);
-    const findings = checkMandatedCurrencyChars(irProducing("GH"), ["aka-GH"], "demo");
+    const { findings } = checkMandatedCurrencyChars(irProducing("GH"), ["aka-GH"], "demo");
     expect(findings[0]!.code).toBe("KM_LINT_MANDATED_CHAR_MISSING");
   });
 

@@ -25,8 +25,12 @@
 // PRESENT .kpj with no <Version> element (the pre-versioned project
 // shape) is outdated by construction for 1.10b and un-bumped for 2.7.
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 /** The current .kpj project-file format version (criterion 1.10's pin). */
 export const KPJ_CURRENT_FORMAT_VERSION = "2.0";
@@ -88,11 +92,13 @@ export interface KpjFacts {
 }
 
 /** 1.10b — the .kpj format version is older than the current format. */
-export function checkKpjFormatOutdated(facts: KpjFacts): LintFinding[] {
-  if (facts.kpjText === undefined || facts.kpjPath === undefined) return [];
+export function checkKpjFormatOutdated(facts: KpjFacts): CheckResult {
+  const code = "KM_LINT_KPJ_FORMAT_OUTDATED";
+  if (facts.kpjText === undefined || facts.kpjPath === undefined)
+    return checkPassed(code, ["No .kpj text supplied to check."]);
   const version = parseKpjFormatVersion(facts.kpjText);
   if (version === undefined) {
-    return [
+    return checkFailed(code, [
       criteriaFinding({
         code: "KM_LINT_KPJ_FORMAT_OUTDATED",
         file: facts.kpjPath,
@@ -100,31 +106,42 @@ export function checkKpjFormatOutdated(facts: KpjFacts): LintFinding[] {
           "The .kpj project file carries no <Options><Version> element — it predates the versioned project-file format.",
         hint: `Open the project in a current Keyman Developer so it is rewritten in the current format (<Version>${KPJ_CURRENT_FORMAT_VERSION}</Version>).`,
       }),
-    ];
+    ]);
   }
-  if (compareKpjVersions(version, KPJ_CURRENT_FORMAT_VERSION) >= 0) return [];
-  return [
+  if (compareKpjVersions(version, KPJ_CURRENT_FORMAT_VERSION) >= 0)
+    return checkPassed(code, [
+      `Format version "${version}" (current: ${KPJ_CURRENT_FORMAT_VERSION}).`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPJ_FORMAT_OUTDATED",
       file: facts.kpjPath,
       message: `The .kpj project file format version "${version}" is older than the current format "${KPJ_CURRENT_FORMAT_VERSION}".`,
       hint: `Open the project in a current Keyman Developer so it is rewritten at format version ${KPJ_CURRENT_FORMAT_VERSION}.`,
     }),
-  ];
+  ]);
 }
 
 /** 2.7 — the .kpj format version was bumped past the current format. */
-export function checkKpjVersionBumped(facts: KpjFacts): LintFinding[] {
-  if (facts.kpjText === undefined || facts.kpjPath === undefined) return [];
+export function checkKpjVersionBumped(facts: KpjFacts): CheckResult {
+  const code = "KM_LINT_KPJ_VERSION_BUMPED";
+  if (facts.kpjText === undefined || facts.kpjPath === undefined)
+    return checkPassed(code, ["No .kpj text supplied to check."]);
   const version = parseKpjFormatVersion(facts.kpjText);
-  if (version === undefined) return [];
-  if (compareKpjVersions(version, KPJ_CURRENT_FORMAT_VERSION) <= 0) return [];
-  return [
+  if (version === undefined)
+    return checkPassed(code, [
+      "No <Version> element: not bumped past the current format (outdated is 1.10b's finding).",
+    ]);
+  if (compareKpjVersions(version, KPJ_CURRENT_FORMAT_VERSION) <= 0)
+    return checkPassed(code, [
+      `Format version "${version}" (current: ${KPJ_CURRENT_FORMAT_VERSION}): not bumped.`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPJ_VERSION_BUMPED",
       file: facts.kpjPath,
       message: `The .kpj project file format version "${version}" is newer than the current format "${KPJ_CURRENT_FORMAT_VERSION}" — the file-format version must not be bumped with the keyboard version.`,
       hint: `Leave the .kpj <Options><Version> at the current file-format version (${KPJ_CURRENT_FORMAT_VERSION}); bump only the keyboard version.`,
     }),
-  ];
+  ]);
 }

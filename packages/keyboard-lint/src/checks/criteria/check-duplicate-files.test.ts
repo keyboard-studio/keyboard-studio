@@ -14,7 +14,7 @@ function vfsOf(files: Array<{ path: string; content: string | Uint8Array }>) {
 
 describe("checkDuplicateSourceFiles (1.9)", () => {
   it("flags the same basename with identical content at two paths", () => {
-    const findings = checkDuplicateSourceFiles(
+    const { findings } = checkDuplicateSourceFiles(
       vfsOf([
         { path: "source/help/kb.css", content: "img { width: 100%; }" },
         { path: "source/welcome/kb.css", content: "img { width: 100%; }" },
@@ -28,7 +28,7 @@ describe("checkDuplicateSourceFiles (1.9)", () => {
   });
 
   it("does not flag the same basename with different content", () => {
-    const findings = checkDuplicateSourceFiles(
+    const { findings } = checkDuplicateSourceFiles(
       vfsOf([
         { path: "source/help/kb.css", content: "a {}" },
         { path: "source/welcome/kb.css", content: "b {}" },
@@ -38,7 +38,7 @@ describe("checkDuplicateSourceFiles (1.9)", () => {
   });
 
   it("does not flag identical content under different basenames", () => {
-    const findings = checkDuplicateSourceFiles(
+    const { findings } = checkDuplicateSourceFiles(
       vfsOf([
         { path: "source/a.txt", content: "same" },
         { path: "source/b.txt", content: "same" },
@@ -49,7 +49,7 @@ describe("checkDuplicateSourceFiles (1.9)", () => {
 
   it("compares binary content byte-for-byte and matches basenames case-insensitively", () => {
     const bytes = new Uint8Array([1, 2, 3, 4]);
-    const findings = checkDuplicateSourceFiles(
+    const { findings } = checkDuplicateSourceFiles(
       vfsOf([
         { path: "source/Icon.ico", content: bytes },
         { path: "source/help/icon.ico", content: new Uint8Array([1, 2, 3, 4]) },
@@ -63,7 +63,7 @@ describe("checkDuplicateSourceFiles (1.9)", () => {
   });
 
   it("reports one finding per duplicate group", () => {
-    const findings = checkDuplicateSourceFiles(
+    const { findings } = checkDuplicateSourceFiles(
       vfsOf([
         { path: "a/x.txt", content: "1" },
         { path: "b/x.txt", content: "1" },

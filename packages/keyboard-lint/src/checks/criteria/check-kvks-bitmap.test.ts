@@ -37,7 +37,7 @@ function irPlain(): KeyboardIR {
 
 describe("checkRaltMissingUsealtgr (7.5)", () => {
   it("flags RALT chords when the .kvks lacks usealtgr", () => {
-    const findings = checkRaltMissingUsealtgr(
+    const { findings } = checkRaltMissingUsealtgr(
       irWithRalt(),
       kvks([{ shift: "", keys: [{ vkey: "K_A", label: "a" }] }], false),
       KVKS_PATH,
@@ -52,16 +52,16 @@ describe("checkRaltMissingUsealtgr (7.5)", () => {
         irWithRalt(),
         kvks([{ shift: "", keys: [{ vkey: "K_A", label: "a" }] }], true),
         KVKS_PATH,
-      ),
+      ).findings,
     ).toEqual([]);
   });
 
   it("passes when no rule uses RALT, and when there is no .kvks at all", () => {
     expect(
-      checkRaltMissingUsealtgr(irPlain(), kvks([], false), KVKS_PATH),
+      checkRaltMissingUsealtgr(irPlain(), kvks([], false), KVKS_PATH).findings,
     ).toEqual([]);
     expect(
-      checkRaltMissingUsealtgr(irWithRalt(), undefined, undefined),
+      checkRaltMissingUsealtgr(irWithRalt(), undefined, undefined).findings,
     ).toEqual([]);
   });
 });
@@ -72,25 +72,25 @@ describe("checkKvksBlank (7.16)", () => {
       checkKvksBlank(
         kvks([{ shift: "", keys: [{ vkey: "K_A", label: "a" }] }]),
         KVKS_PATH,
-      ),
+      ).findings,
     ).toEqual([]);
   });
 
   it("flags a .kvks with zero layers", () => {
-    const findings = checkKvksBlank(kvks([]), KVKS_PATH);
+    const { findings } = checkKvksBlank(kvks([]), KVKS_PATH);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KVKS_BLANK");
     expect(findings[0]!.message).toContain("blank");
   });
 
   it("flags a .kvks whose layers hold no keys", () => {
-    const findings = checkKvksBlank(kvks([{ shift: "", keys: [] }]), KVKS_PATH);
+    const { findings } = checkKvksBlank(kvks([{ shift: "", keys: [] }]), KVKS_PATH);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.message).toContain("0 key(s)");
   });
 
   it("flags a present-but-unparseable .kvks as blank/unreadable, distinctly worded", () => {
-    const findings = checkKvksBlank(undefined, KVKS_PATH);
+    const { findings } = checkKvksBlank(undefined, KVKS_PATH);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.message).toContain("could not be parsed");
   });
@@ -111,7 +111,7 @@ describe("checkBitmapPlaceholder (7.9)", () => {
       header: { keyboardId: "demo" },
       stores: [bitmapStore("qaa.ico")],
     });
-    const findings = checkBitmapPlaceholder(ir, ["source/demo.ico"]);
+    const { findings } = checkBitmapPlaceholder(ir, ["source/demo.ico"]);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_BITMAP_PLACEHOLDER");
     expect(findings[0]!.message).toContain("placeholder");
@@ -122,7 +122,7 @@ describe("checkBitmapPlaceholder (7.9)", () => {
       header: { keyboardId: "demo" },
       stores: [bitmapStore("demo.ico")],
     });
-    const findings = checkBitmapPlaceholder(ir, ["source/demo.kmn"]);
+    const { findings } = checkBitmapPlaceholder(ir, ["source/demo.kmn"]);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.message).toContain("no such .ico");
   });
@@ -133,11 +133,11 @@ describe("checkBitmapPlaceholder (7.9)", () => {
       stores: [bitmapStore("demo.ico")],
     });
     expect(
-      checkBitmapPlaceholder(ir, ["source/demo.kmn", "source/demo.ico"]),
+      checkBitmapPlaceholder(ir, ["source/demo.kmn", "source/demo.ico"]).findings,
     ).toEqual([]);
   });
 
   it("is silent when the keyboard declares no &BITMAP", () => {
-    expect(checkBitmapPlaceholder(irPlain(), [])).toEqual([]);
+    expect(checkBitmapPlaceholder(irPlain(), []).findings).toEqual([]);
   });
 });

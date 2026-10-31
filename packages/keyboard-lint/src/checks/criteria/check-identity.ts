@@ -11,7 +11,13 @@
 // second surface when the assembly supplies one and it differs.
 
 import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding, kmnPath } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 /** Display names to judge: the IR's &NAME plus a differing .kps name. */
 function displayNames(ir: KeyboardIR, kpsDisplayName?: string): string[] {
@@ -26,11 +32,14 @@ function displayNames(ir: KeyboardIR, kpsDisplayName?: string): string[] {
 export function checkIdContainsKeyboard(
   ir: KeyboardIR,
   kpsDisplayName?: string,
-): LintFinding[] {
-  const findings: LintFinding[] = [];
+): CheckResult {
+  const code = "KM_LINT_ID_CONTAINS_KEYBOARD";
+  const checked: string[] = [];
+  const offenderFindings: LintFinding[] = [];
   const id = ir.header.keyboardId;
+  checked.push(`ID: ${id}`);
   if (/keyboard/i.test(id)) {
-    findings.push(
+    offenderFindings.push(
       criteriaFinding({
         code: "KM_LINT_ID_CONTAINS_KEYBOARD",
         file: kmnPath(id),
@@ -40,8 +49,9 @@ export function checkIdContainsKeyboard(
     );
   }
   for (const name of displayNames(ir, kpsDisplayName)) {
+    checked.push(`display name: "${name}"`);
     if (/keyboard/i.test(name)) {
-      findings.push(
+      offenderFindings.push(
         criteriaFinding({
           code: "KM_LINT_ID_CONTAINS_KEYBOARD",
           file: kmnPath(id),
@@ -51,22 +61,33 @@ export function checkIdContainsKeyboard(
       );
     }
   }
-  return findings;
+  if (offenderFindings.length > 0) return checkFailed(code, offenderFindings);
+  return checkPassed(code, [`Checked ${checked.join("; ")}: no "keyboard".`]);
 }
 
 /** 7.7a — the display name contains no literal underscore characters. */
 export function checkDisplayNameUnderscore(
   ir: KeyboardIR,
   kpsDisplayName?: string,
-): LintFinding[] {
-  return displayNames(ir, kpsDisplayName)
-    .filter((name) => name.includes("_"))
-    .map((name) =>
-      criteriaFinding({
-        code: "KM_LINT_DISPLAY_NAME_UNDERSCORE",
-        file: kmnPath(ir.header.keyboardId),
-        message: `Display name "${name}" contains a literal underscore.`,
-        hint: "Use spaces instead of underscores in the display name.",
-      }),
+): CheckResult {
+  const code = "KM_LINT_DISPLAY_NAME_UNDERSCORE";
+  const names = displayNames(ir, kpsDisplayName);
+  if (names.length === 0)
+    return checkPassed(code, ["No display name declared to check."]);
+  const offenders = names.filter((name) => name.includes("_"));
+  if (offenders.length > 0)
+    return checkFailed(
+      code,
+      offenders.map((name) =>
+        criteriaFinding({
+          code: "KM_LINT_DISPLAY_NAME_UNDERSCORE",
+          file: kmnPath(ir.header.keyboardId),
+          message: `Display name "${name}" contains a literal underscore.`,
+          hint: "Use spaces instead of underscores in the display name.",
+        }),
+      ),
     );
+  return checkPassed(code, [
+    `Checked display name(s): ${names.map((n) => `"${n}"`).join(", ")} — no underscores.`,
+  ]);
 }
