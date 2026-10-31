@@ -66,7 +66,7 @@ export interface CriterionRowProps {
    * GitHub link context: when present, "File: <path>" evidence lines become
    * links to the file at the pinned sha (open in new tab).
    */
-  githubLink?: { owner: string; repo: string; sha: string } | null;
+  githubLink?: { owner: string; repo: string; sha: string; path: string } | null;
   /**
    * /review severity override ("met" | "warning" | "error"), set by the
    * health report. When present, the status label is color-coded.
@@ -217,10 +217,13 @@ export function CriterionRow({
     };
 
     if (githubLink) {
-      const m = /^File: (.+)$/.exec(line);
+      const m = /^File: ([^#]+)(#L(\d+))?$/.exec(line);
       if (m) {
-        const path = m[1]!;
-        const url = `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${path}`;
+        const filePath = m[1]!;
+        const lineAnchor = m[2] ?? "";
+        // Prepend the keyboard's repo-relative folder to get the full path
+        const fullPath = `${githubLink.path}/${filePath}`;
+        const url = `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${fullPath}${lineAnchor}`;
         return (
           <>
             File:{" "}
@@ -230,7 +233,7 @@ export function CriterionRow({
               rel="noopener noreferrer"
               style={{ color: ACCENT, fontFamily: FONT_MONO, fontSize: 12 }}
             >
-              {path}
+              {filePath}
             </a>
           </>
         );
