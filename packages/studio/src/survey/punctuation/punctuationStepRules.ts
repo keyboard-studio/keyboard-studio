@@ -44,6 +44,11 @@ export function punctuationTier(inventory: ExemplarInventory | null): string[] {
 /** What the working copy already types, or null with no working copy. */
 export type PunctuationBaseCoverage = ReturnType<typeof startPunctuationCoverage>;
 
+/** What the working copy already types; null with no working copy (the step's `baseCoverage`). */
+export function baseCoverageOf(ir: Parameters<typeof startPunctuationCoverage>[0] | null): PunctuationBaseCoverage | null {
+  return ir === null ? null : startPunctuationCoverage(ir);
+}
+
 /**
  * FR-023: a phase-C confirmedInventory already on the session means the author
  * confirmed this step; their decision stands, but only for the evidence it was

@@ -24,7 +24,7 @@ import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
-import { resolveTypedLanguage } from "./resolveTypedLanguage.ts";
+import { languageResultsFor, resolveTypedLanguage } from "./resolveTypedLanguage.ts";
 import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
 import { interpolate } from "./interpolate.ts";
 
@@ -363,7 +363,7 @@ function LangtagsComboboxField({
         // is undefined.)
         const current = latestValueRef.current;
         if (current.trim() !== "") {
-          const results = current.trim() ? mod.lookupByName(current) : mod.listLanguages();
+          const results = languageResultsFor(mod, current);
           setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
           resolveTyped(current, results);
         }
@@ -403,7 +403,7 @@ function LangtagsComboboxField({
     onChange(text);
     const mod = modRef.current;
     if (mod === null) return;
-    const results = text.trim() ? mod.lookupByName(text) : mod.listLanguages();
+    const results = languageResultsFor(mod, text);
     setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
     resolveTyped(text, results);
   }
@@ -412,7 +412,7 @@ function LangtagsComboboxField({
     const mod = modRef.current;
     if (mod === null) return;
     const cur = strVal.trim();
-    const results = cur ? mod.lookupByName(cur) : mod.listLanguages();
+    const results = languageResultsFor(mod, cur);
     setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
   }
 

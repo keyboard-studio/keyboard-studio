@@ -59,7 +59,8 @@ describe.skipIf(!sc004GatesEnabled)("decision-point fixtures", () => {
           });
 
           for (const gate of GATES) {
-            const owner = ownerOf(b.base, point, gate);
+            // The replay walks no touch step, so walk-only rows do not apply here.
+            const owner = ownerOf(b.base, point, gate, { walked: false });
             const check = (): void => {
               const r = fx.gates.find((g) => g.gate === gate);
               expect(r, `no ${gate} result`).toBeDefined();

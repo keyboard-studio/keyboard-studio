@@ -107,7 +107,7 @@ export interface RunFailure {
   detail: string;
 }
 
-export type DisplacementAction = "confirm-move" | "keep-both" | "leave";
+export type DisplacementAction = "confirm-move" | "keep-both" | "leave" | "demote-displaced";
 
 export interface RunReport {
   steps: PolicyStep[];
@@ -117,6 +117,8 @@ export interface RunReport {
   skippedSteps: { step: string; reason: string }[];
   /** Gate failures spec 106's KNOWN_GAPS already owns. */
   knownGaps: { gate: GateId; owner: string }[];
+  /** Playwright-only decisions this run does not cover (FR-042); ids from playwrightOnly.ts. */
+  notCovered: string[];
   /** The store default used (FR-060); not in any decision value or the record. */
   fallbackPolicy: string;
   timingMs: { author: number; replay: number };

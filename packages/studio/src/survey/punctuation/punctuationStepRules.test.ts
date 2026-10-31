@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PUNCTUATION_INVENTORY_ANSWER_ID,
   PUNCTUATION_STEP_ID,
+  baseCoverageOf,
   completePunctuation,
   isPunctuationAlreadyConfirmed,
   isPunctuationChar,
@@ -39,5 +40,11 @@ describe("isPunctuationChar", () => {
   it("accepts punctuation and rejects letters", () => {
     expect(isPunctuationChar(".")).toBe(true);
     expect(isPunctuationChar("a")).toBe(false);
+  });
+});
+
+describe("baseCoverageOf", () => {
+  it("is null with no working copy", () => {
+    expect(baseCoverageOf(null)).toBeNull();
   });
 });

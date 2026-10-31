@@ -58,7 +58,7 @@ export const inventoryStepsInventory: readonly InventoryEntry[] = [
   { fn: "PUNCTUATION_STEP_ID", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
   { fn: "PUNCTUATION_INVENTORY_ANSWER_ID", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
   { fn: "punctuationKey", module: "steps/evidence.ts", callers: [PUNCTUATION_STEP] },
-  { fn: "startPunctuationCoverage", module: "@keyboard-studio/engine", callers: [PUNCTUATION_STEP] },
+  { fn: "baseCoverageOf", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
   // --- invisibles ---
   { fn: "invisiblesCandidates", module: INVISIBLES_RULES, callers: [INVISIBLES_STEP] },
   { fn: "invisiblesCarriedOver", module: INVISIBLES_RULES, callers: [INVISIBLES_STEP] },

@@ -47,3 +47,15 @@ export function resolveTypedLanguage(
   const byAlias = results.filter(aliasMatch);
   return byAlias.length === 1 ? byAlias[0]! : null;
 }
+
+/**
+ * The matches the name picker lists for what is typed: ranked name matches for
+ * non-blank text, the full language list for blank text. `mod` is the loaded
+ * langtags module.
+ */
+export function languageResultsFor<R>(
+  mod: { lookupByName: (text: string) => R; listLanguages: () => R },
+  text: string,
+): R {
+  return text.trim() ? mod.lookupByName(text) : mod.listLanguages();
+}

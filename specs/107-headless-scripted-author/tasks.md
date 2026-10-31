@@ -186,9 +186,9 @@ reporting a missing lift. Stop and lift (FR-040) or list it (FR-042); never writ
 
 **Independent Test**: the audit table is complete and SC-006 evidence is recorded.
 
-- [ ] T064 [US5] Audit every driver in `HA/stepDrivers/` for logic reached through a component or hook rather than a lifted function, and for any branch, constant or computed value the UI does not have (FR-013, FR-017); lift any found (same rules as T018-T024)
-- [ ] T065 [US5] Add a "Playwright-only" table (rule, component, reason) to the header comment of `HA/runAuthorCase.ts` for any rule that cannot be lifted without a behaviour change, and mark those decisions as not covered in the run report (FR-042); empty table if none
-- [ ] T066 [US5] Extend `HA/driftGuard.ts` with every lifted function and its component caller (T018-T024, T064)
+- [X] T064 [US5] Audit every driver in `HA/stepDrivers/` for logic reached through a component or hook rather than a lifted function, and for any branch, constant or computed value the UI does not have (FR-013, FR-017); lift any found (same rules as T018-T024) **As built**: 3 more lifts: `languageResultsFor` (survey/resolveTypedLanguage.ts, QuestionField's 3 sites), `baseCoverageOf` (punctuationStepRules.ts), `displacementOutcomeFor` (mechanismPlacement.ts, MechanismGallery's displacement handlers). One open finding, not lifted: the mechanism driver's companion -> record -> displacement -> companion order restates MechanismGallery's inline `plan.*` sequences (3 sites, through hook state); parity covers it on the 4 records.
+- [X] T065 [US5] Add a "Playwright-only" table (rule, component, reason) to the header comment of `HA/runAuthorCase.ts` for any rule that cannot be lifted without a behaviour change, and mark those decisions as not covered in the run report (FR-042); empty table if none **As built**: 15 rules, as data in `HA/playwrightOnly.ts`; the run report's `notCovered` lists them (FR-042); a test keeps the header table and the data in step.
+- [X] T066 [US5] Extend `HA/driftGuard.ts` with every lifted function and its component caller (T018-T024, T064) **As built**: every lift is inventoried with a production caller; `analyseWorkingCopyContextTolerance` is reached through the inventoried `runContextToleranceAnalysis` (no author file imports it, so the two-sided rule cannot list it).
 - [ ] T067 [US5] SC-006: run the golden walk in verify mode (`npx playwright test e2e/golden-walk.spec.ts`) and the touched components' tests; 0 re-baselines; record the result in the phase commit message
 
 ---
@@ -200,8 +200,8 @@ reporting a missing lift. Stop and lift (FR-040) or list it (FR-042); never writ
 **Independent Test**: G6 reported for `sil_cameroon_qwerty`/`sil_cameroon_azerty`, not applicable for `bj_cree_woods`.
 
 - [X] T068 [US6] Touch-seed driver in `HA/stepDrivers/touchSeed.ts`: `deriveSeedLayout` (`lib/buildTouchLayoutJson.ts:169`) and the seed-source step's default (FR-050) **As built**: landed with Phase 3: the Phase F coverage gate reads the touch layout, so US1 needs a real touch step.
-- [ ] T069 [US6] Report G6 as `not-applicable` (not passed) when the copied keyboard has no touch layout, in `HA/runAuthorCase.ts`
-- [ ] T070 [US6] Tests in `HA/authorCase.corpus.test.ts`: G6 evaluated on a touch-layout keyboard; `not-applicable` on `bj_cree_woods`
+- [X] T069 [US6] Report G6 as `not-applicable` (not passed) when the copied keyboard has no touch layout, in `HA/runAuthorCase.ts` **As built**: keyed on the copied keyboard's shipped touch file (`copiedKeyboardHasTouch` in stepDrivers/touchSeed.ts); the replay now installs the walk's touch layout, so G6 is evaluated at all.
+- [X] T070 [US6] Tests in `HA/authorCase.corpus.test.ts`: G6 evaluated on a touch-layout keyboard; `not-applicable` on `bj_cree_woods` **As built**: G6 applicable on chechen_latin, not-applicable on bj_cree_woods. Evaluating G6 found it failing on every touch-bearing keyboard (default-layer labels only, no starting-content split): a walk-only KNOWN_GAPS row owned by its issue, which the decision-point replay (no touch step) does not apply.
 
 ---
 

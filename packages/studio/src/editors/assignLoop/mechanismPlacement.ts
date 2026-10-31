@@ -44,6 +44,7 @@ import {
   mechanismSlotEntries,
   orthographyTier,
   slotKeyFor,
+  type DisplacementAction,
   type NeedSets,
   type SlotOccupant,
 } from "../../survey/slotOccupancy.ts";
@@ -482,6 +483,33 @@ export function bothCoreDemoteAssignments(
   });
   if (demotion === null) return null;
   return [...sessionAssignments, demotion];
+}
+
+/**
+ * What one displacement banner action does (the action names come from
+ * `displacementActions`): confirm-move and the both-core demotion override
+ * record assignments (null when the proposal is stale or records nothing);
+ * keep-both and leave are the recorded dismissal.
+ */
+export type DisplacementOutcome =
+  | { kind: "record"; next: MechanismAssignment[] | null }
+  | { kind: "dismiss" };
+
+export function displacementOutcomeFor(
+  action: DisplacementAction,
+  proposal: DisplacementProposal,
+  sessionAssignments: MechanismAssignment[],
+  workingIr: KeyboardIR | null,
+): DisplacementOutcome {
+  switch (action) {
+    case "confirm-move":
+      return { kind: "record", next: displacementConfirmAssignments(proposal, sessionAssignments, workingIr) };
+    case "demote-displaced":
+      return { kind: "record", next: bothCoreDemoteAssignments(proposal, sessionAssignments, workingIr) };
+    case "keep-both":
+    case "leave":
+      return { kind: "dismiss" };
+  }
 }
 
 // ---------------------------------------------------------------------------

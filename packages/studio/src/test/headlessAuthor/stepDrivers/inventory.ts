@@ -34,7 +34,6 @@
 // journey strip (no decision reads them), the character map pane, and the
 // flagged-additions Next gate (never blocks the build list).
 
-import { startPunctuationCoverage } from "@keyboard-studio/engine";
 import { alphabetKeyOf, punctuationKey } from "../../../steps/evidence.ts";
 import { deriveIdentityResult, deriveSurveyContext } from "../../../decisions/identitySelectors.ts";
 import { getDecisionSnapshot } from "../../../stores/decisionStore.ts";
@@ -75,6 +74,7 @@ import { resolveSourcedExemplars } from "../../../survey/sourcedExemplarsLookup.
 import {
   PUNCTUATION_INVENTORY_ANSWER_ID,
   PUNCTUATION_STEP_ID,
+  baseCoverageOf,
   completePunctuation,
   isPunctuationAlreadyConfirmed,
   seedPunctuationProposals,
@@ -231,7 +231,7 @@ async function drivePunctuation(ctx: DriverContext): Promise<unknown> {
   });
   seedPunctuationProposals({
     inventory,
-    baseCoverage: wc.ir === null ? null : startPunctuationCoverage(wc.ir),
+    baseCoverage: baseCoverageOf(wc.ir),
     startKeyboardId: wc.startKeyboard?.id,
     alreadyConfirmed,
     seedProposals: inventoryOps(PUNCTUATION_STEP_ID).seedProposals,

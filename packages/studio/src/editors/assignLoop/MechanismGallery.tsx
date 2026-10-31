@@ -153,13 +153,12 @@ import { buildRationaleLine } from "../../survey/placementRationale.ts";
 import { preselectMethod } from "./suggestionOrder.ts";
 import {
   baseOnlyProducedSetFor,
-  bothCoreDemoteAssignments,
   buildDeadkeyBaseLetterResolveOptions,
   buildNeedSets,
   canGoNextFor,
   companionConfirmAssignments,
+  displacementOutcomeFor,
   dismissedSuggestionEntryKey,
-  displacementConfirmAssignments,
   excludeSequenceMechanisms,
   placementOffer,
   placementWalkList,
@@ -2652,37 +2651,28 @@ export function MechanismGallery({
    * assignment must still be present by reference, or the proposal is
    * dismissed and nothing is recorded. (The both-core proposal never
    * reaches this handler — its confirm is "Keep both", a dismissal; its
-   * demotion override is handleBothCoreDemoteOverride below.) What is
+   * demotion override is the second banner action, below.) What is
    * recorded comes from the lifted confirm (mechanismPlacement.ts).
    */
-  const handleDisplacementConfirm = useCallback(() => {
-    if (pendingDisplacement === null) return;
-    const next = displacementConfirmAssignments(pendingDisplacement, sessionAssignments, workingIr);
-    if (next !== null) recordAssignments(next);
-    clearDisplacement();
-  }, [pendingDisplacement, sessionAssignments, workingIr, recordAssignments, clearDisplacement]);
-
-  /**
-   * Both-core explicit author override: the author chose to demote the
-   * displaced core glyph anyway (the banner's non-default choice). This
-   * is never the default button — the default keeps both primaries.
-   */
-  const handleBothCoreDemoteOverride = useCallback(() => {
-    if (pendingDisplacement === null) return;
-    const next = bothCoreDemoteAssignments(pendingDisplacement, sessionAssignments, workingIr);
-    if (next !== null) recordAssignments(next);
-    clearDisplacement();
-  }, [pendingDisplacement, sessionAssignments, workingIr, recordAssignments, clearDisplacement]);
-
-  // Each displacement action (survey/slotOccupancy.ts displacementActions)
-  // bound to its handler. "keep-both" and "leave" are both the recorded
-  // dismissal; the banner's two buttons take the first and second action.
-  const displacementHandlers: Record<DisplacementAction, () => void> = {
-    "confirm-move": handleDisplacementConfirm,
-    "keep-both": dismissDisplacement,
-    "demote-displaced": handleBothCoreDemoteOverride,
-    leave: dismissDisplacement,
-  };
+  // The banner's two buttons take the first and second action of
+  // displacementActions. What each action records (or that it is the recorded
+  // dismissal) is the lifted displacementOutcomeFor (mechanismPlacement.ts);
+  // confirm-move and the both-core demotion override (never the default
+  // button, which keeps both primaries) clear the proposal, keep-both and
+  // leave dismiss it.
+  const resolveDisplacementAction = useCallback(
+    (action: DisplacementAction) => {
+      if (pendingDisplacement === null) return;
+      const outcome = displacementOutcomeFor(action, pendingDisplacement, sessionAssignments, workingIr);
+      if (outcome.kind === "dismiss") {
+        dismissDisplacement();
+        return;
+      }
+      if (outcome.next !== null) recordAssignments(outcome.next);
+      clearDisplacement();
+    },
+    [pendingDisplacement, sessionAssignments, workingIr, recordAssignments, clearDisplacement, dismissDisplacement],
+  );
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -3980,11 +3970,11 @@ export function MechanismGallery({
                 // frequency data); demoting the displaced glyph is the
                 // explicit override on the other button. Every other
                 // direction confirms the demotion / dismisses as usual.
-                onConfirm={
-                  displacementHandlers[displacementActions(pendingDisplacement.direction)[0]]
+                onConfirm={() =>
+                  resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[0])
                 }
-                onDismiss={
-                  displacementHandlers[displacementActions(pendingDisplacement.direction)[1]]
+                onDismiss={() =>
+                  resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[1])
                 }
               />
             )}

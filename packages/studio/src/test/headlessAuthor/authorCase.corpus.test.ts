@@ -306,3 +306,30 @@ describe.skipIf(!sc004GatesEnabled || (ONE !== undefined && ONE !== AZERTY_ID))(
     });
   },
 );
+
+// ---- T070 / US6, FR-050: G6 on the headless bundle ----
+
+// One run per keyboard, shared across the assertions. chechen_latin ships a touch layout;
+// bj_cree_woods ships none (both are inline PR-set cases).
+describe.skipIf(!sc004GatesEnabled || ONE !== undefined)("headless author: G6 follows the copied keyboard's touch layout (T070)", () => {
+  let withTouch: AuthorRun;
+  let withoutTouch: AuthorRun;
+  beforeAll(async () => {
+    withTouch = await runAuthorCase(caseById("pr-whole-chechen-latin"));
+    withoutTouch = await runAuthorCase(caseById("pr-whole-cree-woods"));
+  }, RUN_TIMEOUT * 2);
+
+  it("evaluates G6 (applicable) on a keyboard with a touch layout", () => {
+    expect(withTouch.outcome, JSON.stringify(withTouch.failure)).toBe("completed");
+    const g6 = withTouch.gates.find((g) => g.gate === "G6");
+    expect(g6, "G6 is reported").toBeDefined();
+    expect(g6?.applicable, `G6 detail: ${JSON.stringify(g6?.detail)}`).toBe(true);
+  });
+
+  it("reports G6 as not applicable, not passed, on a keyboard with no touch layout", () => {
+    expect(withoutTouch.outcome, JSON.stringify(withoutTouch.failure)).toBe("completed");
+    const g6 = withoutTouch.gates.find((g) => g.gate === "G6");
+    expect(g6, "G6 is reported").toBeDefined();
+    expect(g6?.applicable).toBe(false);
+  });
+});

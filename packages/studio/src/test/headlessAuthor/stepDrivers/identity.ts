@@ -19,7 +19,7 @@ import { getDecisionSnapshot } from "../../../stores/decisionStore.ts";
 import { deriveSurveyContext } from "../../../decisions/identitySelectors.ts";
 import { flowSources, loadFlowSourceDef } from "../../../steps/flowSources.ts";
 import { createIdentityResolution } from "../../../survey/identityResolution.ts";
-import { resolveTypedLanguage } from "../../../survey/resolveTypedLanguage.ts";
+import { languageResultsFor, resolveTypedLanguage } from "../../../survey/resolveTypedLanguage.ts";
 import { attributionOptions, projectNameOptions } from "../../../editors/adapters/flowStepOptionRecords.ts";
 import { completeFlow, completeFlowStep, type FlowChoices } from "./flowStep.ts";
 import type { StepDrivers } from "./types.ts";
@@ -46,7 +46,7 @@ export const identityDrivers: StepDrivers = {
       typed: (question, text) => {
         // The language-name picker resolves what is typed to one entry (or none).
         if (question.options_source !== "@langtags_names" || typeof text !== "string") return;
-        const results = text.trim() ? langtags.lookupByName(text) : langtags.listLanguages();
+        const results = languageResultsFor(langtags, text);
         resolution.onEntryResolved(
           question.id,
           resolveTypedLanguage(text, results, (code) => langtags.getLanguageDefaults(code)?.englishNames),

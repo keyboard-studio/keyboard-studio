@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import type { AuthorRun, PolicyStep, RunReport } from "./caseTypes.ts";
+import { NOT_COVERED } from "./playwrightOnly.ts";
 
 export interface RunReportAccumulator {
   report: RunReport;
@@ -23,6 +24,7 @@ export function createRunReport(fallbackPolicy: string): RunReportAccumulator {
     displacements: [],
     skippedSteps: [],
     knownGaps: [],
+    notCovered: [...NOT_COVERED],
     fallbackPolicy,
     timingMs: { author: 0, replay: 0 },
   };

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { LanguageSummary } from "@keyboard-studio/contracts";
-import { resolveTypedLanguage } from "./resolveTypedLanguage.ts";
+import { languageResultsFor, resolveTypedLanguage } from "./resolveTypedLanguage.ts";
 
 const row = (code: string, englishName: string): LanguageSummary => ({ code, englishName }) as LanguageSummary;
 
@@ -33,5 +33,14 @@ describe("resolveTypedLanguage", () => {
   it("treats NFC and NFD spellings as the same name", () => {
     const hit = row("yo", "Yorùbá");
     expect(resolveTypedLanguage("Yorùbá".normalize("NFD"), [hit], none)).toBe(hit);
+  });
+});
+
+describe("languageResultsFor", () => {
+  const mod = { lookupByName: (t: string): string[] => [`name:${t}`], listLanguages: (): string[] => ["all"] };
+
+  it("looks up non-blank text and lists everything for blank text", () => {
+    expect(languageResultsFor(mod, "baf")).toEqual(["name:baf"]);
+    expect(languageResultsFor(mod, "  ")).toEqual(["all"]);
   });
 });

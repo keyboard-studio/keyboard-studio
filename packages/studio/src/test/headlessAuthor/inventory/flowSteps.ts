@@ -34,6 +34,7 @@ export const flowStepsInventory: readonly InventoryEntry[] = [
   // --- Identity (IdentityLite and the name picker) ---
   { fn: "createIdentityResolution", module: "survey/identityResolution.ts", callers: ["survey/IdentityLite.tsx"] },
   { fn: "resolveTypedLanguage", module: "survey/resolveTypedLanguage.ts", callers: ["survey/QuestionField.tsx"] },
+  { fn: "languageResultsFor", module: "survey/resolveTypedLanguage.ts", callers: ["survey/QuestionField.tsx"] },
   { fn: "loadLangtags", module: "lib/langtagsDefaults.ts", callers: ["survey/QuestionField.tsx"] },
   { fn: "deriveSurveyContext", module: "decisions/identitySelectors.ts", callers: ["editors/adapters/panelAdapters.tsx"] },
   // --- Windows layout ---

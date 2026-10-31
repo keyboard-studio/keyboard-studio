@@ -9,10 +9,7 @@ import { chooseByPolicy } from "../walkPolicy.ts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
 import { selectDesktopAssignments } from "../../../lib/unimplementedInventory.ts";
 import { displacementActions } from "../../../survey/slotOccupancy.ts";
-import {
-  bothCoreDemoteAssignments,
-  displacementConfirmAssignments,
-} from "../../../editors/assignLoop/mechanismPlacement.ts";
+import { displacementOutcomeFor } from "../../../editors/assignLoop/mechanismPlacement.ts";
 import {
   declineDisplacementProposal,
   type DisplacementProposal,
@@ -39,20 +36,9 @@ export function resolveDisplacement(ctx: DriverContext, proposal: DisplacementPr
   const store = useWorkingCopyStore.getState();
   const assignments = selectDesktopAssignments(store.phaseResults);
   const workingIr = store.ir ?? store.startIr;
-  if (action === "confirm-move") {
-    const next = displacementConfirmAssignments(proposal, assignments, workingIr);
-    if (next !== null) store.recordAssignments(next);
-  } else if (action === "demote-displaced") {
-    // The both-core override is the banner's second action; the walk takes the first.
-    const next = bothCoreDemoteAssignments(proposal, assignments, workingIr);
-    if (next !== null) store.recordAssignments(next);
-  } else {
-    // "keep-both" and "leave" are both the recorded dismissal.
-    declineDisplacementProposal(proposal);
-  }
-  if (action === "demote-displaced") {
-    throw new Error("displacement: the first banner action was the demotion override");
-  }
+  const outcome = displacementOutcomeFor(action, proposal, assignments, workingIr);
+  if (outcome.kind === "dismiss") declineDisplacementProposal(proposal);
+  else if (outcome.next !== null) store.recordAssignments(outcome.next);
   ctx.report.addDisplacement({
     char: proposal.incomingChar,
     key: proposal.vkey,

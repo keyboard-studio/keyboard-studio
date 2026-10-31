@@ -61,6 +61,13 @@ export interface DecisionPointFixtureSpec {
   point: DecisionPoint;
   /** Already cut at `point` (see recordToDecisionSet). */
   decisions: DecisionSet;
+  /**
+   * The touch layout the touch step left in the working copy (spec 107 FR-050): the
+   * replay does not reproduce that step, so a caller that walked it passes the result
+   * (null when the step emitted nothing). When given, the projection carries it and
+   * G6 is evaluated on the bundle; absent, G6 stays walk-only.
+   */
+  touchLayoutJson?: string | null;
 }
 
 export interface DecisionPointFixture {
@@ -211,6 +218,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
 
   // 5. install what replay leaves elsewhere.
   installUnreplayedSlices(spec.decisions);
+  if (spec.touchLayoutJson !== undefined) useWorkingCopyStore.getState().setTouchLayoutJson(spec.touchLayoutJson);
   const toleranceStaleSiteIds = spec.point === "tolerance" ? await installToleranceOverlay(spec.decisions) : undefined;
 
   // 6. the real download path.
@@ -239,6 +247,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     decisions: spec.decisions,
     point: spec.point,
     startIr,
+    ...(spec.touchLayoutJson !== undefined ? { includeTouch: true } : {}),
     ...(again !== null ? { repeatVfs: again.vfs } : {}),
   });
 

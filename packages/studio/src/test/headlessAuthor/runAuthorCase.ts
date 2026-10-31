@@ -30,7 +30,27 @@
 // spec 106's replay (buildDecisionPointFixture: rebuild, download path,
 // compile, gates), the one projection (FR-005).
 //
-// Playwright-only (FR-042): none yet.
+// Playwright-only (FR-042): decisions the author cannot reach without a
+// behaviour change. Data lives in playwrightOnly.ts; every run report names
+// these rules as `notCovered`, and playwrightOnly.test.ts keeps this table in
+// step with it.
+//
+// | rule | component | reason |
+// | intro-manual-path | survey/PhaseB.tsx (IntroChooser) | the manual flow fills no inventory draft; the author takes the build-list path the chooser pre-selects |
+// | escape-banner-toggles | editors/assignLoop/DeadkeyEscapesBanner.tsx | checkbox edits to a placed deadkey's trigger escapes are free-form edits with no proposal to accept |
+// | mark-for-later-review | editors/assignLoop/MechanismGallery.tsx | defers a character instead of placing it; the author always places |
+// | manual-s08-pickers | editors/assignLoop/MechanismGallery.tsx | the layer-token and custom-character key pickers are free-form entry, not a proposal |
+// | deadkey-card-prefill | editors/assignLoop/MechanismGallery.tsx | a chip that only prefills the deadkey card for a manual Apply; the walk dismisses it and takes the next offer |
+// | back-next-unlock | components/StepHost.tsx, editors/assignLoop/MechanismGallery.tsx, survey/convenience/ConvenienceCharsStep.tsx | the author only moves forward; Back, the pop navigation branch and unlocking a completed step are navigation state |
+// | existing-method-removal | editors/assignLoop/MechanismGallery.tsx | removing a method the copied keyboard already has is a deliberate edit with no proposal |
+// | touch-case-pair-proposal | editors/assignLoop/TouchGallery.tsx | raised only by a touch key edit; the touch step completes with no edits |
+// | oauth-author-seed | editors/adapters/flowStepDeps.ts (authenticated-profile hook) | needs a connected GitHub session; the author is a guest |
+// | rebase-confirm-prompt | survey/chooseStart/confirmStartKeyboard.ts (window.confirm) | a browser dialog; the author starts from a clean working copy so it never fires |
+// | language-region-pick | survey/SurveyRunner.tsx (il_language_region, routed by identityResolution) | asked only for a region-ambiguous language, as a free pick among its regions; a case names no region, so the author leaves it blank |
+// | debug-pin-chip | survey/SurveyRunner.tsx (debugPinsStore) | a debug-only affordance that pins a question's value, not part of an author's decisions |
+// | help-docs-dialog | editors/adapters/PhaseFGate.tsx (ConfirmDialog) | a blocking dialog over the help-docs content; dismissing it records nothing |
+// | documentation-fix-proposals | components/DocumentationFixProposals.tsx | per-finding fix proposals applied by button; no walk policy accepts them |
+// | more-detail-gate-yes | survey/questions/f (pf_more_detail_gate) | answering Yes opens extra Phase F questions; the author keeps the lookup default (No) |
 
 import type { DecisionPoint } from "../decisionPointBases.ts";
 import { manifest } from "../../steps/manifest.ts";
@@ -51,6 +71,7 @@ import {
   type DecisionPointFixtureSpec,
   type StartingPoint,
 } from "../decisionPointFixture.ts";
+import type { GateResult } from "../consistencyGates.ts";
 import { ownerOf } from "../decisionPointKnownGaps.fixture.ts";
 import type { AuthorRun, Case } from "./caseTypes.ts";
 import { eligibility, type EligibilityDeps, type Slice } from "./eligibility.ts";
@@ -67,7 +88,7 @@ import { marksDrivers } from "./stepDrivers/marks.ts";
 import { convenienceDrivers } from "./stepDrivers/convenience.ts";
 import { carveDrivers } from "./stepDrivers/carve.ts";
 import { mechanismDrivers } from "./stepDrivers/mechanism.ts";
-import { touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
+import { copiedKeyboardHasTouch, touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
 
 export interface AuthorRunOptions {
@@ -77,7 +98,15 @@ export interface AuthorRunOptions {
   stopAfter?: DecisionPoint;
   /** Overrides for eligibility's corpus lookups (tests inject a keyboard the corpus lacks). */
   eligibilityDeps?: EligibilityDeps;
+  /** Called as each step starts (the sweep records it so a killed shard names where it was). */
+  onStep?: (step: string) => void;
 }
+
+/** KS_AUTHOR_TRACE=1: `[TRACE] <case> step <id> start|end <ms>` on stderr (a hung step shows as a start with no end). */
+const TRACE = process.env.KS_AUTHOR_TRACE === "1";
+const trace = (caseId: string, step: string, edge: "start" | "end", ms: number): void => {
+  process.stderr.write(`[TRACE] ${caseId} step ${step} ${edge} ${Math.round(ms)}\n`);
+};
 
 /** Dispatch by manifest step id. Which step comes next is the routing's call, never this table's. */
 const DRIVERS: StepDrivers = {
@@ -100,7 +129,7 @@ const MAX_STEP_VISITS = 64;
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-async function walk(base: DriverContext, point: StartingPoint): Promise<void> {
+async function walk(base: DriverContext, point: StartingPoint, onStep?: (step: string) => void): Promise<void> {
   // One recorder, as StudioShell holds one: the reducer deps record each
   // completion through it and drivers record each non-final Next (per-screen
   // answers, the base contribution) through the same instance.
@@ -123,6 +152,9 @@ async function walk(base: DriverContext, point: StartingPoint): Promise<void> {
       throw new StepFailure({ step, kind: "step-blocked", detail: `no driver for step "${step}"` });
     }
 
+    onStep?.(step);
+    const t0 = performance.now();
+    if (TRACE) trace(base.case.id, step, "start", t0);
     let result: unknown;
     try {
       result = await driver(ctx);
@@ -130,6 +162,7 @@ async function walk(base: DriverContext, point: StartingPoint): Promise<void> {
       if (e instanceof StepFailure) throw e;
       throw new StepFailure({ step, kind: "proposal-threw", detail: message(e) });
     }
+    if (TRACE) trace(base.case.id, step, "end", performance.now() - t0);
 
     const wc = useWorkingCopyStore.getState();
     const gate = deriveInventoryCoverageGate(wc);
@@ -157,6 +190,12 @@ async function walk(base: DriverContext, point: StartingPoint): Promise<void> {
   if (!committed) {
     throw new StepFailure({ step, kind: "step-blocked", detail: "the walk ended before the base and the track were both decided" });
   }
+}
+
+/** G6 is not applicable (never "passed") when the copied keyboard has no touch layout (FR-050). */
+function withTouchApplicability(g: GateResult, hasShippedTouch: boolean): GateResult {
+  if (g.gate !== "G6" || hasShippedTouch) return g;
+  return { gate: "G6", applicable: false, pass: true, detail: ["the copied keyboard has no touch layout"] };
 }
 
 export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promise<AuthorRun> {
@@ -190,19 +229,25 @@ export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promi
       return { ...base, outcome: "failed", failure: { step: "choose_base", kind: "scaffold-failed", detail: message(e) } };
     }
 
+    // Keyed on the copied keyboard's shipped touch file: a reseed emits a layout even
+    // for a keyboard that had none, so the projected package cannot answer this.
+    const hasShippedTouch = copiedKeyboardHasTouch(point.vfs);
+
     try {
-      await walk({ case: c, startIr: point.ir, report }, point);
+      await walk({ case: c, startIr: point.ir, report }, point, opts.onStep);
     } catch (e) {
       if (e instanceof StepFailure) return { ...base, outcome: "failed", failure: e.failure };
       throw e;
     }
     const decisions = getDecisionSnapshot();
     const record = readRunRecord();
+    // What the touch step left in the working copy, read before the replay resets the stores.
+    const touchLayoutJson = useWorkingCopyStore.getState().touchLayoutJson;
     const replayStart = performance.now();
 
     let fx;
     try {
-      fx = await buildDecisionPointFixture({ ...spec, decisions });
+      fx = await buildDecisionPointFixture({ ...spec, decisions, touchLayoutJson });
     } catch (e) {
       return {
         ...base,
@@ -214,12 +259,13 @@ export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promi
     }
     const end = performance.now();
     report.setTiming({ author: Math.round(replayStart - authorStart), replay: Math.round(end - replayStart) });
-    for (const g of fx.gates) {
+    const gates = fx.gates.map((g) => withTouchApplicability(g, hasShippedTouch));
+    for (const g of gates) {
       const owner = g.pass ? undefined : ownerOf(c.base, spec.point, g.gate);
       if (owner !== undefined) report.addKnownGap({ gate: g.gate, owner });
     }
 
-    return { ...base, outcome: "completed", record, decisions, bundle: fx.bundle, gates: fx.gates };
+    return { ...base, outcome: "completed", record, decisions, bundle: fx.bundle, gates };
   } finally {
     resetAuthorStores();
   }

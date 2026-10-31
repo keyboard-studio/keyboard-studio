@@ -47,7 +47,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { InventoryChar } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
-import { startPunctuationCoverage, computeInventoryDelta } from "@keyboard-studio/engine";
+import { computeInventoryDelta } from "@keyboard-studio/engine";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
@@ -66,6 +66,7 @@ import { useSourcedExemplars } from "../useSourcedExemplars.ts";
 import {
   PUNCTUATION_INVENTORY_ANSWER_ID,
   PUNCTUATION_STEP_ID,
+  baseCoverageOf,
   completePunctuation,
   isPunctuationAlreadyConfirmed,
   isPunctuationChar,
@@ -250,7 +251,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // base whose output is UNKNOWABLE (opaque fragments), not for a missing one.
   const ir = useWorkingCopyStore((s) => s.ir);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
-  const baseCoverage = useMemo(() => (ir === null ? null : startPunctuationCoverage(ir)), [ir]);
+  const baseCoverage = useMemo(() => baseCoverageOf(ir), [ir]);
   const baseCoverageIncomplete = baseCoverage === null || !baseCoverage.coverageComplete;
 
   const evidenceKey = punctuationKey(inventory?.resolvedTag, startKeyboard?.id);

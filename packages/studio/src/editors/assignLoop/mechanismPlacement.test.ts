@@ -8,6 +8,7 @@ import {
   companionConfirmAssignments,
   dismissedSuggestionEntryKey,
   displacementConfirmAssignments,
+  displacementOutcomeFor,
   excludeSequenceMechanisms,
   placementOffer,
   placementWalkList,
@@ -169,5 +170,40 @@ describe("displacementConfirmAssignments", () => {
 
   it("records nothing for a stale proposal", () => {
     expect(displacementConfirmAssignments(proposal, [], null)).toBeNull();
+  });
+});
+
+describe("displacementOutcomeFor", () => {
+  const base = swap("ŋ", "+ [K_X] > U+014B");
+  const proposal: DisplacementProposal = {
+    displacedChar: "x",
+    incomingChar: "ŋ",
+    vkey: "K_X",
+    modifiers: [],
+    demotionMethod: "ralt",
+    direction: "demote-incumbent",
+    baseAssignment: base,
+  };
+
+  it("confirm-move records what the confirm records", () => {
+    expect(displacementOutcomeFor("confirm-move", proposal, [base], null)).toEqual({
+      kind: "record",
+      next: displacementConfirmAssignments(proposal, [base], null),
+    });
+  });
+
+  it("the both-core demotion override records the displaced glyph's demotion", () => {
+    const outcome = displacementOutcomeFor("demote-displaced", { ...proposal, direction: "both-core" }, [base], null);
+    expect(outcome.kind).toBe("record");
+    expect(outcome.kind === "record" ? outcome.next?.[1]?.target : undefined).toBe("x");
+  });
+
+  it("keep-both and leave are the recorded dismissal", () => {
+    expect(displacementOutcomeFor("keep-both", proposal, [base], null)).toEqual({ kind: "dismiss" });
+    expect(displacementOutcomeFor("leave", proposal, [base], null)).toEqual({ kind: "dismiss" });
+  });
+
+  it("a stale proposal records nothing", () => {
+    expect(displacementOutcomeFor("confirm-move", proposal, [], null)).toEqual({ kind: "record", next: null });
   });
 });
