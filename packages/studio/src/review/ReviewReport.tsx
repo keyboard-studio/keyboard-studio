@@ -70,14 +70,14 @@ export function ReviewReport({
   );
 
   const shareUrl = useMemo(() => {
-    const u = new URL(window.location.origin + "/review");
-    u.searchParams.set("source", target.source);
-    u.searchParams.set("path", target.path);
-    u.searchParams.set("sha", target.sha);
+    // Hard-link format: /review/<owner>/keyboards/pull/<N> or
+    // /review/<owner>/keyboards/<path>. The report pins the judged sha;
+    // the link resolves to the current head at open time.
+    const base = window.location.origin;
     if (target.prNumber !== undefined) {
-      u.searchParams.set("pr", String(target.prNumber));
+      return `${base}/review/${target.owner}/keyboards/pull/${target.prNumber}`;
     }
-    return u.toString();
+    return `${base}/review/${target.owner}/keyboards/${target.path}`;
   }, [target]);
 
   const copyLink = async () => {
