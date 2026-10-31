@@ -155,6 +155,27 @@ describe("CriteriaPage — header and rows agree", () => {
     ]);
   });
 
+  it("moves Not applicable rows to the bottom, still under their section", () => {
+    const byId = (id: string) => FIXTURE_CRITERIA.find((c) => c.id === id)!;
+    const result = resolveCriteria(
+      fixtureInput({
+        // §9 font row first in catalog order; no bundled font makes it N/A.
+        criteria: [byId("fix.7-font-license"), byId("fix.4-yellow"), byId("fix.2-history-order")],
+        facts: { ...BASELINE_FACTS, fontBundled: false },
+      }),
+    );
+    render(<CriteriaPage result={result} mode="authored" />);
+
+    expect(
+      screen.getAllByTestId("criteria-section-heading").map((h) => h.textContent),
+    ).toEqual(["4. Fixture questions", "3. Fixture history", "9. Fixture fonts"]);
+    const statuses = screen
+      .getAllByTestId("criteria-row")
+      .map((r) => r.getAttribute("data-status"));
+    expect(statuses.at(-1)).toBe("not-applicable");
+    expect(statuses.slice(0, -1)).not.toContain("not-applicable");
+  });
+
   it("over the real catalog: 188 rows, header counts sum to the rows", () => {
     const result = resolveCriteria({
       criteria: ALL_CRITERIA,

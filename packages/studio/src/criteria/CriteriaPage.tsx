@@ -9,8 +9,9 @@
 // fixture in tests.
 //
 // Rows are grouped by catalog section, in the order the resolver emitted
-// them (consecutive rows sharing a section form one group) — group order
-// is never re-sorted here. Section headings and criterion descriptions
+// them (consecutive rows sharing a section form one group), except that
+// Not applicable rows — inactive for this keyboard — move to the bottom
+// of the list, still grouped under their sections. Section headings and criterion descriptions
 // are Tier B content, resolved through contentI18n against the live
 // locale; the chrome (title, statuses, controls) is Tier A Lingui.
 
@@ -139,7 +140,10 @@ export function CriteriaPage({
   severityMap,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
-  const groups = groupBySection(result.rows);
+  const groups = groupBySection([
+    ...result.rows.filter((r) => r.status !== "not-applicable"),
+    ...result.rows.filter((r) => r.status === "not-applicable"),
+  ]);
 
   const keyboard = keyboardLabel;
 
@@ -164,7 +168,7 @@ export function CriteriaPage({
       <CriteriaSummary result={result} />
 
       <ul style={listStyle}>
-        {groups.map((group) => {
+        {groups.map((group, groupIndex) => {
           const sectionHeading = resolveContentString(
             "criteria",
             group.firstRow.criterion.id,
@@ -174,7 +178,8 @@ export function CriteriaPage({
           );
           return (
             <li
-              key={group.section}
+              // A section can appear twice: once active, once in the trailing Not applicable run.
+              key={`${groupIndex}:${group.section}`}
               style={sectionGroupStyle}
               data-testid="criteria-section-group"
             >
