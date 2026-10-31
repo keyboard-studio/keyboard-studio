@@ -35,7 +35,7 @@ Expect: 0 unexplained differences across the 4 committed records; stale allow-li
 
 ## 3. PR lane (what CI runs on every PR, SC-002)
 
-The same two steps the parallel `headless-author` job runs (`timeout-minutes` set by T051, at most 5):
+The same two steps the parallel `headless-author` job runs (`timeout-minutes: 4`, set by T051; at most 5):
 
 ```sh
 # 1. corpus config: the PR set and parity
@@ -44,7 +44,7 @@ npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet sr
 npx vitest run src/test/headlessAuthor/driftGuard src/test/headlessAuthor/boundary
 ```
 
-Local figures (T071): step 1 takes 55-60 s; step 2 takes 32-35 s. Expect: 6 PR-set cases report every gate (expected failures named with their owner); wall time (including
+Local figures (T071): step 1 takes 55-60 s; step 2 takes 32-35 s. On CI (T051): 28-50 s and 14-23 s; the whole job 84-132 s. Expect: 6 PR-set cases report every gate (expected failures named with their owner); wall time (including
 vitest's module load, about 25 s) well inside the job's cap. SC-005 check: revert `sameGroupName` in
 `packages/engine/src/codec/groupName.ts` locally, rebuild the engine, rerun; the `bj_cree_woods`
 case fails with a duplicate-group compile error.

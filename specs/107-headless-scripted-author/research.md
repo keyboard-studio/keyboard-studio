@@ -35,20 +35,25 @@ cache warm-up.)
 **0.04-0.8 s per case**; the full-decision case is 0.07-0.8 s. The fixed cost dominates, so the PR set
 must run as **one vitest invocation** (one module graph), not one process per case.
 
-**Author half (not yet measurable)**: the author adds proposal calls per case (the sourced exemplar
+**Author half**: the author adds proposal calls per case (the sourced exemplar
 lookup and text-sample inventory, marks proposals, `analyseContextTolerance` which simulates,
-placement ranking). Budget: **under 5 s per case** until task T051 measures it on CI. With replay at
-under 1 s, a case is budgeted at 6 s. Local figures from T071 (5 runs of the PR lane, 0 non-gate
-failures): PR set plus parity 55-60 s; drift guard plus boundary 32-35 s. T051 still has to measure
-the job on CI and set the cap, and must update every restatement of the CI timing: spec
-Clarifications, SC-002 and Dependencies; plan Summary and Complexity Tracking; this R1 and R3.
+placement ranking). Budget: **under 5 s per case**. With replay at under 1 s, a case is budgeted at
+6 s. Local figures from T071 (5 runs of the PR lane, 0 non-gate failures): PR set plus parity 55-60 s;
+drift guard plus boundary 32-35 s.
+
+**Measured on CI (T051, 2026-10-31)**: the PR set's test file takes 14.1-25.3 s for its six cases on
+the three PR runs (14.6 s on `main`), about **2.4-4.2 s per case**, inside the 5 s budget. This is the
+file-level vitest duration divided by six, not the per-case `timingMs`: CI does not pass
+`--silent=false`, so vitest hides the case reports of passing tests. Job totals and the cap are in R3.
+Every restatement of the CI timing was updated with this measurement: spec Clarifications, SC-002 and
+Dependencies; plan Summary and Complexity Tracking; this R1 and R3.
 
 **Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x up to 6 s = about 31-61 s of test time,
 about 30 s if the author is as cheap as replay. The PR lane is the parallel job `headless-author` (R3),
 which also pays its own checkout, corpus checkout, install and `contracts`/`engine` build (estimated
 1.5-2 min), so its total is about 2-3 min. That is inside the `fast` + `build` chain (about 5.1 min),
 so PR wall time does not grow. Its cap is T051's measurement plus about 50%, rounded up to a whole
-minute, at most 5 minutes. All six cases stay unless the job would exceed 5 minutes; a seventh shape
+minute, at most 5 minutes. Measured: 84-132 s, so the cap is 4 minutes (R3). All six cases stay unless the job would exceed 5 minutes; a seventh shape
 replaces a weaker one (FR-031).
 
 **32-case suite (SC-008)**: 25 s + 32 x 6 s = about 3.6 min, under the 10-minute bound.
@@ -149,8 +154,9 @@ day): a new job **`headless-author`** in `.github/workflows/ci.yml`:
   1. a corpus-config run (the PR set and parity): `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity`;
   2. a default-config run (the drift guard and boundary test): `pnpm --filter @keyboard-studio/studio exec vitest run src/test/headlessAuthor/driftGuard src/test/headlessAuthor/boundary`.
 
-  Local figures from T071: PR set plus parity 55-60 s; drift guard plus boundary 32-35 s.
-- `timeout-minutes` on the job, set by T051 (below).
+  Local figures from T071: PR set plus parity 55-60 s; drift guard plus boundary 32-35 s. On CI
+  (T051): 28-50 s and 14-23 s.
+- `timeout-minutes: 4` on the job, set by T051 (below).
 - It gates merges once the owner adds `headless-author` to the required status checks of the
   `main: CI + integrity` ruleset (T077), after it has run green on `main` at least once: a required check
   that never reports blocks every PR. The job name must stay stable from then on.
@@ -166,6 +172,26 @@ time.
 with the ceiling, `timeout-minutes: 5`. T051 measures the job on CI and sets the cap to that time plus
 about 50% headroom, rounded up to a whole minute, never above 5. At R1's estimate (about 2-3 min) that
 is 4-5 minutes. T052 checks three PR runs against the cap and against the 10-minute whole-run total.
+
+**Measured (T051/T052, 2026-10-31)**, the three CI runs of PR #2410 plus the first run on `main`:
+
+| Run | Commit | `headless-author` | Step 1 (PR set + parity) | Step 2 (drift guard + boundary) | Ended before `build` | Whole run |
+|---|---|---|---|---|---|---|
+| 41183084720 (PR) | `f680a76e` | 132 s | 49.6 s | 22.6 s | 3.6 min | 6.0 min |
+| 41184541972 (PR) | `8d826767` | 84 s | 28.3 s | 14.4 s | 3.7 min | 5.4 min |
+| 41185262425 (PR) | `01c16ea2` | 123 s | 46.0 s | 20.6 s | 2.9 min | 5.1 min |
+| 41220294641 (`main`) | `7b5533e6` | 100 s | 30.1 s | 16.7 s | n/a | n/a (`build` failed outside this job) |
+
+- **Cap**: 132 s + 50% = 198 s, rounded up to **4 minutes** (`timeout-minutes: 4`).
+- **T052**: every run finished inside the cap; `headless-author` ended 2.9-3.7 minutes before the
+  `fast` -> `build` chain, so PR wall time did not grow; every whole run stayed under 10 minutes
+  (5.1-6.0). The set stays at six.
+- **Not measured: a cold cache.** All four runs restored the pnpm store, SLDR and langtags caches.
+  A miss adds the fetches to the job; at 132 s plus a miss the job is still expected inside 4 minutes,
+  but this is unmeasured. If a run exceeds the cap while under 5 minutes, re-measure and re-set the cap
+  by T051's rule (T052).
+- The job ran green on `main` (run 41220294641), which T077 requires before it is made a required
+  check.
 
 **When to cut the set**: only if the job would exceed 5 minutes. Otherwise all six stay. Cutting order:
 weakest shape first, both regression guards (`bj_cree_woods`, `basic_kbdfr`) kept.

@@ -30,15 +30,15 @@ Three run tiers share one runner:
 
 | Tier | What | Where | Budget |
 |---|---|---|---|
-| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, the parallel job `headless-author` (`needs: changes`; gated on `e2e`), required via the ruleset | 0 wall time while within the `fast` + `build` chain (about 5.1 min); cap = T051's measurement + ~50%, rounded up, at most 5 min (SC-002) |
+| PR set | 6 curated keyboards x 1 profile, plus parity on the 4 committed records, plus the drift guard | PR CI, the parallel job `headless-author` (`needs: changes`; gated on `e2e`), required via the ruleset | 0 wall time while within the `fast` + `build` chain (about 5.1 min); cap = T051's measurement + ~50%, rounded up, at most 5 min: measured 84-132 s, cap 4 min (SC-002) |
 | 32-case suite | the committed canonical case file `cases/harness-cases.json` (FR-035) | on demand, and nightly | under 10 min (SC-008) |
 | Wide sweep | eligible slice of `../keyboards` x profiles | weekly schedule, sharded; manual dispatch | not on PRs; failures filed as issues (FR-034) |
 
 Timing is measured, not estimated, for the replay half (research R1). The author half (proposal calls)
-does not exist yet, so its cost is an estimate with a stated ceiling that task T051 measures and that
-sets the job's cap: the measured job time plus about 50% headroom, rounded up to a whole minute, at most
-5 minutes. All six cases stay unless the job would exceed 5 minutes; only then is the set cut, weakest
-shape first, both regression guards kept.
+was estimated at plan time, with a stated ceiling that task T051 measured on CI and that sets the job's
+cap: the measured job time plus about 50% headroom, rounded up to a whole minute, at most 5 minutes.
+T051 measured 84-132 s, so the cap is 4 minutes (research R3). All six cases stay unless the job would
+exceed 5 minutes; only then is the set cut, weakest shape first, both regression guards kept.
 
 ## Technical Context
 
@@ -59,7 +59,7 @@ The PR set runs as its own corpus-config invocation in CI (research R3).
 lifts of component logic into pure functions in the studio source.
 
 **Performance Goals**: SC-001 (one case under 60 s cold, under 5 s warm per further case); SC-002
-(PR lane is a parallel job, no added wall time, at most 5 min); SC-008 (32 cases under 10 min).
+(PR lane is a parallel job, no added wall time, at most 5 min; cap 4 min from T051); SC-008 (32 cases under 10 min).
 
 **Constraints**: the author bypasses the UI only and cannot diverge from product code below it
 (FR-013 to FR-017; boundary test + depcruise rule, SC-010); no browser, dev server, port or network
@@ -145,7 +145,7 @@ packages/studio/src/test/headlessAuthor/
 
 packages/studio/src/...       # lifted pure functions next to their components (FR-040)
 .dependency-cruiser.cjs       # new rule `product-not-to-headless-author` (FR-016)
-.github/workflows/ci.yml      # new `headless-author` job: needs: changes, if: e2e, timeout-minutes from T051 (<= 5)
+.github/workflows/ci.yml      # new `headless-author` job: needs: changes, if: e2e, timeout-minutes 4 (T051; <= 5)
 .github/workflows/headless-sweep.yml   # scheduled + dispatch: 32 cases nightly, wide sweep weekly
 scripts/file-sweep-issues.mjs # dedupe-and-file for sweep failures
 ```
@@ -178,4 +178,4 @@ code outside `main`.
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
 | Art. X: the `zzq<hex>` placeholder is a value no product function proposes | Some decisions have neither a suggestion nor a default (a character the copied keyboard cannot place). A walk must still finish to reach the gates. It mirrors exactly what the Playwright harness types today, so parity with recorded walks holds. | Stopping the case at the first unproposed decision would hide every later gate failure; inventing a "better" scheme would break parity with the existing records and add a second placeholder convention. Each placeholder is recorded as `hand-set` and counted in the run report, so nothing is silent. |
-| A second CI job (`headless-author`) for the PR set | Zero wall-time cost: it needs only `changes`, so it runs beside the `fast` -> `build` chain (about 5.1 min) and adds nothing to PR wall time while it finishes within that chain (SC-002). It is required through the ruleset, so it still gates merges. | A step inside `build` reuses `build`'s install but lengthens the longest chain by its own run time on every PR; a job that `build` needs puts max(headless, `fast`) + `build` on the chain. Both cost wall time; the parallel job costs only runner minutes. |
+| A second CI job (`headless-author`) for the PR set | Zero wall-time cost: it needs only `changes`, so it runs beside the `fast` -> `build` chain (about 5.1 min) and adds nothing to PR wall time while it finishes within that chain (SC-002); on CI it ended 2.9-3.7 min before `build` on every measured run (research R3). It is required through the ruleset, so it still gates merges. | A step inside `build` reuses `build`'s install but lengthens the longest chain by its own run time on every PR; a job that `build` needs puts max(headless, `fast`) + `build` on the chain. Both cost wall time; the parallel job costs only runner minutes. |
