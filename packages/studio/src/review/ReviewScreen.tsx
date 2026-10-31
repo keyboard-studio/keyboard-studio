@@ -133,8 +133,8 @@ export function ReviewScreen() {
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         <div
           style={{
-            background: "#042C54",
-            color: "#fff",
+            background: "var(--sil-blue-dark)",
+            color: "var(--sil-white)",
             borderRadius: 12,
             padding: "14px 18px",
             marginBottom: 16,
@@ -152,7 +152,7 @@ export function ReviewScreen() {
         </div>
 
         {indexError && (
-          <p style={{ color: "var(--sil-red-dark, #A6121F)" }}>
+          <p style={{ color: "var(--sil-red-dark)" }}>
             Couldn&apos;t load the keyboard index: {indexError}
           </p>
         )}

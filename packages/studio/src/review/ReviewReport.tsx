@@ -131,8 +131,8 @@ export function ReviewReport({
 
       <div
         style={{
-          background: "#042C54",
-          color: "#fff",
+          background: "var(--sil-blue-dark)",
+          color: "var(--sil-white)",
           borderRadius: 12,
           padding: "14px 18px",
         }}
@@ -153,7 +153,7 @@ export function ReviewReport({
       <div
         role="note"
         style={{
-          borderLeft: "4px solid var(--sil-orange-dark, #C24F00)",
+          borderLeft: "4px solid var(--sil-orange-dark)",
           background: BG_INSET,
           borderRadius: "0 10px 10px 0",
           padding: "10px 14px",
