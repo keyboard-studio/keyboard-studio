@@ -13,7 +13,7 @@ describe("checkStyleParity (11.10 KM_LINT_PHP_HTM_STYLE_MISMATCH)", () => {
       "welcome-htm": "<p>Welcome to Test</p>",
       "help-php": "<p>Welcome to Test</p>",
     };
-    expect(checkStyleParity(makeInput(members))).toEqual([]);
+    expect(checkStyleParity(makeInput(members)).findings).toEqual([]);
   });
 
   it("passes when styles are identical modulo whitespace", () => {
@@ -21,7 +21,7 @@ describe("checkStyleParity (11.10 KM_LINT_PHP_HTM_STYLE_MISMATCH)", () => {
       "welcome-htm": '<p style="color:red">Welcome</p>',
       "help-php": '<p style="color:  red">Welcome</p>',
     };
-    expect(checkStyleParity(makeInput(members))).toEqual([]);
+    expect(checkStyleParity(makeInput(members)).findings).toEqual([]);
   });
 
   it("fires when the help page adds a style not present on welcome", () => {
@@ -29,14 +29,13 @@ describe("checkStyleParity (11.10 KM_LINT_PHP_HTM_STYLE_MISMATCH)", () => {
       "welcome-htm": "<p>Welcome to Test</p>",
       "help-php": '<p style="color:red">Welcome to Test</p>',
     };
-    const findings = checkStyleParity(makeInput(members));
-    expect(findings).toHaveLength(1);
+    const findings = checkStyleParity(makeInput(members)).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe("KM_LINT_PHP_HTM_STYLE_MISMATCH");
     expect(findings[0]?.location?.file).toBe("source/help/test_kbd.php");
   });
 
   it("returns [] when either member is absent", () => {
-    expect(checkStyleParity(makeInput({ "welcome-htm": "<p>Hi</p>" }))).toEqual([]);
-    expect(checkStyleParity(makeInput({ "help-php": "<p>Hi</p>" }))).toEqual([]);
+    expect(checkStyleParity(makeInput({ "welcome-htm": "<p>Hi</p>" })).findings).toEqual([]);
+    expect(checkStyleParity(makeInput({ "help-php": "<p>Hi</p>" })).findings).toEqual([]);
   });
 });

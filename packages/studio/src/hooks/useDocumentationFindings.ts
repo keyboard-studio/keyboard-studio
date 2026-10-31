@@ -138,7 +138,7 @@ export function useDocumentationFindings(): LintFinding[] {
         cssTexts,
         ...(isAdaptation ? { startHistoryMdText } : {}),
       }),
-    );
+    ).findings;
     if (findings.length === 0) return EMPTY;
 
     const tierOf = new Map(memberStates.map((s) => [s.member, s.tier]));

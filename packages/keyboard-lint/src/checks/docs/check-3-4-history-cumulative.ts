@@ -4,8 +4,9 @@
 // base HISTORY.md entry present at instantiation (`DocLintInput.startHistoryMdText`,
 // data-model.md §7) is missing from the current text.
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 function entryKey(version: string, date: string | null): string {
   return `${version}\u0000${date ?? ""}`;
@@ -18,15 +19,17 @@ function entryKey(version: string, date: string | null): string {
  * @param input - Documentation check input (uses `startHistoryMdText` and
  *   `members["history-md"]`).
  */
-export function checkHistoryCumulative(input: DocLintInput): LintFinding[] {
+export function checkHistoryCumulative(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_HISTORY_TRUNCATED";
   const baseText = input.startHistoryMdText;
   const currentText = input.members["history-md"];
-  if (baseText === undefined || currentText === undefined) return [];
+  if (baseText === undefined || currentText === undefined)
+    return checkPassed(code, ["No base HISTORY.md to compare against."]);
 
   const baseEntries = parseHistoryEntries(baseText).filter(
     (e): e is typeof e & { version: string } => e.version !== null,
   );
-  if (baseEntries.length === 0) return [];
+  if (baseEntries.length === 0) return checkPassed(code, ["No base entries to preserve."]);
 
   const currentKeys = new Set(
     parseHistoryEntries(currentText)
@@ -35,12 +38,16 @@ export function checkHistoryCumulative(input: DocLintInput): LintFinding[] {
   );
 
   const missing = baseEntries.filter((e) => !currentKeys.has(entryKey(e.version, e.date)));
-  if (missing.length === 0) return [];
+  if (missing.length === 0)
+    return checkPassed(code, [
+      "File: " + docMemberPath("history-md", input.keyboardId),
+      `All ${baseEntries.length} base entr${baseEntries.length === 1 ? "y" : "ies"} preserved.`,
+    ]);
 
   const path = docMemberPath("history-md", input.keyboardId);
   const versions = missing.map((e) => e.version).join(", ");
   const plural = missing.length === 1;
-  return [
+  return checkFailed(code, [
     {
       code: "KM_LINT_HISTORY_TRUNCATED",
       severity: "warning",
@@ -49,5 +56,5 @@ export function checkHistoryCumulative(input: DocLintInput): LintFinding[] {
       location: { file: path, line: 1 },
       hint: `Restore the ${versions} HISTORY.md entr${plural ? "y" : "ies"} instead of overwriting it — HISTORY.md must be cumulative.`,
     },
-  ];
+  ]);
 }

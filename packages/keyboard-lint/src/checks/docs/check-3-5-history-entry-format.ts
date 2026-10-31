@@ -4,8 +4,9 @@
 // tool's ATX `## <version> (<YYYY-MM-DD>)` generator shape and the criteria
 // prose's setext/hyphen-underline shape used by many corpus bases.
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 /**
  * Check that every HISTORY.md entry heading is `<version> (<YYYY-MM-DD>)`
@@ -13,20 +14,25 @@ import { docMemberPath, parseHistoryEntries } from "./_shared.js";
  *
  * @param input - Documentation check input (uses `members["history-md"]`).
  */
-export function checkHistoryEntryFormat(input: DocLintInput): LintFinding[] {
+export function checkHistoryEntryFormat(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_HISTORY_ENTRY_FORMAT";
   const text = input.members["history-md"];
-  if (text === undefined) return [];
+  if (text === undefined) return checkPassed(code, ["No HISTORY.md to check."]);
 
   const entries = parseHistoryEntries(text);
   const bad = entries.filter(
     (e) => e.version === null || !e.dateValid || e.bullets.length === 0 || e.strayLines.length > 0,
   );
-  if (bad.length === 0) return [];
+  if (bad.length === 0)
+    return checkPassed(code, [
+      "File: " + docMemberPath("history-md", input.keyboardId),
+      `All ${entries.length} entr${entries.length === 1 ? "y" : "ies"} follow the format.`,
+    ]);
 
   const path = docMemberPath("history-md", input.keyboardId);
   const headings = bad.map((e) => (e.headingRaw !== "" ? e.headingRaw : "(unparsable heading)")).join(", ");
   const plural = bad.length !== 1;
-  return [
+  return checkFailed(code, [
     {
       code: "KM_LINT_HISTORY_ENTRY_FORMAT",
       severity: "warning",
@@ -35,5 +41,5 @@ export function checkHistoryEntryFormat(input: DocLintInput): LintFinding[] {
       location: { file: path, line: 1 },
       hint: `Format each HISTORY.md entry as "## <version> (<YYYY-MM-DD>)" (or the same text underlined with hyphens) followed by one or more "* " or "- " bullet lines.`,
     },
-  ];
+  ]);
 }

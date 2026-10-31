@@ -14,7 +14,7 @@ describe("checkOskLayersListed (11.2 KM_LINT_PHP_OSK_LAYERS_INCOMPLETE)", () => 
   it("passes when data-states lists every real layer", () => {
     const helpPhp = '<span data-states="default,shift"></span>';
     expect(
-      checkOskLayersListed(makeInput(helpPhp, ["default", "shift"])),
+      checkOskLayersListed(makeInput(helpPhp, ["default", "shift"])).findings,
     ).toEqual([]);
   });
 
@@ -22,8 +22,7 @@ describe("checkOskLayersListed (11.2 KM_LINT_PHP_OSK_LAYERS_INCOMPLETE)", () => 
     const helpPhp = '<span data-states="default"></span>';
     const findings = checkOskLayersListed(
       makeInput(helpPhp, ["default", "shift"]),
-    );
-    expect(findings).toHaveLength(1);
+    ).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe("KM_LINT_PHP_OSK_LAYERS_INCOMPLETE");
     expect(findings[0]?.message).toContain("shift");
   });
@@ -32,24 +31,24 @@ describe("checkOskLayersListed (11.2 KM_LINT_PHP_OSK_LAYERS_INCOMPLETE)", () => 
     const phantom = makeInput('<span data-states="default,phantom"></span>', [
       "default",
     ]);
-    expect(checkOskLayersListed(phantom)).toEqual([]);
-    expect(checkDataStatesComplete(phantom)).toHaveLength(1);
+    expect(checkOskLayersListed(phantom).findings).toEqual([]);
+    expect(checkDataStatesComplete(phantom).findings).toHaveLength(1);
 
     const missing = makeInput('<span data-states="default"></span>', [
       "default",
       "shift",
     ]);
-    expect(checkDataStatesComplete(missing)).toEqual([]);
-    expect(checkOskLayersListed(missing)).toHaveLength(1);
+    expect(checkDataStatesComplete(missing).findings).toEqual([]);
+    expect(checkOskLayersListed(missing).findings).toHaveLength(1);
   });
 
   it("passes when the page does not use OSK syntax (no data-states)", () => {
     expect(
-      checkOskLayersListed(makeInput("<html></html>", ["default"])),
+      checkOskLayersListed(makeInput("<html></html>", ["default"])).findings,
     ).toEqual([]);
   });
 
   it("returns [] when help-php is absent", () => {
-    expect(checkOskLayersListed(makeInput(undefined, ["default"]))).toEqual([]);
+    expect(checkOskLayersListed(makeInput(undefined, ["default"])).findings).toEqual([]);
   });
 });

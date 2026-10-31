@@ -5,8 +5,9 @@
 // comparison, both codes emitted at most once each, message naming both
 // versions (spec 080 US7-1).
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 /**
  * Check that HISTORY.md's top entry version matches the keyboard's `.kmn`
@@ -16,22 +17,31 @@ import { docMemberPath, parseHistoryEntries } from "./_shared.js";
  * @param input - Documentation check input (uses `members["history-md"]`
  *   and `keyboardVersion`).
  */
-export function checkHistoryVersionMatch(input: DocLintInput): LintFinding[] {
+export function checkHistoryVersionMatch(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_HISTORY_VERSION_MISMATCH";
   const text = input.members["history-md"];
-  if (text === undefined) return [];
+  if (text === undefined) return checkPassed(code, ["No HISTORY.md to check."]);
 
   const entries = parseHistoryEntries(text).filter(
     (e): e is typeof e & { version: string } => e.version !== null,
   );
   const top = entries[0];
-  if (top === undefined) return [];
-  if (top.version === input.keyboardVersion) return [];
+  if (top === undefined)
+    return checkPassed(code, [
+      "File: " + docMemberPath("history-md", input.keyboardId),
+      "No versioned entries in HISTORY.md.",
+    ]);
+  if (top.version === input.keyboardVersion)
+    return checkPassed(code, [
+      "File: " + docMemberPath("history-md", input.keyboardId),
+      `HISTORY version "${top.version}" matches .kmn version "${input.keyboardVersion}".`,
+    ]);
 
   const historyPath = docMemberPath("history-md", input.keyboardId);
   const kmnPath = `source/${input.keyboardId}.kmn`;
   const message = `HISTORY.md's top entry is version ${top.version}, but the .kmn file's version is ${input.keyboardVersion}.`;
 
-  return [
+  return checkFailed(code, [
     {
       code: "KM_LINT_HISTORY_VERSION_MISMATCH",
       severity: "warning",
@@ -48,5 +58,5 @@ export function checkHistoryVersionMatch(input: DocLintInput): LintFinding[] {
       location: { file: kmnPath, line: 1 },
       hint: `Update the .kmn file's version to ${top.version} to match HISTORY.md's top entry, or update HISTORY.md's top entry to ${input.keyboardVersion}.`,
     },
-  ];
+  ]);
 }

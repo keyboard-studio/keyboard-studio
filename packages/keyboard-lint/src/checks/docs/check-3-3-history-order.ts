@@ -3,32 +3,42 @@
 // change entry is at the top of the file." Fires when the top HISTORY.md
 // entry's version is not the newest among the parsed entries.
 
-import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import type { DocLintInput } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries, compareVersions } from "./_shared.js";
+import { checkFailed, checkPassed, type CheckResult } from "../criteria/_shared.js";
 
 /**
  * Check that HISTORY.md's top entry is the newest version present.
  *
  * @param input - Documentation check input (uses `members["history-md"]`).
  */
-export function checkHistoryOrder(input: DocLintInput): LintFinding[] {
+export function checkHistoryOrder(input: DocLintInput): CheckResult {
+  const code = "KM_LINT_HISTORY_ORDER";
   const text = input.members["history-md"];
-  if (text === undefined) return [];
+  if (text === undefined) return checkPassed(code, ["No HISTORY.md to check."]);
 
   const entries = parseHistoryEntries(text).filter(
     (e): e is typeof e & { version: string } => e.version !== null,
   );
-  if (entries.length < 2) return [];
+  if (entries.length < 2)
+    return checkPassed(code, [
+      "File: " + docMemberPath("history-md", input.keyboardId),
+      `Only ${entries.length} versioned entr${entries.length === 1 ? "y" : "ies"} — nothing to order.`,
+    ]);
 
   const top = entries[0]!;
   let newest = top;
   for (const entry of entries) {
     if (compareVersions(entry.version, newest.version) > 0) newest = entry;
   }
-  if (top.version === newest.version) return [];
+  if (top.version === newest.version)
+    return checkPassed(code, [
+      "File: " + docMemberPath("history-md", input.keyboardId),
+      `Top entry is version ${top.version}, the newest of ${entries.length} entries.`,
+    ]);
 
   const path = docMemberPath("history-md", input.keyboardId);
-  return [
+  return checkFailed(code, [
     {
       code: "KM_LINT_HISTORY_ORDER",
       severity: "warning",
@@ -37,5 +47,5 @@ export function checkHistoryOrder(input: DocLintInput): LintFinding[] {
       location: { file: path, line: 1 },
       hint: `Move the ${newest.version} entry to the top of HISTORY.md so the most recent change is listed first.`,
     },
-  ];
+  ]);
 }

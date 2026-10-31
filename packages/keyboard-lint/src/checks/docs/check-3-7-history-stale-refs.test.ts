@@ -12,29 +12,27 @@ function makeInput(historyMd: string | undefined, deletedFilenames: string[]) {
 describe("checkHistoryStaleFileRefs (3.7 KM_LINT_HISTORY_STALE_FILE_REFS)", () => {
   it("passes when no bullet mentions a deleted file", () => {
     const text = "## 1.0 (2024-01-01)\n* Initial release.\n";
-    expect(checkHistoryStaleFileRefs(makeInput(text, ["old-icon.ico"]))).toEqual([]);
+    expect(checkHistoryStaleFileRefs(makeInput(text, ["old-icon.ico"])).findings).toEqual([]);
   });
 
   it("fires when a bullet references a deleted file", () => {
     const text = "## 1.2 (2024-03-01)\n* Removed old-icon.ico from icons.\n";
-    const findings = checkHistoryStaleFileRefs(makeInput(text, ["old-icon.ico"]));
-    expect(findings).toHaveLength(1);
+    const findings = checkHistoryStaleFileRefs(makeInput(text, ["old-icon.ico"])).findings;    expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe("KM_LINT_HISTORY_STALE_FILE_REFS");
     expect(findings[0]?.message).toContain("old-icon.ico");
   });
 
   it("fires once per offending bullet", () => {
     const text = "## 1.2 (2024-03-01)\n* Removed old-icon.ico.\n* Removed second.ico too.\n";
-    const findings = checkHistoryStaleFileRefs(makeInput(text, ["old-icon.ico", "second.ico"]));
-    expect(findings).toHaveLength(2);
+    const findings = checkHistoryStaleFileRefs(makeInput(text, ["old-icon.ico", "second.ico"])).findings;    expect(findings).toHaveLength(2);
   });
 
   it("returns [] when deletedFilenames is empty", () => {
     const text = "## 1.0 (2024-01-01)\n* Removed old-icon.ico.\n";
-    expect(checkHistoryStaleFileRefs(makeInput(text, []))).toEqual([]);
+    expect(checkHistoryStaleFileRefs(makeInput(text, [])).findings).toEqual([]);
   });
 
   it("returns [] when history-md is absent", () => {
-    expect(checkHistoryStaleFileRefs(makeInput(undefined, ["old-icon.ico"]))).toEqual([]);
+    expect(checkHistoryStaleFileRefs(makeInput(undefined, ["old-icon.ico"])).findings).toEqual([]);
   });
 });

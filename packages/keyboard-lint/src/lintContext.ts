@@ -40,6 +40,7 @@ import {
 } from "./checks/check-18-6-touch-coverage.js";
 import { checkContextTolerance } from "./checks/check-19-x-context-tolerance.js";
 import { resolveJoinedCheckInputs } from "./checks/_shared.js";
+import { mergeResults } from "./checks/criteria/_shared.js";
 import { checkHistoryOrder } from "./checks/docs/check-3-3-history-order.js";
 import { checkHistoryCumulative } from "./checks/docs/check-3-4-history-cumulative.js";
 import { checkHistoryEntryFormat } from "./checks/docs/check-3-5-history-entry-format.js";
@@ -59,26 +60,35 @@ import { checkStyleParity } from "./checks/docs/check-11-10-style-parity.js";
  * Run the US7/FR-019 documentation checks (thirteen codes; 3.6/7.1 share
  * one module) plus spec 084's 11.2 OSK-layers check (Batch 1) and 11.8
  * OSK-image check (Batch 2), in criteria order, returning every finding
- * they produce.
- * Pure and total: each check returns `[]` on absent input members.
+ * they produce plus per-code verified details for the met-case evidence.
+ * Pure and total: each check names its met-moot reason on absent input
+ * members rather than silently passing.
  */
-export function runDocChecks(input: DocLintInput): LintFinding[] {
-  return [
-    ...checkHistoryOrder(input),
-    ...checkHistoryCumulative(input),
-    ...checkHistoryEntryFormat(input),
-    ...checkHistoryVersionMatch(input),
-    ...checkHistoryStaleFileRefs(input),
-    ...checkCopyrightHolder(input),
-    ...checkReadmeTargets(input),
-    ...checkHtmlWellFormed(input),
-    ...checkOskLayersListed(input),
-    ...checkOskImageConstrained(input),
-    ...checkDataStatesComplete(input),
-    ...checkPagenameFormat(input),
-    ...checkBodyParity(input),
-    ...checkStyleParity(input),
+export function runDocChecks(input: DocLintInput): {
+  findings: LintFinding[];
+  verifiedByCode: Map<string, string[]>;
+} {
+  const results = [
+    checkHistoryOrder(input),
+    checkHistoryCumulative(input),
+    checkHistoryEntryFormat(input),
+    checkHistoryVersionMatch(input),
+    checkHistoryStaleFileRefs(input),
+    checkCopyrightHolder(input),
+    checkReadmeTargets(input),
+    checkHtmlWellFormed(input),
+    checkOskLayersListed(input),
+    checkOskImageConstrained(input),
+    checkDataStatesComplete(input),
+    checkPagenameFormat(input),
+    checkBodyParity(input),
+    checkStyleParity(input),
   ];
+  const merged = mergeResults(...results);
+  // checkHistoryVersionMatch verifies two codes with the same lines.
+  const v36 = merged.verifiedByCode.get("KM_LINT_HISTORY_VERSION_MISMATCH");
+  if (v36 !== undefined) merged.verifiedByCode.set("KM_LINT_KMN_VERSION_MISMATCH", v36);
+  return merged;
 }
 
 /**
@@ -236,7 +246,11 @@ export async function lintWithContext(
   // studio has assembled a DocLintInput (same absent -> silently skipped
   // gating shape as every optional input above).
   if (ctx.docLintInput) {
-    findings.push(...runDocChecks(ctx.docLintInput));
+    const docs = runDocChecks(ctx.docLintInput);
+    findings.push(...docs.findings);
+    for (const [code, lines] of docs.verifiedByCode) {
+      verifiedByCode.set(code, lines);
+    }
   }
 
   // spec 084 Batch 1: the criteria checks — only when the criteria
