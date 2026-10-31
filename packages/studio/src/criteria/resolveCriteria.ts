@@ -373,9 +373,12 @@ function resolveRow(
               const fileLine = finding.location
                 ? `File: ${finding.location.file}#L${finding.location.line}`
                 : null;
+              // Split message on newlines so multi-line messages (e.g. with
+              // a full source line) render as separate paragraphs.
+              const msgLines = finding.message.split("\n");
               const parts = finding.hint
-                ? [finding.message, finding.hint]
-                : [finding.message];
+                ? [...msgLines, finding.hint]
+                : msgLines;
               return fileLine ? [fileLine, ...parts] : parts;
             }),
             lintRuleId,

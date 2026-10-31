@@ -174,13 +174,19 @@ export function checkVersionInDocs(facts: TextContentFacts): CheckResult {
   }
   const versionMatch = stripTags(hits[0]![1]!).match(VERSION_LIKE);
   const version = versionMatch ? versionMatch[0] : "";
+  // Find the full original line containing the version (for the code block)
+  const fullLine = hits[0]![1]!
+    .split("\n")
+    .find((l) => VERSION_LIKE.test(stripTags(l)))
+    ?.trim();
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_VERSION_IN_DOCS",
       file: hits[0]![0],
       message:
         `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.` +
-        (version ? ` Found: "${version}"` : ""),
+        (version ? ` Found: "${version}"` : "") +
+        (fullLine ? `\nLine: "${fullLine}"` : ""),
       hint: "Remove the hardcoded version from the documentation; the package version is the single source of truth.",
     }),
   ]);
