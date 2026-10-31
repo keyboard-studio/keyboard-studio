@@ -16,3 +16,8 @@ Loaded when working under `packages/studio/`. Repo-wide guidance lives in the ro
   what not to wrap) live in
   [specs/046-i18n-localization/contracts/catalog-format.md](../../specs/046-i18n-localization/contracts/catalog-format.md);
   rationale in [docs/i18n-spike.md](../../docs/i18n-spike.md).
+- **New UI strings ship with their French.** `messages:extract` adds each new id to
+  `src/locales/fr/messages.json` as `""`; write the French in the same change.
+  `pnpm run i18n-catalog-lint` rejects empty target values, because a blank that reaches `main`
+  comes back from the next Crowdin sync as English, while French committed here is uploaded to
+  Crowdin on merge and round-trips.
