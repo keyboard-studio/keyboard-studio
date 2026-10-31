@@ -17,6 +17,8 @@ import type {
   LintFinding,
 } from "@keyboard-studio/contracts";
 
+import type { ReviewerSource } from "./reviewerSource.ts";
+
 /**
  * Which surface is asking for the judgment. "authored" judges the author's
  * own studio-built keyboard (the record may carry their answers);
@@ -118,6 +120,14 @@ export interface CriteriaFacts {
    * context exists (the foreign host never sets it).
    */
   instantiationMode?: "adapt-existing" | "new-from-base";
+  /**
+   * The lint pass ran and reported "no PUA codepoints in the produced
+   * output" (13.1's verified line). A positive fact, never inferred from
+   * a check that did not run.
+   */
+  noPuaInOutput?: boolean;
+  /** 13.4 ran and found no mathematical Latin look-alikes in the output. */
+  noMathLatinLookalikes?: boolean;
 }
 
 /**
@@ -189,6 +199,12 @@ export interface CriteriaInput {
    * per-font attestation does.
    */
   licenseTextHints?: readonly string[];
+  /**
+   * /review host only: source facts the yellow/red rows show the reviewer
+   * side by side (names, language tags, excerpts, PR scope). Text for
+   * evidence only; it never decides a status.
+   */
+  reviewerSource?: ReviewerSource;
 }
 
 /**

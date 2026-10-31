@@ -56,6 +56,10 @@ import {
 import { collectDocLintInputFromVfs } from "../lib/collectDocLintInputFromVfs.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { mergeLintFindings } from "./mergeFindings.ts";
+import {
+  buildReviewerSource,
+  type LangtagsLookup,
+} from "./reviewerSource.ts";
 
 /** Options the host supplies (Compare artifact, /review target). */
 export interface JudgeForeignOptions {
@@ -106,6 +110,57 @@ export function historyChangedInPr(
   if (treePaths === undefined) return undefined;
   const want = `${repoPath}/history.md`.toLowerCase();
   return treePaths.some((p) => p.toLowerCase() === want);
+}
+
+/**
+ * Stamp each finding with whether its file is part of the PR (`prDelta`).
+ * A finding is "changed" when `repoPath/file` is among the PR's paths,
+ * "unchanged" when the file exists in the judged VFS but is not, and left
+ * unstamped when its file is empty, synthetic ("package"), or absent (a
+ * missing file is not "already there"). Statuses are never touched.
+ */
+export function stampPrDelta(
+  findings: readonly LintFinding[],
+  reviewContext: ReviewContext | undefined,
+  vfs: VirtualFS,
+): LintFinding[] {
+  if (
+    reviewContext === undefined ||
+    !reviewContext.isPr ||
+    reviewContext.treePaths === undefined
+  ) {
+    return [...findings];
+  }
+  const changed = new Set(reviewContext.treePaths.map((p) => p.toLowerCase()));
+  const present = new Set(vfs.list().map((p) => p.toLowerCase()));
+  return findings.map((f) => {
+    const file = f.location?.file;
+    if (file === undefined || file === "") return f;
+    const key = file.toLowerCase();
+    if (changed.has(`${reviewContext.repoPath}/${file}`.toLowerCase())) {
+      return { ...f, prDelta: "changed" as const };
+    }
+    if (present.has(key)) return { ...f, prDelta: "unchanged" as const };
+    return f;
+  });
+}
+
+/** The langtags name/script/region lookup, or undefined when unavailable. */
+async function loadLangtagsLookup(): Promise<LangtagsLookup | undefined> {
+  try {
+    const mod = await import("@keyboard-studio/engine/langtags");
+    return (subtag) => {
+      const d = mod.getLanguageDefaults(subtag);
+      if (d === null) return null;
+      return {
+        ...(d.englishName !== undefined ? { name: d.englishName } : {}),
+        ...(d.defaultScript !== undefined ? { script: d.defaultScript } : {}),
+        ...(d.defaultRegion !== undefined ? { region: d.defaultRegion } : {}),
+      };
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -224,9 +279,11 @@ export async function judgeForeignKeyboard(
 
   // 3.4 (PR targets): decide what the base HISTORY.md comparison can claim.
   let historyVerified: string | undefined;
-  let newKeyboardAtBase = false;
   let startHistoryMdText: string | undefined;
   const rc = options.reviewContext;
+  // The keyboard's folder exists in no tier at the PR's base commit.
+  const newKeyboardAtBase =
+    rc !== undefined && rc.isPr && rc.idConflictAtBase?.existingTiers.length === 0;
   if (rc !== undefined && rc.isPr) {
     const changed = historyChangedInPr(rc.repoPath, rc.treePaths);
     if (changed === false) {
@@ -235,8 +292,8 @@ export async function judgeForeignKeyboard(
       if (rc.idConflictAtBase === undefined) {
         contextMissing[HISTORY_TRUNCATED_CODE] =
           "the PR base-commit keyboard-folder lookup";
-      } else if (rc.idConflictAtBase.existingTiers.length === 0) {
-        newKeyboardAtBase = true;
+      } else if (newKeyboardAtBase) {
+        // Not applicable via the newKeyboardAtBase fact.
       } else if (options.baseHistory?.kind === "text") {
         startHistoryMdText = options.baseHistory.text;
       } else if (options.baseHistory?.kind === "absent") {
@@ -299,10 +356,24 @@ export async function judgeForeignKeyboard(
     // adaptation. Without it the §19 rows resolve Not applicable.
     isAdaptation: isAdaptationSignal(options.reviewContext),
   };
+  const langtags = await loadLangtagsLookup();
+  const reviewerSource = buildReviewerSource({
+    vfs,
+    kpsText: ctx.criteriaInput?.kpsText,
+    kpsLanguages: ctx.criteriaInput?.kpsLanguages ?? [],
+    keyboardIR: ctx.keyboardIR,
+    reviewContext: options.reviewContext,
+    isUpgradePr: (rc?.idConflictAtBase?.existingTiers.length ?? 0) > 0,
+    ...(langtags !== undefined ? { langtags } : {}),
+  });
   return resolveCriteria({
     criteria: ALL_CRITERIA,
     mode: "foreign",
-    lintFindings: mergeLintFindings(docFindings, engineFindings),
+    lintFindings: stampPrDelta(
+      mergeLintFindings(docFindings, engineFindings),
+      options.reviewContext,
+      vfs,
+    ),
     verifiedByCode,
     record: EMPTY_CRITERIA_RECORD,
     facts,
@@ -310,5 +381,6 @@ export async function judgeForeignKeyboard(
     compileResult: options.compileResult ?? null,
     // §9.2 supporting evidence only (never decides the row).
     licenseTextHints: licenseTextHints(readVfsText(vfs, "LICENSE.md")),
+    reviewerSource,
   });
 }

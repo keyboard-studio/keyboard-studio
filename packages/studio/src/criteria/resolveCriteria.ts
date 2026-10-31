@@ -34,6 +34,17 @@ import { resolveCompileRow } from "./compileMapping.ts";
 import { resolveFontLicenseRow } from "./fontLicense.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
 import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
+import {
+  copyrightContextLines,
+  licenseCopyrightLine,
+  scopeNote,
+  sourceContextLines,
+} from "./reviewerSource.ts";
+
+/** 13.1's / 13.4's verified lines when they found nothing (lint wording). */
+const NO_PUA_LINE = "No PUA codepoints in the produced output.";
+const NO_MATH_LATIN_LINE =
+  "No mathematical Latin look-alikes in the produced output.";
 
 const ALL_STATUSES: readonly CriterionStatus[] = [
   "met",
@@ -102,9 +113,21 @@ function indexFindings(
  * - _findingsByCode: findings from related checks (currently unused)
  */
 function reviewerContext(
-  criterionId: string,
+  criterion: Criterion,
   input: CriteriaInput,
   _findingsByCode: Map<string, readonly LintFinding[]>,
+): string[] {
+  const criterionId = criterion.id;
+  const lines = reviewerContextBody(criterionId, input);
+  const side = input.reviewerSource;
+  if (side === undefined) return lines;
+  const note = scopeNote(criterion.section, side);
+  return note === null ? lines : [...lines, note];
+}
+
+function reviewerContextBody(
+  criterionId: string,
+  input: CriteriaInput,
 ): string[] {
   const verified = input.verifiedByCode;
   const getVerified = (code: string): string[] =>
@@ -127,18 +150,17 @@ function reviewerContext(
     }
 
     // --- Copyright-related ---
+    // The LICENSE line comes from 4.1b's verified line, which exists
+    // whenever a copyright line does (4.5b's only when the syntax passes).
     case "4.2-copyright-year-range-if-multiyear":
     case "4.4-org-legal-name-current":
-    case "4.8-year-range-starts-at-original": {
-      const copy = getVerified("KM_LINT_COPYRIGHT_SYNTAX");
-      if (copy.length > 0) return ["Copyright line:", ...copy];
-      return [];
-    }
-    case "4.3-copyright-holder-is-authorized": {
-      const copy = getVerified("KM_LINT_COPYRIGHT_SYNTAX");
-      const author = getVerified("KM_LINT_AUTHOR_IN_KMN");
-      return [...copy, ...author];
-    }
+    case "4.8-year-range-starts-at-original":
+    case "4.3-copyright-holder-is-authorized":
+      return copyrightContextLines(
+        criterionId,
+        licenseCopyrightLine(getVerified("KM_LINT_COPYRIGHT_ABSENT")),
+        input.reviewerSource,
+      );
 
     // --- Description/readme-related ---
     // README.md / .kps description text not available in resolver input;
@@ -147,16 +169,17 @@ function reviewerContext(
     case "5.4-readme-description-sensible":
     case "10.10-kps-description-meaningful":
     case "10.11-kps-no-spelling-errors":
-      return [];
+      return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Tags/BCP47-related ---
     // Tag values not available in resolver input; would need kps parsing
     // plumbed through. Noted for future work.
     case "10.3-kps-tags-minimal":
     case "10.4-kps-unusual-tag-flagged":
-    case "10.5-kps-conlang-flagged":
     case "12.1-bcp47-tag-correct":
     case "12.5-script-mismatch-flagged":
+      return sourceContextLines(criterionId, input.reviewerSource);
+    case "10.5-kps-conlang-flagged":
     case "12.6-script-mismatch-submitted-to-langtags":
       return [];
 
@@ -176,6 +199,7 @@ function reviewerContext(
     // Display name value not in verified; RTL flag needs .kmn/.kps parsing.
     // Noted for future work.
     case "7.7-display-name-no-underscores":
+      return sourceContextLines(criterionId, input.reviewerSource);
     case "7.8-rtl-flag-matches-script":
       return [];
 
@@ -192,17 +216,15 @@ function reviewerContext(
     }
 
     // --- History ---
-    case "3.2-history-header-sensible": {
-      return [];
-    }
+    case "3.2-history-header-sensible":
+      return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Welcome/readme.htm ---
     case "6.2-readme-htm-short":
     case "6.4-welcome-htm-describes-usage":
     case "6.5-welcome-htm-no-install-instructions":
-    case "6.7-welcome-htm-not-political": {
-      return [];
-    }
+    case "6.7-welcome-htm-not-political":
+      return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Red checklist ---
     case "14.1-third-party-patch-author-consulted":
@@ -438,13 +460,21 @@ function resolveRow(
                   ? `File: ${finding.location.file}#L${finding.location.line}`
                   : `File: ${finding.location.file}`
                 : null;
+              const deltaLine =
+                finding.prDelta === "changed"
+                  ? "Changed in this PR"
+                  : finding.prDelta === "unchanged"
+                    ? "Already present before this PR (file unchanged by this PR)"
+                    : null;
               // Split message on newlines so multi-line messages (e.g. with
               // a full source line) render as separate paragraphs.
               const msgLines = finding.message.split("\n");
               const parts = finding.hint
                 ? [...msgLines, finding.hint]
                 : msgLines;
-              return fileLine ? [fileLine, ...parts] : parts;
+              return fileLine
+                ? [fileLine, ...(deltaLine ? [deltaLine] : []), ...parts]
+                : parts;
             }),
             lintRuleId,
             findings,
@@ -500,7 +530,7 @@ function resolveRow(
         status: "needs-author",
         controls: input.mode === "authored" ? "attest" : null,
         evidence: () => {
-          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const context = reviewerContext(criterion, input, findingsByCode);
           const lines = [
             input.mode === "foreign"
               ? "Reviewer judgment needed."
@@ -540,7 +570,7 @@ function resolveRow(
         status: "needs-human",
         controls: input.mode === "authored" ? "confirm" : null,
         evidence: () => {
-          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const context = reviewerContext(criterion, input, findingsByCode);
           const lines = [checklistText];
           if (context.length > 0) {
             lines.push("", "Reviewer context:", ...context);
@@ -556,7 +586,24 @@ function resolveRow(
 }
 
 /** Judge every criterion in `input.criteria`, preserving catalog order. */
-export function resolveCriteria(input: CriteriaInput): CriteriaResult {
+export function resolveCriteria(rawInput: CriteriaInput): CriteriaResult {
+  // Positive lint facts for the named Not applicable predicates: only when
+  // the check ran and its verified line says it found nothing. Both modes
+  // run the same engine pass, so both get these facts.
+  const verified = rawInput.verifiedByCode;
+  const input: CriteriaInput = {
+    ...rawInput,
+    facts: {
+      ...rawInput.facts,
+      noPuaInOutput:
+        verified?.get("KM_LINT_PUA_KEYBOARD_PLACEMENT")?.includes(NO_PUA_LINE) ===
+        true,
+      noMathLatinLookalikes:
+        verified
+          ?.get("KM_LINT_MATH_LATIN_LOOKALIKE")
+          ?.includes(NO_MATH_LATIN_LINE) === true,
+    },
+  };
   const findingsByCode = indexFindings(input.lintFindings);
   const counts = emptyStatusCounts();
   const bandCounts = emptyBandCounts();

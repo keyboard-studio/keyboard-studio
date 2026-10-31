@@ -108,5 +108,36 @@ export function applicabilityFor(
         "This criterion concerns incrementing a previously deployed version, and a keyboard created new from a base has no previously deployed version.",
     };
   }
+  // Named positive facts from the lint pass (spec 084 D7): the check ran
+  // and found nothing, so the documentation/judgment rows about that
+  // thing have nothing to judge. A check that did not run sets no fact.
+  if (
+    facts.noPuaInOutput === true &&
+    (criterion.id === "7.13-pua-documentation" ||
+      criterion.id === "13.2-pua-notices-in-docs")
+  ) {
+    return {
+      reason:
+        "The produced output contains no Private Use Area codepoints (check 13.1), so there is nothing to document.",
+    };
+  }
+  if (
+    facts.noMathLatinLookalikes === true &&
+    criterion.id === "13.5-math-latin-not-spoofing"
+  ) {
+    return {
+      reason:
+        "The produced output contains no mathematical Latin look-alikes (check 13.4), so there is nothing to compare for spoofing.",
+    };
+  }
+  if (
+    facts.newKeyboardAtBase === true &&
+    criterion.id === "14.1-third-party-patch-author-consulted"
+  ) {
+    return {
+      reason:
+        "This PR adds the keyboard, so it patches no existing third-party keyboard whose author needs consulting.",
+    };
+  }
   return null;
 }
