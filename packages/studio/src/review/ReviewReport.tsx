@@ -6,7 +6,7 @@
 // notes, and the read-only actions. Nothing here can stage, adapt, or submit
 // the keyboard — this screen imports no authoring store.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
 import {
@@ -23,6 +23,15 @@ import {
   type ReviewTarget,
 } from "./reviewSources.ts";
 import type { SkippedFile } from "./useReviewSnapshot.ts";
+import {
+  severityForReviewRow,
+  type ReviewSeverity,
+} from "./reviewSeverity.ts";
+import {
+  ERROR_TEXT,
+  SUCCESS_ACCENT,
+  WARNING,
+} from "../ui/theme.ts";
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -110,6 +119,39 @@ export function ReviewReport({
     });
   };
 
+  // Classify rows into Met / Warning / Error; hide scaffolder-bake rows
+  // (their twins carry the post-hoc check) and not-applicable rows.
+  const [severityFilter, setSeverityFilter] = useState<
+    "all" | "met" | "warning" | "error"
+  >("all");
+  const { displayResult, severityCounts, severityMap } = useMemo(() => {
+    const severities = new Map<string, ReviewSeverity>();
+    const kept = result.rows.filter((r) => {
+      const s = severityForReviewRow(r);
+      severities.set(r.criterion.id, s);
+      return s !== "hidden";
+    });
+    const counts = { met: 0, warning: 0, error: 0 };
+    for (const r of kept) {
+      const s = severities.get(r.criterion.id);
+      if (s === "met") counts.met++;
+      else if (s === "warning") counts.warning++;
+      else if (s === "error") counts.error++;
+    }
+    // Apply the severity filter for display.
+    const filtered =
+      severityFilter === "all"
+        ? kept
+        : kept.filter(
+            (r) => severities.get(r.criterion.id) === severityFilter,
+          );
+    return {
+      displayResult: { ...result, rows: filtered, total: filtered.length },
+      severityCounts: counts,
+      severityMap: Object.fromEntries(severities),
+    };
+  }, [result, severityFilter]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
       <button
@@ -148,6 +190,64 @@ export function ReviewReport({
           {reviewTargetLabel(target)} · judged{" "}
           {new Date(judgedAt).toLocaleString()} · {result.total} criteria
         </p>
+      </div>
+
+      <div
+        role="group"
+        aria-label="Filter results by severity"
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        {(
+          [
+            { key: "all", label: `All`, color: "var(--app-text)" },
+            {
+              key: "met",
+              label: `✓ ${severityCounts.met} met`,
+              color: SUCCESS_ACCENT,
+            },
+            {
+              key: "warning",
+              label: `⚠ ${severityCounts.warning} warnings`,
+              color: WARNING,
+            },
+            {
+              key: "error",
+              label: `✖ ${severityCounts.error} errors`,
+              color: ERROR_TEXT,
+            },
+          ] as const
+        ).map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setSeverityFilter(f.key)}
+            aria-pressed={severityFilter === f.key}
+            style={{
+              background:
+                severityFilter === f.key ? BG_INSET : BG_CARD,
+              color: f.color,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              padding: "8px 14px",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: severityFilter === f.key ? 700 : 600,
+              fontFamily: FONT,
+              outline:
+                severityFilter === f.key
+                  ? `2px solid ${f.color}`
+                  : undefined,
+              outlineOffset: 1,
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       <div
@@ -220,10 +320,11 @@ export function ReviewReport({
 
       <div style={{ minHeight: 0, flex: 1 }}>
         <CriteriaPage
-          result={result}
+          result={displayResult}
           mode="foreign"
           keyboardLabel={target.displayName}
           judgedNote={judgedNote}
+          severityMap={severityMap}
         />
       </div>
     </div>

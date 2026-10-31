@@ -48,6 +48,12 @@ export interface CriteriaPageProps {
   onClearFontLicense?: (fontName: string) => void;
   /** A statement of what was judged (e.g. the preview caveat in foreign mode). */
   judgedNote?: string;
+  /**
+   * Optional per-criterion severity override for the /review report
+   * ("met" | "warning" | "error"), keyed by criterion id. When present,
+   * the row's status label is color-coded by severity.
+   */
+  severityMap?: Record<string, "met" | "warning" | "error" | "hidden">;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -123,6 +129,7 @@ export function CriteriaPage({
   onAttestFontLicense,
   onClearFontLicense,
   judgedNote,
+  severityMap,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
   const groups = groupBySection(result.rows);
@@ -176,6 +183,9 @@ export function CriteriaPage({
                     key={row.criterion.id}
                     row={row}
                     mode={mode}
+                    {...(severityMap?.[row.criterion.id] !== undefined
+                      ? { severity: severityMap[row.criterion.id] }
+                      : {})}
                     {...(onAttest !== undefined ? { onAttest } : {})}
                     {...(onClearAttestation !== undefined ? { onClearAttestation } : {})}
                     {...(onConfirm !== undefined ? { onConfirm } : {})}
