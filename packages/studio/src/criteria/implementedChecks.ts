@@ -11,9 +11,14 @@
 //      a catalog criterion's lintRuleId.
 //   2. ASSEMBLY_SYNTHESIZED_CODES below: codes no lint check emits,
 //      produced by a named synthesis in the criteria assembly (the
-//      compile-result severity mapping in compileMapping.ts). This is
-//      an explicit named set, not a weakening of the scan: every code
-//      here must name its synthesis, and the test pins the set exactly.
+//      compile-result severity mapping in compileMapping.ts, and the
+//      instantiation-state verdicts in assemblyVerdicts.ts for the
+//      codes that have no lint producer). This is an explicit named
+//      set, not a weakening of the scan: every code here must name
+//      its synthesis, and the test pins the set exactly. (§1.5's
+//      KM_LINT_DUPLICATE_KEYBOARD_ID is deliberately absent: it has
+//      both a lint producer for foreign mode and an authored-mode
+//      assembly verdict.)
 //
 // Warning: adding a lint check means adding its code here in the same
 // change. Until a code is listed here, its criterion honestly resolves
@@ -22,11 +27,19 @@
 /**
  * Codes produced by a named synthesis in the criteria assembly rather
  * than by a keyboard-lint check: §§7.6/7.21 map the host's compile
- * result by diagnostic severity (compileMapping.ts), and §§1.5/2.1/
- * 2.2/2.6 are verdicts computed from the instantiation state
+ * result by diagnostic severity (compileMapping.ts), and §§2.1/2.2/2.6
+ * are verdicts computed from the instantiation state
  * (assemblyVerdicts.ts, Batch 3). Precertified codes (precertify.ts)
  * are NOT here — precertification is a separate resolver mechanism,
  * not an implemented check.
+ *
+ * §1.5 (KM_LINT_DUPLICATE_KEYBOARD_ID) and §2.6
+ * (KM_LINT_VERSION_NOT_INCREMENTED) are NOT here: each has a lint
+ * producer (checkKeyboardIdConflict's PR base-commit ID lookup;
+ * checkVersionNotIncremented's base-commit version comparison) for
+ * foreign mode, alongside its authored-mode assembly verdict —
+ * the scanner finds their `code:` literals, so listing them here would
+ * trip the drift guard's "no lint producer" assertion.
  *
  * Also NOT here, deliberately (Batch 5): KM_LINT_FONT_LICENSE_EMPTY
  * and KM_LINT_FONT_LICENSE_NOT_OPEN (§§9.1/9.2). No lint check emits
@@ -38,10 +51,8 @@
 export const ASSEMBLY_SYNTHESIZED_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
-  "KM_LINT_DUPLICATE_KEYBOARD_ID",
   "KM_LINT_VERSION_NOT_BUMPED",
   "KM_LINT_SPURIOUS_VERSION_BUMP",
-  "KM_LINT_VERSION_NOT_INCREMENTED",
 ]);
 
 /** Lint codes with a real check behind them, mapped to catalog criteria. */
@@ -178,7 +189,9 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_HISTORY_ATTRIBUTION_BAD",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
-  // instantiation-state verdicts (assemblyVerdicts.ts).
+  // instantiation-state verdicts (assemblyVerdicts.ts). §§1.5/2.6 keep
+  // their authored-mode assembly verdicts AND their foreign-mode lint
+  // checks (checkKeyboardIdConflict, checkVersionNotIncremented).
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
   "KM_LINT_DUPLICATE_KEYBOARD_ID",

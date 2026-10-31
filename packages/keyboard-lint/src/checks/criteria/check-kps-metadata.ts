@@ -51,7 +51,7 @@ export function checkKpsFontUnselected(
   if (!facts.fontsInFiles)
     return checkPassed(code, ["No font files in the package."]);
   if (facts.fontSelected !== "")
-    return checkPassed(code, [`Font selected: ${facts.fontSelected}`]);
+    return checkPassed(code, [`File: ${facts.kpsPath}`, `Font selected: ${facts.fontSelected}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_FONT_UNSELECTED",
@@ -70,6 +70,7 @@ export function checkKpsLanguagesUnselected(
   const code = "KM_LINT_KPS_LANGUAGES_UNSELECTED";
   if (facts.languages.length > 0)
     return checkPassed(code, [
+      `File: ${facts.kpsPath}`,
       `Language tags: ${facts.languages.join(", ")}`,
     ]);
   return checkFailed(code, [
@@ -96,6 +97,7 @@ export function checkKpsDetailsUnselected(
   if (facts.detailsLicense === "") missing.push("LICENSE.md (LicenseFile)");
   if (missing.length === 0)
     return checkPassed(code, [
+      `File: ${facts.kpsPath}`,
       `Details tab: ReadMeFile=${facts.detailsReadme || "(none)"}, WelcomeFile=${facts.detailsWelcome || "(none)"}, LicenseFile=${facts.detailsLicense || "(none)"}.`,
     ]);
   return checkFailed(code, [
@@ -131,7 +133,7 @@ export function checkKpsDescriptionEmpty(
 ): CheckResult {
   const code = "KM_LINT_KPS_DESCRIPTION_EMPTY";
   if (facts.description !== "")
-    return checkPassed(code, [`Description: "${facts.description}"`]);
+    return checkPassed(code, [`File: ${facts.kpsPath}`, `Description: "${facts.description}"`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_DESCRIPTION_EMPTY",

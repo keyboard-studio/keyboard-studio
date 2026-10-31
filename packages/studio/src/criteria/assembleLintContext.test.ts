@@ -354,9 +354,9 @@ describe("assembleLintContext", () => {
       // the finding itself, not a missing input).
       KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
       KM_LINT_PHP_CLOSING_TAGS: "the help .php",
-      // The fixture passes no reviewContext (/review-only), so the four
+      // The fixture passes no reviewContext (/review-only), so the six
       // repo-context codes are honestly named missing (Group A2 Batch 5
-      // + Group C). The §19 rows are applicability-gated, not
+      // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
       // input-gated.
       KM_LINT_REPO_PLACEMENT_BAD:
         "the repository context (repo path and file list)",
@@ -366,7 +366,84 @@ describe("assembleLintContext", () => {
         "the repository context (repo path and file list)",
       KM_LINT_FILES_OUTSIDE_FOLDER:
         "the repository context (repo path and file list)",
+      KM_LINT_DUPLICATE_KEYBOARD_ID:
+        "the repository context (repo path and file list)",
+      KM_LINT_VERSION_NOT_INCREMENTED:
+        "the repository context (repo path and file list)",
     });
+  });
+
+  it("1.5: a PR reviewContext without the base lookup names it context-missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+      },
+    });
+    expect(contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"]).toBe(
+      "the PR base-commit keyboard-ID lookup",
+    );
+  });
+
+  it("1.5: a PR reviewContext with the base lookup names nothing missing for 1.5", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        idConflictAtBase: { baseSha: "abc1234", existingTiers: [] },
+      },
+    });
+    expect(contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"]).toBeUndefined();
+  });
+
+  it("1.5: a non-PR reviewContext needs no base lookup", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "release/c/criteria_fixture",
+        treePaths: ["release/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: false,
+      },
+    });
+    expect(contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"]).toBeUndefined();
+  });
+
+  it("2.6: a PR reviewContext without the base version names it context-missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        idConflictAtBase: { baseSha: "abc1234", existingTiers: [] },
+      },
+    });
+    expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBe(
+      "the PR base-commit .kmn version",
+    );
+  });
+
+  it("2.6: a PR reviewContext with the base version names nothing missing for 2.6", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        idConflictAtBase: { baseSha: "abc1234", existingTiers: [] },
+        baseKmnVersion: { baseSha: "abc1234", version: "1.0" },
+      },
+    });
+    expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBeUndefined();
   });
 
   it("without a .kmn, degrades: no IR and the missing input is named", () => {
@@ -492,9 +569,9 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       KM_LINT_WELCOME_LANG_MISMATCH: "source/welcome.htm",
       KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
       KM_LINT_PHP_CLOSING_TAGS: "the help .php",
-      // The fixture passes no reviewContext (/review-only), so the four
+      // The fixture passes no reviewContext (/review-only), so the six
       // repo-context codes are honestly named missing (Group A2 Batch 5
-      // + Group C). The §19 rows are applicability-gated, not
+      // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
       // input-gated.
       KM_LINT_REPO_PLACEMENT_BAD:
         "the repository context (repo path and file list)",
@@ -503,6 +580,10 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       KM_LINT_REPO_ROOT_SOURCE:
         "the repository context (repo path and file list)",
       KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_DUPLICATE_KEYBOARD_ID:
+        "the repository context (repo path and file list)",
+      KM_LINT_VERSION_NOT_INCREMENTED:
         "the repository context (repo path and file list)",
     });
 

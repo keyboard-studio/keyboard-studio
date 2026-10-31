@@ -47,7 +47,7 @@ const SOURCE_EXTS = [".kmn", ".ico", ".kvks", ".keyman-touch-layout", ".kps"];
 export function checkKpsKmxAbsent(facts: KpsListingFacts): CheckResult {
   const code = "KM_LINT_KPS_KMX_ABSENT";
   const hit = facts.fileNames.find((n) => norm(n).endsWith(".kmx"));
-  if (hit !== undefined) return checkPassed(code, [`Listed: ${hit}`]);
+  if (hit !== undefined) return checkPassed(code, [`File: ${facts.kpsPath}`, `Listed: ${hit}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_KMX_ABSENT",
@@ -66,7 +66,7 @@ export function checkKpsKmxAbsent(facts: KpsListingFacts): CheckResult {
 export function checkKpsKvkAbsent(facts: KpsListingFacts): CheckResult {
   const code = "KM_LINT_KPS_KVK_ABSENT";
   const hit = facts.fileNames.find((n) => norm(n).endsWith(".kvk"));
-  if (hit !== undefined) return checkPassed(code, [`Listed: ${hit}`]);
+  if (hit !== undefined) return checkPassed(code, [`File: ${facts.kpsPath}`, `Listed: ${hit}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_KVK_ABSENT",
@@ -91,7 +91,7 @@ export function checkKpsJsAbsent(facts: KpsListingFacts): CheckResult {
   if (!facts.hasTouchLayout)
     return checkPassed(code, ["No touch layout; no .js required."]);
   const hit = facts.fileNames.find((n) => norm(n).endsWith(".js"));
-  if (hit !== undefined) return checkPassed(code, [`Listed: ${hit}`]);
+  if (hit !== undefined) return checkPassed(code, [`File: ${facts.kpsPath}`, `Listed: ${hit}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_JS_ABSENT",
@@ -110,7 +110,7 @@ export function checkKpsJsAbsent(facts: KpsListingFacts): CheckResult {
 export function checkKpsLicenseAbsent(facts: KpsListingFacts): CheckResult {
   const code = "KM_LINT_KPS_LICENSE_ABSENT";
   const hit = facts.fileNames.find((n) => base(n) === "license.md");
-  if (hit !== undefined) return checkPassed(code, [`Listed: ${hit}`]);
+  if (hit !== undefined) return checkPassed(code, [`File: ${facts.kpsPath}`, `Listed: ${hit}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_LICENSE_ABSENT",
@@ -129,7 +129,7 @@ export function checkKpsLicenseAbsent(facts: KpsListingFacts): CheckResult {
 export function checkKpsReadmeAbsent(facts: KpsListingFacts): CheckResult {
   const code = "KM_LINT_KPS_README_ABSENT";
   const hit = facts.fileNames.find((n) => base(n) === "readme.htm");
-  if (hit !== undefined) return checkPassed(code, [`Listed: ${hit}`]);
+  if (hit !== undefined) return checkPassed(code, [`File: ${facts.kpsPath}`, `Listed: ${hit}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_README_ABSENT",
@@ -161,7 +161,7 @@ export function checkKpsWelcomeAbsent(facts: KpsListingFacts): CheckResult {
       (n) =>
         base(n) === "welcome.htm" || IMAGE_EXTS.some((e) => norm(n).endsWith(e)),
     );
-    return checkPassed(code, [`Listed: ${listed.join(", ")}`]);
+    return checkPassed(code, [`File: ${facts.kpsPath}`, `Listed: ${listed.join(", ")}`]);
   }
   return checkFailed(code, [
     criteriaFinding({

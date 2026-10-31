@@ -141,6 +141,108 @@ export function checkFilesOutsideFolder(
   ]);
 }
 
+/**
+ * 1.5 — the keyboard ID (folder name) is not already used in
+ * experimental/, legacy/, or release/.
+ *
+ * Matthew's rule: check the commit BEFORE the PR (the base). The
+ * review host records, per tier, whether the keyboard's folder
+ * already exists at the base sha (ReviewContext.idConflictAtBase).
+ * Three outcomes:
+ *
+ * - Upgrade: the folder exists at base in the PR's own tier and the
+ *   PR modifies it — the normal "next version" case. Met.
+ * - Deprecation/move: the folder exists at base in a DIFFERENT tier
+ *   and the PR moves it (touches the old folder) or the PR body
+ *   mentions deprecation — e.g. release/ → legacy/. Met, named.
+ * - Conflict: the ID exists at base in a tier the PR does not touch
+ *   and no deprecation is in play — a different keyboard with the
+ *   same name. Finding.
+ *
+ * Non-PR targets are already published: ID uniqueness was established
+ * at submission (met-moot). A failed base lookup is the assembly's
+ * contextMissing, never a verdict here.
+ */
+export function checkKeyboardIdConflict(
+  facts: RepoContextFacts,
+): CheckResult {
+  const code = "KM_LINT_DUPLICATE_KEYBOARD_ID";
+  const { review, keyboardId } = facts;
+  if (!review.isPr) {
+    return checkPassed(code, [
+      "Already published in the repo; ID uniqueness was established at submission.",
+    ]);
+  }
+  const conflict = review.idConflictAtBase;
+  if (conflict === undefined) {
+    // Unreachable when the assembly is correct: a PR target without a
+    // base lookup is named in contextMissing before checks run. Never
+    // manufacture a verdict from a missing lookup.
+    return checkPassed(code, []);
+  }
+  const sha7 = conflict.baseSha.slice(0, 7);
+  const segments = review.repoPath.split("/").filter((s) => s !== "");
+  const newTier = segments[0] ?? "";
+  const org = segments[1] ?? "";
+  const idLower = keyboardId.toLowerCase();
+  const changed = (review.treePaths ?? []).map((p) => p.toLowerCase());
+  const deprecatInBody =
+    review.prBody !== undefined && /deprecat/i.test(review.prBody);
+  const upgrades: string[] = [];
+  const moves: string[] = [];
+  const conflicts: string[] = [];
+  for (const tier of conflict.existingTiers) {
+    const folder = `${tier}/${org}/${idLower}/`.toLowerCase();
+    const touched = changed.some((p) => p.startsWith(folder));
+    if (tier.toLowerCase() === newTier.toLowerCase()) {
+      // The reviewed folder itself exists at base: the PR modifies it.
+      upgrades.push(`${tier}/${org}/${keyboardId}`);
+    } else if (touched || deprecatInBody) {
+      // Cross-tier move: the old folder is being retired (touched by
+      // the PR) or the PR body declares a deprecation.
+      const kind =
+        newTier.toLowerCase() === "legacy" || deprecatInBody
+          ? "Deprecation"
+          : "Move";
+      moves.push(
+        `${kind}: ${keyboardId} moving from ${tier}/ to ${newTier}/ (base commit ${sha7}).`,
+      );
+    } else {
+      conflicts.push(tier);
+    }
+  }
+  if (conflicts.length > 0) {
+    return checkFailed(code, [
+      criteriaFinding({
+        code: "KM_LINT_DUPLICATE_KEYBOARD_ID",
+        file: review.repoPath,
+        message:
+          `The keyboard ID "${keyboardId}" is already used by a different keyboard ` +
+          `in ${conflicts.join(", ")} (at the PR's base commit).` +
+          (moves.length > 0 ? ` Also: ${moves.join(" ")}` : "") +
+          (upgrades.length > 0
+            ? ` Also an upgrade to ${upgrades.join(", ")}.`
+            : ""),
+        hint: "Choose a different keyboard ID, or update the existing keyboard instead of adding a new one with the same ID.",
+      }),
+    ]);
+  }
+  const verified: string[] = [];
+  for (const u of upgrades) {
+    verified.push(
+      `Upgrade to existing ${u} (base commit ${sha7}).` +
+        (deprecatInBody ? " PR body mentions deprecation." : ""),
+    );
+  }
+  verified.push(...moves);
+  if (verified.length === 0) {
+    verified.push(
+      `ID "${keyboardId}" not found in experimental/, legacy/, or release/ at base commit ${sha7}.`,
+    );
+  }
+  return checkPassed(code, verified);
+}
+
 const ADAPTED_FROM = /adapted\s+from/i;
 const SHA40 = /\b[0-9a-f]{40}\b/i;
 
@@ -222,7 +324,7 @@ export function checkHistoryAttributionBad(
   ]);
 }
 
-/** Run the repo-context checks (1.2b/1.3b/1.4b + Group C). */
+/** Run the repo-context checks (1.2b/1.3b/1.4b/1.5 + Group C). */
 export function checkRepoContext(
   facts: RepoContextFacts,
 ): ReturnType<typeof mergeResults> {
@@ -231,6 +333,7 @@ export function checkRepoContext(
     checkRepoNoOrganizingFolder(facts),
     checkRepoRootSource(facts),
     checkFilesOutsideFolder(facts),
+    checkKeyboardIdConflict(facts),
   );
 }
 
@@ -248,11 +351,13 @@ export function checkAttribution(
  * The Batch 5 + Group C codes, for the assembly's contextMissing when
  * no reviewContext is present. 19.1b/19.2b are NOT here — their
  * applicability is gated by the adaptation signal, not by input
- * presence.
+ * presence. 1.5 (KM_LINT_DUPLICATE_KEYBOARD_ID) IS here: without a
+ * reviewContext the base-commit lookup cannot run.
  */
 export const REPO_CONTEXT_CODES = [
   "KM_LINT_REPO_PLACEMENT_BAD",
   "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
   "KM_LINT_REPO_ROOT_SOURCE",
   "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_DUPLICATE_KEYBOARD_ID",
 ] as const;

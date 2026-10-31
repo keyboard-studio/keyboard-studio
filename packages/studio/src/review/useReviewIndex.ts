@@ -197,6 +197,8 @@ export interface PrContext {
   filePaths: string[];
   /** The PR description (body), or "" when empty. */
   body: string;
+  /** The PR's base commit sha (the commit before the PR's changes). */
+  baseSha: string;
 }
 
 const prContextCache = new Map<string, Promise<PrContext>>();
@@ -225,15 +227,145 @@ export function fetchPrContext(
     ]);
     if (!prRes.ok) throw new Error(`PR API: HTTP ${prRes.status}`);
     if (!filesRes.ok) throw new Error(`PR files API: HTTP ${filesRes.status}`);
-    const pr = (await prRes.json()) as { body?: string | null };
+    const pr = (await prRes.json()) as {
+      body?: string | null;
+      base?: { sha?: string } | null;
+    };
     const files = (await filesRes.json()) as Array<{ filename?: string }>;
     return {
       filePaths: (Array.isArray(files) ? files : [])
         .map((f) => f.filename ?? "")
         .filter((n) => n !== ""),
       body: pr.body ?? "",
+      baseSha: pr.base?.sha ?? "",
     };
   })();
   prContextCache.set(key, p);
+  return p;
+}
+
+/**
+ * Criterion 1.5's base-commit lookup (Matthew's insight: "you just have
+ * to check the commit before the PR"): the tiers of
+ * experimental/legacy/release where the keyboard's folder already
+ * exists at the PR's base sha.
+ *
+ * Returns null when the lookup fails (API error) or the base sha is
+ * unknown — the caller leaves the field absent and the assembly names
+ * the missing input, never a pass or fail.
+ */
+export interface IdConflictAtBase {
+  baseSha: string;
+  /** Tiers where `{tier}/{org}/{id}/` exists at the base commit. */
+  existingTiers: string[];
+}
+
+const idConflictCache = new Map<string, Promise<IdConflictAtBase | null>>();
+
+const ID_CHECK_TIERS = ["experimental", "release", "legacy"] as const;
+export function fetchIdConflictAtBase(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  /** The keyboard's repo folder, e.g. "experimental/g/gikuyukanya". */
+  targetPath: string,
+): Promise<IdConflictAtBase | null> {
+  const key = `${owner}/${repo}#${prNumber}:idconflict:${targetPath}`;
+  const cached = idConflictCache.get(key);
+  if (cached) return cached;
+  const p = (async (): Promise<IdConflictAtBase | null> => {
+    try {
+      const pr = await fetchPrContext(owner, repo, prNumber);
+      const baseSha = pr.baseSha;
+      if (!baseSha) return null;
+      const segments = targetPath.split("/").filter((s) => s !== "");
+      // targetPath is tier/org/id; check the same org/id under each tier.
+      const org = segments[1] ?? "";
+      const id = segments[segments.length - 1] ?? "";
+      if (!org || !id) return null;
+      const existingTiers: string[] = [];
+      for (const tier of ID_CHECK_TIERS) {
+        const folder = `${tier}/${org}/${id}`;
+        const res = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/contents/${folder}?ref=${baseSha}`,
+          { headers: { Accept: "application/vnd.github+json" } },
+        );
+        if (res.ok) {
+          existingTiers.push(tier);
+        } else if (res.status !== 404) {
+          // Anything but "not found" is a lookup failure, not a pass.
+          return null;
+        }
+      }
+      return { baseSha, existingTiers };
+    } catch {
+      return null;
+    }
+  })();
+  idConflictCache.set(key, p);
+  return p;
+}
+
+/**
+ * Parse a .kmn's declared version: store(&KEYBOARDVERSION) wins, then
+ * store(&VERSION) — mirroring the IR parser's `keyboardVersion || version`.
+ */
+function parseKmnVersionText(kmnText: string): string | undefined {
+  const kv = /store\s*\(\s*&KEYBOARDVERSION\s*\)\s*["']([^"']*)["']/i.exec(kmnText);
+  if (kv && kv[1]!.trim() !== "") return kv[1]!.trim();
+  const v = /store\s*\(\s*&VERSION\s*\)\s*["']([^"']*)["']/i.exec(kmnText);
+  if (v && v[1]!.trim() !== "") return v[1]!.trim();
+  return undefined;
+}
+
+/**
+ * Criterion 2.6's base-commit lookup: the judged .kmn's declared
+ * version at the PR's base sha.
+ *
+ * Returns null on API failure (the caller leaves the field absent and
+ * the assembly names the missing input). A 404 — the .kmn is new at
+ * the base — returns a present entry with no version: nothing to
+ * increment from, not a lookup failure.
+ */
+const baseKmnVersionCache = new Map<
+  string,
+  Promise<{ baseSha: string; version?: string } | null>
+>();
+
+export function fetchBaseKmnVersion(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  /** Repo-relative .kmn path, e.g. "experimental/g/foo/source/foo.kmn". */
+  kmnRepoPath: string,
+): Promise<{ baseSha: string; version?: string } | null> {
+  const key = `${owner}/${repo}#${prNumber}:basever:${kmnRepoPath}`;
+  const cached = baseKmnVersionCache.get(key);
+  if (cached) return cached;
+  const p = (async (): Promise<{ baseSha: string; version?: string } | null> => {
+    try {
+      const pr = await fetchPrContext(owner, repo, prNumber);
+      const baseSha = pr.baseSha;
+      if (!baseSha) return null;
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${kmnRepoPath}?ref=${baseSha}`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      );
+      if (res.status === 404) return { baseSha };
+      if (!res.ok) return null;
+      const body = (await res.json()) as {
+        content?: string;
+        encoding?: string;
+      };
+      if (typeof body.content !== "string" || body.encoding !== "base64")
+        return null;
+      const text = atob(body.content);
+      const version = parseKmnVersionText(text);
+      return version === undefined ? { baseSha } : { baseSha, version };
+    } catch {
+      return null;
+    }
+  })();
+  baseKmnVersionCache.set(key, p);
   return p;
 }

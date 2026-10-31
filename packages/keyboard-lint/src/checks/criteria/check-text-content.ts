@@ -223,7 +223,7 @@ export function checkReadmeKeymanLinkAbsent(
     return checkPassed(code, ["No README.md to check."]);
   const want = `https://keyman.com/keyboards/${facts.keyboardId}`.toLowerCase();
   if (facts.readmeMd.toLowerCase().includes(want))
-    return checkPassed(code, [`Found: ${want}`]);
+    return checkPassed(code, ["File: README.md", `Found: ${want}`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_README_KEYMAN_LINK_ABSENT",
@@ -247,7 +247,7 @@ export function checkReadmeHelpLinkAbsent(
   const https = `https://help.keyman.com/keyboard/${id}`;
   if (lowered.includes(http) || lowered.includes(https)) {
     const found = lowered.includes(https) ? https : http;
-    return checkPassed(code, [`Found: ${found}`]);
+    return checkPassed(code, ["File: README.md", `Found: ${found}`]);
   }
   return checkFailed(code, [
     criteriaFinding({
@@ -275,6 +275,7 @@ export function checkWelcomeLangMismatch(
   const lang = (m?.[1] ?? "").trim().toLowerCase();
   if (lang === facts.primaryBcp47.toLowerCase())
     return checkPassed(code, [
+      "File: source/welcome.htm",
       `welcome.htm <html lang="${m?.[1]}"> matches "${facts.primaryBcp47}".`,
     ]);
   return checkFailed(code, [
@@ -333,7 +334,7 @@ export function checkPhpHeaderBad(facts: TextContentFacts): CheckResult {
   // Strip a BOM before checking the open tag.
   const text = facts.php.replace(/^\ufeff/, "");
   if (PHP_OPEN.test(text) && PHP_HEADER_BLOCK.test(text))
-    return checkPassed(code, [`Found: ${phpFile} with PHP header.`]);
+    return checkPassed(code, [`File: ${phpFile}`, `Found: ${phpFile} with PHP header.`]);
   const firstLine = text.split("\n")[0]?.trim();
   return checkFailed(code, [
     criteriaFinding({
@@ -357,7 +358,7 @@ export function checkPhpStyleOutside(facts: TextContentFacts): CheckResult {
   const closeIdx = facts.php.indexOf("?>");
   const outside = closeIdx >= 0 ? facts.php.slice(closeIdx + 2) : facts.php;
   if (!/<style[\s>]/i.test(outside))
-    return checkPassed(code, ["No <style> outside the PHP header block."]);
+    return checkPassed(code, [`File: ${phpFile}`, "No <style> outside the PHP header block."]);
   const line = firstMatchingLine(outside, /<style[\s>]/i);
   return checkFailed(code, [
     criteriaFinding({
@@ -378,7 +379,7 @@ export function checkPhpClosingTags(facts: TextContentFacts): CheckResult {
     return checkPassed(code, ["No .php file to check."]);
   const phpFile = facts.phpPath ?? "source/help/" + facts.keyboardId + ".php";
   if (!/<\/(body|html)\s*>/i.test(facts.php))
-    return checkPassed(code, ["No closing </body> or </html> tags."]);
+    return checkPassed(code, [`File: ${phpFile}`, "No closing </body> or </html> tags."]);
   const line = firstMatchingLine(facts.php, /<\/(body|html)\s*>/i);
   return checkFailed(code, [
     criteriaFinding({

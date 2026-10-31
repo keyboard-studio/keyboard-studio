@@ -130,18 +130,20 @@ describe("resolveCriteria — foreign baseline", () => {
 
     expect(result.rows).toHaveLength(188);
     expect(result.counts).toEqual({
-      // 91 = the 91 implemented layer-c checks that are applicable with
-      // no findings in the synthetic baseline (no contextMissing).
-      met: 91,
+      // 93 = the 93 implemented layer-c checks that are applicable with
+      // no findings in the synthetic baseline (no contextMissing) —
+      // including 1.5/2.6, which resolve via their lint checks in
+      // foreign mode.
+      met: 93,
       "not-met": 0,
       // The §19 twin rows are Not applicable without an adaptation signal.
       "not-applicable": 2,
       "needs-author": 32,
       "needs-human": 10,
-      // 40 foreign scaffolder-bake rows + 13 unimplemented layer-c.
-      "not-yet-checkable": 53,
+      // 40 foreign scaffolder-bake rows + 11 unimplemented layer-c.
+      "not-yet-checkable": 51,
     });
-    expect(result.resolvedCount).toBe(93); // 91 met + 2 not-applicable
+    expect(result.resolvedCount).toBe(95); // 93 met + 2 not-applicable
     for (const row of result.rows) {
       expect(row.controls).toBeNull();
     }

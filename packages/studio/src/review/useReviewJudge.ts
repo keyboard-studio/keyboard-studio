@@ -27,7 +27,11 @@ import {
   type JudgeWorkerOutput,
 } from "./judgeWorkerProtocol.ts";
 import type { ReviewSnapshot } from "./useReviewSnapshot.ts";
-import { fetchPrContext } from "./useReviewIndex.ts";
+import {
+  fetchBaseKmnVersion,
+  fetchIdConflictAtBase,
+  fetchPrContext,
+} from "./useReviewIndex.ts";
 import type { ReviewTarget } from "./reviewSources.ts";
 
 /** Hard timeout for one battery run: the worker is terminated. */
@@ -56,12 +60,32 @@ async function buildReviewContext(
       : undefined;
   if (target.prNumber !== undefined) {
     const pr = await fetchPrContext(target.owner, target.repo, target.prNumber);
+    // 1.5: does the keyboard ID already exist at the base commit?
+    // 2.6: what version did the base .kmn declare?
+    // A failed lookup leaves the field absent — the assembly names the
+    // missing input (contextMissing), never a pass or fail.
+    const [idConflict, baseKmn] = await Promise.all([
+      fetchIdConflictAtBase(
+        target.owner,
+        target.repo,
+        target.prNumber,
+        target.path,
+      ),
+      fetchBaseKmnVersion(
+        target.owner,
+        target.repo,
+        target.prNumber,
+        `${target.path}/source/${target.keyboardId}.kmn`,
+      ),
+    ]);
     return {
       repoPath: target.path,
       treePaths: pr.filePaths,
       prBody: pr.body,
       isPr: true,
       ...(historyMd !== undefined ? { historyMd } : {}),
+      ...(idConflict !== null ? { idConflictAtBase: idConflict } : {}),
+      ...(baseKmn !== null ? { baseKmnVersion: baseKmn } : {}),
     };
   }
   return {

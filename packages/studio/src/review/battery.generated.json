@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-31T04:16:26.253Z",
+ "generatedAt": "2026-10-31T06:43:19.421Z",
  "catalogSize": 188,
  "byBand": {
   "layer-c-enforce": 106,
@@ -123,7 +123,9 @@
    },
    "implemented": true,
    "precertified": false,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
   },
   {
    "id": "1.6-id-does-not-contain-keyboard",
@@ -379,7 +381,10 @@
    },
    "implemented": true,
    "precertified": false,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
   },
   {
    "id": "2.7-kpj-version-not-bumped",

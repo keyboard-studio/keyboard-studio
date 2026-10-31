@@ -79,6 +79,7 @@ import { checkTouchLayoutFontMismatch } from "./checks/criteria/check-touch-font
 import {
   checkVersionFormat,
   checkVersionLeadingZero,
+  checkVersionNotIncremented,
   checkVersionVPrefix,
 } from "./checks/criteria/check-version.js";
 import { checkDeprecatedKpsLinkage } from "./checks/criteria/check-deprecated-kps.js";
@@ -340,6 +341,10 @@ export function runCriteriaChecks(
     collect(checkVersionFormat(keyboardIR));
     collect(checkVersionLeadingZero(keyboardIR));
     collect(checkVersionVPrefix(keyboardIR));
+    // 2.6 — foreign-only: the PR's version against the base commit's.
+    // The authored host judges this from instantiation state (assembly
+    // verdict); the resolver defers to this check in foreign mode.
+    collect(checkVersionNotIncremented(keyboardIR, input.reviewContext));
     collect(checkIdContainsKeyboard(keyboardIR, input.kpsDisplayName));
     collect(
       checkDisplayNameUnderscore(keyboardIR, input.kpsDisplayName),

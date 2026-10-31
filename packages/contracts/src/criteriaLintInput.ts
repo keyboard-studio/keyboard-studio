@@ -159,4 +159,28 @@ export interface ReviewContext {
   isPr: boolean;
   /** HISTORY.md text, when the file exists in the judged VFS. */
   historyMd?: string;
+  /**
+   * Criterion 1.5 (PR targets only): the PR's base commit sha and the
+   * tiers (of experimental/legacy/release) where the keyboard's folder
+   * already exists at that commit. Absent when the target is not a PR,
+   * or when the base-commit lookup failed — the assembly then names
+   * the missing input rather than letting the row pass or fail
+   * undecided.
+   */
+  idConflictAtBase?: {
+    baseSha: string;
+    existingTiers: readonly string[];
+  };
+  /**
+   * Criterion 2.6 (PR targets only): the judged .kmn's declared version
+   * at the PR's base commit, for the "strictly greater" comparison.
+   * Absent when the target is not a PR or when the base .kmn cannot be
+   * fetched (API error — the assembly names the missing input). A
+   * present entry with no version means the base declares none (or the
+   * .kmn is new): nothing to increment from.
+   */
+  baseKmnVersion?: {
+    baseSha: string;
+    version?: string;
+  };
 }
