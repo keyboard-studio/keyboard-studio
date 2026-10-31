@@ -30,6 +30,7 @@ import {
   BORDER,
   ERROR_TEXT,
   FONT,
+  FONT_MONO,
   SUCCESS_ACCENT,
   TEXT_DIM,
   WARNING,
@@ -143,6 +144,14 @@ const controlButtonStyle: React.CSSProperties = {
 
 const evidenceLineStyle: React.CSSProperties = { margin: "0 0 4px", color: TEXT_DIM };
 
+const evidenceCodeStyle: React.CSSProperties = {
+  fontFamily: FONT_MONO,
+  fontSize: 12,
+  background: "var(--app-bg-inset)",
+  padding: "1px 4px",
+  borderRadius: 3,
+};
+
 export function CriterionRow({
   row,
   mode,
@@ -190,8 +199,23 @@ export function CriterionRow({
   /**
    * Linkify "File: <path>" evidence lines to the GitHub blob at the pinned
    * sha (opens in a new tab). Only in hosts that pass githubLink (/review).
+   * Values (quoted strings, paths) render in monospace code style.
    */
   const renderEvidenceLine = (line: string, index: number): React.ReactNode => {
+    // Helper: wrap quoted strings in <code>
+    const withCode = (text: string): React.ReactNode[] => {
+      const parts = text.split(/("[^"]*")/g);
+      return parts.map((part, i) =>
+        part.startsWith('"') && part.endsWith('"') && part.length > 1 ? (
+          <code key={i} style={evidenceCodeStyle}>
+            {part}
+          </code>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      );
+    };
+
     if (githubLink) {
       const m = /^File: (.+)$/.exec(line);
       if (m) {
@@ -204,13 +228,17 @@ export function CriterionRow({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: ACCENT }}
+              style={{ color: ACCENT, fontFamily: FONT_MONO, fontSize: 12 }}
             >
               {path}
             </a>
           </>
         );
       }
+    }
+    // Wrap quoted values in code style
+    if (line.includes('"')) {
+      return <>{withCode(line)}</>;
     }
     return line;
   };
