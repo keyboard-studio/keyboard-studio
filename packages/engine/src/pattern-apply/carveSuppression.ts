@@ -273,7 +273,30 @@ function compileSlotGuards(
     }
   }
 
-  return restorations;
+  // Cross-rule dedupe: two distinct paired rules over stores with identical
+  // items (e.g. `any(Cu)` / `any(Co)`) substitute to the same guard context,
+  // and the later copy can never fire (the verb is a pure function of the
+  // context). Keep the EARLIEST guard by position in the group — slots iterate
+  // in a different order from rules, so first-emitted is not first-positioned.
+  // Only guards emitted by this run are candidates.
+  const emitted = new Set(restorations.map((r) => r.synthesizedNodeId));
+  const dropped = new Set<string>();
+  for (const nextGroup of nextGroups.values()) {
+    const seen = new Set<string>();
+    nextGroup.rules = nextGroup.rules.filter((r) => {
+      if (!emitted.has(r.nodeId)) return true;
+      const key = JSON.stringify(r.context);
+      if (seen.has(key)) {
+        dropped.add(r.nodeId);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }
+  return dropped.size === 0
+    ? restorations
+    : restorations.filter((r) => r.synthesizedNodeId === undefined || !dropped.has(r.synthesizedNodeId));
 }
 
 /**

@@ -673,6 +673,47 @@ describe("store-slot guard rules (T013)", () => {
     expect(result.restorations.filter((r) => r.kind === "guard")).toHaveLength(2);
   });
 
+  it("emits one guard when two distinct rules over identical-item stores substitute to the same context", () => {
+    // Cree Cu/Co shape: twin stores with equal items, twin rules.
+    const ir: KeyboardIR = {
+      nodeId: "kbd",
+      stores: [
+        charStore({ nodeId: "store#cu", name: "Cu", chars: ["a", "b"] }),
+        charStore({ nodeId: "store#co", name: "Co", chars: ["a", "b"] }),
+      ],
+      groups: [
+        {
+          nodeId: "group#main",
+          rules: [
+            charRule({
+              nodeId: "ruleCu",
+              context: [{ kind: "any", storeRef: "Cu" }, { kind: "char", value: "x" }],
+              output: [{ kind: "char", value: "1" }],
+            }),
+            charRule({
+              nodeId: "ruleCo",
+              context: [{ kind: "any", storeRef: "Co" }, { kind: "char", value: "x" }],
+              output: [{ kind: "char", value: "2" }],
+            }),
+          ],
+        },
+      ],
+    };
+    // Carve the Co side first so the first-emitted guard belongs to the later rule.
+    const result = compileCarveSuppression(ir, ["store#co#0", "store#cu#0"].map(blockDisposition));
+    const rules = result.ir.groups[0]!.rules;
+    const guards = rules.filter((r) => r.nodeId.startsWith("gen-carve-guard-"));
+    expect(guards).toHaveLength(1);
+    // The kept guard is the earliest by position: ahead of ruleCu.
+    expect(rules.map((r) => r.nodeId.startsWith("gen-carve-guard-") ? "guard" : r.nodeId)).toEqual([
+      "guard",
+      "ruleCu",
+      "ruleCo",
+    ]);
+    const guardRestorations = result.restorations.filter((r) => r.kind === "guard");
+    expect(guardRestorations.map((r) => r.synthesizedNodeId)).toEqual(guards.map((g) => g.nodeId));
+  });
+
   it("carving only one side yields the same guards as carving both", () => {
     const one = compileCarveSuppression(bkspPairIR(), ["store#composed#0", "store#composed#1"].map(blockDisposition));
     const both = compileCarveSuppression(
