@@ -80,7 +80,8 @@ export interface ProjectionExtras {
 
 /**
  * Step 2.6's input from the marks-treatment value: null until the series
- * completes. The bare-mark answer is the guard specification's behaviour.
+ * completes. Buffer-start behaviour is per mark (issue #2374) and travels on
+ * the worklist's `bareMarkAllowed` channel — no keyboard-wide answer.
  */
 export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): MarksGuardsInput | null {
   const completion = value?.completion;
@@ -90,7 +91,6 @@ export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): Ma
     outputForm: completion.outputForm,
     ...(completion.backspace !== undefined ? { backspace: completion.backspace } : {}),
     ...(completion.stacks !== undefined ? { stacks: completion.stacks } : {}),
-    ...(value?.guardSpecification != null ? { bareMarkBehaviour: value.guardSpecification.behaviour } : {}),
   };
 }
 

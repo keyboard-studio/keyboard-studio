@@ -44,6 +44,7 @@ export {
 } from "./applyStoreSlotRemovals.js";
 export type {
   StoreSlotRemovalResult,
+  CascadedSlotRemoval,
   StoreSlotEditMode,
   StoreSlotBlockReason,
   StorePairingDescription,

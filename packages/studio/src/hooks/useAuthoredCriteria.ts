@@ -44,6 +44,7 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
     ready,
     vfs,
     lintFindings,
+    verifiedByCode,
     contextMissing,
     compileResult,
     assemblyVerdicts,
@@ -56,6 +57,7 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
       criteria: ALL_CRITERIA,
       mode: "authored",
       lintFindings,
+      verifiedByCode,
       record: {
         attestations,
         confirmations,

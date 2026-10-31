@@ -16,7 +16,10 @@
 //   2. basis    `isCasedBaseKeyboard(startIr)` -> `deriveMarksBasis(...)`
 //               (classes, proposals via the engine's `proposeAttachments`,
 //               posture). `marksStationDefaults(...)` runs 2-6 in the step's
-//               own order and returns every station's default answer.
+//               own order and returns every station's default answer. The
+//               start-of-line box's default comes from
+//               `startOfLineSeed(value, startOfLineImportSeeded(track, startIr))`
+//               and is passed in as `startOfLineDefault`.
 //   3. override the case's choices on the returned state: `inputOrder`,
 //               `outputForm`, `backspace`. (An override of `inputOrder` or
 //               `outputForm` is applied BEFORE the stations after it are
@@ -38,7 +41,6 @@ import type {
   AttestedStack,
   BackspaceBehaviour,
   ConfirmedAlphabet,
-  GuardSpecification,
   KeyboardIR,
   MarkInputOrder,
   MarksContextToleranceDecision,
@@ -98,15 +100,12 @@ import {
   type AttachmentChecked,
   type MarksStationId,
 } from "./marksViews.ts";
+import { detectImportedStartOfLineSeed } from "./importedStartOfLine.ts";
 import {
-  GUARD_BEHAVIOUR_QUESTION_ID,
-  DEFAULT_GUARD_BEHAVIOUR,
-  detectImportedGuardBehaviour,
-  findGuardReevaluationItems,
-  makeGuardSpecification,
-  type GuardBehaviour,
-} from "./guardSpecification.ts";
-import type { MarksCompletion, MarksTreatmentValue } from "./marksValue.ts";
+  legacyGuardSpecification,
+  type MarksCompletion,
+  type MarksTreatmentValue,
+} from "./marksValue.ts";
 import {
   CONTEXT_TOLERANCE_QUESTION_ID,
   CONTEXT_TOLERANCE_SITES_QUESTION_ID,
@@ -160,26 +159,21 @@ export interface VisibleStationsInput {
   stackingEvidence: boolean;
   /** The context-tolerance station is shown (analysis running, or a proposal exists). */
   showToleranceStation: boolean;
-  hasOwnKeyMark: boolean;
 }
 
 /**
- * The stations the series shows, in series order (FR-018/SC-003, plus the
- * context-tolerance and guard stations). A station with nothing to decide is
+ * The stations the series shows, in series order (at most four, FR-018/SC-003,
+ * plus the context-tolerance station). A station with nothing to decide is
  * absent.
  */
 export function visibleMarksStations(input: VisibleStationsInput): MarksStationId[] {
-  const { proposals, classes, posture, stackingEvidence, showToleranceStation, hasOwnKeyMark } = input;
+  const { proposals, classes, posture, stackingEvidence, showToleranceStation } = input;
   const stations: MarksStationId[] = [];
   if (proposals.length > 0) stations.push("marks_attachment");
   if (classes.some((c) => classNeedsTreatmentScreen(c, [...proposals]))) stations.push("marks_treatment");
   if (hasDecidablePairs(posture)) stations.push("marks_output_form");
   if (stackingEvidence) stations.push("marks_stacking");
   if (showToleranceStation) stations.push("marks_context_tolerance");
-  // Only a mark with a key of its own can be tapped with no letter before it.
-  // Output form is not the test: a ready-made keyboard can still have mark
-  // keys (output composition is independent of placement).
-  if (hasOwnKeyMark) stations.push("marks_guard");
   return stations;
 }
 
@@ -220,6 +214,46 @@ export function deriveMarksBasis(
     proposals: proposeAttachments(alphabet, classes, fold),
     posture: nfcPostureOfInventory(alphabet),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The start-of-line box's default (issue #2374)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a Track 2 import seeds the per-mark "start of line" box ticked: the
+ * author is adapting an existing keyboard whose own marks are all unguarded
+ * (`detectImportedStartOfLineSeed`), so a re-imported emit-keyboard does not
+ * silently flip to blocked at line start.
+ */
+export function startOfLineImportSeeded(
+  authoringTrack: unknown,
+  startIr: KeyboardIR | null | undefined,
+): boolean {
+  return authoringTrack === "adapt" && startIr != null && detectImportedStartOfLineSeed(startIr);
+}
+
+export interface StartOfLineSeed {
+  /**
+   * A CONFIRMED legacy guard record with behaviour "emit" migrates as ticked
+   * (origin "migrated-from-guard"). Confirmed "swallow" is a no-op;
+   * seeded-but-unconfirmed records are dropped (never adopted).
+   */
+  migrated: boolean;
+  /** The box's default before the author answers: migrated, or seeded by the import. */
+  defaultTicked: boolean;
+}
+
+/**
+ * The per-mark "start of line" box opens unticked, which reproduces the old
+ * `swallow` exactly. A migrated legacy record or the Track 2 import seed
+ * (`startOfLineImportSeeded`) pre-ticks it; a saved answer always wins over
+ * this default (reconcile).
+ */
+export function startOfLineSeed(marksValue: MarksTreatmentValue, importSeeded: boolean): StartOfLineSeed {
+  const legacyGuard = legacyGuardSpecification(marksValue);
+  const migrated = legacyGuard?.confirmed === true && legacyGuard.behaviour === "emit";
+  return { migrated, defaultTicked: migrated || importSeeded };
 }
 
 /**
@@ -519,8 +553,6 @@ export interface MarksStationState {
   multiMarkStacks: readonly AttestedStack[];
   stackingAllowed: boolean;
   stacksConfirmed: Readonly<Record<string, boolean>>;
-  /** The behaviour the guard station shows (the author's pick, a prior answer, the seed, or the default). */
-  guardChoice: GuardBehaviour;
 }
 
 /** The bases a mark's attachment row has ticked. */
@@ -578,10 +610,6 @@ export function marksStationAnswers(stationId: MarksStationId, state: MarksStati
         { questionId: "marks.marks_stacking.stacks", answerType: "char-list", value: confirmedKeys },
       ];
     }
-    case "marks_guard":
-      // The answer rides the completion like every other station's (R-04); the
-      // load-bearing record is the GuardSpecification in the decision value.
-      return [{ questionId: GUARD_BEHAVIOUR_QUESTION_ID, answerType: "select", value: state.guardChoice }];
     default:
       return [];
   }
@@ -596,107 +624,8 @@ export function marksSeriesAnswers(
 }
 
 // ---------------------------------------------------------------------------
-// Guard specification and context-tolerance decision (spec 104 / spec 078)
+// Context-tolerance decision (spec 078)
 // ---------------------------------------------------------------------------
-
-/**
- * The Track 2 seed behaviour: the imported keyboard's own guard behaviour. A
- * CONFIRMED prior ends the question; an UNCONFIRMED prior is the seed itself,
- * recorded provisionally by an intermediate commit, so the seed signal must
- * survive it.
- */
-export function guardSeedBehaviourFor(input: {
-  authoringTrack: unknown;
-  priorGuard: GuardSpecification | undefined;
-  startIr: KeyboardIR | null | undefined;
-}): GuardBehaviour | undefined {
-  const { authoringTrack, priorGuard, startIr } = input;
-  return authoringTrack === "adapt" && !(priorGuard?.confirmed ?? false) && startIr != null
-    ? detectImportedGuardBehaviour(startIr)
-    : undefined;
-}
-
-/** The seed specification for a seed behaviour (unconfirmed, extracted provenance). */
-export function guardSeedFor(seedBehaviour: GuardBehaviour | undefined): GuardSpecification | undefined {
-  return seedBehaviour !== undefined
-    ? makeGuardSpecification({
-        behaviour: seedBehaviour,
-        origin: "seeded-from-import",
-        confirmed: false,
-        supersedesRecord: null,
-      })
-    : undefined;
-}
-
-/** The behaviour the guard station displays: the pick, else the prior answer, else the seed, else the default. */
-export function guardChoiceOf(input: {
-  guardAnswer: GuardSpecification | null;
-  priorGuard: GuardSpecification | undefined;
-  seedBehaviour: GuardBehaviour | undefined;
-}): GuardBehaviour {
-  const { guardAnswer, priorGuard, seedBehaviour } = input;
-  return guardAnswer?.behaviour ?? priorGuard?.behaviour ?? seedBehaviour ?? DEFAULT_GUARD_BEHAVIOUR;
-}
-
-/** The specification a pick on the guard station records. */
-export function guardAnswerFor(input: {
-  behaviour: GuardBehaviour;
-  priorGuard: GuardSpecification | undefined;
-  guardSeed: GuardSpecification | undefined;
-}): GuardSpecification {
-  const { behaviour, priorGuard, guardSeed } = input;
-  const origin: GuardSpecification["origin"] =
-    guardSeed !== undefined && priorGuard === undefined && behaviour === guardSeed.behaviour
-      ? "seeded-from-import"
-      : "asked";
-  return makeGuardSpecification({
-    behaviour,
-    origin,
-    confirmed: true,
-    supersedesRecord: priorGuard ?? guardSeed ?? null,
-  });
-}
-
-/**
- * The specification a commit point records: the author's station answer wins;
- * a prior record is carried unchanged; a seed rides provisionally until the
- * commit point IS the guard station's own Continue, which confirms it as-is.
- * With neither, the default is recorded only at the guard station's own
- * Continue: the author saw it selected and passed.
- */
-export function guardRecordForCommit(input: {
-  station: MarksStationId;
-  guardAnswer: GuardSpecification | null;
-  priorGuard: GuardSpecification | undefined;
-  guardSeed: GuardSpecification | undefined;
-}): GuardSpecification | null {
-  const { station, guardAnswer, priorGuard, guardSeed } = input;
-  if (guardAnswer !== null) return guardAnswer;
-  // A CONFIRMED prior carries unchanged. An unconfirmed prior is the
-  // provisional seed itself (an intermediate commit recorded it): it must fall
-  // through to the seed branch, or passing the guard station would never
-  // confirm it.
-  if (priorGuard !== undefined && priorGuard.confirmed) return priorGuard;
-  if (guardSeed !== undefined) {
-    return station === "marks_guard"
-      ? makeGuardSpecification({
-          behaviour: guardSeed.behaviour,
-          origin: "seeded-from-import",
-          confirmed: true,
-          supersedesRecord: guardSeed,
-        })
-      : guardSeed;
-  }
-  if (station === "marks_guard") {
-    return makeGuardSpecification({
-      behaviour: DEFAULT_GUARD_BEHAVIOUR,
-      origin: "asked",
-      confirmed: true,
-      supersedesRecord: priorGuard ?? null,
-    });
-  }
-  return priorGuard ?? null;
-}
 
 /**
  * The context-tolerance decision to report (spec 078). A decision taken on
@@ -750,21 +679,20 @@ export function contextToleranceAnswers(decision: MarksContextToleranceDecision)
  * The marks-treatment decision value (spec 090 T023): the answer composite in
  * record form, the completion payload (null unless the series is completing —
  * an answer record after a completion therefore clears it, so a stale payload
- * can never re-apply), the context-tolerance decision the value currently
- * carries, and the guard specification.
+ * can never re-apply), and the context-tolerance decision the value currently
+ * carries.
  */
 export function buildMarksTreatmentValue(
   stationAnswers: readonly SurveyAnswer[],
   completion: MarksCompletion | null,
   tolerance: MarksContextToleranceDecision | null,
-  guard: GuardSpecification | null,
 ): MarksTreatmentValue {
   const answers: Record<string, string | string[] | boolean | undefined> = {};
   for (const a of stationAnswers) answers[a.questionId] = a.value;
   if (tolerance !== null) {
     for (const a of contextToleranceAnswers(tolerance)) answers[a.questionId] = a.value;
   }
-  return { answers, completion, contextTolerance: tolerance, guardSpecification: guard };
+  return { answers, completion, contextTolerance: tolerance };
 }
 
 /**
@@ -815,10 +743,8 @@ export interface AssembleMarksSeriesInput {
   /** Every station's answer state. */
   state: MarksStationState;
   visibleStations: readonly MarksStationId[];
-  /** The working copy's IR at completion (R10 and guard re-evaluation read it); null when none. */
+  /** The working copy's IR at completion (the R10 determination reads it); null when none. */
   workingIr: KeyboardIR | null;
-  /** The guard specification the completing commit point records (null when none). */
-  guard: GuardSpecification | null;
   /** The tolerance decision taken or carried on this pass, if any (reported on the phase result). */
   reportedTolerance?: MarksContextToleranceDecision | undefined;
   /** What the value records: the reported decision, else the prior one still held, else null. */
@@ -845,9 +771,7 @@ export interface AssembledMarksSeries {
  * promoting a lowercase marked character derives its uppercase counterpart
  * (spec 052 FR-023). The computed axes project the recorded treatment onto
  * A4/A3a so strategy selection sees it (US4). `migrationNeeded` is the retired
- * reducer's R10 determination, read from the pre-guard working IR. The guard
- * re-evaluation is REPORTED in the completion, never silently re-minted
- * (spec 104 US1 scenario 6).
+ * reducer's R10 determination, read from the pre-guard working IR.
  */
 export function assembleMarksSeries(input: AssembleMarksSeriesInput): AssembledMarksSeries {
   const {
@@ -860,7 +784,6 @@ export function assembleMarksSeries(input: AssembleMarksSeriesInput): AssembledM
     state,
     visibleStations,
     workingIr,
-    guard,
     reportedTolerance,
     effectiveTolerance,
   } = input;
@@ -885,8 +808,6 @@ export function assembleMarksSeries(input: AssembleMarksSeriesInput): AssembledM
     state.outputForm === "base-plus-mark" &&
     workingIr !== null &&
     detectStartMarkMechanism(workingIr) === "precomposed";
-  const guardReevaluation =
-    guard !== null && workingIr !== null ? findGuardReevaluationItems(workingIr, guard) : [];
 
   const completion: MarksCompletion = {
     worklist,
@@ -894,12 +815,11 @@ export function assembleMarksSeries(input: AssembleMarksSeriesInput): AssembledM
     backspace: state.backspace,
     stacks: keptAttestedStacks(alphabet, state.stackingAllowed, state.stacksConfirmed),
     migrationNeeded,
-    guardReevaluation,
   };
   return {
     answers,
     completion,
-    value: buildMarksTreatmentValue(answers, completion, effectiveTolerance, guard),
+    value: buildMarksTreatmentValue(answers, completion, effectiveTolerance),
     result: seriesResult(worklist, state.outputForm, computedAxes, answers, reportedTolerance, state.backspace),
   };
 }
@@ -916,6 +836,11 @@ export interface MarksStationDefaultsInput {
   importedOrder?: string | undefined;
   /** The context-tolerance station is shown; the default walk has no analysis, so false unless told. */
   showToleranceStation?: boolean;
+  /**
+   * The start-of-line box's default (`startOfLineSeed(...).defaultTicked`):
+   * false unless a migrated legacy record or the Track 2 import seeds it.
+   */
+  startOfLineDefault?: boolean;
   /**
    * Author choices applied on top of the defaults. `inputOrder` is applied
    * before the output-form proposal is resolved and `outputForm` before the
@@ -943,7 +868,7 @@ export interface MarksStationDefaults {
 /**
  * Every station's default answer for an alphabet, resolved in the step's own
  * order with the same functions the step calls (no saved answers). Spread the
- * result into `assembleMarksSeries` with the guard, working IR and tolerance.
+ * result into `assembleMarksSeries` with the working IR and tolerance.
  * On a skipped gate the stations are empty and `visibleStations` is `[]`.
  */
 export function marksStationDefaults(input: MarksStationDefaultsInput): MarksStationDefaults {
@@ -953,7 +878,12 @@ export function marksStationDefaults(input: MarksStationDefaultsInput): MarksSta
   const saved: SavedAnswers = {};
   const isCasedBase = isCasedBaseKeyboard(startIr);
   const basis = deriveMarksBasis(alphabet, isCasedBase, bcp47);
-  const attachmentChecked = reconciledAttachmentChecked(alphabet, basis.proposals, saved);
+  const attachmentChecked = reconciledAttachmentChecked(
+    alphabet,
+    basis.proposals,
+    saved,
+    input.startOfLineDefault === true,
+  );
   const expandedAttachments = expandAttachmentsForCase(alphabet, attachmentChecked, isCasedBase, bcp47);
   const treatmentPrefills = deriveTreatmentPrefills({ alphabet, basis, startIr, expandedAttachments });
   const t = resolveTreatmentStation({
@@ -990,7 +920,6 @@ export function marksStationDefaults(input: MarksStationDefaultsInput): MarksSta
         posture: basis.posture,
         stackingEvidence: stacking.stackingEvidence,
         showToleranceStation: input.showToleranceStation === true,
-        hasOwnKeyMark: t.hasOwnKeyMark,
       });
 
   return {
@@ -1013,7 +942,6 @@ export function marksStationDefaults(input: MarksStationDefaultsInput): MarksSta
       multiMarkStacks,
       stackingAllowed: stacking.stackingAllowed,
       stacksConfirmed: stacking.stacksConfirmed,
-      guardChoice: DEFAULT_GUARD_BEHAVIOUR,
     },
   };
 }

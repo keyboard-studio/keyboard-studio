@@ -14,3 +14,10 @@ byte for byte, never edited. `scripts/genDecisionPoints.ts` reads them to write 
 
 The two remaining round-3 records (`camqwerty.json`, `camazerty.json`) predate the S-02 fix, and either may carry `zzq` placeholder assignments from the
 walk harness. Replace a record only by copying it from a newer walk zip, and update this table when you do.
+
+## #2374 carve-out (2026-10-30)
+
+Issue #2374 removed the marks-series guard question. All four records carried a confirmed `"swallow"` guard specification — a migration no-op (the new
+unticked start-of-line default reproduces it exactly) — so the inert `guardSpecification` field was stripped from each record's marks-treatment value
+rather than carried as dead weight. This is the single exception to "copied byte for byte, never edited"; `scripts/genDecisionPoints.ts` was then
+re-run to regenerate the derived `*.decisions.json` fixtures (never hand-edited).

@@ -46,7 +46,6 @@ import {
   isSpacerKeyClass,
   resolveTouchProduction,
   touchKeyStateFromLayerId,
-  type GuardSpecification,
   type KeyIdentityDecision,
   type KeyboardIR,
   type TouchKeyIR,
@@ -57,6 +56,8 @@ import {
   type TouchLayoutIR,
   type TransplantRecord,
 } from "@keyboard-studio/contracts";
+
+import type { BareMarkAllowedByMark } from "../../../hooks/useBareMarkAllowedByMark.ts";
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -107,8 +108,13 @@ export interface KeyIdentityViewModel {
   readonly decisions: readonly KeyIdentityDecision[];
   /** The key's transplant record (latest, supersede-resolved), when one exists. */
   readonly transplant?: TransplantRecord;
-  /** The guard specification in force, when the caller supplied one. */
-  readonly guard?: GuardSpecification;
+  /**
+   * The key's combining-mark "start of line" box state — the per-mark
+   * #2374 replacement for the keyboard-wide guard specification's display.
+   * Present only when the caller supplied the box map and the key types a
+   * combining mark.
+   */
+  readonly bareMarkAllowed?: boolean;
   /** Present iff FR-029 re-linking is offered for this key right now. */
   readonly relink?: KeyRelinkOffer;
 }
@@ -124,7 +130,12 @@ export interface BuildKeyIdentityViewModelInputs {
   readonly key: TouchKeyIR;
   readonly decisions?: readonly KeyIdentityDecision[];
   readonly transplants?: readonly TransplantRecord[];
-  readonly guardSpecification?: GuardSpecification;
+  /**
+   * The per-mark "start of line" box (#2374), when the caller can supply
+   * it. The criterion derivation resolves the key's own mark against it;
+   * absent, every mark takes the unticked default.
+   */
+  readonly bareMarkAllowedByMark?: BareMarkAllowedByMark;
   /** The FR-002 target host set in force; recorded decisions carry their own. Default `["US"]`. */
   readonly hostSet?: readonly string[];
   /** The keyboard's `&VERSION`, for the decision table's arm (c)/(c′) split. */
@@ -324,10 +335,12 @@ function deriveCriterion(
       : {}),
     ...(plainOutput !== undefined ? { plainOutput } : {}),
     ...(plainOutput !== undefined && ALL_MARKS_RE.test(plainOutput)
-      ? { isCombiningMark: true }
-      : {}),
-    ...(inputs.guardSpecification !== undefined
-      ? { guardSpecification: inputs.guardSpecification }
+      ? {
+          isCombiningMark: true,
+          // Per-mark #2374: the key's own mark resolved against the box
+          // map; absent map (or absent mark entry) reads as unticked.
+          bareMarkAllowed: inputs.bareMarkAllowedByMark?.[plainOutput] === true,
+        }
       : {}),
     ...(inputs.keyboardVersion !== undefined
       ? { keyboardVersion: inputs.keyboardVersion }
@@ -470,7 +483,13 @@ export function buildKeyIdentityViewModel(
     productionRows,
     decisions,
     ...(transplant !== undefined ? { transplant } : {}),
-    ...(inputs.guardSpecification !== undefined ? { guard: inputs.guardSpecification } : {}),
+    // The key's own mark resolved against the box map, for the identity
+    // section's per-mark display (replaces the keyboard-wide guard spec).
+    ...(facts.plainOutput !== undefined &&
+    ALL_MARKS_RE.test(facts.plainOutput) &&
+    inputs.bareMarkAllowedByMark !== undefined
+      ? { bareMarkAllowed: inputs.bareMarkAllowedByMark[facts.plainOutput] === true }
+      : {}),
     ...(relink !== undefined ? { relink } : {}),
   };
 }

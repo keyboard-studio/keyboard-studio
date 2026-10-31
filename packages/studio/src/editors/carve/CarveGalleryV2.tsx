@@ -20,6 +20,7 @@ import {
   recommendedRowIds,
 } from '../../survey/carve/carveContinue.ts';
 import { resolveCarvedCombos } from '../../lib/carvedCombo.ts';
+import { pairedCascadeChars } from '../../lib/carveCascadePreview.ts';
 import { ReviewCarvedKeysDialog } from './ReviewCarvedKeys.tsx';
 import { displayChar } from '../../lib/irToCarveNodes.ts';
 import { carveRecommendation } from '../../survey/carve/carveRecommendation.ts';
@@ -560,6 +561,27 @@ return (
 }
 
 /**
+ * Plain-language heads-up that discarding a character also discards the
+ * characters paired with it (a store slot tied to a partner store by
+ * position). Shown before the author discards, on both details surfaces.
+ * Renders nothing when there is no cascade.
+ */
+function CascadeNotice({ ch, partners }: { ch: string; partners: readonly string[] }) {
+  if (partners.length === 0) return null;
+  const chosen = displayChar(ch);
+  const alsoRemoved = partners.map(displayChar).join(' ');
+  return (
+    <p
+      role="note"
+      data-testid="carve-cascade-notice"
+      style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: 'var(--app-text)' }}
+    >
+      <Trans id="carve.details.pairedCascade">Discarding {chosen} also discards {alsoRemoved}. They are paired in a keyboard rule (for example, Backspace turns one back into the other), so they can only go together.</Trans>
+    </p>
+  );
+}
+
+/**
  * Narrow-viewport character-details card (mobile adaptation, Phase 3).
  * Replaces the 290px details rail under 479px: a collapsible card pinned
  * above the chip grid showing the selected character, Keep/Discard actions,
@@ -579,8 +601,11 @@ function CarveDetailsCard({
   onToggleOpen,
   onKeep,
   onCarve,
+  cascadePartners,
 }: {
   cell: CharacterCell | undefined;
+  /** Paired characters that discarding this one also discards (pairedCascadeChars). */
+  cascadePartners: readonly string[];
   /** Whether the author has recorded a keep/discard disposition for this character. */
   decided: boolean;
   /** Whether the character is currently discarded. */
@@ -698,6 +723,7 @@ function CarveDetailsCard({
               <HowItsTyped cell={cell} showLabel={false} />
             </div>
           )}
+          <CascadeNotice ch={cell.ch} partners={cascadePartners} />
           <p style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
             <Trans id="carve.details.discardBlurb">If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.</Trans>
           </p>
@@ -1121,6 +1147,13 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [cellsByCh, cells, selectedCh],
   );
 
+  // Characters paired with the selected one that discarding it would also
+  // discard — shown before the author acts, so the cascade is never silent.
+  const cascadePartners = useMemo(
+    () => (ir && selectedCell ? pairedCascadeChars(ir, selectedCell) : []),
+    [ir, selectedCell],
+  );
+
   // The recommendation row behind a reco selected cell (for the card's
   // discarded state and Keep/Discard actions) — case-merged row semantics,
   // mirroring RecommendedGroupCard's isRowDiscarded usage.
@@ -1304,6 +1337,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             onToggleOpen={() => setDetailsCardOpen((v) => !v)}
             onKeep={() => decideSelected(false)}
             onCarve={() => decideSelected(true)}
+            cascadePartners={cascadePartners}
           />
         ) : (
           <>
@@ -1416,6 +1450,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     control in this panel. Toggling a character happens only
                     by clicking its grid cell, a suggested-group card, or the
                     removed-characters dropdown above. */}
+                <CascadeNotice ch={cell.ch} partners={cascadePartners} />
                 <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
                   <Trans id="carve.details.discardBlurb">If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.</Trans>
                 </p>

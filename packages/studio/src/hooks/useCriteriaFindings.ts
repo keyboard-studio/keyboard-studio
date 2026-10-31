@@ -77,25 +77,14 @@ import { useDocumentationFindings } from "./useDocumentationFindings.ts";
  * first: their `origin: "upstream"` reclassification is preserved if the
  * engine ever reports the same problem.
  */
-export function mergeLintFindings(
-  ...groups: readonly (readonly LintFinding[])[]
-): LintFinding[] {
-  const seen = new Set<string>();
-  const merged: LintFinding[] = [];
-  for (const group of groups) {
-    for (const finding of group) {
-      const key = `${finding.code}\0${finding.message}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(finding);
-    }
-  }
-  return merged;
-}
+import { mergeLintFindings } from "../criteria/mergeFindings.ts";
+export { mergeLintFindings };
 
 export interface CriteriaFindings {
   /** Doc + engine findings, merged and deduped by (code, message). */
   lintFindings: LintFinding[];
+  /** Per-code verified details for the met-case evidence. */
+  verifiedByCode: Map<string, string[]>;
   /** Consumable directly as CriteriaInput.contextMissing. */
   contextMissing: Record<string, string>;
   /** True once the stage is ready AND the engine run for it has settled. */
@@ -128,6 +117,7 @@ interface EngineRun {
    * recompiled artifact with the same file names never inherits a stale run. */
   forVfs: VirtualFS;
   findings: LintFinding[];
+  verifiedByCode: Map<string, string[]>;
   contextMissing: Record<string, string>;
 }
 
@@ -269,18 +259,29 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
       );
 
       try {
-        const findings = await new KeyboardLintEngine().lintWithContext(
+        const engine = await new KeyboardLintEngine().lintWithContext(
           vfs,
           keyboardId,
           ctx,
         );
-        if (!cancelled) setEngineRun({ forVfs: vfs, findings, contextMissing });
+        if (!cancelled)
+          setEngineRun({
+            forVfs: vfs,
+            findings: engine.findings,
+            verifiedByCode: engine.verifiedByCode,
+            contextMissing,
+          });
       } catch {
         // A failed engine run must not wedge the page: report no engine
         // findings for this artifact, but keep the contextMissing map so
         // checks that could not run still resolve Not yet checkable.
         if (!cancelled)
-          setEngineRun({ forVfs: vfs, findings: [], contextMissing });
+          setEngineRun({
+            forVfs: vfs,
+            findings: [],
+            verifiedByCode: new Map(),
+            contextMissing,
+          });
       }
     })();
 
@@ -307,6 +308,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
 
   return {
     lintFindings,
+    verifiedByCode: runIsCurrent ? engineRun.verifiedByCode : new Map(),
     contextMissing: runIsCurrent ? engineRun.contextMissing : {},
     ready: readyStage !== null && runIsCurrent,
     keyboardId,

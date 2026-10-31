@@ -136,6 +136,14 @@ export interface PlacementWorklist {
    * before the column existed, which allow no extra context.
    */
   allowedContexts?: Record<string, string[]>;
+  /**
+   * Per mark, whether the attachment station's "start of line" box is ticked
+   * (issue #2374): ticked marks pass at buffer start and after line breaks,
+   * unticked marks are swallowed there. Only ticked marks are recorded;
+   * absent (or absent per mark) means unticked — the default. Absent on
+   * worklists recorded before the column existed, which behave as unticked.
+   */
+  bareMarkAllowed?: Record<string, boolean>;
 }
 
 /** Factory: an empty three-store alphabet. */

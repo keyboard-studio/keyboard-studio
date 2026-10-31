@@ -242,12 +242,13 @@ const SCENARIOS: readonly Scenario[] = [
     },
   },
   {
-    // #523 — store#extra/extraX is unreferenced by any rule, so its chip is a
+    // store#extra/extraX is unreferenced by any rule, so its chip is a
     // drop-class edit (classifyStoreSlotEdit returns "drop", not "nul-fill").
+    // Carving its only slot empties it, and an emptied store is not emitted.
     name: "store-chip drop-class rewrite (unreferenced store)",
     deletedItemIds: ["store#extra#0"],
     effect: (out) => {
-      expect(out.kmn).toMatch(/store\(extraX\)/);
+      expect(out.kmn).not.toMatch(/store\(extraX\)/);
       expect(out.kmn).not.toContain("'Q'");
     },
   },

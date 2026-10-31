@@ -11,8 +11,14 @@
 // the same source file" either. Not precertifiable: adapt tracks carry
 // base files through, so the folder is actually looked at.
 
-import type { LintFinding, VirtualFS } from "@keyboard-studio/contracts";
-import { baseNameLower, criteriaFinding } from "./_shared.js";
+import type { VirtualFS } from "@keyboard-studio/contracts";
+import {
+  baseNameLower,
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 const textEncoder = new TextEncoder();
 
@@ -28,26 +34,34 @@ function contentHash(content: string | Uint8Array): string {
 }
 
 /** 1.9 — same basename at 2+ paths with identical content → one finding per group. */
-export function checkDuplicateSourceFiles(fs: VirtualFS): LintFinding[] {
+export function checkDuplicateSourceFiles(fs: VirtualFS): CheckResult {
+  let total = 0;
   const groups = new Map<string, string[]>();
   for (const entry of fs.entries()) {
+    total += 1;
     const key = `${baseNameLower(entry.path)}|${contentHash(entry.content)}`;
     const list = groups.get(key);
     if (list) list.push(entry.path);
     else groups.set(key, [entry.path]);
   }
-  const findings: LintFinding[] = [];
+  const duplicateGroups: string[][] = [];
   for (const paths of groups.values()) {
     if (paths.length < 2) continue;
-    const sorted = [...paths].sort();
-    findings.push(
+    duplicateGroups.push([...paths].sort());
+  }
+  if (duplicateGroups.length === 0)
+    return checkPassed("KM_LINT_DUPLICATE_SOURCE_FILES", [
+      `Scanned ${total} file(s): no duplicate copies of the same source file.`,
+    ]);
+  return checkFailed(
+    "KM_LINT_DUPLICATE_SOURCE_FILES",
+    duplicateGroups.map((sorted) =>
       criteriaFinding({
         code: "KM_LINT_DUPLICATE_SOURCE_FILES",
         file: sorted[0]!,
         message: `Duplicate copies of the same source file in the keyboard folder: ${sorted.join(", ")}.`,
         hint: "Keep one copy of the file and reference it from the single location.",
       }),
-    );
-  }
-  return findings;
+    ),
+  );
 }

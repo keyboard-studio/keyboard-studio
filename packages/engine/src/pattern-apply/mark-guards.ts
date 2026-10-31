@@ -8,7 +8,10 @@
 //      mark, `notany(generated_marks_allowed_<hex>) '<mark>' > context(1)`,
 //      swallows it after anything else (digits, punctuation, unchecked
 //      bases); a `nul '<mark>' > nul` rule ahead of it swallows it at buffer
-//      start unless the bare-mark answer is `emit`. Implemented as a
+//      start unless the mark's "start of line" box is ticked (issue #2374:
+//      per-mark, replacing the old keyboard-wide bare-mark answer). A ticked
+//      mark additionally carries U+000A in its allowed store, so it also
+//      passes after a line break. Implemented as a
 //      generated non-using-keys guard group entered via `match > use(...)`
 //      from the entry group (the standard KMN post-processing idiom), so it
 //      works regardless of which keys the gallery later assigns. Generated
@@ -70,12 +73,6 @@ export const MARKS_ALLOWED_STORE_PREFIX = "generated_marks_allowed_";
 export const MARKS_UNWRAP_FROM_STORE = "generated_marks_unwrap_from";
 export const MARKS_UNWRAP_TO_STORE = "generated_marks_unwrap_to";
 export const MARKS_WHOLESTACK_RULE_PREFIX = "gen-marks-wholestack-rule-";
-
-/**
- * What a mark typed at buffer start does (spec 104's `GuardSpecification.behaviour`):
- * `swallow` drops it, `emit` lets the bare mark through.
- */
-export type BareMarkBehaviour = "swallow" | "emit";
 
 export interface MarkGuardsResult {
   ir: KeyboardIR;
@@ -169,9 +166,13 @@ const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 
  * Per mark, the characters it may directly follow, sorted. A mark's allowed
  * set is every plain base not blocked with it, its `allowedContexts`, and,
  * for a mark stacked on another in an attested stack, the mark before it
- * (base-plus-mark) and the precomposed prefix (ready-made). Every mark the
- * worklist knows of gets an entry, even an empty one: digits, punctuation and
- * buffer start are always outside the set.
+ * (base-plus-mark) and the precomposed prefix (ready-made). A mark whose
+ * "start of line" box is ticked (issue #2374, `worklist.bareMarkAllowed`)
+ * additionally allows U+000A, so it passes after a line break — the
+ * space-box idiom. Every mark the worklist knows of gets an entry, even an
+ * empty one: digits, punctuation and buffer start are always outside the
+ * set (buffer start is handled by the per-mark `nul` rule in buildGuard,
+ * not by the store).
  */
 function allowedByMark(
   worklist: PlacementWorklist,
@@ -196,6 +197,9 @@ function allowedByMark(
       if (!blocked.has(`${base}\u0000${mark}`)) set.add(lastCodePoint(base));
     }
     for (const ch of worklist.allowedContexts?.[mark] ?? []) set.add(ch);
+    // Issue #2374: a ticked "start of line" box allows the mark after a line
+    // break (the space-box idiom — U+000A joins the allowed store).
+    if (worklist.bareMarkAllowed?.[mark] === true) set.add("\n");
   }
 
   // Stacks: the same reachability walk as wholeStackSequences — the first
@@ -236,7 +240,6 @@ function bufferStartRule(mark: string, output: IRRule["output"]): IRRule {
 function buildGuard(
   worklist: PlacementWorklist,
   stacks: readonly AttestedStack[],
-  bareMarkBehaviour: BareMarkBehaviour,
 ): { group: IRGroup; stores: IRStore[] } | null {
   const allowed = allowedByMark(worklist, stacks);
   if (allowed.size === 0) return null;
@@ -244,12 +247,17 @@ function buildGuard(
   const stores: IRStore[] = [];
   for (const [mark, contexts] of allowed) {
     const id = hex(mark);
-    if (bareMarkBehaviour === "swallow") rules.push(bufferStartRule(mark, [{ kind: "nul" }]));
+    // Issue #2374: per-mark "start of line" box. Unticked (default) keeps the
+    // buffer-start swallow rule; ticked omits it (the bare mark passes — the
+    // `notany` rule below cannot match with no preceding char) and U+000A is
+    // already in the mark's allowed store (see allowedByMark), so it also
+    // passes after a line break.
+    if (worklist.bareMarkAllowed?.[mark] !== true) {
+      rules.push(bufferStartRule(mark, [{ kind: "nul" }]));
+    }
     if (contexts.length === 0) {
       // Nothing allowed: an empty store cannot back notany(), and every
-      // preceding character is outside the set anyway. Under `emit` a
-      // buffer-start rule lets the bare mark through first.
-      if (bareMarkBehaviour === "emit") rules.push(bufferStartRule(mark, [{ kind: "char", value: mark }]));
+      // preceding character is outside the set anyway.
       rules.push({
         nodeId: `gen-marks-block-${id}`,
         context: [{ kind: "char", value: mark }],
@@ -393,8 +401,9 @@ function buildWholeStack(
  * list — the whole-stack generator's source table (the same tables as
  * everything else, R5); it is consulted for the base-plus-mark +
  * `whole-stack` pairing, and by the guard for which marks may stack.
- * `bareMarkBehaviour` decides a mark typed at buffer start (default
- * `swallow`).
+ * Buffer-start behaviour is per mark (issue #2374): the worklist's
+ * `bareMarkAllowed` channel — ticked marks pass at buffer start and after
+ * line breaks, unticked marks are swallowed at buffer start.
  */
 export function applyMarkGuards(
   ir: KeyboardIR,
@@ -402,9 +411,8 @@ export function applyMarkGuards(
   outputForm: "ready-made" | "base-plus-mark",
   backspace: BackspaceBehaviour = "peel",
   stacks: readonly AttestedStack[] = [],
-  bareMarkBehaviour: BareMarkBehaviour = "swallow",
 ): MarkGuardsResult {
-  const guard = buildGuard(worklist, stacks, bareMarkBehaviour);
+  const guard = buildGuard(worklist, stacks);
   const guardGroup = guard?.group ?? null;
   const unwrap = buildUnwrap(worklist, outputForm, backspace);
   const wholeStackRules = buildWholeStack(worklist, outputForm, backspace, stacks);

@@ -146,6 +146,20 @@ export function manifestIndexOf(id: string): number {
   return manifest.findIndex((s) => s.id === id);
 }
 
+/**
+ * Whether the mobile/touch keyboard preview may be offered on `stepId`.
+ * Steps before the Touch gallery ("touch") mutate the touch layout while the
+ * author is still working, so the touch preview would look half-finished;
+ * it is offered from the Touch gallery onward. An unknown/absent step id
+ * (e.g. "done", or no active step) keeps the unrestricted behaviour.
+ */
+export function isTouchPreviewAvailable(stepId: string | null | undefined): boolean {
+  if (stepId === null || stepId === undefined) return true;
+  const idx = manifestIndexOf(stepId);
+  if (idx === -1) return true;
+  return idx >= manifestIndexOf("touch");
+}
+
 // ---------------------------------------------------------------------------
 // nextMainLineStepAfter — moved from StudioShell.tsx (was private, now exported).
 //

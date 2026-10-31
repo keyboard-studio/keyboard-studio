@@ -23,6 +23,13 @@
 import type { AttestedStack, ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { stackKey } from "@keyboard-studio/contracts";
 import type { AttachmentProposal, MarkClass, MarkTreatmentPrefill } from "@keyboard-studio/engine";
+// Issue #2374: the per-mark "start of line" column's sentinel is the engine's
+// single value (worklist.ts) — a SYMBOLIC string, never "" or a real char —
+// re-exported here so survey code imports it from one place. It must never
+// enter `allowedContexts` (chars only); it feeds the worklist's
+// `bareMarkAllowed` channel instead.
+import { ATTACHMENT_START_OF_LINE } from "@keyboard-studio/engine";
+export { ATTACHMENT_START_OF_LINE };
 import type { ReproposalReason, SavedAnswer } from "../../steps/answerTypes.ts";
 import {
   hasChar,
@@ -45,12 +52,7 @@ export type MarksStationId =
   // spec 078: after output form and stacking (tolerance is the mark model's
   // fifth consumer). Shown only behind the flag, while the analysis is running
   // or when it found fixable rules.
-  | "marks_context_tolerance"
-  // spec 104 FR-013: the guard question — once per keyboard, last in the
-  // series. Always shown while the gate is open: the answer (or the Track 2
-  // seed, presented for confirmation) decides how every mark key on the
-  // touch layout is minted, so there is no evidence state that skips it.
-  | "marks_guard";
+  | "marks_context_tolerance";
 
 /** Attachment answers: per mark, per base — checked = reachable on the keyboard. */
 export type AttachmentChecked = Record<string, Record<string, boolean>>;
@@ -91,6 +93,13 @@ export function reconciledAttachmentChecked(
   alphabet: ConfirmedAlphabet,
   proposals: readonly AttachmentProposal[],
   savedAnswers: Readonly<Record<string, SavedAnswer>>,
+  /**
+   * The default for the "start of line" column (issue #2374) before the
+   * author ever answers it: `false` normally; `true` when the #2374
+   * migration seeds it (a confirmed legacy `emit` guard record, or a Track 2
+   * import classified unguarded). A saved answer always wins over this.
+   */
+  startOfLineDefault = false,
 ): AttachmentChecked {
   const out: AttachmentChecked = {};
   for (const proposal of proposals) {
@@ -106,6 +115,13 @@ export function reconciledAttachmentChecked(
     const spaceId = `marks_attachment.${proposal.mark}|${ATTACHMENT_SPACE}`;
     const spaceKey = marksAttachmentKey(alphabet, proposal.mark, ATTACHMENT_SPACE);
     row[ATTACHMENT_SPACE] = reconcile(savedAnswers[spaceId], spaceKey, false).value;
+    // The start-of-line column (issue #2374): same shape as the space
+    // column — not a base, never proposed, never case-expanded — with its
+    // own migration default above. The symbolic sentinel never enters
+    // `allowedContexts`; the worklist reads it into `bareMarkAllowed`.
+    const solId = `marks_attachment.${proposal.mark}|${ATTACHMENT_START_OF_LINE}`;
+    const solKey = marksAttachmentKey(alphabet, proposal.mark, ATTACHMENT_START_OF_LINE);
+    row[ATTACHMENT_START_OF_LINE] = reconcile(savedAnswers[solId], solKey, startOfLineDefault).value;
     out[proposal.mark] = row;
   }
   return out;

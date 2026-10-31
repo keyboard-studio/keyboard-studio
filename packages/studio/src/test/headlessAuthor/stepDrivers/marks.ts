@@ -9,8 +9,9 @@
 //            series' own order; the case's inputOrder / outputForm / backspace
 //            are overrides (outputForm.ts). The context-tolerance station
 //            joins the list when its analysis offers a proposal (tolerance.ts).
-//   guard    the last station is the guard station; its commit records the
-//            specification (guardRecordForCommit).
+//            The start-of-line box's default is the step's own
+//            (startOfLineSeed / startOfLineImportSeeded): a migrated legacy
+//            guard record or a Track 2 import pre-ticks it.
 //   commit   assembleMarksSeries -> the value the step records as the
 //            marks-treatment decision, and the result it passes to onComplete.
 //            The host's session mirrors and the tolerance apply effect follow.
@@ -24,13 +25,11 @@ import { deriveSurveyContext } from "../../../decisions/identitySelectors.ts";
 import {
   assembleMarksSeries,
   computeMarksGate,
-  guardChoiceOf,
-  guardRecordForCommit,
-  guardSeedBehaviourFor,
-  guardSeedFor,
   marksStationDefaults,
   resolveToleranceDecision,
   seriesResult,
+  startOfLineImportSeeded,
+  startOfLineSeed,
 } from "../../../survey/marks/marksSeriesValue.ts";
 import {
   EMPTY_MARKS_VALUE,
@@ -38,7 +37,6 @@ import {
   recordMarksTreatmentValue,
 } from "../../../survey/marks/marksValue.ts";
 import { mirrorMarksCompletionToSession } from "../../../survey/marks/marksSessionMirror.ts";
-import { chooseByPolicy } from "../walkPolicy.ts";
 import { chooseMarksAnswers } from "./outputForm.ts";
 import { applyToleranceStation, takeToleranceStation } from "./tolerance.ts";
 import type { StepDrivers } from "./types.ts";
@@ -51,11 +49,17 @@ export const marksDrivers: StepDrivers = {
     const prior = getMarksTreatmentValue();
     const decisions = getDecisionSnapshot();
     const gate = computeMarksGate(wc.session.alphabet);
+    const priorMarks = prior ?? EMPTY_MARKS_VALUE;
+    const startOfLine = startOfLineSeed(
+      priorMarks,
+      startOfLineImportSeeded(decisions["authoring-track"]?.value, wc.startIr),
+    );
     const base = {
       alphabet: gate.alphabet,
       startIr: wc.startIr,
       bcp47: deriveSurveyContext(decisions).bcp47_tag,
       importedOrder: wc.session.axes.markInputOrder,
+      startOfLineDefault: startOfLine.defaultTicked,
     };
 
     // The gate first: the series never shows without marks, so nothing below runs.
@@ -69,29 +73,7 @@ export const marksDrivers: StepDrivers = {
     const show = { showToleranceStation: tolerance.shown };
     const overrides = chooseMarksAnswers(ctx, base, show);
     const d = marksStationDefaults({ ...base, ...show, overrides });
-    const finalStation = d.visibleStations.at(-1);
-    if (finalStation === undefined) throw new Error("the marks series has no station to complete at");
-
-    // Guard: nothing is picked at the station, so the displayed behaviour is the
-    // prior answer, else the Track 2 seed, else the default, and the commit at
-    // the guard station records it.
-    const priorMarks = prior ?? EMPTY_MARKS_VALUE;
-    const priorGuard = priorMarks.guardSpecification ?? undefined;
-    const seedBehaviour = guardSeedBehaviourFor({
-      authoringTrack: decisions["authoring-track"]?.value,
-      priorGuard,
-      startIr: wc.startIr,
-    });
-    const guardSeed = guardSeedFor(seedBehaviour);
-    ctx.report.addStep(
-      chooseByPolicy({
-        decisionId: "marks.guard",
-        suggestions: [],
-        defaultValue: guardChoiceOf({ guardAnswer: null, priorGuard, seedBehaviour }),
-        proposalSource: "guardChoiceOf",
-      }),
-    );
-    const guard = guardRecordForCommit({ station: finalStation, guardAnswer: null, priorGuard, guardSeed });
+    if (d.visibleStations.length === 0) throw new Error("the marks series has no station to complete at");
 
     const priorTolerance = priorMarks.contextTolerance ?? undefined;
     const analysis = tolerance.analysis;
@@ -111,7 +93,6 @@ export const marksDrivers: StepDrivers = {
       state: d.state,
       visibleStations: d.visibleStations,
       workingIr: useWorkingCopyStore.getState().ir,
-      guard,
       reportedTolerance,
       effectiveTolerance: reportedTolerance ?? priorTolerance ?? null,
     });

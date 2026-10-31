@@ -31,6 +31,49 @@ export function criteriaFinding(input: {
   };
 }
 
+/**
+ * The result of one criteria check: the lint code it verifies, findings
+ * (empty when the check passes), plus human-readable lines describing what
+ * was verified, shown under "Show details" when the check is met.
+ */
+export interface CheckResult {
+  /** The KM_LINT_* code this check verifies (for verifiedByCode mapping). */
+  code: string;
+  findings: LintFinding[];
+  /** What the check verified, for the met-case details. Empty if nothing to show. */
+  verified: string[];
+}
+
+/** A passing check with verified details. */
+export function checkPassed(code: string, verified: string[] = []): CheckResult {
+  return { code, findings: [], verified };
+}
+
+/** A failing check with findings (verified details omitted on failure). */
+export function checkFailed(code: string, findings: LintFinding[]): CheckResult {
+  return { code, findings, verified: [] };
+}
+
+/**
+ * Merge multiple check results into the combined findings plus a
+ * per-code verified-details map (for the aggregate check functions).
+ */
+export function mergeResults(...results: CheckResult[]): {
+  findings: LintFinding[];
+  verifiedByCode: Map<string, string[]>;
+} {
+  const verifiedByCode = new Map<string, string[]>();
+  for (const r of results) {
+    if (r.verified.length > 0) {
+      verifiedByCode.set(r.code, r.verified);
+    }
+  }
+  return {
+    findings: results.flatMap((r) => r.findings),
+    verifiedByCode,
+  };
+}
+
 /** The conventional VFS path of the judged keyboard's .kmn source. */
 export function kmnPath(keyboardId: string): string {
   return `source/${keyboardId}.kmn`;

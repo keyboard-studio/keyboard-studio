@@ -12277,15 +12277,7 @@
             "migrationNeeded": false,
             "guardReevaluation": []
           },
-          "contextTolerance": null,
-          "guardSpecification": {
-            "recordId": "guard-specification:asked:swallow",
-            "behaviour": "swallow",
-            "origin": "asked",
-            "confirmed": true,
-            "recordedAt": 1792517802952,
-            "supersedes": null
-          }
+          "contextTolerance": null
         },
         "summary": "Marks treatment"
       },

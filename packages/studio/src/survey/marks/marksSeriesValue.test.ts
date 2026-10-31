@@ -17,19 +17,16 @@ import {
   buildMarksTreatmentValue,
   computeMarksGate,
   contextToleranceAnswers,
-  guardAnswerFor,
-  guardChoiceOf,
-  guardRecordForCommit,
-  guardSeedFor,
   keptAttestedStacks,
   marksSeriesAnswers,
   marksStationDefaults,
   resolveOutputStation,
   resolveToleranceDecision,
   seriesResult,
+  startOfLineSeed,
   visibleMarksStations,
 } from "./marksSeriesValue.ts";
-import { DEFAULT_GUARD_BEHAVIOUR, makeGuardSpecification } from "./guardSpecification.ts";
+import { ATTACHMENT_START_OF_LINE } from "./marksViews.ts";
 
 const ACUTE = "́";
 const GRAVE = "̀";
@@ -148,7 +145,6 @@ describe("visibleMarksStations", () => {
       posture: [],
       stackingEvidence: false,
       showToleranceStation: false,
-      hasOwnKeyMark: false,
     });
     expect(none).toEqual([]);
     const all = visibleMarksStations({
@@ -157,14 +153,13 @@ describe("visibleMarksStations", () => {
       posture: [],
       stackingEvidence: true,
       showToleranceStation: true,
-      hasOwnKeyMark: true,
     });
-    expect(all.slice(-3)).toEqual(["marks_stacking", "marks_context_tolerance", "marks_guard"]);
+    expect(all.slice(-2)).toEqual(["marks_stacking", "marks_context_tolerance"]);
   });
 });
 
 describe("assembleMarksSeries", () => {
-  function assemble(over: { guard?: ReturnType<typeof guardRecordForCommit>; tol?: MarksContextToleranceDecision | null } = {}) {
+  function assemble(over: { tol?: MarksContextToleranceDecision | null } = {}) {
     const d = defaults();
     return {
       d,
@@ -178,7 +173,6 @@ describe("assembleMarksSeries", () => {
         state: d.state,
         visibleStations: d.visibleStations,
         workingIr: null,
-        guard: over.guard ?? null,
         effectiveTolerance: over.tol ?? null,
       }),
     };
@@ -198,13 +192,10 @@ describe("assembleMarksSeries", () => {
   it("records the same answers and completion in the decision value", () => {
     const { out } = assemble();
     expect(out.value.completion).toEqual(out.completion);
-    expect(out.completion).toMatchObject({
-      migrationNeeded: false,
-      guardReevaluation: [],
-    });
+    expect(out.completion).toMatchObject({ migrationNeeded: false });
     for (const a of out.answers) expect(out.value.answers[a.questionId]).toEqual(a.value);
     expect(out.value.contextTolerance).toBeNull();
-    expect(out.value.guardSpecification).toBeNull();
+    expect(out.value).not.toHaveProperty("guardSpecification");
   });
 
   it("answers every visible station under the pinned question ids", () => {
@@ -214,17 +205,6 @@ describe("assembleMarksSeries", () => {
     expect(ids).toContain(`marks.marks_attachment.${GRAVE}`);
     expect(ids).toContain("marks.marks_output_form.form");
     expect(ids).toContain("marks.marks_output_form.backspace");
-  });
-
-  it("carries the guard specification into the value", () => {
-    const guard = makeGuardSpecification({
-      behaviour: "emit",
-      origin: "asked",
-      confirmed: true,
-      supersedesRecord: null,
-    });
-    const { out } = assemble({ guard });
-    expect(out.value.guardSpecification).toBe(guard);
   });
 
   it("reports a tolerance decision on the result and records it in the value", () => {
@@ -245,7 +225,6 @@ describe("assembleMarksSeries", () => {
       state: d.state,
       visibleStations: d.visibleStations,
       workingIr: null,
-      guard: null,
       reportedTolerance: tol,
       effectiveTolerance: tol,
     });
@@ -269,7 +248,7 @@ describe("seriesResult / buildMarksTreatmentValue", () => {
   it("an answer record carries no completion", () => {
     const d = defaults();
     const answers = marksSeriesAnswers(d.visibleStations, d.state);
-    const v = buildMarksTreatmentValue(answers, null, null, null);
+    const v = buildMarksTreatmentValue(answers, null, null);
     expect(v.completion).toBeNull();
     expect(v.answers).not.toEqual(EMPTY_MARKS_VALUE.answers);
   });
@@ -294,47 +273,25 @@ describe("keptAttestedStacks", () => {
   });
 });
 
-describe("guard helpers", () => {
-  it("records the default at the guard station's own Continue when nothing else is known", () => {
-    const at = guardRecordForCommit({
-      station: "marks_guard",
-      guardAnswer: null,
-      priorGuard: undefined,
-      guardSeed: undefined,
-    });
-    expect(at?.behaviour).toBe(DEFAULT_GUARD_BEHAVIOUR);
-    expect(at?.confirmed).toBe(true);
-    expect(
-      guardRecordForCommit({
-        station: "marks_treatment",
-        guardAnswer: null,
-        priorGuard: undefined,
-        guardSeed: undefined,
-      }),
-    ).toBeNull();
+describe("start-of-line default", () => {
+  const legacy = (behaviour: "emit" | "swallow", confirmed: boolean) =>
+    ({ ...EMPTY_MARKS_VALUE, guardSpecification: { behaviour, confirmed } }) as typeof EMPTY_MARKS_VALUE;
+
+  it("opens unticked, and only a confirmed legacy emit record or the import seed ticks it", () => {
+    expect(startOfLineSeed(EMPTY_MARKS_VALUE, false)).toEqual({ migrated: false, defaultTicked: false });
+    expect(startOfLineSeed(EMPTY_MARKS_VALUE, true)).toEqual({ migrated: false, defaultTicked: true });
+    expect(startOfLineSeed(legacy("emit", true), false)).toEqual({ migrated: true, defaultTicked: true });
+    expect(startOfLineSeed(legacy("emit", false), false)).toEqual({ migrated: false, defaultTicked: false });
+    expect(startOfLineSeed(legacy("swallow", true), false)).toEqual({ migrated: false, defaultTicked: false });
   });
 
-  it("confirms a seed only at the guard station, and rides it provisionally before", () => {
-    const seed = guardSeedFor("emit");
-    expect(seed?.confirmed).toBe(false);
-    const mid = guardRecordForCommit({ station: "marks_treatment", guardAnswer: null, priorGuard: undefined, guardSeed: seed });
-    expect(mid).toBe(seed);
-    const last = guardRecordForCommit({ station: "marks_guard", guardAnswer: null, priorGuard: undefined, guardSeed: seed });
-    expect(last?.confirmed).toBe(true);
-    expect(last?.behaviour).toBe("emit");
-  });
-
-  it("lets the author's pick win and picks the displayed behaviour in precedence order", () => {
-    const pick = guardAnswerFor({ behaviour: "emit", priorGuard: undefined, guardSeed: undefined });
-    expect(pick.origin).toBe("asked");
-    expect(
-      guardRecordForCommit({ station: "marks_guard", guardAnswer: pick, priorGuard: undefined, guardSeed: undefined }),
-    ).toBe(pick);
-    expect(guardChoiceOf({ guardAnswer: pick, priorGuard: undefined, seedBehaviour: "swallow" })).toBe("emit");
-    expect(guardChoiceOf({ guardAnswer: null, priorGuard: undefined, seedBehaviour: "emit" })).toBe("emit");
-    expect(guardChoiceOf({ guardAnswer: null, priorGuard: undefined, seedBehaviour: undefined })).toBe(
-      DEFAULT_GUARD_BEHAVIOUR,
-    );
+  it("marksStationDefaults seeds every attachment row's start-of-line box from it", () => {
+    const off = defaults();
+    const on = marksStationDefaults({ alphabet: ALPHABET, startIr: null, bcp47: "und", startOfLineDefault: true });
+    for (const mark of [ACUTE, GRAVE]) {
+      expect(off.state.attachmentChecked[mark]?.[ATTACHMENT_START_OF_LINE]).toBe(false);
+      expect(on.state.attachmentChecked[mark]?.[ATTACHMENT_START_OF_LINE]).toBe(true);
+    }
   });
 });
 

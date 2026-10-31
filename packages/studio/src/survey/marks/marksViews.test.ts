@@ -14,6 +14,7 @@ import { groupMarkClasses, proposeAttachments } from "@keyboard-studio/engine";
 import type { SavedAnswer } from "../../steps/answerTypes.ts";
 import {
   ATTACHMENT_SPACE,
+  ATTACHMENT_START_OF_LINE,
   reconciledAttachmentChecked,
   initialAttachmentChecked,
   deriveMarksFlags,
@@ -66,10 +67,29 @@ describe("reconciledAttachmentChecked (spec 079 US3 item 4)", () => {
     const proposals = proposeAttachments(ALPHABET, classes);
     const reconciled = reconciledAttachmentChecked(ALPHABET, proposals, {});
     const initial = initialAttachmentChecked(proposals);
-    // Plus the space column, unticked (spec 106 FR-013).
+    // Plus the space column (spec 106 FR-013) and the start-of-line column
+    // (issue #2374), both unticked.
     expect(reconciled).toEqual(
-      Object.fromEntries(Object.entries(initial).map(([mark, row]) => [mark, { ...row, [ATTACHMENT_SPACE]: false }])),
+      Object.fromEntries(
+        Object.entries(initial).map(([mark, row]) => [
+          mark,
+          { ...row, [ATTACHMENT_SPACE]: false, [ATTACHMENT_START_OF_LINE]: false },
+        ]),
+      ),
     );
+  });
+
+  it("seeds the start-of-line column ticked when the migration default says so (issue #2374)", () => {
+    const classes = groupMarkClasses(ALPHABET);
+    const proposals = proposeAttachments(ALPHABET, classes);
+    const reconciled = reconciledAttachmentChecked(ALPHABET, proposals, {}, true);
+    expect(reconciled[ACUTE]?.[ATTACHMENT_START_OF_LINE]).toBe(true);
+    // A saved answer always wins over the seed.
+    const key = marksAttachmentKey(ALPHABET, ACUTE, ATTACHMENT_START_OF_LINE);
+    const savedAnswers = { [`marks_attachment.${ACUTE}|${ATTACHMENT_START_OF_LINE}`]: savedAnswer(false, key) };
+    expect(
+      reconciledAttachmentChecked(ALPHABET, proposals, savedAnswers, true)[ACUTE]?.[ATTACHMENT_START_OF_LINE],
+    ).toBe(false);
   });
 
   it("reads a saved space-column tick (spec 106 FR-013)", () => {

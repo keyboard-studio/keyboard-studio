@@ -117,7 +117,6 @@ import {
   applyMarkGuards,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
-import type { BareMarkBehaviour } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
@@ -340,13 +339,12 @@ export interface ProjectWorkingCopyVfsInput {
   ruleAdditions?: DerivedRuleAdditions;
 }
 
-/** Step 2.6's input: the marks completion payload plus the bare-mark answer. */
+/** Step 2.6's input: the marks completion payload (buffer-start behaviour is per mark on the worklist, issue #2374). */
 export interface MarksGuardsInput {
   worklist: PlacementWorklist;
   outputForm: OutputForm;
   backspace?: BackspaceBehaviour;
   stacks?: readonly AttestedStack[];
-  bareMarkBehaviour?: BareMarkBehaviour;
 }
 
 /**
@@ -1012,7 +1010,6 @@ export function projectWorkingCopyVfs(
           marksGuards.outputForm,
           marksGuards.backspace ?? "peel",
           marksGuards.stacks ?? [],
-          marksGuards.bareMarkBehaviour ?? "swallow",
         );
         if (guarded.ir !== parsedForGuards) vfs.set(kmnPathForGuards, emitKmn(guarded.ir), false);
         if (guarded.guardHopSkipped === true) {

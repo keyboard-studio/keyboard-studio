@@ -82,6 +82,9 @@ export interface CarveKeycapRemovalInput {
  *   - A store that {@link classifyStoreSlotEdit} marks `blocked` is one
  *     applyStoreSlotRemovals REFUSES to edit, so for survivor purposes ALL
  *     its char slots count as intact — carved slot ids on it notwithstanding.
+ *     (This is the blocked classification only. Carving EVERY slot of an
+ *     any()-consumed store is not a refusal: the store and the rules that
+ *     reference it are removed, so its carved chars are gone here too.)
  *
  * Pure — exported for direct unit testing.
  */

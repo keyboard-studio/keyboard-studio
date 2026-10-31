@@ -59,6 +59,7 @@ import {
 } from "@keyboard-studio/contracts/fixtures";
 import type {
   CarveDisposition,
+  ContextElement,
   IRRule,
   KeyboardIR,
   OutputElement,
@@ -659,61 +660,6 @@ describe("store-slot guard rules (T013)", () => {
     ],
   });
 
-  it("emits one guard per (rule, context) when both sides of a paired store set are carved", () => {
-    const both = ["store#composed#0", "store#compdia#0", "store#composed#1", "store#compdia#1"].map(blockDisposition);
-    const result = compileCarveSuppression(bkspPairIR(), both);
-    const rules = result.ir.groups[0]!.rules;
-    expect(rules.map((r) => r.nodeId)).toEqual([
-      "gen-carve-guard-store#composed-0-bksp-0",
-      "gen-carve-guard-store#composed-1-bksp-0",
-      "bksp",
-    ]);
-    const keys = rules.map((r) => JSON.stringify(r.context));
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(result.restorations.filter((r) => r.kind === "guard")).toHaveLength(2);
-  });
-
-  it("emits one guard when two distinct rules over identical-item stores substitute to the same context", () => {
-    // Cree Cu/Co shape: twin stores with equal items, twin rules.
-    const ir: KeyboardIR = {
-      nodeId: "kbd",
-      stores: [
-        charStore({ nodeId: "store#cu", name: "Cu", chars: ["a", "b"] }),
-        charStore({ nodeId: "store#co", name: "Co", chars: ["a", "b"] }),
-      ],
-      groups: [
-        {
-          nodeId: "group#main",
-          rules: [
-            charRule({
-              nodeId: "ruleCu",
-              context: [{ kind: "any", storeRef: "Cu" }, { kind: "char", value: "x" }],
-              output: [{ kind: "char", value: "1" }],
-            }),
-            charRule({
-              nodeId: "ruleCo",
-              context: [{ kind: "any", storeRef: "Co" }, { kind: "char", value: "x" }],
-              output: [{ kind: "char", value: "2" }],
-            }),
-          ],
-        },
-      ],
-    };
-    // Carve the Co side first so the first-emitted guard belongs to the later rule.
-    const result = compileCarveSuppression(ir, ["store#co#0", "store#cu#0"].map(blockDisposition));
-    const rules = result.ir.groups[0]!.rules;
-    const guards = rules.filter((r) => r.nodeId.startsWith("gen-carve-guard-"));
-    expect(guards).toHaveLength(1);
-    // The kept guard is the earliest by position: ahead of ruleCu.
-    expect(rules.map((r) => r.nodeId.startsWith("gen-carve-guard-") ? "guard" : r.nodeId)).toEqual([
-      "guard",
-      "ruleCu",
-      "ruleCo",
-    ]);
-    const guardRestorations = result.restorations.filter((r) => r.kind === "guard");
-    expect(guardRestorations.map((r) => r.synthesizedNodeId)).toEqual(guards.map((g) => g.nodeId));
-  });
-
   it("carving only one side yields the same guards as carving both", () => {
     const one = compileCarveSuppression(bkspPairIR(), ["store#composed#0", "store#composed#1"].map(blockDisposition));
     const both = compileCarveSuppression(
@@ -740,6 +686,7 @@ describe("store-slot guard rules (T013)", () => {
             nodeId: "paired",
             context: [
               { kind: "deadkey", id: 3 },
+              { kind: "raw", text: "+" },
               { kind: "any", storeRef: "dkf003b" },
             ],
             output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],
@@ -767,6 +714,7 @@ describe("store-slot guard rules (T013)", () => {
     // same index, so the guard substitutes "E" into the paired rule's LHS.
     expect(guard.context).toEqual([
       { kind: "deadkey", id: 3 },
+      { kind: "raw", text: "+" },
       { kind: "char", value: "E" },
     ]);
     // Deadkey + char context → the context verb (context-bearing
@@ -789,9 +737,9 @@ describe("store-slot guard rules (T013)", () => {
     ]);
   });
 
-  it("reproduces the full LHS through the trigger for `+` rules", () => {
-    // any(word) + [K_X] > index(word, 1): index offset 1 resolves to the
-    // any() once the synthetic `+` separator is excluded.
+  it("reproduces the full LHS through the key element for `+` rules", () => {
+    // z + any(word) > index(word, 1): the any() is in KEY position (right of
+    // `+`), so the guard substitutes the carved selector char there.
     const ir: KeyboardIR = {
       nodeId: "kbd",
       stores: [charStore({ nodeId: "store#word", name: "word", chars: ["a", "b"] })],
@@ -802,9 +750,9 @@ describe("store-slot guard rules (T013)", () => {
             charRule({
               nodeId: "paired",
               context: [
-                { kind: "any", storeRef: "word" },
+                { kind: "char", value: "z" },
                 { kind: "raw", text: "+" },
-                { kind: "vkey", name: "K_X", modifiers: [] },
+                { kind: "any", storeRef: "word" },
               ],
               output: [{ kind: "index", storeRef: "word", offset: 1 }],
             }),
@@ -821,11 +769,72 @@ describe("store-slot guard rules (T013)", () => {
     expect(rules).toHaveLength(2);
     const guard = rules[0]!;
     expect(guard.context).toEqual([
-      { kind: "char", value: "a" },
+      { kind: "char", value: "z" },
       { kind: "raw", text: "+" },
-      { kind: "vkey", name: "K_X", modifiers: [] },
+      { kind: "char", value: "a" },
     ]);
     expect(guard.ownedByBehaviour).toBe("carve-suppression");
+  });
+
+  const pairedStoresIR = (context: ContextElement[]): KeyboardIR => ({
+    nodeId: "kbd",
+    stores: [
+      charStore({ nodeId: "store#a", name: "a", chars: ["x", "y"] }),
+      charStore({ nodeId: "store#b", name: "b", chars: ["p", "q"] }),
+    ],
+    groups: [
+      {
+        nodeId: "group#main",
+        rules: [
+          charRule({
+            nodeId: "paired",
+            context,
+            output: [{ kind: "index", storeRef: "b", offset: 1 }],
+          }),
+        ],
+      },
+    ],
+  });
+
+  it("emits one guard per distinct LHS when positionally paired stores are carved at the same index", () => {
+    // `+ any(a) > index(b,1)` pairs a and b; carving index 0 in BOTH would
+    // otherwise yield two identical `+ 'x'` guards (the second unreachable
+    // for kmcmplib).
+    const ir = pairedStoresIR([
+      { kind: "raw", text: "+" },
+      { kind: "any", storeRef: "a" },
+    ]);
+
+    const result = compileCarveSuppression(ir, [
+      { comboId: "store#a#0", disposition: "block" },
+      { comboId: "store#b#0", disposition: "block" },
+    ]);
+
+    const rules = result.ir.groups[0]!.rules;
+    const guards = rules.filter((r) => r.ownedByBehaviour === "carve-suppression");
+    const lhsKeys = guards.map((g) => JSON.stringify(g.context));
+    expect(new Set(lhsKeys).size).toBe(lhsKeys.length);
+    expect(guards).toHaveLength(1);
+    expect(rules[rules.length - 1]!.nodeId).toBe("paired");
+    // Restorations stay coherent: exactly one per emitted guard.
+    expect(result.restorations.filter((r) => r.kind === "guard")).toHaveLength(1);
+  });
+
+  it("emits NO guard when the carved store is only in the CONTEXT (left of `+`)", () => {
+    // `any(a) + [K_BKSP] > index(b,1)`: the carved char can no longer be
+    // typed, so a rule keyed on it protects nothing and would break
+    // Backspace after a pasted/legacy char.
+    const ir = pairedStoresIR([
+      { kind: "any", storeRef: "a" },
+      { kind: "raw", text: "+" },
+      { kind: "vkey", name: "K_BKSP", modifiers: [] },
+    ]);
+    const result = compileCarveSuppression(ir, [
+      { comboId: "store#a#0", disposition: "block" },
+      { comboId: "store#b#0", disposition: "block" },
+    ]);
+    expect(result.ir.groups[0]!.rules.map((r) => r.nodeId)).toEqual(["paired"]);
+    expect(result.restorations).toEqual([]);
   });
 
   it("allow-host on a slot emits no guard and records no restoration", () => {

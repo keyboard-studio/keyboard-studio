@@ -15,9 +15,14 @@
 // variants are 5+ or digit-led alphanumeric), so the same scan
 // position applies.
 
-import type { LintFinding } from "@keyboard-studio/contracts";
 import { ISO_639_5_COLLECTIVE_CODES } from "@keyboard-studio/contracts";
-import { criteriaFinding, kmnPath } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 /** The primary language subtag of a BCP47 tag, lowercased. */
 export function primaryLanguageSubtag(tag: string): string {
@@ -32,7 +37,7 @@ export function primaryLanguageSubtag(tag: string): string {
 export function checkIso6395Collective(
   tags: readonly string[],
   keyboardId: string,
-): LintFinding[] {
+): CheckResult {
   const offenders = [
     ...new Set(
       tags.filter((t) =>
@@ -40,15 +45,19 @@ export function checkIso6395Collective(
       ),
     ),
   ];
-  if (offenders.length === 0) return [];
-  return [
+  if (offenders.length === 0)
+    return checkPassed("KM_LINT_ISO_639_5_LANG_CODE", [
+      `File: ${kmnPath(keyboardId)}`,
+      `Checked ${tags.length} tag(s): no ISO 639-5 collective codes.`,
+    ]);
+  return checkFailed("KM_LINT_ISO_639_5_LANG_CODE", [
     criteriaFinding({
       code: "KM_LINT_ISO_639_5_LANG_CODE",
       file: kmnPath(keyboardId),
       message: `BCP47 tag(s) use an ISO 639-5 collective (language-group) code as the language: ${offenders.join(", ")}.`,
       hint: "Replace the collective code with the specific language's ISO 639 code.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -65,17 +74,24 @@ export function checkNumericRegionContrastive(
   tags: readonly string[],
   keyboardId: string,
   attested: boolean,
-): LintFinding[] {
+): CheckResult {
   const offenders = [...new Set(tags.filter(tagUsesNumericRegion))];
-  if (offenders.length === 0 || attested) return [];
-  return [
+  if (offenders.length === 0)
+    return checkPassed("KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", [
+      "No numeric region subtags in the tags.",
+    ]);
+  if (attested)
+    return checkPassed("KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", [
+      `Numeric region(s) attested as explicitly contrastive: ${offenders.join(", ")}.`,
+    ]);
+  return checkFailed("KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", [
     criteriaFinding({
       code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
       file: kmnPath(keyboardId),
       message: `BCP47 tag(s) use a numeric region subtag that is not attested as explicitly contrastive: ${offenders.join(", ")}.`,
       hint: "Use the alpha-2 region code, or — if the numeric region is deliberate and contrastive — attest it on the criteria page.",
     }),
-  ];
+  ]);
 }
 
 /** True when a BCP47 tag uses region subtag 001. */
@@ -107,32 +123,38 @@ export function tagUsesNumericRegion(tag: string): boolean {
 export function checkNumericRegionTag(
   tags: readonly string[],
   keyboardId: string,
-): LintFinding[] {
+): CheckResult {
   const offenders = [...new Set(tags.filter(tagUsesNumericRegion))];
-  if (offenders.length === 0) return [];
-  return [
+  if (offenders.length === 0)
+    return checkPassed("KM_LINT_KPS_NUMERIC_REGION_TAG", [
+      `Checked ${tags.length} tag(s): no 3-digit region subtags.`,
+    ]);
+  return checkFailed("KM_LINT_KPS_NUMERIC_REGION_TAG", [
     criteriaFinding({
       code: "KM_LINT_KPS_NUMERIC_REGION_TAG",
       file: kmnPath(keyboardId),
       message: `BCP47 tag(s) use a 3-digit (M.49) region subtag: ${offenders.join(", ")}.`,
       hint: "Use the ISO alpha-2 region code instead of the numeric M.49 code, unless the numeric region is deliberate.",
     }),
-  ];
+  ]);
 }
 
 /** 12.4 — any judged tag using region 001 → one finding naming them. */
 export function checkRegion001(
   tags: readonly string[],
   keyboardId: string,
-): LintFinding[] {
+): CheckResult {
   const offenders = [...new Set(tags.filter(tagUsesRegion001))];
-  if (offenders.length === 0) return [];
-  return [
+  if (offenders.length === 0)
+    return checkPassed("KM_LINT_REGION_001_TAG", [
+      `Checked ${tags.length} tag(s): no region 001.`,
+    ]);
+  return checkFailed("KM_LINT_REGION_001_TAG", [
     criteriaFinding({
       code: "KM_LINT_REGION_001_TAG",
       file: kmnPath(keyboardId),
       message: `BCP47 tag(s) use region code 001: ${offenders.join(", ")}.`,
       hint: 'Replace region 001 ("world") with the specific region the keyboard targets, or drop the region subtag.',
     }),
-  ];
+  ]);
 }

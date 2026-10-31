@@ -20,6 +20,7 @@ import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { TEXT_MAIN, FONT } from "../survey/surveyStyles.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
+import { isTouchPreviewAvailable } from "../steps/advance.ts";
 import { CharacterMapPane } from "../survey/CharacterMapPane.tsx";
 
 export interface SurveyPreviewPaneProps {
@@ -53,6 +54,11 @@ export function SurveyPreviewPane({
   // Text rows keep an inset (12px compact, 24px desktop); the keyboard
   // itself does not — it spans the pane edge to edge at every width.
   const inset = compact ? "0 12px" : "0 24px";
+  // Before the Touch gallery the mobile preview is hidden and the pane falls
+  // back to desktop for display only; the stored preference is left alone so
+  // it is honoured again on reaching the Touch gallery.
+  const touchAvailable = isTouchPreviewAvailable(activeStepId);
+  const shownOskMode: OskMode = touchAvailable ? oskMode : "desktop";
   return (
     <section
       aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
@@ -144,12 +150,16 @@ export function SurveyPreviewPane({
                 flexWrap: "wrap",
               }}
             >
-              <OskModeToggle value={oskMode} onChange={onOskModeChange} />
+              <OskModeToggle
+                value={shownOskMode}
+                onChange={onOskModeChange}
+                hideTouch={!touchAvailable}
+              />
             </div>
           </div>
           <OSKFrame
             startKeyboard={localStart}
-            oskMode={oskMode}
+            oskMode={shownOskMode}
             stage={stage}
             retry={retry}
             // Compact = the narrow PreviewSheet the author just opened.

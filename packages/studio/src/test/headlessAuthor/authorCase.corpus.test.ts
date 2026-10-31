@@ -197,7 +197,7 @@ describe.skipIf(!sc004GatesEnabled)("headless author: one case (T017, T035-T038)
     });
 
     it("the DecisionSet, minus timestamps, is identical", () => {
-      // Decision values carry their own recordedAt (e.g. guardSpecification).
+      // Decision values may carry their own recordedAt.
       expect(withoutTimestamps(second.decisions)).toEqual(withoutTimestamps(run.decisions));
     });
 

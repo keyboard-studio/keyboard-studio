@@ -124,18 +124,43 @@ describe("applyMarkGuards — blocking (FR-021 swallow; spec 106 FR-012)", () =>
     ]);
   });
 
-  it("under emit, drops the buffer-start rule so a bare mark passes there", () => {
+  it("when the mark's start-of-line box is ticked, drops the buffer-start rule and adds U+000A to its allowed store", () => {
     const { ir } = parse(BASE_KMN, "guards");
     const result = applyMarkGuards(
       ir,
-      worklist({ ownLetterUnits: ["a"], markUnits: [{ mark: ACUTE, inputOrder: "postfix" }] }),
+      worklist({
+        ownLetterUnits: ["a"],
+        markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+        bareMarkAllowed: { [ACUTE]: true },
+      }),
       "base-plus-mark",
-      "peel",
-      [],
-      "emit",
     );
     const guard = result.ir.groups.find((g) => g.name === MARKS_GUARD_GROUP);
     expect(guard?.rules.map((r) => r.nodeId)).toEqual(["gen-marks-block-0301"]);
+    expect(chars(result.ir.stores.find((s) => s.name === `${MARKS_ALLOWED_STORE_PREFIX}0301`))).toEqual(["\n", "a"]);
+    expect(emit(result.ir)).toContain(`store(${MARKS_ALLOWED_STORE_PREFIX}0301) U+000A 'a'`);
+  });
+
+  it("per-mark: one ticked mark passes at buffer start while an unticked mark is still swallowed", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({
+        ownLetterUnits: ["a"],
+        markUnits: [
+          { mark: ACUTE, inputOrder: "postfix" },
+          { mark: CIRCUMFLEX, inputOrder: "postfix" },
+        ],
+        bareMarkAllowed: { [ACUTE]: true },
+      }),
+      "base-plus-mark",
+    );
+    const guard = result.ir.groups.find((g) => g.name === MARKS_GUARD_GROUP);
+    expect(guard?.rules.map((r) => r.nodeId)).toEqual([
+      "gen-marks-block-0301",
+      "gen-marks-start-0302",
+      "gen-marks-block-0302",
+    ]);
   });
 
   it("never puts nul or beep in a generated store (G8)", () => {
@@ -179,11 +204,12 @@ describe("applyMarkGuards — compiled behaviour", () => {
     '+ [K_1] > "1"',
     "+ [K_SPACE] > U+0020",
     "+ [K_5] > U+0301",
+    "+ [K_ENTER] > U+000A",
     "",
   ].join("\n");
   const type = (vkeys: string[]): SimKeyInput[] => vkeys.map((vkey) => ({ vkey, modifiers: [], caps: false }));
 
-  async function build(allowSpace: boolean, bare: "swallow" | "emit") {
+  async function build(allowSpace: boolean, startOfLineTicked: boolean) {
     const { ir } = parse(KEYS_KMN, "guards");
     const guarded = applyMarkGuards(
       ir,
@@ -192,11 +218,9 @@ describe("applyMarkGuards — compiled behaviour", () => {
         markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
         blockedCombinations: [{ base: "k", mark: ACUTE }],
         ...(allowSpace ? { allowedContexts: { [ACUTE]: [" "] } } : {}),
+        ...(startOfLineTicked ? { bareMarkAllowed: { [ACUTE]: true } } : {}),
       }),
       "base-plus-mark",
-      "peel",
-      [],
-      bare,
     );
     const vfs = createVirtualFS([{ path: "source/guards.kmn", content: emit(guarded.ir), isBinary: false }]);
     const compiled = await compile(vfs, "guards");
@@ -205,7 +229,7 @@ describe("applyMarkGuards — compiled behaviour", () => {
   }
 
   it("blocks the mark after an unchecked base, a digit and an unticked space; keeps it after a checked base", async () => {
-    const run = await build(false, "swallow");
+    const run = await build(false, false);
     expect(run(["K_A", "K_5"])).toBe(`a${ACUTE}`);
     expect(run(["K_K", "K_5"])).toBe("k");
     expect(run(["K_1", "K_5"])).toBe("1");
@@ -213,12 +237,22 @@ describe("applyMarkGuards — compiled behaviour", () => {
     expect(run(["K_5"])).toBe("");
   }, 60_000);
 
-  it("allows the mark after a ticked space, and at buffer start under emit", async () => {
-    const run = await build(true, "emit");
+  it("allows the mark after a ticked space, and at buffer start when the start-of-line box is ticked", async () => {
+    const run = await build(true, true);
     expect(run(["K_SPACE", "K_5"])).toBe(` ${ACUTE}`);
     expect(run(["K_5"])).toBe(ACUTE);
     expect(run(["K_1", "K_5"])).toBe("1");
   }, 60_000);
+
+  // Issue #2374 verification gate: the "\n"-in-store idiom is unverified in
+  // this codebase — no test typed Enter before. Ticked must pass the mark
+  // after a real Enter press; unticked must swallow it there.
+  it("gate: ticked mark passes after Enter; unticked mark is swallowed after Enter", async () => {
+    const ticked = await build(false, true);
+    expect(ticked(["K_ENTER", "K_5"])).toBe(`\n${ACUTE}`);
+    const unticked = await build(false, false);
+    expect(unticked(["K_ENTER", "K_5"])).toBe("\n");
+  }, 120_000);
 });
 
 describe("applyMarkGuards — format version for notany()+context()", () => {

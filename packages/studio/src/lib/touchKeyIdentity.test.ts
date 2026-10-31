@@ -8,7 +8,6 @@
 
 import { describe, expect, it } from "vitest";
 import type {
-  GuardSpecification,
   KeyboardIR,
   RepairProposal,
   TouchLayoutIR,
@@ -34,7 +33,6 @@ import {
   appendTransplantRecord,
   deadKeyRepairDefault,
   deriveRepairRows,
-  guardSpecificationInForce,
   identityChoiceFingerprint,
   identityDecisionForAddress,
   identityTrackFor,
@@ -93,17 +91,6 @@ function layoutOf(): TouchLayoutIR {
     ],
     nodeIds: [],
   } as unknown as TouchLayoutIR;
-}
-
-function swallowGuard(): GuardSpecification {
-  return {
-    recordId: "guard:g:1",
-    behaviour: "swallow",
-    origin: "asked",
-    confirmed: true,
-    recordedAt: 1760000000000,
-    supersedes: null,
-  };
 }
 
 function recordsWith(partial: Partial<TouchKeyIdentityRecords>): TouchKeyIdentityRecords {
@@ -182,15 +169,29 @@ describe("deriveRepairRows", () => {
     expect(digit.defaultAction).toBe("convert-to-u");
     expect(digit.convertToId).toBe("U_0031");
     const mark = rows.find((r) => r.keyId === "T_0300")!;
-    expect(mark.defaultAction).toBe("convert-to-u");
+    // #2374: with no box map the mark takes the unticked default — guarded —
+    // so the repair default is mint-and-rule, not convert-to-u.
+    expect(mark.defaultAction).toBe("mint-and-rule");
   });
 
-  it("the guard specification in force changes the mark row's default", () => {
-    const records = recordsWith({ guardSpecifications: [swallowGuard()] });
-    const rows = deriveRepairRows({ ir: irOf(), layout: layoutOf(), records });
-    expect(rows.find((r) => r.keyId === "T_0300")!.defaultAction).toBe("mint-and-rule");
-    expect(rows.find((r) => r.keyId === "T_0031")!.defaultAction).toBe("convert-to-u");
-    expect(guardSpecificationInForce(records)?.behaviour).toBe("swallow");
+  it("the start-of-line box changes the mark row's default", () => {
+    const ticked = deriveRepairRows({
+      ir: irOf(),
+      layout: layoutOf(),
+      records: null,
+      bareMarkAllowedByMark: { "̀": true },
+    });
+    expect(ticked.find((r) => r.keyId === "T_0300")!.defaultAction).toBe("convert-to-u");
+    expect(ticked.find((r) => r.keyId === "T_0031")!.defaultAction).toBe("convert-to-u");
+    // Unticked box: the mark row's default is mint-and-rule (guarded T_).
+    const unticked = deriveRepairRows({
+      ir: irOf(),
+      layout: layoutOf(),
+      records: null,
+      bareMarkAllowedByMark: { "̀": false },
+    });
+    expect(unticked.find((r) => r.keyId === "T_0300")!.defaultAction).toBe("mint-and-rule");
+    expect(unticked.find((r) => r.keyId === "T_0031")!.defaultAction).toBe("convert-to-u");
   });
 
   it("a ruled T_ key derives no row", () => {

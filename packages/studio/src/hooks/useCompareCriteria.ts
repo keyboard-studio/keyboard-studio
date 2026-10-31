@@ -44,114 +44,20 @@
 // simply does not know.
 
 import { useEffect, useState } from "react";
-import { ALL_CRITERIA } from "@keyboard-studio/contracts";
-import type {
-  CompileResult,
-  CriteriaPlacement,
-  VirtualFS,
-} from "@keyboard-studio/contracts";
-import { KeyboardLintEngine, runDocChecks } from "@keymanapp/keyboard-lint";
-
-import { assembleLintContext } from "../criteria/assembleLintContext.ts";
-import { deriveCriteriaFacts } from "../criteria/deriveCriteriaFacts.ts";
-import { licenseTextHints } from "../criteria/fontLicense.ts";
-import { resolveCriteria } from "../criteria/resolveCriteria.ts";
-import {
-  EMPTY_CRITERIA_RECORD,
-  type CriteriaResult,
-} from "../criteria/criteriaTypes.ts";
-import { collectDocLintInputFromVfs } from "../lib/collectDocLintInputFromVfs.ts";
-import { readVfsText } from "../lib/vfsText.ts";
+import type { VirtualFS } from "@keyboard-studio/contracts";
+import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import type { CompareArtifact } from "./useCompareArtifact.ts";
-import { mergeLintFindings } from "./useCriteriaFindings.ts";
+import {
+  judgeForeignKeyboard,
+  placementFromRepoPath,
+} from "../criteria/judgeForeign.ts";
 
-/** Options the Compare host supplies from its artifact (Batch 1). */
-export interface JudgeForeignOptions {
-  /**
-   * The Compare pipeline's compile result for this keyboard (the
-   * §§7.6/7.21 severity mapping). Omitted when no compile ran — the
-   * compile rows then resolve Not yet checkable, never Met.
-   */
-  compileResult?: CompileResult | null;
-  /**
-   * Repository placement from the catalog keyboard's repo path
-   * (§13.1). Defaults to "release" when the path is unknown.
-   */
-  placement?: CriteriaPlacement;
-}
-
-/**
- * The repository placement a catalog keyboard's repo path states:
- * `release/…`, `experimental/…`, or `legacy/…` — the first segment is
- * the keyboards repo's tier folder. Anything else is "unknown".
- */
-export function placementFromRepoPath(
-  path: string | undefined,
-): CriteriaPlacement {
-  const tier = path?.split("/")[0];
-  if (tier === "release" || tier === "experimental" || tier === "legacy") {
-    return tier;
-  }
-  return "unknown";
-}
-
-/**
- * Judge one foreign keyboard VFS: doc + engine findings, merged, run
- * through the pure resolver in foreign mode. A failed engine run does
- * not discard the judgment: the doc findings still stand, and the
- * contextMissing map keeps the checks that could not run resolving
- * Not yet checkable rather than Met.
- *
- * Batch 1: the assembly runs with the foreign flags — scratchScan on
- * (1.13's CHECK-NOW arm; authored mode precertifies instead and never
- * scans) and deprecationInPlay on (mirroring the facts below, §§15–16
- * applicable by default). No precertified set is ever passed here.
- */
-export async function judgeForeignKeyboard(
-  vfs: VirtualFS,
-  keyboardId: string,
-  displayName: string,
-  options: JudgeForeignOptions = {},
-): Promise<CriteriaResult> {
-  const { ctx, contextMissing } = assembleLintContext({
-    vfs,
-    keyboardId,
-    placement: options.placement ?? "release",
-    scratchScan: true,
-    deprecationInPlay: true,
-  });
-  const docFindings = runDocChecks(
-    collectDocLintInputFromVfs(vfs, keyboardId, displayName),
-  );
-  let engineFindings: Awaited<
-    ReturnType<KeyboardLintEngine["lintWithContext"]>
-  > = [];
-  try {
-    engineFindings = await new KeyboardLintEngine().lintWithContext(
-      vfs,
-      keyboardId,
-      ctx,
-    );
-  } catch {
-    engineFindings = [];
-  }
-  const facts = {
-    ...deriveCriteriaFacts(vfs),
-    deprecated: true,
-    partnerPackage: true,
-  };
-  return resolveCriteria({
-    criteria: ALL_CRITERIA,
-    mode: "foreign",
-    lintFindings: mergeLintFindings(docFindings, engineFindings),
-    record: EMPTY_CRITERIA_RECORD,
-    facts,
-    contextMissing,
-    compileResult: options.compileResult ?? null,
-    // §9.2 supporting evidence only (never decides the row).
-    licenseTextHints: licenseTextHints(readVfsText(vfs, "LICENSE.md")),
-  });
-}
+// The foreign assembly lives in criteria/judgeForeign.ts (React-free, so the
+// /review Health Check can run it in a Web Worker). Re-exported here so the
+// Compare tab, its verification tests, and any other importer keep working
+// unchanged.
+export { judgeForeignKeyboard, placementFromRepoPath } from "../criteria/judgeForeign.ts";
+export type { JudgeForeignOptions } from "../criteria/judgeForeign.ts";
 
 export interface CompareCriteria {
   /** The foreign-mode judgment, or null until the run for this VFS settles. */

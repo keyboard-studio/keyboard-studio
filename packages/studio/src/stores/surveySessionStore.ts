@@ -31,7 +31,20 @@
 
 import { create } from "zustand";
 import type { StartKeyboard } from "@keyboard-studio/contracts";
-import type { GuardReevaluationItem } from "../survey/marks/marksValue.ts";
+// Issue #2374 retired the marks-series guard question and with it
+// `GuardReevaluationItem` (survey/marks/marksValue.ts). The session field
+// below is durable-draft compat — old drafts may still carry the list — so
+// the item shape is restated here locally. Never written after #2374
+// (MarksStepHost's mirror is gone); never read by any UI.
+/** One touch key whose minted form disagreed with the retired guard specification. */
+interface LegacyGuardReevaluationItem {
+  mark: string;
+  keyId: string;
+  platformId: string;
+  layerId: string;
+  currentForm: "unicode" | "guarded-t";
+  specBehaviour: "swallow" | "emit";
+}
 // Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
 // types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
 // PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
@@ -304,7 +317,7 @@ export interface SurveySessionState {
    * flag it is written, never cleared, by the host — session reset owns
    * clearing.
    */
-  marksGuardReevaluation: readonly GuardReevaluationItem[];
+  marksGuardReevaluation: readonly LegacyGuardReevaluationItem[];
 
   // Spec 089 FR-005/T017: identityResult, identityPhaseResult, surveyContext,
   // and scaffoldSpec are NO LONGER session fields — they are derived from the
@@ -373,7 +386,7 @@ export interface SurveySessionState {
   setMarksMigrationNeeded: (needed: boolean) => void;
 
   /** Record the spec 104 guard re-evaluation report (see marksGuardReevaluation). */
-  setMarksGuardReevaluation: (items: readonly GuardReevaluationItem[]) => void;
+  setMarksGuardReevaluation: (items: readonly LegacyGuardReevaluationItem[]) => void;
 
   /**
    * Generic back. Pops the last entry off history and sets it as activeStepId.

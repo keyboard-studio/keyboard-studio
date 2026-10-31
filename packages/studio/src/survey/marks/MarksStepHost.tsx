@@ -11,10 +11,6 @@
 // the pre-guard working IR, the reducer's exact input) and carries it in
 // the value; this host writes it, with the reducer's only-ever-true
 // semantics (nothing here ever clears it — session reset owns that).
-// Spec 104 adds the second mirror on the same channel: the completion
-// report's guard re-evaluation items (marks minted before the guard
-// specification existed whose form it contradicts — US1 scenario 6),
-// written whenever a completion carries a non-empty list.
 
 import { useEffect, useMemo } from "react";
 import type { ComponentType } from "react";

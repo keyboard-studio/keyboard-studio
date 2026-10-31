@@ -12,9 +12,13 @@
 //      This is why suppression runs FIRST, not last: the task text's
 //      "filter → slot removals → suppression" order would starve the guard
 //      synthesis of its selector chars.)
-//   2. Slot removals — applyStoreSlotRemovals replaces carved store slots
-//      with nul fillers on the suppressed IR. Suppression-owned guard rules
+//   2. Slot removals — applyStoreSlotRemovals drops carved store slots on the
+//      suppressed IR; a store left empty is removed with the rules that
+//      reference it (re-derived from the start IR each time, so un-carve
+//      needs no restoration record for this stage). Suppression-owned guard rules
 //      are rules, not store entries, so they are unaffected.
+//   4. Deadkey prune — a deadkey the carve left unconsumed (consumed
+//      in the start IR, by nothing in the carved IR) is stripped from every output (see carveDeadkeyPrune.ts).
 //   3. Whole-node filter — carveFilterIr drops deleted nodes. Rules carrying
 //      ownedByBehaviour (suppression output) are never filter targets: the
 //      filter must not undo the compiler's in-place block rewrite, and
@@ -23,8 +27,9 @@
 import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
 import { compileCarveSuppression } from "./carveSuppression.js";
 import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
-import { applyStoreSlotRemovals } from "./applyStoreSlotRemovals.js";
+import { applyStoreSlotRemovals, type CascadedSlotRemoval } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
+import { pruneCarveUnusedDeadkeys } from "./carveDeadkeyPrune.js";
 import { parseSlotId } from "./slotId.js";
 
 /**
@@ -59,6 +64,17 @@ export interface CarvePipelineInput {
 export interface CarvePipelineResult {
   ir: KeyboardIR;
   warnings: string[];
+  /**
+   * Informational slot-removal messages, e.g. which rules were removed because
+   * every slot of a store they reference was carved. Never a problem.
+   */
+  notices: string[];
+  /**
+   * Partner characters the slot-removal stage dropped only because they are
+   * positionally paired with a slot the author chose (see
+   * {@link CascadedSlotRemoval}). Empty when no carve reached a paired store.
+   */
+  cascadedRemovals: CascadedSlotRemoval[];
 }
 
 /**
@@ -136,5 +152,17 @@ export function deriveCarvedIr(
   ]);
   const filtered = carveFilterIr(removalResult.ir, allWholeNodeIds);
 
-  return { ir: filtered, warnings: removalResult.warnings };
+  // Stage 4 — prune deadkeys the carve left unconsumed (and the arming rules
+  // that only existed to set them). Runs last so it sees every removal.
+  const pruned = pruneCarveUnusedDeadkeys(startIr, filtered, {
+    swallow: input.fallbackPolicy === "swallow",
+    loud: input.loud === true,
+  });
+
+  return {
+    ir: pruned.ir,
+    warnings: removalResult.warnings,
+    notices: [...removalResult.notices, ...pruned.notices],
+    cascadedRemovals: removalResult.cascaded,
+  };
 }

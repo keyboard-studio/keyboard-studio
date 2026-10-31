@@ -185,6 +185,16 @@ export function resolveAssemblyVerdictRow(
   mode: "authored" | "foreign",
 ): ResolvedRow | null {
   if (!ASSEMBLY_VERDICT_CODES.has(lintRuleId)) return null;
+  // 1.5 and 2.6 in foreign (/review, Compare) mode are judged by lint
+  // checks (the base-commit ID lookup and version comparison), not by
+  // assembly verdicts — the authored host alone holds instantiation
+  // state. Defer so the findings path below resolves the rows.
+  if (
+    mode === "foreign" &&
+    (lintRuleId === DUPLICATE_ID_CODE ||
+      lintRuleId === VERSION_NOT_INCREMENTED_CODE)
+  )
+    return null;
   const verdict = verdicts?.get(lintRuleId);
   if (verdict === undefined) {
     return {

@@ -134,12 +134,53 @@ import { isPlusSeparator } from "../shared/rule-shape.js";
  * - `appliedCount` — number of individual store-item removals actually
  *                    performed (summed across every store in a coordinated
  *                    pair-set, not just the one the caller named).
+ * - `cascaded`     — structured, inspectable form of the pair-set cascade:
+ *                    one entry per (chosen slot, partner store) where a
+ *                    removal reached a character the caller did NOT name.
+ *                    See {@link CascadedSlotRemoval}.
  */
 export interface StoreSlotRemovalResult {
   ir: KeyboardIR;
   warnings: string[];
   notices: string[];
   appliedCount: number;
+  cascaded: CascadedSlotRemoval[];
+  /**
+   * Rules removed because every slot of a store they reference was carved
+   * (see the "emptied store" cleanup in {@link applyStoreSlotRemovals}).
+   * Empty when no store emptied. Re-derived from the start IR on every call,
+   * so un-carving needs no restoration record.
+   */
+  removedRules: RemovedRuleRef[];
+  /** Names of the stores dropped from the IR because they emptied or were orphaned. */
+  removedStores: string[];
+}
+
+/** Identifies a rule dropped by the emptied-store cleanup. */
+export interface RemovedRuleRef {
+  groupNodeId: string;
+  ruleNodeId: string;
+}
+
+/**
+ * One partner character removed only because it is positionally paired with a
+ * slot the author chose to remove (e.g. carving `a` in `comp-dia` also drops
+ * `à` from `composed`, tied by `any(composed) + [K_BKSP] > index(comp-dia,1)`).
+ * The cascade is required to keep every paired store the same length and
+ * aligned; this record is what lets a caller say so out loud.
+ *
+ * - `position`         — the shared item index in every member of the pair-set.
+ * - `chosen`           — a slot the caller named at `position` (store + char).
+ * - `partner`          — the store whose item at `position` went with it, and
+ *                        the character that was there.
+ *
+ * Only partners holding a character are reported; a nul filler or non-char
+ * partner has nothing an author would recognise as "lost".
+ */
+export interface CascadedSlotRemoval {
+  position: number;
+  chosen: { storeName: string; char: string };
+  partner: { storeName: string; char: string };
 }
 
 /**
@@ -743,9 +784,10 @@ export function applyStoreSlotRemovals(
 ): StoreSlotRemovalResult {
   const warnings: string[] = [];
   const notices: string[] = [];
+  const cascaded: CascadedSlotRemoval[] = [];
 
   if (slotIds.size === 0) {
-    return { ir: startIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0, cascaded, removedRules: [], removedStores: [] };
   }
 
   // --- Parse and group slot ids by storeNodeId ----------------------------
@@ -771,7 +813,7 @@ export function applyStoreSlotRemovals(
 
   if (targetsByStore.size === 0) {
     // All ids were malformed.
-    return { ir: startIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0, cascaded, removedRules: [], removedStores: [] };
   }
 
   const analysis = analyzeStores(startIr);
@@ -816,6 +858,10 @@ export function applyStoreSlotRemovals(
   // --- Apply each pair-work batch ------------------------------------------
   const replacedById = new Map<string, IRStore>();
   let appliedCount = 0;
+  // Stores whose every item was dropped, and the stores (the emptied ones plus
+  // their pair-set peers) that may be left unreferenced once their rules go.
+  const emptiedStoreNames = new Set<string>();
+  const cleanupCandidates = new Set<string>();
 
   for (const work of workByKey.values()) {
     const coordinated = work.memberNames.length > 1;
@@ -868,27 +914,19 @@ export function applyStoreSlotRemovals(
 
     if (validPositions.size === 0) continue;
 
-    // Would-empty guard, evaluated over the WHOLE pair-set: refuse the
-    // entire coordinated drop (no partial application) if it would empty
-    // any member that is any()-consumed — that compiles to a keyboard that
-    // silently fails to build (spec §10 Layer-A evidence).
-    const emptiedAnySourceMembers = memberStores.filter(
-      (s) =>
-        s.items.length - validPositions.size === 0 &&
-        (analysis.usageByName.get(s.name)?.asAnySource ?? false),
-    );
-
-    if (emptiedAnySourceMembers.length > 0) {
-      const emptiedLabel = emptiedAnySourceMembers.map((s) => `"${s.name}"`).join(", ");
-      warnings.push(
-        coordinated
-          ? `[store-slot] refusing coordinated removal across paired stores ${memberLabel()} - ` +
-              `dropping these positions would empty ${emptiedLabel}, which is consumed by any() and would ` +
-              `break the build; remove the whole store and its rules instead`
-          : `[store-slot] refusing to empty store ${emptiedLabel} - a store consumed by any() compiles to a ` +
-              `keyboard that silently fails to build when empty; remove the whole store and its rules instead`,
-      );
-      continue;
+    // A member left with no items is dropped together with every rule that
+    // references it (see the cleanup below): an empty store consumed by any()
+    // fails the build, and the rules that read it can never match once its
+    // slots are carved.
+    for (const s of memberStores) {
+      // "Empty" includes a partner left holding only nul padding (an index()
+      // target can be longer than its any() source, e.g. trailing dkt* nuls).
+      const remaining = s.items.filter((_, i) => !validPositions.has(i));
+      if (remaining.every((it) => it.kind === "raw" && it.text.trim().toLowerCase() === "nul")) {
+        emptiedStoreNames.add(s.name);
+        cleanupCandidates.add(s.name);
+        for (const m of memberStores) cleanupCandidates.add(m.name);
+      }
     }
 
     for (const s of memberStores) {
@@ -898,6 +936,25 @@ export function applyStoreSlotRemovals(
     }
 
     if (coordinated) {
+      for (const pos of [...validPositions].sort((a, b) => a - b)) {
+        let chosen: CascadedSlotRemoval["chosen"] | undefined;
+        for (const name of work.memberNames) {
+          if (!work.requestedByName.get(name)?.has(pos)) continue;
+          const item = analysis.storeByName.get(name)?.items[pos];
+          if (item?.kind === "char") {
+            chosen = { storeName: name, char: item.value };
+            break;
+          }
+        }
+        if (chosen === undefined) continue;
+        for (const name of work.memberNames) {
+          if (work.requestedByName.get(name)?.has(pos)) continue;
+          const item = analysis.storeByName.get(name)?.items[pos];
+          if (item?.kind === "char") {
+            cascaded.push({ position: pos, chosen, partner: { storeName: name, char: item.value } });
+          }
+        }
+      }
       notices.push(
         `[store-slot] coordinated removal across paired stores ${memberLabel()}: dropped ` +
           `${validPositions.size} position(s) from each to preserve index() alignment.`,
@@ -907,15 +964,66 @@ export function applyStoreSlotRemovals(
 
   if (replacedById.size === 0) {
     // Nothing survived the guards.
-    return { ir: startIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0, cascaded, removedRules: [], removedStores: [] };
   }
 
   // --- Structural-sharing shallow copy of the IR --------------------------
-  const newIr: KeyboardIR = {
+  let newIr: KeyboardIR = {
     ...startIr,
     stores: startIr.stores.map((s) => replacedById.get(s.nodeId) ?? s),
     // groups, comments, raw, touchLayout, visualKeyboard passed through by reference.
   };
 
-  return { ir: newIr, warnings, notices, appliedCount };
+  // --- Emptied-store cleanup ------------------------------------------------
+  // Carving every slot of a store removes it, and every rule that references
+  // it (any/notany/index in context, index/outs in output). Then any store the
+  // removed rules were the last reference to goes too, so no empty or orphaned
+  // store is emitted. Derived from `startIr` each call: un-carving re-derives,
+  // so no restoration record is needed.
+  const removedRules: RemovedRuleRef[] = [];
+  const removedStores: string[] = [];
+  if (emptiedStoreNames.size > 0) {
+    const doomed = new Set(emptiedStoreNames);
+    const refsOf = (rule: { context: ContextElement[]; output: OutputElement[] }): string[] => {
+      const names: string[] = [];
+      for (const el of [...rule.context, ...rule.output]) {
+        if ("storeRef" in el) names.push(el.storeRef);
+      }
+      return names;
+    };
+    const referencedBefore = new Set<string>();
+    for (const group of startIr.groups) {
+      for (const rule of group.rules) for (const n of refsOf(rule)) referencedBefore.add(n);
+    }
+    const groups = newIr.groups.map((group) => {
+      const kept = group.rules.filter((rule) => {
+        const refs = refsOf(rule);
+        if (!refs.some((n) => doomed.has(n))) return true;
+        removedRules.push({ groupNodeId: group.nodeId, ruleNodeId: rule.nodeId });
+        for (const n of refs) cleanupCandidates.add(n);
+        return false;
+      });
+      return kept.length === group.rules.length ? group : { ...group, rules: kept };
+    });
+    const referencedAfter = new Set<string>();
+    for (const group of groups) {
+      for (const rule of group.rules) for (const n of refsOf(rule)) referencedAfter.add(n);
+    }
+    for (const name of cleanupCandidates) {
+      const store = analysis.storeByName.get(name);
+      if (store === undefined || store.isSystem) continue;
+      if (referencedBefore.has(name) && !referencedAfter.has(name)) doomed.add(name);
+    }
+    newIr = { ...newIr, groups, stores: newIr.stores.filter((s) => !doomed.has(s.name)) };
+    removedStores.push(...[...doomed].sort());
+    if (removedRules.length > 0) {
+      notices.push(
+        `[store-slot] every slot of ${[...emptiedStoreNames].sort().map((n) => `"${n}"`).join(", ")} was carved; ` +
+          `removed the store(s) and ${removedRules.length} rule(s) that referenced them: ` +
+          removedRules.map((r) => r.ruleNodeId).join(", "),
+      );
+    }
+  }
+
+  return { ir: newIr, warnings, notices, appliedCount, cascaded, removedRules, removedStores };
 }

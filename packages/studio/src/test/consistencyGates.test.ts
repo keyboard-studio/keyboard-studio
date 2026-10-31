@@ -38,7 +38,6 @@ function marksDecision(opts: { blocked: boolean; marks: boolean; outputForm?: "r
       outputForm: opts.outputForm ?? "ready-made",
     },
     contextTolerance: null,
-    guardSpecification: null,
   });
 }
 

@@ -7,8 +7,15 @@
 // .storeDirectives raw bodies are scanned as a fallback for IRs built
 // by other producers), plus the judged VFS inventory for existence.
 
-import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
-import { baseNameLower, criteriaFinding, kmnPath } from "./_shared.js";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
+import {
+  baseNameLower,
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 /** Template placeholder bitmap names that ship in starter templates. */
 const PLACEHOLDER_BITMAPS: ReadonlySet<string> = new Set(["qaa.ico"]);
@@ -40,31 +47,36 @@ export function bitmapReference(ir: KeyboardIR): string | undefined {
 export function checkBitmapPlaceholder(
   ir: KeyboardIR,
   filePaths: readonly string[],
-): LintFinding[] {
+): CheckResult {
   const ref = bitmapReference(ir);
-  if (ref === undefined) return [];
+  if (ref === undefined)
+    return checkPassed("KM_LINT_BITMAP_PLACEHOLDER", [
+      "No store(&BITMAP) reference to check.",
+    ]);
   const file = kmnPath(ir.header.keyboardId);
   const base = baseNameLower(ref);
   if (PLACEHOLDER_BITMAPS.has(base)) {
-    return [
+    return checkFailed("KM_LINT_BITMAP_PLACEHOLDER", [
       criteriaFinding({
         code: "KM_LINT_BITMAP_PLACEHOLDER",
         file: file,
         message: `store(&BITMAP) references "${ref}", a template placeholder, not this keyboard's own icon.`,
         hint: "Point &BITMAP at the keyboard's actual .ico file.",
       }),
-    ];
+    ]);
   }
   const present = filePaths.some((p) => baseNameLower(p) === base);
   if (!present) {
-    return [
+    return checkFailed("KM_LINT_BITMAP_PLACEHOLDER", [
       criteriaFinding({
         code: "KM_LINT_BITMAP_PLACEHOLDER",
         file: file,
         message: `store(&BITMAP) references "${ref}", but no such .ico file is in the package.`,
         hint: "Add the referenced .ico to the package, or point &BITMAP at the icon that ships.",
       }),
-    ];
+    ]);
   }
-  return [];
+  return checkPassed("KM_LINT_BITMAP_PLACEHOLDER", [
+    `store(&BITMAP) references "${ref}", present in the package.`,
+  ]);
 }

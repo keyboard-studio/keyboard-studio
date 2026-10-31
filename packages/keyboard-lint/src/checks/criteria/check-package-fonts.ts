@@ -13,8 +13,13 @@
 // the .kps <File> names. Neither is precertification: adapt tracks can
 // carry base files through, so the files are actually looked at.
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { baseNameLower, criteriaFinding } from "./_shared.js";
+import {
+  baseNameLower,
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 /**
  * Industry/proprietary font families the criterion names ("Arial,
@@ -59,7 +64,8 @@ export interface IndustryFontInput {
 }
 
 /** 8.12 — any industry font among the package's font names/families → finding. */
-export function checkIndustryFonts(input: IndustryFontInput): LintFinding[] {
+export function checkIndustryFonts(input: IndustryFontInput): CheckResult {
+  const code = "KM_LINT_KPS_INDUSTRY_FONT";
   const candidates: Array<{ name: string; via: string }> = [];
   for (const name of input.kpsFileNames) {
     candidates.push({ name: fileFontName(name), via: `file "${name}"` });
@@ -83,15 +89,21 @@ export function checkIndustryFonts(input: IndustryFontInput): LintFinding[] {
     });
   }
   const offenders = candidates.filter((c) => INDUSTRY_FONTS.has(c.name));
-  if (offenders.length === 0) return [];
-  return [
+  if (offenders.length === 0) {
+    if (candidates.length === 0)
+      return checkPassed(code, ["No font names or families to check."]);
+    return checkPassed(code, [
+      `Checked ${candidates.length} font name(s): none are industry fonts.`,
+    ]);
+  }
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_INDUSTRY_FONT",
       file: input.kpsPath,
       message: `The package uses industry font(s): ${offenders.map((o) => o.via).join(", ")}.`,
       hint: "Replace industry fonts (Arial, Times, Tahoma, …) with an openly licensed font bundled for this keyboard.",
     }),
-  ];
+  ]);
 }
 
 /** 9.6 — any .woff/.woff2 in the VFS inventory or the .kps file list → finding. */
@@ -99,17 +111,20 @@ export function checkWoffInPackage(
   filePaths: readonly string[],
   kpsFileNames: readonly string[],
   kpsPath: string,
-): LintFinding[] {
-  const offenders = [...filePaths, ...kpsFileNames].filter((p) =>
-    /\.woff2?$/i.test(p.trim()),
-  );
-  if (offenders.length === 0) return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_WOFF_FONT_IN_PACKAGE";
+  const scanned = [...filePaths, ...kpsFileNames];
+  const offenders = scanned.filter((p) => /\.woff2?$/i.test(p.trim()));
+  if (offenders.length === 0)
+    return checkPassed(code, [
+      `Checked ${scanned.length} file(s): no .woff/.woff2.`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_WOFF_FONT_IN_PACKAGE",
       file: kpsPath,
       message: `The package contains web font(s): ${[...new Set(offenders)].join(", ")}.`,
       hint: "Remove .woff/.woff2 files from the package; ship the font as .ttf or .otf instead.",
     }),
-  ];
+  ]);
 }

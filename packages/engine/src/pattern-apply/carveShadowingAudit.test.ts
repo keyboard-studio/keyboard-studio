@@ -52,7 +52,8 @@
 // a down oracle would make every "no new findings" assertion meaningless.
 
 import { describe, it, expect } from "vitest";
-import { compileCarveSuppression } from "./carveSuppression.js";
+import { compileCarveSuppression, restoreCarveSuppression } from "./carveSuppression.js";
+import { deriveCarvedIr } from "./carvePipeline.js";
 import { emit } from "../codec/emit.js";
 import { validateWithOracle } from "../validator/oracle.js";
 import {
@@ -361,4 +362,132 @@ describe("carve suppression — Layer B shadowing audit (T021)", () => {
     },
     60_000,
   );
+
+  it(
+    "positionally paired stores carved at the same index emit no unreachable duplicate guard",
+    async () => {
+      const ir = makeTestIR(
+        [
+          irGroup({
+            nodeId: "group#main",
+            name: "main",
+            rules: [
+              charRule({
+                nodeId: "paired",
+                context: [
+                  { kind: "deadkey", id: 3 },
+                  { kind: "raw", text: "+" },
+                  { kind: "any", storeRef: "ka" },
+                ],
+                output: [{ kind: "index", storeRef: "kb", offset: 1 }],
+              }),
+            ],
+          }),
+        ],
+        [
+          charStore({ nodeId: "store#ka", name: "ka", chars: ["x", "y"] }),
+          charStore({ nodeId: "store#kb", name: "kb", chars: ["p", "q"] }),
+        ],
+      );
+      const introduced = await newlyUnreachable({
+        name: "paired-double-carve",
+        ir,
+        dispositions: [blockDisposition("store#ka#0"), blockDisposition("store#kb#0")],
+      });
+      expect(introduced).toEqual([]);
+    },
+    60_000,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Every slot of an any() store carved: the consumer is dead, not shadowed
+// ---------------------------------------------------------------------------
+
+describe("carve shadowing audit: fully-carved any() store", () => {
+  /** `<ctx> + any(ka) > index(kb, 1)` over a two-char store pair. */
+  function fullCarveIr(ctx: IRRule["context"]): KeyboardIR {
+    return makeTestIR(
+      [
+        irGroup({
+          nodeId: "group#main",
+          name: "main",
+          rules: [
+            charRule({
+              nodeId: "consumer",
+              context: [...ctx, { kind: "raw", text: "+" }, { kind: "any", storeRef: "ka" }],
+              output: [{ kind: "index", storeRef: "kb", offset: ctx.length + 1 }],
+            }),
+          ],
+        }),
+      ],
+      [
+        charStore({ nodeId: "store#ka", name: "ka", chars: ["x", "y"] }),
+        charStore({ nodeId: "store#kb", name: "kb", chars: ["X", "Y"] }),
+      ],
+    );
+  }
+  const allIds = new Set(["store#ka#0", "store#ka#1", "store#kb#0", "store#kb#1"]);
+
+  it.each([
+    ["bare key", [] as IRRule["context"]],
+    ["deadkey context", [{ kind: "deadkey", id: 3 }] as IRRule["context"]],
+  ])(
+    "swallow, %s: no unreachable hint; every carved key still swallowed",
+    async (_label, ctx) => {
+      const ir = fullCarveIr(ctx);
+      const { ir: carved, warnings } = deriveCarvedIr(ir, {
+        deletedNodeIds: new Set(),
+        deletedItemIds: allIds,
+        fallbackPolicy: "swallow",
+      });
+      // With the consumer gone the stores may empty: no refuse-to-empty warning.
+      expect(warnings.filter((w) => w.includes("refusing"))).toEqual([]);
+      const kmn = emit(carved);
+      expect(await unreachableRuleTexts(kmn)).toEqual([]);
+      // Each carved key keeps its own guard (swallowed, not host fall-through)
+      // and the dead consumer is gone.
+      expect(kmn).toMatch(/U\+0078 > context/);
+      expect(kmn).toMatch(/U\+0079 > context/);
+      expect(kmn).not.toMatch(/any\(ka\)/);
+    },
+    60_000,
+  );
+
+  it.each([
+    ["bare key", [] as IRRule["context"]],
+    ["deadkey context", [{ kind: "deadkey", id: 3 }] as IRRule["context"]],
+  ])(
+    "swallow, %s, one slot carved: no unreachable hint, carved key guarded",
+    async (_label, ctx) => {
+      const carved = deriveCarvedIr(fullCarveIr(ctx), {
+        deletedNodeIds: new Set(),
+        deletedItemIds: new Set(["store#ka#0", "store#kb#0"]),
+        fallbackPolicy: "swallow",
+      }).ir;
+      const kmn = emit(carved);
+      expect(await unreachableRuleTexts(kmn)).toEqual([]);
+      expect(kmn).toMatch(/U\+0078 > context/);
+    },
+    60_000,
+  );
+
+  it("a partially carved store keeps its live consumer", () => {
+    const ir = fullCarveIr([]);
+    const carved = deriveCarvedIr(ir, {
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["store#ka#0", "store#kb#0"]),
+      fallbackPolicy: "swallow",
+    }).ir;
+    expect(carved.groups[0]?.rules.some((r) => r.nodeId === "consumer")).toBe(true);
+  });
+
+  it("un-carve re-inserts the dead consumer at its original index", () => {
+    const ir = fullCarveIr([]);
+    const dispositions = ["store#ka#0", "store#ka#1"].map(blockDisposition);
+    const { ir: compiled, restorations } = compileCarveSuppression(ir, dispositions);
+    expect(compiled.groups[0]?.rules.some((r) => r.nodeId === "consumer")).toBe(false);
+    const restored = restoreCarveSuppression(compiled, restorations);
+    expect(restored.groups[0]?.rules.map((r) => r.nodeId)).toEqual(["consumer"]);
+  });
 });

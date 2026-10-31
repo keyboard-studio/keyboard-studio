@@ -580,59 +580,16 @@ export async function driveConvenienceStep(
  * if that is ALSO gated away — the carve gallery itself), rather than trusting
  * a fixed-timeout absence read to mean "the S0 gate skipped this".
  */
-/**
- * Spec 104 FR-013: the marks series ends at the guard station ("A mark
- * with no letter before it") whenever some mark has a key of its own. The
- * station opens on a selection — the author's pick, a prior answer, the
- * Track 2 seed, or else the "swallow" default — so Continue is enabled.
- *
- * This helper answers ONLY the unselected case (kept as a safety net for
- * older builds): when the station shows with neither option selected, it
- * selects `behaviour`. A seed
- * or prior answer already selected is left exactly as it stands (on the
- * adapt track the seed is the imported keyboard's own behaviour, and
- * overriding it would change what the walk is adapting). The default,
- * "swallow", is the guarded behaviour the pre-104 product minted by
- * default (spec 063's combining-mark guard), so the legacy walks that pass
- * through here keep the downstream minting behaviour they were written
- * against. Walks that care about the answer itself (spec 104's own e2e)
- * assert the station explicitly and pass their behaviour.
- *
- * Returns true when the guard station was present (answered or already
- * answered), false when it never rendered.
- */
-export async function answerGuardStationIfPresent(
-  page: Page,
-  behaviour: "swallow" | "emit" = "swallow",
-): Promise<boolean> {
-  const station = page.getByTestId("guard-station");
-  if (!(await station.isVisible().catch(() => false))) return false;
-  const swallow = page.getByTestId("guard-option-swallow");
-  const emit = page.getByTestId("guard-option-emit");
-  if ((await swallow.count()) === 0 || (await emit.count()) === 0) {
-    // The read-only "prior answer" form (a confirmed specification is
-    // shown, not re-asked) — Continue is already unblocked.
-    return true;
-  }
-  const anySelected =
-    (await swallow.isChecked().catch(() => false)) ||
-    (await emit.isChecked().catch(() => false));
-  if (!anySelected) {
-    await page.getByTestId(`guard-option-${behaviour}`).check();
-  }
-  return true;
-}
-
 export async function driveMarksSeries(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("marks-continue");
   const nextLandmarks = [
     page.getByTestId("convenience-continue"),
     page.getByTestId("carve-gallery"),
   ];
-  // 8 iterations, not the pre-104 6: the series gained a station (spec
-  // 104's guard station is always last), and a station count at the old
-  // budget's edge must still complete.
-  for (let i = 0; i < 8; i++) {
+  // 6 iterations: at most 5 stations (SC-006), and a station count at the
+  // budget's edge must still complete. (#2374 removed the guard station,
+  // returning the budget to its pre-104 size.)
+  for (let i = 0; i < 6; i++) {
     const timeout = i === 0 ? 20_000 : 5_000;
     await Promise.race([
       continueBtn.waitFor({ state: "visible", timeout }),
@@ -642,11 +599,6 @@ export async function driveMarksSeries(page: Page): Promise<void> {
       // direct visibility check below.
     });
     if (!(await continueBtn.isVisible().catch(() => false))) return; // skipped, or just completed
-    // Spec 104 FR-013: if this station is the guard station and it is
-    // unanswered, marks-continue is disabled and the click below would
-    // wait on actionability until the test timeout. Answer it first
-    // (seed/prior-respecting — see answerGuardStationIfPresent).
-    await answerGuardStationIfPresent(page);
     await continueBtn.click();
   }
 }

@@ -1185,3 +1185,57 @@ describe('CarveGalleryV2 — suggested discards are marked, applied on Continue 
     expect(useDecisionStore.getState().decisions['carved-layout']?.provenance).toBe('asked');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Paired-store cascade is shown BEFORE the author discards. Hovering or
+// focusing a cell selects it (no discard yet); the details surface must
+// already name the partner characters the discard would also remove.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — paired characters are named before discard', () => {
+  function makePairedIR(): KeyboardIR {
+    const bksp: IRRule = {
+      nodeId: 'r-bksp',
+      context: [
+        { kind: 'any', storeRef: 'composed' },
+        { kind: 'raw', text: '+' },
+        { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+      ],
+      output: [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
+    };
+    return makeIR(
+      [makeGroup('g-main', 'main', [bksp])],
+      [makeStore('s#composed', 'composed', ['à', 'è']), makeStore('s#comp-dia', 'comp-dia', ['a', 'e'])],
+    );
+  }
+
+  function mockPairedContributors() {
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), storeSlotIds: ['s#comp-dia#0'] };
+      if (ch === 'à') return { ...emptyContributors(ch), storeSlotIds: ['s#composed#0'] };
+      if (ch === 'e') return { ...emptyContributors(ch), storeSlotIds: ['s#comp-dia#1'] };
+      if (ch === 'è') return { ...emptyContributors(ch), storeSlotIds: ['s#composed#1'] };
+      return emptyContributors(ch);
+    });
+  }
+
+  it('names the composed partner on hover, before anything is discarded', () => {
+    mockPairedContributors();
+    renderGalleryV2(makePairedIR());
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'a — U+0061' }));
+
+    const notice = screen.getByTestId('carve-cascade-notice');
+    expect(notice.textContent).toContain('a also discards à');
+    expect(notice.getAttribute('role')).toBe('note');
+    // Hover is not a discard: nothing was removed yet.
+    expect(useWorkingCopyStore.getState().deletedItemIds.size).toBe(0);
+  });
+
+  it('shows no notice for a character whose slot is not paired', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'q — U+0071' }));
+    expect(screen.queryByTestId('carve-cascade-notice')).toBeNull();
+  });
+});

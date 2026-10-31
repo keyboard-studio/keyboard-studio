@@ -251,3 +251,58 @@ group(main) using keys
     expect(emitted).toMatch(/store\(&CasedKeys\)/);
   });
 });
+
+describe("scaffoldIR — unused deadkey prune", () => {
+  const HEADER = US_BASE_KMN.split("begin Unicode")[0];
+  const run = (body: string) => {
+    const { ir } = parse(`${HEADER}begin Unicode > use(main)\ngroup(main) using keys\n${body}`, "us_english");
+    scaffoldIR(ir, { group: "qwerty-qwertz", identity: { keyboardId: "k", displayName: "K", } });
+    return emit(ir);
+  };
+
+  it("removes an arming rule for a deadkey nothing reads", () => {
+    const kmn = run("+ [K_Y] > dk(3)\n+ [K_C] > 'c'\n");
+    expect(kmn).not.toMatch(/dk\(/);
+    expect(kmn).toMatch(/\[K_C\]/);
+  });
+
+  it("strips the dk() from a mixed output and keeps the rest", () => {
+    const kmn = run("+ [K_Y] > 'x' dk(3)\n");
+    expect(kmn).not.toMatch(/dk\(/);
+    expect(kmn).toMatch(/U\+0078|'x'/);
+  });
+
+  it("keeps a deadkey that a rule consumes", () => {
+    const kmn = run("+ [K_Y] > dk(3)\ndk(3) + [K_A] > 'a'\n");
+    expect(kmn).toMatch(/dk\(3\)|dk\(0*3\)/i);
+    expect((kmn.match(/dk\(/g) ?? []).length).toBe(2);
+  });
+
+  it("fixed point: a chain of dead deadkeys is removed", () => {
+    const kmn = run("+ [K_Y] > dk(3)\ndk(3) + [K_W] > dk(4)\n");
+    expect(kmn).not.toMatch(/dk\(/);
+  });
+
+  const armingSurvives = (fragmentText: string): boolean => {
+    const { ir } = parse(
+      `${HEADER}begin Unicode > use(main)
+group(main) using keys
++ [K_Y] > dk(3)
+`,
+      "us_english",
+    );
+    ir.raw.push({ nodeId: "raw#1", origin: "imported", sourceText: fragmentText, reason: "test" });
+    scaffoldIR(ir, { group: "qwerty-qwertz", identity: { keyboardId: "k", displayName: "K" } });
+    return ir.groups.some((g) => g.rules.some((r) => r.output.some((o) => o.kind === "deadkey")));
+  };
+
+  it("fails closed: a deadkey named in an opaque fragment stays", () => {
+    expect(armingSurvives("dk(3) + [K_Z] > 'z'")).toBe(true);
+    // Control: an unrelated fragment does not protect it.
+    expect(armingSurvives("dk(9) + [K_Z] > 'z'")).toBe(false);
+  });
+
+  it("fails closed: an unreadable deadkey token in a fragment disables pruning", () => {
+    expect(armingSurvives("dk()")).toBe(true);
+  });
+});

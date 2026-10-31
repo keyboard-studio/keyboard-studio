@@ -28,6 +28,8 @@ export interface GalleryPreviewPaneProps {
   stage: Stage;
   retry: () => void;
   defaultOskMode: OskMode;
+  /** false on steps before the Touch gallery: no Mobile KB option, desktop only. */
+  allowTouch?: boolean;
   heading: string;
   warningLabel?: string;
 }
@@ -37,12 +39,14 @@ export function GalleryPreviewPane({
   stage,
   retry,
   defaultOskMode,
+  allowTouch = true,
   heading,
   warningLabel,
 }: GalleryPreviewPaneProps) {
   const { t } = useLingui();
   const resolvedWarningLabel = warningLabel ?? t({ id: "editor.assignLoop.preview.defaultWarningsLabel", message: "Warnings:" });
-  const [oskMode, setOskMode] = useState<OskMode>(defaultOskMode);
+  const [storedOskMode, setOskMode] = useState<OskMode>(defaultOskMode);
+  const oskMode: OskMode = allowTouch ? storedOskMode : "desktop";
   // The keyboard spans the full width of the pane at every width (#1898):
   // AssignLoopShell's right pane carries no side gutter, so the text blocks
   // carry their own side inset — 12px in the narrow PreviewSheet (the
@@ -96,6 +100,7 @@ export function GalleryPreviewPane({
         <OskModeToggle
           value={oskMode}
           onChange={setOskMode}
+          hideTouch={!allowTouch}
           disabled={stage.kind !== "ready"}
         />
       </div>

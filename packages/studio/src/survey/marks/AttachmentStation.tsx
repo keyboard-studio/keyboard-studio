@@ -8,14 +8,16 @@
 // an already-confirmed summary the designer can open and edit (FR-008).
 // Case pairs are derived from the alphabet's case data, never asked (FR-009).
 // Each row also has a "space" box, unticked by default: ticked, the mark may
-// follow a space too (spec 106 FR-013).
+// follow a space too (spec 106 FR-013) — and a "start of line" box, unticked
+// by default: ticked, the mark may appear with no letter before it (issue
+// #2374). Unticked, the mark is blocked at line start (types nothing there).
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { AttachmentProposal } from "@keyboard-studio/engine";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { prefixCombiningMark } from "../../lib/irToCarveNodes.ts";
-import { ATTACHMENT_SPACE } from "./marksViews.ts";
+import { ATTACHMENT_SPACE, ATTACHMENT_START_OF_LINE } from "./marksViews.ts";
 import {
   ACCENT,
   BORDER,
@@ -57,8 +59,13 @@ function AttachmentRow({
   // base even though the base is folded out of the displayed lowercase choices
   // (spec 049). Filtering the display list would render a blank "confirmed on"
   // summary for such a mark. The worklist is unaffected either way.
-  const checkedBases = Object.keys(checked).filter((b) => b !== ATTACHMENT_SPACE && checked[b] === true);
+  // The two symbolic column keys (space, start of line) are not bases and
+  // must not leak into the FR-008 "confirmed on" summary — load-bearing.
+  const checkedBases = Object.keys(checked).filter(
+    (b) => b !== ATTACHMENT_SPACE && b !== ATTACHMENT_START_OF_LINE && checked[b] === true,
+  );
   const spaceChecked = checked[ATTACHMENT_SPACE] === true;
+  const startOfLineChecked = checked[ATTACHMENT_START_OF_LINE] === true;
   const body = (
     <>
       <p style={{ ...mutedParaFlush, margin: "6px 0" }}>
@@ -138,7 +145,39 @@ function AttachmentRow({
             <Trans id="survey.marks.attachment.spaceLabel">after a space</Trans>
           </span>
         </label>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 8px",
+            border: `1px solid ${BORDER}`,
+            borderRadius: 6,
+            fontSize: 14,
+            color: TEXT_MAIN,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={startOfLineChecked}
+            onChange={(e) => onToggle(ATTACHMENT_START_OF_LINE, e.target.checked)}
+            aria-label={t({
+              id: "survey.marks.attachment.startOfLineAriaLabel",
+              message: `${{ mark: markLabel(proposal.mark) }} can appear at the start of a line`,
+            })}
+          />
+          <span>
+            <Trans id="survey.marks.attachment.startOfLineLabel">at the start of a line</Trans>
+          </span>
+        </label>
       </div>
+      <p style={{ ...mutedParaFlush, margin: "6px 0", fontSize: 12 }}>
+        <Trans id="survey.marks.attachment.startOfLineHelp">
+          Leave “at the start of a line” unticked and this mark is blocked with
+          no letter before it — at the start of a line it types nothing.
+        </Trans>
+      </p>
     </>
   );
 

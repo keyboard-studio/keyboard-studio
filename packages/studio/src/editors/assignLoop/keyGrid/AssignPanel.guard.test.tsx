@@ -1,14 +1,14 @@
-// AssignPanel × guard specification (spec 104 FR-013 / T013): the
-// recorded specification threads into the panel's proposals — "swallow"
-// mints a combining mark as guarded T_, "emit" keeps U_ — and when no
-// specification exists yet, selecting a mark routes the author to the
-// guard question instead of minting unguarded by default (FR-013's
-// tail). Harness mirrors AssignPanel.test.tsx.
+// AssignPanel × per-mark "start of line" box (#2374 Track B): the box map
+// threads into the panel's proposals — unticked (or no box at all, e.g. a
+// late-added mark with no survey row) mints a combining mark as guarded
+// T_, ticked keeps U_ — and the old guard question is gone entirely:
+// selecting a mark with no box never routes anywhere, it takes the
+// guarded default. Harness mirrors AssignPanel.test.tsx.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
-import type { GuardSpecification, KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { touchKeyAddress } from "@keyboard-studio/engine";
@@ -34,20 +34,8 @@ function deadKeyCell(): KeyGridCellViewModel {
   };
 }
 
-function spec(behaviour: "swallow" | "emit"): GuardSpecification {
-  return {
-    recordId: `guard-specification:asked:${behaviour}`,
-    behaviour,
-    origin: "asked",
-    confirmed: true,
-    recordedAt: 1,
-    supersedes: null,
-  };
-}
-
 function defaultProps(overrides: {
-  guardSpecification?: GuardSpecification;
-  onGuardAnswer?: (behaviour: "swallow" | "emit") => void;
+  bareMarkAllowedByMark?: Readonly<Record<string, boolean>>;
   onCommit?: ReturnType<typeof vi.fn>;
 } = {}) {
   const ir: KeyboardIR = makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true });
@@ -62,10 +50,9 @@ function defaultProps(overrides: {
     capsHandled: false,
     repertoire: [" ", ".", ","],
     onCommit: overrides.onCommit ?? vi.fn(),
-    ...(overrides.guardSpecification !== undefined
-      ? { guardSpecification: overrides.guardSpecification }
+    ...(overrides.bareMarkAllowedByMark !== undefined
+      ? { bareMarkAllowedByMark: overrides.bareMarkAllowedByMark }
       : {}),
-    ...(overrides.onGuardAnswer !== undefined ? { onGuardAnswer: overrides.onGuardAnswer } : {}),
   };
 }
 
@@ -73,33 +60,33 @@ function charField(): HTMLElement {
   return screen.getByLabelText("Character or code point");
 }
 
-describe("AssignPanel — guard specification threading (spec 104 FR-013)", () => {
-  it("routes to the question when a mark is selected and no specification exists", () => {
-    const onGuardAnswer = vi.fn();
-    render(<AssignPanel {...defaultProps({ onGuardAnswer })} />);
+function committedId(props: ReturnType<typeof defaultProps>): string {
+  const result = (props.onCommit as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
+    op: { fields: { id: string } };
+  };
+  return result.op.fields.id;
+}
+
+describe("AssignPanel — per-mark start-of-line box (#2374)", () => {
+  it("with no box at all, a selected mark takes the guarded default — no question, committable", () => {
+    const props = defaultProps();
+    render(<AssignPanel {...props} />);
     fireEvent.change(charField(), { target: { value: "U+0300" } });
 
-    expect(screen.getByTestId("guard-question-prompt")).toBeTruthy();
-    expect(screen.queryByTestId("assign-panel-proposal")).toBeNull();
-    expect((screen.getByTestId("assign-panel-confirm") as HTMLButtonElement).disabled).toBe(true);
-
-    // Opens on the swallow default; one confirm records it.
-    expect((screen.getByTestId("guard-option-swallow") as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByTestId("guard-prompt-confirm"));
-    expect(onGuardAnswer).toHaveBeenCalledWith("swallow");
-  });
-
-  it("does not route for a plain letter — the question is marks-only", () => {
-    const onGuardAnswer = vi.fn();
-    render(<AssignPanel {...defaultProps({ onGuardAnswer })} />);
-    fireEvent.change(charField(), { target: { value: "e" } });
-
+    // The guard question is gone: no prompt testid anywhere, and the
+    // proposal is the guarded T_ form straight away.
     expect(screen.queryByTestId("guard-question-prompt")).toBeNull();
-    expect(screen.getByTestId("assign-panel-proposal")).toBeTruthy();
+    expect(screen.getByTestId("assign-panel-proposal").textContent).toContain("T_0300");
+    expect(screen.getByTestId("assign-panel-guard-pair")).toBeTruthy();
+    expect((screen.getByTestId("assign-panel-confirm") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.submit(screen.getByTestId("assign-panel"));
+    expect(props.onCommit).toHaveBeenCalledTimes(1);
+    expect(committedId(props)).toBe("T_0300");
   });
 
-  it("under a swallow specification the mark proposal is the guarded T_ form", () => {
-    const props = defaultProps({ guardSpecification: spec("swallow"), onGuardAnswer: vi.fn() });
+  it("with an unticked box the mark proposal is the guarded T_ form", () => {
+    const props = defaultProps({ bareMarkAllowedByMark: { "̀": false } });
     render(<AssignPanel {...props} />);
     fireEvent.change(charField(), { target: { value: "U+0300" } });
 
@@ -109,14 +96,11 @@ describe("AssignPanel — guard specification threading (spec 104 FR-013)", () =
 
     fireEvent.submit(screen.getByTestId("assign-panel"));
     expect(props.onCommit).toHaveBeenCalledTimes(1);
-    const result = (props.onCommit as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
-      op: { fields: { id: string } };
-    };
-    expect(result.op.fields.id).toBe("T_0300");
+    expect(committedId(props)).toBe("T_0300");
   });
 
-  it("under an emit specification the mark proposal stays U_", () => {
-    const props = defaultProps({ guardSpecification: spec("emit"), onGuardAnswer: vi.fn() });
+  it("with a ticked box the mark proposal stays U_", () => {
+    const props = defaultProps({ bareMarkAllowedByMark: { "̀": true } });
     render(<AssignPanel {...props} />);
     fireEvent.change(charField(), { target: { value: "U+0300" } });
 
@@ -125,9 +109,15 @@ describe("AssignPanel — guard specification threading (spec 104 FR-013)", () =
     // the committed id is the assertion that matters.
     fireEvent.submit(screen.getByTestId("assign-panel"));
     expect(props.onCommit).toHaveBeenCalledTimes(1);
-    const result = (props.onCommit as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
-      op: { fields: { id: string } };
-    };
-    expect(result.op.fields.id).toBe("U_0300");
+    expect(committedId(props)).toBe("U_0300");
+  });
+
+  it("a plain letter is unaffected by the box map", () => {
+    const props = defaultProps({ bareMarkAllowedByMark: { "̀": true } });
+    render(<AssignPanel {...props} />);
+    fireEvent.change(charField(), { target: { value: "e" } });
+
+    expect(screen.queryByTestId("guard-question-prompt")).toBeNull();
+    expect(screen.getByTestId("assign-panel-proposal")).toBeTruthy();
   });
 });

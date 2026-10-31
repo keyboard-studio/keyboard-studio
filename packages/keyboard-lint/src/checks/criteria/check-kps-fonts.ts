@@ -16,12 +16,13 @@
 // vs "Charis SIL" bundled is a real mismatch this check cannot paper
 // over.
 
-import type {
-  KvksIR,
-  LintFinding,
-  TouchLayoutIR,
-} from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import type { KvksIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+} from "./_shared.js";
 
 function normalizeFamily(name: string): string {
   return name.trim().toLowerCase();
@@ -52,18 +53,25 @@ export function checkKpsFontMissing(input: {
   /** Family names extracted from the package's bundled font files. */
   bundledFamilies: readonly string[];
   keyboardId: string;
-}): LintFinding[] {
+}): CheckResult {
+  const code = "KM_LINT_KPS_FONT_MISSING";
   const required = requiredFontFamilies(input);
-  if (required.length === 0) return [];
+  if (required.length === 0)
+    return checkPassed(code, [
+      "No font families required (no .kvks or touch layout font).",
+    ]);
   const bundled = new Set(input.bundledFamilies.map(normalizeFamily));
   const missing = required.filter((f) => !bundled.has(normalizeFamily(f)));
-  if (missing.length === 0) return [];
-  return [
+  if (missing.length === 0)
+    return checkPassed(code, [
+      `Required: ${required.join(", ")} — all bundled in the package.`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_FONT_MISSING",
       file: `source/${input.keyboardId}.kps`,
       message: `No font bundled in the package matches the font family the keyboard uses: ${missing.join(", ")}.`,
       hint: "Include a font of each used family in the .kps <Files> (and the package), or change the keyboard to a bundled family.",
     }),
-  ];
+  ]);
 }

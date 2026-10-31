@@ -22,8 +22,10 @@ const noop = () => {};
 function renderPane(overrides: {
   localStart?: StartKeyboard | null;
   compact?: boolean;
+  mode?: OskMode;
+  activeStepId?: string | null;
 }) {
-  const mode: OskMode = "desktop";
+  const mode: OskMode = overrides.mode ?? "desktop";
   render(
     <SurveyPreviewPane
       localStart={overrides.localStart === undefined ? BASE : overrides.localStart}
@@ -32,7 +34,7 @@ function renderPane(overrides: {
       stage={{ kind: "idle" }}
       retry={noop}
       showCharacterMap={false}
-      activeStepId={null}
+      activeStepId={overrides.activeStepId === undefined ? null : overrides.activeStepId}
       {...(overrides.compact !== undefined ? { compact: overrides.compact } : {})}
     />,
   );
@@ -95,5 +97,25 @@ describe("SurveyPreviewPane", () => {
     const osk = screen.getByTitle("On-screen keyboard preview")
       .parentElement as HTMLElement;
     expect(osk.style.borderRadius).toBe("");
+  });
+
+  it("hides the Mobile KB option before the Touch gallery", () => {
+    renderPane({ activeStepId: "characters" });
+    expect(screen.getByRole("button", { name: "Desktop OSK" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Mobile KB" })).toBeNull();
+  });
+
+  it("falls back to desktop before the Touch gallery when 'touch' is stored", () => {
+    renderPane({ activeStepId: "characters", mode: "touch" });
+    expect(
+      screen.getByRole("button", { name: "Desktop OSK" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("offers Mobile KB at the Touch gallery and honours the stored mode", () => {
+    renderPane({ activeStepId: "touch", mode: "touch" });
+    expect(
+      screen.getByRole("button", { name: "Mobile KB" }).getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 });

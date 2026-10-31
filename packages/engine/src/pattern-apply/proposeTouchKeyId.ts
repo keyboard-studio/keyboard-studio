@@ -48,7 +48,6 @@
 import {
   decodeUnicodeKeyId,
   producedByKeyId,
-  type GuardSpecification,
   type TouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
 import {
@@ -110,11 +109,12 @@ export interface TouchKeyIdProposalRequest {
   /** How many other layers/platforms already carry a candidate `T_` id. */
   readonly sharedCandidateCount?: number;
   /**
-   * The keyboard's combining-mark guard specification (spec 104 FR-013),
-   * forwarded to the minter: a mark is minted to guarded `T_` only when
-   * this says `"swallow"`; absent or `"emit"`, the mark mints `U_`.
+   * The mark's per-mark "start of line" box (#2374), forwarded to the
+   * minter: a mark is minted to guarded `T_` only when the box is
+   * unticked; ticked (or absent — a late-added mark with no survey row)
+   * the mark mints `U_`.
    */
-  readonly guardSpecification?: GuardSpecification;
+  readonly bareMarkAllowed?: boolean;
   /** The keyboard's `&VERSION` (e.g. `"15.0"`), forwarded to the minter (FR-005 arm c/c′). */
   readonly keyboardVersion?: string;
 }
@@ -269,8 +269,8 @@ export function proposeTouchKeyId(req: TouchKeyIdProposalRequest): TouchKeyIdPro
     ...(req.sharedCandidateCount !== undefined
       ? { sharedCandidateCount: req.sharedCandidateCount }
       : {}),
-    ...(req.guardSpecification !== undefined
-      ? { guardSpecification: req.guardSpecification }
+    ...(req.bareMarkAllowed !== undefined
+      ? { bareMarkAllowed: req.bareMarkAllowed }
       : {}),
     ...(req.keyboardVersion !== undefined ? { keyboardVersion: req.keyboardVersion } : {}),
   };

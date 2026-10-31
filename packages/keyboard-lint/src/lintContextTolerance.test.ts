@@ -55,7 +55,7 @@ describe("lintContextTolerance (spec 078 narrow Layer C entry)", () => {
   });
 
   it("carries no finding from any other Layer C check, even where the full suite reports some", async () => {
-    const full = await lintWithContext(createVirtualFS(), "test", { keyboardIR: makeIR(), toleranceReport: REPORT });
+    const { findings: full } = await lintWithContext(createVirtualFS(), "test", { keyboardIR: makeIR(), toleranceReport: REPORT });
     const narrow = lintContextTolerance(makeIR(), REPORT);
 
     expect(narrow.every((f) => TOLERANCE_CODES.has(f.code))).toBe(true);

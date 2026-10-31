@@ -2,7 +2,8 @@
 //
 // These run against the real catalog (ALL_CRITERIA) with baseline facts
 // that make every criterion applicable, so the counts pin the band logic
-// itself: 40 scaffolder-bake + 53 implemented layer-c checks resolve Met
+// itself: 40 scaffolder-bake + 89 implemented layer-c checks resolve Met
+// (the 4 repo-context codes need a reviewContext) in authored mode
 // in authored mode with no findings, 14 layer-c criteria are honestly
 // Not yet checkable, and the yellow/red bands wait on the author/human.
 
@@ -61,27 +62,35 @@ const ALL_STATUSES: readonly CriterionStatus[] = [
 ];
 
 describe("resolveCriteria — authored baseline", () => {
-  it("resolves all 149 rows in catalog order with the pinned counts", () => {
+  it("resolves all 188 rows in catalog order with the pinned counts", () => {
     const result = resolveCriteria(makeInput());
 
-    expect(result.rows).toHaveLength(149);
-    expect(result.total).toBe(149);
+    expect(result.rows).toHaveLength(188);
+    expect(result.total).toBe(188);
     expect(result.rows.map((r) => r.criterion.id)).toEqual(
       ALL_CRITERIA.map((c) => c.id),
     );
 
-    // 40 scaffolder-bake + 53 implemented layer-c checks pass; the other
-    // 14 layer-c criteria have no check yet; yellow waits on the author
-    // and red on a human.
+    // 40 scaffolder-bake + 89 implemented layer-c checks pass; the other
+    // 14 layer-c criteria have no check yet, the 4 repo-context codes
+    // need a reviewContext, and the 2 §19 twins need an adaptation
+    // signal; yellow waits on the author and red on a human.
     expect(result.counts).toEqual({
-      met: 93,
+      // 127 + the 3 repo twins (1.2b/1.3b/1.4b) + 1.1 (now implemented):
+      // the baseline is synthetic (no contextMissing), so implemented
+      // checks with no findings resolve Met. The assembly test pins the
+      // real contextMissing behavior.
+      met: 131,
       "not-met": 0,
-      "not-applicable": 0,
+      // The §19 twin rows (19.1b/19.2b) concern adaptations; the baseline
+      // carries no adaptation signal, so they are Not applicable.
+      "not-applicable": 2,
       "needs-author": 32,
       "needs-human": 10,
-      "not-yet-checkable": 14,
+      // 14 unimplemented - 1.1 (now implemented) = 13.
+      "not-yet-checkable": 13,
     });
-    expect(result.resolvedCount).toBe(93);
+    expect(result.resolvedCount).toBe(133); // 131 met + 2 not-applicable
   });
 
   it("gives every row exactly one status and bandCounts that agree with counts", () => {
@@ -91,7 +100,7 @@ describe("resolveCriteria — authored baseline", () => {
       expect(ALL_STATUSES).toContain(row.status);
     }
     const counted = Object.values(result.counts).reduce((a, b) => a + b, 0);
-    expect(counted).toBe(149);
+    expect(counted).toBe(188);
 
     for (const status of ALL_STATUSES) {
       const bandTotal = Object.values(result.bandCounts).reduce(
@@ -101,8 +110,8 @@ describe("resolveCriteria — authored baseline", () => {
       expect(bandTotal).toBe(result.counts[status]);
     }
     expect(result.bandCounts["scaffolder-bake"].met).toBe(40);
-    expect(result.bandCounts["layer-c-enforce"].met).toBe(53);
-    expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(14);
+    expect(result.bandCounts["layer-c-enforce"].met).toBe(91);
+    expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(13); // 14 - 1.1 (now implemented)
     expect(result.bandCounts["yellow-survey"]["needs-author"]).toBe(32);
     expect(result.bandCounts["red-checklist"]["needs-human"]).toBe(10);
   });
@@ -116,20 +125,25 @@ describe("resolveCriteria — authored baseline", () => {
 });
 
 describe("resolveCriteria — foreign baseline", () => {
-  it("resolves only the 53 implemented layer-c checks and offers no controls", () => {
+  it("resolves only the 93 implemented layer-c checks and offers no controls", () => {
     const result = resolveCriteria(makeInput({ mode: "foreign" }));
 
-    expect(result.rows).toHaveLength(149);
+    expect(result.rows).toHaveLength(188);
     expect(result.counts).toEqual({
-      met: 53,
+      // 93 = the 93 implemented layer-c checks that are applicable with
+      // no findings in the synthetic baseline (no contextMissing) —
+      // including 1.5/2.6, which resolve via their lint checks in
+      // foreign mode.
+      met: 93,
       "not-met": 0,
-      "not-applicable": 0,
+      // The §19 twin rows are Not applicable without an adaptation signal.
+      "not-applicable": 2,
       "needs-author": 32,
       "needs-human": 10,
-      // 40 foreign scaffolder-bake rows join the 14 unimplemented checks.
-      "not-yet-checkable": 54,
+      // 40 foreign scaffolder-bake rows + 11 unimplemented layer-c.
+      "not-yet-checkable": 51,
     });
-    expect(result.resolvedCount).toBe(53);
+    expect(result.resolvedCount).toBe(95); // 93 met + 2 not-applicable
     for (const row of result.rows) {
       expect(row.controls).toBeNull();
     }
@@ -165,9 +179,9 @@ describe("resolveCriteria — layer-c findings", () => {
     expect(evidence.lines).toContain(finding.hint);
 
     const result = resolveCriteria(makeInput({ lintFindings: [finding] }));
-    expect(result.counts.met).toBe(92);
+    expect(result.counts.met).toBe(130); // 131 - 1 (the finding)
     expect(result.counts["not-met"]).toBe(1);
-    expect(result.resolvedCount).toBe(93);
+    expect(result.resolvedCount).toBe(133); // 130 + 1 + 2
   });
 
   it("dedupes an identical finding reported twice (doc + engine)", () => {
@@ -221,8 +235,8 @@ describe("resolveCriteria — missing lint context", () => {
     );
 
     const result = resolveCriteria(input);
-    expect(result.counts.met).toBe(92);
-    expect(result.counts["not-yet-checkable"]).toBe(15);
+    expect(result.counts.met).toBe(130); // 131 - 1 (inventory now missing)
+    expect(result.counts["not-yet-checkable"]).toBe(14); // 13 + 1
   });
 });
 
@@ -432,17 +446,22 @@ describe("resolveCriteria — precertification (Batch 1)", () => {
     expect(row.evidence().kind).toBe("precertified");
   });
 
-  it("without the precertified set, authored 1.1 stays Not yet checkable (no lint check exists for it)", () => {
+  it("without the precertified set, authored 1.1 resolves via its lint check (Batch 5)", () => {
+    // Batch 5 implemented the Group C extraneous-files check for 1.1, so
+    // without precertification it falls through to the lint gate: with no
+    // findings it is a lint pass, never Not yet checkable.
     const row = rowFor(filesOutside.id, makeInput());
-    expect(row.status).toBe("not-yet-checkable");
-    expect(row.evidence().kind).toBe("not-implemented");
+    expect(row.status).toBe("met");
+    expect(row.evidence().kind).toBe("lint-pass");
   });
 
   it("foreign mode can never claim precertification, even if the set is passed by mistake", () => {
     const input = makeInput({ mode: "foreign", precertified });
+    // 1.1 foreign resolves through its real Batch 5 check instead: with
+    // no findings it is a lint pass, never a precertification.
     const outside = rowFor(filesOutside.id, input);
-    expect(outside.status).toBe("not-yet-checkable");
-    expect(outside.evidence().kind).toBe("not-implemented");
+    expect(outside.status).toBe("met");
+    expect(outside.evidence().kind).toBe("lint-pass");
     // 1.13 foreign resolves through its real scan check instead: with
     // no findings it is a lint pass, never a precertification.
     const stray = rowFor(strayScratch.id, input);
@@ -493,7 +512,8 @@ describe("resolveCriteria — applicability", () => {
           expect(row.evidence().lines[0]?.length).toBeGreaterThan(0);
         }
       }
-      expect(result.counts["not-applicable"]).toBe(14);
+      // 14 (sections 9/15/16) + 2 (§19 twins, no adaptation signal in baseline).
+      expect(result.counts["not-applicable"]).toBe(16);
 
       // A section-1 row is untouched by the three predicates.
       const section1 = result.rows.find((r) =>

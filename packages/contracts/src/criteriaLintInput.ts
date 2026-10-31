@@ -19,24 +19,6 @@ export type CriteriaPlacement =
   | "legacy"
   | "unknown";
 
-/**
- * The structural form facts of one .kpj project file (engine
- * parseKpjForm), behind the KPJ pair (criteria 1.10b / 2.7, ruling B:
- * structural, no numeric pin). "modern" = the file declares its
- * format via an `<Options><Version>` element (upstream: the element
- * is implicit in the legacy form and required from format 2.0
- * onward); "legacy" = no such element — the implicit classical form,
- * whose project is driven by its `<Files>` list.
- */
-export interface KpjFormFacts {
-  /** Trimmed `<Options><Version>` text, or null when the element is absent. */
-  versionElement: string | null;
-  /** Whether the project carries a `<Files>` element. */
-  hasFilesList: boolean;
-  /** "modern" when versionElement is present, otherwise "legacy". */
-  form: "modern" | "legacy";
-}
-
 export interface CriteriaLintInput {
   /**
    * The parsed .kvks visual keyboard (engine parseKvks), when a .kvks
@@ -112,19 +94,93 @@ export interface CriteriaLintInput {
    */
   scratchScan: boolean;
   /**
-   * Form facts of the judged keyboard's own .kpj (engine parseKpjForm,
-   * run by the assembly over the judged VFS). Absent when the judged
-   * VFS carries no .kpj at all — the assembly then names the missing
-   * project file for criterion 1.10b rather than letting it pass.
+   * VFS path of the judged .kpj project file (`<keyboardId>.kpj` at the
+   * VFS root), present iff a .kpj file exists in the judged VFS at all
+   * (KPJ pair, criteria 1.10b / 2.7). Like `kvksPath`, presence is the
+   * signal: an absent .kpj is a named missing input in the assembly,
+   * never a verdict; a present one is judged on its text.
    */
-  kpj?: KpjFormFacts;
+  kpjPath?: string;
   /**
-   * Form facts of the BASE keyboard's .kpj — the project file the
-   * judged keyboard was adapted from (criterion 2.7 compares the
-   * format-marker state base ↔ output). Authored host only, folded in
-   * by the assembly from the base's .kpj text; the foreign host never
-   * supplies it (a compared keyboard has no base), so 2.7 resolves
-   * Not yet checkable there with the missing input named.
+   * Raw text of the judged .kpj project file, when one exists. The
+   * KPJ-pair checks in keyboard-lint read the `<Options><Version>`
+   * element from it (the parseKpjFlags regex style) — the same raw-text
+   * handoff as `kpsText` for criterion 15.3.
    */
-  baseKpj?: KpjFormFacts;
+  kpjText?: string;
+  /**
+   * .kps Keyboards-tab font selection (engine parseKpsPackageDetails):
+   * the first non-empty `<OSKFont>` / `<DisplayFont>`. Empty when no
+   * font is selected (Group A2, criterion 10.1b).
+   */
+  kpsFontSelected: string;
+  /**
+   * .kps Details-tab selections (engine parseKpsPackageDetails): the
+   * `<Options>` ReadMeFile / WelcomeFile / LicenseFile texts. Empty
+   * when unselected (Group A2, criterion 10.7b).
+   */
+  kpsDetailsReadme: string;
+  kpsDetailsWelcome: string;
+  kpsDetailsLicense: string;
+  /**
+   * A `<FollowKeyboardVersion>` element is present under the .kps
+   * `<Options>` (engine parseKpsPackageDetails; Group A2, 10.8b).
+   */
+  kpsFollowKeyboardVersion: boolean;
+  /**
+   * The .kps `<Info><Description>` text (engine parseKpsPackageDetails).
+   * Empty when absent (Group A2, criterion 10.9b).
+   */
+  kpsDescription: string;
+  /**
+   * Repository context for the /review Group A2 repo/PR twins (Batch 5)
+   * and the Group C extraneous-files check. Set by the /review assembly
+   * only; absent on the authored and Compare surfaces (those never see
+   * the repo, only a folder).
+   */
+  reviewContext?: ReviewContext;
+}
+
+/**
+ * Repository context for /review-only checks (Batch 5 + Group C).
+ * All paths are repo-relative POSIX paths.
+ */
+export interface ReviewContext {
+  /** The keyboard's folder in the repo, e.g. "release/gff/gff_amharic". */
+  repoPath: string;
+  /**
+   * File list for the extraneous-file checks: the full repo tree at the
+   * pinned sha (published keyboards) or the PR's changed files (PRs).
+   */
+  treePaths?: readonly string[];
+  /** The PR description (PR sources only). */
+  prBody?: string;
+  /** True when the judged target is a pull request. */
+  isPr: boolean;
+  /** HISTORY.md text, when the file exists in the judged VFS. */
+  historyMd?: string;
+  /**
+   * Criterion 1.5 (PR targets only): the PR's base commit sha and the
+   * tiers (of experimental/legacy/release) where the keyboard's folder
+   * already exists at that commit. Absent when the target is not a PR,
+   * or when the base-commit lookup failed — the assembly then names
+   * the missing input rather than letting the row pass or fail
+   * undecided.
+   */
+  idConflictAtBase?: {
+    baseSha: string;
+    existingTiers: readonly string[];
+  };
+  /**
+   * Criterion 2.6 (PR targets only): the judged .kmn's declared version
+   * at the PR's base commit, for the "strictly greater" comparison.
+   * Absent when the target is not a PR or when the base .kmn cannot be
+   * fetched (API error — the assembly names the missing input). A
+   * present entry with no version means the base declares none (or the
+   * .kmn is new): nothing to increment from.
+   */
+  baseKmnVersion?: {
+    baseSha: string;
+    version?: string;
+  };
 }

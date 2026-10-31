@@ -14,9 +14,11 @@ export interface OskModeToggleProps {
   value: OskMode;
   onChange: (next: OskMode) => void;
   disabled?: boolean;
+  /** Hide the Mobile KB option (steps before the Touch gallery). Default false. */
+  hideTouch?: boolean;
 }
 
-export function OskModeToggle({ value, onChange, disabled }: OskModeToggleProps) {
+export function OskModeToggle({ value, onChange, disabled, hideTouch = false }: OskModeToggleProps) {
   const { t } = useLingui();
   const opt = (mode: OskMode, label: string) => {
     const active = value === mode;
@@ -50,7 +52,7 @@ export function OskModeToggle({ value, onChange, disabled }: OskModeToggleProps)
       style={{ display: "inline-flex", borderRadius: 8, overflow: "hidden" }}
     >
       {opt("desktop", t({ id: "osk.modeToggle.desktop", message: "Desktop OSK" }))}
-      {opt("touch", t({ id: "osk.modeToggle.touch", message: "Mobile KB" }))}
+      {hideTouch ? null : opt("touch", t({ id: "osk.modeToggle.touch", message: "Mobile KB" }))}
     </div>
   );
 }

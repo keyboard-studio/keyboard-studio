@@ -1162,7 +1162,14 @@ function restoreSavedAnswer(raw: unknown): SavedAnswer | null {
   if (!isSavedValue(value)) return null;
   // Bound to AnswerTypeSchema so a new AnswerType can't silently desync here.
   if (!AnswerTypeSchema.safeParse(answerType).success) return null;
-  if (origin !== "proposed" && origin !== "confirmed" && origin !== "overturned") return null;
+  if (
+    origin !== "proposed" &&
+    origin !== "confirmed" &&
+    origin !== "overturned" &&
+    origin !== "migrated-from-guard" &&
+    origin !== "imported"
+  )
+    return null;
   if (stage !== "draft" && stage !== "confirmed") return null;
   if (evidenceKey !== null && typeof evidenceKey !== "string") return null;
   if (typeof screenId !== "string") return null;

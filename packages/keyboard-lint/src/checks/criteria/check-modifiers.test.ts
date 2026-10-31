@@ -72,7 +72,7 @@ describe("kvksShiftAtoms (the .kvks arm of the 7.4 map)", () => {
 
 describe("checkModifierNamesConsistent (7.4)", () => {
   it("the prose example, consistent: RALT / RA / rightalt agree", () => {
-    const findings = checkModifierNamesConsistent({
+    const { findings } = checkModifierNamesConsistent({
       ir: irWithModifiers(["RALT"]),
       kvks: kvksWithShifts("", "RA"),
       touchLayout: touchWithLayers("default", "rightalt"),
@@ -81,7 +81,7 @@ describe("checkModifierNamesConsistent (7.4)", () => {
   });
 
   it("the prose example, inconsistent: unsided ALT in the .kmn against RA / rightalt", () => {
-    const findings = checkModifierNamesConsistent({
+    const { findings } = checkModifierNamesConsistent({
       ir: irWithModifiers(["ALT"]),
       kvks: kvksWithShifts("", "RA"),
       touchLayout: touchWithLayers("default", "rightalt"),
@@ -93,7 +93,7 @@ describe("checkModifierNamesConsistent (7.4)", () => {
   });
 
   it("flags left in one source against right in another", () => {
-    const findings = checkModifierNamesConsistent({
+    const { findings } = checkModifierNamesConsistent({
       ir: irWithModifiers(["LALT"]),
       touchLayout: touchWithLayers("default", "rightalt"),
     });
@@ -103,7 +103,7 @@ describe("checkModifierNamesConsistent (7.4)", () => {
   });
 
   it("applies the same agreement rule to Ctrl", () => {
-    const findings = checkModifierNamesConsistent({
+    const { findings } = checkModifierNamesConsistent({
       ir: irWithModifiers(["CTRL"]),
       kvks: kvksWithShifts("", "LC"),
     });
@@ -113,18 +113,18 @@ describe("checkModifierNamesConsistent (7.4)", () => {
 
   it("a family used by only one source has nothing to disagree with", () => {
     expect(
-      checkModifierNamesConsistent({ ir: irWithModifiers(["RALT"]) }),
+      checkModifierNamesConsistent({ ir: irWithModifiers(["RALT"]) }).findings,
     ).toEqual([]);
     expect(
       checkModifierNamesConsistent({
         ir: irWithModifiers(["RALT"]),
         kvks: kvksWithShifts(""),
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
   it("agrees when every source uses the unsided name", () => {
-    const findings = checkModifierNamesConsistent({
+    const { findings } = checkModifierNamesConsistent({
       ir: irWithModifiers(["ALT"]),
       kvks: kvksWithShifts("", "A"),
       touchLayout: touchWithLayers("default", "alt"),
@@ -133,7 +133,7 @@ describe("checkModifierNamesConsistent (7.4)", () => {
   });
 
   it("ignores non-modifier touch layers and NCAPS negations", () => {
-    const findings = checkModifierNamesConsistent({
+    const { findings } = checkModifierNamesConsistent({
       ir: irWithModifiers(["NCAPS"], ["SHIFT"]),
       touchLayout: touchWithLayers("default", "symbol", "numeric", "shift"),
     });

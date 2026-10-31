@@ -47,7 +47,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type {
   AttestedStack,
-  GuardSpecification,
   MarksContextToleranceDecision,
   SurveyAnswer,
 } from "@keyboard-studio/contracts";
@@ -70,11 +69,6 @@ import {
   deriveMarksBasis,
   deriveTreatmentPrefills,
   expandAttachmentsForCase,
-  guardAnswerFor,
-  guardChoiceOf,
-  guardRecordForCommit,
-  guardSeedBehaviourFor,
-  guardSeedFor,
   isCasedBaseKeyboard,
   marksSeriesAnswers,
   marksStationAnswers,
@@ -83,6 +77,8 @@ import {
   resolveToleranceDecision,
   resolveTreatmentStation,
   seriesResult,
+  startOfLineImportSeeded,
+  startOfLineSeed,
   visibleMarksStations,
   type MarksStationState,
 } from "./marksSeriesValue.ts";
@@ -99,7 +95,7 @@ import {
   marksStackKey as marksStackEvidenceKey,
   marksPromotedKey,
 } from "../../steps/evidence.ts";
-import { ATTACHMENT_SPACE, deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
+import { ATTACHMENT_SPACE, ATTACHMENT_START_OF_LINE, deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
 import { reproposalCueMessage } from "../reproposalReason.ts";
 import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
@@ -111,10 +107,6 @@ import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
-import { GuardStation } from "./GuardStation.tsx";
-import {
-  type GuardBehaviour,
-} from "./guardSpecification.ts";
 import { toleranceProposalFor, toleranceStationShown } from "./contextToleranceProposal.ts";
 import {
   ACCENT,
@@ -251,14 +243,38 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     [gate.alphabet, bcp47, isCasedBase],
   );
 
+  // --- start-of-line column migration + import seeding (issue #2374) ---
+  // The per-mark "start of line" box opens unticked — the new default, which
+  // reproduces old `swallow` exactly (`T_` minting + the buffer-start `nul`
+  // rule). Two sources pre-tick it before the author ever answers:
+  //   1. a CONFIRMED legacy GuardSpecification with behaviour "emit" —
+  //      migrated as ticked with origin "migrated-from-guard" (visible in
+  //      the row, attributed, changeable). Confirmed "swallow" is a no-op;
+  //      seeded-but-unconfirmed records are dropped (never adopted).
+  //   2. a Track 2 import whose own marks are all unguarded — per-mark ticks
+  //      with origin "imported", so a re-imported emit-keyboard does not
+  //      silently flip to blocked at line start.
+  // A saved answer always wins over the seed (reconcile); the seed origin is
+  // stamped only at the row's first attachment commit. The rule itself is
+  // startOfLineImportSeeded / startOfLineSeed, so a headless caller runs it too.
+  const authoringTrack = decisions["authoring-track"]?.value;
+  const startOfLineImportSeed = useMemo(
+    () => startOfLineImportSeeded(authoringTrack, startIr),
+    [authoringTrack, startIr],
+  );
+  const { migrated: startOfLineMigrated, defaultTicked: startOfLineDefault } = startOfLineSeed(
+    marksValue,
+    startOfLineImportSeed,
+  );
+
   // --- S1 attachment: derived from the store via reconcile(), never useState ---
 
   // spec 079 US3 parity fix: this is the SAME `reconciledAttachmentChecked`
   // `hooks/useWorkToDo.ts` calls for the badge computation, so the two can
   // never disagree about which attachments are actually checked.
   const attachmentChecked: AttachmentChecked = useMemo(
-    () => reconciledAttachmentChecked(gate.alphabet, proposals, savedAnswers),
-    [proposals, savedAnswers, gate.alphabet],
+    () => reconciledAttachmentChecked(gate.alphabet, proposals, savedAnswers, startOfLineDefault),
+    [proposals, savedAnswers, gate.alphabet, startOfLineDefault],
   );
 
   // The case-expanded attachment map is what "reachable" means downstream: US1
@@ -327,7 +343,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     prefilledFromImport,
     orderKey,
     orderExplicitlySet,
-    hasOwnKeyMark,
     treatment,
   } = treatmentStation;
 
@@ -522,39 +537,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   }, [toleranceFingerprint]);
   const showToleranceStation = toleranceStationShown(tolerance, toleranceProposal);
 
-  // --- guard specification (spec 104 FR-013) ---
-  // The per-keyboard answer the guard station records into the decision
-  // value. On Track 2 it is seeded from the imported keyboard's own marks
-  // (extracted provenance, provisional until the author confirms it at
-  // the station); a fresh keyboard is asked. The station is always last:
-  // completing the series therefore always passes it, and the landed
-  // specification is what the completion report re-evaluates earlier
-  // minting against (US1 scenario 6).
-  const priorGuard = marksValue.guardSpecification ?? undefined;
-  const authoringTrack = decisions["authoring-track"]?.value;
-  const guardSeedBehaviour = useMemo(
-    () => guardSeedBehaviourFor({ authoringTrack, priorGuard, startIr }),
-    [authoringTrack, priorGuard, startIr],
-  );
-  const guardSeed = useMemo(() => guardSeedFor(guardSeedBehaviour), [guardSeedBehaviour]);
-  const [guardAnswer, setGuardAnswer] = useState<GuardSpecification | null>(null);
-  /** The behaviour the guard station displays: the author's pick, else the prior answer, else the seed, else the default. */
-  const guardChoice: GuardBehaviour = guardChoiceOf({
-    guardAnswer,
-    priorGuard,
-    seedBehaviour: guardSeedBehaviour,
-  });
-
-  function guardRecordFor(station: MarksStationId): GuardSpecification | null {
-    return guardRecordForCommit({ station, guardAnswer, priorGuard, guardSeed });
-  }
-
-  function handleGuardChange(behaviour: GuardBehaviour): void {
-    setGuardAnswer(guardAnswerFor({ behaviour, priorGuard, guardSeed }));
-  }
-
   // --- visible stations, in series order (at most FOUR — FR-018/SC-003,
-  // plus spec 078's context-tolerance station and spec 104's guard station) ---
+  // plus spec 078's context-tolerance station) ---
   const visibleStations: MarksStationId[] = useMemo(
     () =>
       visibleMarksStations({
@@ -563,9 +547,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         posture,
         stackingEvidence,
         showToleranceStation,
-        hasOwnKeyMark,
       }),
-    [proposals, classes, posture, stackingEvidence, showToleranceStation, hasOwnKeyMark],
+    [proposals, classes, posture, stackingEvidence, showToleranceStation],
   );
 
   // spec 079 FR-004/FR-023: the author's position inside the series lives in
@@ -644,9 +627,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
             label: t({ id: "survey.marks.series.continueButton", message: "Continue" }),
             onClick: handleContinue,
             testId: "marks-continue",
-            // spec 104 FR-013: the guard station completes only with an
-            // answer on record — the author's pick, a prior answer, or the
-            // Track 2 seed presented for confirmation.
             disabled: nextGate.blocked,
             ...(nextGate.blocked ? { ariaDescribedBy: blockedHintId } : {}),
           },
@@ -708,7 +688,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     multiMarkStacks,
     stackingAllowed,
     stacksConfirmed,
-    guardChoice,
   };
 
   /** This station's answers, in recordQuestionAnswers shape (spec 079 R-04). */
@@ -733,10 +712,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     // same commit point the retired reducer MARKS handler ran them. The
     // R10 migration determination reads the pre-guard working IR (the exact
     // input the reducer read); MarksStepHost mirrors it into the session
-    // (apply has no session channel). The landed guard specification
-    // re-evaluates marks minted before it existed (spec 104 US1 scenario 6):
-    // the contradictions are REPORTED in this completion payload, never
-    // silently re-minted here. The assembly itself is assembleMarksSeries.
+    // (apply has no session channel). The assembly itself is
+    // assembleMarksSeries.
     const assembled = assembleMarksSeries({
       alphabet: gate.alphabet,
       classes,
@@ -747,7 +724,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       state: stationState,
       visibleStations,
       workingIr: useWorkingCopyStore.getState().ir,
-      guard: guardRecordFor(activeStation),
       reportedTolerance: toleranceDecision,
       effectiveTolerance,
     });
@@ -765,9 +741,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   function recordValue(
     stationAnswers: SurveyAnswer[],
     tolerance: MarksContextToleranceDecision | null,
-    guard: GuardSpecification | null,
   ): void {
-    onMarksChange(buildMarksTreatmentValue(stationAnswers, null, tolerance, guard));
+    onMarksChange(buildMarksTreatmentValue(stationAnswers, null, tolerance));
   }
 
   /** The context-tolerance decision to report (spec 078); see resolveToleranceDecision. */
@@ -816,6 +791,26 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
             origin: spaceTicked ? "overturned" : "confirmed",
             stage: "confirmed",
             evidenceKey: marksAttachmentKey(gate.alphabet, proposal.mark, ATTACHMENT_SPACE),
+            screenId: "marks_attachment",
+          });
+          // Issue #2374: the start-of-line tick rides the same commit. The
+          // origin is the migration/import attribution only at the row's
+          // FIRST commit while the seed is what the author sees; afterwards
+          // (or when the author set the tick themselves) it is the author's
+          // own confirmed/overturned trajectory against the unticked default.
+          const solId = `marks_attachment.${proposal.mark}|${ATTACHMENT_START_OF_LINE}`;
+          const solTicked = attachmentChecked[proposal.mark]?.[ATTACHMENT_START_OF_LINE] ?? false;
+          const solSeeded = savedAnswers[solId] === undefined && solTicked && startOfLineDefault;
+          saveAnswer(STEP_ID, solId, {
+            value: solTicked,
+            answerType: "boolean",
+            origin: solSeeded
+              ? (startOfLineMigrated ? "migrated-from-guard" : "imported")
+              : solTicked
+                ? "overturned"
+                : "confirmed",
+            stage: "confirmed",
+            evidenceKey: marksAttachmentKey(gate.alphabet, proposal.mark, ATTACHMENT_START_OF_LINE),
             screenId: "marks_attachment",
           });
         }
@@ -912,11 +907,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         // spec 078: the decision rides the phase result (marksContextTolerance
         // and its answers), recorded with its own provenance at completion.
         break;
-      case "marks_guard":
-        // spec 104: the specification rides the decision value
-        // (recordValue at this station's Next / completion), not the
-        // survey-answer store — the registry entry is the record.
-        break;
     }
   }
 
@@ -939,7 +929,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       recordValue(
         marksSeriesAnswers(visibleStations, stationState),
         priorTolerance ?? null,
-        guardRecordFor(activeStation),
       );
       setPosition(STEP_ID, visibleStations[nextIndex]!);
     } else {
@@ -1057,15 +1046,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           onAllowedChange={handleStackingAllowedChange}
           confirmed={stacksConfirmed}
           onConfirmChange={handleStackConfirmChange}
-        />
-      )}
-
-      {activeStation === "marks_guard" && (
-        <GuardStation
-          value={guardChoice}
-          {...(priorGuard !== undefined ? { prior: priorGuard } : {})}
-          {...(guardSeedBehaviour !== undefined ? { seededBehaviour: guardSeedBehaviour } : {})}
-          onChange={handleGuardChange}
         />
       )}
 

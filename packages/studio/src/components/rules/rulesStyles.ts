@@ -86,6 +86,18 @@ export const rulesInput: CSSProperties = {
   maxWidth: "100%",
 };
 
+/** Read-only output preview box on the demo pane (#2384) — shows what the
+ * keyboard WOULD output for the typed text, next to the unchanged typing
+ * box. Same inset styling as rulesInput but non-interactive and wrapped. */
+export const rulesOutputPreview: CSSProperties = {
+  ...rulesInput,
+  display: "block",
+  minHeight: 40,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+  cursor: "default",
+};
+
 /** Horizontal-scroll wrapper so a wide table never widens the page. */
 export const rulesTableWrap: CSSProperties = {
   overflowX: "auto",

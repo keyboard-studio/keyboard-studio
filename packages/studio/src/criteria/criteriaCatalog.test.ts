@@ -1,14 +1,21 @@
 // Catalog counts tests for the criteria resolver (spec 084, Phase 1).
 //
 // The resolver's honesty rests on two pinned numbers: the real catalog is
-// 149 criteria in the 40/67/32/10 band split, and exactly 59 of its
+// 188 criteria in the 40/106/32/10 band split, and exactly 99 of its
 // layer-c lintRuleIds have a real mechanism behind them (the original
 // 19 — §18 touch/inventory + the doc band — plus spec 084 Batch 1's 20
 // criteria checks in keyboard-lint's checks/criteria/ and docs/, plus
 // the 2 compile-result mappings synthesized in the criteria assembly,
 // plus Batch 2's 7 cross-file reconciliation checks, plus the 10.6
 // catch-up, plus Batch 3's 4 checks and 4 assembly verdicts, plus the
-// KPJ pair's 2 structural .kpj form checks (follow-on, ruling B)).
+// KPJ pair's 2 checks — 1.10b/2.7 landed once Matthew's 2026-10-14
+// ruling re-pinned criterion 1.10's current .kpj format to 2.0 — plus
+// the /review Group A2 file-inventory twins' 7 checks, plus the
+// .kps-listing twins' 10 checks, plus the
+// .kps-metadata twins' 5 checks, plus the
+// text-content twins' 12 checks, plus the
+// repo-context twins' 5 checks and the Group C
+// extraneous-files check (1.1, no twin needed)).
 // The implemented set is re-derived here from its two named sources —
 // the keyboard-lint producer scan (the gateCoverage.test.ts method) and
 // ASSEMBLY_SYNTHESIZED_CODES — so adding a lint check fails this test
@@ -70,25 +77,25 @@ function catalogLintRuleIds(): Set<string> {
 }
 
 describe("criteria catalog", () => {
-  it("has 149 rows in the 40/67/32/10 band split, with unique ids", () => {
-    expect(ALL_CRITERIA).toHaveLength(149);
+  it("has 188 rows in the 40/106/32/10 band split, with unique ids", () => {
+    expect(ALL_CRITERIA).toHaveLength(188);
 
     const perBand = new Map<string, number>();
     for (const criterion of ALL_CRITERIA) {
       perBand.set(criterion.band, (perBand.get(criterion.band) ?? 0) + 1);
     }
     expect(perBand.get("scaffolder-bake")).toBe(40);
-    expect(perBand.get("layer-c-enforce")).toBe(67);
+    expect(perBand.get("layer-c-enforce")).toBe(106);
     expect(perBand.get("yellow-survey")).toBe(32);
     expect(perBand.get("red-checklist")).toBe(10);
 
-    expect(new Set(ALL_CRITERIA.map((c) => c.id)).size).toBe(149);
+    expect(new Set(ALL_CRITERIA.map((c) => c.id)).size).toBe(188);
   });
 });
 
 describe("IMPLEMENTED_LINT_CODES", () => {
   it("has exactly 59 codes, every one a lintRuleId present in the catalog", () => {
-    expect(IMPLEMENTED_LINT_CODES.size).toBe(59);
+    expect(IMPLEMENTED_LINT_CODES.size).toBe(99);
     const catalogIds = catalogLintRuleIds();
     for (const code of IMPLEMENTED_LINT_CODES) {
       expect(catalogIds.has(code)).toBe(true);
@@ -99,10 +106,8 @@ describe("IMPLEMENTED_LINT_CODES", () => {
     expect([...ASSEMBLY_SYNTHESIZED_CODES].sort()).toEqual([
       "KM_LINT_COMPILE_ERRORS",
       "KM_LINT_COMPILE_HAS_WARNINGS",
-      "KM_LINT_DUPLICATE_KEYBOARD_ID",
       "KM_LINT_SPURIOUS_VERSION_BUMP",
       "KM_LINT_VERSION_NOT_BUMPED",
-      "KM_LINT_VERSION_NOT_INCREMENTED",
     ]);
     for (const code of ASSEMBLY_SYNTHESIZED_CODES) {
       expect(IMPLEMENTED_LINT_CODES.has(code)).toBe(true);
