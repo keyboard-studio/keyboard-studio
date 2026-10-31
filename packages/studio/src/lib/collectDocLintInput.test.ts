@@ -100,7 +100,7 @@ describe("collectDocLintInput", () => {
     expect(input.deletedFilenames).toEqual([]);
     expect(input.startHistoryMdText).toBeUndefined();
     // Consistent holders, matching version: the shared checks stay silent.
-    expect(runDocChecks(input).map((f) => f.code)).not.toContain("KM_LINT_COPYRIGHT_HOLDER_INCONSISTENT");
+    expect(runDocChecks(input).findings.map((f) => f.code)).not.toContain("KM_LINT_COPYRIGHT_HOLDER_INCONSISTENT");
   });
 
   it("US7-1: a HISTORY whose top version disagrees with the keyboard version yields exactly one HISTORY finding naming both, with a hint", () => {
@@ -114,7 +114,7 @@ describe("collectDocLintInput", () => {
       touchLayoutJson: null,
       members: { "history-md": "## 2.0 (2026-09-12)\n* Something.\n" },
     });
-    const findings = runDocChecks(input);
+    const findings = runDocChecks(input).findings;
     const history = findings.filter((f) => f.code === "KM_LINT_HISTORY_VERSION_MISMATCH");
     expect(history).toHaveLength(1);
     expect(history[0]!.severity).toBe("warning");
