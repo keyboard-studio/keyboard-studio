@@ -239,7 +239,13 @@ values only, because `recordToDecisionSet` folds every recorded decision to `ask
 
 **Decision**: normalised by named rule: timestamps (dropped); `zzq<hex>` placeholders (reduced to
 `zzq`, as `decisionPoint.corpus.test.ts` already does); carve `suggestionFingerprint` (recomputed with
-`suggestionFingerprintOf` on both sides). Compared exactly: everything else, including generated ids.
+`suggestionFingerprintOf` on both sides); tester-typed values (where the author run's own `PolicyStep`
+for a decision has rule `placeholder`, the record's value is compared on presence, not value; keyed off
+the PolicyStep rule, never a decision id). Rationale for the last: the harness typed a fixed "Walk
+Author" where the author types the placeholder; both are tester-supplied text where a guest session
+proposes nothing. Compared exactly: everything else, including generated ids. Both sides are read from their decision records through `recordToDecisionSet`:
+a decision is recorded when its step completes, and later steps (punctuation) keep seeding the live
+draft, so the author's live store is not comparable with a record.
 
 ## R9. Determinism (FR-007)
 

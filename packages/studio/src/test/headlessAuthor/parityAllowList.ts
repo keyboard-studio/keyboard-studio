@@ -12,4 +12,29 @@
 
 import type { ParityAllowEntry } from "./caseTypes.ts";
 
-export const PARITY_ALLOW_LIST: readonly ParityAllowEntry[] = [];
+export const PARITY_ALLOW_LIST: readonly ParityAllowEntry[] = [
+  {
+    caseId: "p4-unwrap-bafut-camqwerty",
+    decisionId: "carved-layout",
+    reason:
+      "The product now proposes 571 derived removals, marked until Continue, and the author keeps them (tool-proposed). " +
+      "The record predates marked-until-Continue: it has no removals and legacy bulk-default allow-host dispositions (hand-set).",
+    explainedBy: "record-age:origin/main 2698f774 (round 3)",
+  },
+  {
+    caseId: "p4-unwrap-ewondo-camazerty",
+    decisionId: "carved-layout",
+    reason:
+      "The product now proposes 642 derived removals, marked until Continue, and the author keeps them (tool-proposed). " +
+      "The record predates marked-until-Continue: it has no removals and legacy bulk-default allow-host dispositions (hand-set).",
+    explainedBy: "record-age:origin/main 2698f774 (round 3)",
+  },
+  {
+    caseId: "p4-unwrap-bafut-camqwerty",
+    decisionId: "marks-treatment",
+    reason:
+      "contextTolerance only: the author accepts the station's pre-accepted normalization; the record has null because " +
+      "the walker pressed Continue before the analysis arrived. The accepted overlay goes stale by output (the dropped-decision bug).",
+    explainedBy: "record-age:origin/main 2698f774 (round 3)",
+  },
+];
