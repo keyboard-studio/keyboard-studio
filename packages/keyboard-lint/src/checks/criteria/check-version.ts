@@ -118,7 +118,9 @@ function compareDotVersions(a: string, b: string): number {
  *
  * - PR version > base → met.
  * - PR version == base on an upgrade (the PR modifies the existing
- *   keyboard) → finding: upgrades must bump the version.
+ *   keyboard) → finding when a package file changed (2.1's
+ *   classification); met-moot when only non-package files changed —
+ *   nothing new is deployed.
  * - PR version == base on a new keyboard → met-moot: nothing to
  *   increment from.
  * - PR version < base → finding.
@@ -132,6 +134,7 @@ function compareDotVersions(a: string, b: string): number {
 export function checkVersionNotIncremented(
   ir: KeyboardIR,
   review: ReviewContext | undefined,
+  kpsFileNames: readonly string[],
 ): CheckResult {
   const code = "KM_LINT_VERSION_NOT_INCREMENTED";
   const prVersion = versionOf(ir);
@@ -175,6 +178,10 @@ export function checkVersionNotIncremented(
   // to increment from. Upgrade = the folder exists at base in the
   // PR's tier and the PR touches it (same determination as 1.5).
   if (isUpgrade(ir, review)) {
+    if (classifyChanges(ir, review, kpsFileNames).pkg.length === 0)
+      return checkPassed(code, [
+        `No package file changed; the deployed version "${baseVersion}" stands (base commit ${sha7}).`,
+      ]);
     const bumped = suggestBump(baseVersion);
     return checkFailed(code, [
       criteriaFinding({

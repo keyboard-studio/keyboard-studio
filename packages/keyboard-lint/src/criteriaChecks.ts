@@ -346,7 +346,9 @@ export function runCriteriaChecks(
     // 2.1/2.2/2.6 — foreign-only: the PR against its base commit. The
     // authored host judges these from instantiation state (assembly
     // verdicts); the resolver defers to these checks in foreign mode.
-    collect(checkVersionNotIncremented(keyboardIR, input.reviewContext));
+    collect(
+      checkVersionNotIncremented(keyboardIR, input.reviewContext, input.kpsFileNames),
+    );
     collect(
       checkVersionBumpRequired(keyboardIR, input.reviewContext, input.kpsFileNames),
     );

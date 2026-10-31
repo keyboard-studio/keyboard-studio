@@ -77,20 +77,20 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
   });
 
   it("non-PR target is met-moot", () => {
-    const r = checkVersionNotIncremented(irWithVersion("1.0"), undefined);
+    const r = checkVersionNotIncremented(irWithVersion("1.0"), undefined, []);
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/version history is the repo/);
   });
 
   it("PR version greater than base is met", () => {
-    const r = checkVersionNotIncremented(irWithVersion("1.1"), prReview());
+    const r = checkVersionNotIncremented(irWithVersion("1.1"), prReview(), []);
     expect(r.code).toBe("KM_LINT_VERSION_NOT_INCREMENTED");
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/"1.1" > "1.0"/);
   });
 
   it("equal version on an upgrade is a finding", () => {
-    const r = checkVersionNotIncremented(irWithVersion("1.0"), prReview());
+    const r = checkVersionNotIncremented(irWithVersion("1.0"), prReview(), []);
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]!.code).toBe("KM_LINT_VERSION_NOT_INCREMENTED");
     expect(r.findings[0]!.message).toMatch(/not incremented from "1.0"/);
@@ -104,15 +104,27 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
         idConflictAtBase: { baseSha: SHA, existingTiers: [] },
         baseKmnVersion: { baseSha: SHA },
       }),
+      [],
     );
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/nothing to increment from/);
+  });
+
+  it("equal version on a docs-only upgrade is met-moot (agrees with 2.1/2.2)", () => {
+    const r = checkVersionNotIncremented(
+      irWithVersion("1.0"),
+      prReview({ treePaths: ["experimental/d/demo/README.md"] }),
+      [],
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(/No package file changed/);
   });
 
   it("PR version less than base is a finding", () => {
     const r = checkVersionNotIncremented(
       irWithVersion("0.9"),
       prReview({ baseKmnVersion: { baseSha: SHA, version: "1.0" } }),
+      [],
     );
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]!.message).toMatch(/"0.9" is less than the base version "1.0"/);
@@ -122,13 +134,14 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
     const r = checkVersionNotIncremented(
       irWithVersion("1.0"),
       prReview({ baseKmnVersion: { baseSha: SHA } }),
+      [],
     );
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/nothing to increment from/);
   });
 
   it("PR with no version declared is met-moot (judged elsewhere)", () => {
-    const r = checkVersionNotIncremented(irWithVersion(""), prReview());
+    const r = checkVersionNotIncremented(irWithVersion(""), prReview(), []);
     expect(r.findings).toEqual([]);
   });
 
@@ -136,6 +149,7 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
     const r = checkVersionNotIncremented(
       irWithVersion("1.0"),
       prReview({ baseKmnVersion: undefined }),
+      [],
     );
     expect(r.findings).toEqual([]);
   });
