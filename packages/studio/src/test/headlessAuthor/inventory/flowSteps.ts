@@ -43,6 +43,12 @@ export const flowStepsInventory: readonly InventoryEntry[] = [
   // --- Starting keyboard ---
   { fn: "confirmStartKeyboard", module: "survey/chooseStart/confirmStartKeyboard.ts", callers: ["survey/chooseStart/StartKeyboardRenderer.tsx"] },
   { fn: "default", module: "survey/questions/gallery/baseKeyboard.ts", callers: ["editors/adapters/panelAdapters.tsx"] },
+  // The setup decision's instantiation (StudioShell's doCommit): the choose_base
+  // completion with the previewed keyboard, once the base and the track are both
+  // decided; the start keyboard is the catalog record the browser lists.
+  { fn: "applyStepCompletion", module: "steps/reducer.ts", callers: ["StudioShell.tsx", "lib/completeStep.ts"] },
+  { fn: "selectTrack", module: "stores/decisionStore.ts", callers: ["StudioShell.tsx", "lib/completeStep.ts"] },
+  { fn: "readCatalogEntry", module: "../vite-plugins/keyboardCatalog.ts", callers: ["../vite-plugins/localKeyboards.ts"] },
   // The live extraction pass StudioShell runs after the instantiation (and the
   // runner re-runs at question-push time).
   { fn: "runLiveExtractionFromStores", module: "decisions/liveExtraction.ts", callers: ["StudioShell.tsx", FLOW_WALK] },

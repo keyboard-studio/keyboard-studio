@@ -22,7 +22,6 @@ import { createIdentityResolution } from "../../../survey/identityResolution.ts"
 import { resolveTypedLanguage } from "../../../survey/resolveTypedLanguage.ts";
 import { attributionOptions, projectNameOptions } from "../../../editors/adapters/flowStepOptionRecords.ts";
 import { completeFlow, completeFlowStep, type FlowChoices } from "./flowStep.ts";
-import { commitStartKeyboard } from "./track.ts";
 import type { StepDrivers } from "./types.ts";
 
 /** Typed where the product offers nothing and the case supplies nothing for a required name. */
@@ -67,16 +66,12 @@ export const identityDrivers: StepDrivers = {
     );
   },
 
-  attribution: (ctx) => {
-    // The first step after the base and the track are both recorded: where
-    // StudioShell's instantiation effect has run.
-    commitStartKeyboard(ctx);
-    return completeFlowStep(
+  attribution: (ctx) =>
+    completeFlowStep(
       attributionOptions,
       { placeholders: { il_author_name: () => PLACEHOLDER_TEXT } },
       ctx,
-    );
-  },
+    ),
 
   project_name: (ctx) => completeFlowStep(projectNameOptions, {}, ctx),
 };

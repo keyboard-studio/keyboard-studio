@@ -11,7 +11,7 @@
 // the record (survey/carve/carveValue.ts), so every fixture runs with the store
 // default. A walk that changed it is not reproduced.
 
-import { makeStartKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard, type StartKeyboard } from "@keyboard-studio/contracts";
 import type {
   CompileResult,
   KeyboardIR,
@@ -55,6 +55,8 @@ export interface DecisionPointFixtureSpec {
   group: string;
   script: string;
   displayName: string;
+  /** The start keyboard's BCP47 languages (the catalog record's), when known. */
+  languages?: string[];
   track: "copy" | "adapt";
   point: DecisionPoint;
   /** Already cut at `point` (see recordToDecisionSet). */
@@ -86,12 +88,16 @@ function resetStores(): void {
   resetRebuildTrail();
 }
 
-/**
- * Instantiate the way the open-base run does: the loader's asset clean-up, parse,
- * pattern recognition and the base's touch layout, then the track's entry point.
- * Shared with the headless author (spec 107 T013), which instantiates the same way.
- */
-export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
+/** The starting keyboard as loaded, before any store sees it. */
+export interface StartingPoint {
+  vfs: VirtualFS;
+  ir: KeyboardIR;
+  base: StartKeyboard;
+  removalCapabilities: ReturnType<typeof classifyRemovalCapabilities>;
+}
+
+/** Load and parse the starting keyboard, touching no store (the first half of instantiate). */
+export function loadStartingPoint(spec: DecisionPointFixtureSpec): StartingPoint {
   const vfs = loadVfs({ id: spec.base, group: spec.group });
   const kmnPath = `source/${spec.base}.kmn`;
   const fetched = readVfsText(vfs, kmnPath);
@@ -115,9 +121,20 @@ export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
     targets: ["windows"],
     displayName: spec.displayName,
     version: "1.0",
+    ...(spec.languages !== undefined ? { languages: spec.languages } : {}),
   });
+  return { vfs, ir, base, removalCapabilities: classifyRemovalCapabilities(ir) };
+}
+
+/**
+ * Instantiate the way the open-base run does: the loader's asset clean-up, parse,
+ * pattern recognition and the base's touch layout, then the track's entry point.
+ * Shared with the headless author (spec 107 T013), which instantiates the same way.
+ */
+export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
+  const { vfs, ir, base, removalCapabilities } = loadStartingPoint(spec);
   const store = useWorkingCopyStore.getState();
-  const opts = { vfs, ir, removalCapabilities: classifyRemovalCapabilities(ir) };
+  const opts = { vfs, ir, removalCapabilities };
   if (spec.track === "copy") store.instantiateFromStart(base, opts);
   else store.instantiateFromExisting(base, opts);
   return ir;

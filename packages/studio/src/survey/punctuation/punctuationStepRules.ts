@@ -1,0 +1,124 @@
+// punctuationStepRules -- the punctuation step's seeding and completion as
+// plain functions, so the UI (PunctuationStep) and a headless caller (spec
+// 107's scripted author) take the same path.
+//
+//   SEED      `seedPunctuationProposals`: the CLDR/SLDR tier, then the base
+//             group, each once per evidence key (the two effects the step
+//             runs when the exemplar lookup settles).
+//   COMPLETE  `completePunctuation`: records what the inventory was confirmed
+//             FOR and reports the phase-C result.
+
+import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import {
+  buildPunctuationProposal,
+  glyphCategory,
+  startPunctuationCoverage,
+} from "@keyboard-studio/engine";
+import type { ExemplarInventory } from "../../lib/services.ts";
+import { charactersInTier } from "../../lib/services.ts";
+import type { SavedAnswer } from "../../steps/answerTypes.ts";
+import { getCharacterInventoryValue } from "../useInventoryDraft.ts";
+import type { DraftProvenance } from "../phaseBDraftOps.ts";
+import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
+
+/** Manifest step id -- matches steps/manifest.ts's "punctuation" entry. */
+export const PUNCTUATION_STEP_ID = "punctuation";
+
+/**
+ * The saved answer that carries the evidence key the confirmed inventory was
+ * built on (spec 079 R-07, FR-022): what it was confirmed FOR, so the FR-023
+ * guard can tell "confirmed here" from "confirmed for another language or base".
+ */
+export const PUNCTUATION_INVENTORY_ANSWER_ID = "punctuation.inventory";
+
+/** True for the one category this page collects. */
+export function isPunctuationChar(c: string): boolean {
+  return glyphCategory(c) === "punctuation";
+}
+
+/** The exemplar source's punctuation tier, NFC-normalised (empty with no offer). */
+export function punctuationTier(inventory: ExemplarInventory | null): string[] {
+  return inventory === null ? [] : charactersInTier(inventory, "punctuation").map((c) => c.normalize("NFC"));
+}
+
+/** What the working copy already types, or null with no working copy. */
+export type PunctuationBaseCoverage = ReturnType<typeof startPunctuationCoverage>;
+
+/**
+ * FR-023: a phase-C confirmedInventory already on the session means the author
+ * confirmed this step; their decision stands, but only for the evidence it was
+ * confirmed on (a confirmation with no recorded key predates spec 079).
+ */
+export function isPunctuationAlreadyConfirmed(args: {
+  phaseResults: readonly SurveyPhaseResult[];
+  confirmedForKey: string | null | undefined;
+  evidenceKey: string;
+}): boolean {
+  return (
+    args.phaseResults.some((p) => p.phase === "C" && p.confirmedInventory !== undefined) &&
+    (args.confirmedForKey === undefined ||
+      args.confirmedForKey === null ||
+      args.confirmedForKey === args.evidenceKey)
+  );
+}
+
+/**
+ * Seed the proposals once the exemplar lookup has settled: the CLDR/SLDR tier
+ * (when the lookup found one), then the base group (when a working copy
+ * exists). `seedProposals` is a no-op on a repeated key, honours the author's
+ * rejections and never downgrades an author pick; under the FR-023 guard the
+ * key is still recorded, with nothing to seed.
+ */
+export function seedPunctuationProposals(args: {
+  inventory: ExemplarInventory | null;
+  baseCoverage: PunctuationBaseCoverage | null;
+  startKeyboardId: string | undefined;
+  alreadyConfirmed: boolean;
+  seedProposals: (chars: readonly string[], source: DraftProvenance, seedKey: string) => void;
+}): void {
+  const { inventory, baseCoverage, alreadyConfirmed, seedProposals } = args;
+  if (inventory !== null) {
+    const seedKey = "punctuation:" + inventory.resolvedTag;
+    seedProposals(alreadyConfirmed ? [] : punctuationTier(inventory), inventory.source, seedKey);
+  }
+  if (baseCoverage === null) return;
+  const seedKey = "punctuation-base:" + (args.startKeyboardId ?? "working-copy");
+  const currentDraft = getCharacterInventoryValue();
+  const proposal = buildPunctuationProposal({
+    exemplars: inventory,
+    baseCoverage,
+    rejected: new Set(currentDraft.rejected),
+    authorChosen: new Set(
+      Object.keys(currentDraft.provenance).filter((c) => currentDraft.provenance[c] === "author"),
+    ),
+  });
+  // This page collects Unicode PUNCTUATION only, so the floor's symbol members
+  // are not proposed here (they stay shielded by carve's always-keep rule).
+  seedProposals(
+    alreadyConfirmed ? [] : proposal.baseGroup.filter(isPunctuationChar),
+    proposal.baseCoverageIncomplete ? "ascii-floor" : "base",
+    seedKey,
+  );
+}
+
+/** The step's phase result: the shared phase-C union (`[]` records "asked, chose none"). */
+export function punctuationResult(): SurveyPhaseResult {
+  return { phase: "C", answers: [], confirmedInventory: phaseCConfirmedInventory() };
+}
+
+/** Done: record the evidence key the inventory was confirmed for, and report the result. */
+export function completePunctuation(args: {
+  evidenceKey: string;
+  saveAnswer: (stepId: string, answerId: string, answer: Omit<SavedAnswer, "savedAt">) => void;
+}): SurveyPhaseResult {
+  const result = punctuationResult();
+  args.saveAnswer(PUNCTUATION_STEP_ID, PUNCTUATION_INVENTORY_ANSWER_ID, {
+    value: result.confirmedInventory ?? [],
+    answerType: "char-list",
+    origin: "confirmed",
+    stage: "confirmed",
+    evidenceKey: args.evidenceKey,
+    screenId: PUNCTUATION_STEP_ID,
+  });
+  return result;
+}

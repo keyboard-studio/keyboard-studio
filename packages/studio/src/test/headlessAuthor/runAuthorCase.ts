@@ -19,21 +19,20 @@
 // mock, direct store write or second step list. boundary.test.ts and the
 // depcruise rule `product-not-to-headless-author` enforce this.
 //
-// The walk: instantiate the copied keyboard exactly as the decision-point
-// replay does, then from `identity` hand each step to its driver and complete
-// it through lib/completeStep.ts -- the code StepHost's onComplete runs, with
-// the reducer deps StudioShell injects (lib/studioReducerDeps.ts) -- and move
-// the session to whatever step `advance` names. No step list: the order is the
-// product's routing. After the last step, the decisions the walk recorded go to
+// The walk: load the copied keyboard exactly as the decision-point replay does
+// (no store sees it yet), then from `identity` hand each step to its driver and
+// complete it through lib/completeStep.ts -- the code StepHost's onComplete
+// runs, with the reducer deps StudioShell injects (lib/studioReducerDeps.ts) --
+// and move the session to whatever step `advance` names. No step list: the
+// order is the product's routing. As in the UI, the working copy is instantiated
+// only once the base and the track are both decided (commitStartKeyboard), so
+// identity runs with no start keyboard. After the last step, the decisions the walk recorded go to
 // spec 106's replay (buildDecisionPointFixture: rebuild, download path,
 // compile, gates), the one projection (FR-005).
 //
 // Playwright-only (FR-042): none yet.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { DecisionPoint } from "../decisionPointBases.ts";
-import { parseKps } from "@keyboard-studio/engine";
 import { manifest } from "../../steps/manifest.ts";
 import { bindManifest, useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
@@ -46,11 +45,15 @@ import {
   createStudioReducerDeps,
   createStudioSnapshotter,
 } from "../../lib/studioReducerDeps.ts";
-import { buildDecisionPointFixture, instantiate, type DecisionPointFixtureSpec } from "../decisionPointFixture.ts";
+import {
+  buildDecisionPointFixture,
+  loadStartingPoint,
+  type DecisionPointFixtureSpec,
+  type StartingPoint,
+} from "../decisionPointFixture.ts";
 import { ownerOf } from "../decisionPointKnownGaps.fixture.ts";
-import { CORPUS } from "../sc004Harness.ts";
 import type { AuthorRun, Case } from "./caseTypes.ts";
-import { eligibility, type Slice } from "./eligibility.ts";
+import { eligibility, type EligibilityDeps, type Slice } from "./eligibility.ts";
 import { createRunReport } from "./runReport.ts";
 import { readRunRecord } from "./recordWriter.ts";
 import { resetAuthorStores } from "./resetStores.ts";
@@ -58,7 +61,7 @@ import { StepFailure } from "./stepFailure.ts";
 import type { DriverContext, StepDrivers } from "./stepDrivers/types.ts";
 import { identityDrivers } from "./stepDrivers/identity.ts";
 import { windowsLayoutDrivers } from "./stepDrivers/windowsLayout.ts";
-import { trackDrivers } from "./stepDrivers/track.ts";
+import { catalogStartKeyboard, commitStartKeyboard, trackDrivers } from "./stepDrivers/track.ts";
 import { inventoryDrivers } from "./stepDrivers/inventory.ts";
 import { marksDrivers } from "./stepDrivers/marks.ts";
 import { convenienceDrivers } from "./stepDrivers/convenience.ts";
@@ -72,6 +75,8 @@ export interface AuthorRunOptions {
   slice?: Slice;
   /** Decision point the gates are evaluated at. Default: every decision (`tolerance`). */
   stopAfter?: DecisionPoint;
+  /** Overrides for eligibility's corpus lookups (tests inject a keyboard the corpus lacks). */
+  eligibilityDeps?: EligibilityDeps;
 }
 
 /** Dispatch by manifest step id. Which step comes next is the routing's call, never this table's. */
@@ -95,13 +100,7 @@ const MAX_STEP_VISITS = 64;
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** Script and display name as the product's .kps reader gives them (case fields win). */
-function kpsInfo(c: Case): { script: string; displayName: string } {
-  const kps = parseKps(readFileSync(join(CORPUS, c.group, c.base, "source", `${c.base}.kps`), "utf8"));
-  return { script: c.script ?? kps.script ?? "", displayName: kps.displayName || c.base };
-}
-
-async function walk(base: DriverContext): Promise<void> {
+async function walk(base: DriverContext, point: StartingPoint): Promise<void> {
   // One recorder, as StudioShell holds one: the reducer deps record each
   // completion through it and drivers record each non-final Next (per-screen
   // answers, the base contribution) through the same instance.
@@ -113,6 +112,7 @@ async function walk(base: DriverContext): Promise<void> {
   });
   const ctx: DriverContext = { ...base, recorder };
 
+  let committed = false;
   let step: string = useSurveySessionStore.getState().activeStepId;
   for (let visits = 0; !TERMINALS.has(step); visits++) {
     if (visits >= MAX_STEP_VISITS) {
@@ -132,19 +132,30 @@ async function walk(base: DriverContext): Promise<void> {
     }
 
     const wc = useWorkingCopyStore.getState();
+    const gate = deriveInventoryCoverageGate(wc);
     const outcome = completeStep(step, result, reducerDeps, {
       recordPhase: wc.recordPhase,
-      allCharactersImplemented: !deriveInventoryCoverageGate(wc).blocked,
+      allCharactersImplemented: !gate.blocked,
     });
     if (outcome.next === step) {
-      throw new StepFailure({ step, kind: "step-blocked", detail: `advance() stayed on "${step}"` });
+      const uncovered = gate.blocked
+        ? `; coverage gate: desktop [${gate.unimplementedDesktop.join(" ")}] touch [${gate.unimplementedTouch.join(" ")}]`
+        : "";
+      throw new StepFailure({ step, kind: "step-blocked", detail: `advance() stayed on "${step}"${uncovered}` });
     }
+
+    // StudioShell's instantiation effect: fires once the base and the track are
+    // both recorded, before the session moves on.
+    if (!committed) committed = commitStartKeyboard({ point, reducerDeps, recorder });
 
     // StepHost steps 4-5: the session moves on through its own actions.
     const session = useSurveySessionStore.getState();
     session.advance(outcome.next);
     if (outcome.setCharactersSubStage !== undefined) session.setCharactersSubStage(outcome.setCharactersSubStage);
     step = outcome.next;
+  }
+  if (!committed) {
+    throw new StepFailure({ step, kind: "step-blocked", detail: "the walk ended before the base and the track were both decided" });
   }
 }
 
@@ -154,31 +165,33 @@ export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promi
   const base = { caseId: c.id, gates: [], report: report.report };
 
   try {
-    const elig = eligibility(c.base, opts.slice ?? "all-eligible");
+    const elig = eligibility(c.base, opts.slice ?? "all-eligible", opts.eligibilityDeps);
     if (!elig.eligible) return { ...base, outcome: "skipped", skipReason: elig.reason };
 
     const authorStart = performance.now();
-    const { script, displayName } = kpsInfo(c);
-    const spec: DecisionPointFixtureSpec = {
-      base: c.base,
-      group: elig.group,
-      script,
-      displayName,
-      track: c.track,
-      point: opts.stopAfter ?? "tolerance",
-      decisions: {},
-    };
-
-    let startIr;
+    let spec: DecisionPointFixtureSpec;
+    let point: StartingPoint;
     try {
       bindManifest(manifest);
-      startIr = instantiate(spec);
+      // The start keyboard as the browser lists it: catalog name, script, languages.
+      const catalog = catalogStartKeyboard(c.base, elig.group);
+      spec = {
+        base: c.base,
+        group: elig.group,
+        script: catalog.script,
+        displayName: catalog.displayName,
+        ...(catalog.languages !== undefined ? { languages: catalog.languages } : {}),
+        track: c.track,
+        point: opts.stopAfter ?? "tolerance",
+        decisions: {},
+      };
+      point = loadStartingPoint(spec);
     } catch (e) {
       return { ...base, outcome: "failed", failure: { step: "choose_base", kind: "scaffold-failed", detail: message(e) } };
     }
 
     try {
-      await walk({ case: c, startIr, report });
+      await walk({ case: c, startIr: point.ir, report }, point);
     } catch (e) {
       if (e instanceof StepFailure) return { ...base, outcome: "failed", failure: e.failure };
       throw e;

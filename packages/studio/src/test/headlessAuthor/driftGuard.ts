@@ -17,6 +17,7 @@ import { marksInventory } from "./inventory/marks.ts";
 import { carveInventory } from "./inventory/carve.ts";
 import { mechanismInventory } from "./inventory/mechanism.ts";
 import { phaseFInventory } from "./inventory/phaseF.ts";
+import { touchSeedInventory } from "./inventory/touchSeed.ts";
 
 export type { InventoryEntry } from "./inventory/types.ts";
 import type { InventoryEntry } from "./inventory/types.ts";
@@ -34,6 +35,7 @@ export const PROPOSAL_INVENTORY: readonly InventoryEntry[] = [
   ...carveInventory,
   ...mechanismInventory,
   ...phaseFInventory,
+  ...touchSeedInventory,
 ];
 
 export const INVENTORY: readonly InventoryEntry[] = [
@@ -60,6 +62,7 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "useWorkingCopyStore", module: "stores/workingCopyStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
   { fn: "useSurveySessionStore", module: "stores/surveySessionStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
   { fn: "getDecisionSnapshot", module: "stores/decisionStore.ts", callers: ["StudioShell.tsx", "lib/completeStep.ts"] },
+  { fn: "useSurveyAnswerStore", module: "stores/surveyAnswerStore.ts", callers: ["survey/CharactersStep.tsx", "survey/punctuation/PunctuationStep.tsx"] },
   {
     // The Phase F hard gate StepHost reads through useInventoryCoverageGate.
     fn: "deriveInventoryCoverageGate",

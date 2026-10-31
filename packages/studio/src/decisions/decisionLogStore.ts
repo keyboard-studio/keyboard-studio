@@ -424,6 +424,8 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
   },
 
   reset: () => {
+    // An empty record holds no ids, so the counter restarts with it.
+    seq = 0;
     set({ record: makeEmptyDecisionRecord(), droppedCount: 0 });
   },
 }));

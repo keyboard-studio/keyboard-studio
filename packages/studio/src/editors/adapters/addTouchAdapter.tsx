@@ -31,15 +31,9 @@ import type { EditorStepProps } from "../../steps/types.ts";
 import { TouchGallery } from "../assignLoop/TouchGallery.tsx";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
-import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
-import {
-  applyTouchCompletionEffects,
-  type TouchCompleteResult,
-} from "../../lib/assignLoopCompletion.ts";
-import { currentTouchLayoutValue } from "../../survey/assignLoop/touchLayoutValue.ts";
+import type { TouchCompleteResult } from "../../lib/assignLoopCompletion.ts";
+import { completeTouchStep, touchDesktopModifications } from "../../lib/touchStepCompletion.ts";
 import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
-
-const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
 /**
  * EditorStep adapter for the Touch Gallery (Phase E — touch key assignment
@@ -78,20 +72,13 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
 
   const mods = useMemo<DesktopModifications>(() => {
-    if (startIr === null) return EMPTY_MODS;
-    return deriveDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
+    return touchDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startIr, modsDepsKey]);
 
   function handleComplete(assignments: TouchAssignment[]) {
     const payload: TouchCompleteResult = { assignments, startIr, startVfs, mods, seedSource };
-    useDecisionStore.getState().record({
-      id: "touch-layout",
-      value: currentTouchLayoutValue(),
-      provenance: "asked",
-    });
-    applyTouchCompletionEffects(payload);
-    onComplete(payload);
+    onComplete(completeTouchStep(payload));
   }
 
   // TouchGallery requires onBack (its own prop is non-optional — it never

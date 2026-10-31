@@ -46,8 +46,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { SurveyAnswer } from "@keyboard-studio/contracts";
-import { parseUPlusNotation } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
@@ -55,8 +53,6 @@ import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useInventoryDraft } from "../useInventoryDraft.ts";
 import type { InventoryDecisionValue } from "../phaseBDraftOps.ts";
-import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
-import { isFormatChar } from "../charNormUtils.ts";
 import {
   directionAnswersFromDecisions,
   writingDirectionFrom,
@@ -66,12 +62,14 @@ export {
   writingDirectionFrom,
 } from "./invisibleDirection.ts";
 export type { WritingDirection } from "./invisibleDirection.ts";
+import { needStatementFor, type InvisibleCharacterCandidate } from "./invisibleCandidates.ts";
 import {
-  invisibleCandidatesFor,
-  invisibleIdSuffix,
-  needStatementFor,
-  type InvisibleCharacterCandidate,
-} from "./invisibleCandidates.ts";
+  invisiblesCandidates,
+  invisiblesCarriedOver,
+  invisiblesResult,
+  isInvisibleAccepted,
+} from "./invisiblesStepRules.ts";
+export { invisibleQuestionId } from "./invisiblesStepRules.ts";
 import {
   ACCENT,
   BORDER,
@@ -84,11 +82,6 @@ import {
   sectionHeading,
   secondaryButton,
 } from "../surveyStyles.ts";
-
-/** `"U+200C"` -> `"invisibles.u200c"` — the recorded answer's questionId. */
-export function invisibleQuestionId(candidate: InvisibleCharacterCandidate): string {
-  return "invisibles." + invisibleIdSuffix(candidate.codePoint);
-}
 
 // ---------------------------------------------------------------------------
 // CandidateRow — one named invisible character with a yes/no toggle
@@ -199,19 +192,16 @@ const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue
   // BEFORE adopting it, so the candidate list keeps offering those characters
   // after they have moved out of `chars`. Characters already decided about on
   // an earlier visit stay offered too — nothing an author entered is dropped.
-  const carriedOver = useMemo(() => {
-    const fromControls = controls.filter(isFormatChar);
-    const fromDecisions = Object.keys(invisibleDecisions)
-      .map(parseUPlusNotation)
-      .filter((c): c is string => c !== null);
-    return [...fromControls, ...fromDecisions];
-  }, [controls, invisibleDecisions]);
+  const carriedOver = useMemo(
+    () => invisiblesCarriedOver(controls, invisibleDecisions),
+    [controls, invisibleDecisions],
+  );
   useEffect(() => {
     adoptControlsAsInvisibles();
   }, [adoptControlsAsInvisibles]);
 
   const candidates = useMemo(
-    () => invisibleCandidatesFor({ direction, carriedOver }),
+    () => invisiblesCandidates(direction, carriedOver),
     [direction, carriedOver],
   );
   const alwaysCandidates = candidates.filter((c) => c.relevance !== "rtl");
@@ -222,8 +212,7 @@ const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue
     if (direction === "rtl") setBidiExpanded(true);
   }, [direction]);
 
-  const isAccepted = (c: InvisibleCharacterCandidate): boolean =>
-    invisibleDecisions[c.notation] === "accepted";
+  const isAccepted = (c: InvisibleCharacterCandidate): boolean => isInvisibleAccepted(invisibleDecisions, c);
   const acceptedCount = candidates.filter(isAccepted).length;
 
   // Double-complete guard (mirrors the punctuation step).
@@ -237,14 +226,7 @@ const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue
   function complete(): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    // One boolean per OFFERED candidate: a declined or untouched offer records
-    // `false`, which the decision record can tell apart from "never asked".
-    const answers: SurveyAnswer[] = candidates.map((c) => ({
-      questionId: invisibleQuestionId(c),
-      answerType: "boolean",
-      value: isAccepted(c),
-    }));
-    onComplete({ phase: "C", answers, confirmedInventory: phaseCConfirmedInventory() });
+    onComplete(invisiblesResult(candidates, invisibleDecisions));
   }
 
   // Back / Continue render in the footer (spec 081).

@@ -4,4 +4,9 @@
 
 import type { InventoryEntry } from "./types.ts";
 
-export const phaseFInventory: readonly InventoryEntry[] = [];
+export const phaseFInventory: readonly InventoryEntry[] = [
+  // The Phase F flow's options record (PhaseFGate's factory component is built from it).
+  { fn: "phaseFOptions", module: "editors/adapters/flowStepOptionRecords.ts", callers: ["editors/adapters/flowStepOptions.tsx"] },
+  // The per-question findings projection the component hands the flow.
+  { fn: "buildFindingsByQuestionId", module: "lint/lintToQuestion.ts", callers: ["hooks/useValidatorFindings.ts"] },
+];

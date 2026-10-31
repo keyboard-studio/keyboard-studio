@@ -11,6 +11,8 @@ export interface AuthorRunOptions {
   slice?: "all-eligible" | "latin" | { ids: readonly string[] };
   /** Stop after this decision point (for parity against partial records). Default: run every step. */
   stopAfter?: DecisionPoint;
+  /** Overrides for eligibility's corpus lookups (group, parse status, script); tests inject a keyboard the corpus lacks. */
+  eligibilityDeps?: EligibilityDeps;
 }
 
 export function runAuthorCase(c: Case, opts?: AuthorRunOptions): Promise<AuthorRun>;
