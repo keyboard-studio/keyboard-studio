@@ -35,20 +35,20 @@ const GOOD: TextContentFacts = {
 
 describe("text-content twins", () => {
   it("passes a clean keyboard", () => {
-    expect(checkTextContent(GOOD)).toEqual([]);
+    expect(checkTextContent(GOOD).findings).toEqual([]);
   });
 
   it("4.1b flags a LICENSE.md without a copyright year", () => {
-    const f = checkCopyrightAbsent({ ...GOOD, licenseMd: "The MIT License\n" });
+    const { findings: f } = checkCopyrightAbsent({ ...GOOD, licenseMd: "The MIT License\n" });
     expect(f[0]!.code).toBe("KM_LINT_COPYRIGHT_ABSENT");
   });
 
   it("4.1b passes on an absent LICENSE.md (assembly contextMissing)", () => {
-    expect(checkCopyrightAbsent({ ...GOOD, licenseMd: undefined })).toEqual([]);
+    expect(checkCopyrightAbsent({ ...GOOD, licenseMd: undefined }).findings).toEqual([]);
   });
 
   it("4.5b flags a malformed copyright line", () => {
-    const f = checkCopyrightSyntax({
+    const { findings: f } = checkCopyrightSyntax({
       ...GOOD,
       licenseMd: "Copyright 2025 Someone\n",
     });
@@ -60,12 +60,12 @@ describe("text-content twins", () => {
       checkCopyrightSyntax({
         ...GOOD,
         licenseMd: "Copyright (c) 1997-2025 Holder\n",
-      }),
+      }).findings,
     ).toEqual([]);
   });
 
   it("4.6b flags a year in the .kmn copyright", () => {
-    const f = checkCopyrightYearEmbedded({
+    const { findings: f } = checkCopyrightYearEmbedded({
       ...GOOD,
       kmn: "store(&Copyright) 'Copyright 2025 X'\n",
     });
@@ -73,7 +73,7 @@ describe("text-content twins", () => {
   });
 
   it("4.6b flags a year in the .kps Copyright element", () => {
-    const f = checkCopyrightYearEmbedded({
+    const { findings: f } = checkCopyrightYearEmbedded({
       ...GOOD,
       kps: "<Info><Copyright>© 2025 Someone</Copyright></Info>",
     });
@@ -81,7 +81,7 @@ describe("text-content twins", () => {
   });
 
   it("5.2b flags a version in the docs", () => {
-    const f = checkVersionInDocs({
+    const { findings: f } = checkVersionInDocs({
       ...GOOD,
       readmeMd: "Version 2.1 is out.\n",
     });
@@ -89,7 +89,7 @@ describe("text-content twins", () => {
   });
 
   it("5.3b flags a copyright in readme.htm", () => {
-    const f = checkCopyrightInDocs({
+    const { findings: f } = checkCopyrightInDocs({
       ...GOOD,
       readmeHtm: "<p>Copyright 2025 Someone</p>",
     });
@@ -97,7 +97,7 @@ describe("text-content twins", () => {
   });
 
   it("5.5b flags a README.md without the keyman.com link", () => {
-    const f = checkReadmeKeymanLinkAbsent({
+    const { findings: f } = checkReadmeKeymanLinkAbsent({
       ...GOOD,
       readmeMd: "# Title\n\nNo links here.\n",
     });
@@ -105,7 +105,7 @@ describe("text-content twins", () => {
   });
 
   it("5.6b flags a README.md without the help link", () => {
-    const f = checkReadmeHelpLinkAbsent({
+    const { findings: f } = checkReadmeHelpLinkAbsent({
       ...GOOD,
       readmeMd: "See https://keyman.com/keyboards/gff_amharic.\n",
     });
@@ -113,7 +113,7 @@ describe("text-content twins", () => {
   });
 
   it("6.6b flags a welcome.htm lang mismatch", () => {
-    const f = checkWelcomeLangMismatch({
+    const { findings: f } = checkWelcomeLangMismatch({
       ...GOOD,
       welcomeHtm: '<html lang="en"><body></body></html>',
     });
@@ -121,7 +121,7 @@ describe("text-content twins", () => {
   });
 
   it("6.6b flags a missing lang attribute", () => {
-    const f = checkWelcomeLangMismatch({
+    const { findings: f } = checkWelcomeLangMismatch({
       ...GOOD,
       welcomeHtm: "<html><body></body></html>",
     });
@@ -130,7 +130,7 @@ describe("text-content twins", () => {
   });
 
   it("7.11b flags store(&Author) in the .kmn", () => {
-    const f = checkAuthorInKmn({
+    const { findings: f } = checkAuthorInKmn({
       ...GOOD,
       kmn: "store(&Author) 'Someone'\n",
     });
@@ -138,18 +138,18 @@ describe("text-content twins", () => {
   });
 
   it("11.1b flags an absent .php", () => {
-    const f = checkPhpHeaderBad({ ...GOOD, php: undefined, phpPath: undefined });
+    const { findings: f } = checkPhpHeaderBad({ ...GOOD, php: undefined, phpPath: undefined });
     expect(f[0]!.code).toBe("KM_LINT_PHP_HEADER_BAD");
     expect(f[0]!.message).toContain("No <name>.php");
   });
 
   it("11.1b flags a .php without the header block", () => {
-    const f = checkPhpHeaderBad({ ...GOOD, php: "<?php\necho 'hi';\n?>\n" });
+    const { findings: f } = checkPhpHeaderBad({ ...GOOD, php: "<?php\necho 'hi';\n?>\n" });
     expect(f[0]!.code).toBe("KM_LINT_PHP_HEADER_BAD");
   });
 
   it("11.3b flags a <style> tag outside the PHP block", () => {
-    const f = checkPhpStyleOutside({
+    const { findings: f } = checkPhpStyleOutside({
       ...GOOD,
       php: "<?php\n/*\n  Name: x\n*/\n?>\n<style>p{}</style>\n",
     });
@@ -157,10 +157,62 @@ describe("text-content twins", () => {
   });
 
   it("11.4b flags closing body/html tags", () => {
-    const f = checkPhpClosingTags({
+    const { findings: f } = checkPhpClosingTags({
       ...GOOD,
       php: "<?php\n/*\n  Name: x\n*/\n?>\n<p>Hi</p></body></html>\n",
     });
     expect(f[0]!.code).toBe("KM_LINT_PHP_CLOSING_TAGS");
+  });
+
+  it("11.3b/11.4b are moot without a .php file, naming why", () => {
+    const noPhp = { ...GOOD, php: undefined };
+    expect(checkPhpStyleOutside(noPhp).verified).toEqual([
+      "No .php file to check.",
+    ]);
+    expect(checkPhpClosingTags(noPhp).verified).toEqual([
+      "No .php file to check.",
+    ]);
+  });
+
+  it("names the moot reason when source files are absent", () => {
+    const bare = {
+      ...GOOD,
+      licenseMd: undefined,
+      readmeMd: undefined,
+      readmeHtm: undefined,
+      kmn: undefined,
+      kps: undefined,
+      welcomeHtm: undefined,
+      php: undefined,
+    };
+    expect(checkCopyrightAbsent(bare).verified).toEqual([
+      "No LICENSE.md to check.",
+    ]);
+    expect(checkCopyrightSyntax(bare).verified).toEqual([
+      "No LICENSE.md to check.",
+    ]);
+    expect(checkCopyrightYearEmbedded(bare).verified).toEqual([
+      "No .kmn or .kps to check.",
+    ]);
+    expect(checkVersionInDocs(bare).verified).toEqual([
+      "No documentation files to check.",
+    ]);
+    expect(checkReadmeKeymanLinkAbsent(bare).verified).toEqual([
+      "No README.md to check.",
+    ]);
+    expect(checkWelcomeLangMismatch(bare).verified).toEqual([
+      "No welcome.htm to check.",
+    ]);
+    expect(checkAuthorInKmn(bare).verified).toEqual(["No .kmn to check."]);
+  });
+
+  it("4.5b is moot when LICENSE.md has no copyright line at all", () => {
+    const { verified } = checkCopyrightSyntax({
+      ...GOOD,
+      licenseMd: "The MIT License\n",
+    });
+    expect(verified).toEqual([
+      "No copyright line in LICENSE.md (absence is 4.1b's check).",
+    ]);
   });
 });

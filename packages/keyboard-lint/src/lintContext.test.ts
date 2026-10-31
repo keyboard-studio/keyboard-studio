@@ -33,26 +33,26 @@ const LAYOUT: TouchLayoutIR = {
 
 describe("lintWithContext — 18.6 touch coverage wiring", () => {
   it("emits no KM_LINT_TOUCH_UNCOVERED findings when touchLayout is absent", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       touchInventory: ["z"],
     });
     expect(findings.find((f) => f.code === "KM_LINT_TOUCH_UNCOVERED")).toBeUndefined();
   });
 
   it("emits no KM_LINT_TOUCH_UNCOVERED findings when touchInventory is absent", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       touchLayout: LAYOUT,
     });
     expect(findings.find((f) => f.code === "KM_LINT_TOUCH_UNCOVERED")).toBeUndefined();
   });
 
   it("emits no findings at all when context is entirely empty", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {});
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {});
     expect(findings).toEqual([]);
   });
 
   it("emits KM_LINT_TOUCH_UNCOVERED when both touchLayout and touchInventory are present", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       touchLayout: LAYOUT,
       touchInventory: ["a", "z"],
     });
@@ -84,21 +84,21 @@ const TOLERANCE_REPORT: ToleranceReport = {
 
 describe("lintWithContext — 19.x context tolerance wiring", () => {
   it("emits no KM_WARN_CONTEXT_NOT_TOLERANT findings when toleranceReport is absent", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       keyboardIR: makeTestIR(),
     });
     expect(findings.find((f) => f.code === "KM_WARN_CONTEXT_NOT_TOLERANT")).toBeUndefined();
   });
 
   it("emits no KM_WARN_CONTEXT_NOT_TOLERANT findings when keyboardIR is absent", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       toleranceReport: TOLERANCE_REPORT,
     });
     expect(findings.find((f) => f.code === "KM_WARN_CONTEXT_NOT_TOLERANT")).toBeUndefined();
   });
 
   it("emits KM_WARN_CONTEXT_NOT_TOLERANT when both keyboardIR and toleranceReport are present", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       keyboardIR: makeTestIR(),
       toleranceReport: TOLERANCE_REPORT,
     });
@@ -126,12 +126,12 @@ const MISMATCHED_HISTORY_DOC_LINT_INPUT: DocLintInput = {
 
 describe("lintWithContext — documentation-check wiring (spec 080 US7/FR-019)", () => {
   it("emits no documentation findings when docLintInput is absent", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {});
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {});
     expect(findings.find((f) => f.layer === "C" && f.code.startsWith("KM_LINT_HISTORY"))).toBeUndefined();
   });
 
   it("runs the documentation checks when docLintInput is present", async () => {
-    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+    const { findings: findings } = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
       docLintInput: MISMATCHED_HISTORY_DOC_LINT_INPUT,
     });
     expect(findings.find((f) => f.code === "KM_LINT_HISTORY_VERSION_MISMATCH")).toBeDefined();

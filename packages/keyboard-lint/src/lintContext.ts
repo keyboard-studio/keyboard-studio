@@ -149,7 +149,10 @@ export async function lintWithContext(
   fs: VirtualFS,
   keyboardId: string,
   ctx: LintContext,
-): Promise<LintFinding[]> {
+): Promise<{
+  findings: LintFinding[];
+  verifiedByCode: Map<string, string[]>;
+}> {
   const tlPath = touchLayoutPath(keyboardId);
   const kmnPath = `source/${keyboardId}.kmn`;
 
@@ -157,9 +160,19 @@ export async function lintWithContext(
 
   // 18.1 – 18.5: touch-layout checks
   const ir = parseTouchLayout(fs, keyboardId);
+  // Fold a CheckResult's findings in and record its verified details.
+  const verifiedByCode = new Map<string, string[]>();
+  const collectTouch = (r: {
+    code: string;
+    findings: LintFinding[];
+    verified: string[];
+  }) => {
+    findings.push(...r.findings);
+    if (r.verified.length > 0) verifiedByCode.set(r.code, r.verified);
+  };
   if (ir) {
-    findings.push(...checkLongpress(ir, tlPath));
-    findings.push(...checkTouchRows(ir, tlPath));
+    collectTouch(checkLongpress(ir, tlPath));
+    collectTouch(checkTouchRows(ir, tlPath));
     findings.push(...checkKeysPerRow(ir, tlPath));
     findings.push(...checkControlKeyDrift(ir, tlPath));
     findings.push(...checkLayerSwitchReturn(ir, tlPath));
@@ -228,13 +241,22 @@ export async function lintWithContext(
 
   // spec 084 Batch 1: the criteria checks — only when the criteria
   // assembly has assembled a CriteriaLintInput (same gating shape).
+  // Verified details ride alongside findings for the met-case evidence;
+  // the studio reads them off the returned verifiedByCode.
   if (ctx.criteriaInput) {
-    findings.push(
-      ...runCriteriaChecks(fs, keyboardId, ctx.keyboardIR, ctx.criteriaInput),
+    const criteria = runCriteriaChecks(
+      fs,
+      keyboardId,
+      ctx.keyboardIR,
+      ctx.criteriaInput,
     );
+    findings.push(...criteria.findings);
+    for (const [code, lines] of criteria.verifiedByCode) {
+      verifiedByCode.set(code, lines);
+    }
   }
 
-  return findings;
+  return { findings, verifiedByCode };
 }
 
 /**

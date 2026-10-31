@@ -124,6 +124,11 @@ export interface CriteriaInput {
   criteria: readonly Criterion[];
   mode: CriteriaMode;
   lintFindings: readonly LintFinding[];
+  /**
+   * Per-code verified details from the checks, for the met-case
+   * "Show details". Absent codes fall back to the generic pass line.
+   */
+  verifiedByCode?: Map<string, string[]>;
   record: CriteriaRecordInput;
   facts: CriteriaFacts;
   /**

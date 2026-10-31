@@ -11,8 +11,13 @@
 // .kps never reaches these checks — the studio assembly names it in
 // contextMissing for all five codes.
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  criteriaFinding,
+  mergeResults,
+  type CheckResult,
+} from "./_shared.js";
 
 export interface KpsMetadataFacts {
   /** VFS path of the judged .kps (finding location). */
@@ -41,10 +46,13 @@ export interface KpsMetadataFacts {
  */
 export function checkKpsFontUnselected(
   facts: KpsMetadataFacts,
-): LintFinding[] {
-  if (!facts.fontsInFiles) return [];
-  if (facts.fontSelected !== "") return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_KPS_FONT_UNSELECTED";
+  if (!facts.fontsInFiles)
+    return checkPassed(code, ["No font files in the package."]);
+  if (facts.fontSelected !== "")
+    return checkPassed(code, [`Font selected: ${facts.fontSelected}`]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_FONT_UNSELECTED",
       file: facts.kpsPath,
@@ -52,22 +60,26 @@ export function checkKpsFontUnselected(
         "The .kps includes font files but no font is selected in the Keyboards tab.",
       hint: "Select the package font (OSKFont / DisplayFont) in the .kps Keyboards tab.",
     }),
-  ];
+  ]);
 }
 
 /** 10.2b — no language tag is selected in the .kps Keyboards tab. */
 export function checkKpsLanguagesUnselected(
   facts: KpsMetadataFacts,
-): LintFinding[] {
-  if (facts.languages.length > 0) return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_KPS_LANGUAGES_UNSELECTED";
+  if (facts.languages.length > 0)
+    return checkPassed(code, [
+      `Language tags: ${facts.languages.join(", ")}`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_LANGUAGES_UNSELECTED",
       file: facts.kpsPath,
       message: "No language tag is selected in the .kps Keyboards tab.",
       hint: "Select at least one BCP47 language tag in the .kps Keyboards tab.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -76,61 +88,71 @@ export function checkKpsLanguagesUnselected(
  */
 export function checkKpsDetailsUnselected(
   facts: KpsMetadataFacts,
-): LintFinding[] {
+): CheckResult {
+  const code = "KM_LINT_KPS_DETAILS_UNSELECTED";
   const missing: string[] = [];
   if (facts.detailsReadme === "") missing.push("readme.htm (ReadMeFile)");
   if (facts.detailsWelcome === "") missing.push("welcome.htm (WelcomeFile)");
   if (facts.detailsLicense === "") missing.push("LICENSE.md (LicenseFile)");
-  if (missing.length === 0) return [];
-  return [
+  if (missing.length === 0)
+    return checkPassed(code, [
+      `Details tab: ReadMeFile=${facts.detailsReadme || "(none)"}, WelcomeFile=${facts.detailsWelcome || "(none)"}, LicenseFile=${facts.detailsLicense || "(none)"}.`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_DETAILS_UNSELECTED",
       file: facts.kpsPath,
       message: `Not selected in the .kps Details tab: ${missing.join(", ")}.`,
       hint: "Select readme.htm, welcome.htm, and LICENSE.md in the .kps Details tab.",
     }),
-  ];
+  ]);
 }
 
 /** 10.8b — "Follow keyboard version" is not selected in the .kps. */
 export function checkKpsFollowVersionUnset(
   facts: KpsMetadataFacts,
-): LintFinding[] {
-  if (facts.followKeyboardVersion) return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_KPS_FOLLOW_VERSION_UNSET";
+  if (facts.followKeyboardVersion)
+    return checkPassed(code, ["Follow keyboard version is enabled."]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_FOLLOW_VERSION_UNSET",
       file: facts.kpsPath,
       message: '"Follow keyboard version" is not selected in the .kps Details tab.',
       hint: "Enable Follow keyboard version in the .kps Details tab so the package version tracks the keyboard.",
     }),
-  ];
+  ]);
 }
 
 /** 10.9b — the .kps description is empty. */
 export function checkKpsDescriptionEmpty(
   facts: KpsMetadataFacts,
-): LintFinding[] {
-  if (facts.description !== "") return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_KPS_DESCRIPTION_EMPTY";
+  if (facts.description !== "")
+    return checkPassed(code, [`Description: "${facts.description}"`]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_KPS_DESCRIPTION_EMPTY",
       file: facts.kpsPath,
       message: "The .kps description is empty.",
       hint: "Fill in the package description in the .kps Info tab.",
     }),
-  ];
+  ]);
 }
 
 /** Run all five .kps-metadata checks over one .kps details set. */
-export function checkKpsMetadata(facts: KpsMetadataFacts): LintFinding[] {
-  return [
-    ...checkKpsFontUnselected(facts),
-    ...checkKpsLanguagesUnselected(facts),
-    ...checkKpsDetailsUnselected(facts),
-    ...checkKpsFollowVersionUnset(facts),
-    ...checkKpsDescriptionEmpty(facts),
-  ];
+export function checkKpsMetadata(
+  facts: KpsMetadataFacts,
+): ReturnType<typeof mergeResults> {
+  return mergeResults(
+    checkKpsFontUnselected(facts),
+    checkKpsLanguagesUnselected(facts),
+    checkKpsDetailsUnselected(facts),
+    checkKpsFollowVersionUnset(facts),
+    checkKpsDescriptionEmpty(facts),
+  );
 }
 
 /** The five .kps-metadata twin codes, for the assembly's contextMissing. */

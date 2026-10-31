@@ -20,7 +20,7 @@ import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { ACCENT, BG_CARD, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { ReviewPicker } from "./ReviewPicker.tsx";
 import { ReviewReport } from "./ReviewReport.tsx";
-import { useReviewIndex } from "./useReviewIndex.ts";
+import { fetchPrAuthorInfo, useReviewIndex, type PrAuthorInfo } from "./useReviewIndex.ts";
 import { useReviewJudge } from "./useReviewJudge.ts";
 import { useReviewSnapshot } from "./useReviewSnapshot.ts";
 import {
@@ -31,38 +31,12 @@ import {
 
 type Phase = "pick" | "running" | "report";
 
-export type ReviewPathLink =
-  | { kind: "pr"; owner: string; prNumber: number }
-  | { kind: "repo"; owner: string; keyboardPath: string };
-
-/**
- * Parse a /review hard link path. Returns null for the bare /review
- * (picker) or unrecognized shapes.
- */
-export function parseReviewPath(pathname: string): ReviewPathLink | null {
-  const m = /^\/review\/([^/]+)\/keyboards\/(.+)$/.exec(pathname);
-  if (!m) return null;
-  const owner = m[1]!;
-  const rest = m[2]!;
-  const prMatch = /^pull\/(\d+)$/.exec(rest);
-  if (prMatch) {
-    return { kind: "pr", owner, prNumber: Number(prMatch[1]) };
-  }
-  // Anything else is a keyboard path under the repo.
-  if (rest.includes("..")) return null;
-  return { kind: "repo", owner, keyboardPath: rest };
-}
-
-/** Map a repo owner to the review source ids. */
-export function ownerToSources(owner: string): {
-  repo: ReviewSourceId;
-  prs: ReviewSourceId;
-  key: string;
-} | null {
-  if (owner === "keyboard-studio") return { repo: "ks-repo", prs: "ks-prs", key: "ks" };
-  if (owner === "keymanapp") return { repo: "km-repo", prs: "km-prs", key: "km" };
-  return null;
-}
+import {
+  hardLinkForTarget,
+  ownerToSources,
+  parseReviewPath,
+  type ReviewPathLink,
+} from "./reviewLinks.ts";
 
 export function targetFromParams(
   params: URLSearchParams,
@@ -112,6 +86,7 @@ export function ReviewScreen() {
   const [result, setResult] = useState<CriteriaResult | null>(null);
   const [judgedAt, setJudgedAt] = useState<string>("");
   const [runNonce, setRunNonce] = useState(0);
+  const [authorInfo, setAuthorInfo] = useState<PrAuthorInfo | null>(null);
 
   // Deep link: ?source=&path=&sha=(&pr=) jumps straight to the run.
   // Hard link: /review/<owner>/keyboards/pull/<N> or
@@ -176,11 +151,27 @@ export function ReviewScreen() {
     }
   }, [phase, judge]);
 
+  // When the report lands, jump the address bar to the hard link so the
+  // URL is shareable (and a refresh re-runs the same review).
+  useEffect(() => {
+    if (phase === "report" && target) {
+      const url = hardLinkForTarget(target);
+      if (window.location.pathname !== url) {
+        window.history.pushState(null, "", url);
+      }
+    }
+  }, [phase, target]);
+
   const startRun = (t: ReviewTarget) => {
     setTarget(t);
     setResult(null);
+    setAuthorInfo(null);
     setPhase("running");
     setRunNonce((n) => n + 1);
+    // Fetch PR author info for the §17 context banner (PR targets only).
+    if (t.prNumber !== undefined) {
+      fetchPrAuthorInfo(t.owner, t.repo, t.prNumber).then(setAuthorInfo);
+    }
   };
 
   const runningDetail = useMemo(() => {
@@ -301,11 +292,13 @@ export function ReviewScreen() {
             result={result}
             skipped={snapshot.kind === "ready" ? snapshot.snapshot.skipped : []}
             judgedAt={judgedAt}
+            authorInfo={authorInfo}
             onRerun={() => startRun(target)}
             onBack={() => {
               setPhase("pick");
               setTarget(null);
               setResult(null);
+              setAuthorInfo(null);
             }}
           />
         )}

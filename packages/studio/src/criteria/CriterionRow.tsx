@@ -62,6 +62,11 @@ export interface CriterionRowProps {
   /** §§9.1/9.2 (Batch 5): remove one font's license attestation. */
   onClearFontLicense?: (fontName: string) => void;
   /**
+   * GitHub link context: when present, "File: <path>" evidence lines become
+   * links to the file at the pinned sha (open in new tab).
+   */
+  githubLink?: { owner: string; repo: string; sha: string } | null;
+  /**
    * /review severity override ("met" | "warning" | "error"), set by the
    * health report. When present, the status label is color-coded.
    */
@@ -149,6 +154,7 @@ export function CriterionRow({
   onClearContrastive,
   onAttestFontLicense,
   onClearFontLicense,
+  githubLink,
   severity,
 }: CriterionRowProps) {
   const { t, i18n } = useLingui();
@@ -175,11 +181,39 @@ export function CriterionRow({
     <>
       {model.lines.map((line, index) => (
         <p key={index} style={evidenceLineStyle}>
-          {line}
+          {renderEvidenceLine(line, index)}
         </p>
       ))}
     </>
   );
+
+  /**
+   * Linkify "File: <path>" evidence lines to the GitHub blob at the pinned
+   * sha (opens in a new tab). Only in hosts that pass githubLink (/review).
+   */
+  const renderEvidenceLine = (line: string, index: number): React.ReactNode => {
+    if (githubLink) {
+      const m = /^File: (.+)$/.exec(line);
+      if (m) {
+        const path = m[1]!;
+        const url = `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${path}`;
+        return (
+          <>
+            File:{" "}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: ACCENT }}
+            >
+              {path}
+            </a>
+          </>
+        );
+      }
+    }
+    return line;
+  };
 
   // The check that produced a layer-c verdict, named inside the evidence
   // only — the one identifier the page deliberately shows (plan §6).

@@ -22,6 +22,8 @@ import {
   reviewTargetLabel,
   type ReviewTarget,
 } from "./reviewSources.ts";
+import { hardLinkForTarget } from "./reviewLinks.ts";
+import type { PrAuthorInfo } from "./useReviewIndex.ts";
 import type { SkippedFile } from "./useReviewSnapshot.ts";
 import {
   severityForReviewRow,
@@ -47,11 +49,15 @@ function downloadJson(filename: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
+/** Criterion 17.2: the new-author local-pull check. */
+const NEW_AUTHOR_CRITERION_ID = "17.2-new-author-local-pull";
+
 export function ReviewReport({
   target,
   result,
   skipped,
   judgedAt,
+  authorInfo,
   onRerun,
   onBack,
 }: {
@@ -59,9 +65,13 @@ export function ReviewReport({
   result: CriteriaResult;
   skipped: SkippedFile[];
   judgedAt: string;
+  /** PR author info (PR targets only; null while loading or on API failure). */
+  authorInfo: PrAuthorInfo | null;
   onRerun: () => void;
   onBack: () => void;
 }) {
+  // Inject the author status into 17.2's details (red-checklist rows show
+  // the checklist text; for a PR we can name the author situation).
   const judgedNote = useMemo(
     () =>
       `Judged from a read-only snapshot of ${reviewTargetLabel(target)} — ` +
@@ -70,14 +80,9 @@ export function ReviewReport({
   );
 
   const shareUrl = useMemo(() => {
-    // Hard-link format: /review/<owner>/keyboards/pull/<N> or
-    // /review/<owner>/keyboards/<path>. The report pins the judged sha;
-    // the link resolves to the current head at open time.
-    const base = window.location.origin;
-    if (target.prNumber !== undefined) {
-      return `${base}/review/${target.owner}/keyboards/pull/${target.prNumber}`;
-    }
-    return `${base}/review/${target.owner}/keyboards/${target.path}`;
+    // Hard-link format (see hardLinkForTarget): the report pins the judged
+    // sha; the link resolves to the current head at open time.
+    return window.location.origin + hardLinkForTarget(target);
   }, [target]);
 
   const copyLink = async () => {
@@ -151,6 +156,27 @@ export function ReviewReport({
       severityMap: Object.fromEntries(severities),
     };
   }, [result, severityFilter]);
+
+  const resultWithAuthor = useMemo(() => {
+    if (!authorInfo) return displayResult;
+    const authorLine = authorInfo.isFirstPr
+      ? `Author @${authorInfo.login}: first PR to this repo — §17.2 applies.`
+      : `Author @${authorInfo.login}: ${authorInfo.prCount} PRs to this repo (not a first-time contributor).`;
+    return {
+      ...displayResult,
+      rows: displayResult.rows.map((row) =>
+        row.criterion.id === NEW_AUTHOR_CRITERION_ID
+          ? {
+              ...row,
+              evidence: () => {
+                const ev = row.evidence();
+                return { ...ev, lines: [...ev.lines, authorLine] };
+              },
+            }
+          : row,
+      ),
+    };
+  }, [displayResult, authorInfo]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
@@ -268,6 +294,30 @@ export function ReviewReport({
         a check that passed.
       </div>
 
+      {authorInfo && target.prNumber !== undefined && (
+        authorInfo.isFirstPr ? (
+          <div
+            role="note"
+            style={{
+              borderLeft: "4px solid var(--sil-green-dark, #2e7d32)",
+              background: BG_INSET,
+              borderRadius: "0 10px 10px 0",
+              padding: "10px 14px",
+              fontSize: 12.5,
+            }}
+          >
+            <strong>🌱 First-time contributor.</strong> @{authorInfo.login} has
+            not opened a PR to this repo before — see §17.2 (new-author
+            local pull) in the Build Trigger section below.
+          </div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: TEXT_DIM }}>
+            PR by @{authorInfo.login} · {authorInfo.prCount} PR
+            {authorInfo.prCount === 1 ? "" : "s"} to this repo
+          </div>
+        )
+      )}
+
       {skipped.length > 0 && (
         <div
           role="note"
@@ -320,10 +370,11 @@ export function ReviewReport({
 
       <div style={{ minHeight: 0, flex: 1 }}>
         <CriteriaPage
-          result={displayResult}
+          result={resultWithAuthor}
           mode="foreign"
           keyboardLabel={target.displayName}
           judgedNote={judgedNote}
+          githubLink={{ owner: target.owner, repo: target.repo, sha: target.sha }}
           severityMap={severityMap}
         />
       </div>

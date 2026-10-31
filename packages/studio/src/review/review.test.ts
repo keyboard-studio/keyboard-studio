@@ -12,7 +12,8 @@ import {
   reviewTargetLabel,
   type ReviewTarget,
 } from "./reviewSources.ts";
-import { parseReviewPath, targetFromParams } from "./ReviewScreen.tsx";
+import { targetFromParams } from "./ReviewScreen.tsx";
+import { parseReviewPath } from "./reviewLinks.ts";
 import type { ReviewIndex } from "./reviewSources.ts";
 import { rehydrateResult, runJudgeJob } from "./judgeWorkerProtocol.ts";
 import { ALL_CRITERIA } from "@keyboard-studio/contracts";

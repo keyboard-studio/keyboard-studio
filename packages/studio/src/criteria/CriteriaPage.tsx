@@ -49,6 +49,11 @@ export interface CriteriaPageProps {
   /** A statement of what was judged (e.g. the preview caveat in foreign mode). */
   judgedNote?: string;
   /**
+   * GitHub link context for the /review report: when present, "File: <path>"
+   * evidence lines become links to the file at the pinned sha (open in new tab).
+   */
+  githubLink?: { owner: string; repo: string; sha: string } | null;
+  /**
    * Optional per-criterion severity override for the /review report
    * ("met" | "warning" | "error"), keyed by criterion id. When present,
    * the row's status label is color-coded by severity.
@@ -129,6 +134,7 @@ export function CriteriaPage({
   onAttestFontLicense,
   onClearFontLicense,
   judgedNote,
+  githubLink,
   severityMap,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
@@ -194,6 +200,7 @@ export function CriteriaPage({
                     {...(onClearContrastive !== undefined ? { onClearContrastive } : {})}
                     {...(onAttestFontLicense !== undefined ? { onAttestFontLicense } : {})}
                     {...(onClearFontLicense !== undefined ? { onClearFontLicense } : {})}
+                    {...(githubLink !== undefined ? { githubLink } : {})}
                   />
                 ))}
               </ul>

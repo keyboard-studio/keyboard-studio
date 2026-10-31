@@ -136,6 +136,61 @@ export function fetchPrKeyboards(
   return p;
 }
 
+/** PR author info for the §17 Build Trigger context (first-time contributor). */
+export interface PrAuthorInfo {
+  /** The PR author's GitHub login. */
+  login: string;
+  /** True when this is the author's first PR to the repo. */
+  isFirstPr: boolean;
+  /** Total PRs by this author to the repo (including this one). */
+  prCount: number;
+}
+
+const prAuthorCache = new Map<string, Promise<PrAuthorInfo | null>>();
+
+/**
+ * Fetch a PR's author and whether it's their first PR to the repo.
+ * Uses the search API for the author's PR count. Session-cached like
+ * fetchPrKeyboards. Returns null on API failure — never breaks the review.
+ */
+export function fetchPrAuthorInfo(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<PrAuthorInfo | null> {
+  const key = `${owner}/${repo}#${prNumber}:author`;
+  const cached = prAuthorCache.get(key);
+  if (cached) return cached;
+  const p = (async (): Promise<PrAuthorInfo | null> => {
+    try {
+      const prRes = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      );
+      if (!prRes.ok) return null;
+      const pr = (await prRes.json()) as { user?: { login?: string } | null };
+      const login = pr.user?.login;
+      if (!login) return null;
+
+      // Count the author's PRs to this repo (open + closed).
+      const searchRes = await fetch(
+        `https://api.github.com/search/issues?q=${encodeURIComponent(
+          `repo:${owner}/${repo} type:pr author:${login}`,
+        )}&per_page=1`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      );
+      if (!searchRes.ok) return null;
+      const search = (await searchRes.json()) as { total_count?: number };
+      const prCount = typeof search.total_count === "number" ? search.total_count : 0;
+      return { login, isFirstPr: prCount <= 1, prCount };
+    } catch {
+      return null;
+    }
+  })();
+  prAuthorCache.set(key, p);
+  return p;
+}
+
 /** PR context for the /review-only checks: changed files + description. */
 export interface PrContext {
   /** Repo-relative paths of the PR's changed files. */

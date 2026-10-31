@@ -11,8 +11,14 @@
 // (3.6/7.1), and a format verdict on a value that is not there would be
 // a guess. `v1.02` fails all three, each for its own stated reason.
 
-import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding, kmnPath } from "./_shared.js";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 const NUMERIC = /^\d+$/;
 
@@ -20,59 +26,71 @@ function versionOf(ir: KeyboardIR): string {
   return ir.header.version.trim();
 }
 
+const NO_VERSION = "No version declared (judged by the version-match checks).";
+
 /** 2.3 — the version is dot-separated and entirely numeric. */
-export function checkVersionFormat(ir: KeyboardIR): LintFinding[] {
+export function checkVersionFormat(ir: KeyboardIR): CheckResult {
   const version = versionOf(ir);
-  if (version === "") return [];
+  if (version === "") return checkPassed("KM_LINT_VERSION_FORMAT", [NO_VERSION]);
   const components = version.split(".");
-  if (components.every((c) => NUMERIC.test(c))) return [];
-  return [
+  if (components.every((c) => NUMERIC.test(c)))
+    return checkPassed("KM_LINT_VERSION_FORMAT", [
+      `Version "${version}": dot-separated and entirely numeric.`,
+    ]);
+  return checkFailed("KM_LINT_VERSION_FORMAT", [
     criteriaFinding({
       code: "KM_LINT_VERSION_FORMAT",
       file: kmnPath(ir.header.keyboardId),
       message: `Keyboard version "${version}" is not dot-separated and entirely numeric.`,
       hint: 'Use a version of dot-separated numbers only, e.g. "1.0" or "2.10.3".',
     }),
-  ];
+  ]);
 }
 
 /** 2.4 — no version component has a leading zero. */
-export function checkVersionLeadingZero(ir: KeyboardIR): LintFinding[] {
+export function checkVersionLeadingZero(ir: KeyboardIR): CheckResult {
   const version = versionOf(ir);
-  if (version === "") return [];
+  if (version === "")
+    return checkPassed("KM_LINT_VERSION_LEADING_ZERO", [NO_VERSION]);
   const offenders = version
     .split(".")
     .filter((c) => NUMERIC.test(c) && c.length > 1 && c.startsWith("0"));
-  if (offenders.length === 0) return [];
-  return [
+  if (offenders.length === 0)
+    return checkPassed("KM_LINT_VERSION_LEADING_ZERO", [
+      `Version "${version}": no leading zeros.`,
+    ]);
+  return checkFailed("KM_LINT_VERSION_LEADING_ZERO", [
     criteriaFinding({
       code: "KM_LINT_VERSION_LEADING_ZERO",
       file: kmnPath(ir.header.keyboardId),
       message: `Keyboard version "${version}" has component(s) with a leading zero: ${offenders.join(", ")}.`,
       hint: 'Remove the leading zero from each version component ("01" → "1").',
     }),
-  ];
+  ]);
 }
 
 /** 2.5 — the version has no `v` prefix and no non-numeric labels. */
-export function checkVersionVPrefix(ir: KeyboardIR): LintFinding[] {
+export function checkVersionVPrefix(ir: KeyboardIR): CheckResult {
   const version = versionOf(ir);
-  if (version === "") return [];
+  if (version === "") return checkPassed("KM_LINT_VERSION_V_PREFIX", [NO_VERSION]);
   const hasVPrefix = /^v/i.test(version);
   const labels = version.split(".").filter((c) => !NUMERIC.test(c));
-  if (!hasVPrefix && labels.length === 0) return [];
+  if (!hasVPrefix && labels.length === 0)
+    return checkPassed("KM_LINT_VERSION_V_PREFIX", [
+      `Version "${version}": no v prefix, no non-numeric labels.`,
+    ]);
   const reasons = [
     ...(hasVPrefix ? ['it starts with a "v" prefix'] : []),
     ...(labels.length > 0
       ? [`component(s) ${labels.join(", ")} are not numeric labels`]
       : []),
   ];
-  return [
+  return checkFailed("KM_LINT_VERSION_V_PREFIX", [
     criteriaFinding({
       code: "KM_LINT_VERSION_V_PREFIX",
       file: kmnPath(ir.header.keyboardId),
       message: `Keyboard version "${version}" is not a plain numeric version: ${reasons.join(" and ")}.`,
       hint: 'Drop any "v" prefix and any suffix labels ("-beta", "rc1") from the version.',
     }),
-  ];
+  ]);
 }

@@ -26,22 +26,22 @@ const CLEAN = [
 ];
 
 function codes(paths: readonly string[]): string[] {
-  return checkFileInventory(paths).map((f) => f.code);
+  return checkFileInventory(paths).findings.map((f) => f.code);
 }
 
 describe("file-inventory twins", () => {
   it("passes a clean keyboard folder", () => {
-    expect(checkFileInventory(CLEAN)).toEqual([]);
+    expect(checkFileInventory(CLEAN).findings).toEqual([]);
   });
 
   it("1.7b flags keyboard.info", () => {
-    const findings = checkKeyboardInfoPresent([...CLEAN, "keyboard.info"]);
+    const { findings } = checkKeyboardInfoPresent([...CLEAN, "keyboard.info"]);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KEYBOARD_INFO_PRESENT");
   });
 
   it("1.8b flags docs/ duplicates, case-insensitively", () => {
-    const findings = checkDuplicateDocsSubfolder([
+    const { findings } = checkDuplicateDocsSubfolder([
       ...CLEAN,
       "docs/README.md",
       "Docs/HISTORY.md",
@@ -52,18 +52,24 @@ describe("file-inventory twins", () => {
 
   it("1.8b ignores a docs folder without duplicates", () => {
     expect(
-      checkDuplicateDocsSubfolder([...CLEAN, "docs/notes.txt"]),
+      checkDuplicateDocsSubfolder([...CLEAN, "docs/notes.txt"]).findings,
     ).toEqual([]);
   });
 
+  it("1.8b is moot without a docs/ folder, naming why", () => {
+    expect(checkDuplicateDocsSubfolder(CLEAN).verified).toEqual([
+      "No docs/ folder to check.",
+    ]);
+  });
+
   it("1.11b flags .kpj.user", () => {
-    const findings = checkKpjUserPresent([...CLEAN, "gff_amharic.kpj.user"]);
+    const { findings } = checkKpjUserPresent([...CLEAN, "gff_amharic.kpj.user"]);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPJ_USER_PRESENT");
   });
 
   it("1.12b flags build/ contents", () => {
-    const findings = checkBuildFolderPresent([
+    const { findings } = checkBuildFolderPresent([
       ...CLEAN,
       "build/gff_amharic.kmx",
     ]);
@@ -73,14 +79,14 @@ describe("file-inventory twins", () => {
 
   it("3.1b flags a missing HISTORY.md", () => {
     const without = CLEAN.filter((p) => p !== "HISTORY.md");
-    const findings = checkHistoryMdAbsent(without);
+    const { findings } = checkHistoryMdAbsent(without);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_HISTORY_MD_ABSENT");
   });
 
   it("6.1b flags a missing source/readme.htm", () => {
     const without = CLEAN.filter((p) => p !== "source/readme.htm");
-    const findings = checkReadmeHtmAbsent(without);
+    const { findings } = checkReadmeHtmAbsent(without);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_README_HTM_ABSENT");
   });
@@ -89,12 +95,12 @@ describe("file-inventory twins", () => {
     const folder = CLEAN.filter((p) => p !== "source/welcome.htm").concat(
       "source/welcome/welcome.htm",
     );
-    expect(checkWelcomeHtmAbsent(folder)).toEqual([]);
+    expect(checkWelcomeHtmAbsent(folder).findings).toEqual([]);
   });
 
   it("6.3b flags a missing welcome.htm", () => {
     const without = CLEAN.filter((p) => p !== "source/welcome.htm");
-    const findings = checkWelcomeHtmAbsent(without);
+    const { findings } = checkWelcomeHtmAbsent(without);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_WELCOME_HTM_ABSENT");
   });
