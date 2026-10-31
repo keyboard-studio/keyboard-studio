@@ -43,6 +43,22 @@ export function applicabilityFor(
         "This criterion concerns partner-organization packages, and this package is not a partner-organization package.",
     };
   }
+  // /review Batch 5: the §19 twin rows (19.1b/19.2b) concern keyboards
+  // adapted from a release keyboard. Without an adaptation signal (PR
+  // body / HISTORY.md, set by the /review host) they are Not applicable
+  // — a regular contributor PR is not an adaptation. The bake rows
+  // (19.1/19.2) are vacuously satisfied for non-adaptations (the
+  // scaffolder's guarantee holds trivially), so they stay applicable.
+  if (
+    (criterion.id === "19.1b-import-attribution-in-pr-body" ||
+      criterion.id === "19.2b-import-attribution-in-history-md") &&
+    !facts.isAdaptation
+  ) {
+    return {
+      reason:
+        "This criterion concerns keyboards adapted from a release keyboard, and this keyboard shows no adaptation signal.",
+    };
+  }
   // Batch 3: the version-bump rows (2.1/2.2/2.6) presuppose a
   // previously deployed version. A new-from-base keyboard has none —
   // its first version is simply its version.

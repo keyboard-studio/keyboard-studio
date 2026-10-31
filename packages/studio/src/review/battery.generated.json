@@ -1,15 +1,14 @@
 {
- "generatedAt": "2026-10-30T21:47:42.990Z",
- "catalogSize": 149,
+ "generatedAt": "2026-10-30T22:45:40.534Z",
+ "catalogSize": 188,
  "byBand": {
-  "layer-c-enforce": 67,
+  "layer-c-enforce": 106,
   "scaffolder-bake": 40,
   "yellow-survey": 32,
   "red-checklist": 10
  },
- "implementedCount": 59,
+ "implementedCount": 99,
  "notImplemented": [
-  "1.1-no-files-outside-keyboard-folder",
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
   "9.4-shared-font-in-shared-folder",
@@ -32,9 +31,11 @@
     "kind": "lintRuleId",
     "id": "KM_LINT_FILES_OUTSIDE_FOLDER"
    },
-   "implemented": false,
+   "implemented": true,
    "precertified": true,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
   },
   {
    "id": "1.2-keyboard-under-release-or-experimental",
@@ -47,6 +48,21 @@
    }
   },
   {
+   "id": "1.2b-keyboard-under-release-or-experimental",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.2: the keyboard folder lives under `release/` or `experimental/`. The scaffolder always places it there (1.2); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REPO_PLACEMENT_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
    "id": "1.3-keyboard-under-organizing-folder",
    "band": "scaffolder-bake",
    "section": "1. Repository hygiene",
@@ -57,6 +73,21 @@
    }
   },
   {
+   "id": "1.3b-keyboard-under-organizing-folder",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.3: the keyboard sits under an organizing subfolder (`release/<org>/<id>`). The scaffolder always places it there (1.3); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REPO_NO_ORGANIZING_FOLDER"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
    "id": "1.4-no-source-files-at-repo-root",
    "band": "scaffolder-bake",
    "section": "1. Repository hygiene",
@@ -65,6 +96,21 @@
     "kind": "scaffolderRule",
     "id": "no-root-source-files"
    }
+  },
+  {
+   "id": "1.4b-no-source-files-at-repo-root",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.4: no source files are placed at the repository root. The scaffolder never places them there (1.4); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_REPO_ROOT_SOURCE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
   },
   {
    "id": "1.5-keyboard-id-not-already-used",
@@ -106,6 +152,21 @@
    }
   },
   {
+   "id": "1.7b-no-keyboard-info-file",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.7: no `keyboard.info` file is present in the keyboard folder. The scaffolder never emits one (1.7); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KEYBOARD_INFO_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "1.8-no-duplicate-docs-subfolder",
    "band": "scaffolder-bake",
    "section": "1. Repository hygiene",
@@ -114,6 +175,21 @@
     "kind": "scaffolderRule",
     "id": "omit-docs-subfolder"
    }
+  },
+  {
+   "id": "1.8b-no-duplicate-docs-subfolder",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.8: no `docs/` (or similar) subfolder holds duplicate HISTORY / README / INSTALL files. The scaffolder never creates one (1.8); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DOCS_SUBFOLDER_DUPLICATES"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "1.9-no-duplicate-source-files",
@@ -167,6 +243,21 @@
    }
   },
   {
+   "id": "1.11b-no-kpj-user-committed",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.11: no `.kpj.user` file is committed. The scaffolder never emits per-user IDE state (1.11); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_USER_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "1.12-no-build-folder-committed",
    "band": "scaffolder-bake",
    "section": "1. Repository hygiene",
@@ -175,6 +266,21 @@
     "kind": "scaffolderRule",
     "id": "gitignore-build-folder"
    }
+  },
+  {
+   "id": "1.12b-no-build-folder-committed",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "Post-hoc check of 1.12: no `build/` folder contents are committed. The scaffolder never commits build output (1.12); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_BUILD_FOLDER_PRESENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "1.13-no-stray-scratch-files",
@@ -301,6 +407,21 @@
    }
   },
   {
+   "id": "3.1b-history-file-exists",
+   "band": "layer-c-enforce",
+   "section": "3. `HISTORY.md`",
+   "description": "Post-hoc check of 3.1: a `HISTORY.md` exists at the keyboard root. The scaffolder always emits one (3.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "3.2-history-header-sensible",
    "band": "yellow-survey",
    "section": "3. `HISTORY.md`",
@@ -396,6 +517,21 @@
    }
   },
   {
+   "id": "4.1b-copyright-present-with-year",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Post-hoc check of 4.1: a copyright statement with year(s) is present in LICENSE.md. The scaffolder always writes one (4.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "4.2-copyright-year-range-if-multiyear",
    "band": "yellow-survey",
    "section": "4. `LICENSE.md` (copyright)",
@@ -435,6 +571,21 @@
    }
   },
   {
+   "id": "4.5b-copyright-syntax-exact",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Post-hoc check of 4.5: the LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax ((C) matched case-insensitively — the MIT template uses (c)). The scaffolder always writes it (4.5); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_SYNTAX"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "4.6-copyright-year-not-in-kmn-or-kps",
    "band": "scaffolder-bake",
    "section": "4. `LICENSE.md` (copyright)",
@@ -443,6 +594,21 @@
     "kind": "scaffolderRule",
     "id": "strip-copyright-year-from-kmn-kps"
    }
+  },
+  {
+   "id": "4.6b-copyright-year-not-in-kmn-or-kps",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "Post-hoc check of 4.6: no copyright year is embedded in the .kmn or .kps copyright strings. The scaffolder never embeds one (4.6); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_YEAR_EMBEDDED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
   },
   {
    "id": "4.7-copyright-holder-consistent-across-files",
@@ -490,6 +656,21 @@
    }
   },
   {
+   "id": "5.2b-no-version-in-readme-or-docs",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "Post-hoc check of 5.2: no version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: any X.Y[.Z] pattern). The scaffolder never embeds one (5.2); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_VERSION_IN_DOCS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "5.3-no-copyright-in-readme-or-docs",
    "band": "scaffolder-bake",
    "section": "5. `README.md`",
@@ -498,6 +679,21 @@
     "kind": "scaffolderRule",
     "id": "strip-copyright-from-docs"
    }
+  },
+  {
+   "id": "5.3b-no-copyright-in-readme-or-docs",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "Post-hoc check of 5.3: no copyright year/statement is in README.md, readme.htm, or welcome.htm. The scaffolder never writes one there (5.3); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_COPYRIGHT_IN_DOCS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
   },
   {
    "id": "5.4-readme-description-sensible",
@@ -520,6 +716,21 @@
    }
   },
   {
+   "id": "5.5b-readme-keyman-home-link",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "Post-hoc check of 5.5: README.md links to https://keyman.com/keyboards/<id>. The scaffolder always writes it (5.5); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_KEYMAN_LINK_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "5.6-readme-help-link",
    "band": "scaffolder-bake",
    "section": "5. `README.md`",
@@ -528,6 +739,21 @@
     "kind": "scaffolderRule",
     "id": "set-readme-help-link"
    }
+  },
+  {
+   "id": "5.6b-readme-help-link",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "Post-hoc check of 5.6: README.md links to http(s)://help.keyman.com/keyboard/<id>. The scaffolder always writes it (5.6); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_HELP_LINK_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
   },
   {
    "id": "5.7-readme-targets-match-kmn",
@@ -555,6 +781,21 @@
    }
   },
   {
+   "id": "6.1b-readme-htm-exists",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "Post-hoc check of 6.1: `readme.htm` exists in `source/`. The scaffolder always emits one (6.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_HTM_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "6.2-readme-htm-short",
    "band": "yellow-survey",
    "section": "6. Documentation files (`source/`)",
@@ -573,6 +814,21 @@
     "kind": "scaffolderRule",
     "id": "create-welcome-htm"
    }
+  },
+  {
+   "id": "6.3b-welcome-htm-exists",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "Post-hoc check of 6.3: `welcome.htm` exists in `source/` (flat or the `source/welcome/` folder convention). The scaffolder always emits one (6.3); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_WELCOME_HTM_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "6.4-welcome-htm-describes-usage",
@@ -603,6 +859,21 @@
     "kind": "scaffolderRule",
     "id": "set-welcome-htm-lang-attribute"
    }
+  },
+  {
+   "id": "6.6b-welcome-htm-lang-attribute",
+   "band": "layer-c-enforce",
+   "section": "6. Documentation files (`source/`)",
+   "description": "Post-hoc check of 6.6: the welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag. The scaffolder always sets it (6.6); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_WELCOME_LANG_MISMATCH"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
   },
   {
    "id": "6.7-welcome-htm-not-political",
@@ -780,6 +1051,21 @@
    }
   },
   {
+   "id": "7.11b-author-in-kps-not-kmn",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Post-hoc check of 7.11: the author name is in the .kps, not in a .kmn Author store. The scaffolder never writes store(&Author) (7.11); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_AUTHOR_IN_KMN"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "7.12-pua-in-experimental",
    "band": "layer-c-enforce",
    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
@@ -919,6 +1205,21 @@
    }
   },
   {
+   "id": "8.1b-kps-includes-kmx",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.1: a compiled `.kmx` is listed in the `.kps` package. The scaffolder always lists it (8.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_KMX_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
    "id": "8.2-kps-includes-kvk",
    "band": "scaffolder-bake",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
@@ -927,6 +1228,21 @@
     "kind": "scaffolderRule",
     "id": "kps-include-kvk"
    }
+  },
+  {
+   "id": "8.2b-kps-includes-kvk",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.2: a compiled `.kvk` is listed in the `.kps` package. The scaffolder always lists it (8.2); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_KVK_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
   },
   {
    "id": "8.3-kps-includes-js-if-mobile",
@@ -939,6 +1255,21 @@
    }
   },
   {
+   "id": "8.3b-kps-includes-js-if-mobile",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.3: a compiled `.js` is listed in the `.kps` package when the keyboard has a touch layout. The scaffolder always lists it then (8.3); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_JS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
    "id": "8.4-kps-includes-license-md",
    "band": "scaffolder-bake",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
@@ -947,6 +1278,21 @@
     "kind": "scaffolderRule",
     "id": "kps-include-license-md"
    }
+  },
+  {
+   "id": "8.4b-kps-includes-license-md",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.4: `LICENSE.md` is listed in the `.kps` package. The scaffolder always lists it (8.4); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_LICENSE_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
   },
   {
    "id": "8.5-kps-includes-readme-htm",
@@ -959,6 +1305,21 @@
    }
   },
   {
+   "id": "8.5b-kps-includes-readme-htm",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.5: `readme.htm` is listed in the `.kps` package. The scaffolder always lists it (8.5); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_README_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
    "id": "8.6-kps-includes-welcome-and-graphics",
    "band": "scaffolder-bake",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
@@ -967,6 +1328,21 @@
     "kind": "scaffolderRule",
     "id": "kps-include-welcome-and-graphics"
    }
+  },
+  {
+   "id": "8.6b-kps-includes-welcome-and-graphics",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.6: `welcome.htm` and associated graphics are listed in the `.kps` package. The scaffolder always lists them (8.6); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_WELCOME_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
   },
   {
    "id": "8.7-kps-includes-required-fonts",
@@ -994,6 +1370,21 @@
    }
   },
   {
+   "id": "8.8b-kps-no-php-file",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.8: no `.php` help file is listed in the `.kps` package. The scaffolder never lists one (8.8); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_PHP_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
    "id": "8.9-kps-no-help-folder-files",
    "band": "scaffolder-bake",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
@@ -1002,6 +1393,21 @@
     "kind": "scaffolderRule",
     "id": "kps-exclude-help-folder"
    }
+  },
+  {
+   "id": "8.9b-kps-no-help-folder-files",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.9: no files from the `help/` folder are listed in the `.kps` package. The scaffolder never lists them (8.9); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_HELP_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
   },
   {
    "id": "8.10-kps-no-uncompiled-sources",
@@ -1014,6 +1420,21 @@
    }
   },
   {
+   "id": "8.10b-kps-no-uncompiled-sources",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.10: no uncompiled sources (.kmn, .ico, .kvks, .keyman-touch-layout, .kps) are listed in the `.kps`. The scaffolder never lists them (8.10); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_SOURCE_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
+  },
+  {
    "id": "8.11-kps-no-displaymap-json",
    "band": "scaffolder-bake",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
@@ -1022,6 +1443,21 @@
     "kind": "scaffolderRule",
     "id": "kps-exclude-displaymap-json"
    }
+  },
+  {
+   "id": "8.11b-kps-no-displaymap-json",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "Post-hoc check of 8.11: no font display-map `.json` files are listed in the `.kps`. The scaffolder never lists them (8.11); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_JSON_LISTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-listing.ts"
+   ]
   },
   {
    "id": "8.12-kps-no-industry-fonts",
@@ -1147,6 +1583,21 @@
    }
   },
   {
+   "id": "10.1b-kps-font-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.1: a font is selected in the .kps Keyboards tab when a font is included in the package files. The scaffolder always selects it then (10.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FONT_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
    "id": "10.2-kps-language-tags-selected",
    "band": "scaffolder-bake",
    "section": "10. Package metadata (`.kps`)",
@@ -1155,6 +1606,21 @@
     "kind": "scaffolderRule",
     "id": "kps-select-language-tags"
    }
+  },
+  {
+   "id": "10.2b-kps-language-tags-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.2: language tag(s) are selected in the .kps Keyboards tab. The scaffolder always selects them (10.2); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_LANGUAGES_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
   },
   {
    "id": "10.3-kps-tags-minimal",
@@ -1212,6 +1678,21 @@
    }
   },
   {
+   "id": "10.7b-kps-details-files-selected",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.7: readme.htm, welcome.htm, and LICENSE.md are selected in the .kps Details tab. The scaffolder always selects them (10.7); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_DETAILS_UNSELECTED"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
    "id": "10.8-kps-follow-keyboard-version",
    "band": "scaffolder-bake",
    "section": "10. Package metadata (`.kps`)",
@@ -1222,6 +1703,21 @@
    }
   },
   {
+   "id": "10.8b-kps-follow-keyboard-version",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.8: \"Follow keyboard version\" is selected in the .kps Details tab. The scaffolder always selects it (10.8); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_FOLLOW_VERSION_UNSET"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
+  },
+  {
    "id": "10.9-kps-description-nonempty",
    "band": "scaffolder-bake",
    "section": "10. Package metadata (`.kps`)",
@@ -1230,6 +1726,21 @@
     "kind": "scaffolderRule",
     "id": "kps-set-description"
    }
+  },
+  {
+   "id": "10.9b-kps-description-nonempty",
+   "band": "layer-c-enforce",
+   "section": "10. Package metadata (`.kps`)",
+   "description": "Post-hoc check of 10.9: the .kps description is present and non-empty. The scaffolder always fills it (10.9); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_DESCRIPTION_EMPTY"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-kps-metadata.ts"
+   ]
   },
   {
    "id": "10.10-kps-description-meaningful",
@@ -1262,6 +1773,22 @@
    }
   },
   {
+   "id": "11.1b-php-exists-with-header",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "Post-hoc check of 11.1: the <name>.php help file exists and has the proper PHP header (<?php + the /* Name: ... */ block). The scaffolder always emits it (11.1); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_HEADER_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts",
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "11.2-php-osk-all-layers",
    "band": "layer-c-enforce",
    "section": "11. Online help (`source/help/<name>.php`)",
@@ -1287,6 +1814,21 @@
    }
   },
   {
+   "id": "11.3b-php-style-inside-header",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "Post-hoc check of 11.3: all style information (<style> tags) is inside the PHP header block, not outside it. The scaffolder keeps it there (11.3); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_STYLE_OUTSIDE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
+  },
+  {
    "id": "11.4-php-no-closing-body-html",
    "band": "scaffolder-bake",
    "section": "11. Online help (`source/help/<name>.php`)",
@@ -1295,6 +1837,21 @@
     "kind": "scaffolderRule",
     "id": "php-strip-closing-tags"
    }
+  },
+  {
+   "id": "11.4b-php-no-closing-body-html",
+   "band": "layer-c-enforce",
+   "section": "11. Online help (`source/help/<name>.php`)",
+   "description": "Post-hoc check of 11.4: the .php has no closing </body> or </html> tags. The scaffolder never emits them (11.4); this is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PHP_CLOSING_TAGS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
+   ]
   },
   {
    "id": "11.5-php-htm-html-wellformed",
@@ -1806,6 +2363,21 @@
    }
   },
   {
+   "id": "19.1b-import-attribution-in-pr-body",
+   "band": "layer-c-enforce",
+   "section": "19. Import output",
+   "description": "Post-hoc check of 19.1: when a keyboard was adapted from a release keyboard, the PR body includes the attribution block (adapted-from path, commit SHA, round-trip status). Not applicable without an adaptation signal. This is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_PR_ATTRIBUTION_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
    "id": "19.2-import-attribution-in-history-md",
    "band": "scaffolder-bake",
    "section": "19. Import output",
@@ -1814,6 +2386,21 @@
     "kind": "scaffolderRule",
     "id": "emit-import-attribution-history-bullet"
    }
+  },
+  {
+   "id": "19.2b-import-attribution-in-history-md",
+   "band": "layer-c-enforce",
+   "section": "19. Import output",
+   "description": "Post-hoc check of 19.2: when a keyboard was adapted from a release keyboard, HISTORY.md contains an 'Adapted from <sourcePath>' bullet. Not applicable without an adaptation signal. This is the only check covering a foreign keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_HISTORY_ATTRIBUTION_BAD"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
   }
  ]
 }

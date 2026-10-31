@@ -38,6 +38,7 @@ import { ALL_CRITERIA } from "@keyboard-studio/contracts";
 import type {
   CompileResult,
   CriteriaPlacement,
+  ReviewContext,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { KeyboardLintEngine, runDocChecks } from "@keymanapp/keyboard-lint";
@@ -67,6 +68,12 @@ export interface JudgeForeignOptions {
    * Defaults to "release" when the path is unknown.
    */
   placement?: CriteriaPlacement;
+  /**
+   * Repository context for the /review-only checks (Batch 5 + Group C):
+   * repo path, tree/PR file list, PR body, HISTORY.md. The /review host
+   * sets this; other foreign hosts (Compare) never do.
+   */
+  reviewContext?: ReviewContext;
 }
 
 /**
@@ -82,6 +89,22 @@ export function placementFromRepoPath(
     return tier;
   }
   return "unknown";
+}
+
+/**
+ * Whether the review context carries an adaptation signal (§19): the PR
+ * body or HISTORY.md mentions "adapted from". Without it the §19
+ * attribution rows resolve Not applicable.
+ */
+function isAdaptationSignal(
+  reviewContext: ReviewContext | undefined,
+): boolean {
+  if (reviewContext === undefined) return false;
+  const haystacks = [
+    reviewContext.prBody ?? "",
+    reviewContext.historyMd ?? "",
+  ];
+  return haystacks.some((t) => /adapted\s+from/i.test(t));
 }
 
 /**
@@ -108,6 +131,9 @@ export async function judgeForeignKeyboard(
     placement: options.placement ?? "release",
     scratchScan: true,
     deprecationInPlay: true,
+    ...(options.reviewContext !== undefined
+      ? { reviewContext: options.reviewContext }
+      : {}),
   });
   const docFindings = runDocChecks(
     collectDocLintInputFromVfs(vfs, keyboardId, displayName),
@@ -128,6 +154,9 @@ export async function judgeForeignKeyboard(
     ...deriveCriteriaFacts(vfs),
     deprecated: true,
     partnerPackage: true,
+    // §19 adaptation signal: the PR body or HISTORY.md mentions an
+    // adaptation. Without it the §19 rows resolve Not applicable.
+    isAdaptation: isAdaptationSignal(options.reviewContext),
   };
   return resolveCriteria({
     criteria: ALL_CRITERIA,

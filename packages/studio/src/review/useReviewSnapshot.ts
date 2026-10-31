@@ -37,6 +37,13 @@ export interface ReviewSnapshot {
   skipped: SkippedFile[];
   /** Blob count fetched (excludes skipped). */
   fileCount: number;
+  /**
+   * Full repo tree paths at the pinned sha (published keyboards only;
+   * for PR targets this is empty — the PR file list comes from
+   * fetchPrContext instead). Used for the /review-only repo-context
+   * checks (Batch 5 + Group C).
+   */
+  treePaths: string[];
 }
 
 export type SnapshotState =
@@ -87,6 +94,9 @@ export async function fetchSnapshot(
       "keyboard tree is too large to enumerate — refusing to judge a partial file list",
     );
   }
+  const allPaths = (tree.tree ?? [])
+    .filter((e) => e.type === "blob" && typeof e.path === "string")
+    .map((e) => e.path as string);
   const entries = (tree.tree ?? []).filter(
     (e) => e.type === "blob" && typeof e.path === "string" && isSafeEntry(e.path, folder),
   );
@@ -140,7 +150,7 @@ export async function fetchSnapshot(
     onProgress?.(loaded, wanted.length);
   }
 
-  return { vfs, skipped, fileCount: loaded };
+  return { vfs, skipped, fileCount: loaded, treePaths: allPaths };
 }
 
 export function useReviewSnapshot(

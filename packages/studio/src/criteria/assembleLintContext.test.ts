@@ -337,6 +337,35 @@ describe("assembleLintContext", () => {
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
       KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
+      // The fixture VFS carries no LICENSE.md, so both copyright-text
+      // twin inputs are honestly named missing (Group A2 Batch 4).
+      KM_LINT_COPYRIGHT_ABSENT: "LICENSE.md",
+      KM_LINT_COPYRIGHT_SYNTAX: "LICENSE.md",
+      // The fixture VFS carries no README.md / readme.htm /
+      // welcome.htm / .php, so the doc-text twin inputs are honestly
+      // named missing (Group A2 Batch 4).
+      KM_LINT_VERSION_IN_DOCS: "the documentation files",
+      KM_LINT_COPYRIGHT_IN_DOCS: "the documentation files",
+      KM_LINT_README_KEYMAN_LINK_ABSENT: "README.md",
+      KM_LINT_README_HELP_LINK_ABSENT: "README.md",
+      KM_LINT_WELCOME_LANG_MISMATCH: "source/welcome.htm",
+      // The fixture VFS carries no help .php, so the .php-content twin
+      // inputs are honestly named missing (11.1b's existence check is
+      // the finding itself, not a missing input).
+      KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
+      KM_LINT_PHP_CLOSING_TAGS: "the help .php",
+      // The fixture passes no reviewContext (/review-only), so the four
+      // repo-context codes are honestly named missing (Group A2 Batch 5
+      // + Group C). The §19 rows are applicability-gated, not
+      // input-gated.
+      KM_LINT_REPO_PLACEMENT_BAD:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_ROOT_SOURCE:
+        "the repository context (repo path and file list)",
+      KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
     });
   });
 
@@ -451,6 +480,30 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
       KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
+      // The fixture VFS carries no LICENSE.md / README.md / readme.htm /
+      // welcome.htm / .php, so the Group A2 Batch 4 text-twin inputs are
+      // honestly named missing (11.1b's existence check is the finding).
+      KM_LINT_COPYRIGHT_ABSENT: "LICENSE.md",
+      KM_LINT_COPYRIGHT_SYNTAX: "LICENSE.md",
+      KM_LINT_VERSION_IN_DOCS: "the documentation files",
+      KM_LINT_COPYRIGHT_IN_DOCS: "the documentation files",
+      KM_LINT_README_KEYMAN_LINK_ABSENT: "README.md",
+      KM_LINT_README_HELP_LINK_ABSENT: "README.md",
+      KM_LINT_WELCOME_LANG_MISMATCH: "source/welcome.htm",
+      KM_LINT_PHP_STYLE_OUTSIDE: "the help .php",
+      KM_LINT_PHP_CLOSING_TAGS: "the help .php",
+      // The fixture passes no reviewContext (/review-only), so the four
+      // repo-context codes are honestly named missing (Group A2 Batch 5
+      // + Group C). The §19 rows are applicability-gated, not
+      // input-gated.
+      KM_LINT_REPO_PLACEMENT_BAD:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+        "the repository context (repo path and file list)",
+      KM_LINT_REPO_ROOT_SOURCE:
+        "the repository context (repo path and file list)",
+      KM_LINT_FILES_OUTSIDE_FOLDER:
+        "the repository context (repo path and file list)",
     });
 
     const findings = await new KeyboardLintEngine().lintWithContext(

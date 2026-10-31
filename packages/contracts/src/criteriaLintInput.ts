@@ -108,4 +108,55 @@ export interface CriteriaLintInput {
    * handoff as `kpsText` for criterion 15.3.
    */
   kpjText?: string;
+  /**
+   * .kps Keyboards-tab font selection (engine parseKpsPackageDetails):
+   * the first non-empty `<OSKFont>` / `<DisplayFont>`. Empty when no
+   * font is selected (Group A2, criterion 10.1b).
+   */
+  kpsFontSelected: string;
+  /**
+   * .kps Details-tab selections (engine parseKpsPackageDetails): the
+   * `<Options>` ReadMeFile / WelcomeFile / LicenseFile texts. Empty
+   * when unselected (Group A2, criterion 10.7b).
+   */
+  kpsDetailsReadme: string;
+  kpsDetailsWelcome: string;
+  kpsDetailsLicense: string;
+  /**
+   * A `<FollowKeyboardVersion>` element is present under the .kps
+   * `<Options>` (engine parseKpsPackageDetails; Group A2, 10.8b).
+   */
+  kpsFollowKeyboardVersion: boolean;
+  /**
+   * The .kps `<Info><Description>` text (engine parseKpsPackageDetails).
+   * Empty when absent (Group A2, criterion 10.9b).
+   */
+  kpsDescription: string;
+  /**
+   * Repository context for the /review Group A2 repo/PR twins (Batch 5)
+   * and the Group C extraneous-files check. Set by the /review assembly
+   * only; absent on the authored and Compare surfaces (those never see
+   * the repo, only a folder).
+   */
+  reviewContext?: ReviewContext;
+}
+
+/**
+ * Repository context for /review-only checks (Batch 5 + Group C).
+ * All paths are repo-relative POSIX paths.
+ */
+export interface ReviewContext {
+  /** The keyboard's folder in the repo, e.g. "release/gff/gff_amharic". */
+  repoPath: string;
+  /**
+   * File list for the extraneous-file checks: the full repo tree at the
+   * pinned sha (published keyboards) or the PR's changed files (PRs).
+   */
+  treePaths?: readonly string[];
+  /** The PR description (PR sources only). */
+  prBody?: string;
+  /** True when the judged target is a pull request. */
+  isPr: boolean;
+  /** HISTORY.md text, when the file exists in the judged VFS. */
+  historyMd?: string;
 }

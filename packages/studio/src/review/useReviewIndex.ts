@@ -135,3 +135,50 @@ export function fetchPrKeyboards(
   prKeyboardCache.set(key, p);
   return p;
 }
+
+/** PR context for the /review-only checks: changed files + description. */
+export interface PrContext {
+  /** Repo-relative paths of the PR's changed files. */
+  filePaths: string[];
+  /** The PR description (body), or "" when empty. */
+  body: string;
+}
+
+const prContextCache = new Map<string, Promise<PrContext>>();
+
+/**
+ * Fetch a PR's changed-file list and body for the /review-only checks
+ * (Batch 5 + Group C). Session-cached like fetchPrKeyboards.
+ */
+export function fetchPrContext(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<PrContext> {
+  const key = `${owner}/${repo}#${prNumber}:ctx`;
+  const cached = prContextCache.get(key);
+  if (cached) return cached;
+  const p = (async () => {
+    const [prRes, filesRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`, {
+        headers: { Accept: "application/vnd.github+json" },
+      }),
+      fetch(
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      ),
+    ]);
+    if (!prRes.ok) throw new Error(`PR API: HTTP ${prRes.status}`);
+    if (!filesRes.ok) throw new Error(`PR files API: HTTP ${filesRes.status}`);
+    const pr = (await prRes.json()) as { body?: string | null };
+    const files = (await filesRes.json()) as Array<{ filename?: string }>;
+    return {
+      filePaths: (Array.isArray(files) ? files : [])
+        .map((f) => f.filename ?? "")
+        .filter((n) => n !== ""),
+      body: pr.body ?? "",
+    };
+  })();
+  prContextCache.set(key, p);
+  return p;
+}

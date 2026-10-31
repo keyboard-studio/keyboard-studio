@@ -289,11 +289,13 @@ export {
   parseKps,
   parseKpsFiles,
   parseKpsFontRefs,
+  parseKpsPackageDetails,
 } from "./start-browser/kps-parser.js";
 export type {
   KpsMetadata,
   KpsFileEntry,
   KpsFontRefs,
+  KpsPackageDetails,
 } from "./start-browser/kps-parser.js";
 export type { StartBrowserServiceWithDocProfile } from "./start-browser/index.js";
 

@@ -87,7 +87,7 @@ export function ReviewScreen() {
   const snapshot = useReviewSnapshot(activeTarget, runNonce);
   const judge = useReviewJudge(
     activeTarget,
-    snapshot.kind === "ready" ? snapshot.snapshot.vfs : null,
+    snapshot.kind === "ready" ? snapshot.snapshot : null,
     runNonce,
   );
 

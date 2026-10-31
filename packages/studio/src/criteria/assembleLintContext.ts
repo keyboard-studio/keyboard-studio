@@ -64,6 +64,7 @@ import type {
   CriteriaLintInput,
   CriteriaPlacement,
   LinguistInventory,
+  ReviewContext,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { CLDR_TERRITORY_CURRENCY } from "@keyboard-studio/contracts";
@@ -72,6 +73,7 @@ import {
   parseKps,
   parseKpsFiles,
   parseKpsFontRefs,
+  parseKpsPackageDetails,
   parseKvks,
 } from "@keyboard-studio/engine";
 import type { LintContext } from "@keymanapp/keyboard-lint";
@@ -111,6 +113,52 @@ const MISSING_IR = "the parsed keyboard source for this keyboard";
 const MISSING_INVENTORY = "the linguist inventory for this keyboard";
 const MISSING_KVKS = "the .kvks visual keyboard file";
 const MISSING_KPJ = "the .kpj project file";
+const MISSING_KPS = "the .kps package file";
+
+/**
+ * Group A2 .kps-listing twin codes (8.1b–8.6b / 8.8b–8.11b). All ten read
+ * the .kps <File> names; with no .kps in the judged VFS every one is a
+ * named missing input, never a verdict.
+ */
+const KPS_LISTING_TWIN_CODES = [
+  "KM_LINT_KPS_KMX_ABSENT",
+  "KM_LINT_KPS_KVK_ABSENT",
+  "KM_LINT_KPS_JS_ABSENT",
+  "KM_LINT_KPS_LICENSE_ABSENT",
+  "KM_LINT_KPS_README_ABSENT",
+  "KM_LINT_KPS_WELCOME_ABSENT",
+  "KM_LINT_KPS_PHP_LISTED",
+  "KM_LINT_KPS_HELP_LISTED",
+  "KM_LINT_KPS_SOURCE_LISTED",
+  "KM_LINT_KPS_JSON_LISTED",
+];
+
+/**
+ * Group A2 .kps-metadata twin codes (10.1b/10.2b/10.7b/10.8b/10.9b). All
+ * five read the .kps package-tab selections; with no .kps in the judged
+ * VFS every one is a named missing input, never a verdict.
+ */
+const KPS_METADATA_TWIN_CODES = [
+  "KM_LINT_KPS_FONT_UNSELECTED",
+  "KM_LINT_KPS_LANGUAGES_UNSELECTED",
+  "KM_LINT_KPS_DETAILS_UNSELECTED",
+  "KM_LINT_KPS_FOLLOW_VERSION_UNSET",
+  "KM_LINT_KPS_DESCRIPTION_EMPTY",
+];
+
+/**
+ * Group A2 Batch 5 repo-context codes (1.2b/1.3b/1.4b) + the Group C
+ * extraneous-files code (1.1). All four need the reviewContext (repo
+ * path + tree/PR file list); without it each is a named missing input.
+ * (19.1b/19.2b are gated by the adaptation signal instead — see
+ * applicability.ts.)
+ */
+const REPO_CONTEXT_CODES = [
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_ROOT_SOURCE",
+  "KM_LINT_FILES_OUTSIDE_FOLDER",
+];
 
 /**
  * Batch 1 codes whose checks read the parsed keyboard IR. When the .kmn
@@ -160,6 +208,13 @@ const MISSING_KPS_TARGETS = "the .kps package file's declared target list";
 export interface AssembleLintContextInput {
   vfs: VirtualFS;
   keyboardId: string;
+  /**
+   * Repository context for the /review-only checks (Batch 5 + Group C).
+   * The /review host sets this; the authored and Compare hosts never do
+   * (they never see the repo). Absent means the four repo-context codes
+   * are named missing, never judged.
+   */
+  reviewContext?: ReviewContext;
   /**
    * A structured linguist inventory, when the caller already has one.
    * The authored host does NOT pass it here: it builds the inventory
@@ -318,12 +373,28 @@ export function assembleLintContext(
   let kpsTargets: string[] = [];
   let kpsDisplayName: string | undefined;
   let script = "Latn";
+  // Group A2 .kps-metadata twins (10.1b/10.2b/10.7b/10.8b/10.9b): the
+  // package-tab selections, defaulting to unselected when the .kps is
+  // absent (the absent case is named in contextMissing below).
+  let kpsFontSelected = "";
+  let kpsDetailsReadme = "";
+  let kpsDetailsWelcome = "";
+  let kpsDetailsLicense = "";
+  let kpsFollowKeyboardVersion = false;
+  let kpsDescription = "";
   if (kpsText !== undefined) {
     try {
       const meta = parseKps(kpsText);
       kpsLanguages = meta.languages;
       kpsDisplayName = meta.displayName;
       script = meta.script;
+      const details = parseKpsPackageDetails(kpsText);
+      kpsFontSelected = details.fontSelected;
+      kpsDetailsReadme = details.readmeFile;
+      kpsDetailsWelcome = details.welcomeFile;
+      kpsDetailsLicense = details.licenseFile;
+      kpsFollowKeyboardVersion = details.followKeyboardVersion;
+      kpsDescription = details.description;
       // §8.13 compares DECLARED targets. parseKps defaults an absent
       // <Targets> element to ["windows"]; passing that default through
       // would manufacture a disagreement the package never declared,
@@ -379,6 +450,15 @@ export function assembleLintContext(
     kpsLanguages,
     kpsTargets,
     kpsFontFamilies,
+    kpsFontSelected,
+    kpsDetailsReadme,
+    kpsDetailsWelcome,
+    kpsDetailsLicense,
+    kpsFollowKeyboardVersion,
+    kpsDescription,
+    ...(input.reviewContext !== undefined
+      ? { reviewContext: input.reviewContext }
+      : {}),
     contrastiveRegionAttested: input.contrastiveRegionAttested ?? false,
     ...(kpsDisplayName !== undefined ? { kpsDisplayName } : {}),
     placement: input.placement ?? "release",
@@ -426,6 +506,74 @@ export function assembleLintContext(
     // rather than letting either pass on an unread file.
     contextMissing[KPJ_FORMAT_OUTDATED_CODE] = MISSING_KPJ;
     contextMissing[KPJ_VERSION_BUMPED_CODE] = MISSING_KPJ;
+  }
+  if (kpsPath === undefined || kpsText === undefined) {
+    // No .kps in the judged VFS (or none readable as text): none of the
+    // .kps-listing twin rows (8.1b–8.6b / 8.8b–8.11b) or the .kps-metadata
+    // twin rows (10.1b/10.2b/10.7b/10.8b/10.9b) can be judged — name the
+    // missing file for all fifteen rather than letting any pass on an
+    // unread package.
+    for (const code of [...KPS_LISTING_TWIN_CODES, ...KPS_METADATA_TWIN_CODES]) {
+      contextMissing[code] = MISSING_KPS;
+    }
+  }
+
+  // Group A2 text-content twins (Batch 4): name the missing doc inputs.
+  // 11.1b is excluded — the help .php's existence is the criterion, so
+  // its absence is a finding, never a missing input.
+  const loweredPaths = new Set(paths.map((p) => p.toLowerCase()));
+  const hasLicense = loweredPaths.has("license.md");
+  const hasReadmeMd = loweredPaths.has("readme.md");
+  const hasReadmeHtm = loweredPaths.has("source/readme.htm");
+  const hasWelcomeHtm =
+    loweredPaths.has("source/welcome.htm") ||
+    loweredPaths.has("source/welcome/welcome.htm");
+  const hasPhp = [...loweredPaths].some((p) => p.endsWith(".php"));
+  const hasKmn = [...loweredPaths].some((p) => p.endsWith(".kmn"));
+  if (!hasLicense) {
+    contextMissing["KM_LINT_COPYRIGHT_ABSENT"] = "LICENSE.md";
+    contextMissing["KM_LINT_COPYRIGHT_SYNTAX"] = "LICENSE.md";
+  }
+  if (!hasKmn && (kpsPath === undefined || kpsText === undefined)) {
+    contextMissing["KM_LINT_COPYRIGHT_YEAR_EMBEDDED"] =
+      "the .kmn source and the .kps package file";
+  }
+  if (!hasReadmeMd && !hasReadmeHtm && !hasWelcomeHtm && !hasPhp) {
+    contextMissing["KM_LINT_VERSION_IN_DOCS"] = "the documentation files";
+  }
+  if (!hasReadmeMd && !hasReadmeHtm && !hasWelcomeHtm) {
+    contextMissing["KM_LINT_COPYRIGHT_IN_DOCS"] = "the documentation files";
+  }
+  if (!hasReadmeMd) {
+    contextMissing["KM_LINT_README_KEYMAN_LINK_ABSENT"] = "README.md";
+    contextMissing["KM_LINT_README_HELP_LINK_ABSENT"] = "README.md";
+  }
+  if (!hasWelcomeHtm) {
+    contextMissing["KM_LINT_WELCOME_LANG_MISMATCH"] = "source/welcome.htm";
+  }
+  if (!hasKmn) {
+    contextMissing["KM_LINT_AUTHOR_IN_KMN"] = "the .kmn source";
+  }
+  if (!hasPhp) {
+    contextMissing["KM_LINT_PHP_STYLE_OUTSIDE"] = "the help .php";
+    contextMissing["KM_LINT_PHP_CLOSING_TAGS"] = "the help .php";
+  }
+
+  // Group A2 Batch 5 + Group C: without a reviewContext the repo-context
+  // checks cannot run — name the missing context for the four repo codes.
+  // (19.1b/19.2b are gated by the adaptation signal instead.)
+  if (input.reviewContext === undefined) {
+    for (const code of REPO_CONTEXT_CODES) {
+      contextMissing[code] = "the repository context (repo path and file list)";
+    }
+  }
+  // 19.2b needs HISTORY.md text; without the file the row cannot be
+  // judged (its absence is not the 19.2 violation — that's 3.1b's).
+  if (
+    input.reviewContext !== undefined &&
+    input.reviewContext.historyMd === undefined
+  ) {
+    contextMissing["KM_LINT_HISTORY_ATTRIBUTION_BAD"] = "HISTORY.md";
   }
   if (keyboardIR !== undefined && kpsTargets.length === 0) {
     // §8.13 has nothing to compare without a declared .kps target list
