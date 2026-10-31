@@ -167,6 +167,19 @@ describe("resolveCriteria — layer-c findings", () => {
     hint: "Move the most recent entry to the top.",
   };
 
+  it("renders File: path#L<line> for a positive line and no #L for line 0 (whole file)", () => {
+    const at = (line: number): string[] =>
+      rowFor(
+        historyOrder.id,
+        makeInput({
+          lintFindings: [{ ...finding, location: { file: "HISTORY.md", line, column: 1 } }],
+        }),
+      ).evidence().lines;
+    expect(at(12)).toContain("File: HISTORY.md#L12");
+    expect(at(0)).toContain("File: HISTORY.md");
+    expect(at(0).some((l) => l.includes("#L"))).toBe(false);
+  });
+
   it("marks the mapped criterion Not met and attaches the finding as evidence", () => {
     const row = rowFor(historyOrder.id, makeInput({ lintFindings: [finding] }));
     expect(row.status).toBe("not-met");

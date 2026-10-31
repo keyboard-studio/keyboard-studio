@@ -344,7 +344,7 @@ export function buildKpsContent(
     `<?xml version="1.0" encoding="utf-8"?>\n` +
     `<Package>\n` +
     `  <System>\n    <KeymanDeveloperVersion>17.0.0.0</KeymanDeveloperVersion>\n    <FileVersion>7.0</FileVersion>\n  </System>\n` +
-    `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>${WELCOME_PAGE_KPS_REF}</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
+    `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <LicenseFile>..\\LICENSE.md</LicenseFile>\n    <WelcomeFile>${WELCOME_PAGE_KPS_REF}</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
     `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${website}${buildAttributionBlock(identity)}  </Info>\n` +
     `  <Files>\n${fileEntries}\n  </Files>\n` +
     `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n` +

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseKps, parseKpsFontRefs } from "./kps-parser.js";
+import { parseKps, parseKpsFontRefs, parseKpsFiles, parseKpsPackageDetails } from "./kps-parser.js";
 
 const BASIC_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <Package>
@@ -81,6 +81,25 @@ describe("parseKps", () => {
     const meta = parseKps(TAG_CONTENT_XML);
     expect(meta.displayName).toBe("Legacy Keyboard");
     expect(meta.version).toBe("7.0");
+  });
+
+  it("reads attribute-bearing <Info> Name/Description even when a <File><Name> comes first", () => {
+    const xml = `<Package><Files><File><Name>..\\build\\x.kmx</Name><Description>file desc</Description><FileType>.kmx</FileType></File></Files><Info><Name URL="">Real Name</Name><Version URL="">3.1</Version><Description URL="">Real desc</Description></Info><Keyboards><Keyboard><Name>kb</Name><Version>9.9</Version></Keyboard></Keyboards></Package>`;
+    const meta = parseKps(xml);
+    expect(meta.displayName).toBe("Real Name");
+    expect(meta.version).toBe("3.1");
+    expect(parseKpsPackageDetails(xml).description).toBe("Real desc");
+  });
+
+  it("does not read a name outside <Info> (no Info block yields the fallback)", () => {
+    const xml = `<Package><Files><File><Name>..\\build\\x.kmx</Name></File></Files></Package>`;
+    expect(parseKps(xml).displayName).toBe("");
+  });
+
+  it("tolerates attributes on Targets, File and FileType tags", () => {
+    const xml = `<Package><Files><File X="1"><Name>a.ttf</Name><FileType Y="">.ttf</FileType></File></Files><Keyboards><Keyboard><Targets Z="">web</Targets></Keyboard></Keyboards></Package>`;
+    expect(parseKps(xml).targets).toEqual(["web"]);
+    expect(parseKpsFiles(xml)).toEqual([{ name: "a.ttf", fileType: ".ttf" }]);
   });
 
   it("parses Latn script from en-Latn BCP47 language ID", () => {

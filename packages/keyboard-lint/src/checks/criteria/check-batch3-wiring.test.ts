@@ -81,6 +81,17 @@ describe("checkKpsFontMissing (8.7)", () => {
     ).toEqual([]);
   });
 
+  it("does not require industry/system fonts (Arial) to be bundled", () => {
+    expect(
+      checkKpsFontMissing({
+        kvks: kvks("Arial"),
+        touchLayout: touch("Times New Roman"),
+        bundledFamilies: [],
+        keyboardId: "demo",
+      }).findings,
+    ).toEqual([]);
+  });
+
   it("flags a required family with no bundled font", () => {
     const { findings } = checkKpsFontMissing({
       kvks: kvks("Andika Afr"),

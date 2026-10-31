@@ -217,15 +217,13 @@ describe("assembleLintContext", () => {
     expect(plain.ctx.criteriaInput?.contrastiveRegionAttested).toBe(false);
   });
 
-  it("Batch 2 §8.13: a .kps with no <Targets> element contributes no declared targets and names the gap", () => {
+  it("Batch 2 §8.13: a .kps with no <Targets> element contributes no declared targets and and is not a missing input", () => {
     const { ctx, contextMissing } = assembleLintContext({
       vfs: fixtureVfs(),
       keyboardId: KEYBOARD_ID,
     });
     expect(ctx.criteriaInput?.kpsTargets).toEqual([]);
-    expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBe(
-      "a <Targets> list in the .kps (the package does not declare targets)",
-    );
+    expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBeUndefined();
   });
 
   it("Batch 2 §8.13: a declared <Targets> list crosses into the criteria input and clears the gap", () => {
@@ -329,10 +327,6 @@ describe("assembleLintContext", () => {
     });
     expect(ctx.inventory).toBe(inventory);
     expect(contextMissing).toEqual({
-      // The fixture .kps declares no <Targets> element, so §8.13's
-      // input is honestly named missing (spec 084 Batch 2).
-      KM_LINT_KPS_TARGETS_MISMATCH:
-        "a <Targets> list in the .kps (the package does not declare targets)",
       // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
@@ -572,10 +566,6 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       inventory: fixtureInventory(),
     });
     expect(contextMissing).toEqual({
-      // The fixture .kps declares no <Targets> element, so §8.13's
-      // input is honestly named missing (spec 084 Batch 2).
-      KM_LINT_KPS_TARGETS_MISMATCH:
-        "a <Targets> list in the .kps (the package does not declare targets)",
       // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",

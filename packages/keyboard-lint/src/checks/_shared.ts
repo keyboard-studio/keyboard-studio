@@ -8,13 +8,13 @@ import type { TouchKeyRuleIndex } from "@keyboard-studio/contracts";
 /**
  * Build the `location` every check-18-* finding uses today: touch-layout
  * checks operate on the parsed IR, not on `.keyman-touch-layout` source text,
- * so there is no real line number to report — `line: 1` is the established
+ * so there is no real line number to report — `line: 0` ("whole file") is the established
  * placeholder.
  *
  * @param touchLayoutPath - Virtual FS path used in `location.file`.
  */
 export function makeLocation(touchLayoutPath: string): NonNullable<LintFinding["location"]> {
-  return { file: touchLayoutPath, line: 1 };
+  return { file: touchLayoutPath, line: 0 };
 }
 
 // The two layout walks and the exemption vocabulary below moved to

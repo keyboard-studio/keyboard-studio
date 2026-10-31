@@ -45,7 +45,7 @@ export function checkReadmeTargets(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `README.md's Supported Platforms list does not match the .kmn TARGETS (${parts.join("; ")}).`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Update README.md's Supported Platforms list so it names exactly the .kmn TARGETS platforms.`,
     },
   ]);

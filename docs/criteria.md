@@ -77,7 +77,7 @@ Legend:
 - <span style="color:green">[ ] Exists in `source/`.</span>
 - <span style="color:goldenrod">[ ] Describes how to use the keyboard (e.g. keyboard image, table, or written description like `' + a produces á (works for aAeEoO)`).</span>
 - <span style="color:goldenrod">[ ] Does *not* include instructions for installing Keyman or the keyboard package — references the help URLs at https://help.keyman.com/products/ instead. _(Ref: [PR #3950](https://github.com/keymanapp/keyboards/pull/3950) — `mara`: the reviewer asked the author to remove `INSTALL.md` and reference the help pages.)_</span>
-- <span style="color:green">[ ] The `<html lang="...">` attribute matches the keyboard's primary BCP47 language tag (e.g. `<html lang="mnw">` for a Mon keyboard). _(Ref: [PR #3962](https://github.com/keymanapp/keyboards/pull/3962) inline review on `mon_k_nemin/source/welcome/welcome.htm`.)_</span>
+- <span style="color:green">[ ] The `<html lang="...">` attribute matches the keyboard's primary BCP47 language tag (e.g. `<html lang="mnw">` for a Mon keyboard); an English welcome page may declare `lang="en"` instead. _(Ref: [PR #3962](https://github.com/keymanapp/keyboards/pull/3962) inline review on `mon_k_nemin/source/welcome/welcome.htm`.)_</span>
 - <span style="color:goldenrod">[ ] Content is not political or self-promoting.</span>
 
 ## 7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)
@@ -154,7 +154,7 @@ Legend:
 
 ## 11. Online help (`source/help/<name>.php`)
 
-- <span style="color:green">[ ] File exists and has the proper PHP header.</span>
+- <span style="color:green">[ ] File exists and has the proper PHP header (`<?php $pagename = '...'; require_once('header.php'); ?>`).</span>
 - <span style="color:green">[ ] If using OSK syntax, all desktop *and* mobile layers are selected (cross-check against OSK and touch layout code).</span>
 - <span style="color:green">[ ] All style information is inside the PHP header, not outside it. _(Ref: [PR #3986](https://github.com/keymanapp/keyboards/pull/3986) — `mising`: the reviewer pointed the author to the `sil_cheyenne.php` template.)_</span>
 - <span style="color:green">[ ] `.php` does **not** contain closing `</body>` or `</html>` tags — the PHP template wraps the body content. _(Ref: [PR #3877](https://github.com/keymanapp/keyboards/pull/3877) — `manchu_cyrillic`: the reviewer removed closing `body`/`html` tags with the note "Remove closing body and html tags".)_</span>

@@ -204,8 +204,7 @@ export const MANDATED_CHAR_CODE = "KM_LINT_MANDATED_CHAR_MISSING";
 /** §8.13's code: named here because an undeclared .kps target list is a missing input. */
 export const KPS_TARGETS_MISMATCH_CODE = "KM_LINT_KPS_TARGETS_MISMATCH";
 
-const MISSING_KPS_TARGETS =
-  "a <Targets> list in the .kps (the package does not declare targets)";
+const MISSING_KPS_TARGETS = "the keyboard .kmn source";
 
 export interface AssembleLintContextInput {
   vfs: VirtualFS;
@@ -617,10 +616,9 @@ export function assembleLintContext(
   ) {
     contextMissing["KM_LINT_HISTORY_ATTRIBUTION_BAD"] = "HISTORY.md";
   }
-  if (keyboardIR !== undefined && kpsTargets.length === 0) {
-    // §8.13 has nothing to compare without a declared .kps target list
-    // (no .kps, or a .kps with no <Targets> element): name the missing
-    // input rather than letting the row pass on an empty comparison.
+  if (keyboardIR === undefined) {
+    // §8.13 judges from the .kmn plus the package files; with no .kmn IR
+    // there is nothing to judge. A .kps without <Targets> is not a gap.
     contextMissing[KPS_TARGETS_MISMATCH_CODE] = MISSING_KPS_TARGETS;
   }
   if (keyboardIR !== undefined) {

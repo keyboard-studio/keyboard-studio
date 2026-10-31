@@ -43,7 +43,7 @@ export function checkCopyrightHolder(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `Copyright holder is not identical across files: ${summary}.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Use the same copyright holder name in LICENSE.md, the .kmn file, the .kps file, README.md, and HISTORY.md.`,
     },
   ]);

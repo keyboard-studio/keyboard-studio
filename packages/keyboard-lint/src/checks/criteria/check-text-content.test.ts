@@ -115,7 +115,7 @@ describe("text-content twins", () => {
   it("6.6b flags a welcome.htm lang mismatch", () => {
     const { findings: f } = checkWelcomeLangMismatch({
       ...GOOD,
-      welcomeHtm: '<html lang="en"><body></body></html>',
+      welcomeHtm: '<html lang="fr"><body></body></html>',
     });
     expect(f[0]!.code).toBe("KM_LINT_WELCOME_LANG_MISMATCH");
   });
@@ -214,5 +214,89 @@ describe("text-content twins", () => {
     expect(verified).toEqual([
       "No copyright line in LICENSE.md (absence is 4.1b's check).",
     ]);
+  });
+});
+
+describe("audit false-positive fixes", () => {
+  it("11.1b accepts the $pagename + require_once('header.php') header", () => {
+    const php =
+      "<?php\n  $pagename = 'Demo Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<p>Help</p>\n";
+    expect(checkPhpHeaderBad({ ...GOOD, php }).findings).toEqual([]);
+  });
+
+  it("11.1b still flags a .php with neither header form, citing the <?php line", () => {
+    const { findings } = checkPhpHeaderBad({
+      ...GOOD,
+      php: "\n<?php\n$x = 1;\n?>\n<p>Help</p>\n",
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.location!.line).toBe(2);
+  });
+
+  it("5.2b ignores CSS line-height, DOIs and URLs", () => {
+    const welcomeHtm =
+      '<html><head><style>p { line-height: 1.6; }</style></head><body>' +
+      "<p>See doi 10.1080/00437956.2013.1 and https://example.org/v2.3.4/x</p></body></html>";
+    expect(checkVersionInDocs({ ...GOOD, welcomeHtm }).findings).toEqual([]);
+  });
+
+  it("5.2b still flags a visible version, citing its line and the real welcome path", () => {
+    const { findings } = checkVersionInDocs({
+      ...GOOD,
+      welcomeHtm: "<html>\n<body>\n<p>Version 2.3 is out</p>\n</body></html>",
+      welcomePath: "source/welcome/welcome.htm",
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.location).toEqual({
+      file: "source/welcome/welcome.htm",
+      line: 3,
+    });
+  });
+
+  it("4.5b accepts the (c) symbol and cites the line when wrong", () => {
+    expect(
+      checkCopyrightSyntax({
+        ...GOOD,
+        licenseMd: "MIT\n\nCopyright \u00a9 2021-2026 SIL International\n",
+      }).findings,
+    ).toEqual([]);
+    const { findings } = checkCopyrightSyntax({
+      ...GOOD,
+      licenseMd: "MIT\n\nCopyright 2021 SIL International\n",
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.location!.line).toBe(3);
+  });
+
+  it("6.6b accepts lang=en and en-* on a non-English keyboard, citing the real path", () => {
+    for (const lang of ["en", "en-US"]) {
+      expect(
+        checkWelcomeLangMismatch({
+          ...GOOD,
+          welcomeHtm: `<html lang="${lang}"><body></body></html>`,
+        }).findings,
+      ).toEqual([]);
+    }
+    const { findings } = checkWelcomeLangMismatch({
+      ...GOOD,
+      welcomeHtm: '<html lang="fr"><body></body></html>',
+      welcomePath: "source/welcome/welcome.htm",
+    });
+    expect(findings[0]!.location!.file).toBe("source/welcome/welcome.htm");
+  });
+
+  it("findings default to line 0 (whole file) when no line is known", () => {
+    const { findings } = checkCopyrightAbsent({ ...GOOD, licenseMd: "MIT\n" });
+    expect(findings[0]!.location!.line).toBe(0);
+  });
+
+  it("7.11b and 4.6b cite the offending .kmn line", () => {
+    const kmn = "store(&Name) 'x'\nstore(&Author) 'Someone'\n";
+    expect(checkAuthorInKmn({ ...GOOD, kmn }).findings[0]!.location!.line).toBe(2);
+    const y = checkCopyrightYearEmbedded({
+      ...GOOD,
+      kmn: "c\nstore(&Copyright) 'Copyright (C) 2020 X'\n",
+    });
+    expect(y.findings[0]!.location!.line).toBe(2);
   });
 });

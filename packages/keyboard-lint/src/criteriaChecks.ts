@@ -118,6 +118,21 @@ function findPath(
 }
 
 /**
+ * 8.6b input: whether the welcome page references an image. Omitted when
+ * the welcome page cannot be read (the check then keeps requiring graphics).
+ */
+function welcomeImageFact(
+  fs: VirtualFS,
+  filePaths: readonly string[],
+): { welcomeHasImages?: boolean } {
+  const path =
+    findPath(filePaths, "source/welcome.htm") ??
+    findPath(filePaths, "source/welcome/welcome.htm");
+  const text = path === undefined ? undefined : readText(fs, path);
+  return text === undefined ? {} : { welcomeHasImages: /<img/i.test(text) };
+}
+
+/**
  * Resolve the Group A2 text-content twin inputs (Batch 4) from the judged
  * VFS: the doc texts, the help .php, and the primary BCP47 tag (from the
  * parsed .kmn IR, falling back to the .kps language list).
@@ -140,10 +155,10 @@ function resolveTextFacts(
   const kmn = textAt(kmnPath(keyboardId));
   const readmeMd = textAt(findPath(filePaths, "README.md"));
   const readmeHtm = textAt(findPath(filePaths, "source/readme.htm"));
-  const welcomeHtm = textAt(
+  const welcomePath =
     findPath(filePaths, "source/welcome.htm") ??
-      findPath(filePaths, "source/welcome/welcome.htm"),
-  );
+    findPath(filePaths, "source/welcome/welcome.htm");
+  const welcomeHtm = textAt(welcomePath);
   const phpPath = filePaths.find((p) => p.toLowerCase().endsWith(".php"));
   const php = textAt(phpPath);
   const primaryBcp47 =
@@ -155,7 +170,9 @@ function resolveTextFacts(
     ...(input.kpsText !== undefined ? { kps: input.kpsText } : {}),
     ...(readmeMd !== undefined ? { readmeMd } : {}),
     ...(readmeHtm !== undefined ? { readmeHtm } : {}),
-    ...(welcomeHtm !== undefined ? { welcomeHtm } : {}),
+    ...(welcomeHtm !== undefined && welcomePath !== undefined
+      ? { welcomeHtm, welcomePath }
+      : {}),
     ...(php !== undefined && phpPath !== undefined ? { php, phpPath } : {}),
     ...(primaryBcp47 !== undefined ? { primaryBcp47 } : {}),
   };
@@ -239,17 +256,10 @@ export function runCriteriaChecks(
   }
 
   // 8.12 / 9.6 — package font scans over .kps facts + the VFS inventory.
-  const touchFonts = (touchLayout?.platforms ?? [])
-    .map((p) => p.font)
-    .filter((f): f is string => f !== undefined);
   collect(
     checkIndustryFonts({
       kpsFileNames: input.kpsFileNames,
       kpsFontRefs: input.kpsFontRefs,
-      ...(input.kvks?.fontFamily !== undefined
-        ? { kvksFontFamily: input.kvks.fontFamily }
-        : {}),
-      touchFonts,
       kpsPath,
     }),
   );
@@ -296,6 +306,7 @@ export function runCriteriaChecks(
         fileNames: input.kpsFileNames,
         hasTouchLayout,
         kpsPath,
+        ...welcomeImageFact(fs, filePaths),
       }),
     );
     const normNames = input.kpsFileNames.map((n) =>
@@ -437,20 +448,18 @@ export function runCriteriaChecks(
     );
 
     // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
-    // Only when the .kps actually declares targets: parseKps defaults
-    // an absent <Targets> to ["windows"], and the assembly passes []
-    // for that case — an undeclared list is not a disagreement (the
-    // assembly names it context-missing instead).
-    if (input.kpsTargets.length > 0) {
-      collect(
-        checkKpsTargetsMatch({
-          ir: keyboardIR,
-          kpsTargets: input.kpsTargets,
-          kpsFileNames: input.kpsFileNames,
-          kpsPath,
-        }),
-      );
-    }
+    // Runs whenever the .kmn IR exists. An undeclared <Targets> list
+    // reaches the check as [] (parseKps defaults it to ["windows"], the
+    // assembly passes []), and the check then skips only the
+    // declared-set comparison — an undeclared list is not a disagreement.
+    collect(
+      checkKpsTargetsMatch({
+        ir: keyboardIR,
+        kpsTargets: input.kpsTargets,
+        kpsFileNames: input.kpsFileNames,
+        kpsPath,
+      }),
+    );
 
     // 13.1 / 13.4 / 7.12 / 7.14 — one produced-set scan, all four checks.
     const ranges = scanProducedRanges(keyboardIR);

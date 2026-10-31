@@ -8,8 +8,8 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
 
 /**
- * Build one Layer C finding at line 1 of `file` (these checks judge
- * whole files, not lines). Callers pass the code as an object literal
+ * Build one Layer C finding in `file`. `line` is 1-based; the default 0
+ * means "whole file" (most of these checks judge files, not lines). Callers pass the code as an object literal
  * (`{ code: "KM_LINT_…", … }`) on purpose: the criteria catalog's drift
  * guard derives the implemented set by scanning check sources for
  * `code:` literals, and a code passed positionally would be invisible
@@ -20,13 +20,14 @@ export function criteriaFinding(input: {
   file: string;
   message: string;
   hint: string;
+  line?: number;
 }): LintFinding {
   return {
     code: input.code,
     severity: "warning",
     layer: "C",
     message: input.message,
-    location: { file: input.file, line: 1 },
+    location: { file: input.file, line: input.line ?? 0 },
     hint: input.hint,
   };
 }

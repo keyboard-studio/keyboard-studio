@@ -44,7 +44,7 @@ export function checkOskLayersListed(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `${path}'s data-states attribute does not list layer(s): ${missing.join(", ")}.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Add ${missing.join(", ")} to data-states so every layer is listed.`,
     },
   ]);

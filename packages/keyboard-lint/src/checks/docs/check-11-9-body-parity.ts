@@ -35,7 +35,7 @@ export function checkBodyParity(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `source/welcome/welcome.htm and ${path} bodies differ after stripping headers and normalizing whitespace.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Keep the welcome page and help page body content identical — only the help page's header (and the welcome page's own layout images) may differ.`,
     },
   ]);

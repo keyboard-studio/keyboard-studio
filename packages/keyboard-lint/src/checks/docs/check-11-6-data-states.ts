@@ -42,7 +42,7 @@ export function checkDataStatesComplete(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `${path}'s data-states attribute names layer(s) that do not exist: ${phantom.join(", ")}.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Remove ${phantom.join(", ")} from data-states, or add the missing layer(s) to the keyboard.`,
     },
   ]);

@@ -371,7 +371,9 @@ function resolveRow(
             kind: "lint-finding",
             lines: findings.flatMap((finding) => {
               const fileLine = finding.location
-                ? `File: ${finding.location.file}#L${finding.location.line}`
+                ? finding.location.line >= 1
+                  ? `File: ${finding.location.file}#L${finding.location.line}`
+                  : `File: ${finding.location.file}`
                 : null;
               // Split message on newlines so multi-line messages (e.g. with
               // a full source line) render as separate paragraphs.

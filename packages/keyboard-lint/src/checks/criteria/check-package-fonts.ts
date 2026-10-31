@@ -5,14 +5,16 @@
 //   9.6  KM_LINT_WOFF_FONT_IN_PACKAGE — no .woff / .woff2 web fonts in
 //        the package
 //
-// Sources for 8.12 (name matching — a renamed font file can evade the
-// file-name arm, so family strings are matched too): the .kps <File>
-// names and font references (engine parseKpsFiles / parseKpsFontRefs,
-// handed over via CriteriaLintInput), the .kvks font family, and the
-// touch-layout platform fonts. 9.6 scans the judged VFS inventory plus
+// Sources for 8.12: only fonts the .kps actually ships or references —
+// the .kps <File> names and font references (engine parseKpsFiles /
+// parseKpsFontRefs, handed over via CriteriaLintInput). A .kvks display
+// font or touch-layout font is a family the keyboard names, not a font
+// in the package (Arial is Keyman Developer's default .kvks font), so
+// those are not judged here. 9.6 scans the judged VFS inventory plus
 // the .kps <File> names. Neither is precertification: adapt tracks can
 // carry base files through, so the files are actually looked at.
 
+import { isIndustryFont } from "./check-kps-fonts.js";
 import {
   baseNameLower,
   checkFailed,
@@ -20,27 +22,6 @@ import {
   type CheckResult,
   criteriaFinding,
 } from "./_shared.js";
-
-/**
- * Industry/proprietary font families the criterion names ("Arial,
- * Times, Tahoma, etc."), normalised for comparison: lowercased with all
- * non-alphanumerics removed ("Times New Roman" → "timesnewroman").
- */
-const INDUSTRY_FONTS: ReadonlySet<string> = new Set(
-  [
-    "Arial",
-    "Arial MT",
-    "Times",
-    "Times New Roman",
-    "Tahoma",
-    "Verdana",
-    "Helvetica",
-    "Courier New",
-    "Georgia",
-    "Calibri",
-    "Comic Sans MS",
-  ].map((n) => n.toLowerCase().replace(/[^a-z0-9]/g, "")),
-);
 
 function normalizeFontName(raw: string): string {
   return raw
@@ -57,8 +38,6 @@ function fileFontName(path: string): string {
 export interface IndustryFontInput {
   kpsFileNames: readonly string[];
   kpsFontRefs: readonly string[];
-  kvksFontFamily?: string;
-  touchFonts: readonly string[];
   /** VFS path of the .kps, for the finding location ("" when unknown). */
   kpsPath: string;
 }
@@ -76,19 +55,7 @@ export function checkIndustryFonts(input: IndustryFontInput): CheckResult {
       via: `font reference "${ref}"`,
     });
   }
-  if (input.kvksFontFamily !== undefined) {
-    candidates.push({
-      name: normalizeFontName(input.kvksFontFamily),
-      via: `visual keyboard font "${input.kvksFontFamily}"`,
-    });
-  }
-  for (const font of input.touchFonts) {
-    candidates.push({
-      name: normalizeFontName(font),
-      via: `touch layout font "${font}"`,
-    });
-  }
-  const offenders = candidates.filter((c) => INDUSTRY_FONTS.has(c.name));
+  const offenders = candidates.filter((c) => isIndustryFont(c.name));
   if (offenders.length === 0) {
     if (candidates.length === 0)
       return checkPassed(code, ["No font names or families to check."]);

@@ -38,7 +38,7 @@ export function checkPagenameFormat(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `${path}'s $pagename is "${actual}"; expected "${expected}".`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Set $pagename to "${expected}" — the display name, plus " Keyboard Help" (or " Help" if the name already ends in "Keyboard").`,
     },
   ]);

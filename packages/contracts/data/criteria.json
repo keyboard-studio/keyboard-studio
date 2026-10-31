@@ -297,7 +297,7 @@
     "id": "4.5b-copyright-syntax-exact",
     "section": "4. `LICENSE.md` (copyright)",
     "band": "layer-c-enforce",
-    "description": "The LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax.",
+    "description": "The LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax (the `©` symbol is accepted in place of `(C)`).",
     "lintRuleId": "KM_LINT_COPYRIGHT_SYNTAX"
   },
   {
@@ -346,7 +346,7 @@
     "id": "5.2b-no-version-in-readme-or-docs",
     "section": "5. `README.md`",
     "band": "layer-c-enforce",
-    "description": "No version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: any X.Y[.Z] pattern).",
+    "description": "No version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: an X.Y[.Z] pattern in the visible text; CSS, scripts, URLs and DOIs are ignored).",
     "lintRuleId": "KM_LINT_VERSION_IN_DOCS"
   },
   {
@@ -465,7 +465,7 @@
     "id": "6.6b-welcome-htm-lang-attribute",
     "section": "6. Documentation files (`source/`)",
     "band": "layer-c-enforce",
-    "description": "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag.",
+    "description": "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag (an English page may declare lang=\"en\").",
     "lintRuleId": "KM_LINT_WELCOME_LANG_MISMATCH"
   },
   {
@@ -717,7 +717,7 @@
     "id": "8.6b-kps-includes-welcome-and-graphics",
     "section": "8. Package contents (`.kps` \u2192 Packaging tab \u2192 Files)",
     "band": "layer-c-enforce",
-    "description": "`welcome.htm` and associated graphics are listed in the `.kps` package.",
+    "description": "`welcome.htm` is listed in the `.kps` package, and its associated graphics when the welcome page references images.",
     "lintRuleId": "KM_LINT_KPS_WELCOME_ABSENT"
   },
   {
@@ -787,7 +787,7 @@
     "id": "8.12-kps-no-industry-fonts",
     "section": "8. Package contents (`.kps` \u2192 Packaging tab \u2192 Files)",
     "band": "layer-c-enforce",
-    "description": "No industry fonts (Arial, Times, Tahoma, etc.) in the package",
+    "description": "No industry fonts (Arial, Times, Tahoma, etc.) shipped in the package (fonts the `.kps` lists or references; a `.kvks` display font is not judged)",
     "lintRuleId": "KM_LINT_KPS_INDUSTRY_FONT"
   },
   {
@@ -969,7 +969,7 @@
     "id": "11.1b-php-exists-with-header",
     "section": "11. Online help (`source/help/<name>.php`)",
     "band": "layer-c-enforce",
-    "description": "The <name>.php help file exists and has the proper PHP header (<?php + the /* Name: ... */ block).",
+    "description": "The <name>.php help file exists and has the proper PHP header (<?php + `$pagename = '...'` and `require_once('header.php')`).",
     "lintRuleId": "KM_LINT_PHP_HEADER_BAD"
   },
   {

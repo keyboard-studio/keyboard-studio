@@ -36,7 +36,7 @@ export function checkStyleParity(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `source/welcome/welcome.htm and ${path} have different inline CSS.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Keep inline styles identical between the welcome page and the help page (non-rendering whitespace differences are fine).`,
     },
   ]);

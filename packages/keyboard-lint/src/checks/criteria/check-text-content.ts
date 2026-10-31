@@ -35,6 +35,8 @@ export interface TextContentFacts {
   readmeHtm?: string;
   /** source/welcome.htm (or the folder convention) text; undefined when absent. */
   welcomeHtm?: string;
+  /** VFS path of the judged welcome page (finding location); defaults to source/welcome.htm. */
+  welcomePath?: string;
   /** Help .php text; undefined when absent. */
   php?: string;
   /** VFS path of the judged .php (finding location). */
@@ -45,22 +47,34 @@ export interface TextContentFacts {
 
 const COPYRIGHT_YEAR = /copyright[^\n]{0,80}\d{4}/i;
 // 4.5's "exact syntax": Copyright (C) <year> <holder>. The (C) is matched
-// case-insensitively — the MIT template the scaffolder emits uses (c),
+// case-insensitively and the (c) symbol is accepted too -- the MIT template
+// the scaffolder emits uses (c), most corpus LICENSE files use the symbol,
 // and the shape (copyright + year + holder) is what the criterion pins.
 const COPYRIGHT_SYNTAX =
-  /copyright\s+\(c\)\s+\d{4}(?:\s*-\s*\d{4})?\s+\S/i;
+  /copyright\s+(?:\(c\)|\u00a9)\s+\d{4}(?:\s*-\s*\d{4})?\s+\S/i;
 const VERSION_LIKE = /\b\d+\.\d+(?:\.\d+)?\b/;
 const KMN_AUTHOR_STORE = /store\s*\(\s*&author\b/i;
 const HTML_LANG = /<html[^>]*\blang\s*=\s*["']([^"']+)["']/i;
 const PHP_OPEN = /<\?php/i;
+// The proper PHP header is either the corpus convention
+// (`$pagename = '...'; require_once('header.php');`) or a `/* Name: */` block.
 const PHP_HEADER_BLOCK = /<\?php[\s\S]*?\/\*[\s\S]*?Name\s*:/i;
+const PHP_PAGENAME = /\$pagename\s*=\s*['"]/;
+const PHP_REQUIRE_HEADER = /require(?:_once)?\s*\(?\s*['"][^'"]*header\.php['"]/i;
 
-/** First line matching `re` in `text`, trimmed — for evidence. */
-function firstMatchingLine(text: string, re: RegExp): string | undefined {
-  return text
-    .split("\n")
-    .find((l) => re.test(l))
-    ?.trim();
+/** 1-based line of character offset `index` in `text`. */
+function lineOfIndex(text: string, index: number): number {
+  return text.slice(0, index).split("\n").length;
+}
+
+/** First line matching `re` in `text`: trimmed text for evidence plus its 1-based line. */
+function firstMatchingLine(
+  text: string,
+  re: RegExp,
+): { text: string; line: number } | undefined {
+  const lines = text.split("\n");
+  const idx = lines.findIndex((l) => re.test(l));
+  return idx < 0 ? undefined : { text: lines[idx]!.trim(), line: idx + 1 };
 }
 
 /** 4.1b — LICENSE.md has no copyright statement with year(s). */
@@ -68,9 +82,9 @@ export function checkCopyrightAbsent(facts: TextContentFacts): CheckResult {
   const code = "KM_LINT_COPYRIGHT_ABSENT";
   if (facts.licenseMd === undefined)
     return checkPassed(code, ["No LICENSE.md to check."]);
-  const line = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
-  if (line !== undefined)
-    return checkPassed(code, ["File: LICENSE.md", `Found: "${line}"`]);
+  const hit = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
+  if (hit !== undefined)
+    return checkPassed(code, ["File: LICENSE.md", `Found: "${hit.text}"`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_ABSENT",
@@ -94,17 +108,18 @@ export function checkCopyrightSyntax(facts: TextContentFacts): CheckResult {
     return checkPassed(code, [
       "No copyright line in LICENSE.md (absence is 4.1b's check).",
     ]);
-  const line = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
+  const hit = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
   if (COPYRIGHT_SYNTAX.test(facts.licenseMd))
-    return checkPassed(code, line ? ["File: LICENSE.md", `Found: "${line}"`] : []);
+    return checkPassed(code, hit ? ["File: LICENSE.md", `Found: "${hit.text}"`] : []);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_SYNTAX",
       file: "LICENSE.md",
+      ...(hit ? { line: hit.line } : {}),
       message:
-        "The LICENSE.md copyright line does not follow the `Copyright (C) <year> <holder>` syntax." +
-        (line ? ` Found: "${line}"` : ""),
-      hint: "Rewrite the copyright line as `Copyright (C) <year> <holder>`.",
+        "The LICENSE.md copyright line does not follow the `Copyright (C) <year> <holder>` (or `Copyright \u00a9 <year> <holder>`) syntax." +
+        (hit ? ` Found: "${hit.text}"` : ""),
+      hint: "Rewrite the copyright line as `Copyright (C) <year> <holder>` or `Copyright \u00a9 <year> <holder>`.",
     }),
   ]);
 }
@@ -122,15 +137,21 @@ export function checkCopyrightYearEmbedded(
     return checkPassed(code, ["No .kmn or .kps to check."]);
   const hits: string[] = [];
   let offending: string | undefined;
+  let offendingLine: number | undefined;
+  let offendingInKmn = false;
   if (facts.kmn !== undefined && COPYRIGHT_YEAR.test(facts.kmn)) {
     hits.push("the .kmn");
-    offending ??= firstMatchingLine(facts.kmn, COPYRIGHT_YEAR);
+    const hit = firstMatchingLine(facts.kmn, COPYRIGHT_YEAR);
+    offending ??= hit?.text;
+    offendingLine ??= hit?.line;
+    offendingInKmn = true;
   }
   if (facts.kps !== undefined) {
     const copyrightEl = /<Copyright[^>]*>([^<]*)<\/Copyright>/i.exec(facts.kps);
     if (copyrightEl !== null && /\d{4}/.test(copyrightEl[1] ?? "")) {
       hits.push("the .kps");
       offending ??= copyrightEl[0].trim();
+      offendingLine ??= lineOfIndex(facts.kps, copyrightEl.index);
     }
   }
   if (hits.length === 0)
@@ -138,7 +159,12 @@ export function checkCopyrightYearEmbedded(
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_YEAR_EMBEDDED",
-      file: facts.kps !== undefined ? "package" : "source",
+      file: offendingInKmn
+        ? `source/${facts.keyboardId}.kmn`
+        : facts.kps !== undefined
+          ? "package"
+          : "source",
+      ...(offendingLine !== undefined ? { line: offendingLine } : {}),
       message:
         `A copyright year is embedded in ${hits.join(" and ")} copyright strings.` +
         (offending ? ` Found: "${offending}"` : ""),
@@ -148,23 +174,28 @@ export function checkCopyrightYearEmbedded(
 }
 
 /**
- * 5.2b — a version number is embedded in README.md, readme.htm,
- * welcome.htm, or the help .php. Heuristic: any X.Y[.Z] pattern — a
- * warning-level lint, not a proof.
+ * 5.2b -- a version number is embedded in README.md, readme.htm,
+ * welcome.htm, or the help .php. Heuristic: an X.Y[.Z] pattern in the
+ * visible text -- a warning-level lint, not a proof. Markup that merely
+ * looks version-shaped is blanked first (line numbers preserved): tags,
+ * HTML comments, <style>/<script> blocks (CSS `line-height: 1.6`), PHP
+ * blocks, URLs, and DOIs (`10.1080/...`).
  */
+const NOT_VISIBLE_TEXT =
+  /<style[\s\S]*?<\/style\s*>|<script[\s\S]*?<\/script\s*>|<\?php[\s\S]*?\?>|<!--[\s\S]*?-->|<[^>]*>|https?:\/\/\S+|\bwww\.\S+|\b10\.\d{4,9}\/\S+/gi;
+const blankInvisible = (t: string): string =>
+  t.replace(NOT_VISIBLE_TEXT, (m) => m.replace(/[^\n]/g, " "));
+
 export function checkVersionInDocs(facts: TextContentFacts): CheckResult {
   const code = "KM_LINT_VERSION_IN_DOCS";
   const docs: Array<[string, string | undefined]> = [
     ["README.md", facts.readmeMd],
     ["source/readme.htm", facts.readmeHtm],
-    ["source/welcome.htm", facts.welcomeHtm],
+    [facts.welcomePath ?? "source/welcome.htm", facts.welcomeHtm],
     [facts.phpPath ?? "help .php", facts.php],
   ];
-  // Strip HTML tags: a version in markup (e.g. <meta>) is not a hardcoded
-  // version in the visible documentation text.
-  const stripTags = (t: string) => t.replace(/<[^>]*>/g, " ");
   const hits = docs.filter(
-    ([, text]) => text !== undefined && VERSION_LIKE.test(stripTags(text)),
+    ([, text]) => text !== undefined && VERSION_LIKE.test(blankInvisible(text)),
   );
   const present = docs.filter(([, t]) => t !== undefined).map(([n]) => n);
   if (hits.length === 0) {
@@ -172,17 +203,18 @@ export function checkVersionInDocs(facts: TextContentFacts): CheckResult {
       return checkPassed(code, ["No documentation files to check."]);
     return checkPassed(code, [`Checked: ${present.join(", ")}.`]);
   }
-  const versionMatch = stripTags(hits[0]![1]!).match(VERSION_LIKE);
+  const original = hits[0]![1]!;
+  const visible = blankInvisible(original);
+  const versionMatch = visible.match(VERSION_LIKE);
   const version = versionMatch ? versionMatch[0] : "";
-  // Find the full original line containing the version (for the code block)
-  const fullLine = hits[0]![1]!
-    .split("\n")
-    .find((l) => VERSION_LIKE.test(stripTags(l)))
-    ?.trim();
+  const lineIdx = visible.split("\n").findIndex((l) => VERSION_LIKE.test(l));
+  // The full original line containing the version (for the code block).
+  const fullLine = lineIdx >= 0 ? original.split("\n")[lineIdx]?.trim() : undefined;
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_VERSION_IN_DOCS",
       file: hits[0]![0],
+      ...(lineIdx >= 0 ? { line: lineIdx + 1 } : {}),
       message:
         `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.` +
         (version ? ` Found: "${version}"` : "") +
@@ -198,7 +230,7 @@ export function checkCopyrightInDocs(facts: TextContentFacts): CheckResult {
   const docs: Array<[string, string | undefined]> = [
     ["README.md", facts.readmeMd],
     ["source/readme.htm", facts.readmeHtm],
-    ["source/welcome.htm", facts.welcomeHtm],
+    [facts.welcomePath ?? "source/welcome.htm", facts.welcomeHtm],
   ];
   const hits = docs.filter(
     ([, text]) => text !== undefined && COPYRIGHT_YEAR.test(text),
@@ -210,14 +242,15 @@ export function checkCopyrightInDocs(facts: TextContentFacts): CheckResult {
       "No copyright statement in the documentation.",
     ]);
   }
-  const line = firstMatchingLine(hits[0]![1]!, COPYRIGHT_YEAR);
+  const hit = firstMatchingLine(hits[0]![1]!, COPYRIGHT_YEAR);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_IN_DOCS",
       file: hits[0]![0],
+      ...(hit ? { line: hit.line } : {}),
       message:
         `A copyright statement is embedded in ${hits.map(([n]) => n).join(", ")}.` +
-        (line ? ` Found: "${line}"` : ""),
+        (hit ? ` Found: "${hit.text}"` : ""),
       hint: "Remove the copyright statement from the documentation — it belongs in LICENSE.md.",
     }),
   ]);
@@ -269,8 +302,9 @@ export function checkReadmeHelpLinkAbsent(
 }
 
 /**
- * 6.6b — the welcome.htm `<html lang>` does not match the keyboard's
- * primary BCP47 tag.
+ * 6.6b -- the welcome.htm `<html lang>` matches neither the keyboard's
+ * primary BCP47 tag nor English (`en` / `en-*`: an English welcome page
+ * is legitimate for any keyboard).
  */
 export function checkWelcomeLangMismatch(
   facts: TextContentFacts,
@@ -282,20 +316,27 @@ export function checkWelcomeLangMismatch(
     return checkPassed(code, ["Primary BCP47 tag unknown."]);
   const m = HTML_LANG.exec(facts.welcomeHtm);
   const lang = (m?.[1] ?? "").trim().toLowerCase();
+  const welcomeFile = facts.welcomePath ?? "source/welcome.htm";
   if (lang === facts.primaryBcp47.toLowerCase())
     return checkPassed(code, [
-      "File: source/welcome.htm",
+      `File: ${welcomeFile}`,
       `welcome.htm <html lang="${m?.[1]}"> matches "${facts.primaryBcp47}".`,
+    ]);
+  if (lang === "en" || lang.startsWith("en-"))
+    return checkPassed(code, [
+      `File: ${welcomeFile}`,
+      `welcome.htm <html lang="${m?.[1]}"> is English, which is accepted.`,
     ]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_WELCOME_LANG_MISMATCH",
-      file: "source/welcome.htm",
+      file: welcomeFile,
+      ...(m ? { line: lineOfIndex(facts.welcomeHtm, m.index) } : {}),
       message:
         lang === ""
           ? "welcome.htm has no <html lang> attribute."
           : `welcome.htm <html lang="${m?.[1]}"> does not match the keyboard's primary BCP47 tag "${facts.primaryBcp47}".`,
-      hint: `Set <html lang="${facts.primaryBcp47}"> in welcome.htm.`,
+      hint: `Set <html lang="${facts.primaryBcp47}"> (or lang="en" for an English page) in welcome.htm.`,
     }),
   ]);
 }
@@ -307,14 +348,15 @@ export function checkAuthorInKmn(facts: TextContentFacts): CheckResult {
     return checkPassed(code, ["No .kmn to check."]);
   if (!KMN_AUTHOR_STORE.test(facts.kmn))
     return checkPassed(code, ["No store(&Author) in the .kmn."]);
-  const line = firstMatchingLine(facts.kmn, KMN_AUTHOR_STORE);
+  const hit = firstMatchingLine(facts.kmn, KMN_AUTHOR_STORE);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_AUTHOR_IN_KMN",
       file: `source/${facts.keyboardId}.kmn`,
+      ...(hit ? { line: hit.line } : {}),
       message:
         "The author name is in a .kmn Author store — it belongs in the .kps." +
-        (line ? ` Found: "${line}"` : ""),
+        (hit ? ` Found: "${hit.text}"` : ""),
       hint: "Remove the store(&Author) from the .kmn; set the author in the .kps Info tab.",
     }),
   ]);
@@ -322,7 +364,8 @@ export function checkAuthorInKmn(facts: TextContentFacts): CheckResult {
 
 /**
  * 11.1b — the help .php is absent, or present without a proper PHP
- * header (the `<?php` open tag plus a `Name:` header comment block).
+ * header (the `<?php` open tag plus `$pagename = '...'` and
+ * `require_once('header.php')`, or a `Name:` header comment block).
  * Existence is part of the criterion, so absence is the finding
  * (not a missing input).
  */
@@ -342,17 +385,22 @@ export function checkPhpHeaderBad(facts: TextContentFacts): CheckResult {
   }
   // Strip a BOM before checking the open tag.
   const text = facts.php.replace(/^\ufeff/, "");
-  if (PHP_OPEN.test(text) && PHP_HEADER_BLOCK.test(text))
+  const hasHeader =
+    PHP_HEADER_BLOCK.test(text) ||
+    (PHP_PAGENAME.test(text) && PHP_REQUIRE_HEADER.test(text));
+  if (PHP_OPEN.test(text) && hasHeader)
     return checkPassed(code, [`File: ${phpFile}`, `Found: ${phpFile} with PHP header.`]);
   const firstLine = text.split("\n")[0]?.trim();
+  const openLine = firstMatchingLine(text, PHP_OPEN)?.line ?? 1;
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PHP_HEADER_BAD",
       file: phpFile,
+      line: openLine,
       message:
         "The help .php does not have the proper PHP header." +
         (firstLine ? ` First line: "${firstLine}"` : ""),
-      hint: "Start the .php with <?php and the /* Name: ... */ header block.",
+      hint: "Start the .php with <?php, set $pagename, and require_once('header.php') (or use a /* Name: ... */ header block).",
     }),
   ]);
 }
@@ -368,14 +416,14 @@ export function checkPhpStyleOutside(facts: TextContentFacts): CheckResult {
   const outside = closeIdx >= 0 ? facts.php.slice(closeIdx + 2) : facts.php;
   if (!/<style[\s>]/i.test(outside))
     return checkPassed(code, [`File: ${phpFile}`, "No <style> outside the PHP header block."]);
-  const line = firstMatchingLine(outside, /<style[\s>]/i);
+  const hit = firstMatchingLine(outside, /<style[\s>]/i);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PHP_STYLE_OUTSIDE",
       file: phpFile,
       message:
         "Style information (<style>) is outside the PHP header block." +
-        (line ? ` Found: "${line}"` : ""),
+        (hit ? ` Found: "${hit.text}"` : ""),
       hint: "Move style information inside the PHP header block (the $pagestyle variable).",
     }),
   ]);
@@ -389,14 +437,15 @@ export function checkPhpClosingTags(facts: TextContentFacts): CheckResult {
   const phpFile = facts.phpPath ?? "source/help/" + facts.keyboardId + ".php";
   if (!/<\/(body|html)\s*>/i.test(facts.php))
     return checkPassed(code, [`File: ${phpFile}`, "No closing </body> or </html> tags."]);
-  const line = firstMatchingLine(facts.php, /<\/(body|html)\s*>/i);
+  const hit = firstMatchingLine(facts.php, /<\/(body|html)\s*>/i);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PHP_CLOSING_TAGS",
       file: phpFile,
+      ...(hit ? { line: hit.line } : {}),
       message:
         "The help .php contains closing </body> or </html> tags." +
-        (line ? ` Found: "${line}"` : ""),
+        (hit ? ` Found: "${hit.text}"` : ""),
       hint: "Remove the closing </body> / </html> tags — the site template supplies them.",
     }),
   ]);

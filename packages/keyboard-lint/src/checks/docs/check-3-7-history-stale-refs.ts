@@ -37,7 +37,7 @@ export function checkHistoryStaleFileRefs(input: DocLintInput): CheckResult {
         severity: "warning",
         layer: "C",
         message: `HISTORY.md bullet "${bullet}" references "${deleted}", which no longer exists in the keyboard.`,
-        location: { file: path, line: 1 },
+        location: { file: path, line: 0 },
         hint: `Remove or update the HISTORY.md reference to "${deleted}" since that file was deleted.`,
       });
     }

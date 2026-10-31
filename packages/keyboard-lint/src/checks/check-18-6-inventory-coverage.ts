@@ -125,7 +125,7 @@ export function checkInventoryCoverage(
         severity: "warning",
         layer: "C",
         message: `Inventory character U+${codePoint} "${chNFC}" is not produced by any reachable rule in the keyboard.`,
-        location: { file: kmnPath, line: 1 },
+        location: { file: kmnPath, line: 0 },
         hint: `Add an output rule that emits "${chNFC}" (U+${codePoint}), or verify it is covered via an opaque/raw fragment (static analysis does not see those). If your keyboard emits this character as a base codepoint followed by a combining mark (NFD/decomposed form), confirm that sequence normalizes to the expected NFC-precomposed codepoint — or mark the keyboard as having a raw fragment to suppress this check for abugida/abjad layouts where opaque store content handles composition.`,
       });
     }
