@@ -48,6 +48,11 @@ export interface CriteriaPageProps {
   onClearFontLicense?: (fontName: string) => void;
   /** A statement of what was judged (e.g. the preview caveat in foreign mode). */
   judgedNote?: string;
+  /**
+   * GitHub link context for the /review report: when present, "File: <path>"
+   * evidence lines become links to the file at the pinned sha (open in new tab).
+   */
+  githubLink?: { owner: string; repo: string; sha: string } | null;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -123,6 +128,7 @@ export function CriteriaPage({
   onAttestFontLicense,
   onClearFontLicense,
   judgedNote,
+  githubLink,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
   const groups = groupBySection(result.rows);
@@ -184,6 +190,7 @@ export function CriteriaPage({
                     {...(onClearContrastive !== undefined ? { onClearContrastive } : {})}
                     {...(onAttestFontLicense !== undefined ? { onAttestFontLicense } : {})}
                     {...(onClearFontLicense !== undefined ? { onClearFontLicense } : {})}
+                    {...(githubLink !== undefined ? { githubLink } : {})}
                   />
                 ))}
               </ul>
