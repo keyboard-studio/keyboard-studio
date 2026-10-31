@@ -394,6 +394,25 @@ export function ReviewPicker({
           {prKeyboards === null && !prKeyboardsError && (
             <p style={{ fontSize: 13, color: TEXT_DIM }}>Reading the PR&apos;s file list…</p>
           )}
+          {prKeyboards !== null && prKeyboards.length > 1 && (
+            <div
+              role="alert"
+              style={{
+                borderLeft: "4px solid var(--app-warning-text)",
+                background: BG_INSET,
+                borderRadius: "0 10px 10px 0",
+                padding: "10px 14px",
+                fontSize: 12.5,
+                marginBottom: 8,
+              }}
+            >
+              <strong style={{ color: CSS_WARNING_TEXT }}>
+                ⚠ This PR touches {prKeyboards.length} keyboards.
+              </strong>{" "}
+              Review each one separately — a multi-keyboard PR deserves a
+              closer look.
+            </div>
+          )}
           {prKeyboards !== null && (
             <KeyboardList
               keyboards={prKeyboards}

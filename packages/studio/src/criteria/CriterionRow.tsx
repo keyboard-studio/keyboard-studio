@@ -25,7 +25,15 @@ import { msg } from "@lingui/core/macro";
 
 import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
-import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+import {
+  ACCENT,
+  BORDER,
+  ERROR_TEXT,
+  FONT,
+  SUCCESS_ACCENT,
+  TEXT_DIM,
+  WARNING,
+} from "../ui/theme.ts";
 import type {
   AttestationAnswer,
   CriteriaMode,
@@ -53,6 +61,11 @@ export interface CriterionRowProps {
   ) => void;
   /** §§9.1/9.2 (Batch 5): remove one font's license attestation. */
   onClearFontLicense?: (fontName: string) => void;
+  /**
+   * /review severity override ("met" | "warning" | "error"), set by the
+   * health report. When present, the status label is color-coded.
+   */
+  severity?: "met" | "warning" | "error" | "hidden";
 }
 
 /**
@@ -136,6 +149,7 @@ export function CriterionRow({
   onClearContrastive,
   onAttestFontLicense,
   onClearFontLicense,
+  severity,
 }: CriterionRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -277,7 +291,19 @@ export function CriterionRow({
         </span>
         <span
           data-testid="criteria-row-status"
-          style={{ fontSize: 11, color: TEXT_DIM, whiteSpace: "nowrap" }}
+          style={{
+            fontSize: 11,
+            whiteSpace: "nowrap",
+            fontWeight: severity ? 600 : undefined,
+            color:
+              severity === "met"
+                ? SUCCESS_ACCENT
+                : severity === "warning"
+                  ? WARNING
+                  : severity === "error"
+                    ? ERROR_TEXT
+                    : TEXT_DIM,
+          }}
         >
           {criterionStatusLabel(row.status, i18n)}
         </span>

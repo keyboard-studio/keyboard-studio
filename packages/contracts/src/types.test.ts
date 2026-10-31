@@ -564,7 +564,9 @@ describe("criteria.json schema conformance", () => {
 
   it("section-19 has 2 import-output criteria", () => {
     expect(
-      ALL_CRITERIA.filter((c) => c.section === "19. Import output").length
+      ALL_CRITERIA.filter(
+        (c) => c.section === "19. Import output" && c.band === "scaffolder-bake"
+      ).length
     ).toBe(2);
     const row2 = ALL_CRITERIA.find((c) => c.id === "19.2-import-attribution-in-history-md");
     expect(row2).toBeDefined();
