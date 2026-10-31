@@ -8,7 +8,7 @@
 //                    18.5 KM_WARN_LAYER_SWITCH_NO_RETURN
 //   Compile gate  -> 18.6 KM_LINT_INVENTORY_UNCOVERED (also needs keyboardIR + inventory — use lintWithContext)
 //   Submit        -> all of the above
-//   18.7 KM_LINT_MANDATED_CHAR_MISSING -> implemented in criteriaChecks (spec 084 Batch 3)
+//   18.7 KM_LINT_MANDATED_CHAR_MISSING (implemented — see checks/criteria/check-currency.ts)
 //   1.10b KM_LINT_KPJ_FORMAT_OUTDATED + 2.7 KM_LINT_KPJ_VERSION_BUMPED -> implemented in
 //        criteriaChecks (spec 084 KPJ pair — compare the judged .kpj's <Options><Version>
 //        against criterion 1.10's pinned current format, re-pinned to 2.0 by ruling)

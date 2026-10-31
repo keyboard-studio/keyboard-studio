@@ -4,7 +4,7 @@
 US1 (all studio UI chrome externalized + locale switching, P1 MVP) and US3
 (region-locale resolution, ICU plurals, translator context, CI upload/download
 round-trip, no-flash boot) are both complete — see
-[tasks.md](../specs/046-i18n-localization/tasks.md) for the per-task status. US2
+[tasks.md](../specs/_archive/046-i18n-localization/tasks.md) for the per-task status. US2
 (content-owned strings — survey/pattern/criteria prose) has not started; it is
 gated on a joint engine+content session (T026) before any extraction work
 begins. The design below (explicit stable ids, minimal-JSON catalogs, the
@@ -91,7 +91,7 @@ professionally translated — Crowdin owns the real ones).
 
 ## Verification
 
-Runnable end-to-end checks live in [quickstart.md](../specs/046-i18n-localization/quickstart.md)
+Runnable end-to-end checks live in [quickstart.md](../specs/_archive/046-i18n-localization/quickstart.md)
 (extraction round-trip, drift gate, locale-switch test, typecheck + lint,
 Crowdin dry-run). Summary:
 
@@ -134,7 +134,7 @@ Crowdin dry-run). Summary:
   CLI's `--check` (wired into `pnpm lint`) and target-locale key-set parity by
   `utilities/content-i18n-lint`; `criteria.json` is further gated by its zod
   schema + the criteria-count test. Seam decisions live in
-  [specs/046-i18n-localization/research.md](../specs/046-i18n-localization/research.md)
+  [specs/_archive/046-i18n-localization/research.md](../specs/_archive/046-i18n-localization/research.md)
   (D8) and spec 073's research.md (D7 — why `flowQuestions` freshness is
   delegated to the extractor CLI rather than mirrored in the plain-JS lint tool).
   `flowQuestions` gained a fifth, optional field — `audit_label`, the

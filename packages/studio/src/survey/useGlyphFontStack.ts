@@ -1,5 +1,5 @@
 // useGlyphFontStack — the CSS font-family stack for the author's chosen Phase
-// B font (Noto Sans default / Charis SIL), applied to every glyph-bearing
+// B font (Noto Sans default / Charis SIL / Andika), applied to every glyph-bearing
 // surface: CharChipEditor's typed-in chips, SuggestionChip's CLDR suggestion
 // chips, and CharacterMapPane's character-map cells (all three read the
 // character-inventory value's `selectedFont` then `phaseBFontStack(...)`

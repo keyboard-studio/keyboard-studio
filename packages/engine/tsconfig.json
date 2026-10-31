@@ -10,8 +10,7 @@
     "experimentalDecorators": true
   },
   "references": [
-    { "path": "../contracts" },
-    { "path": "../llm" }
+    { "path": "../contracts" }
   ],
   "include": ["src/**/*", "src/character-discovery/generated/*.json"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]

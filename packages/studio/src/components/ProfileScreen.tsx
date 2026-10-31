@@ -21,6 +21,7 @@ import {
 import { ERROR_TEXT } from "../ui/theme.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
 import { MyKeyboardsList } from "./MyKeyboardsList.tsx";
+import { YourDataPanel } from "./YourDataPanel.tsx";
 
 // ---------------------------------------------------------------------------
 // Shared style helpers
@@ -298,6 +299,10 @@ export function ProfileScreen() {
 
         {/* My keyboards — the multi-project draft list (US3a / FR-014). */}
         <MyKeyboardsList />
+
+        {/* Your data — privacy self-service: export + delete-all for
+            server drafts (specs 097/098), guest-honest when signed out. */}
+        <YourDataPanel />
       </div>
 
       {/* Bottom — back link, then the single global Sign out button */}

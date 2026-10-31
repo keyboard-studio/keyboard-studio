@@ -29,7 +29,6 @@ import type { Step } from "./types.ts";
 import {
   decisionModules,
   declaredScreenGates,
-  galleryModules,
 } from "../survey/questions/registry.ts";
 import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
@@ -208,9 +207,10 @@ const stepPool: readonly Step[] = [
 
   // --- Invisible characters (spec 075 US3) ---
   // Format characters — ZWJ, ZWNJ, ZWSP, SOFT HYPHEN, WORD JOINER and the
-  // bidi controls — have no glyph, so no character map can show them and no
-  // exemplar tier attests them. This step offers each BY NAME with a need
-  // statement; the author's yes/no per character is a recorded decision.
+  // bidi controls — have no glyph, so no exemplar tier attests them. The
+  // right-pane gallery (#1794) offers each BY NAME with a need statement,
+  // block-grouped like the other character maps; the author's yes/no per
+  // character is a recorded decision.
   // ALWAYS renders (FR-020): no computed gate, no null return, unlike the
   // marks series and the convenience question on either side of it. Declares
   // inputs/writes empty (spec 066 FR-006): confirming an inventory is a survey
@@ -224,6 +224,10 @@ const stepPool: readonly Step[] = [
     inputs: [],
     writes: [],
     component: InvisiblesStepHost,
+    // Right pane swaps to the interactive gallery, as on the punctuation
+    // step — unconditionally: this step has no discovery fork, so the map
+    // shows for every author (scope "invisibles", the non-glyph variant).
+    rightPane: "character-map",
     specRef: ["specs/075-punctuation-defaults"],
     evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
     // The invisibles-inventory decision (spec 090); no answer-store
@@ -381,25 +385,6 @@ export const screenTrails: ReadonlyMap<string, StepTrail> = new Map<string, Step
   ["package", { spine: true }],
 ]);
 
-/**
- * Gallery-hosted steps (spec 090 T005): screen id → the gallery module
- * that settles the screen's gallery decision. Derived from screen
- * membership (spec 091 T014): a screen appears here exactly when one of
- * its member decisions is provided by a registered gallery module. Step
- * wrappers and StepHost resolve their module through this map and render
- * it via the gallery host (steps/galleryHost.tsx). A screen settling two
- * gallery decisions would be ambiguous — the coverage test
- * (decisions/galleryModules.coverage.test.ts) pins one provider per
- * settles id, and no screen settles more than one.
- */
-export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
-  derivedScreens.flatMap((screen) => {
-    const mod = galleryModules.find((m) =>
-      (m.provides ?? []).some((id) => screen.decisionIds.includes(id)),
-    );
-    return mod === undefined ? [] : [[screen.id, mod] as const];
-  }),
-);
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).
@@ -474,6 +459,17 @@ export function validateManifestShape(): void {
     if (step?.layout !== "full") {
       throw new Error(
         `[manifest] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
+      );
+    }
+  }
+
+  // Right-pane guard: rightPane, when declared, must be one of the
+  // allowed values. "none" hides the preview pane (identity/layout).
+  const ALLOWED_RIGHT_PANES = new Set(["preview", "character-map", "none"]);
+  for (const step of manifest) {
+    if (step.rightPane !== undefined && !ALLOWED_RIGHT_PANES.has(step.rightPane)) {
+      throw new Error(
+        `[manifest] step "${step.id}" declares invalid rightPane "${step.rightPane}" — expected "preview", "character-map", or "none"`,
       );
     }
   }

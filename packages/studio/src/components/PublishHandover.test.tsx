@@ -166,6 +166,33 @@ describe("PublishHandover", () => {
     expect(screen.getByTestId("publish-handover-open")).toBeTruthy();
   });
 
+  it("keeps the submit panel mounted while a submission is in flight, even as new builds arrive (#2050)", async () => {
+    recordBuild(FP_A, 0);
+    renderHandover(FP_A);
+    await open();
+    fireEvent.click(screen.getByTestId("publish-handover-confirm"));
+    expect(screen.getByTestId("submit-panel")).toBeTruthy();
+    // A submission starts; a new test build lands mid-submit.
+    act(() => useTestingStore.getState().setSubmitInFlight(true));
+    act(() => recordBuild(FP_B, 0));
+    expect(screen.getByTestId("submit-panel")).toBeTruthy();
+    expect(screen.queryByTestId("publish-handover-open")).toBeNull();
+  });
+
+  it("keeps the panel visible after the submit settles so its outcome is never dropped (#2050)", async () => {
+    recordBuild(FP_A, 0);
+    renderHandover(FP_A);
+    await open();
+    fireEvent.click(screen.getByTestId("publish-handover-confirm"));
+    act(() => useTestingStore.getState().setSubmitInFlight(true));
+    act(() => recordBuild(FP_B, 0));
+    // The submit settles (error path): the panel stays on screen with the
+    // outcome instead of falling back to the confirm step.
+    act(() => useTestingStore.getState().setSubmitInFlight(false));
+    expect(screen.getByTestId("submit-panel")).toBeTruthy();
+    expect(screen.queryByTestId("publish-handover-open")).toBeNull();
+  });
+
   it("shows the submit panel directly once the project is submitted (frozen)", () => {
     recordBuild(FP_A, 0);
     useTestingStore.setState({ frozen: true });

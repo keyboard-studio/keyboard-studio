@@ -43,6 +43,7 @@ import {
   confirmPrefill,
   buildOneCharacterList,
   carveCharacter,
+  driveDeadkeysStep,
   driveMechanismsGallery,
   surveyAdvance,
 } from "./helpers/surveyFlow";
@@ -115,8 +116,8 @@ async function backToLayoutStep(page: Page): Promise<void> {
 async function forwardToCarve(page: Page): Promise<void> {
   const carveGallery = page.getByTestId("carve-gallery");
   const revisitControls = [
-    "prefill-confirm",
-    "phase-b-done",
+    "prefill-continue",
+    "charlist-done",
     "marks-continue",
     "punctuation-done",
     "invisibles-continue",
@@ -175,7 +176,9 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
     .toEqual(expect.arrayContaining(TARGET_RULE_IDS));
   await page.getByTestId("carve-continue").click();
 
-  // Rules step (spec 082) sits between carve and mechanisms.
+  // Deadkeys step (spec 083) sits between carve and rules (#2053).
+  await driveDeadkeysStep(page);
+  // Rules step (spec 082) sits between deadkeys and mechanisms.
   await page.getByTestId("rules-continue").click();
 
   // Mechanisms: place every character the gallery walks (é + its marks
@@ -233,6 +236,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
     .locator(`button[aria-label*="— ${label}"]`);
   await expect(cells.first()).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("carve-continue").click();
+  await driveDeadkeysStep(page);
   await page.getByTestId("rules-continue").click();
 
   // SURVIVAL (mechanisms): the gallery's characters are still covered —

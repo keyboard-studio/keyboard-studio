@@ -1,6 +1,6 @@
 // Unit tests for MechanismGallery — progression: advance after Apply, mark for later
-// review, the Done state and its blocked hint, the added chip row, Back/Next
-// navigation, auto-unlock after Done, full-inventory auto-lock, and the within-step
+// review, the "Continue" state and its blocked hint, the added chip row, Back/Next
+// navigation, auto-unlock after Continue, full-inventory auto-lock, and the within-step
 // walk position.
 //
 // Shared module mocks, spies, and the lifecycle hooks every suite installs:
@@ -83,7 +83,7 @@ describe("MechanismGallery — advance after apply", () => {
 // (mechanism-gallery-progression). A pure per-character TOGGLE: it does not
 // itself navigate, records nothing in the working copy (authoring metadata
 // only, in surveySessionStore), and satisfies canGoNext so the EXISTING
-// Next/Done control (not a second navigation control) advances.
+// Next/Continue control (not a second navigation control) advances.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — mark for later review", () => {
@@ -129,7 +129,7 @@ describe("MechanismGallery — mark for later review", () => {
     });
   });
 
-  it("marking the current character enables Next/Done without changing the coverage count", async () => {
+  it("marking the current character enables Next/Continue without changing the coverage count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
@@ -184,16 +184,16 @@ describe("MechanismGallery — mark for later review", () => {
 // Done state
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — Done state (positional: last char's forward button)", () => {
+describe("MechanismGallery — Continue state (positional: last char's forward button)", () => {
   it("the only (and therefore last) character's forward button already reads Done, disabled until a method is applied", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // idx 0 === lettersToAdd.length - 1 for a single-char list, so the
-    // forward button reads "Done" from the very first render — there is no
+    // forward button reads "Continue" from the very first render — there is no
     // separate "Next character" step to click through first.
-    const doneBtn = screen.getByRole("button", { name: "Done" });
+    const doneBtn = screen.getByRole("button", { name: "Continue" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
@@ -204,7 +204,7 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
     });
   });
 
-  it("clicking Done invokes the onComplete callback directly (no intermediate Next click)", async () => {
+  it("clicking Continue invokes the onComplete callback directly (no intermediate Next click)", async () => {
     const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
@@ -219,16 +219,16 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
     await waitFor(() => {
-      const doneBtn = screen.getByRole("button", { name: "Done" });
+      const doneBtn = screen.getByRole("button", { name: "Continue" });
       expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
       fireEvent.click(doneBtn);
     });
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it('marking the only (last) character enables Done, which completes directly — no modal', async () => {
+  it('marking the only (last) character enables Continue, which completes directly — no modal', async () => {
     // Marking the last position is itself the phase-completion enabler: once
-    // "á" is marked (not applied), Done becomes clickable and completes
+    // "á" is marked (not applied), Continue becomes clickable and completes
     // directly. There is no more "leave-warning" confirm dialog
     // (mechanism-gallery-progression) — the affordance is disabled, not
     // click-intercepted.
@@ -242,7 +242,7 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
         />, { withStepNav: true }
       );
     });
-    const doneBtn = screen.getByRole("button", { name: "Done" });
+    const doneBtn = screen.getByRole("button", { name: "Continue" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(
@@ -257,14 +257,14 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
 });
 
 // ---------------------------------------------------------------------------
-// Done-blocked inline hint — replaces the old leave-warning ConfirmDialog
+// Continue-blocked inline hint — replaces the old leave-warning ConfirmDialog
 // (mechanism-gallery-progression). No <dialog> element is rendered by this
-// gallery at all anymore; the Done/Continue control is simply disabled while
+// gallery at all anymore; the Continue control is simply disabled while
 // any lettersToAdd character is neither implemented nor marked, and an inline
 // role="status" hint explains why.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
+describe("MechanismGallery — Continue-blocked inline hint (no modal)", () => {
   it("never renders a <dialog> element, even while characters remain unimplemented", async () => {
     seedInventory(["á", "é"]);
     const { container } = await act(async () =>
@@ -489,9 +489,9 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
       expectCurrentChar("í");
     });
 
-    // The last character's forward button already reads "Done" (not yet
+    // The last character's forward button already reads "Continue" (not yet
     // applied for "í", so it starts disabled).
-    const doneBtn = screen.getByRole("button", { name: "Done" });
+    const doneBtn = screen.getByRole("button", { name: "Continue" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
 
     // --- Back from "í" (idx 2) lands on "é" (idx 1) — covered, not skipped. ---
@@ -570,7 +570,7 @@ const UNLOCK_FIXTURE_MANIFEST: readonly Step[] = [
   makeEditorStepFixture("touch", [], [PATH_GROUPS_FIXTURE]),
 ];
 
-describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () => {
+describe("MechanismGallery — edit after Continue (auto-unlock on first edit)", () => {
   beforeEach(() => {
     bindManifest(UNLOCK_FIXTURE_MANIFEST);
   });
@@ -688,13 +688,13 @@ describe("MechanismGallery — Back after marking the only character", () => {
       );
     });
 
-    // Marking the only character enables Done at that same position (idx 0
+    // Marking the only character enables Continue at that same position (idx 0
     // is also the last position) — it does not move currentChar anywhere.
-    // "á" was marked (never applied), so Done completes directly — no modal.
+    // "á" was marked (never applied), so Continue completes directly — no modal.
     fireEvent.click(
       screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
     );
-    const doneBtn = await screen.findByRole("button", { name: "Done" });
+    const doneBtn = await screen.findByRole("button", { name: "Continue" });
     await waitFor(() => expect((doneBtn as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
@@ -716,7 +716,7 @@ describe("MechanismGallery — Back after marking the only character", () => {
 // Forward button — forced visible/enabled once the whole inventory is
 // covered, even when currentChar is outside lettersToAdd's walk (bug fix).
 //
-// This suite pins TWO independent, OR-ed reasons the Done button can be
+// This suite pins TWO independent, OR-ed reasons the "Continue" button can be
 // force-shown for a currentChar outside lettersToAdd's walk:
 //   (a) `allCovered` — the producer-badge signal, exercised by the first two
 //       tests below;
@@ -728,8 +728,8 @@ describe("MechanismGallery — Back after marking the only character", () => {
 //       branch doc comment for the full reconciliation between the two.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — Done button forced visible when the whole inventory is covered", () => {
-  it("shows an ENABLED Done button when every inventory character has count >= 1, even navigated to an already-produced character outside lettersToAdd (previously hidden)", async () => {
+describe("MechanismGallery — Continue button forced visible when the whole inventory is covered", () => {
+  it("shows an ENABLED Continue button when every inventory character has count >= 1, even navigated to an already-produced character outside lettersToAdd (previously hidden)", async () => {
     const ruleZ: IRRule = {
       nodeId: "r-z",
       context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
@@ -784,14 +784,14 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     // The Done button is FORCED visible and enabled — the whole inventory
     // (both "y" and "z") is covered.
     const doneBtn = screen.getByTestId("mechanisms-continue");
-    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect(doneBtn.textContent).toMatch(/Continue/i);
     expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("does NOT force-show the Done button when at least one character is still count === 0, even when navigated to an already-produced character outside lettersToAdd", async () => {
+  it('does NOT force-show the "Continue" button when at least one character is still count === 0, even when navigated to an already-produced character outside lettersToAdd', async () => {
     const ruleZ: IRRule = {
       nodeId: "r-z",
       context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
@@ -831,7 +831,7 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     expect(screen.queryByTestId("mechanisms-continue")).toBeNull();
   });
 
-  it("force-shows an ENABLED Done button via the mark-aware unaccountedChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
+  it("force-shows an ENABLED Continue button via the mark-aware unaccountedChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
     // "z" is directly produced by the base (badge count via signal (a)) —
     // stays OUT of lettersToAdd, the SHOW-ALL-only character this test
     // navigates to. "á" has no base coverage, so it is the walk's sole
@@ -885,9 +885,9 @@ describe("MechanismGallery — Done button forced visible when the whole invento
 
     // Every character is implemented ("z") or marked ("á") —
     // `unaccountedChars` is empty even though `allCovered` (badge) is
-    // false — Done force-shows, ENABLED, from this out-of-walk character.
+    // false — Continue force-shows, ENABLED, from this out-of-walk character.
     const doneBtn = screen.getByTestId("mechanisms-continue");
-    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect(doneBtn.textContent).toMatch(/Continue/i);
     expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
 
     // Unlike the badge-only test above, clicking here is expected to
@@ -910,7 +910,7 @@ describe("MechanismGallery — Done button forced visible when the whole invento
 //       MechanismAssignment(scope: "individual") — the "every alphabet
 //       character gets assigned to at least one key/mechanism" functional
 //       path, and
-//   (b) reaching the phase's completion (the final Done click) fires the
+//   (b) reaching the phase's completion (the final "Continue" click) fires the
 //       real completion effects (R1, re-homed from the reducer to
 //       lib/assignLoopCompletion.ts at spec 090 T041 — D-090-38),
 //       landing desktopLocked === true on the real store.
@@ -956,7 +956,7 @@ describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008
       });
     }
 
-    // The last character's forward button reads "Done" — Apply, then Done
+    // The last character's forward button reads "Continue" — Apply, then Continue
     // fires onComplete (which runs the real R1 completion effects above).
     const lastChar = DECLARED_CHARS[DECLARED_CHARS.length - 1]!;
     fireEvent.click(
@@ -965,7 +965,7 @@ describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008
       }),
     );
     await waitFor(() => {
-      const doneBtn = screen.getByRole("button", { name: "Done" });
+      const doneBtn = screen.getByRole("button", { name: "Continue" });
       expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
       fireEvent.click(doneBtn);
     });

@@ -15,12 +15,12 @@
   --app-surface:          #FFFFFF;
   --app-surface-2:        #F8FAFB;
   --app-overlay:          #FFFFFF;
-  /* Frosted-chrome surface: the translucent material for the persistent
-     floating bars (top nav, journey footer). Built on --app-surface so it
-     tracks the theme with no per-theme override — page content shows through
-     softly under backdrop blur. Legibility comes from the blur plus the fill,
-     never from stacking chrome on chrome. */
-  --app-chrome-surface:   color-mix(in srgb, var(--app-surface) 72%, transparent);
+  /* Hard divider for the solid chrome bars (top nav, journey footer): the
+     "black line" where each bar meets the content. Pure black on the light
+     theme (21:1); on navy it reads as a dark seam (1.5:1 against the bar
+     surface — nothing darker exists, and a grey would not be the asked-for
+     black line). A decorative 1px rule, not text, so no AA target applies. */
+  --app-chrome-divider:    #000000;
   --app-border:           #E3E7EB;
   --app-border-strong:    #CFD6DC;
   --app-text:             #18242E;
@@ -49,6 +49,18 @@
      at once. */
   --app-text-subtle:      #65717E;
   --app-text-disabled:    rgba(24, 36, 46, 0.35);
+  /* Placeholder text (issue #1985): no stylesheet set ::placeholder, so
+     inputs fell back to Chrome's fixed #757575 default — visibly dim on navy
+     but near-full-strength on light, where an empty field read as filled in.
+     Measured as normal-size text (AA needs 4.5:1) on the surfaces inputs
+     sit on:
+                       page #F3F5F7   surface #FFF   surface-2 #F8FAFB
+       #65717E              4.56            4.98           4.76   <- passes all
+     #65717E is the LIGHTEST value that clears 4.5:1 on all three light
+     surfaces — maximally dim (clearly quieter than --app-text input text)
+     while staying readable where a placeholder carries meaning (1.4.3).
+     Gated by styles/placeholder.test.ts. */
+  --app-placeholder:      #65717E;
   --app-text-on-accent:   #FFFFFF;
 
   --app-accent:           var(--sil-blue);
@@ -137,6 +149,16 @@
   --app-text-muted:       #AEBCD6;
   --app-text-subtle:      #8493B6;
   --app-text-disabled:    rgba(234, 241, 251, 0.35);
+  /* Navy's placeholder (issue #1985): NOT --app-text-subtle's navy value —
+     #8493B6 only reaches 3.88:1 on the lighter --app-surface-2 (#27365A),
+     which fails 4.5:1 for inputs sitting on that surface. #AEBCD6 clears
+     AA on every navy surface:
+                       page #18243F  surface #1F2C49  surface-2 #27365A
+       #AEBCD6              8.04            7.24             6.22
+     still visibly dimmer than the near-white --app-text (#EAF1FB) input
+     text, so empty fields keep reading as empty.
+     Gated by styles/placeholder.test.ts. */
+  --app-placeholder:      #AEBCD6;
   /* DARK, not white — and this override is load-bearing.
      Navy's accent is a LIGHT blue (#5AA7F0), the inverse of light's dark
      #005CB9, so text sitting ON the accent fill has to invert too:

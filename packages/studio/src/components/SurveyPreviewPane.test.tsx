@@ -65,4 +65,35 @@ describe("SurveyPreviewPane", () => {
       screen.getByText(/Choose a starting keyboard/, { exact: false }),
     ).not.toBeNull();
   });
+
+  // #1898: on desktop the OSK spans the full width of the pane exactly as
+  // in the compact sheet — the pane carries no side gutter, the title row
+  // insets itself by the former 24px pane padding, and the OSK frame is
+  // full-bleed (no rounded card).
+  it("desktop: no side gutter, title row inset 24px, OSK full-bleed", () => {
+    renderPane({});
+    const pane = document.querySelector(
+      '[aria-label="Keyboard preview"]',
+    ) as HTMLElement;
+    expect(pane.style.padding).toBe("24px 0px");
+    const titleRow = screen.getByText("US").parentElement as HTMLElement;
+    expect(titleRow.style.padding).toBe("0px 24px");
+    const osk = screen.getByTitle("On-screen keyboard preview")
+      .parentElement as HTMLElement;
+    expect(osk.style.borderRadius).toBe("");
+    expect(osk.style.borderTop).toBe("1px solid var(--app-border)");
+  });
+
+  it("compact: no pane padding, title row inset 12px, OSK full-bleed", () => {
+    renderPane({ compact: true });
+    const pane = document.querySelector(
+      '[aria-label="Keyboard preview"]',
+    ) as HTMLElement;
+    expect(pane.style.padding).toBe("0px");
+    const titleRow = screen.getByText("US").parentElement as HTMLElement;
+    expect(titleRow.style.padding).toBe("0px 12px");
+    const osk = screen.getByTitle("On-screen keyboard preview")
+      .parentElement as HTMLElement;
+    expect(osk.style.borderRadius).toBe("");
+  });
 });

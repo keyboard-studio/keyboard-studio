@@ -3,7 +3,7 @@
 **Repository:** https://github.com/keyboard-studio/keyboard-studio
 **Date:** 2026-06-26
 **Version:** 2.0.0
-**Status:** Draft — pre-Day-1 sync
+**Status:** Historical design document — superseded as an authority by [Constitution v2.0.0](.specify/memory/constitution.md) (ratified 2026-10-14), whose precedence-by-topic table governs on any conflict. Its still-load-bearing sections are cited from [docs/architecture.md](docs/architecture.md) and from the specs that implement them.
 
 > **Changelog.**
 > - **v2.0.0 (2026-06-26) — MAJOR.** Ratified at the §18 joint engine+content session (2026-06-26): contract additions that move `packages/contracts` to a new MAJOR version — the per-key touch provenance field on `TouchKeyIR` and the `IRPath` typed-path concept (§5a). This is a **gated/ratified major bump**, not an additive-minor revision. Same session ratified the §7.7 typed assignment-map contract (now built incrementally) and the functional phase labels + A–G crosswalk (Decision 15, §14). Decision 6 / §16 gained the touch-on-physical-substrate rationale.

@@ -23,6 +23,7 @@ import {
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
+  carveCharacter,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -33,9 +34,15 @@ import {
 const RESULTS_DIR =
   "/private/tmp/claude-501/-Users-grace-github-sil-keyboards/5f050279-211d-4d0e-83d1-b72d58a70f25/scratchpad/switch-base-results";
 
-const BASE_A = "bj_cree_woods"; // initial base (has raw rule#93 for the carve level)
+const BASE_A = "bj_cree_woods"; // initial base (the carve level's fixture — see below)
 const BASE_B = "basic_kbdfr"; // the "different base" switched to
-const CARVE_NODE_ID = "rule#93";
+// The L7 carve target in CarveGalleryV2 terms: U+14EC (ᓬ), whose only
+// producers in bj_cree_woods are the literal rules rule#18 / rule#20, so
+// discarding the character records exactly those two in deletedItemIds.
+// (The v1 target, rule#93, has no v2 discard path — see buildToLevel's L7
+// comment.)
+const CARVE_TARGET_CHAR = "ᓬ";
+const CARVE_DELETED_RULE_IDS = ["rule#18", "rule#20"];
 
 type DialogAction = "accept" | "dismiss";
 
@@ -137,8 +144,8 @@ function attach(page: Page, scenario: string, level: string, probe: string): Har
         basePicker: await vis(() => p.getByTestId("base-picker")),
         baseConfirm: await vis(() => p.getByTestId("base-confirm")),
         trackAdapt: await vis(() => p.getByTestId("track-adapt")),
-        prefillConfirm: await vis(() => p.getByTestId("prefill-confirm")),
-        phaseBIntro: await vis(() => p.getByTestId("phase-b-intro-next")),
+        prefillConfirm: await vis(() => p.getByTestId("prefill-continue")),
+        phaseBIntro: await vis(() => p.getByTestId("charlist-continue")),
         carveGallery: await vis(() => p.getByTestId("carve-gallery")),
         surveyBack: await vis(() => p.getByTestId("survey-back")),
         surveyAdvance: await vis(() => p.getByTestId("survey-advance")),
@@ -179,6 +186,7 @@ function attach(page: Page, scenario: string, level: string, probe: string): Har
                 )
               : null,
             deletedNodeIds: h.getDeletedNodeIds(),
+            deletedItemIds: h.getDeletedItemIds(),
           };
         })
         .catch((e) => ({ present: "eval-failed", error: String(e).slice(0, 120) }));
@@ -209,6 +217,7 @@ declare global {
     __ksE2E__?: {
       getWorkingIr(): { header?: unknown } | null;
       getDeletedNodeIds(): string[];
+      getDeletedItemIds(): string[];
     };
   }
 }
@@ -305,12 +314,12 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
 
   await chooseAdaptTrack(page);
   await driveAttributionStep(page);
-  await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 30_000 });
+  await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 30_000 });
   h.note("track chosen (adapt); at prefill confirmation");
   if (level === "L4-track-chosen") return;
 
   await confirmPrefill(page);
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 30_000 });
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 30_000 });
   h.note("prefill confirmed; at Phase B intro");
   if (level === "L5-prefill-confirmed") return;
 
@@ -319,26 +328,29 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   h.note("Phase B done (added ᙮); at carve gallery");
   if (level === "L6-phaseB-done") return;
 
-  // STALE since v2 went live: carve-card-<id>, raw-remove-anyway, and
-  // raw-confirm-remove were v1-only test-ids (the rule/node carve gallery's
-  // Rail / Inspector, since removed) — v2 is rendered instead. None of these elements exist in the
-  // live app, so L7-carve-deleted will time out on `targetCard` below rather
-  // than reach the carve step this level is meant to probe. L1 through L6
-  // above remain reachable (carve-gallery's own test-id is shared by both
-  // v1 and v2). Reaching L7 would need porting this to v2's own discard flow
-  // (irToCharacterView cells + getDeletedItemIds()) — out of scope for this
-  // pass, which only confirms the finding per #1628 item 3.
-  const targetCard = page.getByTestId(`carve-card-${CARVE_NODE_ID}`);
-  await expect(targetCard).toBeVisible({ timeout: 30_000 });
-  await targetCard.click();
-  await page.getByTestId("raw-remove-anyway").click();
-  await page.getByTestId("raw-confirm-remove").click();
+  // L7 ported to CarveGalleryV2 (#2053): carve-card-<id>, raw-remove-anyway,
+  // and raw-confirm-remove were v1-only test-ids (the rule/node carve
+  // gallery's Rail / Inspector, since removed) — none of them exist in the
+  // live app. The v1 target itself, rule#93 (`if(option_key = '') U+1427
+  // any(C_ef) > index(C_efc,3)`), also has NO v2 discard path: it parses as
+  // an opaque fragment, so every character it alone produces is blocked /
+  // non-toggleable in the character-first v2 gallery — verified live for
+  // #2053 (the U+140C cell renders but clicking it neither toggles it nor
+  // records a deletion; carve.spec.ts's header documents the same finding).
+  // L7 therefore carves the v2-supported equivalent on the same fixture —
+  // U+14EC, produced only by the literal rules rule#18 / rule#20 — which
+  // puts the walk in the same "a carve deletion is recorded" state the
+  // probes below exist to exercise, asserted through v2's channel
+  // (getDeletedItemIds(), not getDeletedNodeIds()).
+  await carveCharacter(page, CARVE_TARGET_CHAR);
   await expect
-    .poll(() => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []), {
+    .poll(() => page.evaluate(() => window.__ksE2E__?.getDeletedItemIds() ?? []), {
       timeout: 10_000,
     })
-    .toContain(CARVE_NODE_ID);
-  h.note(`carved ${CARVE_NODE_ID}; still at carve gallery`);
+    .toEqual(expect.arrayContaining(CARVE_DELETED_RULE_IDS));
+  h.note(
+    `carved U+14EC (deleted ${CARVE_DELETED_RULE_IDS.join(", ")}); still at carve gallery`,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu wire prefill",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:56.230Z"
+    }
+  ],
+  "telemetryInstanceId": "5019dd4b-db92-40ea-b9a5-cde495b47605"
+}

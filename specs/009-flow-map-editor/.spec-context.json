@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "flow map editor",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:45.058Z"
+    }
+  ],
+  "telemetryInstanceId": "8ce3bf29-3ec8-4e67-b916-d52a8edebca6"
+}

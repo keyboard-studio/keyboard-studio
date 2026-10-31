@@ -24,6 +24,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useIdentitySession } from "../hooks/useIdentitySession.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
+import { PrivacyLink } from "./PrivacyScreen.tsx";
 
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
@@ -206,6 +207,11 @@ export function SignUpPanel() {
           <Trans id="output.identity.signOut.label">Sign out</Trans>
         </button>
 
+        <p style={{ margin: 0, fontSize: 12, color: "var(--app-text-subtle)" }}>
+          <Trans id="output.identity.privacy.lead">How we handle your data:</Trans>{" "}
+          <PrivacyLink />
+        </p>
+
         {github.error !== null && (
           <div role="alert" style={alertStyle}>
             {github.error}
@@ -255,6 +261,11 @@ export function SignUpPanel() {
         <GoogleMark />
         <Trans id="output.identity.google.signUpLabel">Sign up with Google</Trans>
       </button>
+
+      <p style={{ margin: 0, fontSize: 12, color: "var(--app-text-subtle)" }}>
+        <Trans id="output.identity.privacy.lead">How we handle your data:</Trans>{" "}
+        <PrivacyLink />
+      </p>
 
       {github.error !== null && (
         <div role="alert" style={alertStyle}>

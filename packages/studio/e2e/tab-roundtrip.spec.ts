@@ -101,7 +101,7 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
 
-    const prefillConfirm = page.getByTestId("prefill-confirm");
+    const prefillConfirm = page.getByTestId("prefill-continue");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
 
     // The axe scans below cover the TABS this spec navigates between — the
@@ -151,8 +151,8 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
 
     // ---- The Phase B draft alphabet survives a round trip (D-4) ------------
     await confirmPrefill(page);
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 20_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 20_000 });
+    await page.click('[data-testid="charlist-continue"]');
 
     const charInput = page.getByLabel("Character to add");
     await charInput.waitFor({ timeout: 15_000 });

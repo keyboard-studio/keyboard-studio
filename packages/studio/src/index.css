@@ -1,12 +1,11 @@
 /* Token-layer import manifest (epic #533). Import order is cascade order:
  * brand (raw palette) -> colors (semantic --app-* light/navy) -> typography
- * -> geometry -> legacy (deprecated aliases, must load last so its
- * naming-collision override in legacy.css wins — see the comment there). */
+ * -> geometry. (The deprecated pre-#533 aliases in styles/legacy.css were
+ * deleted once every call site migrated to the --app-* tokens directly.) */
 @import "./styles/brand.css";
 @import "./styles/colors.css";
 @import "./styles/typography.css";
 @import "./styles/geometry.css";
-@import "./styles/legacy.css";
 
 * {
   box-sizing: border-box;
@@ -15,9 +14,23 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--ui);
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--app-font);
+}
+
+/* Themed placeholder text (issue #1985) -----------------------------------
+ * No stylesheet set ::placeholder, so every input fell back to Chrome's
+ * fixed #757575 default grey: visibly dim on navy, but on light nearly as
+ * dark as label text — an empty field read as filled in. The token keeps
+ * placeholders visibly dimmer than typed text on both themes while clearing
+ * WCAG 1.4.3 where a placeholder carries meaning. opacity: 1 defeats
+ * Firefox's default placeholder dimming so the token value is what renders.
+ * A class cannot express a pseudo-element, hence a global element rule. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--app-placeholder);
+  opacity: 1;
 }
 
 /* Shared control conventions (issue #536) ---------------------------------
@@ -90,39 +103,26 @@ body {
   }
 }
 
-/* Translucent chrome (frosted-glass bars) ------------------------------------
+/* Solid chrome (persistent bars) ------------------------------------------------
  * The studio's persistent bars — the desktop top navigation
  * (.ks-chrome-bar-top) and the journey footer (.ks-studio-footer) — are
- * translucent layers, not opaque strips: a semi-transparent surface fill
- * plus backdrop blur, with page content scrolling underneath each bar. The
- * hard hairline dividers are replaced by a scroll-edge fade: a short
- * gradient band where the bar meets the content, so scrolling content
- * visibly softens into the bar instead of hitting a line. The fade is part
- * of the bar itself, so it appears only where floating chrome overlaps
- * content.
- *
- * The frost is painted on ::before/::after, NEVER on the bar element: a
- * backdrop-filter on the element would make it a containing block for
- * fixed-position descendants, and both bars own viewport-fixed layers (the
- * contents sheet inside the footer; the account popover backdrop inside
- * the nav).
+ * opaque strips, not translucent layers: a solid surface fill with a hard
+ * hairline divider where each bar meets the content. There is no backdrop
+ * blur and no scroll-edge fade. The bars sit in the shell's normal column
+ * flow, so page content ends exactly at each bar's edge — a pane's own
+ * scrollbar never runs behind a bar.
  *
  * z-index 100: above in-pane widgets (picker popups and the like sit at
  * 50 or below), below popovers (199/200), sheets (240/241) and dialogs
- * (299). When a sheet or dialog opens, its scrim covers the chrome —
- * translucent surfaces never stack on each other.
+ * (299). When a sheet or dialog opens, its scrim covers the chrome.
  */
 
 /* Studio footer frame (spec 081 FR-020 / FR-020a). A fixed height, never
  * content-driven: 40 px under a fine pointer, and 52 px under a coarse one so a
  * nav button's 44 px `.ks-hit-target` fits without growing the strip. A class
- * rather than an inline style because the pointer query cannot be inline.
- *
- * The bar overlaps the content above it by exactly its own height: it stays
- * in normal flow (the shell's column math is untouched) while pane content
- * scrolls beneath the frosted layer. */
+ * rather than an inline style because the pointer query cannot be inline. */
 /* The footer's height, published on :root so content that must clear the
- * overlapping bar (the narrow floating preview button) can read it. 0 while
+ * bar (the narrow floating preview button) can read it. 0 while
  * no footer is mounted (before the journey starts). */
 :root {
   --studio-footer-h: 0px;
@@ -133,50 +133,13 @@ body {
 
 .ks-studio-footer {
   height: var(--studio-footer-h);
-  margin-top: calc(-1 * var(--studio-footer-h));
   position: relative;
   z-index: 100;
-  background: var(--app-chrome-surface);
-  /* `visible`: the scroll-edge fade (::before) hangs above the bar. The old
-   * overflow: hidden (FR-047, no horizontal page overflow) is not needed
-   * here — the shell root already clips horizontally, and the dot row keeps
-   * its own horizontal scroll. */
-  overflow: visible;
-}
-
-/* Frost layer for the footer — kept off the element itself (see the header
- * comment above). */
-.ks-studio-footer::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
-  backdrop-filter: blur(var(--app-chrome-blur));
-  pointer-events: none;
-}
-
-/* Scroll-edge fade: the 24 px band above the footer where content softens
- * into the bar. Taps fall through to the content beneath. The blur ramps in
- * with the tint (mask): a full-strength blur ends in a hard edge 24 px above
- * the bar, which reads as the bar itself being 24 px taller. */
-.ks-studio-footer::before {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  height: 24px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--app-chrome-surface)
-  );
-  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
-  backdrop-filter: blur(var(--app-chrome-blur));
-  -webkit-mask-image: linear-gradient(to bottom, transparent, black);
-  mask-image: linear-gradient(to bottom, transparent, black);
-  pointer-events: none;
+  background: var(--app-surface);
+  border-top: 1px solid var(--app-chrome-divider);
+  /* The old overflow: hidden (FR-047, no horizontal page overflow) is not
+   * needed here — the shell root already clips horizontally, and the dot row
+   * keeps its own horizontal scroll. */
 }
 
 @media (pointer: coarse) {
@@ -185,97 +148,14 @@ body {
   }
 }
 
-/* Desktop top bar: the same frosted treatment, fading downward into the
- * content. The narrow bar keeps its opaque look — NavBar applies this class
- * on desktop only. */
+/* Desktop top bar: the same solid treatment, its hairline sitting below the
+ * bar. The narrow bar keeps its own look — NavBar applies this class on
+ * desktop only. */
 .ks-chrome-bar-top {
   position: relative;
   z-index: 100;
-  background: var(--app-chrome-surface);
-  /* Content scrolls under the bar — unless the phase stepper sits directly
-   * below it (desktop survey route): the stepper is opaque chrome, and
-   * floating frost over chrome would stack two bars. There the nav stays in
-   * flow and drops its fade (below). */
-  margin-bottom: calc(-1 * var(--topbar-h));
-}
-.ks-chrome-bar-top:has(+ [data-testid="phase-stepper"]) {
-  margin-bottom: 0;
-}
-/* Frost layer (see the header comment for why this is a pseudo-element). */
-.ks-chrome-bar-top::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
-  backdrop-filter: blur(var(--app-chrome-blur));
-  pointer-events: none;
-}
-/* Scroll-edge fade below the bar. */
-.ks-chrome-bar-top::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  height: 24px;
-  background: linear-gradient(to top, transparent, var(--app-chrome-surface));
-  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
-  backdrop-filter: blur(var(--app-chrome-blur));
-  /* Ramp the blur out with the tint, as the footer fade does, so it has no
-   * hard edge 24 px below the bar. */
-  -webkit-mask-image: linear-gradient(to top, transparent, black);
-  mask-image: linear-gradient(to top, transparent, black);
-  pointer-events: none;
-}
-/* No fade over the phase stepper: nothing scrolls beneath the nav there, and
- * the band would frost the stepper's own labels. */
-.ks-chrome-bar-top:has(+ [data-testid="phase-stepper"])::after {
-  display: none;
-}
-
-/* Frosted chrome follows the platform transparency preference: drop the blur
- * and raise the surface toward solid, mirroring the reduced-motion
- * precedent (declarative, token-driven). */
-@media (prefers-reduced-transparency: reduce) {
-  .ks-studio-footer,
-  .ks-chrome-bar-top {
-    background: var(--app-surface);
-  }
-  .ks-studio-footer::after,
-  .ks-studio-footer::before,
-  .ks-chrome-bar-top::before,
-  .ks-chrome-bar-top::after {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-  .ks-studio-footer::before {
-    background: linear-gradient(to bottom, transparent, var(--app-surface));
-  }
-  .ks-chrome-bar-top::after {
-    background: linear-gradient(to top, transparent, var(--app-surface));
-  }
-}
-
-/* High-contrast preference: near-solid bars with a defined edge instead of
- * a soft fade — the fade's low-contrast gradient would muddy the boundary. */
-@media (prefers-contrast: more) {
-  .ks-studio-footer,
-  .ks-chrome-bar-top {
-    background: var(--app-surface);
-  }
-  .ks-studio-footer {
-    border-top: 1px solid var(--app-border-strong);
-  }
-  .ks-chrome-bar-top {
-    border-bottom: 1px solid var(--app-border-strong);
-  }
-  .ks-studio-footer::before,
-  .ks-studio-footer::after,
-  .ks-chrome-bar-top::before,
-  .ks-chrome-bar-top::after {
-    display: none;
-  }
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-chrome-divider);
 }
 
 /* Journey contents sheet: enter/exit anchored at the trigger ----------------
@@ -391,12 +271,12 @@ body {
  * which at `--primary` would have measured 4.25:1 and quietly failed. */
 .crash-notice,
 .crash-recovery {
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
+  border: 1px solid var(--app-border-strong);
   border-radius: 8px;
   padding: 12px 16px;
-  font-family: var(--ui);
+  font-family: var(--app-font);
 }
 
 .crash-notice a,
@@ -414,7 +294,7 @@ body {
   min-height: var(--control-h);
   padding: 6px 14px;
   background: var(--app-accent-subtle);
-  color: var(--text);
+  color: var(--app-text);
   border: 1px solid var(--app-accent);
   border-radius: 6px;
   font: inherit;

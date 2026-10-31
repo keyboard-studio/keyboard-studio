@@ -3,8 +3,8 @@
   "specName": "031-specref-trace-join",
   "branch": "031-specref-trace-join",
   "selectedAt": "2026-07-28T04:43:42.014Z",
-  "currentStep": "tasks",
-  "status": "implementing",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -91,5 +91,6 @@
       "why": "Issue-closure discipline: check a box only when the shipped diff genuinely satisfies it, not because the PR merged",
       "rejected": "Rubber-stamping all 22 tasks as done because the feature shipped"
     }
-  ]
+  ],
+  "telemetryInstanceId": "cbf55cf2-c6eb-45ac-88f5-f6d60bb68c83"
 }

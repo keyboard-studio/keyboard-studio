@@ -572,6 +572,8 @@ const OPAQUE_REASON_LANGUAGE: Record<string, string> = {
     "Expands an entire store into the output.",
   "smp-literal":
     "Contains a rare Unicode character literal the typed model can't represent.",
+  "menu-store-syntax":
+    "An old-style multi-tap menu store — its bracketed entries are key sequences, not characters the editor can model.",
   "named-deadkey":
     "Uses a named deadkey — kept as internal machinery, not editable here.",
   "unknown-pre-begin":

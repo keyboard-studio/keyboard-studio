@@ -77,7 +77,7 @@ const ROW_STYLE: CSSProperties = {
   gap: 6,
   padding: "12px 22px",
   background: "var(--app-surface-2)",
-  borderBottom: "1px solid var(--app-border)",
+  borderBottom: "1px solid var(--app-chrome-divider)",
   boxSizing: "border-box",
 };
 

@@ -1,5 +1,5 @@
 // MarksSeriesStep × context tolerance (spec 078 T040/T044/T048): the station
-// joins the series behind the flag, emits the decision and its answers, carries
+// joins the series, emits the decision and its answers, carries
 // a still-valid prior decision forward without re-proposing it (FR-009), and
 // re-proposes when the rules' fingerprint changed.
 
@@ -12,8 +12,6 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore, type ContextToleranceState } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { MarksStepHost } from "./MarksStepHost.tsx";
-
-vi.mock("../../flags/contextToleranceFlag.ts", () => ({ isContextToleranceEnabled: () => true }));
 
 const ACUTE = "́";
 const FINGERPRINT = "0123456789abcdef";

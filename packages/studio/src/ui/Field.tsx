@@ -1,8 +1,8 @@
 // Field — composition wrapper: Label + control slot (children) + optional
 // help/error row.
 //
-// Replaces the implicit field-row <div> wrappers in QuestionField.tsx,
-// ScaffoldForm.tsx, and ProjectNameStep.tsx.
+// Replaces the implicit field-row <div> wrappers in QuestionField.tsx
+// and ScaffoldForm.tsx.
 //
 // FR-005: purely presentational. Renders the same label + gap layout as the
 // inline wrappers it replaces. No color is normalized in P1. Call-site style

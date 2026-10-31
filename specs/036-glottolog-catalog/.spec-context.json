@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "glottolog catalog",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:14.696Z"
+    }
+  ],
+  "telemetryInstanceId": "458fd6b9-c532-40ef-a3cb-5775701b0a5a"
+}

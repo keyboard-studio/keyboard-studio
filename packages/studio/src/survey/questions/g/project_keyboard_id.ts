@@ -7,7 +7,7 @@
 //
 // Slug derivation and validation live in @keyboard-studio/contracts
 // (slugifyKeyboardId / validateKeyboardId); the live seed wiring is in
-// projectNameOptions. The legacy ProjectNameStep panel is unreachable.
+// projectNameOptions. (The legacy ProjectNameStep panel was deleted, #1839.)
 //
 // inputs:  header.bcp47    — language context.
 // writes:  header.keyboardId — the keyboard ID is stored here.

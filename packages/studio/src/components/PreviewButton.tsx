@@ -34,19 +34,11 @@ export interface PreviewButtonProps {
 
 /**
  * How far the button sits above the bottom of its column. The journey footer
- * overlaps the bottom of the content column (translucent chrome: content
- * scrolls under the frosted bar), so the offset adds the bar's height —
- * `--studio-footer-h` is 0 when no footer is mounted (index.css).
+ * is a solid bar at the bottom of the shell column, so the offset adds the
+ * bar's height — `--studio-footer-h` is 0 when no footer is mounted
+ * (index.css).
  */
 const BUTTON_OFFSET = "calc(12px + var(--studio-footer-h, 0px))";
-
-/**
- * The height of the journey footer that overlaps the bottom of every content
- * column (0 when no footer is mounted). A scroll container that ends at the
- * footer adds this to its bottom padding, so its last control can scroll out
- * from under the bar and still take a click.
- */
-export const FOOTER_CLEARANCE = "var(--studio-footer-h, 0px)";
 
 /**
  * Bottom padding a scroll container needs so its last line can scroll clear

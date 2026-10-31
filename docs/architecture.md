@@ -1,336 +1,273 @@
 # Keyboard Studio — architecture & meta-flow
 
-> **The system view — the layer spec-kit omits.** spec-kit gives us a
-> [constitution](../.specify/memory/constitution.md) (invariant *rules*) and
-> per-feature specs under [`specs/`](../specs/) (vertical slices). It has no
-> native home for *how the pieces compose into one running app*. This document
-> is that home.
+> **The system view — the layer spec-kit omits.** The
+> [constitution](../.specify/memory/constitution.md) states the invariant
+> *rules*; per-feature specs under [`specs/`](../specs/) describe vertical
+> slices. This document is the home for *how the pieces compose into one
+> running app*.
 >
 > **It is an index, not a re-derivation.** Detail lives at the linked homes;
-> this file links rather than restates, per the contract-source-of-truth
-> discipline in [CLAUDE.md](../CLAUDE.md). If a fact here contradicts its linked
-> home, the home wins — fix the link, don't fork the fact.
+> this file links rather than restates. When a fact here disagrees with
+> another document, the constitution's **precedence-by-topic table** decides
+> which wins — and the loser is amended, not annotated.
 >
-> **Vocabulary.** The keyboard terms in this document follow the
+> **Vocabulary** follows the
 > [keyboard vocabulary glossary](design-notes/keyboard-vocabulary-glossary.md)
 > (Keyman's terms: base keyboard, copied keyboard, starting point).
->
-> **It is tracked.** [`utilities/spec-trace`](../utilities/spec-trace/) hashes
-> this file (as `docs/architecture.md`) alongside the spec sections and the
-> extracted feature specs, so architectural drift is visible, not silent.
 
 ## Three documentation layers
 
-The repo deliberately keeps three layers. Knowing which layer a change belongs
-to is how we avoid shredding the architecture into feature folders.
-
 | Layer | Answers | Home | Stability |
 |---|---|---|---|
-| **Invariants** | "What must always be true?" | [`.specify/memory/constitution.md`](../.specify/memory/constitution.md) — enforced mechanically by `/speckit-plan`'s Constitution Check | rarely changes |
-| **Architecture / meta-flow** | "How does the whole thing fit together?" | **this file** + the architecture-core spec sections (below) | changes with major design moves |
-| **Features** | "How does subsystem X work, and is it built?" | [`specs/NNN-<slug>/`](../specs/) (+ `plan.md` / `tasks.md` when active) | changes per feature |
+| **Invariants** | "What must always be true?" | [`.specify/memory/constitution.md`](../.specify/memory/constitution.md) — enforced by `/speckit-plan`'s Constitution Check | rarely changes |
+| **Architecture / meta-flow** | "How does the whole thing fit together?" | **this file** | changes with major design moves |
+| **Features** | "How does subsystem X work, and is it built?" | [`specs/NNN-<slug>/`](../specs/); once shipped, its AS-BUILT in `specs/_archive/` | changes per feature |
 
-**Migration rule (see [CLAUDE.md](../CLAUDE.md) → spec-kit section).** Only
-*feature/contract* sections of [`spec.md`](../spec.md) get extracted into
-`specs/NNN/`. The **architecture-core** sections — §4, §5a, §9, §10, §11, §12,
-§13 — are *not* features and are not feature-extracted; they stay in `spec.md`
-and are composed here. (§8 Data flow was extracted to
-[`specs/008-data-flow/`](../specs/008-data-flow/spec.md) before this rule was
-written; it is the *meta-flow* and is treated as architecture-core regardless
-of where its text lives.)
+A completed or superseded spec whose substance is covered elsewhere is
+removed from the live corpus (constitution Art XI). Root [`spec.md`](../spec.md)
+is the historical design document: its still-load-bearing sections are cited
+from here and from the specs that implement them; it is not an architecture
+authority in its own right.
 
-## The spine
-
-Everything in the engine operates on one typed intermediate representation, and
-one persistent working copy.
-
-- **`KeyboardIR` codec spine.** `.kmn`/`.kvks`/`.keyman-touch-layout` parse into
-  a typed `KeyboardIR`; scaffolding, import, validation, and mutation all work
-  on the IR, never on raw text; it emits back and round-trips. Constructs the
-  codec can't model survive as opaque `RawKmnFragment` nodes.
-  → spec [§5a](../spec.md#5a-keyboardir-keyboard-intermediate-representation) ·
-  code [`packages/engine/src/codec/`](../packages/engine/src/codec/)
-- **Working-copy spine (v1.3.0).** A single persistent working copy
-  (`KeyboardIR` + `VirtualFS`) is instantiated when the user picks a keyboard —
-  Track 1 `instantiateFromBase` or Track 2 `instantiateFromExisting` — mutated
-  by every step, serialized only at output.
-  → [docs/workflow-model.md](workflow-model.md) · spec
-  [§8](../spec.md#8-data-flow) → [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
-- **Generic step host (v1.3 studio).** The studio renders every survey/editor
-  step through one generic host — no per-step `switch` in the shell. A typed
-  step **manifest** (`{ id, component, layout, inputs, writes }`)
-  declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
-  the declared `component` in the chrome its `layout` selects, and runs a single
-  centralized completion path (`applyStepCompletion → advance → session.advance`).
-  Adding or re-laying-out a step is a manifest edit, not a shell edit; step
-  *order* is not stated in the manifest but derived: the wizard's screens are
-  derived from the decision modules' `provides`/`requires` and routing
-  (`decisions/deriveScreens.ts` over the registry's `decisionModules`, spec
-  091; the sort is spec 087's), and the manifest is arranged by the derived
-  screen order. The three bespoke survey wrappers converged onto a single `FlowStepHost`
-  + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
-  the extension mechanism for new flows; existing flows keep their
-  `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
-  → [docs/workflow-model.md §7](workflow-model.md#7-survey-wrapper-architecture-spec-029-stage-6--flowstephost-convergence) ·
-  [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/AS-BUILT.md) ·
-  [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/AS-BUILT.md) ·
-  code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),
-  [`survey/FlowStepHost.tsx`](../packages/studio/src/survey/FlowStepHost.tsx)
-
-- **Location spine (spec 057).** Where the author *is* — tab, step, question —
-  is held in one addressable model, not in component lifetime. The hash grammar
-  is `#route[/step[/question]]`
-  ([`lib/location.ts`](../packages/studio/src/lib/location.ts)); a pure resolver
-  answers whether a location can be honoured and, if not, which of five closed
-  reasons applies ([`lib/resolveLocation.ts`](../packages/studio/src/lib/resolveLocation.ts));
-  and ONE jump primitive
-  ([`lib/jumpToLocation.ts`](../packages/studio/src/lib/jumpToLocation.ts))
-  either arrives or refuses — never partially arrives. `navigateTo()` remains
-  the only writer of `window.location.hash`; the `Location` overload widened its
-  vocabulary without adding a second router.
-
-  The defect this replaced is worth remembering, because it is the shape the
-  spine exists to prevent: `SurveyView` reset the traversal store on mount, so
-  a route change — which unmounts and remounts it — silently restarted the
-  walk while the working-copy store beside it kept every answer. Position was
-  modelled as component lifetime; content was not.
-  → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/AS-BUILT.md)
-
-- **The Output-origin revision loop (spec 094).** Output reuses the jump
-  primitive's `returnTo` seam: the section list, blocker banners and tester
-  reports open a step with `returnTo: { route: "output" }`, and the step returns
-  there when it completes. There is no second router. On arrival `StepHost`
-  takes a revision snapshot (`captureRevisionSnapshot` in
-  [`lib/draftPersistence.ts`](../packages/studio/src/lib/draftPersistence.ts)).
-  It covers every store a draft restore covers except traversal, and Discard
-  puts it back with the same prepare-then-commit appliers. **Test builds are a
-  `.kmp`-only projection.** `buildTestBuildKmp` passes a `testBuild` option
-  through `projectWorkingCopyForOutput`, which overrides the version and adds
-  the label. The download, source-zip and PR paths call without options, so
-  their bytes are unchanged. Version arithmetic is the engine's
-  `resolvePublishVersion` / `resolveTestBuildVersion`. Builds and reports live
-  in `testingStore` and persist as the draft's additive `testing` field.
-  → [`specs/094-test-and-revise/`](../specs/094-test-and-revise/spec.md)
-
-- **Phase-B steps between `characters` and `carve`.** Four survey steps
-  run (by derived step order) after the alphabet is confirmed and before the carve
-  gallery, in this order: `marks` (spec 071, computed S0 gate), `punctuation`,
-  `invisibles`, `convenience` (spec 051, computed gate). Since
-  [specs/075](../specs/075-punctuation-defaults/AS-BUILT.md) the punctuation step
-  starts from a *proposed* list — the locale's CLDR/SLDR punctuation tier plus
-  the punctuation the base keyboard already produces (`buildPunctuationProposal`
-  in [`packages/engine/src/character-discovery/punctuationProposal.ts`](../packages/engine/src/character-discovery/punctuationProposal.ts),
-  with a fixed basic-ASCII floor when opaque fragments make base output
-  unknowable) — seeded once per locale into the shared phase-B draft store,
-  where removals are a sticky ledger. `invisibles` is the one **always-rendering**
-  step of the four: it offers ZWJ, ZWNJ, ZWSP, SOFT HYPHEN, WORD JOINER and the
-  bidi allowlist by name, and it subsumed the Phase B modular flow's RTL-only
-  `pb_rtl_direction_marks` / `pb_rtl_direction_marks_detail` question pair,
-  which no longer exists. Both steps emit the same phase-C `confirmedInventory`
-  union ([`survey/phaseCInventory.ts`](../packages/studio/src/survey/phaseCInventory.ts)),
-  so `recordPhase`'s same-phase field merge can never clobber one with the other.
-  → [`steps/manifest.ts`](../packages/studio/src/steps/manifest.ts)
-
-## The meta-flow (end to end)
-
-The application is a pipeline, not a set of independent features. One pass,
-selection → artifact:
+## The system at a glance
 
 ```
-pick keyboard ──▶ instantiate working copy (Track 1 copy/adapt | Track 2 import)
-   │
-   ├─ identity-lite (language, script — decoupled) ─▶ base resolution ─▶ base-derived pre-fill
-   │
-   ├─ character inventory (diffed vs base)
-   │
-   ├─ Phase C  physical gallery  ── strategy selector seeds defaults; DISCUS-guided assignment map
-   │                └─▶ LOCK DESKTOP
-   ├─ Phase E  touch gallery  (derived from locked desktop)
-   │
-   ├─ documentation / metadata (deferred)
-   │
-   ├─ validate  (Layer A + B continuous; Layer C hygiene)  ◀── 300 ms debounce, TS + WASM oracle
-   │
-   └─▶ output  (VirtualFS → .kmp installable  |  → source .zip  |  GitHub OAuth fork + PR)
-         │   ▲
-         │   └── revise one section, Back to testing  (spec 094)
-         └─▶ numbered test build  (.kmp only; never the .zip or PR)
+starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ author decisions
+(base | existing        facts from base,       (extracted ≠        │ registry-ordered
+ keyboard)              identity, CLDR)         decided)           ▼
+                                              DECISION SET (088) ──▶ 053 decision record (audit)
+                                                   │ apply (at step completion) / replay (on change)
+                                                   ▼
+                                     WORKING COPY — KeyboardIR + VirtualFS
+                                                   │ mutate() seam · one 300 ms diagnostic cycle
+                                                   ▼
+                              validate (A/B/A′) ── compile (kmcmplib) ── Layer C lint
+                                                   │ projection (never emits raw working IR)
+                                                   ▼
+                    OUTPUT: .kmp / source .zip / GitHub PR ──▶ criteria page verdict
+                                                   ▲   │
+                                                   └───┘ test-and-revise loop (094):
+                                                         numbered test builds, revise, return
+
+   alongside, always: DRAFT ENVELOPE (persistence) · SURVEY SESSION (where the author is)
 ```
 
-Authoritative detail: [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
-(the 15-step pipeline, survey phases, gallery instantiation) and
-[`specs/007-strategy-selection/`](../specs/007-strategy-selection/spec.md) (the
-A1–A7 axes + decision tree that drive the gallery defaults). How the four
-analytic lenses (facets, §7.1 axes, DISCUS, §11 criteria) compose across this
-pipeline as one keep-or-change flow: [docs/lens-model.md](lens-model.md).
+## The spines
 
-## Validator layering
+- **Codec spine.** `.kmn`/`.kvks`/`.keyman-touch-layout` parse into a typed
+  `KeyboardIR`; everything works on the IR, never on raw text; unmodelled
+  constructs survive as opaque `RawKmnFragment` nodes (constitution Art II).
+  → spec §5a · `packages/engine/src/codec/`
+- **Decision spine (specs 087–093).** The unit of authoring is a **decision**.
+  Question and gallery modules declare `provides`/`requires` in the decision
+  registry; one topological sort (`orderByDependencies`) derives every order,
+  and the wizard's screens are derived from that sort (`deriveScreens`); the
+  step manifest is an unordered pool the derived order arranges. A decision
+  lands two ways that MUST agree: incremental `apply` when its step completes,
+  and **replay** — recalculation of the downstream closure from the checkpoint
+  before the first changed decision. Changing the starting point retains all
+  decisions and recalculates against the new base (constitution Art X).
+  → `packages/studio/src/decisions/`, `steps/manifest.ts`
+- **Working copy.** One per project (Track 1 `instantiateFromBase` / Track 2
+  `instantiateFromExisting`), recalculated from the decision set as above.
+  It is what renders and what output projects from — never what is stored
+  directly (see Persistence).
+- **Step host.** Every step renders through one generic host — no per-step
+  `switch` in the shell. `StepHost` resolves the manifest entry, renders its
+  component in the declared layout's chrome, and runs the single completion
+  path (`applyStepCompletion → advance`). Flow steps converge on
+  `FlowStepHost` + `makeFlowStepComponent` (spec 029).
+  → `packages/studio/src/components/StepHost.tsx`, `survey/FlowStepHost.tsx`
+- **Location spine (spec 057).** Where the author is — tab, step, question —
+  lives in one addressable model (`#route[/step[/question]]`), a pure
+  resolver with five closed refusal reasons, and ONE jump primitive that
+  either arrives or refuses. Output's revise loop (spec 094) rides the same
+  primitive's `returnTo` seam; there is no second router.
+  → `packages/studio/src/lib/{location,resolveLocation,jumpToLocation}.ts`
 
-Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint-engine)):
+## Persistence — the draft envelope
 
-- **Layer A** validity (9 TS-portable + 5 WASM-only checks) + **Layer B** style,
-  plus Layer A′ import-fidelity checks I1–I6 →
-  [`packages/engine/src/validator/`](../packages/engine/src/validator/)
-- **Layer C** hygiene → [`@keymanapp/keyboard-lint`](../packages/keyboard-lint/)
-- **Compile-gate analyses** ride the preview compile, not the debounce. After
-  `useKeyboardArtifact` reaches `ready`, the context-tolerance analysis (spec 078)
-  runs as an un-awaited follow-on task gated by the compile's `runId`. It never
-  delays the preview and adds no timer. Its report reaches Layer C through
-  `lintContextTolerance`.
-  The station first proposes the spec 086 normalization step: one context-only group in
-  front of the keyboard's entry point that rewrites the tail of the existing text into the
-  form the keyboard produces, then passes the keystroke on unchanged. It is derived without
-  simulation, cached per keyboard source (`normalizationStepCache.ts`), and replayed through
-  the same overlay. A refused step, or a keyboard the committed verification record marks
-  `regressed`, falls back to the spec 062 per-rule proposal. That fallback is temporary:
-  it retires when desktop engines and the paste premise are verified and no corpus keyboard
-  is `regressed` (criteria in
-  [the 086 engine contract](../specs/086-context-normalization-group/contracts/engine-normalization-step.md#062-per-rule-path-retirement-criteria)).
-  The step lives only in the projection replay; the working IR stays step-free, so the
-  debounced TS Layer A pass does not see it and only the compile and the WASM oracle do.
-  Desktop-engine verification and the paste premise (paste runs no keyboard rules; the
-  rewrite happens on the next keystroke) are not yet verified, and gate making the step
-  the default over 062.
-- **Async compute, synchronous write (spec 078, research D8).** A fix that must
-  compile and simulate to be generated is computed asynchronously, outside any
-  step. It is committed in two places. The working IR takes it through
-  `applyMutatePatch` against paths the manifest declares (`CONTEXT_TOLERANCE_WRITES`
-  on the `marks` step). The artifact takes it as a persisted overlay that
-  `projectWorkingCopyVfs` replays synchronously, because the preview and the
-  download are re-projected from the base keyboard and never emit the working IR.
-  The step itself writes only the author's decision.
-- One **300 ms debounce** cycle runs the TS check and the WASM `kmcmplib` oracle
-  as concurrent microtasks (decision D3). Do not add a second timer.
-  - **Scope of D3.** D3 governs the *validation/preview* trigger only — the rule
-    exists to prevent visible feedback races between the TS check and the WASM
-    oracle. It does not forbid every debounce in the studio. Non-validation
-    debounced side effects that produce no preview feedback are permitted: the
-    full-corpus import-fidelity round-trip (I2) already runs *outside* the cycle
-    (spec [§10](../spec.md#10-validator-and-lint-engine)), and the persistence
-    and network-sync timers in
-    [`packages/studio/src/lib/draftPersistence.ts`](../packages/studio/src/lib/draftPersistence.ts)
-    (`AUTOSAVE_DEBOUNCE_MS` and `CLOUD_SYNC_DEBOUNCE_MS`) debounce persistence
-    only. Neither races the validation path, so neither is a "second debounce
-    timer" in the D3 sense.
+Drafts are **not** decisions-only (constitution Art III). The saved draft
+(local store + debounced cloud sync) is an envelope:
 
-## Exemplar sourcing — one offline path
+| Slice | Holds | Home |
+|---|---|---|
+| starting point | base/existing keyboard identity + record | spec 093 |
+| `workingCopy` | KeyboardIR + VirtualFS snapshot | draft v2 |
+| `decisions` | the spec-088 decision set | `decisionStore` |
+| decision record | the spec-053 audit trail | `decisionRecordStore` |
+| `surveyAnswers` | answers not (yet) representable as decisions, filtered to decision-provided questions at save | specs 079/088 |
+| `testing` | test builds + tester reports (spec 094) | `testingStore` |
+| `criteriaRecord` | author attestations + checklist confirmations (spec 084) | `criteriaRecordStore` |
 
-Which characters a language actually needs is answered in exactly one place
-([specs/044](../specs/_archive/044-cldr-sldr-exemplars/spec.md) FR-015):
-`sourceExemplars(bcp47)` in
-[`packages/engine/src/character-discovery/exemplarSource.ts`](../packages/engine/src/character-discovery/exemplarSource.ts).
-Its three consumers — `buildCharacterMap` (the Phase B picker), `suggestMissing`
-(gap suggestions and the surplus signal), and the studio's Phase B prefill — all
-read it rather than each wiring their own loader.
+Restore is tolerant-read: unknown or version-mismatched envelopes degrade to
+what can be honoured rather than failing the load; a snapshot whose base no
+longer matches is discarded, never silently kept. Session position is *not*
+in the envelope — it lives in the survey session store (spec 026) and the
+location spine. The reconciler for the envelope is
+`packages/studio/src/lib/draftPersistence.ts`; it is the most complex file in
+the studio precisely because three representations of an author action meet
+there, and changes to it need the mapping stated (constitution Art III).
 
-It reads a **committed, version-pinned index** baked at prebuild from two
-sources: CLDR (`cldr-misc-full`, npm, lockfile-pinned) and SIL's SLDR (one
-SHA-256-pinned tarball). Consequences worth knowing before touching it:
+## Extraction — how a base keyboard becomes proposals
 
-- **No network at authoring time.** The index is a lazily-imported JSON chunk,
-  so a full survey run makes zero requests. The live CLDR fetch loaders still
-  exist and are still exported, but they are the opt-in refresh route and the
-  test-injection seam — not the authoring path.
-- **Precedence is a lookup-time decision, not a bake-time one.** Both sources'
-  raw sets are retained per locale; CLDR wins where it covers a tag. The rule can
-  change without regenerating the artifact.
-- **Deterministic.** Same pins → byte-identical index. No wall clock anywhere in
-  the codegen; the `version.generated` stamp is derived from the pins.
-- **Attribution is per character.** Every returned character carries its source
-  and its confidence (SLDR's LDML draft rank). Confidence is surfaced in the UI,
-  never filtered on — most SLDR coverage is drafted or machine-generated, and
-  dropping it would discard the point of the feature.
-- **`null` means "no confident seed", never an error.** An uncovered tag or a
-  fired confidence gate falls through to whole-script behaviour; nothing blocks
-  the survey.
+Spec 092 runs extraction over the starting point at project open and on
+starting-point change: facts and candidates (script, key inventory,
+behaviours, conventions) are extracted with base-derived provenance and
+surface as **proposals with dispositions** — offered decisions and pre-filled
+defaults, provisional until the author confirms them at the step that
+presents them (accept, edit, or reject). Once confirmed they are first-class
+decisions, visibly attributed to the base; they never take effect silently
+and never overwrite an author-made decision (constitution Art X). The Decisions page
+(`decisions/DecisionsPage.tsx`) is the audit surface for set + record +
+proposals. There is no other "learn from the base" path; the older 055
+contribution record is recoverable history shown read-only, not a mechanism.
+
+## Validation & compile
+
+- **Layer A/B/A′** in `engine/src/validator`; **Layer C** is
+  `@keymanapp/keyboard-lint`. One 300 ms debounce runs the TS check and the
+  WASM `kmcmplib` oracle concurrently (decision D3, scoped to diagnostics —
+  constitution Art IV).
+- **Compile-gate analyses** ride the preview compile, not the debounce. The
+  context-tolerance analysis (spec 078) runs as a follow-on to a ready
+  compile; the station first proposes the **spec 086 normalization step**
+  (one context-only group that rewrites the text tail into the produced
+  form), falling back to the spec 062 per-rule proposal for refused or
+  regressed keyboards. The 062 path retires when the 086 contract's criteria
+  are met (desktop-engine verification + paste premise + no `regressed`
+  corpus keyboard) — until then both paths are live architecture, and 062's
+  spec says so. Fixes are computed async, committed sync: into the working IR
+  through `applyMutatePatch` at manifest-declared paths, and into the artifact
+  as a persisted overlay replayed by `projectWorkingCopyVfs`, because output
+  is re-projected from the base and never emits the working IR.
+- **Exemplar sourcing is one offline path** (spec 044): `sourceExemplars(bcp47)`
+  reads a committed, version-pinned CLDR+SLDR index; all consumers read it,
+  none wire their own loader. `null` means "no confident seed", never an
+  error; per-character attribution and confidence are surfaced, never
+  filtered on.
+
+## Output & delivery
+
+Output projects the working copy (`projectWorkingCopyForOutput`) — download,
+source `.zip`, and PR paths emit identical bytes; test builds are a
+`.kmp`-only projection with overridden version + label (spec 094). Delivery
+to GitHub runs through the OAuth backend (fork + PR); the managed-PR service
+is the second, server-side path. Spec 024's single-GitHub-App consolidation
+is **not built** — until it is, the dual path described here is the
+architecture, and no document may describe the App model as current.
+
+## Criteria subsystem
+
+`packages/contracts/data/criteria.json` — **149 criteria, 19 sections** — is
+the single data home; every count stated anywhere is computed from it. Bands:
+scaffolder-bake and precertified verdicts are settled at generation time from
+the generator's closed manifest (constitution Art X); Layer-C criteria verdict
+via their lint codes; yellow/red criteria via author attestation and human
+checklist in the `criteriaRecord`. The criteria page (spec 084) evaluates the
+studio-built keyboard; the Compare tab evaluates a foreign keyboard, which
+can never claim scaffolder-bake or precertification. The §18.6
+inventory-sufficiency check builds its inventory in-studio for Adapt cases
+(confirmed decisions + template + fallback + author additions/deletions,
+baseline = unioned CLDR exemplars per target) and skips only when no
+CLDR/SLDR entry exists for the target.
+
+## Content & i18n
+
+Author- and UI-facing strings resolve through generated sidecar catalogs
+(`packages/contracts/src/generated/contentI18n.generated.ts`, built from
+`content/` by `utilities/content-catalog`); `resolveContentString` is the
+single lookup, criteria text included. Adding a content collection is a
+catalog change, not a new loader.
+
+## Mobile
+
+The studio adapts its **host layout** to narrow viewports (epic #1853): one
+token set, responsive shell/panes/sheets. The typing surface is untouched —
+KeymanWeb engine + OSK iframe on every viewport, visibility author-controlled
+(hide unmounts, show remounts). Touch *keyboards* are authored as data through
+the same decision flow; touch-first *authoring* is out of scope
+(constitution Art VII).
+
+## Not yet integrated — named, not implied
+
+Architecture documents what composes. These exist in the repo but do **not**
+compose into the live workflow today; no plan may build on them as if they
+did (constitution Art XI):
+
+- **Spec 038 adaptation questions** — a complete module (firing evaluator,
+  posture step, trust policy) with no production caller; its evidence
+  provider is still a mock seam.
+- **The demoted Phase A battery** (specs 022/025) — ~30 identity questions
+  rendered in the Library as a proposed flow; excluded from every live flow;
+  promotion is a paper procedure never yet exercised.
+- **062's write-back axis** — persisted and engine-read; no studio surface
+  can set it (spec 078 removed the story).
+- **Facet index session derivations** — the corpus facet index feeds base
+  selection and the marks key-budget; the broader session consumption
+  (specs 043/070) is unbuilt.
+- **Unbuilt designs** — 077 (base decisions; retired 2026-10-14, absorbed
+  by 092), 085 Part B (adaptive placement; retired as superseded), 009
+  (flow-map editor; retired), and 024 (GitHub App consolidation; still live
+  as the D12 vehicle, not built). Their archived or live text may inform a
+  future plan; none of them describes a running system.
 
 ## Subsystem composition map
-
-The trackable architecture index — each subsystem, its spec home, and its code
-home. (Status mirrors `docs/spec-trace.json`; coverage is the spec-trace job,
-not a number maintained by hand here.)
 
 | Subsystem | Spec home | Code home |
 |---|---|---|
 | Codec / KeyboardIR spine | spec §5a | `packages/engine/src/codec/` |
-| Working-copy spine | spec §8 / [specs/008](../specs/008-data-flow/spec.md) · [workflow-model.md](workflow-model.md) | engine working-copy + `packages/contracts/src/ir/` |
-| Data flow / survey | [specs/008](../specs/008-data-flow/spec.md) | `packages/engine/src/{character-discovery,inventory,loader}/`, `packages/studio/src/survey/` |
-| Exemplar sourcing | [specs/044](../specs/044-cldr-sldr-exemplars/AS-BUILT.md) | `packages/engine/src/character-discovery/{exemplarSource,exemplarIndex,exemplarTypes}.ts` + `generated/exemplars.generated.json` |
-| Three-group routing | spec §9 | engine routing + `packages/studio` gallery scoping |
-| Strategy selection | [specs/007](../specs/007-strategy-selection/spec.md) | `packages/engine/src/strategy-selector/`, `recognizer/` |
-| Pattern schema (contract) | [specs/005](../specs/005-pattern-schema/spec.md) | `packages/contracts/src/pattern.ts` (+ zod `schemas.ts`) |
-| Pattern library | spec §5 / [specs/005](../specs/005-pattern-schema/spec.md) | `packages/engine/src/pattern-library/`, `pattern-apply/` |
-| Validator (A/B/A′/C) | spec §10 | `packages/engine/src/validator/`, `packages/keyboard-lint/` |
-| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/` (wasm ships in the `@keymanapp/kmc-kmn` npm dependency) |
-| Simulator | spec §4 | `packages/engine/src/simulator/`: host-injected keyboard loader (`keyboardLoader.ts`), Node `vm` and browser `new Function` loaders |
-| Context tolerance | [specs/078](../specs/078-context-tolerance-wiring/spec.md) | engine `./context-tolerance` subpath + `pattern-apply/context-tolerance-overlay.ts`; studio `lib/contextToleranceAnalysis.ts`, `hooks/useContextToleranceApply.ts`, `survey/marks/ContextToleranceStation.tsx` |
-| Output / scaffolder | spec §11 / §12 | `packages/engine/src/{output,scaffolder}/` |
+| Decision registry, derived screens, replay | specs 087/091/093 | `packages/studio/src/decisions/` |
+| Decision set + record + trail UI | specs 088/089/053 | `packages/studio/src/decisions/`, `packages/contracts` |
+| Extraction & proposals | spec 092 | `packages/studio/src/decisions/extract*`, engine |
+| Starting point / gallery modules | specs 090/092 | `packages/studio/src/steps/`, `decisions/gallery*` |
+| Working copy + draft envelope | specs 008/093 (as built) | `packages/studio/src/lib/draftPersistence.ts`, engine working-copy |
+| Survey session & traversal | spec 026 | `packages/studio/src/survey/`, session stores |
+| Step host & flows | specs 028/029 (archived) | `packages/studio/src/components/StepHost.tsx`, `survey/FlowStepHost.tsx` |
+| Location | spec 057 (archived) | `packages/studio/src/lib/location*.ts`, `jumpToLocation.ts` |
+| Strategy selection | spec 007 | `packages/engine/src/strategy-selector/`, `recognizer/` |
+| Facets & corpus index | specs 043/070 | `content/facets/`, `utilities/facet-index/` |
+| Pattern schema + library | spec 005 | `packages/contracts/src/pattern.ts`, `packages/engine/src/pattern-*/` |
+| Validator (A/B/A′) / Layer C | spec §10 / criteria data | `packages/engine/src/validator/`, `packages/keyboard-lint/` |
+| Compiler / simulator | spec §4 | `packages/engine/src/compiler/`, `simulator/` |
+| Context tolerance & normalization | specs 078/086/062 | engine `./context-tolerance`, `normalizationStepCache.ts` |
+| Exemplars | spec 044 (archived) | `packages/engine/src/character-discovery/exemplarSource.ts` |
+| Output / scaffolder / delivery | spec §11/§12 | `packages/engine/src/{output,scaffolder}/`, OAuth backend + managed-PR service |
+| Test & revise | spec 094 | `packages/studio/src/output/`, `testingStore` |
+| Criteria | spec 084 + criteria data | `packages/contracts/data/criteria.json`, `packages/studio/src/criteria/` |
+| Content catalogs / i18n | specs 046/061/080 | `utilities/content-catalog`, `packages/studio/src/lib/contentI18n.ts` |
 | Studio SPA | spec §4 | `packages/studio/` |
-| Criteria compliance | spec §11 | `packages/contracts/data/criteria.json` (+ `criteria-summary.md`) |
+
+Retired specs' homes in this map are their AS-BUILT summaries in the spec
+folder (full text in `specs/_archive/`).
 
 ## Teams
 
-Two teams own disjoint surfaces (spec [§12](../spec.md#12-output-artifacts) /
-§13): **Engine** owns the SPA shell, scaffolder, compiler service, validator,
-and output paths; **Content** owns the pattern library, survey text, gallery
-ordering, LLM prompts, and criteria triage. Respect the split when picking up
-work.
+**Engine** owns the SPA shell, scaffolder, compiler service, validator, and
+output paths. **Content** owns the pattern library, survey text, gallery
+ordering, LLM prompts, and criteria triage (constitution Art VI).
 
-## Conformance gates — how the team knows it's on track
+## Conformance gates
 
-Off-track shows up as a **failing gate**, not an architect's review note. Each
-gate catches a different class of drift; together they are the "are we following
-the spec?" signal. The discipline: encode as much into gates as possible — what
-isn't gated falls back on human review.
+Off-track shows up as a failing gate, not a review note.
 
 | Gate | Catches | Fires at |
 |---|---|---|
-| `pnpm typecheck` + **zod drift guards** ([`schemas.ts`](../packages/contracts/src/schemas.ts)) | contract divergence — a locked type and its runtime schema out of sync | build / typecheck |
-| **vitest** suites | behaviour regressions | `pnpm test` / CI |
-| **ESLint** flat config ([`eslint.config.mjs`](../eslint.config.mjs)) | lint-only defects; the home for module-boundary fitness functions | `pnpm lint` / CI |
-| **spec-trace** ([`utilities/spec-trace`](../utilities/spec-trace/)) | spec / architecture *text* drift + declared coverage gaps | `node utilities/spec-trace check` |
-| **Constitution Check** (`/speckit-plan`) | a plan that violates a locked invariant | plan time |
-| **dependency-cruiser** ([`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs)) | architecture boundary violations — layering, team split, dependency-root, runtime circulars | `pnpm lint` / CI |
-| **CODEOWNERS** | changes to the locked contract / constitution / architecture without architect review | PR |
+| `pnpm typecheck` + zod drift guards | contract divergence | build / typecheck |
+| vitest suites | behaviour regressions | `pnpm test` / CI |
+| ESLint flat config + dependency-cruiser | lint defects; package-boundary violations (`keyboard-lint ↛ engine`, `engine ↛ studio`, contracts imports nothing, no runtime circulars) | `pnpm lint` / CI |
+| Constitution Check (`/speckit-plan`) | a plan violating a locked invariant | plan time |
+| spec-trace | spec/architecture *text* drift | `node utilities/spec-trace check` |
+| CODEOWNERS | locked-contract / constitution / architecture changes without architect review | PR |
 
-> **Architecture fitness functions (landed).**
-> [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs) asserts the
-> cross-package boundaries as CI gates (run via `pnpm lint` / `pnpm depcruise`):
-> `keyboard-lint ↛ engine`, `engine ↛ studio`, `contracts` imports no workspace
-> package, nothing imports the `studio-poc` throwaway, and no runtime circular
-> deps (type-only cycles are allowed — TS erases them). Further CLAUDE.md
-> invariants (authoring touches `KeyboardIR` not raw `.kmn`; no second debounce
-> timer) are promotion candidates as they prove mechanically checkable; until
-> then they rely on review.
+## Changing this document
 
-## Changing the plan (amendment ritual)
-
-Plans change as we learn what's possible. That is the **normal case, not an
-exception** — the gates above exist to make a deliberate change *cheap and
-explicit*, not to freeze the design. Three rules keep the system nimble.
-
-**1. Match rigidity to confidence.** Don't gate what you're still exploring;
-tighten the ratchet only as a decision hardens.
-
-| Confidence | Mechanism | How it changes |
-|---|---|---|
-| **Exploring** | a spec doc + tests; `spec-trace` status `unreviewed` / `partial` | rewrite freely — no fitness function yet |
-| **Stabilizing** | contract + tests; versioned | change with a version bump + co-edit |
-| **Settled / load-bearing** | fitness function / drift guard / build-fail | change the rule consciously, recorded below |
-
-**2. The amendment loop** — keep it a one-liner, never a committee:
-
-1. Change the spec (the doc — a `spec.md` section, a `specs/NNN/` feature spec, or this file).
-2. Change the gate it guards **in the same PR** (the zod schema, the test, the fitness function). Co-location is what stops the two from diverging.
-3. Record *why* in one line — [`docs/spec-signoff.md`](spec-signoff.md) for amendments, or the commit/PR body. A **locked-contract** change additionally requires the §18 gate: a major `@keyboard-studio/contracts` version bump + a joint engine+content session (constitution Principle I).
-4. `node utilities/spec-trace acknowledge <unit>` for any tracked doc you changed, and commit `docs/spec-trace.json`.
-
-**3. A gate that fights a *good* change is a bug in the gate.** A refactor that
-trips a fitness function is usefully showing you it changed an architectural
-relationship — but a gate that blocks legitimate changes *often* should be
-loosened or deleted. Gates earn their place; curating them down is part of the
-architect's job. Prefer gates on **relationships / boundaries** (stable) over
-**details** (volatile — let the type system carry those).
+Architecture changes land **with** the design move they describe, in the same
+PR, and the constitution's governance applies (single-reviewer for prose; the
+§18 ritual for locked contracts). A gate that fights a good change is a bug
+in the gate: loosen or delete it, consciously, in the same change. Record
+*why* in the PR body or the governing spec — there is no separate amendment
+ledger.
 
 ## Diagrams
 

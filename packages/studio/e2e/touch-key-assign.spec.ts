@@ -41,6 +41,7 @@ import {
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
+  driveDeadkeysStep,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -118,10 +119,15 @@ async function driveIdentityLite(page: Page): Promise<void> {
 }
 
 /** Carve gallery — nothing is carved for this walk; the survivor set is
- *  irrelevant to an assign-only spec. Just advances. */
+ *  irrelevant to an assign-only spec. Just advances — through the deadkeys
+ *  step (spec 083) and the rules step (spec 082), which both sit between
+ *  carve and mechanisms on the spine (#2053: this copy predated both and
+ *  parked the walk on deadkeys, so Mechanisms never rendered). */
 async function skipCarve(page: Page): Promise<void> {
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("carve-continue").click();
+  await driveDeadkeysStep(page);
+  await page.getByTestId("rules-continue").click();
 }
 
 /**
@@ -333,7 +339,14 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 063 SC-004)"
     // The payoff: the live preview types the assigned character. A real
     // assertion against the rendered on-screen keyboard + its typed-text
     // output, not a proxy over internal store state.
+    //
+    // Spec 065 T037 (FR-024): only character mode renders a preview pane —
+    // the by-key grid has no live OSK preview any more — so the payoff
+    // switches modes to where the preview lives (#2053). The keyboard-only
+    // measurement above is already closed (its assertions have run), so
+    // this click is verification setup, not part of the counted sequence.
     // ---------------------------------------------------------------------
+    await page.getByTestId("touch-mode-tab-character").click();
     const oskFrame = page.frameLocator(OSK_FRAME_SELECTOR);
     await expect
       .poll(() => oskHasKeyId(oskFrame, ASSIGNED_KEY_ID), {

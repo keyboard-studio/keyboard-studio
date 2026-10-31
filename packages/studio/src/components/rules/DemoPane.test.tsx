@@ -16,7 +16,17 @@ import { saveLayoutFamilyAnswer } from "../../lib/layoutFamily.ts";
 function pickWindowsLayout(layoutId: string): void {
   useDecisionStore.getState().record({
     id: "windows-layout",
-    value: { layoutId, origin: "confirmed" },
+    value: { layoutIds: [layoutId], origin: "confirmed" },
+    provenance: "asked",
+    step: "layout",
+  });
+}
+
+/** Record several picks the way the multi-select renderer does (#1902). */
+function pickWindowsLayouts(layoutIds: string[]): void {
+  useDecisionStore.getState().record({
+    id: "windows-layout",
+    value: { layoutIds, origin: "overturned" },
     provenance: "asked",
     step: "layout",
   });
@@ -61,5 +71,19 @@ describe("DemoPane host layout follows the layout step", () => {
   it("uses a stored layout_family answer when no layout is picked", () => {
     saveLayoutFamilyAnswer("azerty");
     expect(renderPane().value).toBe("azerty");
+  });
+
+  it("uses every picked reference host in selection order (#1902)", () => {
+    pickWindowsLayouts(["basic_kbdfr", "basic_kbdgr"]);
+    const select = renderPane();
+    expect(select.value).toBe("azerty");
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(options.slice(0, 2)).toEqual(["azerty", "qwertz"]);
+  });
+
+  it("ignores picks that are not reference hosts, keeping the family fallback", () => {
+    pickWindowsLayouts(["basic_kbdhe", "basic_kbdfr"]);
+    const select = renderPane();
+    expect(select.value).toBe("azerty");
   });
 });

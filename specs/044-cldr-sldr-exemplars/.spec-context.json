@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "cldr sldr exemplars",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:26.101Z"
+    }
+  ],
+  "telemetryInstanceId": "09600c57-dcf6-4e02-beaa-2301a52e74f1"
+}

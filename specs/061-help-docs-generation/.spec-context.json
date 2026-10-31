@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "help docs generation",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:41.344Z"
+    }
+  ],
+  "telemetryInstanceId": "a90421de-1d0f-4e94-b447-1e8944045e88"
+}

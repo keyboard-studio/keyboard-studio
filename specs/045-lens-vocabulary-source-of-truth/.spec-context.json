@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "lens vocabulary source of truth",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:27.278Z"
+    }
+  ],
+  "telemetryInstanceId": "f46b38f3-3d20-4705-80e3-487973ab67a6"
+}

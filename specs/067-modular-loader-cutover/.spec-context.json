@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "modular loader cutover",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:48.581Z"
+    }
+  ],
+  "telemetryInstanceId": "b3d78012-786f-42ba-9709-a60901b94e6e"
+}

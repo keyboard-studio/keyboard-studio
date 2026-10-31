@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "dashboard honest flow map",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:46.205Z"
+    }
+  ],
+  "telemetryInstanceId": "5cf750bf-44e1-432c-a824-95c680933bf2"
+}

@@ -60,7 +60,8 @@ Chosen after reading spec-kit's scripts, the companion extension, and this repo'
 | `utilities/spec-trace` units (`collectFeatureSpecs`) | `specs/<dir>/spec.md` for each top-level dir. Unit id is `specs/<dir>` | Moving `spec.md` removes the unit. `_archive/` has no `spec.md`, so it adds none. The `docs/spec-trace.json` entry is left orphaned, and `check` does not flag missing units. CI `check` then auto-closes any open spec-drift issue for that unit |
 | `utilities/spec-trace` search (`pnpm run spec-search`) | Recursively walks `specs/**` and `docs/**` | **Archived docs stay searchable.** That is useful for history, but it is also noise. The CLAUDE.md rule below tells agents to ignore `specs/_archive/` hits unless the task is historical |
 | companion `spec_context.py` `_match_by_prefix` | Top-level `specs/*` only | `_archive` is invisible. The stub still resolves by prefix |
-| companion `doctor.py --all` | Top-level dirs that contain `.spec-context.json` | Moving `.spec-context.json` to the archive drops the retired feature from sweeps (intended) |
+| companion `doctor.py --all` | Top-level dirs that contain `.spec-context.json` | The full run history moves to the archive; the stub gets a fresh one-entry `status: completed` record (Phase 7) |
+| Companion GUI spec list | Top-level `specs/*` folders; status from `.spec-context.json` | A stub with **no** `.spec-context.json` lists as **Active**. Phase 7 writes a `completed` record so it lists as Completed |
 | companion `doctor_bleed.py` | `specs/` is a non-source prefix | Archive stays non-source. A repo-root `archive/` would not be, which is why `docs/archive/` and a root `archive/` were rejected for specs |
 | companion `resolve-spec-paths.py` | Living specs (`capabilities/`, `*.spec.md`). Skips `specs/` entirely | None. `livingSpecs.enabled: false` in `.specify/companion.yml` |
 | `.gitignore` | No `archive` patterns | Tracked. Confirm with `git check-ignore -v` |
@@ -185,6 +186,11 @@ git mv specs/$F/contracts specs/_archive/$F/contracts
 git mv specs/$F/checklists specs/_archive/$F/checklists
 git mv specs/$F/.spec-context.json specs/_archive/$F/.spec-context.json
 git add specs/$F/AS-BUILT.md
+# Leave a completed record on the stub, or the Companion GUI lists it as Active.
+W=.specify/extensions/companion/scripts/write-context.py
+python3 $W --feature-dir specs/$F --step implement --advance --by ai
+python3 $W --feature-dir specs/$F --mark-complete --by ai
+git add specs/$F/.spec-context.json specs/$F/.gitignore
 ```
 
 - Pinned files stay. Untracked or ignored leftovers are not moved; list them.

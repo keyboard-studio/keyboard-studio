@@ -76,6 +76,7 @@ export const identityStep: EditorStep = step({
   id: "identity",
   title: "Keyboard Identity",
   component: IdentityLiteAdapter,
+  rightPane: "none",
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
   persistence: "answer-store",
 });
@@ -91,6 +92,7 @@ export const layoutStep: EditorStep = step({
   id: "layout",
   title: "Keyboard Layout",
   component: LayoutStepHost,
+  rightPane: "none",
   specRef: ["specs/076-rule-behaviours"],
   persistence: "answer-store",
 });
@@ -112,7 +114,7 @@ export const chooseStartStep: EditorStep = step({
 });
 
 /**
- * Track step: TrackStep (copy vs adapt choice).
+ * Track step: TrackStepFactoryComponent (copy vs adapt choice).
  * Every author chooses a track.
  * Reads session-derived header.bcp47 + resolved base display name (header.name).
  * DEC-D2: branch selection only — no IR leaf in Phase 1, so writes is [].
@@ -146,7 +148,7 @@ export const attributionStep: EditorStep = step({
 });
 
 /**
- * Project name step: ProjectNameStep (copy-track only).
+ * Project name step: ProjectNameStepFactoryComponent (copy-track only).
  * Its declared screen gate (registry.ts) makes it a side trail: copy
  * takes it, adapt bypasses it, and both rejoin at the next ungated step.
  * Collects scaffold params displayName + keyboardId — no separate scaffold step.
@@ -317,30 +319,8 @@ export const packageStep: EditorStep = step({
 });
 
 // ---------------------------------------------------------------------------
-// Exported list (unordered pool — the step order is derived, see stepOrder.ts)
-//
-// Pool ↔ manifest: every step here is referenced by the manifest, and every
-// manifest step (by id) has an entry here. scaffoldStep was removed because
-// scaffold params are collected by projectNameStep's adapter — no separate step.
+// Editor step descriptors. The manifest picks entries by id and assembles
+// them in the derived step order (see stepOrder.ts). scaffoldStep was removed
+// because scaffold params are collected by projectNameStep's adapter — no
+// separate step.
 // ---------------------------------------------------------------------------
-
-/**
- * All editor steps as an unordered pool. The manifest picks entries by id
- * and assembles them in the derived step order. This list is the canonical source
- * of editor-step descriptors.
- */
-export const registeredEditorSteps: readonly EditorStep[] = [
-  identityStep,
-  chooseStartStep,
-  trackStep,
-  attributionStep,
-  projectNameStep,
-  carveStep,
-  deadkeysStep,
-  rulesStep,
-  mechanismsStep,
-  touchSeedSourceStep,
-  touchStep,
-  helpStep,
-  packageStep,
-];

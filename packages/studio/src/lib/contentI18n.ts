@@ -1,5 +1,5 @@
 // Tier B (content) i18n loader with English fallback (spec 046 T028; seam
-// decision in specs/046-i18n-localization/research.md D8's "Loader /
+// decision in specs/_archive/046-i18n-localization/research.md D8's "Loader /
 // resolution semantics" section). The content-YAML loaders themselves
 // (browserPatternLibrary.ts, criteriaData.ts, the engine pattern loader) stay
 // English-only, zero-arg singletons exactly as before — resolution happens at

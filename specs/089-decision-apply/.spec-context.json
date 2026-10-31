@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Question decisions write only through `apply`",
   "branch": "km/decision-apply",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "plan",
@@ -18,6 +18,14 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-10-07T00:55:35.276Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:58:08.113Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "a3203751-5725-4e3b-b534-171dbc2e96bc"
 }

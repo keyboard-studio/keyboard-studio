@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "punctuation defaults",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:58.515Z"
+    }
+  ],
+  "telemetryInstanceId": "5fe2b0e5-1611-4c9d-a5ec-7dcbb9b74f8a"
+}

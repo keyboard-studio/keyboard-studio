@@ -22,7 +22,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
   getCrashSendSnapshot,
-  resetCrashSendState,
   subscribeCrashSend,
 } from "../crash/send.ts";
 
@@ -154,7 +153,3 @@ export function CrashNotice({ onRetract }: CrashNoticeProps) {
   );
 }
 
-/** Dismiss the notice. Exported so a host surface can clear it on navigation. */
-export function dismissCrashNotice(): void {
-  resetCrashSendState();
-}

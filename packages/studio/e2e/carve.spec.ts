@@ -68,7 +68,8 @@ import {
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
-  confirmMechanismsEmpty,
+  driveDeadkeysStep,
+  driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
   seedReturningVisitor,
@@ -133,16 +134,27 @@ declare global {
 //
 // The shared survey prelude (identity-lite, base picker, track choice,
 // prefill, character list, mechanism/touch galleries, help phase) now lives
-// in ./helpers/surveyFlow and is imported above. There is no carve-local
-// driver left: the standalone Sequence Gallery step (formerly inserted
-// between mechanisms and the touch fork) has been retired — S-03 sequences
-// now build inline inside the Mechanism Gallery's method chooser (selecting
-// the "sequence" method swaps the right/preview pane for SequenceBuilderPanel;
-// see MechanismGallery.tsx). This fixture's mechanism step never flags a
-// character for anything (confirmMechanismsEmpty's "No new characters to
-// add." empty-diff path), so there is no per-character loop here to drive the
-// sequence builder through — nothing to replace the old pass-through driver
-// with for THIS walk.
+// in ./helpers/surveyFlow and is imported above. The standalone Sequence
+// Gallery step (formerly inserted between mechanisms and the touch fork)
+// has been retired — S-03 sequences now build inline inside the Mechanism
+// Gallery's method chooser (selecting the "sequence" method swaps the
+// right/preview pane for SequenceBuilderPanel; see MechanismGallery.tsx).
+//
+// The mechanism step DOES flag characters on this fixture now (#2053):
+// the survey's confirmed inventory includes "." and "_", and bj_cree_woods
+// genuinely produces neither — the "." key is remapped to U+166E by an
+// explicit rule (`+ "." > U+166E`), and the shifted "-" key produces
+// U+202F via symbols_Schars — so the gallery correctly asks for a
+// disposition on both, and confirmMechanismsEmpty's "No new characters to
+// add." empty-diff path never renders. Marking them for later review is
+// NOT enough either: it satisfies the gallery's own gate but the
+// phase-finish gate ("2 characters still need an implementation before
+// you can finish: ., _ (desktop)") demands implementations. The walk
+// therefore uses the shared driveMechanismsGallery, which implements
+// every flagged character (its sequence fallback for chars with no
+// Apply-ready method). The sequences it adds for "." / "_" do not touch
+// this spec's emitted-.kmn assertions, which check specific rule ids and
+// the U+14EC token, never whole-file equality.
 
 // ---------------------------------------------------------------------------
 // Spec
@@ -168,7 +180,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     await buildOneCharacterList(page, "᙮");
 
     // Manifest spine order (StudioShell.tsx) is characters -> marks -> carve ->
-    // mechanisms -> touch -> help (no separate sequences step — S-03 builds
+    // deadkeys -> rules -> mechanisms -> touch -> help (no separate sequences step — S-03 builds
     // inline in the Mechanism Gallery, see the note above); the marks-free
     // alphabet ("᙮") auto-skips the marks step, so carve renders right after
     // Phase B.
@@ -226,14 +238,17 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
 
     await page.getByTestId("carve-continue").click();
 
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules — walk
+    // through it (this walk defines no deadkeys).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
 
     // ---------------------------------------------------------------------
     // Remaining spine steps: mechanisms, touch, help. (No separate sequences
     // step — see the note above the describe block.)
     // ---------------------------------------------------------------------
-    await confirmMechanismsEmpty(page);
+    await driveMechanismsGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
@@ -358,10 +373,13 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
 
     await page.getByTestId("carve-continue").click();
 
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules — walk
+    // through it (this walk defines no deadkeys).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
 
-    await confirmMechanismsEmpty(page);
+    await driveMechanismsGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 

@@ -15,6 +15,8 @@
 //   #criteria           — CriteriaScreen: the criteria compliance page
 //                         (spec 084) — every catalog criterion judged
 //                         against the keyboard Output would ship.
+//   #privacy            — PrivacyScreen: the privacy notice (spec 095),
+//                         reachable signed-out and on first visit.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
@@ -91,7 +93,6 @@ import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { PreviewSheet } from "./components/PreviewSheet.tsx";
 import {
   PreviewButton,
-  FOOTER_CLEARANCE,
   PREVIEW_BUTTON_CLEARANCE,
 } from "./components/PreviewButton.tsx";
 import type { OskMode } from "./components/OskModeToggle.tsx";
@@ -102,7 +103,6 @@ import { findKmnPath } from "./lib/findKmnPath.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
 import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
-import { isContextToleranceEnabled } from "./flags/contextToleranceFlag.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -119,8 +119,10 @@ import { ReviewScreen } from "./review/ReviewScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
+import { PrivacyScreen } from "./components/PrivacyScreen.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, screenTrails, validateManifestShape } from "./steps/manifest.ts";
+import { resolveRightPane, shouldShowPreviewPane } from "./steps/types.ts";
 import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
@@ -181,6 +183,7 @@ const VALID_ROUTES = new Set<RouteId>(
       "flowmap",
       "trail",
       "criteria",
+      "privacy",
       "profile",
     ] as const
   ).filter((r) => r !== "flowmap" || SHOW_FLOWMAP),
@@ -420,7 +423,11 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // rightPane field and steps/manifest.ts's "characters" step).
   const activeRightPane = useMemo(() => {
     const step = manifest.find((s) => s.id === activeStepId);
-    return step?.rightPane ?? "preview";
+    return resolveRightPane(step);
+  }, [activeStepId]);
+  const showPreviewPane = useMemo(() => {
+    const step = manifest.find((s) => s.id === activeStepId);
+    return shouldShowPreviewPane(step);
   }, [activeStepId]);
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
   // The discoveryMethod gate applies to the "characters" step ONLY (its
@@ -1211,26 +1218,22 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
 
   // Use localStart (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
-  // spec 078: only this main-walk preview runs the context-tolerance analysis,
-  // and only behind the flag; every other useKeyboardArtifact caller is unchanged.
-  const contextToleranceEnabled = isContextToleranceEnabled();
+  // spec 078: only this main-walk preview runs the context-tolerance analysis;
+  // every other useKeyboardArtifact caller is unchanged.
   const { stage: artifactStage, retry } = useKeyboardArtifact(
     localStart,
     scaffoldSpec,
     workingCopyTransform,
     onInstantiate,
     {
-      analyseContextTolerance: contextToleranceEnabled,
+      analyseContextTolerance: true,
     },
   );
   const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
   // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply(
-    contextToleranceEnabled,
-  );
+  const contextToleranceApplyNotes = useContextToleranceApply();
   const showContextTolerance =
-    contextToleranceEnabled &&
     contextTolerance.status !== "idle" &&
     contextTolerance.status !== "analysing";
 
@@ -1523,9 +1526,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     flexDirection: "column",
     minHeight: 0,
     overflowY: "auto",
-    // The journey footer overlaps the bottom of the pane; the extra bottom
-    // padding lets the last control scroll out from under it.
-    padding: `24px 24px calc(24px + ${FOOTER_CLEARANCE})`,
+    // The journey footer sits in the shell's normal flow below this pane, so
+    // no extra bottom padding is needed — the pane simply ends at the bar.
+    padding: "24px",
     boxSizing: "border-box",
     color: TEXT_MAIN,
     fontFamily: FONT,
@@ -1654,14 +1657,17 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // Narrow viewports: one column of questions. The right pane's content
   // (OSK or character map) opens in a sheet, and only when there is
   // something to show — no base keyboard yet and no character map means no
-  // trigger at all.
-  const hasPreviewContent = showCharacterMap || localStart !== null;
+  // trigger at all. Steps declaring rightPane:"none" (identity/layout)
+  // never show a preview pane, divider, or mobile trigger, even when a
+  // base already exists (e.g. a resumed draft).
+  const hasPreviewContent =
+    showPreviewPane && (showCharacterMap || localStart !== null);
   // The sheet never reopens by itself: when its content goes away (a step
   // without a preview), forget that it was open.
   if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {
     setPreviewSheetOpen(false);
   }
-  const previewPane = (
+  const previewPane = showPreviewPane ? (
     <SurveyPreviewPane
       localStart={localStart}
       oskMode={oskMode}
@@ -1673,7 +1679,14 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       compact={isNarrow}
       {...(isNarrow ? {} : { style: previewPaneStyle })}
     />
-  );
+  ) : null;
+  const fullWidthQuestionsPaneStyle: CSSProperties = {
+    ...questionsPaneStyle,
+    flexBasis: "auto",
+    flexGrow: 1,
+    flexShrink: 1,
+    width: "100%",
+  };
   const previewButtonLabel = showCharacterMap
     ? t({ id: "previewButton.characterMap.label", message: "Character map" })
     : t({ id: "previewButton.label", message: "Preview" });
@@ -1694,7 +1707,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
         flexDirection: isNarrow ? "column" : "row",
         height: "100%",
         width: "100%",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
         overflow: "hidden",
       }}
     >
@@ -1708,12 +1721,15 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
                   ...questionsPaneStyle,
                   ...narrowStackedPaneStyle,
                   // Tighter gutters on a phone; extra bottom room so the last
-                  // line scrolls clear of the floating preview button.
+                  // line scrolls clear of the floating preview button (when
+                  // there is one — the footer itself sits in normal flow).
                   padding: hasPreviewContent
                     ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE}`
-                    : `16px 16px calc(16px + ${FOOTER_CLEARANCE})`,
+                    : "16px",
                 }
-              : questionsPaneStyle
+              : showPreviewPane
+                ? questionsPaneStyle
+                : fullWidthQuestionsPaneStyle
           }
         >
           {cloudResume !== null && (
@@ -1727,10 +1743,10 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
             // Always mounted, so content inserted later is announced (a live
             // region inserted together with its content often is not); it only
             // takes up space when it has something to say.
-            // Rendered flush on "var(--bg)" — the same token the container above
+            // Rendered flush on "var(--app-bg)" — the same token the container above
             // paints and the one CharacterMapPane's own root implicitly sits on
             // (it sets no background of its own, so it shows through to the
-            // container's var(--bg) too). Pinned explicitly here rather than left
+            // container's var(--app-bg) too). Pinned explicitly here rather than left
             // to accidental non-override, so a future change to questionsPaneStyle's
             // background doesn't silently drag this along. No border/card fill/
             // padding-as-box — this is text on the character-map surface, not a
@@ -1748,7 +1764,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
                       flexDirection: "column",
                       gap: 8,
                       marginBottom: 12,
-                      background: "var(--bg)",
+                      background: "var(--app-bg)",
                     }
                   : undefined
               }
@@ -1803,15 +1819,18 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
 
       {/* Drag handle — desktop only; on narrow viewports there is no split
           to drag (one pane fills the column behind the Questions | Preview
-          switch). */}
-      {!isNarrow && <ResizeHandle onPointerDown={onPointerDown} />}
+          switch). Hidden entirely when the step declares no right pane. */}
+      {!isNarrow && showPreviewPane && (
+        <ResizeHandle onPointerDown={onPointerDown} />
+      )}
 
       {/* Right pane: live OSK preview, OR (Phase B build-list only) the
           interactive character map — see activeRightPane/showCharacterMap
           above. The mechanism gallery and every other full-screen step render
           their own preview and are unaffected (they never reach this branch:
-          activeStepIsFullScreen returns early above). */}
-      {!isNarrow && previewPane}
+          activeStepIsFullScreen returns early above). Steps with
+          rightPane:"none" render no pane at all. */}
+      {!isNarrow && showPreviewPane && previewPane}
       {isNarrow && hasPreviewContent && (
         <>
           <PreviewButton
@@ -2162,6 +2181,12 @@ export function StudioShell() {
       // CriteriaPage it renders reads no store, per the D8 layer rule.
       content = <CriteriaScreen />;
       break;
+    case "privacy":
+      // Spec 095: the privacy notice — static, store-free, reachable
+      // signed-out (the welcome link marks the visit first so the
+      // first-visit gate does not rewrite the hash).
+      content = <PrivacyScreen />;
+      break;
     case "profile":
       content = <ProfileScreen />;
       break;
@@ -2192,7 +2217,7 @@ export function StudioShell() {
         maxHeight: "100dvh",
         width: "100vw",
         overflow: "hidden",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
       }}
     >
       <NavBar
