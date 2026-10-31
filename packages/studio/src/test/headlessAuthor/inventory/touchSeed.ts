@@ -14,6 +14,7 @@ const TOUCH_COMPLETION = "lib/touchStepCompletion.ts";
 
 export const touchSeedInventory: readonly InventoryEntry[] = [
   { fn: "defaultTouchSeedSource", module: SEED_CONTINUE, callers: [SEED_PANEL] },
+  { fn: "startShipsUsableTouch", module: SEED_CONTINUE, callers: [SEED_PANEL] },
   { fn: "deriveSeedPreview", module: SEED_CONTINUE, callers: [SEED_PANEL] },
   { fn: "clearTouchDraftOnSeedChange", module: SEED_CONTINUE, callers: [SEED_PANEL] },
   { fn: "touchDesktopModifications", module: TOUCH_COMPLETION, callers: [TOUCH_ADAPTER, SEED_PANEL] },

@@ -30,7 +30,8 @@ read those before anything else. Everything below is pushed.
 
 Each defect has its own commit on this branch (FR-012/FR-017: fixed product-side, never in the author):
 
-- `3e56aefc`, `9a73eb46`: duplicate carve-suppression guards. One commit covers paired stores, the
+- `3e56aefc`, `9a73eb46`: duplicate carve-suppression guards. Superseded by main's carve dedupe
+  (see the Merge section below); `carveSuppression.ts` is main's. One commit covered paired stores, the
   other distinct rules over identical stores.
 - `0352fae9`: quote characters in pattern slots broke KMN literals (kbdus `'` on RAlt).
 - `3d2f3680`: synthesized rules were emitted at the end of their group on fragment-bearing keyboards

@@ -66,7 +66,7 @@ not attributed to assertions, they showed 3-16 ms).
 ## R2. Inventory of FR-010 product functions (confirmed against `main` after the merge)
 
 All paths under `packages/`. "Caller" is the production component or hook that renders or applies the
-proposal, which the drift guard (FR-011) asserts still calls it.
+proposal, which boundary rule (d) (FR-014) asserts still imports it; the drift guard (FR-011) asserts only that the function is still exported.
 
 | Step | Function | Defined at | Production caller(s) |
 |---|---|---|---|
@@ -128,7 +128,7 @@ only what the UI calls (FR-014). The pinned exemplars reach the walk through
 `sourcedExemplarsLookup.ts` above.
 
 **Note**: the inventory, marks and output-form proposals have no caller in a `.tsx` other than
-`MarksSeriesStep.tsx` and the `useWorkToDo` hook, so the drift guard asserts on those two files.
+`MarksSeriesStep.tsx` and the `useWorkToDo` hook, so boundary rule (d) asserts on those two files.
 
 ## R3. Where the PR lane runs
 

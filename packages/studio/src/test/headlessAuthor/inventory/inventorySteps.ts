@@ -52,7 +52,8 @@ export const inventoryStepsInventory: readonly InventoryEntry[] = [
   { fn: "getInvisiblesInventoryValue", module: DRAFT, callers: ["survey/phaseCInventory.ts"] },
   { fn: "inventoryOps", module: DRAFT, callers: [RULES] },
   // --- punctuation ---
-  { fn: "seedPunctuationProposals", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
+  { fn: "seedPunctuationTier", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
+  { fn: "seedPunctuationBase", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
   { fn: "isPunctuationAlreadyConfirmed", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
   { fn: "completePunctuation", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },
   { fn: "PUNCTUATION_STEP_ID", module: PUNCTUATION_RULES, callers: [PUNCTUATION_STEP] },

@@ -42,6 +42,7 @@ import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import { getCharacterInventoryValue, inventoryOps } from "./useInventoryDraft.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 import { ADDITION_ANSWER_PREFIX, CHARACTERS_BUILD_LIST_SCREEN_ID, deriveCharacterFlags } from "./characterFlags.ts";
+import { PUNCTUATION_BASE_SEED_PREFIX, PUNCTUATION_TIER_SEED_PREFIX } from "./punctuation/punctuationStepRules.ts";
 import { isTextSamplePromptDismissed, proposeTextSample } from "./marksTextSample.ts";
 
 /** The survey-answer id the A7a remap-posture confirmation records under. */
@@ -68,8 +69,8 @@ export function isCasedBaseOf(startIr: KeyboardIR | null | undefined): boolean {
 /** Manifest step id -- matches steps/manifest.ts's "characters" entry. */
 const CHARACTERS_STEP_ID = "characters";
 
-/** Seed-key prefixes the punctuation step records (see PunctuationStep's seed effects). */
-const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const;
+/** Seed-key prefixes the punctuation step records (punctuationStepRules). */
+const PUNCTUATION_SEED_PREFIXES = [PUNCTUATION_TIER_SEED_PREFIX, PUNCTUATION_BASE_SEED_PREFIX] as const;
 
 /**
  * The prefill confirm — the ONE chokepoint every route into the build list

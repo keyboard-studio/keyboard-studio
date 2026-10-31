@@ -88,7 +88,7 @@ import { marksDrivers } from "./stepDrivers/marks.ts";
 import { convenienceDrivers } from "./stepDrivers/convenience.ts";
 import { carveDrivers } from "./stepDrivers/carve.ts";
 import { mechanismDrivers } from "./stepDrivers/mechanism.ts";
-import { copiedKeyboardHasTouch, touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
+import { startShipsUsableTouch, touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
 
 export interface AuthorRunOptions {
@@ -231,7 +231,7 @@ export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promi
 
     // Keyed on the copied keyboard's shipped touch file: a reseed emits a layout even
     // for a keyboard that had none, so the projected package cannot answer this.
-    const hasShippedTouch = copiedKeyboardHasTouch(point.vfs);
+    const hasShippedTouch = startShipsUsableTouch(point.vfs);
 
     try {
       await walk({ case: c, startIr: point.ir, report }, point, opts.onStep);

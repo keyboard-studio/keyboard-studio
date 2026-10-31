@@ -4,6 +4,8 @@
 // on them without React.
 
 import { describe, it, expect } from "vitest";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import {
   makeConfirmedAlphabet,
   makeEmptyPlacementWorklist,
@@ -23,6 +25,8 @@ import {
   resolveOutputStation,
   resolveToleranceDecision,
   seriesResult,
+  startOfLineAnswerOrigin,
+  startOfLineImportSeeded,
   startOfLineSeed,
   visibleMarksStations,
 } from "./marksSeriesValue.ts";
@@ -292,6 +296,64 @@ describe("start-of-line default", () => {
       expect(off.state.attachmentChecked[mark]?.[ATTACHMENT_START_OF_LINE]).toBe(false);
       expect(on.state.attachmentChecked[mark]?.[ATTACHMENT_START_OF_LINE]).toBe(true);
     }
+  });
+});
+
+describe("startOfLineImportSeeded", () => {
+  // One unguarded producing T_ mark key: the shape detectImportedStartOfLineSeed seeds.
+  const unguardedMarkIR = (): KeyboardIR =>
+    makeTestIR({
+      groups: [
+        {
+          nodeId: "group#main",
+          name: "main",
+          usingKeys: true,
+          readonly: false,
+          rules: [
+            {
+              nodeId: "rule#p",
+              context: [{ kind: "vkey", name: "T_0300", modifiers: [] }],
+              output: [{ kind: "char", value: GRAVE }],
+            },
+          ],
+        },
+      ],
+      touchLayout: {
+        platforms: [
+          { id: "phone", layers: [{ id: "default", rows: [{ keys: [{ nodeId: "touchKey#0", id: "T_0300", text: "◌̀" }] }] }] },
+        ],
+        nodeIds: [],
+      },
+    });
+
+  it("seeds on the adapt track when the start's marks are all unguarded", () => {
+    expect(startOfLineImportSeeded("adapt", unguardedMarkIR())).toBe(true);
+  });
+
+  it("does not seed on any other track", () => {
+    expect(startOfLineImportSeeded("create", unguardedMarkIR())).toBe(false);
+    expect(startOfLineImportSeeded(undefined, unguardedMarkIR())).toBe(false);
+  });
+
+  it("does not seed without a start IR", () => {
+    expect(startOfLineImportSeeded("adapt", null)).toBe(false);
+    expect(startOfLineImportSeeded("adapt", undefined)).toBe(false);
+  });
+});
+
+describe("startOfLineAnswerOrigin", () => {
+  const base = { ticked: true, firstCommit: true, defaultTicked: true, migrated: false };
+
+  it("attributes the seed only at the first commit of a ticked, seeded row", () => {
+    expect(startOfLineAnswerOrigin(base)).toBe("imported");
+    expect(startOfLineAnswerOrigin({ ...base, migrated: true })).toBe("migrated-from-guard");
+  });
+
+  it("falls back to the author's own trajectory otherwise", () => {
+    expect(startOfLineAnswerOrigin({ ...base, firstCommit: false })).toBe("overturned");
+    expect(startOfLineAnswerOrigin({ ...base, defaultTicked: false })).toBe("overturned");
+    expect(startOfLineAnswerOrigin({ ...base, ticked: false })).toBe("confirmed");
+    expect(startOfLineAnswerOrigin({ ...base, ticked: false, migrated: true })).toBe("confirmed");
   });
 });
 

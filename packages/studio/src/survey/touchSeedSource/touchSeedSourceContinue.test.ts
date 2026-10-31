@@ -14,6 +14,7 @@ import {
   defaultTouchSeedSource,
   deriveSeedPreview,
   parseBaseTouchPreview,
+  startShipsUsableTouch,
 } from "./touchSeedSourceContinue.ts";
 
 const PHONE_ONLY_JSON = JSON.stringify({
@@ -107,6 +108,20 @@ describe("parseBaseTouchPreview", () => {
   it("falls back to the first platform id when none is in the preference order", () => {
     const json = JSON.stringify({ watch: { layer: [] } });
     expect(parseBaseTouchPreview(json)?.previewPlatformId).toBe("watch");
+  });
+});
+
+describe("startShipsUsableTouch", () => {
+  it("is true for a layout with a platform that has layers", () => {
+    expect(startShipsUsableTouch(startVfsWith(PHONE_ONLY_JSON))).toBe(true);
+  });
+
+  it("is false with no touch layout, a null vfs, malformed JSON, or no platforms", () => {
+    expect(startShipsUsableTouch(startVfsWith())).toBe(false);
+    expect(startShipsUsableTouch(null)).toBe(false);
+    expect(startShipsUsableTouch(startVfsWith("{not json"))).toBe(false);
+    expect(startShipsUsableTouch(startVfsWith("{}"))).toBe(false);
+    expect(startShipsUsableTouch(startVfsWith(JSON.stringify({ phone: {} })))).toBe(false);
   });
 });
 

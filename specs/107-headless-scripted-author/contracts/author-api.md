@@ -27,8 +27,8 @@ Guarantees:
    never imports it or branches on it (FR-016). `HA/boundary.test.ts` and the depcruise rule
    `product-not-to-headless-author` enforce this on every PR.
 1. **Product functions only** (FR-010): every suggestion and default comes from a function listed in
-   `driftGuard.ts`; the drift-guard test fails if one is renamed, removed or no longer called by its
-   production caller (research R2).
+   `driftGuard.ts`; the drift-guard test fails if one is renamed or removed, and boundary rule (d) fails if its
+   production caller no longer imports it (research R2).
 2. **Store actions only** (FR-004, FR-015): decisions are written through the functions the UI
    handlers call; no direct `setState` on a decision store (the per-case reset is the single
    allow-listed exception, FR-014).

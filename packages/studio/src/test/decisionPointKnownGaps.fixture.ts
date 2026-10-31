@@ -36,8 +36,9 @@ export const KNOWN_GAPS: readonly Gap[] = [
   // nul/beep inside starting stores is deferred to keymanapp/keyboards#4181.
   { gate: "G8-start", owner: "#2361", bases: ["sil_cameroon_qwerty", "sil_cameroon_azerty"], points: DECISION_POINTS },
   // G6 reads only default-layer key labels, with no starting-content split and
-  // no credit for keys that reach a letter through the .kmn rules. Measured
-  // on every touch-bearing keyboard the author walks (harness and PR set).
+  // no credit for keys that reach a letter through the .kmn rules. The listed
+  // bases are the ones whose measured G6 gap is recorded; a keyboard with a
+  // usable touch layout can show it.
   {
     gate: "G6",
     owner: "#2400",

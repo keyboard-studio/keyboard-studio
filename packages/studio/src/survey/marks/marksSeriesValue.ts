@@ -13,7 +13,7 @@
 //   1. gate     `computeMarksGate(alphabet)`; `skip` means the series
 //               completes at once with `seriesResult()` and records
 //               EMPTY_MARKS_VALUE (see the step's S0 effect).
-//   2. basis    `isCasedBaseKeyboard(startIr)` -> `deriveMarksBasis(...)`
+//   2. basis    `isCasedBaseOf(startIr)` -> `deriveMarksBasis(...)`
 //               (classes, proposals via the engine's `proposeAttachments`,
 //               posture). `marksStationDefaults(...)` runs 2-6 in the step's
 //               own order and returns every station's default answer. The
@@ -69,8 +69,6 @@ import {
   detectStartMarkMechanism,
   prunePromotions,
   treatmentFor,
-  getEffectiveFacet,
-  CASING_FACET_ID,
   type AttachmentProposal,
   type AttestationCaseFold,
   type BackspaceProposal,
@@ -100,6 +98,7 @@ import {
   type AttachmentChecked,
   type MarksStationId,
 } from "./marksViews.ts";
+import { isCasedBaseOf } from "../charactersStepRules.ts";
 import { detectImportedStartOfLineSeed } from "./importedStartOfLine.ts";
 import {
   legacyGuardSpecification,
@@ -181,17 +180,6 @@ export function visibleMarksStations(input: VisibleStationsInput): MarksStationI
 // Station inputs and defaults
 // ---------------------------------------------------------------------------
 
-/**
- * The GATE for "is this base cased at all" (spec 048 FR-006): the working
- * copy's `casing` facet (effective value), not a per-character Unicode test —
- * the two disagree for Georgian. "mixed" opens the gate too: everything below
- * it is per-character and leaves a caseless script's characters alone.
- */
-export function isCasedBaseKeyboard(startIr: KeyboardIR | null | undefined): boolean {
-  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
-  return casingValue === "cased" || casingValue === "mixed";
-}
-
 export interface MarksBasis {
   fold: AttestationCaseFold;
   classes: MarkClass[];
@@ -254,6 +242,24 @@ export function startOfLineSeed(marksValue: MarksTreatmentValue, importSeeded: b
   const legacyGuard = legacyGuardSpecification(marksValue);
   const migrated = legacyGuard?.confirmed === true && legacyGuard.behaviour === "emit";
   return { migrated, defaultTicked: migrated || importSeeded };
+}
+
+/**
+ * The origin stamped on the start-of-line answer a row's commit records. The
+ * migration/import attribution applies only at the row's FIRST commit
+ * (`firstCommit`: no saved answer yet) while the ticked box is the seed the
+ * author sees; afterwards, or when the author set the tick themselves, it is
+ * the author's own trajectory against the unticked default.
+ */
+export function startOfLineAnswerOrigin(input: {
+  ticked: boolean;
+  firstCommit: boolean;
+  defaultTicked: boolean;
+  migrated: boolean;
+}): "migrated-from-guard" | "imported" | "overturned" | "confirmed" {
+  const { ticked, firstCommit, defaultTicked, migrated } = input;
+  if (firstCommit && ticked && defaultTicked) return migrated ? "migrated-from-guard" : "imported";
+  return ticked ? "overturned" : "confirmed";
 }
 
 /**
@@ -876,7 +882,7 @@ export function marksStationDefaults(input: MarksStationDefaultsInput): MarksSta
   const gate = computeMarksGate(input.alphabet);
   const alphabet = gate.alphabet;
   const saved: SavedAnswers = {};
-  const isCasedBase = isCasedBaseKeyboard(startIr);
+  const isCasedBase = isCasedBaseOf(startIr);
   const basis = deriveMarksBasis(alphabet, isCasedBase, bcp47);
   const attachmentChecked = reconciledAttachmentChecked(
     alphabet,

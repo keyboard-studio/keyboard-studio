@@ -26,6 +26,7 @@ import {
   clearTouchDraftOnSeedChange,
   defaultTouchSeedSource,
   deriveSeedPreview,
+  startShipsUsableTouch,
 } from "../../../survey/touchSeedSource/touchSeedSourceContinue.ts";
 import { StepFailure } from "../stepFailure.ts";
 import { chooseByPolicy } from "../walkPolicy.ts";
@@ -34,10 +35,8 @@ import type { StepDrivers } from "./types.ts";
 const DECISION_ID = "touch-seed-source";
 const STEP_ID = "touch_seed_source";
 
-/** Whether the copied keyboard ships a usable touch layout (the same read the seed-source default makes). */
-export function copiedKeyboardHasTouch(startVfs: Parameters<typeof resolveStartTouchJson>[0]): boolean {
-  return resolveStartTouchJson(startVfs) !== undefined;
-}
+/** Re-exported for the case runner, which keys G6 applicability on the same read. */
+export { startShipsUsableTouch };
 
 /** The mods the panel and the adapter both read from the working copy. */
 function currentMods(wc: ReturnType<typeof useWorkingCopyStore.getState>) {

@@ -60,6 +60,7 @@ import {
 import type { BackspaceBehaviour, MarkInputOrder } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
+import { isCasedBaseOf } from "../charactersStepRules.ts";
 import { EMPTY_MARKS_VALUE, type MarksTreatmentValue } from "./marksValue.ts";
 import {
   assembleMarksSeries,
@@ -69,7 +70,6 @@ import {
   deriveMarksBasis,
   deriveTreatmentPrefills,
   expandAttachmentsForCase,
-  isCasedBaseKeyboard,
   marksSeriesAnswers,
   marksStationAnswers,
   resolveOutputStation,
@@ -77,6 +77,7 @@ import {
   resolveToleranceDecision,
   resolveTreatmentStation,
   seriesResult,
+  startOfLineAnswerOrigin,
   startOfLineImportSeeded,
   startOfLineSeed,
   visibleMarksStations,
@@ -221,7 +222,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // keyboard's OTHER attested scripts are. Opening the gate for "mixed" folds
   // exactly the cased subset and leaves caseless characters alone; it doesn't
   // require new filtering, because that's what these primitives already do.
-  const isCasedBase = isCasedBaseKeyboard(startIr);
+  const isCasedBase = isCasedBaseOf(startIr);
   // Attestation is case-symmetric behind the same gate: a mark seen only on a
   // capital must still pre-tick the lowercase row, the only one shown below,
   // and must still group with a sibling seen only on the lowercase letter.
@@ -800,15 +801,15 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           // own confirmed/overturned trajectory against the unticked default.
           const solId = `marks_attachment.${proposal.mark}|${ATTACHMENT_START_OF_LINE}`;
           const solTicked = attachmentChecked[proposal.mark]?.[ATTACHMENT_START_OF_LINE] ?? false;
-          const solSeeded = savedAnswers[solId] === undefined && solTicked && startOfLineDefault;
           saveAnswer(STEP_ID, solId, {
             value: solTicked,
             answerType: "boolean",
-            origin: solSeeded
-              ? (startOfLineMigrated ? "migrated-from-guard" : "imported")
-              : solTicked
-                ? "overturned"
-                : "confirmed",
+            origin: startOfLineAnswerOrigin({
+              ticked: solTicked,
+              firstCommit: savedAnswers[solId] === undefined,
+              defaultTicked: startOfLineDefault,
+              migrated: startOfLineMigrated,
+            }),
             stage: "confirmed",
             evidenceKey: marksAttachmentKey(gate.alphabet, proposal.mark, ATTACHMENT_START_OF_LINE),
             screenId: "marks_attachment",

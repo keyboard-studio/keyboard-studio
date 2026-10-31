@@ -71,7 +71,8 @@ import {
   isPunctuationAlreadyConfirmed,
   isPunctuationChar,
   punctuationTier,
-  seedPunctuationProposals,
+  seedPunctuationBase,
+  seedPunctuationTier,
 } from "./punctuationStepRules.ts";
 import { containsFormatChar, harvestChars, isFormatChar } from "../charNormUtils.ts";
 import { codepointLabel } from "../codepointLabel.ts";
@@ -309,21 +310,27 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
 
   const tier = useMemo(() => punctuationTier(inventory), [inventory]);
 
-  // Seed the CLDR/SLDR tier ONCE per resolved locale, then the base group ONCE
-  // per base keyboard, when the lookup settles (FR-001, FR-006..FR-010,
-  // FR-022/FR-023); see seedPunctuationProposals for the rules. The two proposed
-  // groups are disjoint by construction, and every seed is a no-op on a repeated
-  // key, so one effect over the union of their inputs is the same two seeds.
+  // Seed the CLDR/SLDR tier ONCE per resolved locale when the lookup settles
+  // (FR-001); see seedPunctuationTier for the rules.
   useEffect(() => {
-    if (loading) return;
-    seedPunctuationProposals({
+    if (loading || inventory === null) return;
+    seedPunctuationTier({ inventory, alreadyConfirmed, seedProposals });
+  }, [loading, inventory, tier, alreadyConfirmed, seedProposals]);
+
+  // Seed the base group ONCE per base keyboard, after the exemplar lookup has
+  // settled so the group already excludes the CLDR tier (FR-006); see
+  // seedPunctuationBase. The decision record is read when the effect fires
+  // rather than subscribed to: the seed key makes every re-run a no-op anyway.
+  useEffect(() => {
+    if (loading || baseCoverage === null) return;
+    seedPunctuationBase({
       inventory,
       baseCoverage,
       startKeyboardId: startKeyboard?.id,
       alreadyConfirmed,
       seedProposals,
     });
-  }, [loading, baseCoverage, startKeyboard, inventory, tier, alreadyConfirmed, seedProposals]);
+  }, [loading, baseCoverage, startKeyboard, inventory, alreadyConfirmed, seedProposals]);
 
   // FR-011: how many of the chosen marks the base cannot type yet — the
   // missing side of the inventory delta, visible before Done. This is

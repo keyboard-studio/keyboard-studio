@@ -73,6 +73,15 @@ export function parseBaseTouchPreview(json: string | undefined): StartTouchLayou
 }
 
 /**
+ * Whether the copied keyboard ships a usable touch layout: its touch JSON
+ * resolves and parses to at least one platform with layers. Absent, malformed,
+ * and platform-less JSON all read as not usable (R4).
+ */
+export function startShipsUsableTouch(startVfs: VirtualFS | null): boolean {
+  return parseBaseTouchPreview(resolveStartTouchJson(startVfs)) !== null;
+}
+
+/**
  * The choice the chooser starts on: the recorded one on re-entry, else Import &
  * adapt when the copied keyboard ships a usable touch layout, else Reseed (R4).
  */
@@ -80,8 +89,7 @@ export function defaultTouchSeedSource(
   startVfs: VirtualFS | null,
   stored: TouchSeedSource | null,
 ): TouchSeedSource {
-  const usable = parseBaseTouchPreview(resolveStartTouchJson(startVfs)) !== null;
-  return resolveTouchSeedSource(stored, usable);
+  return resolveTouchSeedSource(stored, startShipsUsableTouch(startVfs));
 }
 
 /**

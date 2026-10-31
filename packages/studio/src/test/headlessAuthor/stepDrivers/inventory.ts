@@ -24,7 +24,7 @@
 //              the case with `network-required` (the product's own message for
 //              it is a chunk-load or network failure).
 // punctuation  The exemplar tier and the base group are seeded as proposals when
-//              the lookup settles (seedPunctuationProposals); the author types
+//              the lookup settles (seedPunctuationTier, seedPunctuationBase); the author types
 //              nothing and presses Continue (completePunctuation).
 // invisibles   Format characters the code-point field left behind are carried
 //              over (adoptControlsAsInvisibles), nothing is toggled, Continue
@@ -77,7 +77,8 @@ import {
   baseCoverageOf,
   completePunctuation,
   isPunctuationAlreadyConfirmed,
-  seedPunctuationProposals,
+  seedPunctuationBase,
+  seedPunctuationTier,
 } from "../../../survey/punctuation/punctuationStepRules.ts";
 import {
   invisiblesCandidates,
@@ -229,19 +230,21 @@ async function drivePunctuation(ctx: DriverContext): Promise<unknown> {
     confirmedForKey: savedAnswers(PUNCTUATION_STEP_ID)?.[PUNCTUATION_INVENTORY_ANSWER_ID]?.evidenceKey,
     evidenceKey,
   });
-  seedPunctuationProposals({
+  const { seedProposals } = inventoryOps(PUNCTUATION_STEP_ID);
+  seedPunctuationTier({ inventory, alreadyConfirmed, seedProposals });
+  seedPunctuationBase({
     inventory,
     baseCoverage: baseCoverageOf(wc.ir),
     startKeyboardId: wc.startKeyboard?.id,
     alreadyConfirmed,
-    seedProposals: inventoryOps(PUNCTUATION_STEP_ID).seedProposals,
+    seedProposals,
   });
   ctx.report.addStep(
     chooseByPolicy({
       decisionId: "punctuation-inventory",
       suggestions: [],
       defaultValue: getCharacterInventoryValue().punctuation,
-      proposalSource: "seedPunctuationProposals",
+      proposalSource: "seedPunctuationTier+seedPunctuationBase",
     }),
   );
   return completePunctuation({ evidenceKey, saveAnswer: useSurveyAnswerStore.getState().saveAnswer });

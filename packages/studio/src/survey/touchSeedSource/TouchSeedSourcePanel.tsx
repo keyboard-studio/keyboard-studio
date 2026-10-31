@@ -67,6 +67,7 @@ import {
   defaultTouchSeedSource,
   deriveSeedPreview,
   parseBaseTouchPreview,
+  startShipsUsableTouch,
 } from "./touchSeedSourceContinue.ts";
 import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
@@ -203,7 +204,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
   const rawJson = useMemo(() => resolveStartTouchJson(startVfs), [startVfs]);
   const preview = useMemo(() => parseBaseTouchPreview(rawJson), [rawJson]);
 
-  const hasUsableBaseLayout = preview !== null;
+  const hasUsableBaseLayout = useMemo(() => startShipsUsableTouch(startVfs), [startVfs]);
   const isMalformed = rawJson !== undefined && preview === null;
   const hasPhonePlatform = preview !== null && preview.platformIds.includes("phone");
   const hasOtherPlatforms = preview !== null && preview.platformIds.some((id) => id !== "phone");
