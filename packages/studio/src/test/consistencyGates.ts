@@ -96,12 +96,19 @@ const ruleKey = (r: IRRule): string => JSON.stringify([r.context, r.output, r.ma
 const storeKey = (name: string, items: readonly StoreItem[]): string => JSON.stringify([name, items]);
 
 /** Fingerprints of the rules and stores the starting keyboard already had. */
-function startFingerprints(startIr: KeyboardIR | undefined): { rules: Set<string>; stores: Set<string> } {
+function startFingerprints(startIr: KeyboardIR | undefined): {
+  rules: Set<string>;
+  stores: Set<string>;
+  /** Per same-named starting store, the items it already held (a carve may have trimmed the store since). */
+  storeItems: Map<string, StoreItem[]>;
+} {
+  const storeItems = new Map<string, StoreItem[]>();
+  for (const s of startIr?.stores ?? []) storeItems.set(s.name, [...s.items]);
   const rules = new Set<string>();
   const stores = new Set<string>();
   for (const g of startIr?.groups ?? []) for (const r of g.rules) rules.add(ruleKey(r));
   for (const s of startIr?.stores ?? []) stores.add(storeKey(s.name, s.items));
-  return { rules, stores };
+  return { rules, stores, storeItems };
 }
 
 /** The literal text each maximal run of `char` output elements spells. */
@@ -191,8 +198,12 @@ function g4(input: GateInput, ir: KeyboardIR | undefined): GateResult {
   }
   for (const s of ir.stores) {
     if (s.isSystem) continue;
-    const starting = start.stores.has(storeKey(s.name, s.items));
-    for (const item of s.items) if (item.kind === "char") check(`store ${s.name}`, item.value, starting);
+    const wholeStore = start.stores.has(storeKey(s.name, s.items));
+    // Per item: a carve trims a starting store without making what is left generated.
+    const startHeld = new Set((start.storeItems.get(s.name) ?? []).map((i) => JSON.stringify(i)));
+    for (const item of s.items) {
+      if (item.kind === "char") check(`store ${s.name}`, item.value, wholeStore || startHeld.has(JSON.stringify(item)));
+    }
   }
   const out = result("G4", problems);
   if (keptStarting.length > 0) out.detail.push(`${keptStarting.length} starting item(s) kept by carve, not failed`);
@@ -328,7 +339,12 @@ function g8(input: GateInput, ir: KeyboardIR | undefined): [GateResult, GateResu
     if (s.isSystem) continue;
     const n = s.items.filter(isIllegalStoreItem).length;
     if (n === 0) continue;
-    (start.stores.has(storeKey(s.name, s.items)) ? starting : generated).push(`store ${s.name}: ${n} nul/beep item(s)`);
+    // Per item: the same-named starting store's nul/beep items are starting, any beyond that count are generated.
+    const held = start.stores.has(storeKey(s.name, s.items))
+      ? n
+      : Math.min(n, (start.storeItems.get(s.name) ?? []).filter(isIllegalStoreItem).length);
+    if (held > 0) starting.push(`store ${s.name}: ${held} nul/beep item(s)`);
+    if (n - held > 0) generated.push(`store ${s.name}: ${n - held} nul/beep item(s)`);
   }
   return [result("G8", generated), result("G8-start", starting)];
 }
