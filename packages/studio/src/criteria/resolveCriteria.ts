@@ -98,12 +98,10 @@ function indexFindings(
  * Data sources:
  * - input.verifiedByCode: verified lines from related implemented checks
  * - input.facts: keyboard facts (fonts, etc.)
- * - findingsByCode: findings from related checks
  */
 function reviewerContext(
   criterionId: string,
   input: CriteriaInput,
-  findingsByCode: Map<string, readonly LintFinding[]>,
 ): string[] {
   const verified = input.verifiedByCode;
   const getVerified = (code: string): string[] =>
@@ -435,7 +433,7 @@ function resolveRow(
         status: "needs-author",
         controls: input.mode === "authored" ? "attest" : null,
         evidence: () => {
-          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const context = reviewerContext(criterion.id, input);
           const lines = ["No attestation has been recorded for this criterion yet."];
           if (context.length > 0) {
             lines.push("", "Reviewer context:", ...context);
@@ -471,7 +469,7 @@ function resolveRow(
         status: "needs-human",
         controls: input.mode === "authored" ? "confirm" : null,
         evidence: () => {
-          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const context = reviewerContext(criterion.id, input);
           const lines = [checklistText];
           if (context.length > 0) {
             lines.push("", "Reviewer context:", ...context);

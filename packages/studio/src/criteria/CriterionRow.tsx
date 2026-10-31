@@ -190,7 +190,7 @@ export function CriterionRow({
     <>
       {model.lines.map((line, index) => (
         <p key={index} style={evidenceLineStyle}>
-          {renderEvidenceLine(line, index)}
+          {renderEvidenceLine(line)}
         </p>
       ))}
     </>
@@ -201,7 +201,7 @@ export function CriterionRow({
    * sha (opens in a new tab). Only in hosts that pass githubLink (/review).
    * Values (quoted strings, paths) render in monospace code style.
    */
-  const renderEvidenceLine = (line: string, index: number): React.ReactNode => {
+  const renderEvidenceLine = (line: string): React.ReactNode => {
     // Helper: wrap quoted strings in <code>
     const withCode = (text: string): React.ReactNode[] => {
       const parts = text.split(/("[^"]*")/g);
