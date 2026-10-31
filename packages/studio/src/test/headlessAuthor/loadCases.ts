@@ -127,8 +127,9 @@ export function loadPrSet(
   canonicalPath: string = CANONICAL_CASES_PATH,
   deps: LoadDeps = {},
 ): { entry: PrSetEntry; case: Case }[] {
-  // Adding a keyboard to prSet.json is part of fixing a keyboard-specific bug,
-  // in the same PR.
+  // Adding a keyboard to prSet.json is part of fixing a keyboard-specific bug:
+  // the fix's PR adds the case and its reason (spec 107 FR-031). A new entry
+  // that would break the PR budget replaces a weaker one of the same shape.
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (!Array.isArray(parsed)) throw new Error(`${path}: expected a JSON array of PR-set entries`);
   const entries = parsed as PrSetEntry[];

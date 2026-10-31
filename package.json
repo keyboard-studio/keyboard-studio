@@ -38,6 +38,7 @@
     "test:nfd-tolerance-corpus": "vitest run --root utilities/nfd-tolerance-corpus",
     "nfd-tolerance-corpus": "node utilities/nfd-tolerance-corpus/run.mjs",
     "test:km-triage": "node --test \"utilities/km-triage-app/*.test.js\"",
+    "test:sweep-issues": "node --test scripts/file-sweep-issues.test.mjs",
     "test:supportability-scanner": "vitest run --root utilities/supportability-scanner",
     "test:corpus-eval": "tsc --noEmit -p utilities/corpus-eval && vitest run --root utilities/corpus-eval",
     "typecheck": "pnpm -r typecheck",

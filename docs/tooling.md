@@ -230,6 +230,42 @@ on every PR against one known corpus. It also sets `KEYBOARDS_REPO` to that path
 postbuild and dev server. When the fork moves, bump the pin deliberately and re-run the
 corpus-gated tests locally against the new commit first.
 
+### Headless author
+
+The scripted author ([spec 107](../specs/107-headless-scripted-author/quickstart.md)) walks the
+studio's own step logic without a browser, replays the result, and runs the consistency gates. It
+reads the sibling `../keyboards` corpus, so it runs under the studio's `vitest.corpus.config.ts`
+(from `packages/studio`; the full walkthrough is the
+[quickstart](../specs/107-headless-scripted-author/quickstart.md)).
+
+| Tier | Run | Where |
+|---|---|---|
+| One case | `KS_AUTHOR_CASE=<id> npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/authorCase` | on demand |
+| PR set | the `headless-author` job in [ci.yml](../.github/workflows/ci.yml) | every PR that touches studio or engine |
+| 32 harness cases | `KS_AUTHOR_HARNESS=1 npx vitest run --config vitest.corpus.config.ts --silent=false --reporter=verbose src/test/headlessAuthor/harnessCases` | on demand |
+| 32 harness cases + PR set x 8 profile variants | `KS_AUTHOR_SWEEP=cases` (sweep test) | nightly, on demand |
+| Latin slice / whole eligible corpus | `KS_AUTHOR_SWEEP=latin` or `eligible` | weekly, on demand |
+
+vitest hides console output from passing tests, so pass `--silent=false --reporter=verbose` to see the per-case
+reports of a green run.
+
+Sweep variables (the file skips with a `[WARN]`, never a silent pass, when `KS_AUTHOR_SWEEP` is unset):
+
+- `KS_AUTHOR_SWEEP` — `latin`, `eligible` or `cases`.
+- `KS_AUTHOR_SHARD` — `k/n`, run shard `k` of `n` (default `1/1`).
+- `KS_AUTHOR_ONLY` — re-run one swept case id alone.
+- `KS_AUTHOR_REPORT_DIR` — where `headless-report-<tier>-<k>of<n>.json` is written (default: the cwd).
+
+The scheduled run is [headless-sweep.yml](../.github/workflows/headless-sweep.yml): never on
+`pull_request`, never a required check. Its `summarise` job merges the shard reports and
+[scripts/file-sweep-issues.mjs](../scripts/file-sweep-issues.mjs) files each new failure as a
+`headless-sweep` issue (or comments on the open one); failures owned by a spec 106 known gap are
+summarised, not filed. Test the script with `pnpm run test:sweep-issues` (CI runs it too).
+
+**PR-set rule.** Adding the keyboard to `prSet.json` (with a reason naming the bug) is part of fixing
+a keyboard-specific bug, in the same PR, so the PR set guards the fix from then on. More than 6
+entries needs a re-measured PR budget.
+
 ## Journey corpus (spec 032)
 
 Hand-authored, replayable end-to-end user-workflow fixtures — a headless (no DOM, no

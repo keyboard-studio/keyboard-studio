@@ -36,7 +36,7 @@ import type { StartingPoint } from "../../decisionPointFixture.ts";
 import { CORPUS } from "../../sc004Harness.ts";
 import { chooseByPolicy } from "../walkPolicy.ts";
 import { completeFlowStep } from "./flowStep.ts";
-import type { DriverContext, StepDrivers } from "./types.ts";
+import type { StepDrivers } from "./types.ts";
 
 /** The catalog record the start-keyboard browser lists for a corpus keyboard. */
 export function catalogStartKeyboard(base: string, group: string): StartKeyboard {
