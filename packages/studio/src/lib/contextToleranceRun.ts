@@ -11,21 +11,19 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { analyseContextTolerance } from "./contextToleranceAnalysis.ts";
+import { analyseContextTolerance, type ContextToleranceResult } from "./contextToleranceAnalysis.ts";
 import { lookupNormalizationVerification } from "./normalizationVerification.ts";
 
 /**
  * Every await inside the analysis is followed by an `isCurrent()` check; a
  * superseded run's result is dropped.
  */
-export function runContextToleranceAnalysis(
+export function analyseWorkingCopyContextTolerance(
   ir: KeyboardIR,
-  runId: number,
   isCurrent: () => boolean,
-): Promise<void> {
-  const { startKeyboard, contextToleranceOverlay, contextNormalizationStep, setContextNormalizationStep, setContextTolerance } =
+): Promise<ContextToleranceResult | null> {
+  const { startKeyboard, contextToleranceOverlay, contextNormalizationStep, setContextNormalizationStep } =
     useWorkingCopyStore.getState();
-  setContextTolerance({ status: "analysing", runId });
   return analyseContextTolerance(ir, isCurrent, contextToleranceOverlay, {
     normalizationSnapshot: contextNormalizationStep,
     verificationLookup: lookupNormalizationVerification,
@@ -38,7 +36,16 @@ export function runContextToleranceAnalysis(
         setContextNormalizationStep(stored);
       }
     },
-  }).then(
+  });
+}
+
+export function runContextToleranceAnalysis(
+  ir: KeyboardIR,
+  runId: number,
+  isCurrent: () => boolean,
+): Promise<void> {
+  useWorkingCopyStore.getState().setContextTolerance({ status: "analysing", runId });
+  return analyseWorkingCopyContextTolerance(ir, isCurrent).then(
     (result) => {
       if (result === null || !isCurrent()) return;
       useWorkingCopyStore.getState().setContextTolerance({ status: "ready", runId, ...result });

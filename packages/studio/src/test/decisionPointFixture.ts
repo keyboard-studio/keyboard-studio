@@ -38,7 +38,7 @@ import { resetRebuildTrail, rebuildWorkingCopyFromStores } from "../decisions/re
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { buildOutputBundle, type OutputBundle } from "../lib/buildOutputBundle.ts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
-import { analyseContextTolerance } from "../lib/contextToleranceAnalysis.ts";
+import { analyseWorkingCopyContextTolerance } from "../lib/contextToleranceRun.ts";
 import { applyContextToleranceDecision } from "../lib/contextToleranceApply.ts";
 import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
@@ -71,6 +71,12 @@ export interface DecisionPointFixture {
   startIr: KeyboardIR;
   /** The download-path bundle the gates were checked on (spec 107 FR-006). */
   bundle: OutputBundle;
+  /**
+   * Sites of a recorded accept/partial tolerance decision the replay dropped as stale
+   * (the product drops it the same way once later steps change the keyboard).
+   * Absent when the decision applied, was declined, or none was recorded.
+   */
+  toleranceStaleSiteIds?: string[];
 }
 
 function resetStores(): void {
@@ -143,9 +149,9 @@ function installUnreplayedSlices(decisions: DecisionSet): void {
  * the product of an async compile and simulation against the keyboard as
  * projected so far. Mirrors useContextToleranceApply.
  */
-async function installToleranceOverlay(decisions: DecisionSet): Promise<void> {
+async function installToleranceOverlay(decisions: DecisionSet): Promise<string[] | undefined> {
   const decision = (decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined)?.contextTolerance;
-  if (decision === undefined || decision === null || decision.decision === "decline") return;
+  if (decision === undefined || decision === null || decision.decision === "decline") return undefined;
 
   const interim = await projectWorkingCopyForOutput();
   if (interim === null) throw new Error("tolerance: working copy not instantiated");
@@ -153,14 +159,19 @@ async function installToleranceOverlay(decisions: DecisionSet): Promise<void> {
   if (kmn === undefined) throw new Error("tolerance: projected .kmn missing");
   const ir = parseKmn(kmn, interim.keyboardId).ir;
 
-  const analysed = await analyseContextTolerance(ir, () => true);
-  if (analysed === null) return;
+  const analysed = await analyseWorkingCopyContextTolerance(ir, () => true);
+  if (analysed === null) return undefined;
   const engine = await loadContextToleranceEngine();
   const outcome = await applyContextToleranceDecision(
     decision,
     { status: "ready", runId: 0, ...analysed },
     { engine, applyFacetTransform },
   );
+  // The product drops a decision whose fingerprint no longer matches the keyboard
+  // as it now stands (useContextToleranceApply): no tolerance rules are applied
+  // and the author is told which sites went stale. The replay does the same and
+  // reports the sites on the fixture rather than throwing.
+  if (outcome.kind === "stale") return outcome.staleSiteIds;
   if (outcome.kind !== "applied") {
     throw new Error(`tolerance: recorded decision did not apply (${outcome.kind})`);
   }
@@ -169,6 +180,7 @@ async function installToleranceOverlay(decisions: DecisionSet): Promise<void> {
     acceptedSiteIds: [...decision.acceptedSiteIds],
     overlay: outcome.overlay,
   });
+  return undefined;
 }
 
 export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec): Promise<DecisionPointFixture> {
@@ -182,7 +194,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
 
   // 5. install what replay leaves elsewhere.
   installUnreplayedSlices(spec.decisions);
-  if (spec.point === "tolerance") await installToleranceOverlay(spec.decisions);
+  const toleranceStaleSiteIds = spec.point === "tolerance" ? await installToleranceOverlay(spec.decisions) : undefined;
 
   // 6. the real download path.
   const bundle = await buildOutputBundle();
@@ -222,5 +234,6 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     simulate: (keys, seed) => simulate(compiled, keys, seed),
     startIr,
     bundle,
+    ...(toleranceStaleSiteIds !== undefined ? { toleranceStaleSiteIds } : {}),
   };
 }
