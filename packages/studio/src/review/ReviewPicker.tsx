@@ -18,7 +18,7 @@ import {
   BORDER,
   CSS_FONT_MONO,
   CSS_SIL_GREEN,
-  CSS_SIL_ORANGE_DARK,
+  CSS_WARNING_TEXT,
   CSS_TEXT,
   CSS_TEXT_MUTED,
   FONT,
@@ -73,7 +73,7 @@ function sourceId(repo: RepoChoice, kind: KindChoice): ReviewSourceId {
 
 const TIER_COLORS: Record<string, string> = {
   release: CSS_SIL_GREEN,
-  experimental: CSS_SIL_ORANGE_DARK,
+  experimental: CSS_WARNING_TEXT,
   legacy: CSS_TEXT_MUTED,
 };
 
@@ -387,7 +387,7 @@ export function ReviewPicker({
             Only the keyboards this PR changes:
           </p>
           {prKeyboardsError && (
-            <p style={{ fontSize: 13, color: CSS_SIL_ORANGE_DARK }}>
+            <p style={{ fontSize: 13, color: CSS_WARNING_TEXT }}>
               Couldn&apos;t list this PR&apos;s keyboards: {prKeyboardsError}
             </p>
           )}
