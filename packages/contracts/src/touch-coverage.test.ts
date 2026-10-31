@@ -295,9 +295,11 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
     const withoutIndex = computeTouchCoverage(layout(), ["̀"], { stripDottedCircle: false });
     expect(withoutIndex.uncovered).toEqual(["̀"]);
 
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_0300", "̀"));
+    const ir = irWithRule("T_0300", "̀");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
     const withIndex = computeTouchCoverage(layout(), ["̀"], {
       ruleIndex,
+      ir,
       stripDottedCircle: false,
     });
     expect(withIndex.uncovered).toEqual([]);
@@ -307,9 +309,10 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
     const physical = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "K_QUOTE", text: "◌̀" })] }] },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("K_QUOTE", "̀"));
+    const ir = irWithRule("K_QUOTE", "̀");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
     expect(
-      computeTouchCoverage(physical, ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
+      computeTouchCoverage(physical, ["̀"], { ruleIndex, ir, stripDottedCircle: false }).uncovered,
     ).toEqual([]);
   });
 
@@ -326,8 +329,9 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
         ],
       },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_SUB", "ŝ"));
-    expect(computeTouchCoverage(nested, ["ŝ"], { ruleIndex }).uncovered).toEqual([]);
+    const ir = irWithRule("T_SUB", "ŝ");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(nested, ["ŝ"], { ruleIndex, ir }).uncovered).toEqual([]);
     // …and without the index it stays uncovered, so the assertion above is not
     // passing for some unrelated reason.
     expect(computeTouchCoverage(nested, ["ŝ"]).uncovered).toEqual(["ŝ"]);
@@ -357,7 +361,7 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
     ]);
     const ruleIndex = buildTouchKeyRuleIndex(ir);
     expect(
-      computeTouchCoverage(layout(), ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
+      computeTouchCoverage(layout(), ["̀"], { ruleIndex, ir, stripDottedCircle: false }).uncovered,
     ).toEqual(["̀"]);
   });
 });
@@ -449,12 +453,24 @@ describe("computeTouchCoverage — the corrected sp enum (FR-012)", () => {
     expect(computeTouchCoverage(layout, ["x"]).uncovered).toEqual(["x"]);
   });
 
-  it("does not credit an sp:9 key's RULE output either — the class short-circuits first", () => {
+  it("VERDICT CHANGE (T021): on the resolver path an sp:9 key's RULE output IS credited — production is the resolver's call", () => {
+    // This fixture previously pinned the opposite ("the class short-circuits
+    // first"). That short-circuit was coverage keeping a second production
+    // model beside the resolver — the spec 104 FR-003 defect the T021
+    // corpus gate's arm 2 caught (ruled sp:9 keys emitting bidi controls
+    // went uncredited). Contracts §1 defines rule production by binding,
+    // with no sp-class condition, so the resolver's verdict governs; the
+    // class still governs the KEYCAP credits (the sibling tests above: a
+    // blank key's " " is never credited, on either path). A rule bound to
+    // T_BLANK itself is a synthetic extreme — real keyboards bind none,
+    // which is why the resolver's `none` for the unruled key is the
+    // protection, not a class preemption here.
     const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "T_BLANK", text: " ", sp: 9 })] }] },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_BLANK", "z"));
-    expect(computeTouchCoverage(layout, ["z"], { ruleIndex }).uncovered).toEqual(["z"]);
+    const ir = irWithRule("T_BLANK", "z");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["z"], { ruleIndex, ir }).uncovered).toEqual([]);
   });
 
   it("the two class predicates partition the enum tail as documented", () => {
@@ -504,10 +520,281 @@ describe("computeTouchCoverage — multi-char behaviour", () => {
     const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "T_FCFA", text: "*FCFA*" })] }] },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_FCFA", "FCFA"));
+    const ir = irWithRule("T_FCFA", "FCFA");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
     // The join's `produced` is the per-codepoint set, so each letter is covered…
-    expect(computeTouchCoverage(layout, ["F", "C", "A"], { ruleIndex }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["F", "C", "A"], { ruleIndex, ir }).uncovered).toEqual([]);
     // …but the whole string is not, since nothing credits it as a unit here.
-    expect(computeTouchCoverage(layout, ["FCFA"], { ruleIndex }).uncovered).toEqual(["FCFA"]);
+    expect(computeTouchCoverage(layout, ["FCFA"], { ruleIndex, ir }).uncovered).toEqual(["FCFA"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 104 T025 — production comes from the resolver (FR-003).
+//
+// With a rule index passed, id-derived and rule-derived crediting is the
+// resolver's, per (key × layer-state); the legacy two-argument path above
+// is byte-identical and untouched. Every verdict that differs from the
+// pre-104 joined behaviour is named VERDICT CHANGE; every verdict that
+// must NOT differ is named PARITY.
+// ---------------------------------------------------------------------------
+
+describe("computeTouchCoverage — resolver production (spec 104 T025)", () => {
+  /** An index (and its IR) whose only rule is keyed on an id no fixture uses. */
+  const unrelatedIr = irWithRule("T_UNUSED", "x");
+  const unrelatedOptions = () => ({
+    ruleIndex: buildTouchKeyRuleIndex(unrelatedIr),
+    ir: unrelatedIr,
+  });
+
+  it("VERDICT CHANGE (spec 104): an unruled K_ key is credited with its US base char when the rule index is passed", () => {
+    // Pre-104 the joined path credited text/output/U_-decode/rule output —
+    // never the K_ fallback, so a bare K_Q keycap-less key covered nothing.
+    // The resolver knows state-0 K_ taps fall back to the US base char.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_Q" })] }] },
+    ] });
+    expect(
+      computeTouchCoverage(layout, ["q"], unrelatedOptions()).uncovered,
+    ).toEqual([]);
+    // …and the legacy path is unchanged: without the index it stays uncovered.
+    expect(computeTouchCoverage(layout, ["q"]).uncovered).toEqual(["q"]);
+  });
+
+  it("VERDICT CHANGE (spec 104): the K_ fallback credit does not apply in a rightalt state", () => {
+    const layout = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [{ keys: [touchKey({ id: "K_RA", text: "*Alt*", nextlayer: "rightalt" })] }],
+      },
+      { id: "rightalt", rows: [{ keys: [touchKey({ id: "K_Q" })] }] },
+    ] });
+    // In RALT state an unmatched K_ key produces nothing (contracts §1), so
+    // there is no base char to credit.
+    expect(
+      computeTouchCoverage(layout, ["q"], unrelatedOptions()).uncovered,
+    ).toEqual(["q"]);
+  });
+
+  it("PARITY: a ruled U_ key credits BOTH its rule output (ा) and its decode arm (अ)", () => {
+    // `+ [U_0905] > 'ा'`: the rule governs the keystrokes it matches, the
+    // U_ decode (अ) the rest (contracts §1). Pre-104 both were credited
+    // (decode + join). The resolver appends the decode as a marked
+    // `viaFallback` production entry and coverage credits it — rule
+    // entries per codepoint, the decode entry as a whole unit.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_0905" })] }] },
+    ] });
+    const ir = irWithRule("U_0905", "ा");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["ा"], { ruleIndex, ir }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["अ"], { ruleIndex, ir }).uncovered).toEqual([]);
+  });
+
+  it("a ruled multi-segment U_ key's decode arm is credited as a whole unit, not per codepoint", () => {
+    // U_0065_0301 decodes to "e" + U+0301. Credited whole, its NFC form
+    // (é) is covered; credited per codepoint (the rule shape) it would
+    // cover "e" instead and leave "é" uncovered.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_0065_0301" })] }] },
+    ] });
+    const ir = irWithRule("U_0065_0301", "x");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["é"], { ruleIndex, ir }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["e"], { ruleIndex, ir }).uncovered).toEqual(["e"]);
+  });
+
+  it("VERDICT CHANGE (spec 104): a rule bound only under SHIFT no longer credits a key that exists only on the default layer", () => {
+    // Pre-104 producedByKeyId was state-blind. The resolver is per state:
+    // on the default layer the SHIFT-bound rule can never fire.
+    const ir = makeTestIR([
+      {
+        nodeId: "group#main",
+        name: "Main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          {
+            nodeId: "rule#shift-bound",
+            context: [{ kind: "vkey", name: "T_S", modifiers: ["SHIFT"] }],
+            output: [{ kind: "char" as const, value: "x" }],
+          },
+        ],
+      },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    const defaultOnly = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_S" })] }] },
+    ] });
+    expect(computeTouchCoverage(defaultOnly, ["x"], { ruleIndex, ir }).uncovered).toEqual(["x"]);
+
+    // PARITY with the change: once the key also sits on the shift layer,
+    // the same rule credits it there.
+    const withShift = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [
+          {
+            keys: [
+              touchKey({ id: "K_SHIFT", text: "*Shift*", nextlayer: "shift" }),
+              touchKey({ id: "T_S" }),
+            ],
+          },
+        ],
+      },
+      { id: "shift", rows: [{ keys: [touchKey({ id: "T_S" })] }] },
+    ] });
+    expect(computeTouchCoverage(withShift, ["x"], { ruleIndex, ir }).uncovered).toEqual([]);
+  });
+
+  it("PARITY: a guard-only T_ key credits nothing through the resolver", () => {
+    const ir = makeTestIR([
+      {
+        nodeId: "group#main",
+        name: "Main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          {
+            nodeId: "rule#guard-only",
+            context: [
+              { kind: "any", storeRef: "diablock" },
+              { kind: "raw", text: "+" },
+              { kind: "vkey", name: "T_G", modifiers: [] },
+            ],
+            output: [{ kind: "raw", text: "context" }],
+          },
+        ],
+      },
+    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_G" })] }] },
+    ] });
+    expect(
+      computeTouchCoverage(layout, ["g"], { ruleIndex: buildTouchKeyRuleIndex(ir), ir }).uncovered,
+    ).toEqual(["g"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spacer/blank class on the resolver path — the T021 arm-2 regression.
+//
+// The corpus gate (spec 104 T021, arm 2) failed on nine keyboards after
+// the resolver's fallback arms were hoisted above its spacer arm: every
+// uncredited production sat on an sp:9/sp:10 key, because coverage's
+// spacer-class early return preempted the resolver call entirely.
+// Contracts §1 defines rule / u-decode / k-fallback production with no
+// sp-class condition and FR-003 makes the resolver the one production
+// model, so on the resolver path the class now governs only the KEYCAP
+// credits. Each test below is one corpus shape, minimized; the PARITY
+// tests pin what must NOT change (blank keycaps stay uncredited, the
+// legacy path stays byte-identical).
+// ---------------------------------------------------------------------------
+
+describe("computeTouchCoverage — spacer/blank class defers production to the resolver (T021 arm 2)", () => {
+  /** An index (and its IR) whose only rule is keyed on an id no fixture uses. */
+  const unrelatedIr = irWithRule("T_UNUSED", "x");
+  const unrelatedOptions = () => ({
+    ruleIndex: buildTouchKeyRuleIndex(unrelatedIr),
+    ir: unrelatedIr,
+  });
+
+  it("VERDICT CHANGE: an sp:9 K_ key is credited with its fallback char (sil_madi's K_Q)", () => {
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_Q", text: "", sp: 9 })] }] },
+    ] });
+    expect(computeTouchCoverage(layout, ["q"], unrelatedOptions()).uncovered).toEqual([]);
+    // The legacy path is unchanged: no resolver, no credit.
+    expect(computeTouchCoverage(layout, ["q"]).uncovered).toEqual(["q"]);
+  });
+
+  it("VERDICT CHANGE: sp:10 K_ keys on the shift layer credit the shifted base chars (hanifi_rohingya's shape)", () => {
+    const layout = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [{ keys: [touchKey({ id: "K_SHIFT", text: "*Shift*", nextlayer: "shift" })] }],
+      },
+      {
+        id: "shift",
+        rows: [{ keys: [touchKey({ id: "K_W", text: "", sp: 10 }), touchKey({ id: "K_Q", text: "", sp: 10 })] }],
+      },
+    ] });
+    expect(computeTouchCoverage(layout, ["W", "Q"], unrelatedOptions()).uncovered).toEqual([]);
+  });
+
+  it("VERDICT CHANGE: an sp:10 U_ key is credited with its decode (rejang's U_A951)", () => {
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_A951", text: "ꥑ", sp: 10 })] }] },
+    ] });
+    expect(computeTouchCoverage(layout, ["ꥑ"], unrelatedOptions()).uncovered).toEqual([]);
+    // Legacy parity: the class ended the walk before the decode, and still does.
+    expect(computeTouchCoverage(layout, ["ꥑ"]).uncovered).toEqual(["ꥑ"]);
+  });
+
+  it("VERDICT CHANGE: an sp:9 ruled K_ key credits its rule output (basic_kbdurdu's bidi shape)", () => {
+    // The corpus keys sit on the shift layer under SHIFT-bound rules
+    // emitting format controls (here U+200D, ZWJ).
+    const ir = makeTestIR([
+      {
+        nodeId: "group#main",
+        name: "Main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          {
+            nodeId: "rule#shift-zwj",
+            context: [{ kind: "vkey", name: "K_Z", modifiers: ["SHIFT"] }],
+            output: [{ kind: "char" as const, value: "\u200D" }],
+          },
+        ],
+      },
+    ]);
+    const layout = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [{ keys: [touchKey({ id: "K_SHIFT", text: "*Shift*", nextlayer: "shift" })] }],
+      },
+      { id: "shift", rows: [{ keys: [touchKey({ id: "K_Z", text: "\u200D", sp: 9 })] }] },
+    ] });
+    expect(
+      computeTouchCoverage(layout, ["\u200D"], { ruleIndex: buildTouchKeyRuleIndex(ir), ir }).uncovered,
+    ).toEqual([]);
+  });
+
+  it("PARITY: a rule-free sp:9 T_ key's keycap is still not credited on the resolver path — the class governs keycaps", () => {
+    // The resolver says `none` (T_ has no fallback) and the keycap push is
+    // class-suppressed, so "x" stays uncovered — unlike the same key at
+    // sp:0, whose keycap WOULD credit it.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_DEAD", text: "x", sp: 9 })] }] },
+    ] });
+    expect(computeTouchCoverage(layout, ["x"], unrelatedOptions()).uncovered).toEqual(["x"]);
+    const plain = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_DEAD", text: "x" })] }] },
+    ] });
+    expect(computeTouchCoverage(plain, ["x"], unrelatedOptions()).uncovered).toEqual([]);
+  });
+
+  it("PARITY: T_BLANK (sp:9, keycap ' ') credits nothing on the resolver path — the resolver's `none` is the protection", () => {
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_BLANK", text: " ", sp: 9 })] }] },
+    ] });
+    expect(computeTouchCoverage(layout, [" "], unrelatedOptions()).uncovered).toEqual([" "]);
+  });
+
+  it("a producing sub-key of a spacer-class parent is credited on the resolver path", () => {
+    // Sub-keys are occurrences too (FR-001): the parent's class suppresses
+    // the parent's keycap credits, not the sub-key's production.
+    const layout = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [{
+          keys: [touchKey({ id: "T_HOST", text: "", sp: 10, sk: [touchKey({ id: "U_002F", text: "/" })] })],
+        }],
+      },
+    ] });
+    expect(computeTouchCoverage(layout, ["/"], unrelatedOptions()).uncovered).toEqual([]);
+    // Legacy parity: the class ended the walk at the parent, sub-keys unseen.
+    expect(computeTouchCoverage(layout, ["/"]).uncovered).toEqual(["/"]);
   });
 });

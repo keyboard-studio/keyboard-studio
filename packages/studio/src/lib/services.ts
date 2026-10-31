@@ -22,7 +22,10 @@ import type {
   ExemplarSource,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
+  TextSampleSource,
   ExemplarTier,
+  ExemplarRefreshResult,
   ToZipOptions,
   BuildKmpResult,
   BuildKmpOptions,
@@ -335,14 +338,45 @@ export async function warmExemplarSource(): Promise<void> {
 // language (spec 044 FR-016/FR-017). Returns null when neither source covers
 // the tag or the confidence gate fires; the discovery-method list then omits
 // the exemplar option entirely rather than offering an empty one.
-export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory | null> {
+export async function sourcedExemplars(bcp47: string): Promise<ExemplarInventory | null> {
   if (!USE_REAL) return null;
   const { loadExemplarSource, sourceExemplars } = await importEngine();
   await loadExemplarSource();
   return sourceExemplars(bcp47);
 }
 
-export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier };
+/**
+ * Both CLDR and SLDR inventories for a tag (#1369 union action).
+ * Returns null when neither side covers the tag. Either side may be null
+ * when it doesn't cover the tag or its gate fires.
+ */
+export async function sourcedExemplarsBoth(bcp47: string): Promise<{
+  resolvedTag: string;
+  cldr: SourcedInventory | null;
+  sldr: SourcedInventory | null;
+} | null> {
+  if (!USE_REAL) return null;
+  const { loadExemplarSource, sourceExemplarsBoth } = await importEngine();
+  await loadExemplarSource();
+  return sourceExemplarsBoth(bcp47);
+}
+
+/**
+ * Opt-in live refresh of exemplar data (#1367). AUTHOR-INITIATED ONLY: the
+ * caller wires this to an explicit button click — never an effect, a mount,
+ * or a timer. On "updated" the engine has installed the refreshed data
+ * inside the single sourcing path, so every consumer (this module's
+ * sourcedExemplars included, on its next resolution) reads the same
+ * inventory. In fixture mode (USE_REAL false) there is no network to check
+ * against, so the honest outcome is "network-error".
+ */
+export async function refreshExemplars(bcp47: string): Promise<ExemplarRefreshResult> {
+  if (!USE_REAL) return { kind: "network-error" };
+  const { refreshExemplars: engineRefreshExemplars } = await importEngine();
+  return engineRefreshExemplars(bcp47);
+}
+
+export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier, ExemplarInventory, TextSampleSource, ExemplarRefreshResult };
 export { charactersInTier };
 
 // Re-export the type so callers can use it without a direct engine import.

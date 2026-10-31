@@ -44,6 +44,52 @@ describe("touchCoverage", () => {
     expect(result.uncovered).toEqual(["z", "z"]);
   });
 
+  it("credits a composed form from its placed base + placed mark keys (issue #2293 AC3)", () => {
+    // The Bafut shape: the author places the base keys and the productive
+    // mark keys on the touch layout; the composed forms are NOT placement
+    // units (they left the walk at the marks-series handoff) but remain
+    // must-produce inventory. Coverage must credit them by composition —
+    // for a precomposed form (à) and for a form with NO precomposed
+    // codepoint (ə + grave) alike — or the FR-008 gate would block on
+    // characters the author was never asked to place.
+    const layout = makeLayout([
+      {
+        id: "default",
+        rows: [
+          {
+            keys: [
+              makeKey("K_A", { text: "a" }),
+              makeKey("K_SCHWA", { text: "ə" }),
+              // A mark key's keycap is the dotted-circle form; the
+              // traversal credits the bare mark (stripDottedCircle).
+              makeKey("T_0300", { text: "◌̀" }),
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const result = touchCoverage(layout, ["a", "ə", "̀", "à", "ə̀", "ɛ"]);
+    // Only ɛ — a base with no key and no composition — is uncovered.
+    expect(result.uncovered).toEqual(["ɛ"]);
+  });
+
+  it("credits a composed form whose mark only exists in additionalProduced (issue #2293 AC3)", () => {
+    // The mark was assigned a DESKTOP deadkey this session but has no
+    // touch key yet: the session-aware gate call passes the desktop
+    // produced set as additionalProduced, and composition must fold the
+    // composed form out of uncovered there too.
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("K_A", { text: "a" })] }] },
+    ]);
+
+    const withDesktopMark = touchCoverage(layout, ["a", "à"], {}, new Set(["̀"]));
+    expect(withDesktopMark.uncovered).toEqual([]);
+
+    const without = touchCoverage(layout, ["a", "à"]);
+    expect(without.uncovered).toEqual(["à"]);
+  });
+
   it("covers an NFC inventory char from an NFD-stored layout string", () => {
     // "e" + combining acute accent (U+0065 U+0301), NFD form of "é". Not a
     // duplicate: the same-titled contracts case stores the precomposed form.
@@ -122,16 +168,16 @@ describe.skipIf(!qwertyPresent)("SC-001 — sil_cameroon_qwerty combining marks 
     // THE US1 DEFECT, on the real file. Each mark lives on a `T_XXXX` touch key
     // whose keycap is a dotted circle plus the mark, and whose output exists only
     // in a `.kmn` rule — so the pre-058 layout-only walk credited none of them.
-    const { layout, ruleIndex } = load();
+    const { ir, layout, ruleIndex } = load();
     const marks = marksFromTouchKeyRules(ruleIndex);
-    expect(touchCoverage(layout, marks, { ruleIndex }).uncovered).toEqual([]);
+    expect(touchCoverage(layout, marks, { ruleIndex, ir }).uncovered).toEqual([]);
   });
 
   it("the FR-008 completion gate therefore does not block on them", () => {
     // The same call and the same predicate the gate itself applies.
-    const { layout, ruleIndex } = load();
+    const { ir, layout, ruleIndex } = load();
     const marks = marksFromTouchKeyRules(ruleIndex);
-    expect(touchCoverage(layout, marks, { ruleIndex }).uncovered.length > 0).toBe(false);
+    expect(touchCoverage(layout, marks, { ruleIndex, ir }).uncovered.length > 0).toBe(false);
   });
 
   it("is genuinely fixing something: with NEITHER additive credit they are uncovered", () => {
@@ -150,12 +196,13 @@ describe.skipIf(!qwertyPresent)("SC-001 — sil_cameroon_qwerty combining marks 
     // them. Pinning the relationship means a future "the strip is redundant now"
     // change has to confront that it is the fallback for keyboards whose rules we
     // cannot read.
-    const { layout, ruleIndex } = load();
+    const { ir, layout, ruleIndex } = load();
     const marks = marksFromTouchKeyRules(ruleIndex);
     const stripOnly = touchCoverage(layout, marks, {}).uncovered.length;
     const neither = touchCoverage(layout, marks, { stripDottedCircle: false }).uncovered.length;
     const indexOnly = touchCoverage(layout, marks, {
       ruleIndex,
+      ir,
       stripDottedCircle: false,
     }).uncovered.length;
     expect(neither).toBe(14);

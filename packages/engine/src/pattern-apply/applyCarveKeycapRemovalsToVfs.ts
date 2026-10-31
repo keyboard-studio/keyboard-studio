@@ -12,8 +12,14 @@
 // during authoring (spec §11).
 
 import type { IRStore, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
-import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
+import {
+  buildRemovalSet,
+  candidateMatchesViaProduction,
+  isTouchSubKeyDuplicate,
+  type RemovalProductionContext,
+} from "./touch-mechanism-shared.js";
 import { parseSlotId, makeSlotId } from "./slotId.js";
 import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
 import { resolveCarveCascade } from "./carveCascade.js";
@@ -76,6 +82,9 @@ export interface CarveKeycapRemovalInput {
  *   - A store that {@link classifyStoreSlotEdit} marks `blocked` is one
  *     applyStoreSlotRemovals REFUSES to edit, so for survivor purposes ALL
  *     its char slots count as intact — carved slot ids on it notwithstanding.
+ *     (This is the blocked classification only. Carving EVERY slot of an
+ *     any()-consumed store is not a refusal: the store and the rules that
+ *     reference it are removed, so its carved chars are gone here too.)
  *
  * Pure — exported for direct unit testing.
  */
@@ -235,7 +244,12 @@ export function applyCarveKeycapRemovalsToVfs(
   const { kvksPath, touchPath } = resolveOskAssetPaths(vfs, keyboardId);
 
   clearKvksKeycaps(vfs, kvksPath, carved, warnings);
-  clearTouchKeycaps(vfs, touchPath, carved, warnings, removals.keepInertTouchChars);
+  // Spec 104 T009: touch matching takes production from the FR-003
+  // resolver (the IR + rule-join of the PRE-carve keyboard — the same
+  // startIr the deletion sets refer to), so a ruled T_ key whose keycap
+  // text does not spell its production is matched too (audit gap 1).
+  const production = { ir: startIr, ruleIndex: buildTouchKeyRuleIndex(startIr) };
+  clearTouchKeycaps(vfs, touchPath, carved, warnings, removals.keepInertTouchChars, production);
 
   return { warnings };
 }
@@ -311,6 +325,7 @@ function clearTouchKeycaps(
   carved: ReadonlySet<string>,
   warnings: string[],
   keepInertTouchChars?: ReadonlySet<string>,
+  production?: { ir: KeyboardIR; ruleIndex: ReturnType<typeof buildTouchKeyRuleIndex> },
 ): void {
   // Touch layout is optional — skip silently when absent or binary.
   const raw = readVfsText(vfs, touchPath);
@@ -336,18 +351,44 @@ function clearTouchKeycaps(
 
   let changed = false;
 
-  const matchesCarved = (entry: { text?: string; output?: string; id?: string }): boolean => {
+  // Spec 104 T009: production matching via the FR-003 resolver, per layer
+  // (the layer name is the key's state). A ruled T_ key (T_0300, keycap
+  // "◌̀") produces its character entirely through .kmn rules — invisible
+  // to the text/output/U_-decode tests this pass used alone (audit gap 1).
+  // The resolver verdict is OR'd with those display tests, never a
+  // replacement for them: this pass's charter includes the keycap a key
+  // DISPLAYS, and a key displaying a carved character is in scope even
+  // when its production comes from elsewhere.
+  const resolverMatches = (
+    entry: { id?: string; sp?: number; nextlayer?: string },
+    layerId: string,
+    chars: ReadonlySet<string>,
+  ): boolean => {
+    if (production === undefined || typeof entry.id !== "string") return false;
+    const ctx: RemovalProductionContext = { production, layerId };
+    return candidateMatchesViaProduction(
+      {
+        id: entry.id,
+        ...(typeof entry.sp === "number" ? { sp: entry.sp } : {}),
+        ...(typeof entry.nextlayer === "string" ? { nextlayer: entry.nextlayer } : {}),
+      },
+      chars,
+      ctx,
+    );
+  };
+
+  const matchesCarved = (
+    entry: { text?: string; output?: string; id?: string; sp?: number; nextlayer?: string },
+    layerId: string,
+  ): boolean => {
     for (const t of carved) {
       if (isTouchSubKeyDuplicate(entry, t)) return true;
     }
-    return false;
+    return (
+      resolverMatches(entry, layerId, carved) ||
+      (typeof entry.id === "string" && carvedKeyIds.has(entry.id))
+    );
   };
-
-  // Main-key text/output match, separate from isTouchSubKeyDuplicate above:
-  // sub-key popup entries compare exactly, but the main-key path (like the
-  // .kvks path) has always normalized to NFC, and `carved` holds NFC values.
-  const mainKeyValueMatches = (value: string | undefined): boolean =>
-    value !== undefined && value !== "" && carved.has(value.normalize("NFC"));
 
   // Same platform discovery as applyKeycapLabelsToVfs's patchTouchLayout:
   // any top-level object value with a `layer` array, else the top object itself.
@@ -363,9 +404,79 @@ function clearTouchKeycaps(
     platformObjects.push(topObj);
   }
 
+  // Carved KEY IDS (spec 104, contracts §4 / US4 scenario 3): an id that
+  // produces a carved character in ANY occurrence's state is carved as an
+  // identity — every occurrence of it is in scope, including layers whose
+  // state gives the key no production (Cameroon's shift-layer T_0300 has
+  // no SHIFT rule and produces nothing there, but it is the same key,
+  // displaying the same carved mark, and its rules are suppressed as one
+  // binding set). Computed in a pre-scan so the mutation pass below can
+  // test membership instead of re-resolving per layer.
+  const carvedCharsByKeyId = new Map<string, Set<string>>();
+  if (production !== undefined) {
+    const noteProduction = (
+      entry: { id?: string; sp?: number; nextlayer?: string },
+      lid: string,
+    ): void => {
+      if (typeof entry.id !== "string") return;
+      for (const t of carved) {
+        if (resolverMatches(entry, lid, buildRemovalSet([t]))) {
+          let set = carvedCharsByKeyId.get(entry.id);
+          if (set === undefined) {
+            set = new Set();
+            carvedCharsByKeyId.set(entry.id, set);
+          }
+          set.add(t);
+        }
+      }
+    };
+    for (const platformObject of platformObjects) {
+      const layers = platformObject["layer"];
+      if (!Array.isArray(layers)) continue;
+      for (const layer of layers) {
+        if (!layer || typeof layer !== "object") continue;
+        const lid = typeof (layer as Record<string, unknown>)["id"] === "string"
+          ? ((layer as Record<string, unknown>)["id"] as string)
+          : "";
+        const rows = (layer as Record<string, unknown>)["row"];
+        if (!Array.isArray(rows)) continue;
+        for (const row of rows) {
+          if (!row || typeof row !== "object") continue;
+          const keys = (row as Record<string, unknown>)["key"];
+          if (!Array.isArray(keys)) continue;
+          for (const key of keys) {
+            if (!key || typeof key !== "object") continue;
+            const k = key as {
+              id?: string; sp?: number; nextlayer?: string;
+              sk?: { id?: string; sp?: number; nextlayer?: string }[];
+              multitap?: { id?: string; sp?: number; nextlayer?: string }[];
+              flick?: Record<string, { id?: string; sp?: number; nextlayer?: string }>;
+            };
+            noteProduction(k, lid);
+            for (const sub of [...(k.sk ?? []), ...(k.multitap ?? []), ...Object.values(k.flick ?? {})]) {
+              if (sub) noteProduction(sub, lid);
+            }
+          }
+        }
+      }
+    }
+  }
+  const carvedKeyIds = new Set(carvedCharsByKeyId.keys());
+
+  // Main-key text/output match, separate from isTouchSubKeyDuplicate above:
+  // sub-key popup entries compare exactly, but the main-key path (like the
+  // .kvks path) has always normalized to NFC, and `carved` holds NFC values.
+  const mainKeyValueMatches = (value: string | undefined): boolean =>
+    value !== undefined && value !== "" && carved.has(value.normalize("NFC"));
+
   for (const platform of platformObjects) {
     for (const layer of platform["layer"] as unknown[]) {
       if (!layer || typeof layer !== "object") continue;
+      // The layer id is the resolver state for every key on this layer
+      // (spec 104 FR-001); a layer without a usable id resolves state 0.
+      const layerId = typeof (layer as Record<string, unknown>)["id"] === "string"
+        ? ((layer as Record<string, unknown>)["id"] as string)
+        : "";
       const rows = (layer as Record<string, unknown>)["row"];
       if (!Array.isArray(rows)) continue;
 
@@ -386,28 +497,46 @@ function clearTouchKeycaps(
             id?: string;
             text?: string;
             output?: string;
-            sk?: { text?: string; output?: string; id?: string }[];
-            multitap?: { text?: string; output?: string; id?: string }[];
-            flick?: Record<string, { text?: string; output?: string; id?: string }>;
+            sp?: number;
+            nextlayer?: string;
+            sk?: { text?: string; output?: string; id?: string; sp?: number; nextlayer?: string }[];
+            multitap?: { text?: string; output?: string; id?: string; sp?: number; nextlayer?: string }[];
+            flick?: Record<string, { text?: string; output?: string; id?: string; sp?: number; nextlayer?: string }>;
           };
 
           // Main keycap: match by displayed text, by `output`, or by a
           // carved U_ id (a U_ id both emits and re-labels its code point
-          // purely off the id, independent of `text`/`output`).
+          // purely off the id, independent of `text`/`output`) — OR by
+          // resolver production (spec 104 T009): a ruled T_ key whose
+          // keycap shows a dotted-circle label produces its character
+          // entirely through rules the display tests cannot see.
           const text = keyObj.text ?? "";
           const textMatches = mainKeyValueMatches(text);
           const outputMatches = mainKeyValueMatches(keyObj.output);
           const idIsCarved =
             typeof keyObj.id === "string" && carvedUnicodeIds.has(keyObj.id);
-          const mainMatched = textMatches || outputMatches || idIsCarved;
+          const productionMatched = resolverMatches(keyObj, layerId, carved);
+          const idIsCarvedKey = typeof keyObj.id === "string" && carvedKeyIds.has(keyObj.id);
+          const mainMatched =
+            textMatches || outputMatches || idIsCarved || productionMatched || idIsCarvedKey;
 
           // Keep-inert applies only when EVERY carved character this key
           // matches is overridden — a key emitting a non-overridden carved
-          // character is still removed.
+          // character is still removed. A production-only match counts the
+          // specific carved characters the resolver credits to this key.
           let keepInert = mainMatched;
           if (textMatches && !keepInertTouchChars?.has(text.normalize("NFC"))) keepInert = false;
           if (outputMatches && !keepInertTouchChars?.has((keyObj.output as string).normalize("NFC"))) keepInert = false;
           if (idIsCarved && !keepInertTouchChars?.has(carvedUnicodeIds.get(keyObj.id as string) as string)) keepInert = false;
+          if (idIsCarvedKey && typeof keyObj.id === "string") {
+            // The characters this key's ID produces in ANY state (the
+            // pre-scan's record) — an occurrence in a state with no
+            // production of its own is still keep-inert only when every
+            // carved character its identity produces is overridden.
+            for (const t of carvedCharsByKeyId.get(keyObj.id) ?? []) {
+              if (!keepInertTouchChars?.has(t)) keepInert = false;
+            }
+          }
 
           if (mainMatched && !keepInert) {
             // T020 default: the key leaves the touch layout entirely. Its
@@ -442,6 +571,20 @@ function clearTouchKeycaps(
             // cleared above, via textMatches).
             keyObj.id = `T_carved_${(keyObj.id as string).slice(2)}`;
             changed = true;
+          } else if (productionMatched) {
+            // Keep-inert only (the removal case `continue`d above): the key
+            // matched purely through its .kmn rules (spec 104 T009 — e.g. a
+            // ruled T_ key with a dotted-circle keycap). Neutralize the id
+            // to the inert T_carved_* form so the kept key cannot fire
+            // those rules — the override's promise is "kept, does nothing",
+            // and the id is the only layout-side guarantee of that. The
+            // label is left alone: it was not itself a carved character.
+            if (typeof keyObj.id === "string") {
+              keyObj.id = keyObj.id.startsWith("U_")
+                ? `T_carved_${keyObj.id.slice(2)}`
+                : `T_carved_${keyObj.id}`;
+            }
+            changed = true;
           }
 
           keptKeys.push(keyObj);
@@ -450,7 +593,7 @@ function clearTouchKeycaps(
           for (const prop of ["sk", "multitap"] as const) {
             const arr = keyObj[prop];
             if (!Array.isArray(arr)) continue;
-            const kept = arr.filter((e) => !e || typeof e !== "object" || !matchesCarved(e));
+            const kept = arr.filter((e) => !e || typeof e !== "object" || !matchesCarved(e, layerId));
             if (kept.length !== arr.length) {
               changed = true;
               if (kept.length === 0) {
@@ -464,7 +607,7 @@ function clearTouchKeycaps(
           if (flick && typeof flick === "object" && !Array.isArray(flick)) {
             for (const dir of Object.keys(flick)) {
               const e = flick[dir];
-              if (e && typeof e === "object" && matchesCarved(e)) {
+              if (e && typeof e === "object" && matchesCarved(e, layerId)) {
                 delete flick[dir];
                 changed = true;
               }

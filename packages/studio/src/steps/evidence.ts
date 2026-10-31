@@ -137,6 +137,18 @@ export function marksOutputFormKey(postureId: string): EvidenceKey {
   return `nfc|${postureId}`;
 }
 
+/**
+ * The backspace answer's evidence (#2302): the proposal it is confirmed
+ * against follows the CHOSEN output form, so the key carries both the
+ * form and the posture the form answer itself is keyed on. Changing the
+ * form changes the key — a confirmed backspace answer is then re-proposed
+ * against the new form's consistent pairing (spec 079 semantics), never
+ * silently carried across.
+ */
+export function marksBackspaceKey(outputForm: string, postureId: string): EvidenceKey {
+  return `bksp|${outputForm}|${postureId}`;
+}
+
 /** Input order depends on which marks are typed on a key of their own. */
 export function marksInputOrderKey(ownKeyMarks: readonly string[]): EvidenceKey {
   return `ord|${sortedJoin(ownKeyMarks)}`;

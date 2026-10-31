@@ -5,12 +5,13 @@
 // back-nav entry (transparent in both directions). A marked alphabet renders
 // the series shell.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { screen, cleanup, act, fireEvent, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { ConfirmedAlphabet, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { computeMarksGate } from "./MarksSeriesStep.tsx";
+import { backspaceStepsForBehaviour } from "./OutputFormStation.tsx";
 import { MarksStepHost } from "./MarksStepHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
@@ -21,6 +22,14 @@ import {
   type SurveyAnswerSnapshot,
 } from "../../stores/surveyAnswerStore.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../../lib/questionRecorder.ts";
+import {
+  EMPTY_MARKS_VALUE,
+  getMarksTreatmentValue,
+  recordMarksTreatmentValue,
+  type MarksTreatmentValue,
+} from "./marksValue.ts";
+import { ATTACHMENT_START_OF_LINE } from "./marksViews.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 
 const ACUTE = "́";
 
@@ -197,7 +206,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     );
   });
 
-  it("simple orthography completes in at most TWO marks screens (SC-002)", () => {
+  it("simple orthography completes in at most TWO marks screens (SC-002); there is no guard question", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
@@ -206,7 +215,8 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     // Screen 1: the auto-confirmed attachment summary.
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
-    // Screen 2: the output-form notice.
+    // Screen 2: the output-form notice — the last screen, since the one
+    // mark is composed (#2374 removed the guard question entirely).
     expect(screen.getByTestId("marks-output-form")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -480,109 +490,158 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// S4 output-form station (US3, FR-013..FR-017; SC-005)
+// S4 output-form station (#2297: the composition question, in its own terms)
 // ---------------------------------------------------------------------------
 
-describe("MarksSeriesStep — S4 output-form station", () => {
+describe("MarksSeriesStep — S4 output-form station (#2297)", () => {
   const SCHWA = "ə"; // no ready-made accented forms exist
 
   function reachOutputForm(): void {
     fireEvent.click(screen.getByTestId("marks-continue")); // past S1
   }
 
-  it("proposes base-plus-mark as a notice when a pair never composes (FR-014, US3 AC1)", () => {
-    seedAlphabet([ACUTE], [SCHWA]);
+  it("asks the composition question as an open choice, with the actual code points per option", () => {
+    seedAlphabet([ACUTE], ["e"]);
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     const station = screen.getByTestId("marks-output-form");
-    expect(station.textContent).toContain("letter plus its mark");
-    // A notice, not an open question: no radio inputs.
-    expect(station.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    expect(station.textContent).toContain("what should your keyboard send");
+    // Always an open choice: two composition radios, however the posture
+    // table looks. (The station also carries the backspace question's two
+    // radios — scoped by name, those are asserted in the #2302 describe.)
+    expect(station.querySelectorAll('input[name="marks-output-form"]')).toHaveLength(2);
+    // The author's own combination, both ways: é as one character vs e + mark.
+    expect(screen.getByTestId("output-form-codepoints-ready-made").textContent).toContain("U+00E9");
+    expect(screen.getByTestId("output-form-codepoints-base-plus-mark").textContent).toContain("U+0065");
+    expect(screen.getByTestId("output-form-codepoints-base-plus-mark").textContent).toContain("U+0301");
   });
 
-  it("proposes ready-made as a notice when every pair composes (FR-015, US2 AC2)", () => {
+  it("suggests base-plus-mark from the default postfix order, tagged and listed first", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
-    expect(screen.getByTestId("marks-output-form").textContent).toContain("ready-made");
-  });
-
-  it("shows the mandatory step-by-step backspace preview (FR-017)", () => {
-    seedAlphabet([ACUTE], ["e"]);
-    act(() => {
-      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
-    });
-    reachOutputForm();
-    expect(screen.getByTestId("backspace-preview")).toBeTruthy();
-  });
-
-  it("offers a way to change the proposed form (propose-then-confirm)", () => {
-    seedAlphabet([ACUTE], ["e"]);
-    act(() => {
-      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
-    });
-    reachOutputForm();
-    fireEvent.click(screen.getByTestId("output-form-change"));
-    expect(screen.getByTestId("marks-output-form").textContent).toContain(
-      "Backspace removes one mark at a time",
+    const station = screen.getByTestId("marks-output-form");
+    const labels = station.querySelectorAll("label");
+    expect(labels[0]?.textContent).toContain("Send the letter and its mark as separate characters");
+    expect(labels[0]?.textContent).toContain("(suggested)");
+    const suggested = screen.getByLabelText(
+      /Send the letter and its mark as separate characters/,
+    ) as HTMLInputElement;
+    expect(suggested.checked).toBe(true);
+    // The premise names the suggestion's source: the input-order answer.
+    expect(screen.getByTestId("output-form-premise").textContent).toContain(
+      "you type the letter first, then its mark",
     );
   });
 
-  it("after an override, the explanation describes the CHOSEN form, not the proposed one", () => {
-    // Regression: the notice rendered `formLabel[value]` above
-    // `proposal.explanation`, which is computed once from the policy and never
-    // recomputed — so one click left the screen stating base-plus-mark above
-    // the ready-made explanation.
+  it("shows ONE step-by-step backspace preview, in the backspace question (consequence, not typing demo)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
-    // Before the override: ready-made, with the ready-made explanation.
-    expect(screen.getByTestId("marks-output-form").textContent).toContain(
-      "Backspace will remove a whole accented letter in one press",
-    );
-
-    fireEvent.click(screen.getByTestId("output-form-change"));
-    const text = screen.getByTestId("marks-output-form").textContent ?? "";
-    // The chosen form and the paragraph under it agree...
-    expect(text).toContain("Backspace removes one mark at a time");
-    expect(text).toContain("Backspace clears the mark first and the plain letter next");
-    // ...and the explanation of the form we just left is gone.
-    expect(text).not.toContain("Backspace removes a whole accented letter in one step");
+    // #2302: the preview keys off the recorded backspace answer, so there
+    // is exactly one — under the backspace question, not one per
+    // composition option (the per-option pair stated each form's NATIVE
+    // behaviour as if it were the behaviour, which was the contradiction).
+    expect(screen.getAllByTestId("backspace-preview")).toHaveLength(1);
+    expect(screen.getByTestId("marks-backspace").contains(screen.getByTestId("backspace-preview"))).toBe(true);
   });
 
-  it("hides the override when no ready-made form exists for some pair (row 1)", () => {
+  it("ready-made stays choosable when a pair has no ready-made form — the fallback is a note, not a ban", () => {
     seedAlphabet([ACUTE], [SCHWA]);
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
-    expect(screen.queryByTestId("output-form-change")).toBeNull();
-    expect(screen.getByTestId("output-form-change-unavailable").textContent).toContain(
-      "no single-character form",
+    // Two composition radios even here: the retired FR-014 forcing offered none.
+    expect(
+      screen.getByTestId("marks-output-form").querySelectorAll('input[name="marks-output-form"]'),
+    ).toHaveLength(2);
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    const readyMade = screen.getByLabelText(
+      /Send each accented letter as one single ready-made character/,
+    ) as HTMLInputElement;
+    expect(readyMade.checked).toBe(true);
+    // ...and the answer is NOT clamped back: the fallback note appears instead.
+    expect(screen.getByTestId("output-form-fallback-note").textContent).toContain(
+      "no single ready-made character",
     );
   });
 
-  it("states the S2 outcome as a premise (no own-key mark)", () => {
-    seedAlphabet([ACUTE], ["e"]);
+  it("a confirmed composition answer does NOT move when only the input order changes", () => {
+    // A productive, fully-composable alphabet: the treatment screen renders
+    // (with this test file's small seeds it is skipped as undecidable, and
+    // there would be no order answer to change).
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e", "i"],
+        marks: [ACUTE, "̀"],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [ACUTE] },
+          { base: "i", marks: [ACUTE] },
+          { base: "a", marks: ["̀"] },
+          { base: "e", marks: ["̀"] },
+          { base: "i", marks: ["̀"] },
+        ],
+        declaredRoles: {},
+      },
+    });
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
-    reachOutputForm();
-    expect(screen.getByTestId("output-form-premise").textContent).toContain(
-      "no mark has a key of its own",
-    );
+    const walkTo = (id: string): void => {
+      for (let i = 0; i < 6 && screen.queryByTestId(id) === null; i++) {
+        fireEvent.click(screen.getByTestId("marks-continue"));
+      }
+    };
+    const walkBackTo = (id: string): void => {
+      for (let i = 0; i < 6 && screen.queryByTestId(id) === null; i++) {
+        fireEvent.click(screen.getByTestId("marks-back"));
+      }
+    };
+    walkTo("marks-treatment"); // order answer lives here: postfix (seeded default)
+    walkTo("marks-output-form");
+    // Suggestion is base-plus-mark (postfix pairing) and it is the answer.
+    expect(
+      (screen.getByLabelText(/Send the letter and its mark as separate characters/) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByTestId("marks-continue")); // record the S4 answer, advance
+    // Walk back to the treatment station and flip ONLY the input order.
+    walkBackTo("marks-treatment");
+    fireEvent.click(screen.getByTestId("input-order-option-prefix"));
+    walkTo("marks-output-form");
+    // The suggestion moved to ready-made (prefix pairing)...
+    const readyMadeLabel = screen
+      .getByLabelText(/Send each accented letter as one single ready-made character/)
+      .closest("label");
+    expect(readyMadeLabel?.textContent).toContain("(suggested)");
+    // ...but the confirmed composition answer did not follow it.
+    expect(
+      (screen.getByLabelText(/Send the letter and its mark as separate characters/) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText(/Send each accented letter as one single ready-made character/) as HTMLInputElement)
+        .checked,
+    ).toBe(false);
   });
 
   it("SC-005: the station never renders the words Unicode or normalization", () => {
     for (const bases of [["e"], [SCHWA]]) {
       cleanup();
       useWorkingCopyStore.getState().reset();
+      useSurveyAnswerStore.getState().reset();
       seedAlphabet([ACUTE], bases);
       act(() => {
         render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
@@ -638,8 +697,8 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
     act(() => {
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
-    // S1 renders first; the series completes within the four-station budget
-    // (spec 052 SC-003 supersedes spec 071's five-screen SC-006).
+    // S1 renders first; the series completes within the station budget
+    // (spec 052 SC-003's four).
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     const screens = continueUntilComplete(onComplete);
     expect(screens).toBeLessThanOrEqual(4);
@@ -858,7 +917,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     act(() => {
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
-    for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+    for (let i = 0; i < 8 && onComplete.mock.calls.length === 0; i++) {
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
@@ -909,16 +968,16 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// S4 open choice (US4, FR-016)
+// S4 open choice (#2297: suggestion follows the order pairing; overridable)
 // ---------------------------------------------------------------------------
 
-describe("MarksSeriesStep — S4 open choice (US4)", () => {
+describe("MarksSeriesStep — S4 open choice (#2297)", () => {
   const GRAVE = "̀";
   const SCHWA_BASE = "ə"; // no ready-made accented forms exist
 
   function seedComposableProductiveAlphabet(): void {
     // Every pair composes (a/e/i with acute+grave all have ready-made forms)
-    // and the wide spread makes the class letter-plus-mark → FR-016 open case.
+    // and the wide spread makes the class productive (own-key marks).
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
       answers: [],
@@ -944,58 +1003,62 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     }
   }
 
-  it("renders as an OPEN choice with the recommended option first and previews for both (US4 AC1+AC2)", () => {
+  it("renders as an OPEN choice with the suggested option first and previews for both", () => {
     seedComposableProductiveAlphabet();
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachStation("marks-output-form");
     const station = screen.getByTestId("marks-output-form");
-    const radios = station.querySelectorAll('input[type="radio"]');
+    const radios = station.querySelectorAll('input[name="marks-output-form"]');
     expect(radios).toHaveLength(2);
-    // Recommended (base-plus-mark for a productive class) listed first + tagged.
-    expect(station.textContent).toContain("recommended");
+    // Suggested (base-plus-mark, from the postfix order) listed first + tagged.
+    expect(station.textContent).toContain("(suggested)");
     const labels = station.querySelectorAll("label");
-    expect(labels[0]?.textContent).toContain("Backspace removes one mark at a time");
-    // Both options carry a backspace preview.
-    expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(2);
+    expect(labels[0]?.textContent).toContain("Send the letter and its mark as separate characters");
+    // One backspace preview (#2302), under the backspace question.
+    expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(1);
     // SC-005 holds on the open-choice rendering too.
     expect(station.textContent).not.toMatch(/unicode/i);
     expect(station.textContent).not.toMatch(/normali[sz]/i);
   });
 
-  it("names the own-key marks from S2 as a premise, and keeps the override (row 2)", () => {
+  it("states the input order as the premise — never the treatment outcome", () => {
     seedComposableProductiveAlphabet();
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachStation("marks-output-form");
     const premise = screen.getByTestId("output-form-premise").textContent ?? "";
-    expect(premise).toContain("marks with a key of their own");
-    expect(premise).toContain(ACUTE);
+    expect(premise).toContain("you type the letter first, then its mark");
+    expect(premise).not.toContain("key of their own");
   });
 
-  it("drops a ready-made override when an alphabet edit makes it unrealisable (row 2 → row 1)", () => {
-    // The re-seed effect keyed on `outputFormProposal.form` cannot catch this:
-    // row 2 and row 1 BOTH propose base-plus-mark, so the proposed form does
-    // not change and a `ready-made` override taken on the open choice would
-    // survive onto a row-1 notice — an answer the keyboard cannot produce, on
-    // a screen that no longer offers the button to undo it.
+  it("ready-made stays choosable after an alphabet edit adds a pair with no ready-made form", () => {
+    // The retired #1762/FR-014 behaviour: the edit collapsed the station to
+    // a notice with NO way back to ready-made — the answer was unrealisable
+    // by decree. Under #2297 the edit re-proposes the composition answer
+    // (the standing spec 079 evidence-key behaviour, flagged for
+    // reconfirmation like every other station), but ready-made remains a
+    // choosable radio, and once chosen it sticks — with the automatic
+    // fallback stated as a note.
     seedComposableProductiveAlphabet();
     act(() => {
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachStation("marks-output-form");
 
-    // Override the open choice to ready-made (the non-recommended option).
-    const readyMade = screen.getByLabelText(/Backspace removes the whole letter at once/) as HTMLInputElement;
-    fireEvent.click(readyMade);
+    // Override the open choice to ready-made (the non-suggested option).
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
     expect(
-      (screen.getByLabelText(/Backspace removes the whole letter at once/) as HTMLInputElement).checked,
+      (screen.getByLabelText(
+        /Send each accented letter as one single ready-made character/,
+      ) as HTMLInputElement).checked,
     ).toBe(true);
 
-    // Edit the alphabet: schwa + acute has no ready-made form, so the posture
-    // table now trips row 1 (which still proposes base-plus-mark).
+    // Edit the alphabet: schwa + acute has no ready-made form.
     act(() => {
       useWorkingCopyStore.getState().recordPhase({
         phase: "B",
@@ -1016,17 +1079,147 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
         },
       });
     });
-    // FR-023 sends the author back to the first station — walk forward again.
+    // The position never moves on an edit — walk forward to the station.
     reachStation("marks-output-form");
 
+    // Still an open choice with ready-made among the radios (not a notice).
     const station = screen.getByTestId("marks-output-form");
-    // A row-1 notice, not the open choice, and the override is gone...
-    expect(station.querySelectorAll('input[type="radio"]')).toHaveLength(0);
-    expect(screen.queryByTestId("output-form-change")).toBeNull();
-    // ...and the answer reset to base-plus-mark rather than keeping the now
-    // unrealisable ready-made.
-    expect(station.textContent).toContain("Backspace removes one mark at a time");
-    expect(station.textContent).not.toContain("Backspace removes the whole letter at once");
+    expect(station.querySelectorAll('input[name="marks-output-form"]')).toHaveLength(2);
+    // Choose ready-made again: it sticks, and the fallback is a note.
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    expect(
+      (screen.getByLabelText(
+        /Send each accented letter as one single ready-made character/,
+      ) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(screen.getByTestId("output-form-fallback-note").textContent).toContain(
+      "no single ready-made character",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S4 backspace question (#2302: its own axis — interrelated with
+// composition, yet independent; the suggestion follows composition)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — S4 backspace question (#2302)", () => {
+  it("backspaceStepsForBehaviour: the sequence is the ANSWER's, under either form", () => {
+    const pair = { stack: { base: "e", marks: [ACUTE] }, hasReadyMadeForm: true };
+    // Peel steps the letter down mark by mark under BOTH forms.
+    expect(backspaceStepsForBehaviour(pair, "ready-made", "peel")).toEqual(["é", "e", ""]);
+    expect(backspaceStepsForBehaviour(pair, "base-plus-mark", "peel")).toEqual(["é", "e", ""]);
+    // Whole-stack clears the emitted letter in one press under BOTH forms.
+    expect(backspaceStepsForBehaviour(pair, "ready-made", "whole-stack")).toEqual(["é", ""]);
+    expect(backspaceStepsForBehaviour(pair, "base-plus-mark", "whole-stack")).toEqual(["é", ""]);
+  });
+
+  function reachOutputForm(): void {
+    fireEvent.click(screen.getByTestId("marks-continue")); // past S1
+  }
+
+  function backspaceRadio(label: RegExp): HTMLInputElement {
+    return screen.getByLabelText(label) as HTMLInputElement;
+  }
+
+  /** ⌫ separators in the preview = steps − 1: peel of é shows 2, whole-stack 1. */
+  function previewSeparators(): number {
+    return (screen.getByTestId("backspace-preview").textContent?.match(/⌫/g) ?? []).length;
+  }
+
+  it("asks the backspace question as its own headed question, in the as-was (#1791) wording", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    const backspaceSection = screen.getByTestId("marks-backspace");
+    expect(backspaceSection.textContent).toContain("What should backspace do to an accented letter?");
+    expect(backspaceSection.textContent).toContain(
+      "Backspace removes one mark at a time (letter and mark kept separate)",
+    );
+    expect(backspaceSection.textContent).toContain(
+      "Backspace removes the whole letter at once (one ready-made unit)",
+    );
+    // SC-005 holds for the backspace question too.
+    expect(backspaceSection.textContent).not.toMatch(/unicode/i);
+    expect(backspaceSection.textContent).not.toMatch(/normali[sz]/i);
+  });
+
+  it("suggests the behaviour that FOLLOWS the composition answer, tagged and listed first", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    // Default composition is base-plus-mark (postfix suggestion), so the
+    // backspace suggestion is peel.
+    const peel = backspaceRadio(/Backspace removes one mark at a time/);
+    expect(peel.checked).toBe(true);
+    const backspaceLabels = screen.getByTestId("marks-backspace").querySelectorAll("label");
+    expect(backspaceLabels[0]?.textContent).toContain("Backspace removes one mark at a time");
+    expect(backspaceLabels[0]?.textContent).toContain("recommended");
+    // Follow: change the composition answer and the (unsaved) backspace
+    // answer follows it to whole-stack.
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    expect(backspaceRadio(/Backspace removes the whole letter at once/).checked).toBe(true);
+    expect(backspaceRadio(/Backspace removes one mark at a time/).checked).toBe(false);
+  });
+
+  it("the preview keys off the BACKSPACE answer, not the form — the override peels under ready-made", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    // base-plus-mark + peel (the follow pairing): é → e → (empty).
+    expect(previewSeparators()).toBe(2);
+    // Switch composition to ready-made; backspace follows to whole-stack:
+    // é → (empty) in one press.
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    expect(previewSeparators()).toBe(1);
+    // OVERRIDE backspace to peel under the ready-made form: the preview
+    // peels again — before #2302 this state was unrepresentable and the
+    // preview (derived from the form) would have kept claiming one press.
+    fireEvent.click(screen.getByLabelText(/Backspace removes one mark at a time/));
+    expect(backspaceRadio(/Backspace removes one mark at a time/).checked).toBe(true);
+    expect(previewSeparators()).toBe(2);
+  });
+
+  it("records the backspace answer on the phase result and in the answers, independently of the form", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
+    });
+    reachOutputForm();
+    // Composition: ready-made (override of the postfix suggestion).
+    // Backspace: peel (override of the follow suggestion).
+    fireEvent.click(
+      screen.getByLabelText(/Send each accented letter as one single ready-made character/),
+    );
+    fireEvent.click(screen.getByLabelText(/Backspace removes one mark at a time/));
+    // Walk the remaining stations to completion.
+    for (let i = 0; i < 8 && onComplete.mock.calls.length === 0; i++) {
+      const next = screen.queryByTestId("marks-continue");
+      if (next === null) break;
+      fireEvent.click(next);
+    }
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(result.marksOutputForm).toBe("ready-made");
+    expect(result.marksBackspace).toBe("peel");
+    expect(result.answers).toContainEqual({
+      questionId: "marks.marks_output_form.backspace",
+      answerType: "select",
+      value: "peel",
+    });
   });
 });
 
@@ -1256,17 +1449,19 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     expect(outputScreen).toBe("marks_output_form");
     expect(outputAnswers).toEqual([
       { questionId: "marks.marks_output_form.form", answerType: "select", value: expect.any(String) },
+      // #2302: the backspace answer rides the same station's record.
+      { questionId: "marks.marks_output_form.backspace", answerType: "select", value: expect.any(String) },
     ]);
 
-    // S5 (final) Next — completes the step. The recorder is NOT called again
-    // here: the final station's answers ride step completion (R-05), not a
-    // direct `recordQuestionAnswers` call.
+    // S5 Next — stacking is the final station (#2374 removed the guard
+    // station that used to close the series), so its answers ride step
+    // completion (R-05), not a direct `recordQuestionAnswers` call.
     fireEvent.click(screen.getByTestId("marks-continue"));
     expect(recorder).toHaveBeenCalledTimes(3);
     expect(onComplete).toHaveBeenCalledTimes(1);
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
     // The completion result carries EVERY station's answers (R-04), including
-    // the stacking answers this final Next itself resolved.
+    // the stacking answers this final Next resolved.
     const finalIds = result.answers.map((a) => a.questionId);
     expect(finalIds).toContain("marks.marks_stacking.allowed");
     expect(finalIds).toContain("marks.marks_stacking.stacks");
@@ -1525,9 +1720,10 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
     // Walk to completion so every station's answers are saved.
-    while (!onComplete.mock.calls.length) {
+    for (let i = 0; i < 10 && !onComplete.mock.calls.length; i++) {
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
+    expect(onComplete).toHaveBeenCalledTimes(1);
     const savedBefore = useSurveyAnswerStore.getState().steps.marks?.answers ?? {};
     expect(Object.keys(savedBefore).length).toBeGreaterThan(0);
     cleanup();
@@ -1549,5 +1745,213 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
       render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 106: the completion records only the stacks the author kept, because
+// the mark guard and the whole-stack backspace are generated from them.
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — recorded stacks follow the stacking station (spec 106)", () => {
+  const CIRC = "\u0302";
+  function seedStacked(): void {
+    useWorkingCopyStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    useDecisionStore.getState().reset();
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e"],
+        marks: [ACUTE, CIRC],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [CIRC] },
+          { base: "a", marks: [CIRC, ACUTE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
+  function walk(answerStacking: () => void): void {
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
+    });
+    for (let i = 0; i < 8 && onComplete.mock.calls.length === 0; i++) {
+      if (screen.queryByTestId("marks-stacking") !== null) answerStacking();
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    expect(onComplete).toHaveBeenCalled();
+  }
+
+  const recordedStacks = () => getMarksTreatmentValue()?.completion?.stacks ?? [];
+
+  it("keeps a confirmed multi-mark stack while stacking is allowed", () => {
+    seedStacked();
+    walk(() => {});
+    expect(recordedStacks()).toContainEqual({ base: "a", marks: [CIRC, ACUTE] });
+  });
+
+  it("drops multi-mark stacks once stacking is answered no, keeping single marks", () => {
+    seedStacked();
+    walk(() => fireEvent.click(screen.getByRole("radio", { name: /^No/ })));
+    expect(recordedStacks()).toEqual([
+      { base: "a", marks: [ACUTE] },
+      { base: "e", marks: [CIRC] },
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #2374: the guard question is gone; its buffer-start role is the
+// per-mark "start of line" box. Confirmed `emit` records migrate to ticked
+// boxes (origin "migrated-from-guard"); everything else opens unticked.
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — #2374 start-of-line migration", () => {
+  const SOL_ID = `marks_attachment.${ACUTE}|${ATTACHMENT_START_OF_LINE}`;
+
+  function seedLegacyGuard(behaviour: "swallow" | "emit", confirmed: boolean): void {
+    useDecisionStore.setState(useDecisionStore.getInitialState(), true);
+    recordMarksTreatmentValue({
+      ...EMPTY_MARKS_VALUE,
+      guardSpecification: {
+        recordId: `guard-specification:asked:${behaviour}`,
+        behaviour,
+        origin: "asked",
+        confirmed,
+        recordedAt: 0,
+        supersedes: null,
+      },
+    } as unknown as MarksTreatmentValue);
+  }
+
+  function solBox(): HTMLInputElement {
+    return screen.getByRole("checkbox", {
+      name: /can appear at the start of a line/,
+    }) as HTMLInputElement;
+  }
+
+  function savedSolAnswer() {
+    return useSurveyAnswerStore.getState().steps.marks?.answers[SOL_ID];
+  }
+
+  beforeEach(() => {
+    useWorkingCopyStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+  });
+
+  it("a confirmed legacy emit migrates to a ticked box; the attachment commit saves it with origin migrated-from-guard", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    seedLegacyGuard("emit", true);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    // The migration is visible in the row before any commit.
+    expect(solBox().checked).toBe(true);
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    const saved = savedSolAnswer();
+    expect(saved?.value).toBe(true);
+    expect(saved?.origin).toBe("migrated-from-guard");
+    expect(saved?.stage).toBe("confirmed");
+  });
+
+  it("a confirmed legacy swallow is a no-op: the box opens unticked", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    seedLegacyGuard("swallow", true);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    expect(solBox().checked).toBe(false);
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(savedSolAnswer()?.value).toBe(false);
+    expect(savedSolAnswer()?.origin).toBe("confirmed");
+  });
+
+  it("a seeded-but-unconfirmed emit record is dropped, never adopted", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    seedLegacyGuard("emit", false);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    expect(solBox().checked).toBe(false);
+  });
+
+  it("the author can untick a migrated tick (changeable, not locked)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    seedLegacyGuard("emit", true);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    expect(solBox().checked).toBe(true);
+    fireEvent.click(solBox());
+    expect(solBox().checked).toBe(false);
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(savedSolAnswer()?.value).toBe(false);
+  });
+
+  it("Track 2: an all-unguarded import seeds ticked boxes with origin imported", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    useDecisionStore.setState(useDecisionStore.getInitialState(), true);
+    act(() => {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "adapt",
+        provenance: "asked",
+      });
+    });
+    // An imported keyboard whose T_ mark key produces its mark unguarded.
+    const startIr = makeTestIR({
+      groups: [
+        {
+          nodeId: "group#main",
+          name: "main",
+          usingKeys: true,
+          rules: [
+            {
+              nodeId: "rule#p",
+              context: [{ kind: "vkey", name: "T_0300", modifiers: [] }],
+              output: [{ kind: "char" as const, value: ACUTE }],
+            },
+          ],
+          readonly: false,
+        },
+      ],
+      touchLayout: {
+        platforms: [
+          {
+            id: "phone",
+            layers: [{ id: "default", rows: [{ keys: [{ nodeId: "touchKey#1", id: "T_0300", text: "◌́" }] }] }],
+          },
+        ],
+        nodeIds: [],
+      },
+    });
+    useWorkingCopyStore.setState({ startIr });
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    expect(solBox().checked).toBe(true);
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    const saved = savedSolAnswer();
+    expect(saved?.value).toBe(true);
+    expect(saved?.origin).toBe("imported");
+  });
+
+  it("a tick the author sets themselves records origin overturned, not a migration origin", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    useDecisionStore.setState(useDecisionStore.getInitialState(), true);
+    act(() => {
+      render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    expect(solBox().checked).toBe(false);
+    fireEvent.click(solBox());
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    const saved = savedSolAnswer();
+    expect(saved?.value).toBe(true);
+    expect(saved?.origin).toBe("overturned");
   });
 });

@@ -230,7 +230,8 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
 // ---------------------------------------------------------------------------
 // spec 079 US3 T048/T079 — a shape change (writing direction becomes RTL)
 // proposes new bidi candidates while keeping the earlier decision, and there
-// is structurally no `reproposed` flag to show (see ../invisiblesFlags.ts).
+// is structurally no `reproposed` flag to show (see useWorkToDo.ts's
+// spec-079 note).
 // ---------------------------------------------------------------------------
 
 describe("InvisiblesStep — shape change: new candidates proposed, decisions kept, no flags (spec 079 US3 T048/T079)", () => {

@@ -1,6 +1,6 @@
 // T015 integration: the engine carve path (applyCarveToVfs with carvePipeline
 // opts) and the studio mutate seam (applyCarveMutate) must derive
-// byte-identical carved output from the same carve overlay + dispositions.
+// byte-identical carved output from the same carve overlay + fallback policy.
 //
 // This file does NOT mock @keyboard-studio/engine. It exercises the real
 // shared pipeline (deriveCarvedIr: suppression → slot removals → filter) on
@@ -24,7 +24,7 @@ import {
   makeTestIR,
   vkeyRule,
 } from "@keyboard-studio/contracts/fixtures";
-import type { CarveDisposition, KeyboardIR } from "@keyboard-studio/contracts";
+import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
 import { applyCarveToVfs, emitKmn } from "@keyboard-studio/engine";
 import { applyCarveMutate } from "../steps/editorMutate.js";
 import { stubKmnVfs } from "../test/workingCopy.ts";
@@ -33,24 +33,13 @@ import { stubKmnVfs } from "../test/workingCopy.ts";
 // Fixture
 // ---------------------------------------------------------------------------
 
-function blockDisposition(comboId: string): CarveDisposition {
-  return { comboId, disposition: "block", provenance: "closed-keyboard-card" };
-}
-
-function allowDisposition(comboId: string): CarveDisposition {
-  return {
-    comboId,
-    disposition: "allow-host",
-    provenance: "closed-keyboard-card-declined",
-  };
-}
-
 /**
  * IR exercising all three T015 carve shapes in one group:
  * - `rule#blockMe`: bare vkey rule, block disposition → suppression rewrite.
- * - `rule#allowMe`: bare vkey rule, allow-host disposition → removed.
  * - `store#dkt003b#1`: store slot, block disposition → guard synthesized
- *   ahead of the paired `any()` rule, slot nulled by the pipeline.
+ *   ahead of the paired `dk(3) + any()` rule, slot nulled by the pipeline.
+ *   The `+` puts the `any()` in the key position; only key-side slots get a
+ *   guard (a context-side slot is just removed).
  * - `lead`: untouched control rule.
  */
 function carvePipelineFixture(): KeyboardIR {
@@ -72,12 +61,12 @@ function carvePipelineFixture(): KeyboardIR {
         nodeId: "group#main",
         rules: [
           vkeyRule({ nodeId: "rule#blockMe", vkey: "K_A", output: "a" }),
-          vkeyRule({ nodeId: "rule#allowMe", vkey: "K_B", output: "b" }),
           charRule({ nodeId: "lead", context: "z", output: "z" }),
           charRule({
             nodeId: "paired",
             context: [
               { kind: "deadkey", id: 3 },
+              { kind: "raw", text: "+" },
               { kind: "any", storeRef: "dkf003b" },
             ],
             output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],
@@ -88,22 +77,16 @@ function carvePipelineFixture(): KeyboardIR {
   });
 }
 
-const DISPOSITIONS: CarveDisposition[] = [
-  blockDisposition("rule#blockMe"),
-  allowDisposition("rule#allowMe"),
-  blockDisposition("store#dkt003b#1"),
-];
-
-const DELETED_NODE_IDS = new Set(["rule#blockMe", "rule#allowMe"]);
+const DELETED_NODE_IDS = new Set(["rule#blockMe"]);
 const DELETED_ITEM_IDS = new Set(["store#dkt003b#1"]);
 
 /** Engine path: applyCarveToVfs with the T015 carvePipeline opts. */
-function enginePath(startIr: KeyboardIR): string {
+function enginePath(startIr: KeyboardIR, fallbackPolicy: FallbackPolicy = "swallow"): string {
   const vfs = stubKmnVfs("test");
   const result = applyCarveToVfs(vfs, "test", startIr, DELETED_NODE_IDS, {
     carvePipeline: {
       deletedItemIds: DELETED_ITEM_IDS,
-      dispositions: DISPOSITIONS,
+      fallbackPolicy,
       loud: false,
     },
   });
@@ -114,14 +97,14 @@ function enginePath(startIr: KeyboardIR): string {
 }
 
 /** Studio path: the mutate seam, then emit. */
-function seamPath(startIr: KeyboardIR): string {
+function seamPath(startIr: KeyboardIR, fallbackPolicy: FallbackPolicy = "swallow"): string {
   const seamIr = applyCarveMutate(
     startIr,
     DELETED_NODE_IDS,
     DELETED_ITEM_IDS,
     undefined,
     {
-      dispositions: DISPOSITIONS,
+      fallbackPolicy,
       loud: false,
     },
   );
@@ -150,7 +133,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
       DELETED_NODE_IDS,
       DELETED_ITEM_IDS,
       undefined,
-      { dispositions: DISPOSITIONS, loud: false },
+      { fallbackPolicy: "swallow", loud: false },
     );
     const suppressed = seamIr.groups[0]!.rules.find(
       (r) => r.nodeId === "rule#blockMe",
@@ -160,29 +143,20 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
     expect(suppressed!.output).toEqual([{ kind: "nul" }]);
   });
 
-  it("allow-host rule carve → no rule, no suppression", () => {
+  it("pass-through policy → carved rule removed, no suppression, slot has no guard", () => {
     const seamIr = applyCarveMutate(
       carvePipelineFixture(),
       DELETED_NODE_IDS,
       DELETED_ITEM_IDS,
       undefined,
-      { dispositions: DISPOSITIONS, loud: false },
+      { fallbackPolicy: "pass-through", loud: false },
     );
-    const nodeIds = seamIr.groups[0]!.rules.map((r) => r.nodeId);
-    // The allow-host rule is gone (removed by the compiler; the filter finds
-    // nothing to double-remove).
-    expect(nodeIds).not.toContain("rule#allowMe");
-    // No suppression rule was synthesized for it.
-    expect(
-      seamIr.groups[0]!.rules.filter(
-        (r) =>
-          r.ownedByBehaviour === "carve-suppression" &&
-          r.nodeId === "rule#allowMe",
-      ),
-    ).toHaveLength(0);
-    // Byte-identical on both paths (the engine path must agree the rule is gone).
-    expect(enginePath(carvePipelineFixture())).toBe(
-      seamPath(carvePipelineFixture()),
+    const rules = seamIr.groups[0]!.rules;
+    expect(rules.map((r) => r.nodeId)).not.toContain("rule#blockMe");
+    expect(rules.filter((r) => r.ownedByBehaviour === "carve-suppression")).toHaveLength(0);
+    // Byte-identical on both paths.
+    expect(enginePath(carvePipelineFixture(), "pass-through")).toBe(
+      seamPath(carvePipelineFixture(), "pass-through"),
     );
   });
 
@@ -192,7 +166,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
       DELETED_NODE_IDS,
       DELETED_ITEM_IDS,
       undefined,
-      { dispositions: DISPOSITIONS, loud: false },
+      { fallbackPolicy: "swallow", loud: false },
     );
     const rules = seamIr.groups[0]!.rules;
     // The guard is synthesized immediately ahead of the paired rule with the
@@ -205,6 +179,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
     expect(guard.ownedByBehaviour).toBe("carve-suppression");
     expect(guard.context).toEqual([
       { kind: "deadkey", id: 3 },
+      { kind: "raw", text: "+" },
       { kind: "char", value: "E" },
     ]);
     expect(rules[guardIndex + 1]!.nodeId).toBe("paired");
@@ -231,7 +206,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
     const before = JSON.stringify(startIr);
     enginePath(startIr);
     applyCarveMutate(startIr, DELETED_NODE_IDS, DELETED_ITEM_IDS, undefined, {
-      dispositions: DISPOSITIONS,
+      fallbackPolicy: "swallow",
       loud: false,
     });
     expect(JSON.stringify(startIr)).toBe(before);

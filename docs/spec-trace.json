@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-14",
+  "lastUpdated": "2026-10-23",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:6c03b52eb4a39dae",
+      "hash": "sha256:10abff8a295def41",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -595,9 +595,9 @@
       "decisions": [],
       "notes": ""
     },
-    "docs/lens-model.md": {
+    "docs/archive/lens-model.md": {
       "title": "How the four analytic lenses compose",
-      "hash": "sha256:8a07fd7c8294abe8",
+      "hash": "sha256:7bc13e7ba3a1d241",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1025,6 +1025,113 @@
       "implements": [],
       "decisions": [],
       "notes": "Implemented and merged in PR #1984 (keyboard derived from decisions). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
+    },
+    "specs/095-privacy-notice": {
+      "title": "Feature Specification: Privacy notice — say what we hold, where it goes, and what becomes public, at the moment it matters",
+      "hash": "sha256:abf8fb6be4eded86",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2100 (privacy notice page, links, self-hosted fonts). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15. Caveat: spec header still reads Draft/planning-only, and SIL Global acceptance of the controller role (#2100's stated merge gate) is not evidenced in the repo."
+    },
+    "specs/096-processing-record-and-retention": {
+      "title": "Feature Specification: Processing record & retention — one maintained inventory of what we hold, and a decided lifetime for every store",
+      "hash": "sha256:d00eded570f23b02",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2100 (docs/privacy/processing-record.md + check:privacy-record enumeration check in CI). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15."
+    },
+    "specs/097-subject-access-requests": {
+      "title": "Feature Specification: Subject access requests — a private intake, a verified identity, a one-month clock, and a complete answer",
+      "hash": "sha256:6a00d6dc4c0449da",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Machinery implemented and merged in PR #2100 (GET /drafts/export, in-app export, docs/privacy/dsar-procedure.md). NOT done per its own FR-010: the end-to-end DSAR dry-run has not been run — it is an open action in docs/privacy/reviews/2026.md. Triaged Path C for drift 2026-10-15; status stays partial until the dry-run is recorded."
+    },
+    "specs/098-erasure": {
+      "title": "Feature Specification: Erasure — delete what we hold, say plainly what we cannot, and prove both",
+      "hash": "sha256:472f274aa2a4bf00",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Machinery implemented and merged in PR #2100 (DELETE /drafts?all=true, purgeUserDrafts + operator CLI, docs/privacy/erasure-procedure.md). SC-001/SC-002 verification rides on the spec 097 dry-run extended with erasure, which has not been run (open action, docs/privacy/reviews/2026.md). Triaged Path C for drift 2026-10-15; status stays partial until then."
+    },
+    "specs/099-breach-response": {
+      "title": "Feature Specification: Breach response — a 72-hour runbook for the stores we actually have, rehearsed before it is needed",
+      "hash": "sha256:1ac6743d2524d88f",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Runbook and SECURITY.md implemented and merged in PR #2100 (docs/privacy/breach-runbook.md). NOT done per its own FR-008: the tabletop rehearsal has not been run — open action in docs/privacy/reviews/2026.md. Triaged Path C for drift 2026-10-15; status stays partial until the tabletop is recorded."
+    },
+    "specs/100-privacy-governance": {
+      "title": "Feature Specification: Privacy governance — Article XII in the constitution, a named owner, and gates that keep 095–099 true",
+      "hash": "sha256:5fa666f157f3e991",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Governance pieces implemented and merged in PR #2100 (privacy owner page, plan-template Personal data checkpoint, annual review #1 in docs/privacy/reviews/2026.md). FR-001 NOT met: Constitution Article XII is not ratified — the constitution on main has no Article XII; canonical text sits in specs/100-privacy-governance/article-xii.md and the local-only branch build/constitution-art12 (74113a02) still needs cherry-picking onto main and a PR. Triaged Path C for drift 2026-10-15; partial until Article XII lands."
+    },
+    "specs/101-analytics-readiness": {
+      "title": "Feature Specification: Analytics readiness — learn where authors get stuck, without becoming a tracker",
+      "hash": "sha256:214ccae4e35a4518",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Readiness only, by design: assessment, event taxonomy and processor scorecard landed with PR #2100; no analytics ships and the spec does not authorise it. Implementation is gated on Article XII ratification (spec 100, FR-001, not yet met). Acknowledged to register the section, per the spec 085 planning-spec precedent. Triaged 2026-10-15."
+    },
+    "specs/102-keyboard-docs-templates": {
+      "title": "Feature Specification: Keyboard documentation templates and version policy",
+      "hash": "sha256:64f94bf471e8184b",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2104 (keyboard documentation templates and version policy; spec renumbered 095 -> 102 in that PR) with review fixes in PR #2184; all 32 tasks complete. Spec was never seeded under the renumbered path, so it flagged as new-section post-merge. Triaged Path C 2026-10-15 (issue #2136): implementation verified on main (output-version.ts, renderHistoryMd.ts, renderDocForm.ts/docSlots.ts/packageDocs.ts, docContent.ts); no code change needed. Known caveat: FR-013 typing guide treats the underlying system layout as printable ASCII (docContent.ts, per task T020); for a declared non-US base layout the guide can over-include characters the base already types."
+    },
+    "specs/103-first-class-if-guards": {
+      "title": "Feature Specification: First-class `if()` guards in KeyboardIR",
+      "hash": "sha256:61626d8372652a28",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2190 (squash d012f262, closing #2163): ContextElement {kind:\"if\",store,value} in contracts, codec parse/emit, all ContextElement consumers, FR-009 round-trip vectors. Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15 (issue #2189); implementation verified on main, no code change needed. Known spec-text caveats (km-keyman review, all fail-closed with no shipped impact): Keyman not-equal is != not <> and a store-valued RHS is possible — both unmodelled and opaque per FR-003; the offset pin is vector-proven for index() only, guarded context(N) counting is unpinned/engine-divergent; &platform values are preserved verbatim, not evaluated (platform matching is a token-set match, and no shipped consumer evaluates the guard)."
+    },
+    "specs/104-touch-key-id-criteria": {
+      "title": "Feature Specification: Touch key identity criteria — when a touch key is K_, U_, or T_",
+      "hash": "sha256:084b6f855d941f15",
+      "status": "implemented",
+      "implements": [
+        "packages/contracts/src/touchProduction.ts",
+        "packages/contracts/src/touch-key-ids.ts",
+        "packages/contracts/src/decisionRecord.ts",
+        "packages/contracts/src/touch-key-diagnostics.ts",
+        "packages/contracts/src/touch-coverage.ts",
+        "packages/engine/src/pattern-apply/severTouchKey.ts",
+        "packages/engine/src/pattern-apply/carveTouchProducers.ts",
+        "packages/engine/src/pattern-apply/keyIdMinting.ts",
+        "packages/engine/src/pattern-apply/proposeTouchKeyId.ts",
+        "packages/engine/src/simulator/tapSimulation.ts",
+        "packages/studio/src/lib/touchKeyIdentity.ts",
+        "packages/studio/src/lib/copyTouchParity.ts",
+        "packages/studio/src/components/TouchKeyIdentityList.tsx",
+        "packages/studio/src/survey/marks/GuardStation.tsx",
+        "packages/studio/src/survey/marks/guardSpecification.ts",
+        "packages/studio/src/editors/assignLoop/keyGrid/keyIdentityViewModel.ts",
+        "packages/studio/e2e/touch-key-identity.spec.ts",
+        "utilities/refusal-probe/probe.ts"
+      ],
+      "decisions": [],
+      "notes": "Implemented 2026-10-17/18 in four waves (PRs #2266, #2267, #2272 + the Wave 4 close-out branch): one production resolver in contracts (FR-003) consumed by coverage, diagnostics, carve, enumeration, placement replay, combo propagation, the scaffolder and the proposer; decideKeyIdForm() implements the contracts §2 decision table (FR-005); severTouchKey()/relinkTouchKey() rule-level transplants with refusal records (FR-008/FR-029); marks-step guard station + GuardSpecification decision (FR-013); Copy parity gate + repair list with the FR-015 unvisited-at-Output ruling; Track 2 inline identity choices with FR-017 fingerprint-pinned decline suppression; key-inspector criterion/production/provenance section (FR-025); four Playwright walks (T023). T026 refusal probe over the corpus: 745 K_-linked touch keys, 12.4% candidate refusal rate (17.7% raw over all requests incl. arm-0-holds cases; utilities/refusal-probe/refusal-report.md). Full FR-by-FR trace and the deviation/adjudication record: specs/104-touch-key-id-criteria/AS-BUILT.md. T021 (corpus gate) and T022 (caps-fallback probe — settled: the caps-state K_ fallback fires) landed with the Wave 4 gates crew and are recorded in the AS-BUILT's Wave 4 gates section. Per the ack-routing convention this entry is adjudicated from main; the hash acknowledges spec.md as merged. Re-acknowledged 2026-10-20 for the Clarifications Session 2026-10-20 entry (empty-context guard ruling: 'start of a word' = the idiom's reachable cases; walk 1's start-of-word probe is the after-a-space tap). Re-acknowledged 2026-10-30 for the #2374 re-ruling (km-lead ruling, spec amendments on km/queue-2374): the per-keyboard guard question is retired; buffer start is offered per mark via the start-of-line column (spec 106 FR-015) — unticked = `nul` swallow rule + guarded `T_` mint, ticked = no `nul` rule + `\"\\n\"` in the mark's allowed set + plain `U_` mint; only confirmed GuardSpecification records migrate (`origin: \"migrated-from-guard\"`); Track 2 keyboard-wide guard seeding retired in favour of per-mark box seeding (`origin: \"imported\"`)."
+    },
+    "specs/105-derived-working-copy": {
+      "title": "Feature Specification: Derived working copy — finish the 088–093 migration",
+      "hash": "sha256:f4b4b1ba6e0b28f0",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes":"Seeded 2026-10-23 (Path C, issue #2318): spec was never seeded, so it flagged as new-section after the spec/plan/Phase 0 merge (PR #2292). Programme is planned only; Phase 0 inventory complete, no implementation landed yet, so no implementing files diverge. Re-review when the first implementation phase merges."
     }
   }
 }

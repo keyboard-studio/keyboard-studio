@@ -20,6 +20,8 @@
 // PhaseProjectName.integration.test.tsx.
 
 import { describe, it, expect } from "vitest";
+import { i18n } from "../../test/renderWithI18n.tsx";
+import { messages as frMessages } from "../../locales/fr/messages.json?lingui";
 import {
   trackOptions,
   phaseFOptions,
@@ -109,14 +111,98 @@ describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () 
     expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
   });
 
-  it("returns undefined before any track was ever chosen (field genuinely unset)", () => {
-    const { deps } = buildDeps({ selectedTrack: null });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBeUndefined();
+  it("a recorded track always wins over the proposal, even when the proposal differs", () => {
+    // Proposal here would be adapt (base's single language is the target);
+    // the recorded copy must stand — back/forward never re-proposes over it.
+    const { deps } = buildDeps({
+      selectedTrack: "copy",
+      surveyContext: { bcp47_tag: "ewo" },
+      localStart: { displayName: "Ewondo", languages: ["ewo"] },
+    });
+    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("copy");
+    expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBeUndefined();
+    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBeUndefined();
   });
 
   it("returns undefined for any other questionId", () => {
     const { deps } = buildDeps({ selectedTrack: "copy" });
     expect(trackOptions.seeds!.getSeedValue("some_other_question", deps)).toBeUndefined();
+    expect(trackOptions.seeds!.getSeedSource?.("some_other_question", deps)).toBeUndefined();
+    expect(trackOptions.seeds!.getSeedCaption?.("some_other_question", deps)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trackOptions.seeds — first-arrival proposal (proposeTrack): preselect the
+// derived track, name its source, and show its reason. Adapt only when the
+// base's single declared language matches the target's language + script.
+// ---------------------------------------------------------------------------
+
+describe("trackOptions.seeds — first-arrival track proposal", () => {
+  it("preselects adapt when the base's single language is exactly the target", () => {
+    const { deps } = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "ewo" },
+      localStart: { displayName: "Ewondo", languages: ["ewo"] },
+    });
+    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
+  });
+
+  it("preselects copy when the target is not the base's single language", () => {
+    const { deps } = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "ewo" },
+      localStart: { displayName: "French", languages: ["fr"] },
+    });
+    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("copy");
+  });
+
+  it("preselects copy for a multi-language base and for a base with no languages", () => {
+    const multi = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "en" },
+      localStart: { displayName: "Many", languages: ["en", "id"] },
+    }).deps;
+    expect(trackOptions.seeds!.getSeedValue("track_choice", multi)).toBe("copy");
+    const none = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "en" },
+      localStart: { displayName: "Unknown" },
+    }).deps;
+    expect(trackOptions.seeds!.getSeedValue("track_choice", none)).toBe("copy");
+    const noBase = buildDeps({ selectedTrack: null, surveyContext: { bcp47_tag: "en" } }).deps;
+    expect(trackOptions.seeds!.getSeedValue("track_choice", noBase)).toBe("copy");
+  });
+
+  it("names the proposal's source as the studio's analysis, and shows its reason", () => {
+    const { deps } = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "ewo" },
+      localStart: { displayName: "Ewondo", languages: ["ewo"] },
+    });
+    expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBe("analysis");
+    // The caption is the en catalogue string for the proposal's basis arm,
+    // resolved through i18n with the arm's params interpolated.
+    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBe(
+      "Suggested because this base is a ewo keyboard — the same single language and script as your target.",
+    );
+  });
+
+  it("resolves the caption from the French catalogue when fr is the active locale", () => {
+    const { deps } = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "ewo" },
+      localStart: { displayName: "French", languages: ["fr"] },
+    });
+    i18n.load("fr", frMessages);
+    i18n.activate("fr");
+    try {
+      expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBe(
+        "Suggéré parce que ce clavier de base est destiné à fr, et non à votre langue cible ewo.",
+      );
+    } finally {
+      i18n.activate("en");
+    }
   });
 });
 

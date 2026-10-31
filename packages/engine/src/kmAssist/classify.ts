@@ -150,6 +150,7 @@ export function classifyRuleKind(rule: IRRule): RuleKind {
     (el) =>
       el.kind === "char" ||
       el.kind === "deadkey" ||
+      el.kind === "namedDeadkey" ||
       el.kind === "index" ||
       el.kind === "outs",
   );

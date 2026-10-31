@@ -12,7 +12,9 @@ import { screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB } from "./PhaseB.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions } from "../survey/useInventoryDraft.ts";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { SourcedInventory } from "../lib/services.ts";
 
 const { getSourcedExemplars, lookupGate } = vi.hoisted(() => {
@@ -39,6 +41,14 @@ vi.mock("../lib/services.ts", async () => ({
   sourcedExemplars: async (_bcp47: string) => {
     if (lookupGate.promise !== null) await lookupGate.promise;
     return getSourcedExemplars.get();
+  },
+  // The union action's hook calls this wherever the apply route renders.
+  // Mirror the singular mock's world: the CLDR side is whatever the test
+  // staged, and there is no SLDR side — so the union action stays hidden,
+  // as it should when SLDR doesn't cover the tag.
+  sourcedExemplarsBoth: async (_bcp47: string) => {
+    if (lookupGate.promise !== null) await lookupGate.promise;
+    return { resolvedTag: "ewo", cldr: getSourcedExemplars.get(), sldr: null };
   },
   charactersInTier: (await import("@keyboard-studio/engine")).charactersInTier,
 }));
@@ -67,6 +77,26 @@ function inventory(
 }
 
 const CONTEXT = { bcp47_tag: "ewo", language_name: "Ewondo" };
+
+/**
+ * Seed a CASED base keyboard (Latin script producing case pairs) so its
+ * baked casing facet opens the character step's casing gate — loanword
+ * letters pair with their other case only behind that gate.
+ */
+function seedCasedBase(): void {
+  const rules = ["a", "b", "c"].map((c) => vkeyRule({ output: [{ kind: "char", value: c }] }));
+  useWorkingCopyStore.getState().instantiateFromStart(
+    {
+      id: "test_kb_cased",
+      path: "release/t/test_kb_cased",
+      script: "Latn",
+      targets: ["windows"],
+      displayName: "Test Cased",
+      version: "1.0",
+    },
+    { vfs: { files: new Map() }, ir: makeTestIR([irGroup({ rules, name: "main" })]) },
+  );
+}
 
 function renderPhaseB(): { onComplete: ReturnType<typeof vi.fn> } {
   const onComplete = vi.fn();
@@ -470,6 +500,14 @@ function bafutInventory(): SourcedInventory {
 }
 
 describe("loanword letters section", () => {
+  // Every test here exercises the case-pair behaviour (chip labels carry the
+  // pair; add/remove moves both cases), which the casing facet gates — seed
+  // a cased base so the gate is open, as it is for the Latin-script
+  // keyboards this section was written against.
+  beforeEach(() => {
+    seedCasedBase();
+  });
+
   it("lists the auxiliary letters, unselected, and leaves them out of the seeded alphabet", async () => {
     getSourcedExemplars.set(bafutInventory());
     renderPhaseB();
@@ -498,7 +536,7 @@ describe("loanword letters section", () => {
     await acceptExemplarsAndContinue();
 
     const loanwords = await screen.findByTestId("alphabet-loanwords");
-    const typeIn = screen.getByRole("region", { name: "Type your alphabet" });
+    const typeIn = screen.getByRole("region", { name: "List your letters" });
     const textSample = screen.getByTestId("text-sample-placeholder");
     const breakdown = screen.getByRole("region", { name: "How your alphabet breaks down" });
 

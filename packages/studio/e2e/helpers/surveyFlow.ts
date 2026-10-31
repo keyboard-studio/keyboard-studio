@@ -586,6 +586,9 @@ export async function driveMarksSeries(page: Page): Promise<void> {
     page.getByTestId("convenience-continue"),
     page.getByTestId("carve-gallery"),
   ];
+  // 6 iterations: at most 5 stations (SC-006), and a station count at the
+  // budget's edge must still complete. (#2374 removed the guard station,
+  // returning the budget to its pre-104 size.)
   for (let i = 0; i < 6; i++) {
     const timeout = i === 0 ? 20_000 : 5_000;
     await Promise.race([
@@ -616,8 +619,11 @@ export async function carveCharacter(page: Page, ch: string): Promise<void> {
     .join(" ");
   const cells = page.getByTestId("carve-gallery").locator(`button[aria-label*="— ${label}"]`);
   await expect(cells.first()).toBeVisible({ timeout: 30_000 });
-  await expect(cells.first()).toHaveAttribute("aria-pressed", "false");
-  await cells.first().click();
+  // Spec 106 FR-042: a suggested-to-discard character arrives marked for
+  // discard (carve-continue applies it), so it needs no click.
+  if ((await cells.first().getAttribute("aria-pressed")) !== "true") {
+    await cells.first().click();
+  }
   const count = await cells.count();
   for (let i = 0; i < count; i++) {
     await expect(cells.nth(i)).toHaveAttribute("aria-pressed", "true");
@@ -726,7 +732,7 @@ export interface MechanismPlacement {
  *     same loop, already owns — the synthetic content string embeds the
  *     character's own codepoint, so no two iterations can ever share a
  *     (content, indicator) pair.
- *   - advances via "Next character"/"Done" until the gallery completes.
+ *   - advances via "Next character"/"Continue" until the gallery completes.
  *
  * Does not name or return which character was which — callers that need to
  * prove a SPECIFIC placed letter landed correctly do so from the emitted
@@ -751,7 +757,21 @@ export async function driveMechanismsGallery(
   // delay uses waitFor({state:"visible", timeout}) instead (see waitVisible),
   // the same mistake driveConvenienceStep's race fix exists to correct.
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
-  if (await waitVisible(startButton, 5_000)) {
+  const emptyNotice = page.getByText("No new characters to add.");
+  const forwardButton = page.getByRole("button", { name: /^(Next character|Continue)$/ });
+  const applyButton = page.getByRole("button", { name: /^Apply method for / });
+
+  // Race the one-time intro splash against the gallery landmarks below
+  // (the same race-proofing as the empty-diff race): a splash that
+  // renders later than a short one-shot poll would be missed, the
+  // gallery behind it would never open, and the walk would read the
+  // missing forward button as "the gallery already completed".
+  await Promise.race([
+    waitVisible(startButton, 15_000),
+    waitVisible(emptyNotice, 15_000),
+    waitVisible(forwardButton, 15_000),
+  ]);
+  if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
   }
 
@@ -762,9 +782,6 @@ export async function driveMechanismsGallery(
   // will" — see waitVisible's doc comment). Either the empty-diff notice or
   // the per-character forward button becoming visible resolves the race;
   // then read which one is ACTUALLY present.
-  const emptyNotice = page.getByText("No new characters to add.");
-  const forwardButton = page.getByRole("button", { name: /^(Next character|Done)$/ });
-  const applyButton = page.getByRole("button", { name: /^Apply method for / });
   await Promise.race([
     waitVisible(emptyNotice, 15_000),
     waitVisible(forwardButton, 15_000),
@@ -780,32 +797,54 @@ export async function driveMechanismsGallery(
 
     if (await waitVisible(applyButton, 2_000)) {
       const ariaLabel = (await applyButton.getAttribute("aria-label")) ?? "";
-      const placement = opts.placements?.[ariaLabel.replace(/^Apply method for /, "")];
+      const currentChar = ariaLabel.replace(/^Apply method for /, "");
+      const placement = opts.placements?.[currentChar];
       if (placement !== undefined) {
         await assignToKey(page, placement);
         await expect(applyButton).toBeEnabled({ timeout: 5_000 });
-        await applyButton.click();
+        await applyButton.click({ timeout: 15_000 });
       } else if (!(await applyButton.isDisabled())) {
-        await applyButton.click();
+        await applyButton.click({ timeout: 15_000 });
       } else {
         // The default method isn't Apply-ready (e.g. a bare combining mark's
         // "Assign to a key" default has no physical key chosen yet) — fall
         // back to "Type a sequence" with a synthetic, collision-free pair.
-        const currentChar = ariaLabel.replace(/^Apply method for /, "");
         const contentToken =
           "zzq" +
           [...currentChar]
             .map((cp) => (cp.codePointAt(0) ?? 0).toString(16))
             .join("");
 
-        await page.getByRole("button", { name: "Type a sequence" }).click();
+        await page.getByRole("button", { name: "Type a sequence" }).click({ timeout: 10_000 });
         await page.getByTestId("sequences-content").fill(contentToken);
         await page.getByTestId("sequences-indicator").fill("j");
-        await page.getByTestId("sequences-apply").click();
+        await page.getByTestId("sequences-apply").click({ timeout: 10_000 });
+      }
+
+      // Discriminator (#2249): an Apply (or the sequence fallback) must
+      // account for the character, which is observable as the forward
+      // button enabling. Bound the wait and NAME the stuck state instead
+      // of letting the forward click below consume the whole test budget
+      // against a disabled button — a 240s click timeout reports nothing
+      // about whether the write landed or the gate disagreed.
+      const forwardEnabled = await expect(forwardButton)
+        .toBeEnabled({ timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!forwardEnabled) {
+        const hint = await page
+          .getByText(/still needs an assignment/)
+          .first()
+          .textContent()
+          .catch(() => null);
+        throw new Error(
+          `driveMechanismsGallery: character "${currentChar}" still unaccounted 30s after Apply ` +
+            `(forward button never enabled). Gallery hint: ${hint ?? "<none rendered>"}`,
+        );
       }
     }
 
-    await forwardButton.click();
+    await forwardButton.click({ timeout: 15_000 });
   }
   throw new Error(
     "driveMechanismsGallery: did not complete within the expected character count",
@@ -859,7 +898,7 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  * "Cannot finish yet" gate forever. Instead this helper actually configures
  * the default "Long-press on a key" method (host key select, aria-label
  * "Host key for long-press") + Apply for every character, then advances via
- * "touch-continue" (which doubles as "Next character"/"Done").
+ * "touch-continue" (which doubles as "Next character"/"Continue").
  *
  * It also has a one-time intro splash ("Start the touch gallery"), dismissed
  * first.
@@ -879,16 +918,37 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  */
 export async function driveTouchGallery(page: Page): Promise<void> {
   const seedConfirm = page.getByTestId("seed-source-confirm");
-  if (await waitVisible(seedConfirm, 5_000)) {
+  const startButton = page.getByRole("button", { name: "Start the touch gallery" });
+  const continueButton = page.getByTestId("touch-continue");
+
+  // Race the seed-source panel against the gallery's own landmarks
+  // rather than polling for it alone with a short one-shot wait: a seed
+  // panel that renders later than the poll (CI pace) would be missed,
+  // and the loop below would then read "no touch-continue yet" as "the
+  // gallery already completed" and return, stranding the walk on the
+  // seed step until a downstream fill consumed the test timeout — the
+  // same misread class as driveHelpPhase's font-guidance race. Whichever
+  // landmark renders first says which screen the walk actually entered
+  // on (a re-entered walk may skip the seed panel entirely).
+  await Promise.race([
+    waitVisible(seedConfirm, 30_000),
+    waitVisible(startButton, 30_000),
+    waitVisible(continueButton, 30_000),
+  ]);
+  if (await seedConfirm.isVisible().catch(() => false)) {
     await seedConfirm.click();
   }
 
-  const startButton = page.getByRole("button", { name: "Start the touch gallery" });
-  if (await waitVisible(startButton, 5_000)) {
+  // Same race for the one-time intro splash: it follows the seed
+  // confirm, and the gallery's continue control follows the splash.
+  await Promise.race([
+    waitVisible(startButton, 15_000),
+    waitVisible(continueButton, 15_000),
+  ]);
+  if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
   }
 
-  const continueButton = page.getByTestId("touch-continue");
   // A ui/SelectMenu like the target-script field above — its options are
   // portalled to document.body, so they go through selectMenuOption.
   const baseKeySelect = page.getByRole("button", { name: "Host key for long-press" });
@@ -903,6 +963,28 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
+      // A character with a touch SUGGESTION (a Phase C desktop assignment's
+      // long-press/replace proposal, the decomposable-accent fallback, or
+      // the corpus long-press tie-breaker) renders the suggestion card
+      // INSTEAD of the method chooser — the "Host key for long-press"
+      // select does not exist until the suggestion is resolved, so
+      // reaching for it directly waits out selectMenuOption's timeout on
+      // a control that was never going to render (the golden walk's
+      // 2026-10-19 stall: first stop U+2010, corpus suggestion "long-press
+      // z", chooser hidden). This walk's fixed answer is the default
+      // long-press on K_A for every character, so it declines the proposal
+      // ("Choose a different touch method" — propose-then-confirm's deny
+      // path, which reveals the chooser) and proceeds exactly as before.
+      // Ported from main's a52612c7 (fix(galleries): credit
+      // composed-treatment marks in the coverage gate), which dev never
+      // received — without it dev's golden walk stalls at this exact
+      // step on both the PR code and the base-code capture.
+      const denySuggestion = page.getByRole("button", {
+        name: "Choose a different touch method",
+      });
+      if (await waitVisible(denySuggestion, 2_000)) {
+        await denySuggestion.click();
+      }
       await selectMenuOption(page, baseKeySelect, "K_A");
       await applyButton.click();
     }
@@ -917,15 +999,18 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  * Phase F has several questions (welcome paragraph, usage tips, credits, contact).
  * This helper:
  *   1. Fills the welcome paragraph
- *   2. Fills the first usage tip
- *   3. Leaves the HISTORY proposal (pf_history_entry, spec 080 US5) undecided
+ *   2. Advances past pf_font_guidance (Phase F revision, #2182) — a core-flow
+ *      question spliced between the welcome paragraph and the first usage
+ *      tip; optional, left blank ("common system fonts are sufficient")
+ *   3. Fills the first usage tip
+ *   4. Leaves the HISTORY proposal (pf_history_entry, spec 080 US5) undecided
  *      and advances past it — optional, so Next is enabled with no answer
- *   4. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
+ *   5. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
  *      revision's required Yes/No gate, which unconditionally follows
  *      pf_history_entry) — the minimal path every existing walk wants,
  *      rather than opening the optional documentation battery
- *   5. Advances through remaining optional questions in a bounded loop
- *   6. Detects arrival at #output (phase boundary)
+ *   6. Advances through remaining optional questions in a bounded loop
+ *   7. Detects arrival at #output (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -939,7 +1024,57 @@ export async function driveHelpPhase(
   await page.locator("#pf_welcome_paragraph").fill(welcomeText);
   await surveyAdvance(page).click();
 
-  await page.locator("#pf_usage_tip_1").fill(usageTipText);
+  // pf_font_guidance (#2182) sits in the core flow between the welcome
+  // paragraph and pf_usage_tip_1 — a walk that waits for the usage-tip
+  // field here stalls until the test timeout (the golden-walk capture's
+  // 1200s death on run 39159050050; the same stall, error-context parked
+  // on the font-guidance question, killed both the capture and the
+  // verify on run 39170610836 and the verify on nightly soak
+  // 39264860097, on trees whose helpers had no font handling at all).
+  // Optional and blank is a complete answer, so advance straight past
+  // it when it shows.
+  //
+  // Race-proof by construction — the same hardening as
+  // driveConvenienceStep / driveMarksSeries above: the first version of
+  // this handling (3890d031, which passed once on PR #2279's run
+  // 39163934900) polled for the font question ALONE with a 5s one-shot
+  // wait. A render slower than 5s at CI pace reads as "question absent"
+  // and the fill below then waits out the whole 1200s test timeout on a
+  // question that was merely late — the exact misread class this file
+  // keeps burning on. Race the font question against the usage-tip
+  // field (the landmark that follows it): whichever renders first says
+  // whether the font question is on this walk's path at all (these
+  // helpers are also copied onto base code for the golden-walk baseline
+  // capture, whose question set may predate #2182). And bound the
+  // usage-tip wait itself, naming the stall instead of letting `.fill`
+  // consume the test budget (the driveMechanismsGallery discriminator
+  // pattern).
+  const fontGuidance = page.locator("#pf_font_guidance");
+  const usageTip = page.locator("#pf_usage_tip_1");
+  await Promise.race([
+    fontGuidance.waitFor({ state: "visible", timeout: 30_000 }),
+    usageTip.waitFor({ state: "visible", timeout: 30_000 }),
+  ]).catch(() => {
+    // Neither landmark showed within the combined window — fall through
+    // to the bounded check below, which names the stuck state.
+  });
+  if (await fontGuidance.isVisible().catch(() => false)) {
+    await surveyAdvance(page).click();
+  }
+  const usageTipShown = await usageTip
+    .waitFor({ state: "visible", timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!usageTipShown) {
+    throw new Error(
+      "driveHelpPhase: #pf_usage_tip_1 never appeared within 30s after the " +
+        `welcome paragraph (url: ${page.url()}) — the walk is parked on an ` +
+        "unhandled Phase F question; the retained error-context snapshot " +
+        "shows which one.",
+    );
+  }
+
+  await usageTip.fill(usageTipText);
   await surveyAdvance(page).click();
 
   // pf_history_entry (spec 080 US5) — optional; leave undecided (stays

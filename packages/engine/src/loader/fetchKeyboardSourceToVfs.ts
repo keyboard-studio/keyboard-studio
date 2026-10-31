@@ -12,6 +12,7 @@ import type {
   VirtualFS,
   KpsFontEntry,
   KpsStylesheetEntry,
+  PackageFontSet,
   WelcomeConvention,
   WelcomeFolderImage,
 } from "@keyboard-studio/contracts";
@@ -45,6 +46,17 @@ export interface FetchKeyboardSourceOptions {
 // get the types.
 export type { KpsFontEntry, KpsStylesheetEntry };
 
+/**
+ * One fetched welcome/help stylesheet: the repo path it was fetched from
+ * (`source/…`) and its text. The path rides along so a consumer can write
+ * the stylesheet back at its own location; the fetch order alone cannot
+ * say which text belongs to which page once a fetch has been skipped.
+ */
+export interface StartDocCssText {
+  path: string;
+  text: string;
+}
+
 export interface FetchKeyboardSourceResult {
   /** CompilerOptions derived from the .kpj (or defaults if .kpj absent). */
   options: Required<CompilerOptions>;
@@ -57,6 +69,13 @@ export interface FetchKeyboardSourceResult {
    * Empty array when no .kps was found or no font entries were present.
    */
   fonts: KpsFontEntry[];
+  /**
+   * The fonts the base `.kps` packages — files (fonts plus their licence and
+   * other companions, all written into the VFS) and its OSK/display font
+   * selections — for the generated descriptor to re-declare.
+   * Absent when the base packages no font, or none could be fetched.
+   */
+  packageFonts?: PackageFontSet;
   /**
    * Per-keyboard CSS stylesheets fetched from the keyboards tree and written
    * into the VFS. The studio injects these into the OSK iframe so the
@@ -126,6 +145,21 @@ export interface FetchKeyboardSourceResult {
    * these entries below the new one (criterion 3.4).
    */
   startHistoryMdText?: string;
+  /**
+   * The stylesheets the base's welcome / help pages use
+   * (`source/welcome/*.css`, `source/help/*.css` — conventionally both are
+   * `kb.css`), each with the path it was fetched from, in page order
+   * (welcome first, then help), or undefined when neither page names one
+   * that could be fetched (issue #2139).
+   *
+   * Fetched for criterion 11.8 only: a custom help image's width constraint
+   * may live in a class rule in these files, and the KMW stylesheet in the
+   * VFS (`source/<id>.css`) has no help-page rules, so judging 11.8 without
+   * them flags class-constrained images (e.g. sil_cameroon_qwerty's
+   * `.full { width: 98% }`) as unconstrained. Fetch-don't-write, like
+   * {@link startWelcomeHtmText}: the rendered pages are what ships.
+   */
+  startDocCssTexts?: StartDocCssText[];
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -149,6 +183,18 @@ export function resolveKpsFontPath(rawPath: string, kbPath: string): string | nu
   if (!resolved.startsWith("release/")) return null;
   return resolved;
 }
+/**
+ * The VFS key for a release-relative `.kps` asset. Keyboard-local assets use
+ * `source/…` so the scaffolder can rename them; shared assets retain their
+ * release-relative path for the package descriptor's `..\..\..\` references.
+ */
+export function releasePathToVfsKey(releasePath: string, kbPath: string): string {
+  const ownSource = `${kbPath}/source/`;
+  return releasePath.startsWith(ownSource)
+    ? `source/${releasePath.slice(ownSource.length)}`
+    : releasePath.slice("release/".length);
+}
+
 const DEFAULT_OPTIONS: Required<CompilerOptions> = {
   compilerWarningsAsErrors: false,
   warnDeprecatedCode: true,
@@ -269,6 +315,7 @@ export async function fetchKeyboardSourceToVfs(
   // The raw .kps is NOT written to the VFS (it references compiled artifacts
   // like ../build/*.kmx that must not leak into the VFS).
   const fonts: KpsFontEntry[] = [];
+  let packageFonts: PackageFontSet | undefined;
   const stylesheets: KpsStylesheetEntry[] = [];
   const kpsUrl = `${baseUrl}/source/${startKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
@@ -276,7 +323,10 @@ export async function fetchKeyboardSourceToVfs(
   // descriptor for `<WelcomeFile>` and the `welcome\…` `<Files>` entries.
   const kpsText = kpsResp.ok && kpsResp.text !== undefined ? kpsResp.text : undefined;
   if (kpsText !== undefined) {
-    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFontRefs(kpsText);
+    const fontRefs = parseKpsFontRefs(kpsText);
+    const { oskFonts, fileFonts, stylesheets: cssRefs } = fontRefs;
+    /** Raw `.kps` font reference -> the VFS key it was written to. */
+    const fetchedFontVfsPaths = new Map<string, string>();
 
     // Build a deduped map of rawPath -> isOskFont.
     const allRaw = new Map<string, boolean>();
@@ -341,7 +391,7 @@ export async function fetchKeyboardSourceToVfs(
             warn: `font '${ttfRelPath}' not fetched (${detail}) — skipped`,
           };
         }
-        return { ok: true as const, ttfRelPath, isOskFont, bytes: r.bytes };
+        return { ok: true as const, rawPath, ttfRelPath, isOskFont, bytes: r.bytes };
       }),
     );
 
@@ -353,7 +403,7 @@ export async function fetchKeyboardSourceToVfs(
       // VFS path strips the leading "release/" so it sits alongside the
       // keyboard source tree root (mirrors how shared/ assets are addressed
       // relative to the keyboard root).
-      const vfsPath = fr.ttfRelPath.slice("release/".length);
+      const vfsPath = releasePathToVfsKey(fr.ttfRelPath, startKeyboard.path);
       // Font files are binary — flag them (see the sibling-asset write above for
       // what an unflagged byte payload costs downstream).
       vfs.set(vfsPath, fr.bytes, true);
@@ -369,7 +419,26 @@ export async function fetchKeyboardSourceToVfs(
         entry.family = kvksFamilyStr;
       }
       fonts.push(entry);
+      fetchedFontVfsPaths.set(fr.rawPath, vfsPath);
     }
+
+    // Criteria 8/9/10: the fonts the base packages, re-declared
+    // by the generated descriptor. A font's companions — the licence, FONTLOG
+    // and README the base lists from the same shared folder — ship with it.
+    // Companions are taken only from a folder OUTSIDE the keyboard's own tree:
+    // a keyboard-local font sits in source/, where "same folder" would sweep
+    // in every other source member.
+    packageFonts = await collectPackageFonts({
+      kpsText,
+      kbPath: startKeyboard.path,
+      fetchedFontVfsPaths,
+      refs: { oskFont: fontRefs.oskFont, displayFont: fontRefs.displayFont },
+      proxyBase,
+      fetchImpl,
+      vfs,
+      warnings,
+      filesLoaded,
+    });
 
     // Fetch each per-keyboard CSS file in parallel. These live next to the .kps
     // in source/ and may use the same `..\..\..` traversal pattern as fonts;
@@ -403,9 +472,14 @@ export async function fetchKeyboardSourceToVfs(
         warnings.push(cr.warn);
         continue;
       }
-      const vfsPath = cr.cssRelPath.slice("release/".length);
-      vfs.set(vfsPath, cr.cssText);
-      filesLoaded.push(vfsPath);
+      // Keyed like the rest of the keyboard's source, so the scaffolder can
+      // rename keyboard-local stylesheets. Welcome/help CSS remains fetch-only
+      // documentation input and is retained in startDocCssTexts instead.
+      const vfsPath = releasePathToVfsKey(cr.cssRelPath, startKeyboard.path);
+      if (!/^source\/(welcome|help)\//i.test(vfsPath)) {
+        vfs.set(vfsPath, cr.cssText);
+        filesLoaded.push(vfsPath);
+      }
       stylesheets.push({
         vfsPath,
         cssRelPath: cr.cssRelPath,
@@ -467,6 +541,19 @@ export async function fetchKeyboardSourceToVfs(
     startHelpPhpText = helpPhpResp.text;
   }
 
+  // Issue #2139 (criterion 11.8): the stylesheets the base's welcome / help
+  // pages use — see the result field's doc for why the check needs them.
+  // Absence is non-fatal and NOT a warning, same tolerance as the pages.
+  const startDocCssTexts: StartDocCssText[] = [];
+  for (const cssPath of docStylesheetPaths({
+    welcomeText: startWelcomeHtmText,
+    welcomeConvention: startWelcomeConvention,
+    helpText: startHelpPhpText,
+  })) {
+    const cssResp = await getText(`${baseUrl}/${cssPath}`, fetchImpl);
+    if (cssResp.ok && cssResp.text !== undefined) startDocCssTexts.push({ path: cssPath, text: cssResp.text });
+  }
+
   // spec 080 FR-006: the base's README.md / HISTORY.md, for inheritance at
   // render time (README prose) and preservation below the new entry (HISTORY,
   // criterion 3.4). Root-level like LICENSE.md; absence is silent.
@@ -486,6 +573,7 @@ export async function fetchKeyboardSourceToVfs(
     filesLoaded,
     warnings,
     fonts,
+    ...(packageFonts !== undefined ? { packageFonts } : {}),
     stylesheets,
     ...(startLicenseText !== undefined ? { startLicenseText } : {}),
     ...(startWelcomeHtmText !== undefined ? { startWelcomeHtmText } : {}),
@@ -494,6 +582,7 @@ export async function fetchKeyboardSourceToVfs(
     ...(startWelcomeImages.length > 0 ? { startWelcomeImages } : {}),
     ...(startReadmeMdText !== undefined ? { startReadmeMdText } : {}),
     ...(startHistoryMdText !== undefined ? { startHistoryMdText } : {}),
+    ...(startDocCssTexts.length > 0 ? { startDocCssTexts } : {}),
   };
 }
 
@@ -515,6 +604,79 @@ function parseKpsWelcomeFile(kpsText: string): string | undefined {
  * applies with its `release/` prefix check, applied to both image loops so a
  * `.kps` entry or an `<img src>` cannot fetch outside the keyboard's folder.
  */
+/**
+ * The base's packaged fonts as a {@link PackageFontSet}.
+ *
+ * Walks the `.kps` `<Files>` in order: each font already fetched is listed
+ * under the VFS key it was written to, and every other member that sits in the
+ * same folder as a fetched font — when that folder is outside the keyboard's
+ * own tree — is fetched as a companion (licence, FONTLOG, README; criterion 9).
+ * A companion that cannot be fetched is skipped with a warning. A selected
+ * OSK/display font that `<Files>` omits is still listed, after the rest.
+ */
+async function collectPackageFonts(args: {
+  kpsText: string;
+  kbPath: string;
+  fetchedFontVfsPaths: ReadonlyMap<string, string>;
+  refs: { oskFont: string | undefined; displayFont: string | undefined };
+  proxyBase: string;
+  fetchImpl: FetchFn;
+  vfs: VirtualFS;
+  warnings: string[];
+  filesLoaded: string[];
+}): Promise<PackageFontSet | undefined> {
+  const { kpsText, kbPath, fetchedFontVfsPaths, refs, proxyBase, fetchImpl, vfs, warnings, filesLoaded } = args;
+  if (fetchedFontVfsPaths.size === 0) return undefined;
+
+  const ownTree = `${kbPath}/`;
+  const fontDirs = new Set<string>();
+  for (const rawPath of fetchedFontVfsPaths.keys()) {
+    const releasePath = resolveKpsFontPath(rawPath, kbPath);
+    if (releasePath !== null && !releasePath.startsWith(ownTree)) fontDirs.add(pathUtils.dirname(releasePath));
+  }
+
+  const files: string[] = [];
+  const listed = new Set<string>();
+  const list = (vfsPath: string): void => {
+    if (listed.has(vfsPath)) return;
+    listed.add(vfsPath);
+    files.push(vfsPath);
+  };
+
+  for (const { name, fileType } of parseKpsFiles(kpsText)) {
+    const fetched = fetchedFontVfsPaths.get(name);
+    if (fetched !== undefined) {
+      list(fetched);
+      continue;
+    }
+    if (fileType === ".ttf" || fileType === ".otf" || fileType === ".css") continue;
+    const releasePath = resolveKpsFontPath(name, kbPath);
+    if (releasePath === null || !fontDirs.has(pathUtils.dirname(releasePath))) continue;
+    const vfsPath = releasePathToVfsKey(releasePath, kbPath);
+    if (listed.has(vfsPath)) continue;
+    const r = await getBytes(`${proxyBase}/${releasePath}`, fetchImpl);
+    if (!r.ok || r.bytes === undefined) {
+      const detail = r.networkError ? `network error: ${r.networkError}` : `HTTP ${r.status}`;
+      warnings.push(`font companion '${releasePath}' not fetched (${detail}) — skipped`);
+      continue;
+    }
+    vfs.set(vfsPath, r.bytes, true);
+    filesLoaded.push(vfsPath);
+    list(vfsPath);
+  }
+
+  const oskFont = refs.oskFont !== undefined ? fetchedFontVfsPaths.get(refs.oskFont) : undefined;
+  const displayFont = refs.displayFont !== undefined ? fetchedFontVfsPaths.get(refs.displayFont) : undefined;
+  if (oskFont !== undefined) list(oskFont);
+  if (displayFont !== undefined) list(displayFont);
+
+  return {
+    files,
+    ...(oskFont !== undefined ? { oskFont } : {}),
+    ...(displayFont !== undefined ? { displayFont } : {}),
+  };
+}
+
 function hasTraversal(rel: string): boolean {
   return rel.split("/").includes("..");
 }
@@ -523,11 +685,91 @@ const WELCOME_FOLDER_PREFIX = "welcome/";
 const FOLDER_WELCOME_PAGE = "welcome/welcome.htm";
 const FLAT_WELCOME_PAGE = "welcome.htm";
 
+/**
+ * Extensions carried as welcome images (#2305). The copy track carries
+ * images only and no prose (spec 080 R9 / FR-007, spec 102 FR-032), so a
+ * `welcome\…` `<Files>` entry that is not an image — the per-layout `.htm`
+ * sub-pages and `kb.css` a keyboard like sil_cameroon_qwerty lists there —
+ * is not a welcome image: carrying it ships it in the copy's `.kps` and the
+ * generated welcome page renders it as a broken `<img>`.
+ */
+const WELCOME_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "svg",
+  "webp",
+  "bmp",
+  "ico",
+  "avif",
+]);
+
+/** True when `rel` names an image file, by extension (case-insensitive). */
+function isWelcomeImagePath(rel: string): boolean {
+  const m = /\.([a-z0-9]+)$/i.exec(rel);
+  return m !== null && WELCOME_IMAGE_EXTENSIONS.has(m[1]!.toLowerCase());
+}
+
 interface ResolvedStartWelcome {
   text: string | undefined;
   convention: WelcomeConvention;
   images: WelcomeFolderImage[];
   warnings: string[];
+}
+
+const LINK_TAG_RE = /<link\b[^>]*>/gi;
+const HREF_ATTR_RE = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+/**
+ * The repo paths (`source/…`) of the stylesheets a base's welcome / help
+ * pages use, in page order (welcome first, then help), deduped (issue
+ * #2139). Per page, the candidates are every relative `.css` href its
+ * `<link>` tags name, resolved against the page's own folder, plus the
+ * conventional `kb.css` in that folder — a page may rely on the help
+ * site's `header.php` for the link instead of carrying it in its own
+ * text. Absolute, scheme-qualified, and `..`-escaping hrefs never count:
+ * only files inside the page's folder can govern it.
+ */
+function docStylesheetPaths(args: {
+  welcomeText: string | undefined;
+  welcomeConvention: WelcomeConvention;
+  helpText: string | undefined;
+}): string[] {
+  const pages: Array<{ text: string | undefined; dir: string }> = [
+    {
+      text: args.welcomeText,
+      dir:
+        args.welcomeConvention === "folder"
+          ? "source/welcome/"
+          : args.welcomeConvention === "flat"
+            ? "source/"
+            : "",
+    },
+    { text: args.helpText, dir: "source/help/" },
+  ];
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  const add = (path: string) => {
+    if (!seen.has(path)) {
+      seen.add(path);
+      paths.push(path);
+    }
+  };
+  for (const { text, dir } of pages) {
+    if (text === undefined || dir === "") continue;
+    for (const tag of text.matchAll(LINK_TAG_RE)) {
+      const m = HREF_ATTR_RE.exec(tag[0]);
+      const href = m?.[1] ?? m?.[2];
+      if (href === undefined) continue;
+      const clean = href.trim().replace(/^\.\//, "");
+      if (!/\.css$/i.test(clean)) continue;
+      if (/^[a-z][a-z0-9+.-]*:/i.test(clean) || clean.startsWith("/") || clean.split("/").includes("..")) continue;
+      add(`${dir}${clean}`);
+    }
+    add(`${dir}kb.css`);
+  }
+  return paths;
 }
 
 /**
@@ -545,8 +787,11 @@ interface ResolvedStartWelcome {
  *     entry), never to a failure.
  *
  * Images are the `welcome\…` `<Files>` entries other than the page, fetched as
- * bytes. Each miss is skipped and recorded — a listed file the base does not
- * ship is the base's defect, and the output must still build.
+ * bytes — image files only (#2305, see {@link WELCOME_IMAGE_EXTENSIONS}): the
+ * same folder listing also names prose sub-pages and stylesheets, which the
+ * copy track does not carry. Each miss is skipped and recorded — a listed
+ * file the base does not ship is the base's defect, and the output must
+ * still build.
  */
 async function resolveStartWelcome(
   baseUrl: string,
@@ -588,8 +833,11 @@ async function resolveStartWelcome(
     convention = "flat";
   }
 
-  // Folder images: every `welcome\…` <Files> entry other than the page itself,
-  // in `.kps` order (deterministic, and the order the corpus descriptor uses).
+  // Folder images: every `welcome\…` <Files> entry other than the page itself
+  // that names an image file (#2305), in `.kps` order (deterministic, and
+  // the order the corpus descriptor uses). Non-image entries (`.htm`
+  // sub-pages, `kb.css`) are skipped silently — they are not missing
+  // images, just not images.
   const images: WelcomeFolderImage[] = [];
   const seen = new Set<string>();
   if (convention === "folder" && kpsText !== undefined) {
@@ -597,6 +845,7 @@ async function resolveStartWelcome(
       const rel = kpsRefToPosix(name);
       if (!rel.startsWith(WELCOME_FOLDER_PREFIX) || hasTraversal(rel)) continue;
       if (rel === pagePath) continue;
+      if (!isWelcomeImagePath(rel)) continue;
       const key = rel.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);

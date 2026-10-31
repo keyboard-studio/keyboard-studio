@@ -8,6 +8,7 @@ import type {
   StartKeyboard,
   VirtualFS,
   KeyboardIR,
+  TouchLayoutIR,
   Attribution,
   WelcomeConvention,
   WelcomeFolderImage,
@@ -27,7 +28,12 @@ import {
 import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
-import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
+import {
+  TOUCH_LAYOUT_JSON_INDENT,
+  parseTouchLayout,
+  emitTouchLayout,
+} from "../codec/parse-touch.js";
+import { mutateCleanTouchLayout } from "./cleanTouchLayout.js";
 import { detectStartLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
@@ -42,6 +48,7 @@ import { welcomeHtm, readmeHtm, helpPhpStub } from "../shared/packageDocs.js";
 import { HISTORY_INITIAL_RELEASE_BULLET } from "../shared/renderHistoryMd.js";
 import {
   buildKpsContent,
+  kpsMemberRef,
   type PackageDescriptorIdentity,
 } from "../package-descriptor/index.js";
 import { dropUnbackedBitmapStore } from "../compiler/stripDanglingAssetStores.js";
@@ -254,62 +261,32 @@ function dropBitmapStoreIfUnbacked(vfs: VirtualFS, keyboardId: string): string[]
   ];
 }
 
+/**
+ * Template cleanup of the inherited `.keyman-touch-layout`, as an IR
+ * mutation (#313 goal 3): parse → {@link mutateCleanTouchLayout} → emit.
+ * The recipe and its semantics live in `./cleanTouchLayout.ts`.
+ *
+ * Leniency contract (unchanged from the raw-JSON form): a missing file, a
+ * non-string entry, or unparseable content leaves the file untouched and
+ * never fails the scaffold. One deliberate delta, disclosed in the #313 PR:
+ * content that is valid JSON but not an object (e.g. `"null"`) used to
+ * abort `scaffold()` with a TypeError from the raw operation; it now takes
+ * the same silent no-op path as a syntax error — the parser throws
+ * TypeError for it and the catch below treats all parse failures alike.
+ */
 function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
   const path = `source/${keyboardId}.keyman-touch-layout`;
   const entry = vfs.get(path);
   if (entry === undefined || typeof entry.content !== "string") return;
 
-  let data: Record<string, unknown>;
+  let ir: TouchLayoutIR;
   try {
-    data = JSON.parse(entry.content) as Record<string, unknown>;
+    ir = parseTouchLayout(entry.content);
   } catch {
     return;
   }
-
-  delete (data as Record<string, unknown>)["phone"];
-
-  for (const device of ["tablet"] as const) {
-    const deviceData = data[device] as { layer?: Array<Record<string, unknown>> } | undefined;
-    if (deviceData?.layer == null) continue;
-    const layers = deviceData.layer;
-
-    const shiftLayer = layers.find((l) => l["id"] === "shift");
-    const capsLayer = layers.find((l) => l["id"] === "caps");
-    if (shiftLayer !== undefined && capsLayer === undefined) {
-      const cloned = JSON.parse(JSON.stringify(shiftLayer)) as Record<string, unknown>;
-      cloned["id"] = "caps";
-      layers.push(cloned);
-    }
-
-    const rightaltShiftLayer = layers.find((l) => l["id"] === "rightalt-shift");
-    const rightaltCapsLayer = layers.find((l) => l["id"] === "rightalt-caps");
-    if (rightaltShiftLayer !== undefined && rightaltCapsLayer === undefined) {
-      const cloned = JSON.parse(JSON.stringify(rightaltShiftLayer)) as Record<string, unknown>;
-      cloned["id"] = "rightalt-caps";
-      layers.push(cloned);
-    }
-
-    for (const layer of layers) {
-      const layerId = layer["id"] as string | undefined;
-      if (layerId === "default" || (layerId != null && layerId.includes("caps"))) continue;
-      const rows = layer["row"] as Array<{ key?: Array<{ sp?: number; nextlayer?: string | null }> }> | undefined;
-      if (rows == null) continue;
-      for (const row of rows) {
-        if (row.key == null) continue;
-        for (const key of row.key) {
-          const sp = key.sp;
-          // sp codes that must NOT get nextlayer defaulted:
-          // 1=special, 2=specialActive, 3=customSpecial, 4=customSpecialActive (frame/modifier keys),
-          // 8=deadkey, 9=blank, 10=spacer. Only sp=0/absent (normal char key) should default.
-          if (![1, 2, 3, 4, 8, 9, 10].includes(sp ?? -1) && key.nextlayer == null) {
-            key.nextlayer = "default";
-          }
-        }
-      }
-    }
-  }
-
-  vfs.set(path, JSON.stringify(data, null, TOUCH_LAYOUT_JSON_INDENT));
+  mutateCleanTouchLayout(ir);
+  vfs.set(path, emitTouchLayout(ir));
 }
 
 // The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
@@ -513,6 +490,12 @@ export function generateStubs(
    * on why both emission paths share one implementation.
    */
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
+  /**
+   * The base's packaged fonts and carried stylesheet references, declared by
+   * the generated `.kps`.
+   */
+  packageFonts?: import("@keyboard-studio/contracts").PackageFontSet,
+  stylesheets: readonly string[] = [],
 ): void {
   const now = new Date();
   const yyyy = emitYear;
@@ -649,7 +632,11 @@ export function generateStubs(
         ? { authorEmail: attribution.authorEmail }
         : {}),
     };
-    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version), false);
+    vfs.set(
+      kpsPath,
+      buildKpsContent(keyboardId, identity, kmnText, version, [], packageFonts, stylesheets),
+      false,
+    );
   }
 }
 
@@ -685,6 +672,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const vfs = createVirtualFS();
       const warnings: string[] = [];
       let startLicenseText: string | undefined;
+      let startHelpPhpTextForExtraction: string | undefined;
       let startWelcomeImages: WelcomeFolderImage[] | undefined;
       let startWelcomeConvention: WelcomeConvention | undefined;
       const attribution = scaffoldOpts?.attribution;
@@ -713,6 +701,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       };
 
       let loaderFonts: import("@keyboard-studio/contracts").KpsFontEntry[] = [];
+      let packageFonts: import("@keyboard-studio/contracts").PackageFontSet | undefined;
       let loaderStylesheets: import("@keyboard-studio/contracts").KpsStylesheetEntry[] = [];
       try {
         const loaderOpts = {
@@ -721,6 +710,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         };
         const loaderResult = await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
         loaderFonts = loaderResult.fonts;
+        packageFonts = loaderResult.packageFonts;
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
         startLicenseText = loaderResult.startLicenseText;
@@ -728,6 +718,12 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         // nothing of its prose — startWelcomeHtmText/startHelpPhpText are
         // deliberately not surfaced from here, FR-007).
         startWelcomeImages = loaderResult.startWelcomeImages;
+        // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): the
+        // base's help text IS surfaced, but only as extraction input for
+        // troubleshooting suggestions — a separate result field with its
+        // own name, never the prose fields above, so no render path can
+        // pick it up by accident.
+        startHelpPhpTextForExtraction = loaderResult.startHelpPhpText;
         startWelcomeConvention = loaderResult.startWelcomeConvention;
       } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
@@ -772,6 +768,12 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       renameFilesInVfs(vfs, actualStartId, keyboardId);
       applyTouchLayoutCleanup(vfs, keyboardId);
+      const kpsStylesheets = loaderStylesheets
+        .filter((sheet) => !/^source\/(welcome|help)\//i.test(sheet.vfsPath))
+        .map((sheet) => {
+          const ref = kpsMemberRef(sheet.cssRelPath, base.path);
+          return ref === `${actualStartId}.css` ? `${keyboardId}.css` : ref;
+        });
       generateStubs(
         vfs,
         keyboardId,
@@ -781,6 +783,8 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         attribution,
         emitYear,
         inheritedHolders,
+        packageFonts,
+        kpsStylesheets,
       );
 
       // The base's icon came across with the rest of source/ (loader) and was
@@ -797,6 +801,9 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         vfs,
         warnings,
         fonts: loaderFonts,
+        // Handed back so the working copy keeps it — the output
+        // projection re-declares these fonts if a descriptor lacks them.
+        ...(packageFonts !== undefined ? { packageFonts } : {}),
         stylesheets: loaderStylesheets,
         attributionMissing,
         inheritedHolderCount: inheritedHolders.length,
@@ -811,6 +818,11 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
           ? { startWelcomeImages }
           : {}),
         ...(startWelcomeConvention !== undefined ? { startWelcomeConvention } : {}),
+        // Issue #2206: extraction-only (see the loader-result assignment
+        // above and the contracts doc) — never rendered, never spliced.
+        ...(startHelpPhpTextForExtraction !== undefined
+          ? { baseHelpPhpTextForExtraction: startHelpPhpTextForExtraction }
+          : {}),
       };
     },
 

@@ -3,7 +3,7 @@
 import type { VirtualFS } from "./virtualFS";
 import type { StartKeyboard } from "./startKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
-import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
+import type { KpsFontEntry, KpsStylesheetEntry, PackageFontSet } from "./fontEntry";
 import type { Attribution } from "./attribution";
 import type { WelcomeConvention, WelcomeFolderImage } from "./doc-members";
 
@@ -97,6 +97,12 @@ export interface ScaffoldResult {
   warnings: string[];
   /** OSK font entries forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   fonts: KpsFontEntry[];
+  /**
+   * The base's packaged fonts forwarded from fetchKeyboardSourceToVfs:
+   * already declared in the scaffolded `.kps`, and kept by the working
+   * copy so the output projection can re-declare any a descriptor lacks.
+   */
+  packageFonts?: PackageFontSet;
   /** Per-keyboard CSS forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   stylesheets: KpsStylesheetEntry[];
   /**
@@ -157,6 +163,20 @@ export interface ScaffoldResult {
   startWelcomeImages?: WelcomeFolderImage[];
   /** Which welcome-page convention the base used (data-model §6). */
   startWelcomeConvention?: WelcomeConvention;
+  /**
+   * The base keyboard's own `source/help/<id>.php`, verbatim, surfaced
+   * for EXTRACTION ONLY (issue #2206): Matthew's 2026-10-17 ruling on
+   * #2206 grants a narrow carve-out to FR-007 / spec 102 FR-032 under
+   * which symptom/fix lines from the base help's Troubleshooting
+   * section may be OFFERED as editable suggestions for the new
+   * keyboard's troubleshooting question. This text is not prose
+   * inheritance — unlike {@link startLicenseText} it must never reach
+   * a rendered page or the serialized working copy's prose slices; the
+   * studio keeps it in a dedicated extraction-only slice that only the
+   * suggestion extractor reads. Undefined when the base has no help
+   * page (the common case).
+   */
+  baseHelpPhpTextForExtraction?: string;
 }
 
 /**

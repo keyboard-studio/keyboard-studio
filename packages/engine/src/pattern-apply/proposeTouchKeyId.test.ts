@@ -69,6 +69,12 @@ interface ClassRow {
 const CLASS_TABLE: readonly ClassRow[] = [
   { row: 1, name: "plain character", chars: "ø", expect: "proposal", path: "unicode-default" },
   {
+    // #2374 replaces spec 104 FR-013's keyboard-wide guard specification
+    // with the mark's per-mark "start of line" box: the default request
+    // carries no box value (a late-added mark with no survey row takes the
+    // unticked default), so the mark mints guarded T_ (arm d′), not U_.
+    // With a ticked box the row is "unicode-default" again — pinned in
+    // the #2374 describe block below.
     row: 2,
     name: "combining mark",
     chars: "́",
@@ -279,5 +285,73 @@ describe("proposeTouchKeyId — order of attempt (contract §1.1)", () => {
       "expectedOutputs",
       "ruleIndex",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 104 T010 — the inherit gate credits intrinsic U_ production (FR-010),
+// and the guard specification threads to the minter (FR-013).
+// ---------------------------------------------------------------------------
+
+describe("proposeTouchKeyId — spec 104 (FR-010 / FR-013)", () => {
+  it("inherits an UNRULED U_ id whose decode covers the expected outputs — no re-mint", () => {
+    // The rule index is empty: the join alone credits this key with
+    // nothing. The resolver's u-decode source is what covers "é".
+    const proposal = proposeTouchKeyId({
+      chars: "é",
+      inheritedId: "U_00E9",
+      ruleIndex: EMPTY_INDEX,
+      expectedOutputs: ["é"],
+      capsHandled: false,
+    });
+    expect(proposal.path).toBe("inherited");
+    expect(proposal.id).toBe("U_00E9");
+    expect(proposal.because).toEqual({ kind: "inherited-from-physical-key", keyId: "U_00E9" });
+  });
+
+  it("credits a RULED U_ key's decode fall-through alongside its rule outputs", () => {
+    // The rule produces "A" for the keystrokes it matches; the keystrokes
+    // it does not match fall through to the decode ("a").
+    const proposal = proposeTouchKeyId({
+      chars: "a",
+      inheritedId: "U_0061",
+      ruleIndex: ruleIndex({ U_0061: ["A"] }),
+      expectedOutputs: ["A", "a"],
+      capsHandled: false,
+    });
+    expect(proposal.path).toBe("inherited");
+    expect(proposal.id).toBe("U_0061");
+  });
+
+  it("does NOT inherit a U_ id whose decode does not cover the expected outputs", () => {
+    const proposal = proposeTouchKeyId({
+      chars: "a",
+      inheritedId: "U_0062",
+      ruleIndex: EMPTY_INDEX,
+      expectedOutputs: ["a"],
+      capsHandled: false,
+    });
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.because).toEqual({ kind: "minted" });
+  });
+
+  it("threads the per-mark box to the minter: unticked mints a guarded T_ mark (#2374)", () => {
+    const proposal = proposeTouchKeyId(req("̀", { bareMarkAllowed: false }));
+    expect(proposal.path).toBe("combining-mark-guard");
+    expect(proposal.id).toBe("T_0300");
+    expect(proposal.guardRequired).toBe(true);
+  });
+
+  it("threads the per-mark box to the minter: ticked mints a plain U_ mark (#2374)", () => {
+    const proposal = proposeTouchKeyId(req("̀", { bareMarkAllowed: true }));
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.id).toBe("U_0300");
+    expect(proposal.guardRequired).toBe(false);
+  });
+
+  it("threads &VERSION to the minter: a string at 15.0 mints a multi-segment U_", () => {
+    const proposal = proposeTouchKeyId(req("ch", { keyboardVersion: "15.0" }));
+    expect(proposal.id).toBe("U_0063_0068");
+    expect(proposal.ruleRequired).toBe(false);
   });
 });

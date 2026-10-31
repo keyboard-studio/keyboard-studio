@@ -22,6 +22,7 @@ import { currentPhysicalLayoutValue } from "../../survey/assignLoop/physicalLayo
 import { applyPhysicalCompletionEffects } from "../../lib/assignLoopCompletion.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
+import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
 
 /**
  * EditorStep adapter for the Mechanism Gallery (Phase C — desktop key
@@ -34,10 +35,6 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   // FR-007: placement priors loaded here (moved from SurveyView.corpusPlacementMap).
   const placementMap = usePlacementPriors();
-  // Spec 046: the marks-series exit state (session.marksWorklist) rides in as
-  // the optional typed worklist prop — absent (series not run / pre-046
-  // session) keeps the flat-inventory behavior.
-  const marksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
 
   function handleComplete() {
     useDecisionStore.getState().record({
@@ -49,13 +46,19 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     onComplete(undefined);
   }
 
+  // Interim host for the keyboard-wide fallback policy (the Behaviours step
+  // that will own it has not landed): a collapsed section below the gallery.
   return (
-    <MechanismGallery
-      selectedStartKeyboard={startKeyboard}
-      onComplete={handleComplete}
-      {...(placementMap ? { placementMap } : {})}
-      {...(marksWorklist !== undefined ? { worklist: marksWorklist } : {})}
-      {...(onBack ? { onBack } : {})}
-    />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <MechanismGallery
+          selectedStartKeyboard={startKeyboard}
+          onComplete={handleComplete}
+          {...(placementMap ? { placementMap } : {})}
+          {...(onBack ? { onBack } : {})}
+        />
+      </div>
+      <FallbackPolicySection />
+    </div>
   );
 }

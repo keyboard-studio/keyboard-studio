@@ -197,6 +197,7 @@ export async function lintWithContext(
         ctx.touchInventory,
         tlPath,
         joined?.ruleIndex,
+        joined?.ir,
       ),
     );
   }

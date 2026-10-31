@@ -4,7 +4,7 @@
 // prior-decision view with a change control (FR-009).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { MarksContextToleranceDecision, RuleToleranceFinding } from "@keyboard-studio/contracts";
 
 import { render } from "../../test/renderWithI18n.tsx";
@@ -70,6 +70,47 @@ describe("ContextToleranceStation — proposal", () => {
     expect(rows.textContent).toMatch(/take priority over the rule on line 20/);
     expect(rows.textContent).toMatch(/Backspace does here cannot be demonstrated/);
     expect(rows.textContent).toMatch(/dot below is typed before the tone/);
+  });
+
+  it("renders the gap findings' worked cases: both forms, characters named", async () => {
+    const names = new Map<number, string>([
+      [0x006f, "LATIN SMALL LETTER O"],
+      [0x0323, "COMBINING DOT BELOW"],
+      [0x1ecd, "LATIN SMALL LETTER O WITH DOT BELOW"],
+    ]);
+    const gapFindings: RuleToleranceFinding[] = [
+      {
+        ruleId: "r10",
+        location: { file: "k.kmn", line: 10 },
+        status: "not-analysed",
+        failingKeystrokes: [{ vkey: "K_LBRKT", modifiers: [] }],
+        precedingText: "ọ",
+        precomposedOutput: "ọ́",
+        decomposedOutput: "ọ́",
+      },
+    ];
+    render(
+      <ContextToleranceStation
+        proposal={proposal()}
+        disclosures={DISCLOSURES}
+        ruleLines={LINES}
+        fingerprint={FINGERPRINT}
+        gapFindings={gapFindings}
+        loadNames={() => Promise.resolve(names)}
+        onDecide={vi.fn()}
+      />,
+    );
+    const cases = screen.getByTestId("context-tolerance-gap-cases");
+    expect(cases.textContent).toMatch(/Rule on line 10: pressing the \[ key/);
+    expect(cases.textContent).toMatch(/After this text, with the diacritic joined to the letter/);
+    expect(cases.textContent).toMatch(/After the same text stored as separate characters/);
+    await waitFor(() => expect(cases.textContent).toContain("U+1ECD LATIN SMALL LETTER O WITH DOT BELOW"));
+    expect(cases.textContent).toContain("U+0323 COMBINING DOT BELOW");
+  });
+
+  it("renders no gap cases when no gap findings are passed", () => {
+    renderStation();
+    expect(screen.queryByTestId("context-tolerance-gap-cases")).toBeNull();
   });
 
   it("confirming with every site ticked is accept, in one interaction (SC-002)", () => {

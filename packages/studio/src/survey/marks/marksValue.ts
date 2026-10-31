@@ -25,7 +25,12 @@
 // runs), re-keyed here from the phase result (spec 078's
 // session.marksContextTolerance derivation stays for session consumers).
 
-import type { MarksContextToleranceDecision, PlacementWorklist } from "@keyboard-studio/contracts";
+import type {
+  AttestedStack,
+  BackspaceBehaviour,
+  MarksContextToleranceDecision,
+  PlacementWorklist,
+} from "@keyboard-studio/contracts";
 import type { OutputForm } from "@keyboard-studio/engine";
 
 import { getDecisionSnapshot } from "../../stores/decisionStore.ts";
@@ -37,6 +42,21 @@ import type { GalleryModule } from "../types.ts";
 export interface MarksCompletion {
   worklist: PlacementWorklist;
   outputForm: OutputForm;
+  /**
+   * The recorded backspace answer (#2302) the apply gates the backspace
+   * generation on, alongside `outputForm`. Optional: completions recorded
+   * before the answer existed carry none, and apply then uses the
+   * historical default (`"peel"` — the pre-#2302 always-unwrap behaviour
+   * under ready-made).
+   */
+  backspace?: BackspaceBehaviour;
+  /**
+   * The confirmed alphabet's attested stacks (#2302): the whole-stack
+   * generator's source table, carried in the payload because apply reads
+   * the payload, not the session. Optional for the same pre-#2302 reason;
+   * absent means no whole-stack rules can be derived.
+   */
+  stacks?: readonly AttestedStack[];
   /** R10: base-plus-mark chosen over a precomposed-form base (reducer parity). */
   migrationNeeded: boolean;
 }
@@ -51,6 +71,31 @@ export interface MarksTreatmentValue {
   answers: Readonly<Record<string, string | string[] | boolean | undefined>>;
   completion: MarksCompletion | null;
   contextTolerance: MarksContextToleranceDecision | null;
+}
+
+/**
+ * The retired spec 104 FR-013 guard record (issue #2374), read-only for
+ * migration. `MarksTreatmentValue` no longer carries the field; recorded
+ * values from before the removal still have it at runtime (decision values
+ * ride the store opaquely — draft restore never schema-strips them), so
+ * read it defensively. Never written after #2374.
+ */
+export interface LegacyGuardSpecification {
+  readonly behaviour: "swallow" | "emit";
+  readonly confirmed: boolean;
+}
+
+/** The legacy guard record on a recorded value, or undefined. */
+export function legacyGuardSpecification(
+  value: MarksTreatmentValue,
+): LegacyGuardSpecification | undefined {
+  const raw = (value as { guardSpecification?: unknown }).guardSpecification;
+  if (raw === null || typeof raw !== "object") return undefined;
+  const { behaviour, confirmed } = raw as { behaviour?: unknown; confirmed?: unknown };
+  if ((behaviour === "swallow" || behaviour === "emit") && typeof confirmed === "boolean") {
+    return { behaviour, confirmed };
+  }
+  return undefined;
 }
 
 /** The value before anything is recorded. */
@@ -69,7 +114,7 @@ const MARKS_MODULE = {
   definition: { id: "marksTreatment" },
   provides: ["marks-treatment"],
   requires: ["character-inventory"],
-  writes: [["groups"], ["stores"]],
+  writes: [],
   apply: () => ({}),
 } as unknown as GalleryModule<MarksTreatmentValue>;
 

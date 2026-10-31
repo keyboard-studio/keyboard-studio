@@ -192,6 +192,10 @@ function storeItemKey(item: StoreItem): string {
     case "char":    return `char:${item.value}`;
     case "vkey":    return `vkey:${item.name}`;
     case "deadkey": return `dk:${item.id}`;
+    // Verbatim name — fidelity keying must NOT case-fold (identity folds,
+    // fidelity doesn't): dk(Semicolon) vs dk(semicolon) is a difference
+    // this oracle exists to catch (#2238 ruling D2).
+    case "namedDeadkey": return `dkn:${item.name}`;
     case "any":     return "any";
     case "raw":     return `raw:${item.text}`;
     default: {
@@ -270,11 +274,13 @@ function contextElementKey(el: ContextElement): string {
     case "char":       return `char:${el.value}`;
     case "vkey":       return `vkey:${el.name}|${normModifiers(el.modifiers)}`;
     case "deadkey":    return `dk:${el.id}`;
+    case "namedDeadkey": return `dkn:${el.name}`;
     case "any":        return `any:${el.storeRef}`;
     case "notany":     return `notany:${el.storeRef}`;
     case "context":    return `ctx:${el.offset}`;
     case "index":      return `index:${el.storeRef}:${el.offset}`;
     case "baselayout": return `baselayout:${el.value}`;
+    case "if":         return `if:${el.store}=${el.value}`;
     case "raw":        return `raw:${el.text}`;
     default: {
       const _: never = el;
@@ -287,6 +293,7 @@ function outputElementKey(el: OutputElement): string {
   switch (el.kind) {
     case "char":    return `char:${el.value}`;
     case "deadkey": return `dk:${el.id}`;
+    case "namedDeadkey": return `dkn:${el.name}`;
     case "beep":    return "beep";
     case "nul":     return "nul";
     case "context": return `ctx:${el.offset}`;

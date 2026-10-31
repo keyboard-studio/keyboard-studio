@@ -128,12 +128,12 @@ describe("serializeWorkingCopy — happy path", () => {
     expect(result!.keyboardId).toBe(basicKbdus.id);
   });
 
-  it("version is read from baseIr.header.version (the release version, not &VERSION)", async () => {
+  it("a Copy ships at 1.0 whatever the start keyboard's release version (spec 102 FR-004)", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     const { ir } = seedStore();
     ir.header.version = "2.3";
     const result = await serializeWorkingCopy();
-    expect(result!.version).toBe("2.3");
+    expect(result!.version).toBe("1.0");
   });
 
   it("version falls back to \"1.0\" when baseIr.header.version is empty", async () => {
@@ -146,11 +146,13 @@ describe("serializeWorkingCopy — happy path", () => {
 
   it("version sanitises filesystem-unsafe chars (spaces, parens) to underscores", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
-    const { ir } = seedStore();
+    // A Copy always ships at 1.0, so the sanitiser is exercised on the adapt
+    // track, where the start version flows through bumpKeyboardVersion.
+    const { ir } = seedAdaptStore("1.0");
     ir.header.version = "1.0 (beta)";
     const result = await serializeWorkingCopy();
-    // "1.0 (beta)" → trim → "1.0 (beta)" → replace /[^\w.\-]/g → "1.0__beta_"
-    expect(result!.version).toBe("1.0__beta_");
+    expect(result!.version).toMatch(/^[\w.\-]+$/);
+    expect(result!.version).toContain("_beta_");
   });
 
   it("calls projectWorkingCopyVfs with baseIr, deletedNodeIds, identity from store", async () => {
@@ -314,7 +316,11 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     // Both paths pass the same keyboardId, startIr, identity, and deletedNodeIds.
     expect(outputCall["keyboardId"]).toBe(previewCall["keyboardId"]);
     expect(outputCall["startIr"]).toBe(previewCall["startIr"]);
-    expect(outputCall["identity"]).toEqual(previewCall["identity"]);
+    // The release version is an output-only overlay (spec 102 FR-009: the
+    // shipped version, 1.0 on a Copy); every other identity field is shared.
+    const { version: outputVersion, ...outputIdentity } = outputCall["identity"] as Record<string, unknown>;
+    expect(outputVersion).toBe("1.0");
+    expect(outputIdentity).toEqual(previewCall["identity"]);
     const outDeleted = outputCall["deletedNodeIds"] as Set<string>;
     const preDeleted = previewCall["deletedNodeIds"] as Set<string>;
     expect([...outDeleted].sort()).toEqual([...preDeleted].sort());
@@ -488,13 +494,12 @@ describe("serializeWorkingCopy — adapt-existing path (Track 2)", () => {
     expect(result!.version).toBe("1.1");
   });
 
-  it("copy path (new-from-base) leaves version unchanged", async () => {
+  it("copy path (new-from-base) ships at 1.0, never a bump of the start version", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     const { ir } = seedStore();
     ir.header.version = "1.0";
     const result = await serializeWorkingCopy();
     expect(result).not.toBeNull();
-    // Track 1 — version stays at the original "1.0", not bumped.
     expect(result!.version).toBe("1.0");
   });
 
@@ -597,6 +602,133 @@ describe("serializeWorkingCopy — adapt-existing path (Track 2)", () => {
     expect(result).not.toBeNull();
     const hasKpsWarn = result!.warnings.some((w) => w.includes("could not update .kps"));
     expect(hasKpsWarn).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #1908: accepted doc-fix proposals reach the shipped output
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — doc-fix proposals (issue #1908)", () => {
+  const CAMEROON_HELP =
+    "<?php\n  $pagename = 'Cameroon QWERTY (SIL) Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Copyright SIL Cameroon</p></body></html>";
+  const CAMEROON_WELCOME = "<html><body><p>Copyright 2018-2022 SIL Cameroon</p></body></html>";
+  const KB_CSS = ".full {\n  width: 98%;\n}\n";
+
+  function seedCameroonAdapt(proposals: Parameters<
+    ReturnType<typeof useWorkingCopyStore.getState>["setDocFixProposals"]
+  >[0]) {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+      { path: "source/help/kb.css", content: KB_CSS, isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    const wc = useWorkingCopyStore.getState();
+    wc.setStartWelcomeHtmText(CAMEROON_WELCOME);
+    wc.setStartHelpPhpText(CAMEROON_HELP);
+    wc.setDocFixProposals(proposals);
+  }
+
+  it("accepted proposals ship: rewritten $pagename, synced body, kb.css width rule", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdapt({ pagename: "accepted", bodySync: "welcome", imageWidth: "accepted" });
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const help = vfs.get("source/help/basic_kbdus.php")?.content as string;
+    expect(help).toContain("$pagename = 'US English (Basic) Keyboard Help';");
+    expect(help).not.toContain("(SIL)");
+    expect(help).toContain("<p>Copyright 2018-2022 SIL Cameroon</p>");
+
+    const kbCss = vfs.get("source/help/kb.css")?.content as string;
+    expect(kbCss).toContain("img { max-width: 100%; }");
+    expect(kbCss).toContain(".full {");
+  });
+
+  it("declined proposals ship the inherited bytes untouched", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdapt({ pagename: "declined", bodySync: "declined", imageWidth: "declined" });
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const help = vfs.get("source/help/basic_kbdus.php")?.content as string;
+    expect(help).toContain("Cameroon QWERTY (SIL) Keyboard Help");
+    expect(help).toContain("<p>Copyright SIL Cameroon</p>");
+
+    const kbCss = vfs.get("source/help/kb.css")?.content as string;
+    expect(kbCss).toBe(KB_CSS);
+  });
+
+  // The loader's real adapt path: kb.css is fetch-don't-write and rides
+  // the startDocCssTexts slice; it is never in the start VFS.
+  function seedCameroonAdaptSliceOnly(
+    proposals: Parameters<ReturnType<typeof useWorkingCopyStore.getState>["setDocFixProposals"]>[0],
+    entries: Array<{ path: string; text: string }>,
+  ) {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    const wc = useWorkingCopyStore.getState();
+    wc.setStartWelcomeHtmText(CAMEROON_WELCOME);
+    wc.setStartHelpPhpText(CAMEROON_HELP);
+    wc.setStartDocCssTexts(entries);
+    wc.setDocFixProposals(proposals);
+  }
+
+  it("accepted image-width writes each slice kb.css into the output at its own path, with the rule appended", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdaptSliceOnly({ imageWidth: "accepted" }, [
+      { path: "source/welcome/kb.css", text: ".wide {\n  width: 90%;\n}\n" },
+      { path: "source/help/kb.css", text: KB_CSS },
+    ]);
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const helpCss = vfs.get("source/help/kb.css")?.content as string;
+    expect(helpCss).toContain(".full {");
+    expect(helpCss).toContain("img { max-width: 100%; }");
+    const welcomeCss = vfs.get("source/welcome/kb.css")?.content as string;
+    expect(welcomeCss).toContain(".wide {");
+    expect(welcomeCss).toContain("img { max-width: 100%; }");
+
+    // The start VFS itself is never mutated (fetch-don't-write end to end).
+    const startVfs = useWorkingCopyStore.getState().startVfs;
+    expect(startVfs?.get("source/help/kb.css")).toBeUndefined();
+    expect(startVfs?.get("source/welcome/kb.css")).toBeUndefined();
+  });
+
+  it("accepted image-width leaves a slice kb.css that already carries the rule byte-identical", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    const ALREADY = ".full {\n  width: 98%;\n}\nimg { max-width: 100%; }\n";
+    seedCameroonAdaptSliceOnly({ imageWidth: "accepted" }, [
+      { path: "source/help/kb.css", text: ALREADY },
+    ]);
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    expect(projected!.vfs.get("source/help/kb.css")?.content as string).toBe(ALREADY);
+  });
+
+  it("declined or unanswered image-width writes no slice kb.css into the output", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdaptSliceOnly({ imageWidth: "declined" }, [
+      { path: "source/help/kb.css", text: KB_CSS },
+    ]);
+    const declined = await projectWorkingCopyForOutput();
+    expect(declined).not.toBeNull();
+    expect(declined!.vfs.get("source/help/kb.css")).toBeUndefined();
+
+    seedCameroonAdaptSliceOnly(null, [{ path: "source/help/kb.css", text: KB_CSS }]);
+    const unanswered = await projectWorkingCopyForOutput();
+    expect(unanswered).not.toBeNull();
+    expect(unanswered!.vfs.get("source/help/kb.css")).toBeUndefined();
   });
 });
 
@@ -710,7 +842,9 @@ describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 0
     wc.setHistoryEntryState({ status: "confirmed", proposal: { ...PROPOSAL, version: "1.0" }, editedBullets: null });
     const projected = await projectWorkingCopyForOutput();
     const history = projected!.vfs.get("HISTORY.md")!.content as string;
-    expect(history).toBe("## 1.0 (2026-09-12)\n* Added 2 characters: a, b\n");
+    expect(history).toBe(
+      "## 1.0 (2026-09-12)\n* Created from basic_kbdus v1.0 via keyboard-studio.\n* Added 2 characters: a, b\n",
+    );
   });
 
   it("copy track, dismissed: the plain stub ships", async () => {
@@ -719,7 +853,9 @@ describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 0
     useWorkingCopyStore.getState().setHistoryEntryState({ status: "dismissed", proposal: PROPOSAL, editedBullets: null });
     const projected = await projectWorkingCopyForOutput();
     const history = projected!.vfs.get("HISTORY.md")!.content as string;
-    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+    expect(history).toMatch(
+      /^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Created from basic_kbdus v1\.0 via keyboard-studio\.\n\* Initial release\.\n$/,
+    );
   });
 });
 
@@ -785,5 +921,102 @@ describe("serializeWorkingCopy — layout charts (spec 079 FR-013..FR-015)", () 
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
     const projected = await projectWorkingCopyForOutput();
     expect(chartNames(projected!.vfs).some((p) => /ks-layout-(phone|tablet)-/.test(p))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 102 US1 (T013): one package, one version. A Copy ships at 1.0 in every
+// version site (&KEYBOARDVERSION, the .kps <Version>, the result `version`
+// that names the download, and the newest HISTORY heading); an Adapt is
+// unchanged. These run the REAL projection, so the sites are compared as
+// shipped rather than as handed to a mock.
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — package version consistency (spec 102 FR-009, FR-011)", () => {
+  const START_KMN = [
+    "store(&VERSION) '10.0'",
+    "store(&NAME) 'Basic US'",
+    "store(&KEYBOARDVERSION) '2.3'",
+    "begin Unicode > use(main)",
+    "",
+    "group(main) using keys",
+    "",
+    "+ [K_A] > 'a'",
+    "",
+  ].join("\n");
+
+  async function useRealProjection(): Promise<void> {
+    const actual = await vi.importActual<typeof import("./projectWorkingCopyVfs.ts")>("./projectWorkingCopyVfs.ts");
+    projectWorkingCopyVfsSpy.mockImplementationOnce(
+      actual.projectWorkingCopyVfs as unknown as Parameters<typeof projectWorkingCopyVfsSpy.mockImplementationOnce>[0],
+    );
+  }
+
+  async function seed(mode: "copy" | "adapt"): Promise<void> {
+    const { parseKmn } = await import("@keyboard-studio/engine");
+    const vfs = createVirtualFS([{ path: "source/basic_kbdus.kmn", content: START_KMN, isBinary: false }]);
+    const ir = parseKmn(START_KMN, "basic_kbdus").ir;
+    expect(ir.header.version).toBe("2.3");
+    if (mode === "copy") useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    else useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+  }
+
+  function versionSites(vfs: ReturnType<typeof createVirtualFS>, id: string) {
+    const kmn = (vfs.get(`source/${id}.kmn`)?.content as string | undefined) ?? "";
+    const kps = (vfs.get(`source/${id}.kps`)?.content as string | undefined) ?? "";
+    const history = (vfs.get("HISTORY.md")?.content as string | undefined) ?? "";
+    return {
+      kmn: /store\(&KEYBOARDVERSION\)\s*'([^']*)'/i.exec(kmn)?.[1],
+      kps: /<Keyboards>[\s\S]*?<Keyboard>[\s\S]*?<Version>([^<]*)<\/Version>/.exec(kps)?.[1],
+      fileFormat: /<FileVersion>([^<]*)<\/FileVersion>/.exec(kps)?.[1],
+      historyHeading: /^## (\S+) \(/.exec(history)?.[1],
+      history,
+    };
+  }
+
+  it.each([
+    ["an unrenamed id", null],
+    ["a renamed id", "ha_sil"],
+  ] as const)("a Copy from a 2.3 start keyboard is 1.0 in every version site, with %s", async (_label, newId) => {
+    const { projectWorkingCopyForOutput, serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    await seed("copy");
+    if (newId !== null) useWorkingCopyStore.getState().setIdentity({ keyboardId: newId });
+    const id = newId ?? basicKbdus.id;
+
+    await useRealProjection();
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const sites = versionSites(projected!.vfs, id);
+    expect(sites.kmn).toBe("1.0");
+    expect(sites.kps).toBe("1.0");
+    expect(sites.historyHeading).toBe("1.0");
+    // The .kps file-format version is not the release version and is left alone.
+    expect(sites.fileFormat).toBe("7.0");
+    // FR-011: the copy records where it came from, at the start keyboard's own version.
+    expect(sites.history).toContain("* Created from basic_kbdus v2.3 via keyboard-studio.\n");
+
+    await useRealProjection();
+    const result = await serializeWorkingCopy();
+    expect(result!.version).toBe("1.0");
+    expect(result!.keyboardId).toBe(id);
+  });
+
+  it("an Adapt of a 2.3 keyboard is unchanged: 2.4 everywhere, with the Adapted-from lineage", async () => {
+    const { projectWorkingCopyForOutput, serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    await seed("adapt");
+
+    await useRealProjection();
+    const projected = await projectWorkingCopyForOutput();
+    const sites = versionSites(projected!.vfs, basicKbdus.id);
+    expect(sites.kmn).toBe("2.4");
+    expect(sites.kps).toBe("2.4");
+    expect(sites.historyHeading).toBe("2.4");
+    expect(sites.fileFormat).toBe("7.0");
+    expect(sites.history).toContain("* Adapted from basic_kbdus v2.3 via keyboard-studio.\n");
+    expect(sites.history).not.toContain("Created from");
+
+    await useRealProjection();
+    const result = await serializeWorkingCopy();
+    expect(result!.version).toBe("2.4");
   });
 });

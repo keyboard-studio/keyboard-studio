@@ -170,6 +170,7 @@ import {
   decodeUnicodeKeyId,
   isSpacerKeyClass,
   producedByKeyId,
+  type KeyboardIR,
   type TouchKeyIR,
   type TouchKeyRuleIndex,
   type TouchLayoutIR,
@@ -346,6 +347,7 @@ export function findCharactersLostForGood(
   op: PendingKeyEditOperation,
   ruleIndex: TouchKeyRuleIndex | undefined,
   assignedChars: ReadonlySet<string>,
+  ir?: KeyboardIR,
 ): readonly string[] {
   const invalidated = findInvalidatedAssignedCharacters(layout, op, ruleIndex, assignedChars);
   if (invalidated.length === 0) return invalidated;
@@ -363,7 +365,7 @@ export function findCharactersLostForGood(
   const { uncovered } = touchCoverage(
     afterLayout,
     invalidated,
-    ruleIndex !== undefined ? { ruleIndex } : {},
+    ruleIndex !== undefined ? { ruleIndex, ...(ir !== undefined ? { ir } : {}) } : {},
   );
   const uncoveredSet = new Set(uncovered.map((ch) => ch.normalize("NFC")));
   return invalidated.filter((ch) => uncoveredSet.has(ch));
@@ -455,6 +457,13 @@ export interface UseKeyEditGuardsOptions {
   /** From `buildTouchKeyRuleIndex(ir)`, built once by the caller. Optional — omitting it under-reports a rule-bound production, never over-reports. */
   readonly ruleIndex?: TouchKeyRuleIndex;
   /**
+   * The IR `ruleIndex` was built from. Spec 104 (T025): the coverage pass
+   * inside `findCharactersLostForGood` takes production from the contracts
+   * resolver, which requires the IR beside the index; an index passed
+   * without its IR keeps the legacy crediting (defined, never a crash).
+   */
+  readonly ir?: KeyboardIR;
+  /**
    * T119 (US5 AS3): the confirmed inventory (`session.confirmedInventory`, as
    * the gallery collates it) — the SAME list the FR-008 completion gate audits
    * coverage against. Watched in addition to the by-character assignments, and
@@ -513,8 +522,20 @@ export interface UseKeyEditGuardsResult {
    *
    * Call it FIRST: there is no point warning about a lost character for an edit
    * that is about to be refused.
+   *
+   * `ruleIndexOverride` judges the op against a rule index other than the
+   * current IR's. A commit that carries its own rule synthesis in the SAME
+   * commit (AssignPanel's guard station: the op mints a `T_` id and
+   * `result.nextIr` carries that id's rules — spec 104 FR-013) must be judged
+   * against the POST-commit index: the op and its rules land atomically, so
+   * judging the bare op against the pre-commit index evaluates a state that
+   * never exists and hard-refuses every guarded mint as a dead key
+   * (`would-create-dead-key`). Callers without a bundled IR omit it.
    */
-  readonly checkRejections: (op: PendingKeyEditOperation) => readonly KeyEditRejectionNotice[];
+  readonly checkRejections: (
+    op: PendingKeyEditOperation,
+    ruleIndexOverride?: TouchKeyRuleIndex,
+  ) => readonly KeyEditRejectionNotice[];
 }
 
 const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
@@ -528,6 +549,7 @@ const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
 export function useKeyEditGuards({
   layout,
   ruleIndex,
+  ir,
   inventoryChars,
   i18n,
 }: UseKeyEditGuardsOptions): UseKeyEditGuardsResult {
@@ -574,7 +596,7 @@ export function useKeyEditGuards({
       // Only classify (the extra applyKeyEditsToLayout + touchCoverage pass)
       // when there is something to classify — see findCharactersLostForGood's
       // own doc comment on this short-circuit.
-      const lostForGood = new Set(findCharactersLostForGood(layout, op, ruleIndex, watchedChars));
+      const lostForGood = new Set(findCharactersLostForGood(layout, op, ruleIndex, watchedChars, ir));
       return invalidated.map((char) => {
         const returnsToWorklist = lostForGood.has(char);
         // T119: only an INVENTORY character can block the FR-008 gate — a
@@ -592,12 +614,15 @@ export function useKeyEditGuards({
         };
       });
     },
-    [layout, ruleIndex, watchedChars, inventoryCharSet, i18n],
+    [layout, ruleIndex, ir, watchedChars, inventoryCharSet, i18n],
   );
 
   const checkRejections = useCallback(
-    (op: PendingKeyEditOperation): readonly KeyEditRejectionNotice[] => {
-      const verdict = checkKeyEditRejections(layout, op, ruleIndex);
+    (
+      op: PendingKeyEditOperation,
+      ruleIndexOverride?: TouchKeyRuleIndex,
+    ): readonly KeyEditRejectionNotice[] => {
+      const verdict = checkKeyEditRejections(layout, op, ruleIndexOverride ?? ruleIndex);
       if (verdict.ok) return [];
       return verdict.rejections.map((rejection) => ({
         reason: rejection.reason,

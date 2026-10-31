@@ -1551,72 +1551,17 @@ function buildTabletRightAltShiftLayer(
 }
 
 /**
- * Build the tablet's numeric/symbol layer: the phone numeric layer's row 1
- * (currency/misc symbols) and row 2 (brackets/math) verbatim, MINUS its digit
- * row (item 5 — digits now live on the tablet default layer's row 1), plus
- * the same "*abc*" return-to-default functional row. Kept under the id
- * "numeric" for continuity with K_SYMBOLS' nextlayer target on the phone path.
- */
-function buildTabletSymbolLayer(
-  minter: NodeIdMinter,
-): TouchLayoutIR["platforms"][number]["layers"][number] {
-  const row1Symbols: Array<[string, number | undefined]> = [
-    ["$", 50], ["@", undefined], ["#", undefined], ["%", undefined],
-    ["&", undefined], ["_", undefined], ["=", undefined],
-    ["|", undefined], ["\\", undefined],
-  ];
-  const row1Keys: TouchKeyIR[] = [
-    ...row1Symbols.map(([ch, pad]) => ({
-      nodeId: minter.mint("touchKey"),
-      id: charToUnicodeKeyId(ch),
-      text: ch,
-      ...(pad !== undefined ? { pad } : {}),
-    })),
-    { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", width: 150, sp: 1 },
-  ];
-
-  const row2Keys: TouchKeyIR[] = [
-    { nodeId: minter.mint("touchKey"), id: "K_LBRKT", text: "[" },
-    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("("), text: "(" },
-    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId(")"), text: ")" },
-    { nodeId: minter.mint("touchKey"), id: "K_RBRKT", text: "]" },
-    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("+"), text: "+" },
-    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("-"), text: "-" },
-    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("*"), text: "*" },
-    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("/"), text: "/" },
-  ];
-
-  const row3Keys: TouchKeyIR[] = [
-    {
-      nodeId: minter.mint("touchKey"),
-      id: "K_LOWER",
-      text: "*abc*",
-      sp: 1,
-      width: 150,
-      nextlayer: "default",
-    },
-    { nodeId: minter.mint("touchKey"), id: "K_LOPT", text: "*Menu*", sp: 1, width: 120 },
-    { nodeId: minter.mint("touchKey"), id: "K_SPACE", text: "", width: 610 },
-    { nodeId: minter.mint("touchKey"), id: "K_ENTER", text: "*Enter*", sp: 1, width: 150 },
-  ];
-
-  return {
-    id: "numeric",
-    rows: [{ keys: row1Keys }, { keys: row2Keys }, { keys: row3Keys }],
-  };
-}
-
-/**
  * Build the tablet default + shift layers (and, when the desktop rules carry
- * RAlt mappings, the rightalt / rightalt-shift secondary layers), plus the tablet
- * numeric/symbol layer — sibling to {@link buildCanonicalPhoneLayers}, used
- * ONLY by the reseed-from-desktop tablet path (spec item 1's `platformStyle`
- * gate). Default layer rows top-to-bottom (spec item 2):
+ * RAlt mappings, the rightalt / rightalt-shift secondary layers) — sibling
+ * to {@link buildCanonicalPhoneLayers}, used ONLY by the reseed-from-desktop
+ * tablet path (spec item 1's `platformStyle` gate). A reseed emits no
+ * numeric/symbol layer: every layer is the five rows of physical keys below
+ * and nothing else. Default layer rows top-to-bottom (spec item 2):
  *
  *   Row 1 (number row): 1 2 3 4 5 6 7 8 9 0 + K_BKSP.
  *   Row 2: Q-P (leading pad on Q) + trailing literal apostrophe.
- *   Row 3: K_SYMBOLS (nextlayer "numeric") + A-L + the specials-access key
- *          (only when the desktop rules carry any RAlt mapping at all).
+ *   Row 3: A-L (leading pad on A) + the specials-access key (only when the
+ *          desktop rules carry any RAlt mapping at all).
  *   Row 4: K_SHIFT + Z-M + "." + "," + K_BKSP (widened to accommodate 11 keys).
  *   Row 5 (functional): K_LOPT + "@" + K_SPACE (wide) + "." + K_ENTER.
  *
@@ -1655,14 +1600,9 @@ function buildTabletLayers(
     ];
 
     const row3Keys: TouchKeyIR[] = [
-      {
-        nodeId: minter.mint("touchKey"),
-        id: "K_SYMBOLS",
-        text: "*Symbol*",
-        sp: 1,
-        nextlayer: "numeric",
-      },
-      ...COMPACT_ROW2_VKEYS.map((vkey) =>
+      buildLetterKey("K_A", layerId, keyMap, deadkeySuccessors, minter, 50,
+        isDefault ? undefined : "default"),
+      ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
         buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter, undefined,
           isDefault ? undefined : "default"),
       ),
@@ -1702,8 +1642,6 @@ function buildTabletLayers(
       ],
     });
   }
-
-  layers.push(buildTabletSymbolLayer(minter));
 
   if (hasRightAlt) layers.push(buildTabletRightAltLayer(keyMap, minter, hasRightAltShift));
   if (hasRightAltShift) layers.push(buildTabletRightAltShiftLayer(keyMap, minter, hasRightAlt));
@@ -1760,17 +1698,100 @@ type CompactLayerSkeletonBuilder = (
  * computed separately from TRUE post-build reachability, not from this
  * function's placement bookkeeping).
  */
+/**
+ * True when a keyMap vkey names a touch-native key (`T_`/`U_`) rather than
+ * a physical key. A ruled vkey in either family carries an identity the
+ * scaffold must reuse verbatim (spec 104 FR-022): the key's production
+ * lives in its rules (T_) or its rule + decode pairing (U_), and re-minting
+ * its character under a fresh U_ longpress — the overflow spill's only
+ * move — severs that linkage and, for guarded T_ marks, silently drops
+ * the guard.
+ */
+function isRuledTouchVkey(vkey: string): boolean {
+  const upper = vkey.toUpperCase();
+  return upper.startsWith("T_") || upper.startsWith("U_");
+}
+
+/**
+ * The ruled touch-native keys (T_/U_ vkeys with at least one char-producing
+ * rule) the scaffold must place as keys in their own right, per layer —
+ * see {@link appendRuledTouchKeys}. Frame-class T_ keys (nextlayer-only,
+ * no char output) never enter the keyMap and are not placed here; they
+ * have no production to preserve.
+ */
+function collectRuledTouchKeys(keyMap: KeyMap): Map<string, Map<LayerId, string>> {
+  const out = new Map<string, Map<LayerId, string>>();
+  for (const [vkey, layerMap] of keyMap) {
+    if (!isRuledTouchVkey(vkey) || layerMap.size === 0) continue;
+    out.set(vkey, layerMap);
+  }
+  return out;
+}
+
+/**
+ * Place the ruled touch-native keys ({@link collectRuledTouchKeys}) on the
+ * built layers — one entry per (vkey, layer) its rules produce on, carrying
+ * the ORIGINAL id so the .kmn's rule linkage (and, for a guarded T_ mark,
+ * its guard) applies to the scaffolded layout unchanged.
+ *
+ * They are attached as longpress (sk[]) entries on that layer's space bar,
+ * never as new rows: a scaffolded layer holds only the skeleton's own rows
+ * of physical keys, so appending rows of touch-only keys below them would
+ * grow the keyboard past its fixed shape. A longpress subkey fires its id's
+ * rules exactly as a main key does, so the linkage survives the move.
+ */
+function placeRuledTouchKeys(
+  layers: TouchLayoutIR["platforms"][number]["layers"],
+  touchKeys: ReadonlyMap<string, Map<LayerId, string>>,
+  minter: NodeIdMinter,
+): void {
+  if (touchKeys.size === 0) return;
+
+  for (const layer of layers) {
+    const layerId = layer.id as LayerId;
+    const subkeys: TouchKeyIR[] = [];
+
+    for (const [vkey, layerMap] of touchKeys) {
+      const ch = layerMap.get(layerId);
+      if (ch === undefined) continue;
+      subkeys.push({
+        nodeId: minter.mint("touchKey"),
+        id: vkey,
+        text: ch,
+        output: ch,
+        provenance: "physical-suggested",
+      });
+    }
+    if (subkeys.length === 0) continue;
+
+    for (const row of layer.rows) {
+      const spaceIdx = row.keys.findIndex((k) => k.id === "K_SPACE");
+      if (spaceIdx === -1) continue;
+      const space = row.keys[spaceIdx]!;
+      row.keys[spaceIdx] = { ...space, sk: [...(space.sk ?? []), ...subkeys] };
+      break;
+    }
+  }
+}
+
 function buildCompactLayers(
   keyMap: KeyMap,
   deadkeySuccessors: DeadkeySuccessors,
   minter: NodeIdMinter,
   buildLayers: CompactLayerSkeletonBuilder,
 ): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
-  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
+  // Spec 104 FR-022 (T019): ruled T_/U_ vkeys are placed with their own
+  // ids (placeRuledTouchKeys below), so their characters are
+  // excluded from overflow routing — otherwise the same character would
+  // ALSO spill to a re-minted U_ longpress, forking its production.
+  const ruledTouchKeys = collectRuledTouchKeys(keyMap);
+  const covered = new Set<string>([...COVERED_VKEYS, ...ruledTouchKeys.keys()]);
+  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, covered);
   const charToVkey = buildCharToVkeyMap(keyMap);
 
   const markSuccessors = new Map<string, string[]>();
   const numericAttachments: Array<{ ch: string; nearestChar: string }> = [];
+  const numericLiterals: string[] = [];
   const stillUnplaced: string[] = [];
   const unresolvedMarks = new Set<string>();
 
@@ -1793,7 +1814,10 @@ function buildCompactLayers(
     }
 
     if (kind === "numeric-or-symbol") {
-      if (NUMERIC_LAYER_LITERAL_CHARS.has(ch)) continue; // already reachable
+      if (NUMERIC_LAYER_LITERAL_CHARS.has(ch)) {
+        numericLiterals.push(ch); // reachable only if the skeleton has a numeric layer
+        continue;
+      }
       const nearestChar = NUMERIC_NEAREST_SLOT[ch];
       if (nearestChar !== undefined) {
         numericAttachments.push({ ch, nearestChar });
@@ -1821,6 +1845,30 @@ function buildCompactLayers(
     if (!attached) stillUnplaced.push(ch);
   }
 
+  // Characters the routing above assumed some other key would carry, which
+  // may have no home on this skeleton: the numeric layer's literals when
+  // the skeleton emits no numeric layer (the tablet reseed), and the deadkey
+  // successors of ruled touch keys — those become longpress subkeys
+  // themselves (placeRuledTouchKeys) and so cannot carry a longpress of
+  // their own. Any not already on a key go to the extras grouping.
+  const fallbacks: string[] = [];
+  if (!layers.some((l) => l.id === "numeric")) fallbacks.push(...numericLiterals);
+  for (const [vkey, layerMap] of ruledTouchKeys) {
+    const own = layerMap.get("default");
+    for (const c of combinedSuccessors.get(vkey) ?? []) {
+      if (c !== own) fallbacks.push(c);
+    }
+  }
+  if (fallbacks.length > 0) {
+    const reachable = collectReachableChars(layers);
+    for (const layerMap of ruledTouchKeys.values()) {
+      for (const c of layerMap.values()) reachable.add(c);
+    }
+    for (const ch of fallbacks) {
+      if (!reachable.has(ch) && !stillUnplaced.includes(ch)) stillUnplaced.push(ch);
+    }
+  }
+
   if (stillUnplaced.length > 0) {
     const tagged = stillUnplaced.map((ch) =>
       unresolvedMarks.has(ch) ? `${ch} (no resolvable base letter)` : ch,
@@ -1832,6 +1880,10 @@ function buildCompactLayers(
         `longpress ("extras") menu instead of being dropped: ${tagged.join(", ")}`,
     );
   }
+
+  // Spec 104 FR-022 (T019): place the ruled touch-native keys last, on the
+  // finished layers, so no routing pass above can also claim their chars.
+  placeRuledTouchKeys(layers, ruledTouchKeys, minter);
 
   return { layers };
 }

@@ -9,7 +9,8 @@
 // registered nor flow-listed (SC-002 / SC-003). record-no-default: with no
 // explicit opt-in nothing is joined.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "q_tp3_orthography_join",
@@ -27,18 +28,8 @@ export const definition = {
   next: null,
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["join", "decline"]);
 
-export function validate(value: string | string[] | undefined): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return { ok: false, code: "required", message: "Please choose whether to join the orthography community." };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a valid choice.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose whether to join the orthography community.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

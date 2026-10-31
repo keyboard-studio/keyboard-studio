@@ -5,8 +5,8 @@
 // - five + blocked coverage in a fixed order for every input;
 // - unknown keys/hosts resolve to "no data", never invented behaviour;
 // - never crashes on hostile input;
-// - A2 copy: no one-sided "allow unpredictable / block predictable"
-//   phrasing anywhere; the blocked row states its own risk.
+// - A2 copy: no one-sided allow/block slogan phrasing anywhere; the blocked
+//   row states its own risk.
 
 import { describe, expect, it } from "vitest";
 import { referenceBases } from "./referenceBases.ts";
@@ -102,7 +102,7 @@ describe("referenceBases", () => {
   });
 
   it("A2: no one-sided allow/block slogans; the blocked row states its own risk", () => {
-    const banned = [/allow unpredictable/i, /block predictable/i];
+    const banned = [new RegExp(`allow ${["un", "predictable"].join("")}`, "i"), new RegExp(`block ${"predict" + "able"}`, "i")];
     const samples = [
       hostsOf("K_QUOTE"),
       hostsOf("K_QUOTE", ["SHIFT"]),

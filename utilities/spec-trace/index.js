@@ -80,7 +80,7 @@ function hashSection(content) {
 const SPECS_DIR = path.join(REPO_ROOT, 'specs');
 const EXTRA_DOCS = [
   { id: 'docs/architecture.md', file: path.join(REPO_ROOT, 'docs', 'architecture.md') },
-  { id: 'docs/lens-model.md', file: path.join(REPO_ROOT, 'docs', 'lens-model.md') }
+  { id: 'docs/archive/lens-model.md', file: path.join(REPO_ROOT, 'docs', 'archive', 'lens-model.md') }
 ];
 
 function firstHeading(content, fallback) {

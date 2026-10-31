@@ -87,16 +87,21 @@ export function checkTouchCoverage(
   layout: TouchLayoutIR,
   inventory: readonly string[],
   touchLayoutPath: string,
-  ruleIndex?: TouchKeyRuleIndex
+  ruleIndex?: TouchKeyRuleIndex,
+  ir?: KeyboardIR
 ): LintFinding[] {
   // Spec 063 FR-007: the Layer C leg of the four-caller migration. With the
   // index, a `T_*` key whose output lives in a `.kmn` rule is credited, so this
   // check stops reporting characters the keyboard genuinely types. Absent it,
   // behaviour is unchanged.
+  // Spec 104 (T025): production comes from the contracts resolver, which
+  // needs the IR beside the index — threaded as the optional fifth
+  // argument. An index without its IR falls back to the legacy crediting
+  // inside computeTouchCoverage (defined behaviour, never a crash).
   const { uncovered } = computeTouchCoverage(
     layout,
     inventory,
-    ruleIndex !== undefined ? { ruleIndex } : {}
+    ruleIndex !== undefined ? { ruleIndex, ...(ir !== undefined ? { ir } : {}) } : {}
   );
   const findings: LintFinding[] = [];
 

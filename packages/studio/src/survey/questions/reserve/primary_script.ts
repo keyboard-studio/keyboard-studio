@@ -1,7 +1,8 @@
 // Per-question module: primary_script (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 
-import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import { makeRequiredFirstOptionValidator } from "../validators.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
@@ -69,23 +70,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string"
-    ? value
-    : Array.isArray(value)
-      ? value[0] ?? ""
-      : "";
-
-  if (v.length === 0) {
-    return { ok: false, code: "required", message: "Please select a writing system." };
-  }
-  if (!VALID_SCRIPT_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a recognised script option.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredFirstOptionValidator(definition.options.map((o) => o.value), "Please select a writing system.", (v) => `"${v}" is not a recognised script option.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

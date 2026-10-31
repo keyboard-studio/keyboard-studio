@@ -39,6 +39,17 @@ export type StoreItem =
   | { kind: "char"; value: string }
   | { kind: "vkey"; name: string }
   | { kind: "deadkey"; id: number }
+  /**
+   * A named deadkey reference, `dk(name)` with a non-hex identifier (#2238,
+   * implementing the #2232 ruling). The name IS the deadkey's identity in
+   * Keyman (auto-registered on first use; the compiler folds it to an
+   * internal number) and is stored verbatim — the spelling of this
+   * occurrence. Identity comparisons fold ASCII case only, via
+   * `deadkeyNameKey` in `ir/deadkeys.ts`; emit reproduces `dk(name)`
+   * exactly as stored. All-hex tokens (`dk(dead)`, `dk(cafe)`) stay on the
+   * numeric `deadkey` variant — the hex boundary does not move.
+   */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "any" }
   | { kind: "raw"; text: string };
 
@@ -47,6 +58,8 @@ export type ContextElement =
   | { kind: "char"; value: string }
   | { kind: "vkey"; name: string; modifiers: string[] }
   | { kind: "deadkey"; id: number }
+  /** Named deadkey reference `dk(name)` — see the StoreItem variant. */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "any"; storeRef: string }
   | { kind: "notany"; storeRef: string }
   | { kind: "context"; offset: number }
@@ -56,12 +69,26 @@ export type ContextElement =
    * It must not contain single-quote characters. Case is preserved here but the Keyman compiler compares case-insensitively.
    */
   | { kind: "baselayout"; value: string }
+  /**
+   * A KMN `if(store = 'value')` guard in context position (spec 103).
+   * `store` is the store name verbatim, including the `&` prefix for system
+   * stores; case is preserved as written (Keyman compares store names
+   * case-insensitively). `value` is the compared literal, unquoted — the
+   * codec owns quoting on emit. A guard produces no context character, but
+   * it DOES occupy an element position: Keyman `index()` offsets count it
+   * (the sil_ipa guarded shape `if(...) any(s) + "k" > index(t,2)` points
+   * at the `any()` in element position 2). Equality only — a `<>` guard
+   * stays an opaque fragment, never this variant.
+   */
+  | { kind: "if"; store: string; value: string }
   | { kind: "raw"; text: string };
 
 /** An element in a KMN rule's output (RHS). */
 export type OutputElement =
   | { kind: "char"; value: string }
   | { kind: "deadkey"; id: number }
+  /** Named deadkey reference `dk(name)` — see the StoreItem variant. */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "beep" }
   /**
    * The `nul` keyword — the rule produces nothing (suppression). Typed per
@@ -229,6 +256,47 @@ export interface TouchKeyIR {
    * Default when absent: DEFAULT_PAD (15) applied by the KMW polyfill at render time.
    */
   pad?: number;
+  /**
+   * Display font family for this key from `.keyman-touch-layout` `font`
+   * (per-key override of the platform font). A standard wire member the
+   * parser previously dropped (spec 035 R9); carried so the codec round-trip
+   * no longer loses it.
+   */
+  font?: string;
+  /**
+   * Display font size for this key from `.keyman-touch-layout` `fontsize`
+   * (e.g. `".6em"`). A standard wire member the parser previously dropped;
+   * carried as the raw string — Keyman accepts CSS-ish sizes here, so there
+   * is no numeric normalization to preserve.
+   */
+  fontsize?: string;
+  /**
+   * Deadkey identifier from `.keyman-touch-layout` `dk`. A standard wire
+   * member the parser previously dropped; carried opaquely.
+   */
+  dk?: string;
+  /**
+   * Wire-format encoding preservation for {@link sp} / {@link width} /
+   * {@link pad} (#2083). The parser normalizes those fields to numbers for
+   * consumers, but records the source encoding here so the emitter writes
+   * back the source form (string vs number) instead of re-encoding — an
+   * unedited key round-trips byte-faithfully. The hint is a fidelity
+   * record only: no consumer may treat the two encodings as semantically
+   * different (the scaffolder's `nextlayer` defaulting reads the numeric
+   * value, #2215). Absent on synthesized keys; the emitter then uses the
+   * Keyman-canonical string form.
+   *
+   * Self-validating (#2216): a hint is honoured only while it still denotes
+   * the field's current numeric value (see `resolveWireEncoding`). A
+   * mutator that changes the numeric deletes the matching hint; a hint that
+   * survives anyway (a writer that forgot, a hand-built IR) is ignored at
+   * emit in favour of the current value — never the other way round.
+   */
+  spWire?: string | number;
+  /** Wire-format encoding preservation for {@link width}; see {@link spWire}. */
+  widthWire?: string | number;
+  /** Wire-format encoding preservation for {@link pad}; see {@link spWire}. */
+  padWire?: string | number;
 }
 
 /** Diff produced by the I2 functional-equivalence round-trip check (decision D7, spec §14). */
@@ -341,7 +409,10 @@ export interface IRStore {
    * install). Set when the store is minted into the working IR; never by the
    * codec parser. The VFS projection splices marked stores absent from the
    * base IR into the projected artifact alongside the marked rules that
-   * reference them. Sibling of {@link IRRule.rulesStepAdded}.
+   * reference them. Sibling of {@link IRRule.rulesStepAdded} — including
+   * its one deliberate exception: a guard store minted by the spec-104
+   * key-identity commit composition carries this marker so the guard rule
+   * that references it projects with its store.
    */
   rulesStepAdded?: true;
 }
@@ -413,7 +484,14 @@ export interface IRRule {
    * artifact in working-IR order, so they take effect in the preview and
    * download. Rules minted by other flows (context-tolerance replay, touch
    * rule synthesis) deliberately do NOT carry this marker — they reach the
-   * artifact through their own projection paths.
+   * artifact through their own projection paths. One deliberate exception:
+   * the spec-104 key-identity commit composition
+   * (`mergeSeveranceWithSynthesis`) stamps the severance transplant's
+   * standing clones and the AssignPanel's synthesized rules with this
+   * marker — that composition has no overlay replay path of its own, so
+   * the additions seam is its only channel to the artifact, and the
+   * projection's rename fix-up skips any rename whose target the stamped
+   * additions already bind (no double projection).
    */
   rulesStepAdded?: true;
 }
@@ -493,9 +571,37 @@ export interface TouchLayoutIR {
   platforms: Array<{
     id: "phone" | "tablet" | "desktop";
     font?: string;
+    /**
+     * Platform-level display font size from `.keyman-touch-layout`
+     * `fontsize`. A standard wire member the parser previously dropped;
+     * carried as the raw string (see {@link TouchKeyIR.fontsize}).
+     */
+    fontsize?: string;
+    /**
+     * Whether the underlying desktop layout shows through this platform's
+     * touch layers (Keyman `displayUnderlying`). A standard wire member the
+     * parser previously dropped; preserved so the codec round-trip no longer
+     * loses it (#2083).
+     */
+    displayUnderlying?: boolean;
+    /**
+     * Longpress hint style from `.keyman-touch-layout` `defaultHint` (e.g.
+     * `"dot"`). Preserved verbatim when the source states it; the emitter no
+     * longer materializes `"dot"` onto platforms that omit it (#2083).
+     */
+    defaultHint?: string;
     layers: Array<{
       id: string;
-      rows: Array<{ keys: TouchKeyIR[] }>;
+      rows: Array<{
+        /**
+         * Source row id from `.keyman-touch-layout` (`row.id`, 1-based in
+         * Keyman-authored files). Preserved so the emitter writes back the
+         * source id instead of regenerating `rowIdx + 1` (#2083). Absent on
+         * synthesized rows; the emitter then falls back to 1-based ids.
+         */
+        id?: number;
+        keys: TouchKeyIR[];
+      }>;
     }>;
   }>;
   /**

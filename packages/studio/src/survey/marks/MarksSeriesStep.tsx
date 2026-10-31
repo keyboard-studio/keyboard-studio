@@ -65,6 +65,7 @@ import {
   proposeAttachments,
   nfcPostureOfInventory,
   resolveOutputFormProposal,
+  resolveBackspaceProposal,
   hasDecidablePairs,
   computeMarkTreatmentPrefills,
   buildPlacementWorklist,
@@ -85,11 +86,12 @@ import {
   type OutputForm,
   type PromotedComposedCharacter,
 } from "@keyboard-studio/engine";
-import type { MarkInputOrder } from "@keyboard-studio/contracts";
+import type { BackspaceBehaviour, MarkInputOrder } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import {
   EMPTY_MARKS_VALUE,
+  legacyGuardSpecification,
   type MarksCompletion,
   type MarksTreatmentValue,
 } from "./marksValue.ts";
@@ -106,11 +108,12 @@ import {
   marksMarkTreatmentKey,
   marksStackKey as marksStackEvidenceKey,
   marksOutputFormKey,
+  marksBackspaceKey,
   marksInputOrderKey,
   marksPromotedKey,
   marksStackingAllowedKey,
 } from "../../steps/evidence.ts";
-import { deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
+import { ATTACHMENT_SPACE, ATTACHMENT_START_OF_LINE, deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
 import { reproposalCueMessage } from "../reproposalReason.ts";
 import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
@@ -122,6 +125,7 @@ import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
+import { detectImportedStartOfLineSeed } from "./importedStartOfLine.ts";
 import { buildContextToleranceProposal, buildNormalizationStepProposal } from "./contextToleranceProposal.ts";
 import {
   CONTEXT_TOLERANCE_QUESTION_ID,
@@ -241,6 +245,7 @@ function seriesResult(
   computedAxes?: MarksComputedAxes,
   answers: SurveyAnswer[] = [],
   contextTolerance?: MarksContextToleranceDecision,
+  backspace?: BackspaceBehaviour,
 ): SurveyPhaseResult {
   return {
     phase: "C",
@@ -248,6 +253,7 @@ function seriesResult(
     ...(contextTolerance !== undefined ? { marksContextTolerance: contextTolerance } : {}),
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
+    ...(backspace !== undefined ? { marksBackspace: backspace } : {}),
     // spec 052 US4: the recorded treatment finally reaches strategy selection.
     // `computedAxes` is an existing additive optional field merged into
     // session.axes by mergePhaseResults — its OMISSION here was the defect, so
@@ -354,14 +360,36 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   );
   const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
 
+  // --- start-of-line column migration + import seeding (issue #2374) ---
+  // The per-mark "start of line" box opens unticked — the new default, which
+  // reproduces old `swallow` exactly (`T_` minting + the buffer-start `nul`
+  // rule). Two sources pre-tick it before the author ever answers:
+  //   1. a CONFIRMED legacy GuardSpecification with behaviour "emit" —
+  //      migrated as ticked with origin "migrated-from-guard" (visible in
+  //      the row, attributed, changeable). Confirmed "swallow" is a no-op;
+  //      seeded-but-unconfirmed records are dropped (never adopted).
+  //   2. a Track 2 import whose own marks are all unguarded — per-mark ticks
+  //      with origin "imported", so a re-imported emit-keyboard does not
+  //      silently flip to blocked at line start.
+  // A saved answer always wins over the seed (reconcile); the seed origin is
+  // stamped only at the row's first attachment commit.
+  const authoringTrack = decisions["authoring-track"]?.value;
+  const legacyGuard = legacyGuardSpecification(marksValue);
+  const startOfLineMigrated = legacyGuard?.confirmed === true && legacyGuard.behaviour === "emit";
+  const startOfLineImportSeed = useMemo(
+    () => authoringTrack === "adapt" && startIr != null && detectImportedStartOfLineSeed(startIr),
+    [authoringTrack, startIr],
+  );
+  const startOfLineDefault = startOfLineMigrated || startOfLineImportSeed;
+
   // --- S1 attachment: derived from the store via reconcile(), never useState ---
 
   // spec 079 US3 parity fix: this is the SAME `reconciledAttachmentChecked`
   // `hooks/useWorkToDo.ts` calls for the badge computation, so the two can
   // never disagree about which attachments are actually checked.
   const attachmentChecked: AttachmentChecked = useMemo(
-    () => reconciledAttachmentChecked(gate.alphabet, proposals, savedAnswers),
-    [proposals, savedAnswers, gate.alphabet],
+    () => reconciledAttachmentChecked(gate.alphabet, proposals, savedAnswers, startOfLineDefault),
+    [proposals, savedAnswers, gate.alphabet, startOfLineDefault],
   );
 
   // The case-expanded attachment map is what "reachable" means downstream: US1
@@ -516,8 +544,10 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
 
   // Own-key resolution needs only class/mark treatment (never `inputOrder`
   // itself), so it can be computed before the input-order answer below.
-  // Kept as the list (not a bare predicate): S4 states the S2 outcome back to
-  // the author and needs the marks themselves (#1762 / spec 052 FR-022).
+  // Kept as the list (not a bare predicate): the input-order evidence key is
+  // keyed over exactly these marks. (#2297 removed S4's former use of this
+  // list — the output-form station no longer states the treatment outcome
+  // back, because its suggestion must not derive from treatment.)
   const ownKeyMarks = gate.alphabet.marks.filter(
     (mark) =>
       treatmentFor(
@@ -529,11 +559,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   );
 
   const hasOwnKeyMark = ownKeyMarks.length > 0;
-
-  const outputFormProposal = useMemo(
-    () => resolveOutputFormProposal(posture, hasOwnKeyMark),
-    [posture, hasOwnKeyMark],
-  );
 
   // S2 — input order. Prefilled from the base keyboard's own behavior when
   // available (detectMarkInputOrderFromImport seeds session.axes.markInputOrder).
@@ -574,21 +599,25 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         .join(","),
     [posture],
   );
+  // #2297: the output-form SUGGESTION derives from the input order alone —
+  // never from treatment, never from the posture table. The saved answer is
+  // reconciled against the posture evidence key only, so neither an order
+  // change nor a treatment change can move a confirmed composition answer;
+  // and there is no clamp: ready-made stays a legal answer even when some
+  // pair has no ready-made form (those pairs fall back to base plus mark
+  // automatically — the old #1762 clamp implemented the FR-014 forcing
+  // #2297 removes).
+  const outputFormProposal = useMemo(
+    () => resolveOutputFormProposal(posture, inputOrder),
+    [posture, inputOrder],
+  );
   const outputFormKey = marksOutputFormKey(postureId);
   const outputFormView = reconcile(
     savedAnswers["marks_output_form.form"],
     outputFormKey,
     outputFormProposal.form,
   );
-  // #1762: a ready-made override must not survive into row 1 (no ready-made
-  // form exists for some pair). Evidence-key changes usually re-seed via
-  // reconcile; this clamp covers the same-key case where the override would
-  // otherwise stick on a screen that no longer offers the undo button.
-  const outputForm = (
-    outputFormProposal.readyMadeUnavailable && outputFormView.value === "ready-made"
-      ? "base-plus-mark"
-      : outputFormView.value
-  ) as OutputForm;
+  const outputForm = outputFormView.value as OutputForm;
 
   function handleOutputFormChange(next: OutputForm): void {
     saveAnswer(STEP_ID, "marks_output_form.form", {
@@ -597,6 +626,40 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       origin: next === outputFormProposal.form ? "confirmed" : "overturned",
       stage: "draft",
       evidenceKey: outputFormKey,
+      screenId: "marks_output_form",
+    });
+  }
+
+  // --- S4 backspace (#2302) ---
+  //
+  // Its own whole-keyboard answer at the same station, interrelated with
+  // the composition answer yet independent of it (Matthew's model,
+  // 2026-10-19). The SUGGESTION follows the chosen form — the consistent
+  // pairing (base-plus-mark ↔ peel, ready-made ↔ whole-stack) — and the
+  // author may override to the other behaviour; the engine generates the
+  // rules for the off-pairings at completion (pattern-apply/mark-guards).
+  // The evidence key carries the form, so changing the composition answer
+  // re-proposes the backspace answer against the new pairing (spec 079)
+  // rather than silently carrying the old confirmation across.
+  const backspaceProposal = useMemo(
+    () => resolveBackspaceProposal(outputForm),
+    [outputForm],
+  );
+  const backspaceKey = marksBackspaceKey(outputForm, postureId);
+  const backspaceView = reconcile(
+    savedAnswers["marks_output_form.backspace"],
+    backspaceKey,
+    backspaceProposal.behaviour,
+  );
+  const backspace = backspaceView.value as BackspaceBehaviour;
+
+  function handleBackspaceChange(next: BackspaceBehaviour): void {
+    saveAnswer(STEP_ID, "marks_output_form.backspace", {
+      value: next,
+      answerType: "select",
+      origin: next === backspaceProposal.behaviour ? "confirmed" : "overturned",
+      stage: "draft",
+      evidenceKey: backspaceKey,
       screenId: "marks_output_form",
     });
   }
@@ -642,6 +705,18 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     stacksConfirmed[key] = view.value as boolean;
   }
 
+  /**
+   * The attested stacks the author kept (spec 106): single-mark stacks always,
+   * a multi-mark stack only while stacking is allowed and that stack is ticked.
+   * The completion records these, so the guard allows, and the whole-stack
+   * backspace clears, exactly the stacks the stacking station confirmed.
+   */
+  function keptStacks(): AttestedStack[] {
+    return gate.alphabet.attestedStacks.filter(
+      (s) => s.marks.length < 2 || (stackingAllowed && stacksConfirmed[stackKey(s)] === true),
+    );
+  }
+
   function handleStackingAllowedChange(next: boolean): void {
     saveAnswer(STEP_ID, "marks_stacking.allowed", {
       value: next,
@@ -670,7 +745,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // --- context tolerance (spec 078) ---
   // The station's proposal, built from the latest analysis. `null` when there
   // is nothing to propose (no analysis yet, failed, or no fixable
-  // rule; could-not-check items stay in the notice, not here).
+  // rule; could-not-check items are never author-facing, not here either).
   const toleranceProposal = useMemo(() => {
     if (tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
     if (tolerance.normalizationStep !== undefined) {
@@ -722,6 +797,16 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       tolerance.status === "ready"
         ? Object.fromEntries(tolerance.report.findings.map((f) => [f.ruleId, f.location.line]))
         : {},
+    [tolerance],
+  );
+  // The gap findings behind the proposal, for the station's worked cases —
+  // the detail the removed global notice used to show (placement model:
+  // the station is the finding's only home).
+  const toleranceGapFindings = useMemo(
+    () =>
+      tolerance.status === "ready"
+        ? tolerance.report.findings.filter((f) => tolerance.classification[f.ruleId] === "gap")
+        : [],
     [tolerance],
   );
   const toleranceFingerprint = tolerance.status === "ready" ? tolerance.fingerprint : undefined;
@@ -780,10 +865,11 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         treatmentPrefills,
         multiMarkStacks,
         postureId,
+        outputForm,
         savedAnswers,
         lastRecorded,
       }),
-    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, savedAnswers, lastRecorded],
+    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, outputForm, savedAnswers, lastRecorded],
   );
   const flaggedWorkItems = useMemo(
     () =>
@@ -915,6 +1001,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       case "marks_output_form":
         return [
           { questionId: "marks.marks_output_form.form", answerType: "select", value: outputForm },
+          { questionId: "marks.marks_output_form.backspace", answerType: "select", value: backspace },
         ];
       case "marks_stacking": {
         const confirmedKeys = multiMarkStacks
@@ -985,8 +1072,12 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       outputForm === "base-plus-mark" &&
       workingIr !== null &&
       detectStartMarkMechanism(workingIr) === "precomposed";
-    recordValue(answers, { worklist, outputForm, migrationNeeded }, effectiveTolerance);
-    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision));
+    recordValue(
+      answers,
+      { worklist, outputForm, backspace, stacks: keptStacks(), migrationNeeded },
+      effectiveTolerance,
+    );
+    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision, backspace));
   }
 
   /**
@@ -1061,6 +1152,35 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
               screenId: "marks_attachment",
             });
           }
+          const spaceTicked = attachmentChecked[proposal.mark]?.[ATTACHMENT_SPACE] ?? false;
+          saveAnswer(STEP_ID, `marks_attachment.${proposal.mark}|${ATTACHMENT_SPACE}`, {
+            value: spaceTicked,
+            answerType: "boolean",
+            origin: spaceTicked ? "overturned" : "confirmed",
+            stage: "confirmed",
+            evidenceKey: marksAttachmentKey(gate.alphabet, proposal.mark, ATTACHMENT_SPACE),
+            screenId: "marks_attachment",
+          });
+          // Issue #2374: the start-of-line tick rides the same commit. The
+          // origin is the migration/import attribution only at the row's
+          // FIRST commit while the seed is what the author sees; afterwards
+          // (or when the author set the tick themselves) it is the author's
+          // own confirmed/overturned trajectory against the unticked default.
+          const solId = `marks_attachment.${proposal.mark}|${ATTACHMENT_START_OF_LINE}`;
+          const solTicked = attachmentChecked[proposal.mark]?.[ATTACHMENT_START_OF_LINE] ?? false;
+          const solSeeded = savedAnswers[solId] === undefined && solTicked && startOfLineDefault;
+          saveAnswer(STEP_ID, solId, {
+            value: solTicked,
+            answerType: "boolean",
+            origin: solSeeded
+              ? (startOfLineMigrated ? "migrated-from-guard" : "imported")
+              : solTicked
+                ? "overturned"
+                : "confirmed",
+            stage: "confirmed",
+            evidenceKey: marksAttachmentKey(gate.alphabet, proposal.mark, ATTACHMENT_START_OF_LINE),
+            screenId: "marks_attachment",
+          });
         }
         break;
       case "marks_treatment":
@@ -1118,6 +1238,14 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           origin: outputForm === outputFormProposal.form ? "confirmed" : "overturned",
           stage: "confirmed",
           evidenceKey: outputFormKey,
+          screenId: "marks_output_form",
+        });
+        saveAnswer(STEP_ID, "marks_output_form.backspace", {
+          value: backspace,
+          answerType: "select",
+          origin: backspace === backspaceProposal.behaviour ? "confirmed" : "overturned",
+          stage: "confirmed",
+          evidenceKey: backspaceKey,
           screenId: "marks_output_form",
         });
         break;
@@ -1237,7 +1365,10 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           proposal={outputFormProposal}
           value={outputForm}
           onChange={handleOutputFormChange}
-          ownKeyMarks={ownKeyMarks}
+          inputOrder={inputOrder}
+          backspaceProposal={backspaceProposal}
+          backspace={backspace}
+          onBackspaceChange={handleBackspaceChange}
         />
       )}
 
@@ -1256,6 +1387,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           disclosures={toleranceDisclosures}
           ruleLines={toleranceRuleLines}
           fingerprint={toleranceFingerprint}
+          gapFindings={toleranceGapFindings}
           {...(priorTolerance !== undefined ? { prior: priorTolerance } : {})}
           {...(tolerance.status === "ready" && tolerance.normalizationStep !== undefined
             ? {

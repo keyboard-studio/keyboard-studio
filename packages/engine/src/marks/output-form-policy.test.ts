@@ -1,64 +1,111 @@
 import { describe, expect, it } from "vitest";
 import type { PosturePair } from "./nfc-posture-of-inventory.js";
-import { hasDecidablePairs, resolveOutputFormProposal } from "./output-form-policy.js";
+import {
+  hasDecidablePairs,
+  nativeBackspaceBehaviour,
+  outputFormString,
+  outputStringForStack,
+  resolveBackspaceProposal,
+  resolveOutputFormProposal,
+} from "./output-form-policy.js";
 
 const ACUTE = "́";
+const GRAVE = "̀";
+const SCHWA = "ə";
 
 function pair(hasReadyMadeForm: boolean): PosturePair {
   return { stack: { base: "e", marks: [ACUTE] }, hasReadyMadeForm };
 }
 
-describe("resolveOutputFormProposal (FR-013..FR-016)", () => {
-  it("FR-014: any never-composing pair → base-plus-mark as a NOTICE", () => {
-    const proposal = resolveOutputFormProposal([pair(true), pair(false)], false);
-    expect(proposal.form).toBe("base-plus-mark");
-    expect(proposal.presentedAs).toBe("notice");
+describe("resolveOutputFormProposal (#2297: suggestion from input order alone)", () => {
+  it("postfix (letter, then mark) → suggests base-plus-mark (NFD)", () => {
+    expect(resolveOutputFormProposal([pair(true)], "postfix").form).toBe("base-plus-mark");
   });
 
-  it("FR-014 wins even when an own-key mark exists (row order)", () => {
-    const proposal = resolveOutputFormProposal([pair(false)], true);
-    expect(proposal.form).toBe("base-plus-mark");
-    expect(proposal.presentedAs).toBe("notice");
+  it("prefix (mark, then letter — incl. a waiting mark key) → suggests ready-made (NFC)", () => {
+    expect(resolveOutputFormProposal([pair(true)], "prefix").form).toBe("ready-made");
   });
 
-  it("FR-015: all pairs compose + no own-key mark → ready-made as a NOTICE", () => {
-    const proposal = resolveOutputFormProposal([pair(true)], false);
+  it("the suggestion does NOT follow the posture table: a never-composing pair does not force base-plus-mark", () => {
+    // The retired FR-014 row forced the whole keyboard to base-plus-mark
+    // here and made ready-made unchoosable. Under #2297 the suggestion
+    // still comes from the order alone, and the pair's lack of a ready-made
+    // form is reported as the automatic-fallback fact only.
+    const proposal = resolveOutputFormProposal([pair(true), pair(false)], "prefix");
     expect(proposal.form).toBe("ready-made");
-    expect(proposal.presentedAs).toBe("notice");
+    expect(proposal.anyPairLacksReadyMade).toBe(true);
   });
 
-  it("FR-016: all pairs compose + an own-key mark → OPEN CHOICE, base-plus-mark recommended", () => {
-    const proposal = resolveOutputFormProposal([pair(true)], true);
-    expect(proposal.presentedAs).toBe("open-choice");
-    expect(proposal.form).toBe("base-plus-mark");
-  });
-
-  it("readyMadeUnavailable is SET on row 1 (some pair has no ready-made form)", () => {
-    // Row 1 fires precisely on `anyPairLacksReadyMade`, so the station must be
-    // able to see that "ready-made" is not a selectable answer at all.
-    expect(resolveOutputFormProposal([pair(true), pair(false)], false).readyMadeUnavailable).toBe(
-      true,
-    );
-    expect(resolveOutputFormProposal([pair(false)], true).readyMadeUnavailable).toBe(true);
-  });
-
-  it("readyMadeUnavailable is CLEAR on rows 2 and 3 (every pair composes)", () => {
-    // Row 2 (open choice) and row 3 (ready-made default) both only run when
-    // every pair has a ready-made form, so the override stays available.
-    expect(resolveOutputFormProposal([pair(true)], true).readyMadeUnavailable).toBe(false);
-    expect(resolveOutputFormProposal([pair(true)], false).readyMadeUnavailable).toBe(false);
+  it("anyPairLacksReadyMade is clear when every pair composes", () => {
+    expect(resolveOutputFormProposal([pair(true)], "prefix").anyPairLacksReadyMade).toBe(false);
+    expect(resolveOutputFormProposal([pair(true)], "postfix").anyPairLacksReadyMade).toBe(false);
   });
 
   it("SC-005: no explanation contains 'Unicode' or 'normalization' (any case)", () => {
-    const cases = [
-      resolveOutputFormProposal([pair(false)], false),
-      resolveOutputFormProposal([pair(true)], false),
-      resolveOutputFormProposal([pair(true)], true),
-    ];
-    for (const c of cases) {
-      expect(c.explanation).not.toMatch(/unicode/i);
-      expect(c.explanation).not.toMatch(/normali[sz]/i);
+    for (const order of ["prefix", "postfix"] as const) {
+      const proposal = resolveOutputFormProposal([pair(false)], order);
+      expect(proposal.explanation).not.toMatch(/unicode/i);
+      expect(proposal.explanation).not.toMatch(/normali[sz]/i);
     }
+  });
+});
+
+describe("outputStringForStack (the emission seam under the global policy)", () => {
+  it("(a) global NFC: a combination with a ready-made form emits the single precomposed code point", () => {
+    const out = outputStringForStack({ base: "a", marks: [GRAVE] }, "ready-made");
+    expect(out).toBe("à");
+    expect([...out]).toHaveLength(1);
+  });
+
+  it("(a) global NFC: a combination with NO ready-made form falls back to base + mark — automatically, only there", () => {
+    // Bafut-shaped: schwa + grave has no precomposed code point (one of the
+    // 9-of-22 in the #2293 repro). No policy can emit a single character
+    // for it; the fallback is Unicode necessity, not an author-chosen mix.
+    const out = outputStringForStack({ base: SCHWA, marks: [GRAVE] }, "ready-made");
+    expect(out).toBe(SCHWA + GRAVE);
+    expect([...out]).toHaveLength(2);
+  });
+
+  it("(a) global NFC over a Bafut-shaped set: composable pairs compose, the rest fall back", () => {
+    const stacks = [
+      { base: "a", marks: [GRAVE] }, // à exists
+      { base: "i", marks: [GRAVE] }, // ì exists
+      { base: SCHWA, marks: [GRAVE] }, // no precomposed form
+      { base: SCHWA, marks: ["̂"] }, // no precomposed form
+      { base: "m", marks: [GRAVE] }, // no precomposed form
+    ];
+    const outs = stacks.map((s) => outputStringForStack(s, "ready-made"));
+    expect(outs[0]).toBe("à");
+    expect(outs[1]).toBe("ì");
+    expect(outs.slice(2).every((o) => [...o].length === 2)).toBe(true);
+  });
+
+  it("(b) global NFD: emits base + mark even where a precomposed form exists", () => {
+    const out = outputStringForStack({ base: "a", marks: [GRAVE] }, "base-plus-mark");
+    expect(out).toBe("a" + GRAVE);
+    expect([...out]).toHaveLength(2);
+  });
+
+  it("(b) global NFD holds however the combination is called up — the seam takes no input-order or mechanism input", () => {
+    // The same stack reached by a postfix mark key, by a mark key pressed
+    // first (a waiting/dead key), or by a dedicated key for the composed
+    // character itself all emit identically: outputStringForStack's only
+    // inputs are the stack and the global policy.
+    const stack = { base: "e", marks: [ACUTE] };
+    expect(outputStringForStack(stack, "base-plus-mark")).toBe("e" + ACUTE);
+    expect(outputStringForStack(stack, "ready-made")).toBe("é");
+  });
+
+  it("multi-mark stacks compose as far as single characters exist under NFC", () => {
+    // e + circumflex + acute composes fully to one character; under NFD it
+    // stays the literal sequence.
+    const stack = { base: "e", marks: ["̂", ACUTE] };
+    expect([...outputStringForStack(stack, "ready-made")]).toHaveLength(1);
+    expect(outputStringForStack(stack, "base-plus-mark")).toBe("e" + "̂" + ACUTE);
+  });
+
+  it("an unset policy degrades to the ready-made (NFC) default", () => {
+    expect(outputStringForStack({ base: "a", marks: [GRAVE] }, undefined)).toBe("à");
   });
 });
 
@@ -69,5 +116,54 @@ describe("hasDecidablePairs (station render gate)", () => {
 
   it("true when at least one pair exists", () => {
     expect(hasDecidablePairs([pair(true)])).toBe(true);
+  });
+});
+
+describe("resolveBackspaceProposal (#2302: the suggestion follows the chosen composition)", () => {
+  it("base-plus-mark output proposes peel — the consistent pairing", () => {
+    expect(resolveBackspaceProposal("base-plus-mark").behaviour).toBe("peel");
+  });
+
+  it("ready-made output proposes whole-stack — the consistent pairing", () => {
+    expect(resolveBackspaceProposal("ready-made").behaviour).toBe("whole-stack");
+  });
+
+  it("the proposal is exactly the form's native behaviour under both forms", () => {
+    // "Follow composition" and "what the emitted text does with no
+    // generated rules" are the same statement; the override is the other
+    // member of the union under either form.
+    expect(resolveBackspaceProposal("base-plus-mark").behaviour).toBe(
+      nativeBackspaceBehaviour("base-plus-mark"),
+    );
+    expect(resolveBackspaceProposal("ready-made").behaviour).toBe(
+      nativeBackspaceBehaviour("ready-made"),
+    );
+    expect(nativeBackspaceBehaviour("base-plus-mark")).toBe("peel");
+    expect(nativeBackspaceBehaviour("ready-made")).toBe("whole-stack");
+  });
+
+  it("explanations name the override as choosable and stay SC-005 clean", () => {
+    for (const form of ["base-plus-mark", "ready-made"] as const) {
+      const { explanation } = resolveBackspaceProposal(form);
+      expect(explanation).toContain("You can choose");
+      expect(explanation).not.toMatch(/unicode|normalization/i);
+    }
+  });
+});
+
+describe("outputFormString (spec 106 FR-020: the emission seam for any output)", () => {
+  it("decomposes a precomposed character fully under base-plus-mark", () => {
+    expect(outputFormString("ǎ", "base-plus-mark")).toBe("a\u030C");
+    expect(outputFormString("ṑ", "base-plus-mark")).toBe("o\u0304\u0300");
+  });
+
+  it("composes under ready-made, and leaves a combination with no single character as base plus mark", () => {
+    expect(outputFormString("a\u030C", "ready-made")).toBe("ǎ");
+    expect(outputFormString("\u025B\u030C", "ready-made")).toBe("\u025B\u030C");
+  });
+
+  it("returns the input untouched when no output form is recorded", () => {
+    expect(outputFormString("a\u030C", undefined)).toBe("a\u030C");
+    expect(outputFormString("ǎ", undefined)).toBe("ǎ");
   });
 });

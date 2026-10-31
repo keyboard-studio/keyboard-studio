@@ -169,9 +169,6 @@ utility, the candidate hosts in this repo are:
   duplicate Pattern fixtures across packages)
 - `packages/engine/src/scaffolder/`, `packages/engine/src/shared/` — package-local
   utilities that may belong in `contracts` if they become cross-package
-- `utilities/Template Cleanup/` — Python tooling for template prep (Python
-  is local to that directory; do not reach into it from TS packages)
-
 If a simplification reveals a utility that genuinely belongs in
 `contracts/` but currently lives in a package, escalate to `/km-lead` rather
 than promoting it inside this pass.

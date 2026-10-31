@@ -1,7 +1,8 @@
 // Per-question module: pb_rtl_short_vowels (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "pb_rtl_short_vowels",
@@ -36,28 +37,8 @@ export const definition = {
   next: "pb_rtl_special_letters",
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["always", "sometimes", "never"]);
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please choose how short vowel marks are used in your language.",
-    };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: `"${v}" is not a valid choice.`,
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose how short vowel marks are used in your language.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

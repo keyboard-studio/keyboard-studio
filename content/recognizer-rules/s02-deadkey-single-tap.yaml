@@ -14,34 +14,56 @@ patternRef: content/patterns/desktop-input/deadkey-single-tap.yaml   # repo-root
 format_status: provisional
 
 description: >
-  Detect a three-rule deadkey composition cluster in a KeyboardIR and lift it
-  into the deadkey-single-tap Pattern. The cluster consists of:
-    (1) a trigger rule: one vkey key press sets a named deadkey state,
+  Detect a deadkey composition cluster in a KeyboardIR and lift it into the
+  deadkey-single-tap Pattern. The cluster consists of:
+    (1) a trigger rule: one keystroke (vkey, character literal, or any() over
+        a single-character store) sets a named deadkey state,
     (2) a fan-out rule: the deadkey state plus any() base from a store maps to
         index() output from a parallel store,
-    (3) an escape rule: the deadkey state plus the same trigger key emits the
-        bare combining accent character.
-  All three rules share the same deadkey id (DK) and live in the same IRGroup.
+    (3) an escape rule (OPTIONAL): the deadkey state plus the trigger key
+        emits the bare accent character.
+  A family is keyed by (fan-out group, deadkey id, prefix character, base
+  store, output store) — one deadkey id may carry several families, and the
+  rules of a family need not share a group: triggers live in a 'using keys'
+  group, fan-out and escape in the fan-out's group. A postfix family (a
+  literal prefix character before the deadkey in the fan-out context) is
+  self-triggering: the prefix character is its trigger identity, and no
+  trigger rule need exist. Shape checks run on the context with the codec's
+  '+' separator elements removed; index() offsets count positions in that
+  cleaned context. (Generalised in #2233 — before it, both shipped matchers
+  found zero families on sil_euro_latin and sil_pan_africa_mnemonic.)
+  NFD (base-plus-mark) form, classic context only: a fan-out whose output is
+  index() into the SAME store as its any() (self-indexing, no output store)
+  followed by one or more combining-mark chars lifts to patternId
+  deadkey_single_tap_nfd with a markChars slot (the mark sequence) and no
+  accentedForms slot. Code-level (s02-families.ts nfdMarks); not expressible
+  in the predicate DSL below, which describes the parallel-store form.
 
 # ---------------------------------------------------------------------------
 # IR predicate
 # ---------------------------------------------------------------------------
 predicate:
   cluster_type: three-rule-deadkey
-  shared_key: deadkey.id   # All three rules share the same numeric deadkey id
+  shared_key: deadkey.id   # Roles share the numeric deadkey id; the FAMILY key is
+                           # (group, deadkey id, prefix char, S_bases, S_output)
 
   rules:
     # Rule 1 — trigger rule: arm the deadkey state
     - role: trigger
       description: >
-        Pressing a single vkey (no prior state) outputs a deadkey marker.
-        This is the "arm" rule — it does not emit a visible character.
+        Pressing a single keystroke (no prior state) outputs a deadkey marker.
+        This is the "arm" rule — it does not emit a visible character. Three
+        keystroke forms occur in the corpus: a vkey ([K_X]), a character
+        literal ("x"), and any() over a store holding exactly one character
+        (sil_pan_africa: + any(K_1) > dk(1) with K_1 = "["). An any() over a
+        multi-item store is a set selector, not a trigger. The trigger rule
+        must live in a 'using keys' group. A postfix family has no trigger
+        rule at all — it is self-triggering via its prefix character.
       context_pattern:
-        # IRRule.context is ContextElement[]. The bare rule form (+ [K_X] > deadkey(...))
-        # has context: [] (empty array) — the engine must match this as well as the
-        # single-vkey form. Both are valid and common trigger shapes.
+        # Cleaned context (codec '+' separators removed) is exactly one element:
+        # a vkey, a char, or an any() over a single-character store.
         - kind: vkey
-          count: zero_or_one   # zero = bare rule (context: []); one = single vkey
+          count: zero_or_one   # one of the three alternative keystroke forms
           constraints:
             no_modifiers_required: false   # modifiers like SHIFT are allowed
             no_prior_deadkey: true         # context must NOT already contain a deadkey
@@ -56,6 +78,11 @@ predicate:
       description: >
         The deadkey state followed by any base letter (from a parallel store)
         produces the corresponding accented letter (via index into the output store).
+        Two cleaned-context forms: the classic [deadkey, any] and the postfix
+        [char, deadkey, any] (sil_euro_latin: "x" dk(1) + any(K) > index(O, 3)),
+        where the leading char is the family's prefix character. The output
+        must be exactly one index() element — a fan-out whose output carries
+        additional elements (e.g. a use() group transition) is not S-02.
       context_pattern:
         - kind: deadkey
           count: exactly_one
@@ -70,50 +97,78 @@ predicate:
           count: exactly_one
           constraints:
             storeRef: S_output   # Names the output store (see store_constraints)
-            # offset must equal the 1-indexed position of the any() element in context.
-            # For this cluster shape (context = [deadkey, any]), any() is at position 2.
-            # The engine must verify: index.offset == (1-indexed position of any() in context)
-            # rather than hardcoding 2 — a cluster with context = [any] would require offset 1.
+            # offset must equal the 1-indexed position of the any() element in the
+            # CLEANED context (codec '+' separators removed — the '+' is keystroke
+            # punctuation, not a context position; Keyman's own index() definition).
+            # Classic form: any() is at position 2. Postfix form: position 3.
+            # The engine must verify: index.offset == (1-indexed cleaned position
+            # of any()) rather than hardcoding either value.
             offset_equals_any_position: true
 
     # Rule 3 — escape rule: deadkey + trigger key -> bare combining accent
     - role: escape
+      optional: true   # Owned when present; recognition does NOT require it (#2233).
+                       # basic_kbdfr ships no escape rules at all — the bare accent is
+                       # slot 0 of its fan-out stores. A beep rule is a fallback, never
+                       # cluster evidence.
       description: >
-        The deadkey state followed by the same trigger key (pressed twice) emits
-        the bare combining accent mark, allowing the trigger character itself to
-        be typed.
+        The deadkey state followed by the trigger keystroke emits the bare
+        accent character, allowing the trigger character itself to be typed.
+        Classic cleaned form: [deadkey, vkey|char] > [char]. Postfix cleaned
+        form: [char(X), deadkey, char(X)] > [char(X)] where X is the family's
+        prefix character (the three-way equality is definitional). An escape
+        matched by several families is recorded on each (for its accentChar)
+        and owned by none.
       context_pattern:
+        # Classic form (shown): [deadkey, vkey|char]. The second element may be
+        # a vkey or a character literal; equality with the trigger rule's
+        # keystroke is NOT enforced (keyboards ship escapes whose keystroke
+        # differs from every trigger). Postfix form: [char(X), deadkey,
+        # char(X)] with the output char also equal to X.
         - kind: deadkey
           count: exactly_one
           constraints:
-            id: DK   # Must match the trigger rule's deadkey id
+            id: DK   # Must match the family's deadkey id
         - kind: vkey
           count: exactly_one
           constraints:
-            same_as_trigger_rule_vkey: true   # Same K_X / modifier combo as rule 1
+            same_as_trigger_rule_vkey: false   # Not enforced — see note above
       output_pattern:
         - kind: char
           count: exactly_one
           constraints:
-            single_codepoint: true   # The bare combining accent, e.g. U+0301
+            single_codepoint: true   # The bare accent, e.g. U+0301
 
   store_constraints:
+    # The ONLY binding store constraint is the parallel-length invariant.
+    # There is deliberately no items_kind restriction (#2233, ruling D6): real
+    # families' stores carry deadkey items (two-level chain idiom, e.g.
+    # basic_kbdrum, sil_cameroon) and raw "nul" padding (sil_cameroon,
+    # sil_akebu). An earlier char-only guard here would have un-matched 9
+    # families the shipped matchers already found. Slot strings built from
+    # such stores keep only their char items (store_items_to_char_string) —
+    # a known slot-fidelity limitation; the carve splice is positional on
+    # the real stores, so recognition is unaffected.
     - store: S_bases
       isSystem: false
-      items_kind: char   # All items must be char; no vkey, deadkey, or raw items
     - store: S_output
       isSystem: false
-      items_kind: char
       same_length_as: S_bases   # Layer A parallel-store invariant — enforced by validator
 
   group_constraints:
-    usingKeys: true             # Must be a 'using keys' group, not nomatch/match
-    all_rules_same_group: true  # All three rules must share the same IRGroup.nodeId
+    usingKeys: true             # Applies to the TRIGGER rule's group (the keystroke
+                                # position only exists there); fan-out/escape groups
+                                # are unconstrained
+    all_rules_same_group: false # Triggers, fan-outs and escapes routinely live in
+                                # different groups (basic_kbdfr: triggers in main,
+                                # fan-outs in a deadkeys group; sil_pan_africa: all
+                                # roles in one 'using keys' group)
 
   disqualifiers:
     - Any rule in the cluster has output element kind=raw (unparsed fragment — cannot safely lift)
-    - S_bases or S_output items contain kind=vkey or kind=deadkey (complex stores, not plain char lists)
+    - A context under test contains a raw element other than the codec '+' separator (the rule's true shape is unknown — e.g. platform(...) tokens stay unclaimed)
     - The two stores have different item counts (parallel-store invariant violated — Layer A bug)
+    - The fan-out output is not exactly one index() element (e.g. [index, use] is two-mechanism behaviour, not S-02)
     - IRRule.ownedByPattern is already set on any rule in the cluster (already claimed)
 
   combinedWith_if:
@@ -172,10 +227,21 @@ corpus_evidence:
     - id: sil_euro_latin
       path: release/sil/sil_euro_latin/source/sil_euro_latin.kmn
       notes: >
-        Primary spec §6 exemplar. 92 deadkey rules across multiple accent families
-        (acute, grave, circumflex, tilde, diaeresis, macron). Each family is a
-        canonical three-rule cluster. Confirming this keyboard gets recognizedRatio > 0
-        is the first AC validation target.
+        19 families, ALL in the postfix form ("x" dk(1) + any(K) > index(O, 3))
+        sharing the single deadkey dk(1), keyed by prefix character + store
+        pair, each with a postfix escape ("x" dk(1) + "x" > "x"). There is NO
+        typed trigger rule — the arming rules sit behind if() guards and the
+        families are self-triggering. (Corrected in #2233: this keyboard was
+        previously described as canonical three-rule clusters; the shipped
+        matchers in fact found zero families on it.)
+    - id: sil_pan_africa_mnemonic
+      path: release/sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kmn
+      notes: >
+        5 families (dk(1) x2 store pairs, dk(2) x3), all roles in one 'using
+        keys' group. Triggers are any() over single-character stores
+        (+ any(K_1) > dk(1), K_1 = "["); the shared triggers serve several
+        families and are owned by none. No escape rules. A sixth dk(1) body
+        with output [index, use] is correctly NOT claimed.
     - id: basic_kbdfr
       path: release/basic/basic_kbdfr/source/basic_kbdfr.kmn
       notes: >
@@ -205,8 +271,10 @@ notes:
     is NOT always a combining mark. Keyboards that use apostrophe as a deadkey
     trigger (common for glottal stops and modifier letters in African and Pacific
     orthographies) emit plain U+0027 from the escape rule, not a combining
-    character. The escape rule must always be present for linguistically complete
-    S-02 behavior.
+    character. The escape rule must be present for linguistically complete
+    S-02 behavior; recognition does not require it (#2233) — keyboards such as
+    basic_kbdfr ship no escape rule and carry the bare accent as slot 0 of the
+    fan-out stores instead.
 
   edge_cases:
     - >
@@ -215,7 +283,9 @@ notes:
       handle both ContextElement shapes.
     - >
       A keyboard may define multiple S-02 families (e.g. acute + grave + circumflex).
-      Each family has its own distinct deadkey id (DK) and its own trigger key. The
-      recognizer should lift each family as a separate Pattern instance.
+      Families are keyed by (group, deadkey id, prefix character, base store,
+      output store): one deadkey id may carry several families (sil_euro_latin's
+      19 families all share dk(1)), told apart by prefix character and store
+      pair. The recognizer lifts each family as a separate Pattern instance.
     - >
       If index().offset does not equal the 1-indexed position of the any() element in the fan-out rule's context, this is an unusual pattern that should not be silently lifted — do not assume offset is always 2.

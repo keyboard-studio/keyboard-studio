@@ -104,6 +104,26 @@ describe("buildProducedSet — run-merge NFC fix", () => {
     expect(result.has("́")).toBe(false);
   });
 
+  it("run interrupted by namedDeadkey flushes identically and produces no glyph (#2238)", () => {
+    const ir = makeTestIR([
+      makeGroup([
+        makeRule([
+          { kind: "char", value: "a" },
+          { kind: "char", value: "́" },
+          { kind: "namedDeadkey", name: "acute" },
+          { kind: "char", value: "b" },
+        ]),
+      ]),
+    ]);
+    const result = buildProducedSet(ir);
+    expect(result.has("á")).toBe(true);
+    expect(result.has("b")).toBe(true);
+    expect(result.has("a")).toBe(false);
+    expect(result.has("́")).toBe(false);
+    // A name is not a glyph: nothing name-derived enters the produced set.
+    expect(result.has("acute")).toBe(false);
+  });
+
   it("single char element: 'á' (already NFC) → set contains 'á'", () => {
     const ir = makeTestIR([
       makeGroup([makeRule([{ kind: "char", value: "á" }])]),

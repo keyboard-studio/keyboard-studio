@@ -132,7 +132,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     );
   });
 
-  it("falls back to today's exact placeholders when helpDocs is null (FR-002)", async () => {
+  it("renders the no-answer forms when helpDocs is null (FR-002, spec 102 FR-030)", async () => {
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
@@ -141,19 +141,34 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
 
-    expect(readVfsText(projected!.vfs, "README.md")).toBe(`# ${basicKbdus.displayName}\n`);
+    // spec 102 FR-029: the README links the keyboard's help-site page even before any answer.
+    expect(readVfsText(projected!.vfs, "README.md")).toBe(
+      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n`,
+    );
     // spec 079 FR-013: the placeholder page still references the generated
     // layout charts (a net-new keyboard has no base images), so the pre-076
-    // bare placeholder is now placeholder + layout section.
+    // bare placeholder is now placeholder + layout section. The page opens
+    // with the element-spec §1 shell (doctype, head, Start Using title,
+    // shared inline style) around the fallback body.
     const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
-    expect(welcome.startsWith(`<html><body><p>Welcome to ${basicKbdus.displayName}</p><h2>Keyboard Layout</h2>`)).toBe(true);
+    expect(welcome.startsWith(
+      "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n" +
+        `<title>Start Using ${basicKbdus.displayName}</title>\n<style>`,
+    )).toBe(true);
+    expect(welcome).toContain(
+      `<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p>\n<h2>Keyboard Layout</h2>`,
+    );
     expect(welcome).toContain('<img src="ks-layout-desktop-');
-    expect(welcome.endsWith("</body></html>")).toBe(true);
+    expect(welcome.endsWith("</body>\n</html>")).toBe(true);
     // spec 079 FR-003 / US1-3: even an early production's help page opens with
-    // the standard help-site header, above the unchanged placeholder comment.
+    // the standard help-site header. Spec 102 FR-030: the body form follows it,
+    // the same body the welcome page carries, instead of a placeholder comment.
+    // The shared inline style leads the fragment — the same style block the
+    // welcome page carries in its head (criterion 11.10).
+    const style = /<style>([\s\S]*?)<\/style>/.exec(welcome)?.[1];
     const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`);
     expect(help).toBe(
-      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<?php /* ${basicKbdus.displayName} help */ ?>`,
+      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<style>${style}</style>\n<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p>`,
     );
   });
 
@@ -178,9 +193,12 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
     const welcomeSansLayout = welcome.replace(/\n?<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<\/body>)/, "");
     const welcomeBody = welcomeSansLayout
-      .replace(/^<html[^>]*><body>/, "")
-      .replace(/<\/body><\/html>$/, "");
-    expect(help.slice(header.length)).toBe(welcomeBody);
+      .replace(/^[\s\S]*?<body>\n/, "")
+      .replace(/<\/body>\n<\/html>$/, "");
+    // The help fragment leads with the same shared style block the welcome
+    // page carries in its head, then the identical inner body.
+    const style = /<style>([\s\S]*?)<\/style>/.exec(welcome)?.[1];
+    expect(help.slice(header.length)).toBe(`<style>${style}</style>\n${welcomeBody}`);
     expect(welcomeSansLayout).not.toBe(welcome);
   });
 
@@ -213,7 +231,7 @@ describe("early production (Track 1, nothing answered yet)", () => {
   it("HISTORY.md is the stub under the keyboard's version, before any proposal decision", async () => {
     instantiate();
     const projected = await projectWorkingCopyForOutput();
-    expect(readVfsText(projected!.vfs, "HISTORY.md")).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+    expect(readVfsText(projected!.vfs, "HISTORY.md")).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Created from basic_kbdus v1\.0 via keyboard-studio\.\n\* Initial release\.\n$/);
   });
 
   it("a dismissed proposal leaves the same stub in place (FR-011)", async () => {
@@ -225,7 +243,7 @@ describe("early production (Track 1, nothing answered yet)", () => {
     });
     const projected = await projectWorkingCopyForOutput();
     const history = readVfsText(projected!.vfs, "HISTORY.md")!;
-    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Created from basic_kbdus v1\.0 via keyboard-studio\.\n\* Initial release\.\n$/);
     expect(history).not.toContain("Added 3 characters");
   });
 

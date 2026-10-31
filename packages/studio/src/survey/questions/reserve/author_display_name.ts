@@ -1,7 +1,8 @@
 // Per-question module: author_display_name (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 
 export const definition = {
   id: "author_display_name",
@@ -22,20 +23,7 @@ export const definition = {
   next: "author_contact_email",
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const trimmed = typeof value === "string"
-    ? value.trim()
-    : Array.isArray(value)
-      ? value.join("").trim()
-      : "";
-
-  if (trimmed.length === 0) {
-    return { ok: false, code: "required", message: "Author name is required." };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Author name is required.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

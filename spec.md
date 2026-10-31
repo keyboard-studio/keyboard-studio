@@ -60,10 +60,10 @@ Language experts who want to submit a keyboard to `keymanapp/keyboards` today fa
 - A complete submission requires producing and keeping consistent: `.kpj`, `.kps`, `.kvks`, `.keyman-touch-layout`, `HISTORY.md`, `LICENSE.md`, `README.md`, `welcome.htm`, and `help/<name>.php`.
 - Generating a touch layout from desktop rules is a manual, error-prone step.
 - Satisfying the ~200 PR-review criteria in `criteria.md` requires both domain knowledge and Keyman-specific familiarity.
-- In practice, reviewers silently fix the same hygiene mistakes across dozens of PRs: missing `usealtgr` tag, wrong `Copyright ©` syntax, `NCAPS` leftovers, blank `.kvks`, `welcome.htm`/`.php` body drift.
+- In practice, reviewers fix the same hygiene mistakes, often directly in the PR, across dozens of submissions: missing `usealtgr` tag, wrong `Copyright ©` syntax, `NCAPS` leftovers, blank `.kvks`, `welcome.htm`/`.php` body drift.
 - Existing keyboards in `release/` cannot be adapted without re-authoring by hand: a maintainer who wants to take a multilingual country keyboard (e.g. `cm_qwerty`) and ship a monolingual subset for one language has no path short of hand-editing `.kmn`. Original authors updating their own keyboards face the same friction.
 
-Keyboard-Studio removes every mechanical barrier: the scaffolder enforces all green criteria by construction, the survey surfaces yellow criteria in plain language, and the validator blocks invalid output before it ever reaches the compiler. The same machinery serves authors adapting an existing keyboard: the studio parses the chosen `.kmn` into a typed in-memory representation, lets the author carve unwanted rules away and add new ones through the same survey, and re-emits a functionally-equivalent `.kmn`.
+Keyboard-Studio aims to remove as many of these mechanical barriers as it can: the scaffolder enforces all green criteria by construction, the survey surfaces yellow criteria in plain language, and the validator blocks invalid output before it ever reaches the compiler. The same machinery serves authors adapting an existing keyboard: the studio parses the chosen `.kmn` into a typed in-memory representation, lets the author carve unwanted rules away and add new ones through the same survey, and re-emits a functionally-equivalent `.kmn`.
 
 ---
 
@@ -116,8 +116,8 @@ This subsection makes explicit what the studio assumes the user *can* and *canno
 
 **User behaviour patterns the studio designs for.**
 
-- **Naive users accept reasonable defaults and do not question them.** A default that gets the user 80% of the way will be shipped as-is; the remaining 20% will not be challenged. This is the **opposite** of Keyman Developer's blank-canvas posture, where the user originates every decision. **The studio's value sits in the defaults, not in the override controls** — the corpus-prior placements (§7.6), the strategy-selector primary (§7.2), the script-class axis fills (§7.2 input contract), the DISCUS-arbitrated mechanism rankings (§7.7), the base-derived prefill (§5), and the carve-gallery starting state are all instances of this principle. A weak default is a user-visible failure regardless of whether override controls exist.
-- **Power users want full control.** Every default must be visibly overridable. Naive-user defaults and power-user controls are not in tension — they share the same surface; the naive user accepts, the power user changes. A studio that forces choice on naive users to please power users has failed the broader cohort §3 targets.
+- **First-time users accept reasonable defaults and do not question them.** A default that gets the user 80% of the way will be shipped as-is; the remaining 20% will not be challenged. Keyman Developer serves experienced authors who make each decision themselves and want that control; the studio serves authors who are better served by a proposed answer. **The studio's value sits in the defaults, not in the override controls** — the corpus-prior placements (§7.6), the strategy-selector primary (§7.2), the script-class axis fills (§7.2 input contract), the DISCUS-arbitrated mechanism rankings (§7.7), the base-derived prefill (§5), and the carve-gallery starting state are all instances of this principle. A weak default is a user-visible failure regardless of whether override controls exist.
+- **Power users want full control.** Every default must be visibly overridable. First-time-user defaults and power-user controls are not in tension — they share the same surface; the first-time user accepts, the power user changes. A studio that forces choice on first-time users to please power users has failed the broader cohort §3 targets.
 
 ---
 
@@ -136,7 +136,7 @@ Success for the studio is **a working keyboard committed to `keymanapp/keyboards
 
 - *Not* "the community adopts the keyboard." Adoption depends on promotion, OS support, font availability, and Keyman's distribution channels — all downstream of submission and outside the studio's influence. Promotion is Keyman's surface; the studio surfaces the submission.
 - *Not* "the user understands what they shipped well enough to maintain it over years." Maintenance is rare for monolingual keyboards (most are one-time submissions); MML keyboards are out of scope for new authoring (§7). When maintenance is needed, the same studio session re-opens the same working copy and re-enters the same flow.
-- *Not* "constructive user feedback returns to the studio." Real-world feedback is mostly the unhelpful "keyboard doesn't work" form. The studio optimises for *successful submission*, not iterative improvement driven by users.
+- *Not* "constructive user feedback returns to the studio." Real-world feedback tends to arrive as a short report that something doesn't work, without the detail needed to act on it. The studio optimises for *successful submission*, not iterative improvement driven by users.
 
 **Submission posture.** A **monolingual keyboard is typically a one-time submission** — the studio is sized for this: ship-it-and-leave with the option to re-open, not a multi-year project IDE. A **massively multilingual keyboard is a multi-year affair**, out of scope for new authoring; supported only as a Track 1 base (§7).
 
@@ -146,13 +146,13 @@ Success for the studio is **a working keyboard committed to `keymanapp/keyboards
 
 ## 3c. Defaults are the product
 
-*Added 2026-06-15. Companion to §3a (skill envelope) — the design principle that follows from the "naive users accept reasonable defaults" pattern.*
+*Added 2026-06-15. Companion to §3a (skill envelope) — the design principle that follows from the "first-time users accept reasonable defaults" pattern.*
 
-The target user (§3, §3a) is, by design, **not** equipped to second-guess the studio. This has a direct consequence for every decision point in the flow:
+The target user (§3, §3a) should **not** have to second-guess the studio. This has a direct consequence for every decision point in the flow:
 
-> Naive users accept reasonable defaults and do not question them. The studio's value sits in the defaults, not the override controls. A weak default is a user-visible failure regardless of whether override controls exist.
+> First-time users accept reasonable defaults and do not question them. The studio's value sits in the defaults, not the override controls. A weak default is a user-visible failure regardless of whether override controls exist.
 
-This is the same failure mode §2 describes from the reviewer's side — the hygiene mistakes reviewers silently fix across dozens of PRs are, almost always, a default the upstream tool never proposed. Keyman Developer's blank canvas pushes the decision onto an author who lacks the context to make it; the studio's job is to make that decision *for* them and let them confirm it.
+This is the same pattern §2 describes from the reviewer's side: many of the hygiene fixes reviewers make across PRs are decisions a first-time author had no default for. Keyman Developer gives experienced authors a blank canvas and full control, which is what they need. A first-time author often lacks the context to make those decisions unaided, so the studio proposes each one and lets them confirm it.
 
 **The posture is propose-then-confirm, everywhere.** This generalizes the §5 base-derived pre-fill rule — *never ask before you can pre-fill* — from base-derived answers to **every** answer the studio has data to propose. Wherever the studio holds a signal that bears on a decision — the chosen base, the BCP47 tag, CLDR, a placement corpus, the OAuth identity, already-collected survey answers, the discovery axes — that signal is converted into a **proposed default rendered as an editable confirmation**, never a blank field. A decision point left blank when a default was derivable is a defect, not a neutral hand-off.
 

@@ -53,7 +53,7 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
       <div style={menuPanel}>
         <div style={menuHeader}>
           <span style={{ font: '600 11px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
-            <Trans id="editor.assignLoop.statusBar.removedCount">Removed · {list.length}</Trans>
+            <Trans id="editor.assignLoop.statusBar.removedCount">Discarded · {list.length}</Trans>
           </span>
           <button onClick={onRestoreAll} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 7, color: 'var(--app-accent-text)', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
             <UndoIcon size={13} /> <Trans id="editor.assignLoop.statusBar.restoreAll">Restore all</Trans>
@@ -97,7 +97,7 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
                   fill itself never changes. Same pairing bug as
                   CarveGalleryV2's "In your alphabet" pill. */}
               <button onClick={() => onRestore(it)} style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', background: 'var(--sil-green)', border: '1px solid var(--sil-green-dark)', borderRadius: 7, color: 'var(--sil-black)', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
-                <CheckIcon size={12} /> <Trans id="editor.assignLoop.statusBar.keepButton">Keep</Trans>
+                <CheckIcon size={12} /> <Trans id="editor.assignLoop.statusBar.keepButton">Restore</Trans>
               </button>
             </div>
           ))}
@@ -144,8 +144,8 @@ export function RemovedDropdown({ list, onRestore, onRestoreAll }: RemovedDropdo
       >
         <UndoIcon size={13} />
         {list.length > 0
-          ? <Trans id="editor.assignLoop.statusBar.removedCountButton"><b>{list.length}</b> removed</Trans>
-          : t({ id: "editor.assignLoop.statusBar.nothingRemoved", message: "Nothing removed" })}
+          ? <Trans id="editor.assignLoop.statusBar.removedCountButton"><b>{list.length}</b> discarded</Trans>
+          : t({ id: "editor.assignLoop.statusBar.nothingRemoved", message: "Nothing discarded" })}
         {list.length > 0 && <ChevronIcon open={open} size={14} />}
       </button>
       {open && list.length > 0 && (
@@ -174,7 +174,7 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--app-text-subtle)', marginTop: 2 }}>
           <Trans id="editor.assignLoop.statusBar.removedReversibleLine">
-            {total - kept} removed · reversible until you continue
+            {total - kept} discarded · you can restore them at any time
           </Trans>
         </div>
       </div>

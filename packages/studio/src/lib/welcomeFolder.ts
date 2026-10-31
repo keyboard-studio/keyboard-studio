@@ -30,14 +30,31 @@ export const WELCOME_PAGE_PATH = `source/${WELCOME_FOLDER}/welcome.htm`;
 /** The pre-076 flat path, which output must never carry (FR-002). */
 export const FLAT_WELCOME_PATH = "source/welcome.htm";
 
-/** The carried base images that live in the welcome folder, in carry order. */
-export function carriedWelcomeImages(images: readonly WelcomeFolderImage[] | null): WelcomeFolderImage[] {
-  return (images ?? []).filter((img) => img.path.startsWith(`${WELCOME_FOLDER}/`));
+/** File types a copy carries from the base's welcome folder. */
+const WELCOME_IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|bmp)$/i;
+
+/**
+ * The carried base files that live in the welcome folder, in carry order.
+ *
+ * `imagesOnly` is the track rule (spec 080 R9 / FR-007): a copy
+ * inherits the base's welcome IMAGES and nothing of its prose, so a copy
+ * passes `true` and the folder's sub-pages (`.htm`) and stylesheets (`kb.css`)
+ * stay behind — its pages are fresh renders with their own inline style. An
+ * adaptation passes `false`: those files are its own documentation, which its
+ * inherited pages link to.
+ */
+export function carriedWelcomeImages(
+  images: readonly WelcomeFolderImage[] | null,
+  imagesOnly: boolean,
+): WelcomeFolderImage[] {
+  return (images ?? []).filter(
+    (img) => img.path.startsWith(`${WELCOME_FOLDER}/`) && (!imagesOnly || WELCOME_IMAGE_EXTENSIONS.test(img.path)),
+  );
 }
 
-/** Bare file names (no folder prefix) of the carried welcome-folder images. */
-export function welcomeFolderFileNames(images: readonly WelcomeFolderImage[] | null): string[] {
-  return carriedWelcomeImages(images).map((img) => img.path.slice(WELCOME_FOLDER.length + 1));
+/** Bare file names (no folder prefix) of the carried welcome-folder files. */
+export function welcomeFolderFileNames(images: readonly WelcomeFolderImage[] | null, imagesOnly: boolean): string[] {
+  return carriedWelcomeImages(images, imagesOnly).map((img) => img.path.slice(WELCOME_FOLDER.length + 1));
 }
 
 /**

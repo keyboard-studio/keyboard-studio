@@ -241,6 +241,14 @@ export interface AssignPanelProps {
   /** BCP47 tag forwarded to `proposeKeyId`'s case-mapping. */
   bcp47?: string;
   /**
+   * The per-mark "start of line" box as `mark -> ticked` (#2374),
+   * forwarded to `proposeKeyId`: with the box unticked a combining mark
+   * mints guarded `T_`; ticked (or no box — a late-added mark with no
+   * survey row takes the unticked default) it mints `U_`. Supplied by the
+   * caller — this panel stays store-free like its siblings.
+   */
+  bareMarkAllowedByMark?: Readonly<Record<string, boolean>>;
+  /**
    * The keyboard's own repertoire (declared exemplars or discovered
    * inventory) — REQUIRED so a freshly-minted guard store is never a
    * hardcoded ASCII literal (key-id-policy.md §2, contract §6.1). May be
@@ -385,6 +393,7 @@ export function AssignPanel({
   characterMapChars,
   capsHandled,
   bcp47,
+  bareMarkAllowedByMark,
   repertoire,
   onCommit,
   label,
@@ -428,6 +437,11 @@ export function AssignPanel({
     return decomposition.kind === "parsed" ? decomposition.tokens : [];
   }, [targetParts]);
 
+  // The selected char's "start of line" box (#2374): ticked → the bare
+  // mark may appear at buffer start (plain U_); unticked or no box →
+  // guarded T_. Resolved once here for both proposal passes below.
+  const bareMarkAllowed = selectedChar !== null && bareMarkAllowedByMark?.[selectedChar] === true;
+
   // Two-pass proposal (see key-id-policy.md §2.1): first learn the candidate
   // `T_` alternative id, then count its occurrences elsewhere in the layout,
   // then re-propose with that count so the alternative's reason is accurate.
@@ -438,8 +452,9 @@ export function AssignPanel({
       capsHandled,
       ...(caseTripleRequested ? { caseTripleRequested } : {}),
       ...(bcp47 !== undefined ? { bcp47 } : {}),
+      ...(bareMarkAllowed ? { bareMarkAllowed } : {}),
     });
-  }, [selectedChar, capsHandled, caseTripleRequested, bcp47]);
+  }, [selectedChar, capsHandled, caseTripleRequested, bcp47, bareMarkAllowed]);
 
   const sharedCandidateCount = useMemo(() => {
     if (baseProposal?.alternative === undefined || selectedCell === null) return undefined;
@@ -453,9 +468,10 @@ export function AssignPanel({
       capsHandled,
       ...(caseTripleRequested ? { caseTripleRequested } : {}),
       ...(bcp47 !== undefined ? { bcp47 } : {}),
+      ...(bareMarkAllowed ? { bareMarkAllowed } : {}),
       ...(sharedCandidateCount !== undefined ? { sharedCandidateCount } : {}),
     });
-  }, [selectedChar, capsHandled, caseTripleRequested, bcp47, sharedCandidateCount]);
+  }, [selectedChar, capsHandled, caseTripleRequested, bcp47, bareMarkAllowed, sharedCandidateCount]);
 
   const assignmentPlan = useMemo<AssignmentPlan | undefined>(() => {
     if (proposal === undefined || selectedChar === null) return undefined;

@@ -7,9 +7,9 @@
 // the author writes both languages inside each answer, so the page is tagged
 // with the main language (pf_doc_language).
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeOptionalOptionValidator } from "../validators.ts";
 
-const OPTION_VALUES = new Set(["none", "english", "target", "other"]);
 
 export const definition = {
   id: "pf_doc_language_second",
@@ -27,26 +27,11 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'other'", goto: "pf_doc_language_second_other" },
-    { default: true, goto: "pf_font_guidance" },
+    { default: true, goto: "pf_usage_tip_2" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (v.length === 0) {
-    return { ok: true };
-  }
-  if (!OPTION_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: "Please choose one of the offered options.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeOptionalOptionValidator(definition.options.map((o) => o.value), "Please choose one of the offered options.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

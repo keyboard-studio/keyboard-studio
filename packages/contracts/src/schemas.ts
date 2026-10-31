@@ -26,6 +26,7 @@ import type {
   CarveDispositionProvenance,
   CarveDispositionValue,
 } from "./carveDisposition";
+import type { FallbackPolicy } from "./fallbackPolicy";
 import type {
   TouchKeyProvenance,
   TouchKeyIR,
@@ -39,6 +40,7 @@ import type { AxisFill, AxisFillSource } from "./axisFill";
 import type {
   AttachmentState,
   AttestedStack,
+  BackspaceBehaviour,
   BlockedCombination,
   ConfirmedAlphabet,
   DeclaredRole,
@@ -71,6 +73,7 @@ import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
   StartDocumentationProfile,
   ChartPreference,
+  DocFixProposals,
   DocLintInput,
   DocMemberState,
   HistoryEntryState,
@@ -127,6 +130,9 @@ export const CarveDispositionSchema = z.object({
   provenance: CarveDispositionProvenanceSchema,
 });
 
+/** Keyboard-wide fallback policy (specs/076-rule-behaviours/fallback-surface-design.md). */
+export const FallbackPolicySchema = z.enum(["swallow", "pass-through"]);
+
 // ---------------------------------------------------------------------------
 // AxisFill (spec §7.2 script-class default-fill prior) — provenance primitive
 // plus the on-disk prior record it is derived from (axis-priors.json).
@@ -149,7 +155,7 @@ export const ScriptClassSchema = z.enum([
   "logographic",
 ]);
 
-export const AxisFillSourceSchema = z.enum(["script-class-prior", "import-derived"]);
+export const AxisFillSourceSchema = z.enum(["script-class-prior", "import-derived", "ir-derived"]);
 
 /**
  * Mirror of {@link AxisFill}. `axis`/`value` are loosely typed (`z.string()` /
@@ -295,6 +301,16 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     sp: z.number().optional(),
     width: z.number().optional(),
     pad: z.number().optional(),
+    // Per-key display fields (standard wire members; #2083).
+    font: z.string().optional(),
+    fontsize: z.string().optional(),
+    dk: z.string().optional(),
+    // Wire-format encoding preservation for sp/width/pad (#2083): the source
+    // form (string vs number) so the emitter writes it back without
+    // re-encoding. Absent on synthesized keys.
+    spWire: z.union([z.string(), z.number()]).optional(),
+    widthWire: z.union([z.string(), z.number()]).optional(),
+    padWire: z.union([z.string(), z.number()]).optional(),
   }),
 );
 
@@ -303,10 +319,17 @@ export const TouchLayoutIRSchema = z.object({
     z.object({
       id: z.enum(["phone", "tablet", "desktop"]),
       font: z.string().optional(),
+      // Platform-level display fields (standard wire members; #2083).
+      // defaultHint is preserved verbatim, never defaulted.
+      fontsize: z.string().optional(),
+      displayUnderlying: z.boolean().optional(),
+      defaultHint: z.string().optional(),
       layers: z.array(
         z.object({
           id: z.string(),
-          rows: z.array(z.object({ keys: z.array(TouchKeyIRSchema) })),
+          // Source row id, preserved so the emitter writes it back instead of
+          // regenerating `rowIdx + 1` (#2083). Absent on synthesized rows.
+          rows: z.array(z.object({ id: z.number().optional(), keys: z.array(TouchKeyIRSchema) })),
         }),
       ),
     }),
@@ -587,6 +610,9 @@ export const AttestedStackSchema = z.object({
   base: z.string().min(1),
   // Order-preserving: closest-to-base first; at least one mark per stack.
   marks: z.array(z.string().min(1)).min(1),
+  // Pair-level provenance (#1784): only text-sample evidence is recorded
+  // explicitly; absent = attested by non-text means.
+  source: z.enum(["text"]).optional(),
 });
 
 export const ConfirmedAlphabetSchema = z.object({
@@ -614,11 +640,18 @@ export const PlacementWorklistSchema = z.object({
   ownLetterUnits: z.array(z.string()),
   markUnits: z.array(MarkUnitSchema),
   blockedCombinations: z.array(BlockedCombinationSchema),
+  allowedContexts: z.record(z.string(), z.array(z.string())).optional(),
+  bareMarkAllowed: z.record(z.string(), z.boolean()).optional(),
 });
 
 // The S4 whole-keyboard output-form decision (spec 071). Carried on
 // SurveyPhaseResult/SurveySession as `marksOutputForm`.
 export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
+
+// The S4 backspace decision (issue #2302; spec 071 amendment 2026-10-19):
+// its own axis alongside the output form. Carried on
+// SurveyPhaseResult/SurveySession as `marksBackspace`.
+export const BackspaceBehaviourSchema = z.enum(["peel", "whole-stack"]);
 
 // The context-tolerance station's decision (spec 078). Carried on
 // SurveyPhaseResult/SurveySession as `marksContextTolerance`.
@@ -893,6 +926,14 @@ export const LayoutChartFileSchema = z.object({
 
 export const ChartPreferenceSchema = z.enum(["keep-base-images", "regenerate"]);
 
+export const DocFixProposalStateSchema = z.enum(["accepted", "declined"]);
+
+export const DocFixProposalsSchema = z.object({
+  pagename: DocFixProposalStateSchema.optional(),
+  bodySync: z.enum(["welcome", "help", "declined"]).optional(),
+  imageWidth: DocFixProposalStateSchema.optional(),
+});
+
 export const DocLintInputSchema = z.object({
   keyboardId: z.string(),
   keyboardVersion: z.string(),
@@ -983,6 +1024,12 @@ type _CarveDispositionValueGuard = Expect<
 type _CarveDispositionProvenanceGuard = Expect<
   AssignableTo<z.infer<typeof CarveDispositionProvenanceSchema>, CarveDispositionProvenance>
 >;
+type _FallbackPolicyGuard = Expect<
+  AssignableTo<z.infer<typeof FallbackPolicySchema>, FallbackPolicy>
+>;
+type _FallbackPolicyReverseGuard = Expect<
+  AssignableTo<FallbackPolicy, z.infer<typeof FallbackPolicySchema>>
+>;
 // AxisFill (spec §7.2). `axis`/`value` are validated loosely (see
 // AxisFillSchema doc) so the guard only pins `source`, which is where real
 // drift (a renamed/added fill-source literal) would occur.
@@ -1029,6 +1076,9 @@ type _PlacementWorklistGuard = Expect<
   AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
 >;
 type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
+type _BackspaceBehaviourGuard = Expect<
+  AssignableTo<z.infer<typeof BackspaceBehaviourSchema>, BackspaceBehaviour>
+>;
 type _MarksContextToleranceDecisionGuard = Expect<
   AssignableTo<z.infer<typeof MarksContextToleranceDecisionSchema>, MarksContextToleranceDecision>
 >;
@@ -1145,5 +1195,8 @@ type _LayoutChartFileGuard = Expect<
 >;
 type _ChartPreferenceGuard = Expect<
   AssignableTo<z.infer<typeof ChartPreferenceSchema>, ChartPreference>
+>;
+type _DocFixProposalsGuard = Expect<
+  AssignableTo<z.infer<typeof DocFixProposalsSchema>, DocFixProposals>
 >;
 type _DocLintInputGuard = Expect<AssignableTo<z.infer<typeof DocLintInputSchema>, DocLintInput>>;

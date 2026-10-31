@@ -106,9 +106,35 @@ describe("KM_LINT_TOUCH_KEY_NO_RULE — fires for a genuinely dead key", () => {
 
 describe("KM_LINT_TOUCH_KEY_NO_RULE — one test per exemption", () => {
   it("EXEMPTION nextlayer: a layer-switch key needs no rule (0x092 parity)", () => {
+    // A layer-switch key is marked as one — frame-class `sp` (1/2, the
+    // same classes findLayerSwitchActiveMismatches expects a nextlayer
+    // key to carry), a `*frame*` label, or a sentinel id. This fixture
+    // originally carried NONE of those markers (producing-class `sp` by
+    // default, plain "abc" caption) and passed only via the blanket
+    // nextlayer exemption spec 104 withdrew (see the NOT EXEMPT case
+    // below); with `sp: 2` it is the key its title claims.
     expect(
-      checkTouchKeyNoRule(inputs([key("T_SWITCH", { text: "abc", nextlayer: "symbol" })]), PATH),
+      checkTouchKeyNoRule(
+        inputs([key("T_SWITCH", { text: "abc", sp: 2, nextlayer: "symbol" })]),
+        PATH,
+      ),
     ).toEqual([]);
+  });
+
+  it("NOT EXEMPT (spec 104 FR-006): a producing-class T_ key whose nextlayer is a post-output layer return IS reported — the basic_* symbol shape", () => {
+    // basic_kbdus's symbol layer: `T_0031` "1" with `nextlayer:
+    // "default"` — type the digit, return to the default layer. The
+    // return is a property of a producing key, not its job; rule-free,
+    // the tap types nothing, and basic_* is spec 104 FR-028's named
+    // dead-key repair fixture. A corpus scan finds no switch-only T_
+    // key that relied on the blanket exemption this case withdraws:
+    // every attested switch idiom carries sp 1/2, a `*frame*` label, or
+    // a sentinel/reserved id, each still exempt above.
+    const findings = checkTouchKeyNoRule(
+      inputs([key("T_0031", { text: "1", nextlayer: "default" })]),
+      PATH,
+    );
+    expect(findings).toHaveLength(1);
   });
 
   it("EXEMPTION sp class: a blank key (sp 9) is non-interactive", () => {

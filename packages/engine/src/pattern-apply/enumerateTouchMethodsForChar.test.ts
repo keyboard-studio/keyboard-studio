@@ -20,9 +20,14 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
+import { buildTouchKeyRuleIndex, parseTouchLayoutString } from "@keyboard-studio/contracts";
 import { touchKey } from "@keyboard-studio/contracts/fixtures";
+import { parse } from "../codec/parse.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -283,5 +288,86 @@ describe("enumerateTouchMethodsForChar", () => {
       "phone:shift:U_0061",
       "tablet:default:U_0061",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 104 T008 — resolver-backed enumeration (audit gap 1)
+// ---------------------------------------------------------------------------
+
+describe("enumerateTouchMethodsForChar — resolver mode (spec 104 T008)", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const fixtureDir = resolve(here, "__fixtures__/touch-id/sil_cameroon_qwerty");
+  const kmn = readFileSync(resolve(fixtureDir, "sil_cameroon_qwerty.kmn"), "utf8");
+  const layoutJson = readFileSync(
+    resolve(fixtureDir, "sil_cameroon_qwerty.keyman-touch-layout"),
+    "utf8",
+  );
+  const ir = parse(kmn, "sil_cameroon_qwerty").ir;
+  const layout = parseTouchLayoutString(layoutJson);
+  const production = { ir, ruleIndex: buildTouchKeyRuleIndex(ir) };
+
+  it("enumerates a ruled T_ method on the same address scheme as K_/U_ methods", () => {
+    const result = enumerateTouchMethodsForChar(layout, "̀", { production });
+    const ids = result.map((r) => r.id).sort();
+    // T_0300 occurs on default + shift, but only the default-layer key has a
+    // producing rule in that state (T_ has no fallback) — one method.
+    expect(ids).toEqual(["tablet:default:T_0300"]);
+    expect(result[0]).toMatchObject({ kind: "tap", producedChar: "̀", deletable: true });
+  });
+
+  it("without production inputs the same T_ method is invisible (the gap-1 blindness)", () => {
+    expect(enumerateTouchMethodsForChar(layout, "̀")).toEqual([]);
+  });
+
+  it("enumerates the bare-rule T_ punctuation producer (T_002E, '.')", () => {
+    const result = enumerateTouchMethodsForChar(layout, ".", { production });
+    expect(result.map((r) => r.id)).toEqual(["tablet:default:T_002E"]);
+  });
+
+  it("a ruled T_ method hosted as a longpress sub-key is enumerated as longpress", () => {
+    const hosted = makeLayout([
+      touchKey({
+        id: "K_A",
+        text: "a",
+        sk: [touchKey({ id: "T_0300", text: "◌̀" })],
+      }),
+    ]);
+    const result = enumerateTouchMethodsForChar(hosted, "̀", { production });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ kind: "longpress", deletable: true });
+    expect(result[0]!.id).toContain("T_0300");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Emulation-class keys (T021 arm3): context rules on function keys are
+// text-rewriting triggers, not typing methods; a bare rule on one is its
+// own production. Corpus shapes: hakka/taigi `phonetic + [K_TAB] >
+// conversion`; ibono/obolo `+ [ALT K_ENTER] > U+000A`.
+// ---------------------------------------------------------------------------
+
+describe("enumerateTouchMethodsForChar — emulation-class keys (spec 104, T021 arm3)", () => {
+  const emuKmn = [
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    '"x" + [K_TAB] > "y"',
+    "+ [ALT K_ENTER] > U+000A",
+    "",
+  ].join("\n");
+  const emuIr = parse(emuKmn, "emulation-fixture").ir;
+  const emuProduction = { ir: emuIr, ruleIndex: buildTouchKeyRuleIndex(emuIr) };
+  const emuLayout = makeLayout([touchKey({ id: "K_TAB", text: "*Tab*" })], {
+    extraPhoneLayer: { id: "alt", keys: [touchKey({ id: "K_ENTER", text: "*Enter*" })] },
+  });
+
+  it("does not enumerate K_TAB for the output of its context conversion rule", () => {
+    expect(enumerateTouchMethodsForChar(emuLayout, "y", { production: emuProduction })).toEqual([]);
+  });
+
+  it("enumerates K_ENTER for its bare-rule production (alt-layer newline)", () => {
+    const result = enumerateTouchMethodsForChar(emuLayout, "\n", { production: emuProduction });
+    expect(result.map((r) => r.id)).toEqual(["phone:alt:K_ENTER"]);
   });
 });

@@ -651,3 +651,115 @@ describe("delivered artifact — generated layout charts in <Files> (spec 079 FR
     expect(names.some((n) => /^welcome\\ks-layout-desktop-.*\.svg$/.test(n))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The starting keyboard's packaged fonts reach the descriptor
+// ---------------------------------------------------------------------------
+
+describe("delivered artifact — packaged fonts (criteria 8/9/10)", () => {
+  const FONT = "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf";
+  const OFL = "shared/fonts/sil/andika_subsets/OFL.txt";
+  const FONT_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";
+  const OFL_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\OFL.txt";
+
+  function expectFontsDeclared(kps: string): void {
+    const names = fileNames(kps);
+    expect(names).toContain(FONT_REF);
+    expect(names).toContain(OFL_REF);
+    expect(kps).toContain(`<OSKFont>${FONT_REF}</OSKFont>`);
+    expect(kps).toContain(`<DisplayFont>${FONT_REF}</DisplayFont>`);
+  }
+
+  it("adapt track: the generated descriptor lists the fonts and selects the OSK/display font", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setStartPackageFonts({ files: [FONT, OFL], oskFont: FONT, displayFont: FONT });
+
+    await serializeWorkingCopy();
+    expectFontsDeclared(descriptorText("basic_kbdus"));
+  });
+
+  it("copy track: a scaffolded descriptor that lacks the fonts has them added", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { vfs } = seedCopyTrack("en");
+    // What a copy scaffolded before the fix holds: the real writer's output,
+    // with a <Files> block but no fonts.
+    vfs.set(
+      "source/basic_kbdus.kps",
+      buildKpsContent("basic_kbdus", { displayName: "US English (Basic)", languageTag: "en" }, BASE_KMN),
+      false,
+    );
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setStartPackageFonts({ files: [FONT, OFL], oskFont: FONT, displayFont: FONT });
+
+    await serializeWorkingCopy();
+    expectFontsDeclared(descriptorText("basic_kbdus"));
+  });
+
+  it("declares no fonts when the starting keyboard packaged none", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setStartPackageFonts(null);
+
+    await serializeWorkingCopy();
+    const kps = descriptorText("basic_kbdus");
+    expect(kps).not.toContain("<OSKFont>");
+    expect(fileNames(kps).some((n) => n.includes("shared\\fonts"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A copy carries the base's welcome IMAGES, never its sub-pages
+// or stylesheets; an adaptation keeps its own welcome folder whole
+// ---------------------------------------------------------------------------
+
+describe("delivered artifact — welcome-folder carry by track", () => {
+  const FOLDER = [
+    { path: "welcome/layout.png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
+    { path: "welcome/qwerty-us-en.htm", bytes: new TextEncoder().encode("<html>sub-page</html>") },
+    { path: "welcome/kb.css", bytes: new TextEncoder().encode("body { margin: 0 }") },
+  ];
+
+  function deliveredWelcomeFiles(): string[] {
+    expect(deliveredVfs, "toZip must have been handed a VFS").not.toBeNull();
+    return deliveredVfs!.list("source/welcome/").map((p) => p.replace(/^source\/welcome\//, "")).sort();
+  }
+
+  it("copy track: ships and lists only the images", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { vfs } = seedCopyTrack("en");
+    // The real scaffolded descriptor, so the welcome files have a <Files> to join.
+    vfs.set(
+      "source/basic_kbdus.kps",
+      buildKpsContent("basic_kbdus", { displayName: "US English (Basic)", languageTag: "en" }, BASE_KMN),
+      false,
+    );
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+    useWorkingCopyStore.getState().setStartWelcomeImages(FOLDER);
+
+    await serializeWorkingCopy();
+
+    const shipped = deliveredWelcomeFiles();
+    expect(shipped).toContain("layout.png");
+    expect(shipped).not.toContain("qwerty-us-en.htm");
+    expect(shipped).not.toContain("kb.css");
+    const names = fileNames(descriptorText("basic_kbdus"));
+    expect(names).toContain("welcome\\layout.png");
+    expect(names.filter((n) => n.startsWith("welcome\\")).sort()).toEqual(["welcome\\layout.png", "welcome\\welcome.htm"]);
+  });
+
+  it("adapt track: ships the whole welcome folder its inherited pages link to", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+    useWorkingCopyStore.getState().setStartWelcomeImages(FOLDER);
+
+    await serializeWorkingCopy();
+
+    expect(deliveredWelcomeFiles()).toEqual(expect.arrayContaining(["layout.png", "qwerty-us-en.htm", "kb.css"]));
+  });
+});

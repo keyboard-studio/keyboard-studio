@@ -17,6 +17,8 @@ To add a row:
 
 Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../packages/engine/src/base-browser/kps-parser.ts).
 
+**Exception: whole-corpus listings.** [design-notes/keyboard-grouping.html](design-notes/keyboard-grouping.html) lists every keyboard in the corpus to show how they cluster. That is an inventory of the corpus, not a reference to individual keyboards, so its entries do not need rows here. The rule still applies to any keyboard the project names on its own (as a starting point, fixture, example, or citation), including one that also appears in that listing.
+
 ## Index
 
 | Keyboard | id | Languages (BCP47) | Author | Path |
@@ -39,9 +41,11 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Western Cree (TH-Woods) | `bj_cree_woods` | `cr` | Bill Jancewicz | `../keyboards/release/bj/bj_cree_woods` |
 | BU Phonetic | `bu_phonetic` | `fr`, `de`, `und-Latn`, `es` | J. Albert Bickford | `../keyboards/release/b/bu_phonetic` |
 | Bukawa | `bukawa` | `buk` | William Eckermann | `../keyboards/release/b/bukawa` |
+| Cabecar | `cabecar` | `cjp-Latn` | Victoria Quint | `../keyboards/release/c/cabecar` |
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
+| Dega | `dega` | `rad`, `kpm`, `cmo`, `jra`, `bdq` | Y Phič Hđơ̆k | `../keyboards/release/d/dega` |
 | Easy Chakma | `easy_chakma` | `ccp` | Bivuti Chakma | `../keyboards/release/e/easy_chakma` |
 | Thuɔŋjäŋ | `el_dinka` | `din-Latn`, `dip-Latn`, `diw-Latn`, `dib-Latn`, `dks-Latn`, `dik-Latn` | © 2015-2018 Enabling Languages | `../keyboards/release/el/el_dinka` |
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |

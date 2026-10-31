@@ -259,6 +259,36 @@ describe("createScaffolderService", () => {
       ).rejects.toThrow(/invalid keyboardId/);
     });
 
+    it("surfaces the base help text ONLY as baseHelpPhpTextForExtraction, never in the scaffolded VFS (issue #2206)", async () => {
+      const baseHelp =
+        "<h2>Troubleshooting</h2><p>If a vowel does not combine, type the consonant first.</p>";
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+        if (url.includes("/source/help/base_keyboard.php")) {
+          return Promise.resolve(makeTextResponse(baseHelp));
+        }
+        return Promise.resolve(makeNotFoundResponse());
+      });
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const result = await service.scaffold(startKeyboard, "new_keyboard", "New Keyboard");
+      // The extraction-only field carries the text verbatim…
+      expect(result.baseHelpPhpTextForExtraction).toBe(baseHelp);
+      // …and the produced documentation does not: the copy's help page
+      // is a fresh render with none of the base's prose (FR-007).
+      const helpContent = result.vfs.get("source/help/new_keyboard.php")?.content as string;
+      expect(helpContent).not.toContain("If a vowel does not combine");
+    });
+
+    it("omits baseHelpPhpTextForExtraction when the base has no help page (issue #2206)", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+        return Promise.resolve(makeNotFoundResponse());
+      });
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const result = await service.scaffold(startKeyboard, "new_keyboard", "New Keyboard");
+      expect(result.baseHelpPhpTextForExtraction).toBeUndefined();
+    });
+
     it("falls through gracefully when fetch fails (stub generation)", async () => {
       const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
@@ -585,6 +615,44 @@ group(main) using keys
     const shiftLayer = data.tablet.layer.find((l) => l.id === "shift");
     const shiftKey = shiftLayer!.row[0].key[0];
     expect(shiftKey.nextlayer).toBe("default");
+  });
+
+  // #313 — the IR-native cleanup keeps the raw form's leniency contract:
+  // unparseable or non-object touch-layout content leaves the file
+  // byte-identical and never fails the scaffold. (The "null" case is the
+  // one disclosed delta: the raw operation aborted scaffold() with a
+  // TypeError here; the IR form no-ops like every other malformed input.)
+  describe("touch-layout cleanup fallback (#313)", () => {
+    const kmnWithLayout = `store(&NAME) 'Base Keyboard'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'base_keyboard.keyman-touch-layout'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'A'
+`;
+    async function scaffoldWithLayoutContent(layoutContent: string): Promise<string | undefined> {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".keyman-touch-layout")) return Promise.resolve(makeTextResponse(layoutContent));
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithLayout));
+        return Promise.resolve(makeNotFoundResponse());
+      });
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
+      const entry = vfs.get("source/my_keyboard.keyman-touch-layout");
+      return entry === undefined ? undefined : (entry.content as string);
+    }
+
+    it("leaves invalid JSON untouched", async () => {
+      await expect(scaffoldWithLayoutContent("{not json")).resolves.toBe("{not json");
+    });
+
+    it("leaves a JSON null untouched (was a scaffold-crashing TypeError in the raw form)", async () => {
+      await expect(scaffoldWithLayoutContent("null")).resolves.toBe("null");
+    });
+
+    it("leaves a JSON array untouched", async () => {
+      await expect(scaffoldWithLayoutContent("[1,2]")).resolves.toBe("[1,2]");
+    });
   });
 
   // #416 — the scaffolded .kps must be a package KD can compile to a .kmp, not
@@ -1133,5 +1201,63 @@ describe("single-line copyright metadata uses the Portions convention (spec 064 
     const f = await fields(ONE);
     // release/fv/fv_dakelh: "<holder>. Portions <holder>"
     expect(f.kmnStore).toMatch(/^Copyright .+\. Portions .+$/);
+  });
+});
+
+describe("scaffold — the generated .kps carries the base's fonts and stylesheet (#2308)", () => {
+  const cameroon: StartKeyboard = {
+    id: "sil_cameroon_qwerty",
+    path: "release/sil/sil_cameroon_qwerty",
+    script: "Latn",
+    targets: ["web"],
+    displayName: "Cameroon QWERTY",
+    version: "6.1.2",
+  };
+  const FONT_REF = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";
+  const CAM_KPS = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    "<Package>",
+    "  <Files>",
+    "    <File>",
+    "      <Name>sil_cameroon_qwerty.css</Name>",
+    "      <FileType>.css</FileType>",
+    "    </File>",
+    "    <File>",
+    `      <Name>${FONT_REF}</Name>`,
+    "      <FileType>.ttf</FileType>",
+    "    </File>",
+    "  </Files>",
+    "  <Keyboards>",
+    "    <Keyboard>",
+    `      <OSKFont>${FONT_REF}</OSKFont>`,
+    `      <DisplayFont>${FONT_REF}</DisplayFont>`,
+    "    </Keyboard>",
+    "  </Keyboards>",
+    "</Package>",
+  ].join("\n");
+  const TTF_BYTES = new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+  it("lists the carried font + OSKFont and the RENAMED stylesheet in source/<new id>.kps", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kps")) return Promise.resolve(makeTextResponse(CAM_KPS));
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.includes(".css")) return Promise.resolve(makeTextResponse(".kmw-keyboard-x { color: red; }"));
+      if (url.includes(".ttf")) return Promise.resolve(makeBytesResponse(TTF_BYTES));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const { vfs, fonts } = await service.scaffold(cameroon, "ewondo", "Ewondo");
+    expect(fonts).toHaveLength(1);
+
+    const kpsEntry = vfs.get("source/ewondo.kps");
+    expect(kpsEntry).toBeDefined();
+    const kps = kpsEntry!.content as string;
+    expect(kps).toContain(`<Name>${FONT_REF}</Name>`);
+    expect(kps).toContain(`<OSKFont>${FONT_REF}</OSKFont>`);
+    expect(kps).toContain(`<DisplayFont>${FONT_REF}</DisplayFont>`);
+    // The stylesheet entry names the copy's renamed file, not the base's.
+    expect(kps).toContain("<Name>ewondo.css</Name>");
+    expect(kps).not.toContain("sil_cameroon_qwerty.css");
   });
 });

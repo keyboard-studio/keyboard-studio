@@ -237,6 +237,8 @@ describe("phase B inventory draft — snapshot/restore round-trip", () => {
       loanwordChars: [],
       rejected: [],
       proposalConfidence: {},
+      // #1367 addition: no CLDR proposal seeded, so no release is recorded.
+      proposalRelease: {},
       exemplarMethodDeclined: false,
       // Spec 075 additions: no proposal seeded, no invisible asked.
       seededProposals: [],
@@ -355,6 +357,69 @@ describe("phase B inventory draft — three-store split (spec 071)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Pair-level text-sample attribution (#1784): stacks harvested from a text
+// sample carry source "text"; exemplar/author pairs carry no source.
+// Attribution is first-origin: a pairing re-attested by a later source
+// keeps the first origin's attribution (no "both" state).
+// ---------------------------------------------------------------------------
+
+describe("phase B inventory draft — attested stack text attribution (#1784)", () => {
+  const ACUTE = "́";
+  const GRAVE = "̀";
+
+  it("a text-sample pick attributes its stack as text", () => {
+    draft().addProposed("è", "text");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+
+  it("an exemplar pick leaves the stack unattributed", () => {
+    draft().addProposed("é", "cldr");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("an author pick leaves the stack unattributed", () => {
+    draft().add("é");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("re-attesting an exemplar pair from a text sample keeps the first origin (proposal sources union)", () => {
+    draft().addProposed("é", "cldr");
+    draft().addProposed("é", "text");
+    // Same NFC grapheme dedupes to the one pick; the first origin wins,
+    // mirroring the character-level provenance rule (spec 044 T053).
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+    expect(draft().provenance["é"]).toBe("cldr");
+  });
+
+  it("upgrading a text pick to author re-derives the stack without text attribution", () => {
+    draft().addProposed("è", "text");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+    draft().add("è");
+    expect(draft().provenance["è"]).toBe("author");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE] }]);
+  });
+
+  it("text attribution survives a remove/re-derive cycle of an unrelated pick", () => {
+    draft().addProposed("è", "text");
+    draft().add("k");
+    draft().remove("k");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+
+  it("setAll keeps text attribution for retained text picks", () => {
+    draft().addProposed("è", "text");
+    draft().setAll(["è", "k"]);
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+
+  it("draftConfirmedAlphabet carries the attribution through to the ConfirmedAlphabet", () => {
+    draft().addProposed("è", "text");
+    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
+    expect(alphabet.attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category split (spec 047): deriveStores routes non-letters to derived
 // numbers/punctuation/symbols/separators/controls arrays; letters stay in
 // `bases`; `chars`/confirmed inventory stays COMPLETE (FR-004/005/013).
@@ -461,6 +526,13 @@ function inventory(
 describe("phase B inventory draft — seedFromProposal (spec 044 FR-016)", () => {
   afterEach(() => {
     resetInventoryDecisions();
+  });
+
+  it("preserves a font chosen before seeding (#1895: the toolbar can set the font before any inventory exists)", () => {
+    draft().setSelectedFont("charis-sil");
+    draft().seedFromProposal(inventory(["ŋ", "ɔ"], "sldr"));
+    expect(draft().selectedFont).toBe("charis-sil");
+    draft().setSelectedFont(DEFAULT_PHASE_B_FONT);
   });
 
   it("seeds the main tier and tags every character with its source", () => {
@@ -961,5 +1033,66 @@ describe("phase B inventory draft — loanword letters beside the alphabet", () 
     restoreInventoryFromSnapshot(snapshot);
     expect(draft().loanwordChars).toEqual(["q", "Q"]);
     expect(draft().chars).toEqual(["a"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1367 — live-refresh provenance: a refreshed CLDR inventory must seed
+// under its own "cldr-live" provenance with its release recorded, so the
+// attribution survives reload and never collapses into the pinned "cldr".
+// ---------------------------------------------------------------------------
+
+describe("phase B inventory draft — seedFromProposal live refresh (#1367)", () => {
+  afterEach(() => {
+    resetInventoryDecisions();
+  });
+
+  function liveInventory(chars: string[], release: string): SourcedInventory {
+    return { ...inventory(chars, "cldr"), live: true, release };
+  }
+
+  it("seeds refreshed characters as cldr-live, not cldr", () => {
+    draft().seedFromProposal(liveInventory(["q", "ŋ"], "48.2.1"));
+    const s = draft();
+    expect(s.provenance["q"]).toBe("cldr-live");
+    expect(s.provenance["ŋ"]).toBe("cldr-live");
+    expect(s.proposalConfidence["cldr-live"]).toBe("approved");
+    expect(s.proposalRelease["cldr-live"]).toBe("48.2.1");
+  });
+
+  it("records the pinned release behind the plain cldr provenance", () => {
+    draft().seedFromProposal({ ...inventory(["a"], "cldr"), release: "48.2.0" });
+    const s = draft();
+    expect(s.provenance["a"]).toBe("cldr");
+    expect(s.proposalRelease["cldr"]).toBe("48.2.0");
+  });
+
+  it("keeps pinned and live provenances distinct across both seeds", () => {
+    draft().seedFromProposal({ ...inventory(["a"], "cldr"), release: "48.2.0" });
+    draft().seedFromProposal(liveInventory(["q"], "48.2.1"));
+    const s = draft();
+    expect(s.provenance["a"]).toBe("cldr");
+    expect(s.provenance["q"]).toBe("cldr-live");
+    expect(s.proposalRelease).toEqual({ cldr: "48.2.0", "cldr-live": "48.2.1" });
+  });
+
+  it("round-trips proposalRelease through a snapshot (the reload path)", () => {
+    draft().seedFromProposal(liveInventory(["q"], "48.2.1"));
+    const snapshot = snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
+    expect(snapshot.proposalRelease).toEqual({ "cldr-live": "48.2.1" });
+    draft().reset();
+    restoreInventoryFromSnapshot(snapshot);
+    const s = draft();
+    expect(s.provenance["q"]).toBe("cldr-live");
+    expect(s.proposalRelease["cldr-live"]).toBe("48.2.1");
+  });
+
+  it("does not resurrect a rejected character from a live inventory", () => {
+    draft().seedFromProposal(liveInventory(["q"], "48.2.1"));
+    draft().remove("q");
+    draft().seedFromProposal(liveInventory(["q", "z"], "48.2.1"));
+    const s = draft();
+    expect(s.chars).not.toContain("q");
+    expect(s.chars).toContain("z");
   });
 });

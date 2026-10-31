@@ -4,7 +4,8 @@
 // copy exists (spec 058):
 //   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
 //     base provenance + a "Change starting keyboard" control that routes back to
-//     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
+//     the survey's choose_base step, plus TrackOneIdentityPanel and the
+//     advanced-gated KmnEditor (AdvancedKmnEditor — hidden by default).
 //     No mode toggle, no picker — nothing on the ship-it screen can re-base
 //     the working copy in place. See PickerPane.tsx's variant notes.
 //   - not instantiated (cold arrival at #output) -> "full": the historical
@@ -35,7 +36,7 @@
 // same explanatory pattern PhaseFGate uses, reusing the identical shared
 // selector (lib/unimplementedInventory.ts via usePreviewArtifact).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
@@ -43,6 +44,12 @@ import { useIsNarrow } from "../hooks/useViewport.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useDocsPreview } from "../hooks/useDocsPreview.ts";
+import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
+import { DocumentationFindingsSummary } from "./DocumentationFindingsSummary.tsx";
+import { UnappliedRepairList } from "./TouchKeyIdentityList.tsx";
+import { LintSummary } from "../lint/LintSummary.tsx";
+import { selectUnmappedFindings } from "../lint/lintToQuestion.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -61,7 +68,7 @@ import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
 import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
-import { KmnEditor } from "./KmnEditor.tsx";
+import { AdvancedKmnEditor } from "./AdvancedKmnEditor.tsx";
 import { TrackOneIdentityPanel } from "../editors/panels/TrackOneIdentityPanel.tsx";
 import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
@@ -122,6 +129,28 @@ export function OutputScreen() {
   // second pipeline instance, and the card is informational only: like
   // DocumentationChecklist it never gates download or submit.
   const criteriaResult = useAuthoredCriteria(artifact.stage);
+  // spec 102 FR-034: the checklist says when the inherited docs made the
+  // generated typing guide redundant. A memoised derivation, no timer (D3).
+  const docsPreview = useDocsPreview();
+  // Issue #2145 (warnings-placement model): hygiene accumulates here. The
+  // documentation findings render with the checklist below (grouped
+  // authored vs inherited inside DocumentationFindingsSummary), and the
+  // remaining unmapped findings — the ones with no owning question — render
+  // as a plain summary. KM_WARN_* infrastructure findings are never
+  // author-facing, and error-severity findings stay with the Output gate
+  // and the NavBar outputBlocked treatment, so both are filtered out here.
+  // Informational only: like the checklist, none of this gates download.
+  const documentationFindings = useDocumentationFindings();
+  const publishedFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const otherOutputFindings = useMemo(() => {
+    const docCodes = new Set(documentationFindings.map((f) => f.code));
+    return selectUnmappedFindings(publishedFindings).filter(
+      (f) =>
+        !docCodes.has(f.code) &&
+        !f.code.startsWith("KM_WARN") &&
+        f.severity !== "error",
+    );
+  }, [publishedFindings, documentationFindings]);
   const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
@@ -364,7 +393,7 @@ export function OutputScreen() {
         identityPanelSlot={<TrackOneIdentityPanel />}
         kmnEditorSlot={
           artifact.stage.kind === "ready" ? (
-            <KmnEditor vfs={artifact.stage.vfs} onRecompile={artifact.recompile} />
+            <AdvancedKmnEditor vfs={artifact.stage.vfs} onRecompile={artifact.recompile} />
           ) : null
         }
       />
@@ -428,6 +457,12 @@ export function OutputScreen() {
             <Trans id="output.heading">Output</Trans>
           </h2>
         )}
+        <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
+          <Trans id="output.intro">
+            Review your finished keyboard and the checks below, then download it
+            to install or submit it for publication.
+          </Trans>
+        </p>
         {startKeyboard !== null && (
           <>
             {/* spec 094 FR-001: revise any completed section and come back. */}
@@ -832,11 +867,44 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
+            {/* Issue #2145: the accumulated hygiene set lives here, with
+                the documentation surfaces below — documentation findings
+                grouped authored vs inherited, then any other unmapped
+                findings. Informational only; gates nothing. */}
+            {documentationFindings.length > 0 && (
+              <section
+                aria-label={t({ id: "output.docFindings.regionAriaLabel", message: "Documentation notes" })}
+                data-testid="output-doc-findings"
+                style={{ marginTop: 10 }}
+              >
+                <DocumentationFindingsSummary findings={documentationFindings} />
+              </section>
+            )}
+            {otherOutputFindings.length > 0 && (
+              <section
+                aria-label={t({ id: "output.otherFindings.regionAriaLabel", message: "Other findings" })}
+                data-testid="output-other-findings"
+                style={{ marginTop: 10 }}
+              >
+                <LintSummary findings={otherOutputFindings} />
+              </section>
+            )}
+
+            {/* Spec 104 FR-015 (clarify ruling): a repair list never
+                visited downloads with its repairs UNAPPLIED — the
+                unapplied repairs are recorded as unvisited on the project
+                and listed here. Informational only; gates nothing, and
+                reaching this step never applies a repair. */}
+            <UnappliedRepairList
+              vfs={artifact.stage.kind === "ready" ? artifact.stage.vfs : null}
+              keyboardId={artifact.stage.kind === "ready" ? artifact.stage.keyboardId : null}
+            />
+
             {/* spec 080 FR-017: what documentation ships and where each file's
                 content came from. Informational only — reads state, gates
                 nothing (FR-018); placeholder rows link back to the step that
                 fills them. */}
-            <DocumentationChecklist />
+            <DocumentationChecklist typingGuideSuppressed={docsPreview.typingGuideSuppressed} />
 
             {/* spec 084: criteria summary card — counts from the shared
                 authored result over this screen's own stage, plus the way
@@ -911,6 +979,14 @@ export function OutputScreen() {
                 outputBlocked={submitBlocker !== undefined}
                 {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
                 prefill={submitPrefill}
+                lintResults={{
+                  criteria:
+                    criteriaResult?.rows.map((r) => ({
+                      criterion: r.criterion,
+                      status: r.status,
+                    })) ?? null,
+                  findings: publishedFindings,
+                }}
               />
             </PublishHandover>
 

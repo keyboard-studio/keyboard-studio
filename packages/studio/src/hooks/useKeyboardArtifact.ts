@@ -2,8 +2,10 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { StartKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
+import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
+import { loadDemoSimulate } from "../components/rules/demoSimulation.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 // Re-exported so tests can assert the open-base fetch passes this exact proxy
@@ -37,10 +39,42 @@ interface EngineModule {
     startHistoryMdText?: string;
     startWelcomeImages?: WelcomeFolderImage[];
     startWelcomeConvention?: WelcomeConvention;
+    // Issue #2139 — the base's welcome/help stylesheets (criterion 11.8).
+    startDocCssTexts?: StartDocCssText[];
+    // The base's packaged fonts, for the package descriptor.
+    packageFonts?: PackageFontSet;
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
+  /** Emit a parsed IR back to .kmn text (the codec's emit, barrel name). */
+  emitKmn?: (ir: KeyboardIR) => string;
+  /**
+   * Layer A′ import-fidelity stages (the engine's, composed inline here).
+   * Parse stage runs on the raw ParseResult + source text; emit stage runs on
+   * the parsed IR + its emitted text. Both return LintFinding[] (I1–I6).
+   */
+  runImportFidelityParseChecks?: (
+    parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
+    source: string,
+  ) => LintFinding[];
+  /**
+   * The synchronous half of the emit stage (I3 + I6 + NUL behaviour) — the
+   * only fidelity work allowed on the pre-`ready` path.
+   */
+  runImportFidelityEmitChecksSync?: (
+    ir: KeyboardIR,
+    emitted: string,
+  ) => LintFinding[];
+  /**
+   * I2 (functional round-trip) on its own. Expensive (two compiles + a
+   * corpus simulation), so the live path runs it AFTER the stage reaches
+   * `ready` and appends its findings to the ready stage's warnings.
+   */
+  runImportFidelityRoundTripCheck?: (
+    ir: KeyboardIR,
+    roundTripDeps?: RoundTripDeps,
+  ) => Promise<LintFinding[]>;
   recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
   classifyRemovalCapabilities?: (ir: KeyboardIR) => Map<string, RemovalCapability>;
   /**
@@ -178,6 +212,34 @@ function revokeBlobUrl(ref: React.MutableRefObject<string | null>): void {
 function revokeBlobUrls(ref: React.MutableRefObject<string[]>): void {
   for (const url of ref.current) URL.revokeObjectURL(url);
   ref.current = [];
+}
+
+// ---------------------------------------------------------------------------
+// Functional I2 (round-trip) supersession — app-wide, not per hook instance
+// ---------------------------------------------------------------------------
+//
+// Several useKeyboardArtifact instances are alive at once during a walk
+// (SurveyView's preview plus the Mechanism/Touch gallery previews, each with
+// its own hook state), and they all share one main thread. The round-trip's
+// cancellation token therefore lives at module scope: at most one I2 pass
+// runs at a time, and ANY instance's new compile retires the pass in flight,
+// whichever instance owns it. The per-instance token this replaces (#2249)
+// let a sibling instance's pass keep simulating after the walk moved on:
+// the gallery instance's pass was still running while the author waited at
+// Output, whose own fresh pipeline then shared the main thread with it, and
+// the Output stage did not reach `ready` inside the e2e driver's wait
+// window (CI run 39045148284: emit-download stuck on the NOT_READY blocker —
+// the sole blocker — with Playwright's poll starved to 8 evaluations in
+// 60 s). An aborted pass reports UNAVAILABLE, never a partial clean bill —
+// the same posture as the same-instance supersession this generalises.
+let activeRoundTripToken: { aborted: boolean } | null = null;
+
+/** Retire the I2 pass currently in flight, whichever instance owns it. */
+function retireActiveRoundTrip(): void {
+  if (activeRoundTripToken !== null) {
+    activeRoundTripToken.aborted = true;
+    activeRoundTripToken = null;
+  }
 }
 
 /**
@@ -327,6 +389,25 @@ export type OnInstantiateCallback = (
   opts: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
 ) => void;
 
+/**
+ * Format Layer A′ import-fidelity findings for the runtime-warning channel.
+ *
+ * Only warning/error/fatal severities surface. The I4 opaque-feature
+ * inventory (info) and the I2 round-trip stub (hint) fire on EVERY import by
+ * design — they are ImportReport metadata, not author-facing diagnostics, and
+ * surfacing them would put a warning banner on every keyboard open.
+ * Error-severity findings (I1 parse completeness, I6 ownership, …) surface
+ * here as non-blocking warnings, exactly like the [ir-parse] gap note:
+ * instantiation proceeds either way.
+ */
+function formatFidelityWarnings(findings: LintFinding[]): string[] {
+  return findings
+    .filter(
+      (f) => f.severity === "warning" || f.severity === "error" || f.severity === "fatal",
+    )
+    .map((f) => `[import-fidelity] ${f.code}: ${f.message}`);
+}
+
 /** Optional behaviour for {@link useKeyboardArtifact}. */
 export interface KeyboardArtifactOptions {
   /**
@@ -335,6 +416,82 @@ export interface KeyboardArtifactOptions {
    * StudioShell's main-walk preview passes this, behind the flag.
    */
   analyseContextTolerance?: boolean;
+  /**
+   * Run the functional I2 round-trip check after a full run reaches
+   * `ready` (spec 078 publish-after-ready posture) and append its findings
+   * to the ready stage's runtime warnings. Only StudioShell's main-walk
+   * preview passes this: it is the instance whose full run IS the base
+   * import, so its pass is the import's verdict. Every other instance
+   * (galleries, Output, Criteria, Compare) compiles the same base or the
+   * author's working copy for its own screen; a 100k-sequence simulation
+   * after each of those readies only competes for the main thread with
+   * the screen the author is waiting on — on PR #2250's CI run
+   * 39053681152 the Output screen's own pass (plus a sibling's) kept
+   * `sil_cameroon_azerty`'s Output compile from settling inside the
+   * driver's 60 s window even with app-wide supersession, while the five
+   * lighter T011 walks passed (#2249).
+   */
+  runRoundTripCheck?: boolean;
+  /**
+   * Whether this instance's full runs write the starting point's
+   * documentation slices (welcome/help prose, README/HISTORY, welcome images,
+   * doc stylesheets, baseline doc findings) into the working-copy store.
+   * Those slices are session state, so only an instance that instantiates the
+   * working copy may write them:
+   *
+   * - `"by-branch"` — StudioShell's main walk: the scaffold branch writes the
+   *   copy's slices (images, no prose), the open-base branch the adaptation's.
+   * - `"copy-on-switch"` — Output/Criteria (usePreviewArtifact), which only
+   *   ever instantiate a Track 1 copy: copy slices, and only when the run is
+   *   for a different keyboard than the working copy already started from.
+   *
+   * Absent, nothing is written. The galleries and Compare compile the same
+   * base for their own screen; when they wrote, a re-preview of a copy's
+   * starting keyboard refilled the prose slices the copy had cleared (and a
+   * gallery's identity-derived scaffold spec cleared an adaptation's).
+   */
+  startDocs?: "by-branch" | "copy-on-switch";
+}
+
+type WorkingCopyActions = ReturnType<typeof useWorkingCopyStore.getState>;
+
+/**
+ * spec 080 R9 / FR-007: a Track 1 copy inherits the base's welcome IMAGES
+ * (carried into its own welcome folder) and nothing of its prose. The prose
+ * slices are cleared explicitly rather than assumed null —
+ * instantiateFromStart does not touch them, so a prior adapt session's texts
+ * would otherwise survive into this copy and merge.
+ */
+function applyCopyStartDocs(
+  wc: WorkingCopyActions,
+  docs: {
+    images: Parameters<WorkingCopyActions["setStartWelcomeImages"]>[0];
+    convention: Parameters<WorkingCopyActions["setStartWelcomeConvention"]>[0];
+    helpForExtraction: string | null;
+    packageFonts: PackageFontSet | null;
+  },
+): void {
+  wc.setStartWelcomeImages(docs.images);
+  wc.setStartWelcomeConvention(docs.convention);
+  wc.setStartWelcomeHtmText(null);
+  wc.setStartHelpPhpText(null);
+  // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): the
+  // base's help text is retained in the EXTRACTION-ONLY slice at
+  // the same moment the prose slice is nulled — the extractor may
+  // offer its Troubleshooting lines as suggestions, but the text
+  // itself never becomes prose (startHelpPhpText stays null, so
+  // every render/serialize path behaves exactly as FR-007 asks).
+  wc.setBaseHelpPhpTextForExtraction(docs.helpForExtraction);
+  // A copy re-declares the fonts its starting keyboard packaged.
+  wc.setStartPackageFonts(docs.packageFonts);
+  wc.setStartReadmeMdText(null);
+  wc.setStartHistoryMdText(null);
+  // Issue #2139: a copy's pages are fresh renders — the base's page
+  // stylesheets do not govern them, so the slice clears with the prose.
+  wc.setStartDocCssTexts(null);
+  // spec 080 FR-020: a copy inherits no prose, so nothing can be an
+  // upstream finding — an EMPTY baseline (computed), not null (pending).
+  wc.setBaselineDocFindings([]);
 }
 
 export interface KeyboardArtifactResult {
@@ -383,6 +540,15 @@ export function useKeyboardArtifact(
   // toggling it never restarts a compile.
   const analyseToleranceRef = useRef(options?.analyseContextTolerance === true);
   analyseToleranceRef.current = options?.analyseContextTolerance === true;
+  // Same read-at-launch discipline as analyseToleranceRef: which instance
+  // owns the I2 check is a mount-time fact, and toggling it must never
+  // restart a compile.
+  const runRoundTripRef = useRef(options?.runRoundTripCheck === true);
+  runRoundTripRef.current = options?.runRoundTripCheck === true;
+  // Same read-at-launch discipline: which instance owns the start docs is a
+  // mount-time fact.
+  const startDocsRef = useRef(options?.startDocs);
+  startDocsRef.current = options?.startDocs;
 
   /**
    * Records a crash breadcrumb on every Stage transition (spec 060 FR-045).
@@ -408,6 +574,16 @@ export function useKeyboardArtifact(
   // rebuilt on every fresh fetch, revoked on teardown / next fetch.
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
+  // This instance's own in-flight post-ready functional round-trip (I2)
+  // token, while its pass is running. The token object IS the module-level
+  // active token (see retireActiveRoundTrip above) so a sibling instance's
+  // compile can retire it; this ref exists so unmount can retire exactly
+  // this instance's pass. A new compile supersedes the previous artifact:
+  // without retirement, every recompile (e.g. each Mechanisms gallery
+  // Apply) stacked another full corpus simulation on the main thread, and
+  // the superseded passes burned CPU to completion even though their
+  // findings were always going to be dropped.
+  const ownRoundTripTokenRef = useRef<{ aborted: boolean } | null>(null);
   const engineRef = useRef<EngineModule | null>(null);
   // Shared engine load+init promise. Assigned by the first run() call that
   // finds it empty; cleared again if the load rejects, so a later run()
@@ -556,6 +732,12 @@ export function useKeyboardArtifact(
     if (engine === null || vfs === null || runId.current !== thisRunId) {
       return;
     }
+    // A new compile supersedes the previous artifact — retire any
+    // round-trip still simulating for it right away, not just when this
+    // compile's own post-ready pass starts. App-wide (module token): the
+    // pass in flight may belong to a sibling instance whose artifact this
+    // compile also supersedes in every way the author can observe.
+    retireActiveRoundTrip();
 
     const isWarmCompile = engine.isReady?.() ?? false;
     setStage({ kind: "compiling", isWarmCompile });
@@ -563,6 +745,12 @@ export function useKeyboardArtifact(
     let result: CompileResult;
     let parsedIr: KeyboardIR | null = null;
     let parsedRemovalCapabilities: Map<string, RemovalCapability> = new Map();
+    // Functional I2 input captured by the parse branch on full runs; the
+    // check itself runs after `ready` publishes (see below).
+    let pendingRoundTrip: {
+      ir: KeyboardIR;
+      deps: Omit<RoundTripDeps, "compileFn" | "simulateFn">;
+    } | null = null;
     // effectiveKeyboardIdRef takes precedence: it is set only when the last
     // vfsTransform application (Track 1 identity rename) actually renamed
     // source/<startId>.* to source/<targetId>.* inside the VFS, so the compile
@@ -574,6 +762,10 @@ export function useKeyboardArtifact(
     // Parse failure is captured here so it can be surfaced as a non-fatal
     // warning rather than aborting the compile/preview flow (slice 4, AC #4).
     let parseWarning: string | null = null;
+    // Layer A′ import-fidelity findings for this run, formatted for the
+    // runtime-warning channel alongside parseWarning below. Populated by the
+    // parse branch when the engine exposes the fidelity stages.
+    let fidelityWarnings: string[] = [];
     try {
       const kmnPath = findKmnPath(vfs);
       const kmnText = kmnPath ? (readVfsText(vfs, kmnPath) ?? "") : "";
@@ -620,6 +812,71 @@ export function useKeyboardArtifact(
             const pr = engine.parseKmn(kmnText, compileId);
             const recognized = engine.recognizePatterns(pr.ir);
             let ir = recognized.ir;
+            // Layer A′ import-fidelity — the engine's parse + emit
+            // stages, run here because this branch is
+            // where the live path holds the raw ParseResult + source text.
+            // FULL RUNS ONLY: a full run is the import moment (the parse
+            // reads the base keyboard as fetched), while recompile() re-parses
+            // the author's edited working copy, where the checks' parse→emit
+            // round-trip premise no longer holds. This also keeps the checks
+            // outside the 300 ms debounce cycle, as designed (see
+            // validator/index-import-fidelity.ts). The emit stage runs on the
+            // recognized IR before the touch-layout carry-over below, exactly
+            // as the codec emits it. A failure here must never break the
+            // compile — same posture as parseTouchLayout below.
+            let fidelityFindings: LintFinding[] = [];
+            let roundTripInput: {
+              ir: KeyboardIR;
+              deps: Omit<RoundTripDeps, "compileFn" | "simulateFn">;
+            } | null = null;
+            if (
+              isFullRun &&
+              engine.runImportFidelityParseChecks &&
+              engine.runImportFidelityEmitChecksSync &&
+              engine.emitKmn
+            ) {
+              try {
+                const parseFindings = engine.runImportFidelityParseChecks(pr, kmnText);
+                const emittedKmnText = engine.emitKmn(ir);
+                // Only the SYNCHRONOUS emit checks (I3 + I6 + NUL) run on
+                // this pre-`ready` path. Functional I2 (#882) compiles both
+                // .kmn versions and simulates the generated corpus through
+                // KeymanWeb — seconds to minutes on a real base — and
+                // awaiting it here wedged every base preview at
+                // "Preparing preview…" (the parse branch shares the
+                // Promise.all the ready stage waits on). I2 now runs after
+                // `ready` publishes, off the captured input below, and its
+                // findings are appended to the ready stage's warnings when
+                // they land — the spec-078 publish-after-ready posture,
+                // same as the context-tolerance analysis.
+                const emitFindings = engine.runImportFidelityEmitChecksSync(
+                  ir,
+                  emittedKmnText,
+                );
+                fidelityFindings = [...parseFindings, ...emitFindings];
+                // Capture the I2 input only on the designated import
+                // instance (see KeyboardArtifactOptions.runRoundTripCheck):
+                // with no input captured, this instance's post-ready step
+                // below starts no pass, so its `ready` is the last word —
+                // nothing keeps simulating behind the screen the author
+                // is waiting on (#2249, Cameroon Output frontier).
+                if (runRoundTripRef.current) {
+                  roundTripInput = {
+                    ir,
+                    deps: {
+                      originalKmn: kmnText,
+                      emittedKmn: emittedKmnText,
+                      keyboardId: compileId,
+                      sourceFiles: vfs
+                        .entries("source/")
+                        .map((e) => ({ path: e.path, content: e.content, isBinary: e.isBinary })),
+                    },
+                  };
+                }
+              } catch (fidelityErr: unknown) {
+                devLog.warn("[useKeyboardArtifact] import-fidelity checks failed:", fidelityErr);
+              }
+            }
             // Carry the base's shipped .keyman-touch-layout into the IR so that
             // touch authoring (Phase E preview + Phase F output) edits a COPY of
             // the existing layout — scaffoldTouchLayout Case B (preserve +
@@ -648,7 +905,7 @@ export function useKeyboardArtifact(
               typeof engine.classifyRemovalCapabilities === "function"
                 ? engine.classifyRemovalCapabilities(ir)
                 : new Map();
-            return { ...pr, ir, removalCapabilities: caps };
+            return { ...pr, ir, removalCapabilities: caps, fidelityFindings, roundTripInput };
           } catch (parseErr: unknown) {
             // Record the gap so it surfaces as a warning on the ready stage.
             // Do not re-throw — compile must still succeed independently.
@@ -663,6 +920,8 @@ export function useKeyboardArtifact(
       if (parseResult) {
         parsedIr = parseResult.ir;
         parsedRemovalCapabilities = parseResult.removalCapabilities;
+        fidelityWarnings = formatFidelityWarnings(parseResult.fidelityFindings);
+        pendingRoundTrip = parseResult.roundTripInput;
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
@@ -675,8 +934,11 @@ export function useKeyboardArtifact(
 
     // Route any parse-gap note to the runtime-warning channel (refs #467) so it
     // surfaces on the ready stage without riding the scaffold/apply channel or
-    // blocking the preview.
-    const runtimeWarnings: string[] = parseWarning !== null ? [parseWarning] : [];
+    // blocking the preview. Import-fidelity findings ride the same channel.
+    const runtimeWarnings: string[] = [
+      ...(parseWarning !== null ? [parseWarning] : []),
+      ...fidelityWarnings,
+    ];
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
 
@@ -733,6 +995,65 @@ export function useKeyboardArtifact(
       readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
     }
     setStage(readyStage);
+    // Functional I2 (#882) runs only now that `ready` has published — never
+    // on the path the author is waiting on (its two compiles + corpus
+    // simulation wedged every base preview at "Preparing preview…" while
+    // it was awaited pre-ready). Findings append to this ready stage's
+    // runtime warnings when they land; a superseded run's are dropped. If
+    // the simulator chunk cannot load, deps stay undefined and I2 reports
+    // its unavailable hint instead of passing silently.
+    // The start is deferred two macrotask hops so the ready render commits
+    // and paints first: corpus generation + simulation churn the main
+    // thread in microtasks, and starting them in this same turn starved
+    // the ready paint — on the CI runner the preview button stayed
+    // "Preparing preview…" past every consumer's wait window even though
+    // the stage had already flipped to ready (run 38999923387 trace: the
+    // compile finished, then I2's corpus generation began immediately).
+    if (pendingRoundTrip !== null && engine.runImportFidelityRoundTripCheck) {
+      const input = pendingRoundTrip;
+      const roundTripCheck = engine.runImportFidelityRoundTripCheck;
+      const startRoundTrip = () => {
+        void (async () => {
+          retireActiveRoundTrip();
+          const abortToken = { aborted: false };
+          activeRoundTripToken = abortToken;
+          ownRoundTripTokenRef.current = abortToken;
+          let deps: RoundTripDeps | undefined;
+          try {
+            const simulateFn = await loadDemoSimulate();
+            deps = {
+              ...input.deps,
+              compileFn: engine.compile,
+              simulateFn,
+              shouldAbort: () => abortToken.aborted,
+            };
+          } catch {
+            deps = undefined;
+          }
+          const findings = await roundTripCheck(input.ir, deps).catch(
+            (err: unknown) => {
+              devLog.warn("[useKeyboardArtifact] functional I2 check failed:", err);
+              return [] as LintFinding[];
+            },
+          );
+          if (activeRoundTripToken === abortToken) activeRoundTripToken = null;
+          if (ownRoundTripTokenRef.current === abortToken) {
+            ownRoundTripTokenRef.current = null;
+          }
+          if (runId.current !== thisRunId) return;
+          const extra = formatFidelityWarnings(findings);
+          if (extra.length === 0) return;
+          setStageRaw((prev) =>
+            prev.kind === "ready" && prev.keyboardId === compileId
+              ? { ...prev, runtimeWarnings: [...(prev.runtimeWarnings ?? []), ...extra] }
+              : prev,
+          );
+        })();
+      };
+      setTimeout(() => {
+        setTimeout(startRoundTrip, 0);
+      }, 0);
+    }
     if (analyseToleranceRef.current) launchContextTolerance(thisRunId, parsedIr);
   }, [scaffoldSpec?.keyboardId, onInstantiate, launchContextTolerance]);
 
@@ -823,6 +1144,14 @@ export function useKeyboardArtifact(
     fontFaceFamilyRef.current = null;
     revokeBlobUrls(prevKeyboardCssBlobUrls);
 
+    // Decided before the fetch, while the store still holds the working copy
+    // this run would replace — see KeyboardArtifactOptions.startDocs.
+    const startDocsMode = startDocsRef.current;
+    const writesStartDocs =
+      startDocsMode === "by-branch" ||
+      (startDocsMode === "copy-on-switch" &&
+        useWorkingCopyStore.getState().startKeyboard?.id !== kb.id);
+
     try {
       if (scaffoldSpec != null) {
         // Scaffold path — new keyboard authoring. Routes through
@@ -851,20 +1180,14 @@ export function useKeyboardArtifact(
         // same holders. It completes a missing LICENSE.md, and the loader never
         // writes the base's into the VFS, so this is its only source.
         wc.setStartLicenseText(result.startLicenseText ?? null);
-        // spec 080 R9 / FR-007: a Track 1 copy inherits the base's welcome
-        // IMAGES (carried into its own welcome folder) and nothing of its
-        // prose. The prose slices are cleared explicitly rather than assumed
-        // null — instantiateFromStart does not touch them, so a prior adapt
-        // session's texts would otherwise survive into this copy and merge.
-        wc.setStartWelcomeImages(result.startWelcomeImages ?? null);
-        wc.setStartWelcomeConvention(result.startWelcomeConvention ?? null);
-        wc.setStartWelcomeHtmText(null);
-        wc.setStartHelpPhpText(null);
-        wc.setStartReadmeMdText(null);
-        wc.setStartHistoryMdText(null);
-        // spec 080 FR-020: a copy inherits no prose, so nothing can be an
-        // upstream finding — an EMPTY baseline (computed), not null (pending).
-        wc.setBaselineDocFindings([]);
+        if (writesStartDocs) {
+          applyCopyStartDocs(wc, {
+            images: result.startWelcomeImages ?? null,
+            convention: result.startWelcomeConvention ?? null,
+            helpForExtraction: result.baseHelpPhpTextForExtraction ?? null,
+            packageFonts: result.packageFonts ?? null,
+          });
+        }
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.
@@ -884,48 +1207,77 @@ export function useKeyboardArtifact(
           FETCH_TIMEOUT_MS,
           "Loading keyboard source",
         );
-        // spec 061 FR-013: retain the base's own welcome.htm/help.php verbatim
-        // so the Track 2 output-projection merge has something to preserve.
-        // Track 1 (scaffold branch above) never sets these — a brand-new
-        // keyboard has no prior docs of its own to merge with (research D-05).
         const wc = useWorkingCopyStore.getState();
-        wc.setStartWelcomeHtmText(fetchResult.startWelcomeHtmText ?? null);
-        wc.setStartHelpPhpText(fetchResult.startHelpPhpText ?? null);
-        // spec 080 FR-006: the rest of the base's documentation bundle — README
-        // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
-        // images and which convention the base used (data-model §6).
-        wc.setStartReadmeMdText(fetchResult.startReadmeMdText ?? null);
-        wc.setStartHistoryMdText(fetchResult.startHistoryMdText ?? null);
-        wc.setStartWelcomeImages(fetchResult.startWelcomeImages ?? null);
-        wc.setStartWelcomeConvention(fetchResult.startWelcomeConvention ?? null);
-        // spec 080 FR-020 (research R8): run the documentation checks ONCE
-        // over the base's own files as fetched. A later finding on a still-
-        // inherited member whose code appears here is the base's, not the
-        // author's, and renders muted instead of counting against them.
-        {
-          const baselineKmnPath = findKmnPath(vfs);
-          const baselineTouchPath = findTouchLayoutPath(vfs);
-          wc.setBaselineDocFindings(
-            computeBaselineDocFindings({
-              keyboardId: kb.id,
-              displayName: kb.displayName,
-              kmnText: baselineKmnPath ? (readVfsText(vfs, baselineKmnPath) ?? null) : null,
-              kpsText: readVfsText(vfs, `source/${kb.id}.kps`) ?? null,
-              kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
-              touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
-              base: {
-                welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
-                helpPhpText: fetchResult.startHelpPhpText ?? null,
-                readmeMdText: fetchResult.startReadmeMdText ?? null,
-                historyMdText: fetchResult.startHistoryMdText ?? null,
-                // The base LICENSE is never written into the VFS (loader FR-011)
-                // and the adapt track's shipped LICENSE.md is generated with no
-                // invented holder, so the base's notice has no current
-                // counterpart to compare against — it is not part of the baseline.
-                licenseText: null,
-              },
-            }),
-          );
+        if (writesStartDocs && startDocsMode === "copy-on-switch") {
+          // Output/Criteria's picker instantiates a Track 1 copy from this
+          // fetch: the copy's slices, exactly as the scaffold branch writes.
+          applyCopyStartDocs(wc, {
+            images: fetchResult.startWelcomeImages ?? null,
+            convention: fetchResult.startWelcomeConvention ?? null,
+            helpForExtraction: fetchResult.startHelpPhpText ?? null,
+            packageFonts: fetchResult.packageFonts ?? null,
+          });
+        } else if (writesStartDocs) {
+          // spec 061 FR-013: retain the base's own welcome.htm/help.php verbatim
+          // so the Track 2 output-projection merge has something to preserve.
+          // Track 1 (scaffold branch above) never sets these — a brand-new
+          // keyboard has no prior docs of its own to merge with (research D-05).
+          wc.setStartWelcomeHtmText(fetchResult.startWelcomeHtmText ?? null);
+          wc.setStartHelpPhpText(fetchResult.startHelpPhpText ?? null);
+          // Issue #2206: the extraction-only slice is a Track 1 (copy)
+          // retention — on this open-base/adapt path the base's
+          // troubleshooting section already ships inside the inherited
+          // prose, and the ruling authorises no extraction here. Cleared
+          // explicitly so a prior copy session's text cannot survive into
+          // an adapt session (the same hazard the Track 1 clearing above
+          // guards against, in reverse).
+          wc.setBaseHelpPhpTextForExtraction(null);
+          // spec 080 FR-006: the rest of the base's documentation bundle — README
+          // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
+          // images and which convention the base used (data-model §6).
+          wc.setStartReadmeMdText(fetchResult.startReadmeMdText ?? null);
+          wc.setStartHistoryMdText(fetchResult.startHistoryMdText ?? null);
+          wc.setStartWelcomeImages(fetchResult.startWelcomeImages ?? null);
+          wc.setStartWelcomeConvention(fetchResult.startWelcomeConvention ?? null);
+          // Issue #2139: the base's welcome/help stylesheet texts, so the live
+          // 11.8 check and the baseline below judge images against kb.css.
+          wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
+          // The fonts the adaptation's generated descriptor declares.
+          wc.setStartPackageFonts(fetchResult.packageFonts ?? null);
+          // spec 080 FR-020 (research R8): run the documentation checks ONCE
+          // over the base's own files as fetched. A later finding on a still-
+          // inherited member whose code appears here is the base's, not the
+          // author's, and renders muted instead of counting against them.
+          {
+            const baselineKmnPath = findKmnPath(vfs);
+            const baselineTouchPath = findTouchLayoutPath(vfs);
+            wc.setBaselineDocFindings(
+              computeBaselineDocFindings({
+                keyboardId: kb.id,
+                displayName: kb.displayName,
+                kmnText: baselineKmnPath ? (readVfsText(vfs, baselineKmnPath) ?? null) : null,
+                kpsText: readVfsText(vfs, `source/${kb.id}.kps`) ?? null,
+                kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
+                touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
+                // Issue #2139: the baseline judges the base's images against the
+                // same kb.css texts the live check uses (FR-020 consistency).
+                ...(fetchResult.startDocCssTexts !== undefined
+                  ? { cssTexts: fetchResult.startDocCssTexts.map((entry) => entry.text) }
+                  : {}),
+                base: {
+                  welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
+                  helpPhpText: fetchResult.startHelpPhpText ?? null,
+                  readmeMdText: fetchResult.startReadmeMdText ?? null,
+                  historyMdText: fetchResult.startHistoryMdText ?? null,
+                  // The base LICENSE is never written into the VFS (loader FR-011)
+                  // and the adapt track's shipped LICENSE.md is generated with no
+                  // invented holder, so the base's notice has no current
+                  // counterpart to compare against — it is not part of the baseline.
+                  licenseText: null,
+                },
+              }),
+            );
+          }
         }
         // Build a blob URL for the OSK font so the frame can inject an
         // @font-face rule before the keyboard JS executes. Stored in refs so
@@ -1133,6 +1485,23 @@ export function useKeyboardArtifact(
 
   useEffect(() => {
     return () => {
+      // Retire this instance's I2 pass if one is in flight: nobody is left
+      // to read its findings, and letting it simulate to completion keeps
+      // it competing for the main thread with whatever screen replaces
+      // this one (#2249 — the Output frontier: SurveyView and the gallery
+      // unmount when the author navigates to Output, and their passes were
+      // still running while Output's own pipeline tried to compile).
+      // Exactly this instance's token — a sibling's pass belongs to a
+      // screen still mounted. StrictMode's simulated unmount runs this
+      // cleanup before any pass can have started (I2 starts after
+      // `ready`), so it is a no-op there.
+      if (ownRoundTripTokenRef.current !== null) {
+        ownRoundTripTokenRef.current.aborted = true;
+        if (activeRoundTripToken === ownRoundTripTokenRef.current) {
+          activeRoundTripToken = null;
+        }
+        ownRoundTripTokenRef.current = null;
+      }
       revokeBlobUrl(prevBlobUrl);
       revokeBlobUrl(prevFontBlobUrl);
       revokeBlobUrls(prevKeyboardCssBlobUrls);

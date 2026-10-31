@@ -7,7 +7,8 @@
 //
 // Enumeration key (FR-005 amendment):
 // - carved combos ENTER the swallow set on recompile,
-// - EXCEPT `allow-host` dispositions (the author allowed host fallback), and
+// - EXCEPT under the `pass-through` fallback policy (the author allowed host
+//   fallback keyboard-wide), and
 // - EXCEPT combos covered by behaviour-owned rules (no double emission,
 //   no shadowing surprises).
 
@@ -15,17 +16,8 @@ import { describe, it, expect } from "vitest";
 import { isInSwallowSet } from "./swallowSet.js";
 import { compileCarveSuppression } from "./carveSuppression.js";
 import { charStore, charRule, vkeyRule } from "@keyboard-studio/contracts/fixtures";
-import type {
-  CarveDisposition,
-  IRRule,
-  KeyboardIR,
-} from "@keyboard-studio/contracts";
-
-const bulk = (comboId: string, disposition: CarveDisposition["disposition"]): CarveDisposition => ({
-  comboId,
-  disposition,
-  provenance: "bulk-default",
-});
+import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
+import type { IRRule, KeyboardIR } from "@keyboard-studio/contracts";
 
 // A minimal pre-carve IR: one bare-key rule.
 const bareKeyIR = (ruleId = "r1"): KeyboardIR =>
@@ -57,6 +49,7 @@ const deadkeySlotIR = (): KeyboardIR =>
             nodeId: "paired",
             context: [
               { kind: "deadkey", id: 3 },
+              { kind: "raw", text: "+" },
               { kind: "any", storeRef: "dkf003b" },
             ],
             output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],
@@ -67,32 +60,32 @@ const deadkeySlotIR = (): KeyboardIR =>
   }) as KeyboardIR;
 
 describe("isInSwallowSet — FR-005 skip-set seam (T014)", () => {
-  it("block rule carve covered by the suppression rewrite is skipped", () => {
-    const dispositions = [bulk("r1", "block")];
+  it("swallow: rule carve covered by the suppression rewrite is skipped", () => {
+    const dispositions = dispositionsForFallbackPolicy("swallow", ["r1"]);
     const suppressed = compileCarveSuppression(bareKeyIR(), dispositions).ir;
     // The rewritten rule now carries ownedByBehaviour: "carve-suppression".
     expect(suppressed.groups[0]!.rules[0]!.ownedByBehaviour).toBe("carve-suppression");
-    expect(isInSwallowSet({ comboId: "r1" }, dispositions, suppressed)).toBe(false);
+    expect(isInSwallowSet({ comboId: "r1" }, "swallow", suppressed)).toBe(false);
   });
 
-  it("block rule carve not yet covered enters the set (safety net)", () => {
+  it("swallow: rule carve not yet covered enters the set (safety net)", () => {
     // Pre-suppression IR: the rule is still unowned — the leak is open, so
     // the combo enters the swallow set until suppression covers it.
-    const dispositions = [bulk("r1", "block")];
-    expect(isInSwallowSet({ comboId: "r1" }, dispositions, bareKeyIR())).toBe(true);
+    expect(isInSwallowSet({ comboId: "r1" }, "swallow", bareKeyIR())).toBe(true);
   });
 
-  it("allow-host rule carve is excluded, pre- and post-suppression", () => {
-    const dispositions = [bulk("r1", "allow-host")];
-    expect(isInSwallowSet({ comboId: "r1" }, dispositions, bareKeyIR())).toBe(false);
+  it("pass-through: nothing enters the set, pre- and post-suppression", () => {
+    expect(isInSwallowSet({ comboId: "r1" }, "pass-through", bareKeyIR())).toBe(false);
+    const dispositions = dispositionsForFallbackPolicy("pass-through", ["r1"]);
     const suppressed = compileCarveSuppression(bareKeyIR(), dispositions).ir;
-    expect(isInSwallowSet({ comboId: "r1" }, dispositions, suppressed)).toBe(false);
+    expect(isInSwallowSet({ comboId: "r1" }, "pass-through", suppressed)).toBe(false);
+    expect(isInSwallowSet({ comboId: "K_Q+shift" }, "pass-through", bareKeyIR())).toBe(false);
   });
 
-  it("a suppression-owned rule is skipped even with no disposition record", () => {
+  it("a suppression-owned rule is skipped under swallow", () => {
     const ir = bareKeyIR();
     (ir.groups[0]!.rules[0] as IRRule).ownedByBehaviour = "carve-suppression";
-    expect(isInSwallowSet({ comboId: "r1" }, [], ir)).toBe(false);
+    expect(isInSwallowSet({ comboId: "r1" }, "swallow", ir)).toBe(false);
   });
 
   it("any behaviour owner counts as covered, not just carve-suppression", () => {
@@ -101,22 +94,20 @@ describe("isInSwallowSet — FR-005 skip-set seam (T014)", () => {
     // second-guess.
     const ir = bareKeyIR();
     (ir.groups[0]!.rules[0] as IRRule).ownedByBehaviour = "mark-on-non-base";
-    expect(isInSwallowSet({ comboId: "r1" }, [], ir)).toBe(false);
+    expect(isInSwallowSet({ comboId: "r1" }, "swallow", ir)).toBe(false);
   });
 
-  it("block store-slot carve covered by a synthesized guard is skipped", () => {
-    const dispositions = [bulk("store#dkt003b#1", "block")];
+  it("swallow: store-slot carve covered by a synthesized guard is skipped", () => {
+    const dispositions = dispositionsForFallbackPolicy("swallow", ["store#dkt003b#1"]);
     const suppressed = compileCarveSuppression(deadkeySlotIR(), dispositions).ir;
     const guard = suppressed.groups[0]!.rules.find((r) =>
       r.nodeId.startsWith("gen-carve-guard-store#dkt003b-1-"),
     );
     expect(guard?.ownedByBehaviour).toBe("carve-suppression");
-    expect(
-      isInSwallowSet({ comboId: "store#dkt003b#1" }, dispositions, suppressed),
-    ).toBe(false);
+    expect(isInSwallowSet({ comboId: "store#dkt003b#1" }, "swallow", suppressed)).toBe(false);
   });
 
-  it("block store-slot carve with no guard enters the set (safety net)", () => {
+  it("swallow: store-slot carve with no guard enters the set (safety net)", () => {
     // No paired any() rule consumes the store, so no guard is synthesized —
     // the leak is still open.
     const ir: KeyboardIR = {
@@ -124,71 +115,65 @@ describe("isInSwallowSet — FR-005 skip-set seam (T014)", () => {
       stores: [charStore({ nodeId: "store#lone", name: "lone", chars: ["a", "b"] })],
       groups: [{ nodeId: "group#main", rules: [] }],
     } as KeyboardIR;
-    const dispositions = [bulk("store#lone#0", "block")];
+    const dispositions = dispositionsForFallbackPolicy("swallow", ["store#lone#0"]);
     const suppressed = compileCarveSuppression(ir, dispositions).ir;
     expect(
       suppressed.groups[0]!.rules.some((r) => r.nodeId.startsWith("gen-carve-guard-")),
     ).toBe(false);
-    expect(isInSwallowSet({ comboId: "store#lone#0" }, dispositions, suppressed)).toBe(
-      true,
-    );
+    expect(isInSwallowSet({ comboId: "store#lone#0" }, "swallow", suppressed)).toBe(true);
   });
 
-  it("allow-host store-slot carve is excluded", () => {
-    const dispositions = [bulk("store#dkt003b#1", "allow-host")];
+  it("pass-through: store-slot carve is excluded", () => {
+    const dispositions = dispositionsForFallbackPolicy("pass-through", ["store#dkt003b#1"]);
     const suppressed = compileCarveSuppression(deadkeySlotIR(), dispositions).ir;
-    expect(
-      isInSwallowSet({ comboId: "store#dkt003b#1" }, dispositions, suppressed),
-    ).toBe(false);
+    expect(isInSwallowSet({ comboId: "store#dkt003b#1" }, "pass-through", suppressed)).toBe(false);
   });
 
-  it("a never-carved undefined combo enters the set (FR-005 core job)", () => {
-    expect(isInSwallowSet({ comboId: "K_Q+shift" }, [], bareKeyIR())).toBe(true);
+  it("deadkey backstop: pass-through expansion still suppresses a deadkey-context carve", () => {
+    // The policy says allow-host, but the compiler coerces deadkey-context
+    // carves to block ("deadkey carves never fall through"). The rule ends up
+    // behaviour-owned, so the predicate also reports it as covered.
+    const ir = deadkeySlotIR();
+    const dispositions = dispositionsForFallbackPolicy("pass-through", ["paired"]);
+    const suppressed = compileCarveSuppression(ir, dispositions).ir;
+    expect(suppressed.groups[0]!.rules.find((r) => r.nodeId === "paired")?.ownedByBehaviour).toBe(
+      "carve-suppression",
+    );
+    expect(isInSwallowSet({ comboId: "paired" }, "swallow", suppressed)).toBe(false);
   });
 
-  it("a combo with no disposition record but an unowned rule enters (fail-safe)", () => {
-    // Pre-fill (T010) guarantees dispositions for carved combos; if the
-    // record is missing the ruling's "suppress by default" wins over an
-    // open leak.
-    expect(isInSwallowSet({ comboId: "r1" }, [], bareKeyIR())).toBe(true);
-  });
-
-  it("duplicate dispositions resolve first-wins, mirroring the compiler", () => {
-    const ir = bareKeyIR();
-    expect(
-      isInSwallowSet(
-        { comboId: "r1" },
-        [bulk("r1", "block"), bulk("r1", "allow-host")],
-        ir,
-      ),
-    ).toBe(true);
-    expect(
-      isInSwallowSet(
-        { comboId: "r1" },
-        [bulk("r1", "allow-host"), bulk("r1", "block")],
-        ir,
-      ),
-    ).toBe(false);
+  it("a never-carved undefined combo enters the set under swallow (FR-005 core job)", () => {
+    expect(isInSwallowSet({ comboId: "K_Q+shift" }, "swallow", bareKeyIR())).toBe(true);
   });
 
   it("a rule nodeId that parses as a slot id is treated as a rule", () => {
     // Mirrors compileSlotGuards' precedence: rule nodeIds win over slot ids.
     const owned = bareKeyIR("rulename#1");
     (owned.groups[0]!.rules[0] as IRRule).ownedByBehaviour = "carve-suppression";
-    expect(isInSwallowSet({ comboId: "rulename#1" }, [], owned)).toBe(false);
+    expect(isInSwallowSet({ comboId: "rulename#1" }, "swallow", owned)).toBe(false);
 
     const unowned = bareKeyIR("rulename#1");
-    expect(isInSwallowSet({ comboId: "rulename#1" }, [], unowned)).toBe(true);
+    expect(isInSwallowSet({ comboId: "rulename#1" }, "swallow", unowned)).toBe(true);
   });
 
-  it("is pure: it never mutates the IR or the dispositions", () => {
+  it("is pure: it never mutates the IR", () => {
     const ir = deadkeySlotIR();
-    const dispositions = [bulk("store#dkt003b#1", "block"), bulk("r1", "allow-host")];
     const irBefore = structuredClone(ir);
-    const dispBefore = structuredClone(dispositions);
-    isInSwallowSet({ comboId: "store#dkt003b#1" }, dispositions, ir);
-    isInSwallowSet({ comboId: "nope" }, dispositions, ir);
+    isInSwallowSet({ comboId: "store#dkt003b#1" }, "swallow", ir);
+    isInSwallowSet({ comboId: "nope" }, "pass-through", ir);
     expect(ir).toEqual(irBefore);
-    expect(dispositions).toEqual(dispBefore);
+  });
+});
+
+describe("dispositionsForFallbackPolicy", () => {
+  it("expands swallow to block and pass-through to allow-host, de-duplicated", () => {
+    expect(dispositionsForFallbackPolicy("swallow", ["a", "b", "a"])).toEqual([
+      { comboId: "a", disposition: "block", provenance: "bulk-default" },
+      { comboId: "b", disposition: "block", provenance: "bulk-default" },
+    ]);
+    expect(dispositionsForFallbackPolicy("pass-through", ["a"])).toEqual([
+      { comboId: "a", disposition: "allow-host", provenance: "bulk-default" },
+    ]);
+    expect(dispositionsForFallbackPolicy("swallow", [])).toEqual([]);
   });
 });

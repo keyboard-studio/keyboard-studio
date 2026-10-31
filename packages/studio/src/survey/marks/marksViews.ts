@@ -23,10 +23,18 @@
 import type { AttestedStack, ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { stackKey } from "@keyboard-studio/contracts";
 import type { AttachmentProposal, MarkClass, MarkTreatmentPrefill } from "@keyboard-studio/engine";
+// Issue #2374: the per-mark "start of line" column's sentinel is the engine's
+// single value (worklist.ts) — a SYMBOLIC string, never "" or a real char —
+// re-exported here so survey code imports it from one place. It must never
+// enter `allowedContexts` (chars only); it feeds the worklist's
+// `bareMarkAllowed` channel instead.
+import { ATTACHMENT_START_OF_LINE } from "@keyboard-studio/engine";
+export { ATTACHMENT_START_OF_LINE };
 import type { ReproposalReason, SavedAnswer } from "../../steps/answerTypes.ts";
 import {
   hasChar,
   marksAttachmentKey,
+  marksBackspaceKey,
   marksClassTreatmentKey,
   marksMarkTreatmentKey,
   marksOutputFormKey,
@@ -85,6 +93,13 @@ export function reconciledAttachmentChecked(
   alphabet: ConfirmedAlphabet,
   proposals: readonly AttachmentProposal[],
   savedAnswers: Readonly<Record<string, SavedAnswer>>,
+  /**
+   * The default for the "start of line" column (issue #2374) before the
+   * author ever answers it: `false` normally; `true` when the #2374
+   * migration seeds it (a confirmed legacy `emit` guard record, or a Track 2
+   * import classified unguarded). A saved answer always wins over this.
+   */
+  startOfLineDefault = false,
 ): AttachmentChecked {
   const out: AttachmentChecked = {};
   for (const proposal of proposals) {
@@ -95,10 +110,28 @@ export function reconciledAttachmentChecked(
       const view = reconcile(savedAnswers[answerId], key, state === "attested");
       row[base] = view.value;
     }
+    // The space column (spec 106 FR-013): not a base, never proposed, so it
+    // defaults to unticked and is never case-expanded.
+    const spaceId = `marks_attachment.${proposal.mark}|${ATTACHMENT_SPACE}`;
+    const spaceKey = marksAttachmentKey(alphabet, proposal.mark, ATTACHMENT_SPACE);
+    row[ATTACHMENT_SPACE] = reconcile(savedAnswers[spaceId], spaceKey, false).value;
+    // The start-of-line column (issue #2374): same shape as the space
+    // column — not a base, never proposed, never case-expanded — with its
+    // own migration default above. The symbolic sentinel never enters
+    // `allowedContexts`; the worklist reads it into `bareMarkAllowed`.
+    const solId = `marks_attachment.${proposal.mark}|${ATTACHMENT_START_OF_LINE}`;
+    const solKey = marksAttachmentKey(alphabet, proposal.mark, ATTACHMENT_START_OF_LINE);
+    row[ATTACHMENT_START_OF_LINE] = reconcile(savedAnswers[solId], solKey, startOfLineDefault).value;
     out[proposal.mark] = row;
   }
   return out;
 }
+
+/**
+ * The attachment row's space column key (spec 106 FR-013). Stored like a base,
+ * `marks_attachment.<mark>| `; the worklist maps it to `allowedContexts`.
+ */
+export const ATTACHMENT_SPACE = " ";
 
 export interface FlaggedMarksAnswer {
   readonly answerId: string;
@@ -118,6 +151,14 @@ export interface MarksFlagInput {
   readonly treatmentPrefills: readonly MarkTreatmentPrefill[];
   readonly multiMarkStacks: readonly AttestedStack[];
   readonly postureId: string;
+  /**
+   * The current output-form value the backspace answer's evidence key is
+   * derived from (#2302: its proposal follows the chosen form). Optional —
+   * a caller that cannot determine the current form (a badge computation
+   * with no recorded form answer and no completed session value) skips
+   * the backspace flag rather than guessing a key.
+   */
+  readonly outputForm?: string | undefined;
   readonly savedAnswers: Readonly<Record<string, SavedAnswer>>;
   /** `stepAnswers.lastRecorded` — which screens have had at least one Next. */
   readonly lastRecorded: Readonly<Record<string, string>>;
@@ -236,6 +277,17 @@ export function deriveMarksFlags(input: MarksFlagInput): FlaggedMarksAnswer[] {
   {
     const answerId = "marks_output_form.form";
     const key = marksOutputFormKey(postureId);
+    considerFlag(out, answerId, "marks_output_form", savedAnswers[answerId], key, lastRecorded, () => ({
+      code: "evidence-added",
+      subject: "the marks in your alphabet",
+      sourceStepId: SOURCE_STEP_ID,
+    }));
+  }
+
+  // --- backspace (#2302: its evidence is the chosen form + posture) ---
+  if (input.outputForm !== undefined) {
+    const answerId = "marks_output_form.backspace";
+    const key = marksBackspaceKey(input.outputForm, postureId);
     considerFlag(out, answerId, "marks_output_form", savedAnswers[answerId], key, lastRecorded, () => ({
       code: "evidence-added",
       subject: "the marks in your alphabet",

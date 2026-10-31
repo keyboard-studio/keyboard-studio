@@ -613,7 +613,7 @@ This filter is a path-based gate, not a content-aware one. It is intentionally c
 
 | Specialist | Skip when NONE of the changed file paths match any of: |
 |---|---|
-| `km-strategy` | `**/*pattern*.{json,ts}`, `**/strategy/**`, `strategy tree/**`, `packages/contracts/src/fixtures/patterns.ts`, `packages/engine/**/strategy*`, `spec.md` |
+| `km-strategy` | `**/*pattern*.{json,ts}`, `**/strategy/**`, `packages/contracts/src/fixtures/patterns.ts`, `packages/engine/**/strategy*`, `spec.md` |
 | `km-keyman` | `**/*.kmn`, `**/*.kps`, `**/*.kvks`, `**/*pattern*.{json,ts,yaml,yml}`, `**/keyboards/**`, `packages/contracts/**`, `packages/engine/src/codec/**`, `packages/engine/src/compiler/**`, `packages/engine/src/validator/**`, `packages/engine/src/scaffolder/**`, `packages/engine/src/pattern-apply/**`, `packages/engine/src/pattern-library/**`, `spec.md` |
 | `km-domain` | `**/*.kmn`, `**/*.kps`, `content/**`, `**/*pattern*.{json,ts,yaml,yml}`, `packages/contracts/data/**`, `packages/engine/src/codec/**`, `packages/engine/src/character-discovery/**`, `packages/engine/src/recognizer/**`, `packages/engine/src/inventory/**`, `packages/engine/src/pattern-apply/**`, `packages/engine/src/placement/**`, `spec.md` |
 

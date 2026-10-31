@@ -3,7 +3,7 @@
 // `marks-treatment` module's renderer.
 //
 // The wrapper owns the hosting (record, host deps, navigation through
-// GalleryStepContext) plus ONE session side-effect the module's apply
+// GalleryStepContext) plus the session side-effects the module's apply
 // cannot perform: mirroring the completion payload's R10
 // `migrationNeeded` determination into the survey session — the flag the
 // retired reducer MARKS handler set through its injected deps. The

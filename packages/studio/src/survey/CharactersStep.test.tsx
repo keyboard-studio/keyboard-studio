@@ -15,7 +15,10 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { render as renderWithI18n } from "../test/renderWithI18n.tsx";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
+import { draftConfirmedAlphabet } from "./phaseBDraftOps.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -626,5 +629,167 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     expect(saved?.value).toBe("ŋ");
     expect(saved?.evidenceKey).toBe(CURRENT_KEY); // the OLD (pre-change) key
     expect(saved?.evidenceKey).not.toBe(s.alphabetEvidenceKey); // != the new key -> reproposed
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1784 — bare-marks text-sample prompt: completing character discovery
+// while marks lack letter+mark pairing evidence defers completion behind
+// the prompt instead of advancing straight to the marks series.
+// ---------------------------------------------------------------------------
+
+describe("CharactersStep — #1784 bare-marks text-sample prompt", () => {
+  const GRAVE = "̀"; // U+0300, lone combining mark
+  const ACUTE = "́"; // U+0301, lone combining mark
+
+  function seedBareMarksDraft(): void {
+    const ops = inventoryOps("characters");
+    ops.add("a");
+    ops.add("e");
+    ops.addProposed(GRAVE, "cldr"); // bare mark, no letter+mark cluster
+  }
+
+  /** prefill -> continue -> PhaseB, ready for the draft to be seeded. */
+  async function reachPhaseB(onComplete: (r: unknown) => void): Promise<void> {
+    resetInventoryDraft();
+    useSurveyAnswerStore.setState({ steps: {}, recordedScreenOf: {} });
+    seedSessionStore();
+    renderWithI18n(<CharactersStepHost onComplete={onComplete} onBack={() => {}} />);
+    fireEvent.click(screen.getByTestId("prefill-continue"));
+    await screen.findByTestId("mock-phase-b");
+  }
+
+  it("defers completion behind the prompt when a mark has no pairing evidence", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    seedBareMarksDraft();
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+
+    expect(await screen.findByTestId("marks-text-sample-prompt")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId("marks-text-sample-prompt").textContent,
+    ).toContain("Which letter does this mark go on?");
+  });
+
+  it("states the skip consequence on the prompt", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    seedBareMarksDraft();
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    await screen.findByTestId("marks-text-sample-prompt");
+
+    expect(screen.getByTestId("marks-text-sample-prompt").textContent).toContain(
+      "won't be reachable by ordinary typing",
+    );
+  });
+
+  it("completes immediately when every mark already has pairing evidence", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    inventoryOps("characters").addProposed("é", "cldr");
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+
+    expect(screen.queryByTestId("marks-text-sample-prompt")).toBeNull();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const emitted = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(emitted.alphabet?.attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("fires the deferred completion once a harvest covers the marks, with text attribution", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    seedBareMarksDraft();
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    await screen.findByTestId("marks-text-sample-prompt");
+
+    // Simulate the affordance's harvest without the async discovery service.
+    act(() => {
+      inventoryOps("characters").addProposed("è", "text");
+    });
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const emitted = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(emitted.alphabet?.attestedStacks).toEqual([
+      { base: "e", marks: [GRAVE], source: "text" },
+    ]);
+  });
+
+  it("keeps the prompt with the still-missing copy when the harvest doesn't cover every mark", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    const ops = inventoryOps("characters");
+    ops.add("a");
+    ops.add("e");
+    ops.addProposed(GRAVE, "cldr");
+    ops.addProposed(ACUTE, "cldr");
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    await screen.findByTestId("marks-text-sample-prompt");
+
+    // Covers grave only; acute is still unpaired.
+    act(() => {
+      inventoryOps("characters").addProposed("è", "text");
+    });
+
+    expect(screen.getByTestId("marks-text-sample-prompt")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.getByTestId("marks-text-sample-prompt").textContent).toContain(
+      "still doesn't show",
+    );
+  });
+
+  it("skip records the dismissal and completes with the bare-mark alphabet", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    seedBareMarksDraft();
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    await screen.findByTestId("marks-text-sample-prompt");
+
+    fireEvent.click(screen.getByTestId("marks-text-sample-prompt-skip"));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const emitted = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(emitted.alphabet?.marks).toEqual([GRAVE]);
+    expect(emitted.alphabet?.attestedStacks).toEqual([]);
+    const saved =
+      useSurveyAnswerStore.getState().steps["characters"]?.answers[
+        "characters.textSamplePrompt"
+      ];
+    expect(saved?.value).toMatch(/^skipped:/);
+  });
+
+  it("does not re-prompt once dismissed for the same alphabet", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    seedBareMarksDraft();
+    // Dismiss up front for the current alphabet content.
+    const key = confirmedAlphabetKey(draftConfirmedAlphabet(getCharacterInventoryValue()));
+    useSurveyAnswerStore.getState().saveAnswer("characters", "characters.textSamplePrompt", {
+      value: `skipped:${key}`,
+      answerType: "select",
+      origin: "confirmed",
+      stage: "confirmed",
+      evidenceKey: key,
+      screenId: "text-sample-prompt",
+    });
+
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+
+    expect(screen.queryByTestId("marks-text-sample-prompt")).toBeNull();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("back returns to the build list without completing", async () => {
+    const onComplete = vi.fn();
+    await reachPhaseB(onComplete);
+    seedBareMarksDraft();
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    await screen.findByTestId("marks-text-sample-prompt");
+
+    fireEvent.click(screen.getByTestId("marks-text-sample-prompt-back"));
+
+    expect(screen.queryByTestId("marks-text-sample-prompt")).toBeNull();
+    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });

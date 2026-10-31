@@ -46,9 +46,14 @@ export function useDocumentationFindings(): LintFinding[] {
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
   const startHistoryMdText = useWorkingCopyStore((s) => s.startHistoryMdText);
+  const startDocCssTexts = useWorkingCopyStore((s) => s.startDocCssTexts);
   const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const baselineDocFindings = useWorkingCopyStore((s) => s.baselineDocFindings);
+  // Issue #1908: the recorded documentation-fix proposals (adapt track only).
+  const docFixProposals = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.docFixProposals : null,
+  );
   const docs = useDocsPreview();
   const memberStates = useDocMemberStates();
   // spec 094: a tested three-part adapt base publishes at a.(b+1).0.
@@ -77,7 +82,7 @@ export function useDocumentationFindings(): LintFinding[] {
     const historyMd = renderHistoryMd(historyEntryState, {
       version: keyboardVersion,
       dateIso: new Date().toISOString().slice(0, 10),
-      adaptedFrom: isAdaptation ? { id: startKeyboard.id, version: rawVersion } : null,
+      lineage: { kind: isAdaptation ? "adapted" : "created", id: startKeyboard.id, version: rawVersion },
       startHistoryText: isAdaptation ? (startHistoryMdText ?? readVfsText(startVfs, "HISTORY.md") ?? null) : null,
     });
 
@@ -91,12 +96,34 @@ export function useDocumentationFindings(): LintFinding[] {
     };
 
     // Criterion 11.8: the base package's bundled stylesheets (image
-    // width constraints may live in their class rules).
-    const cssTexts = startVfs
-      .list("source/")
-      .filter((p) => p.toLowerCase().endsWith(".css"))
-      .map((p) => readVfsText(startVfs, p))
-      .filter((t): t is string => t !== undefined);
+    // width constraints may live in their class rules). The VFS carries
+    // the KMW stylesheet; the welcome/help pages' own stylesheets
+    // (kb.css) are fetch-don't-write and ride the startDocCssTexts slice
+    // (issue 2139) — without them, class-constrained help images are
+    // false positives.
+    const cssTexts = [
+      ...startVfs
+        .list("source/")
+        .filter((p) => p.toLowerCase().endsWith(".css"))
+        .map((p) => readVfsText(startVfs, p))
+        .filter((t): t is string => t !== undefined),
+      ...(startDocCssTexts ?? []).map((entry) => entry.text),
+    ];
+    // Issue 1908: an ACCEPTED image-width proposal amends the shipped
+    // kb.css (serializeWorkingCopy step 5c), so the check sees the same
+    // stylesheet the output will carry — the finding clears here exactly
+    // when it clears in the shipped package. Only when a kb.css is
+    // actually in the working copy: resident in the VFS, or carried by
+    // the startDocCssTexts slice (the loader's fetch-don't-write path,
+    // issue 2139) at a kb.css path.
+    if (
+      isAdaptation &&
+      docFixProposals?.imageWidth === "accepted" &&
+      (startVfs.list("source/").some((p) => /^source\/(?:help|welcome)\/kb\.css$/i.test(p)) ||
+        (startDocCssTexts ?? []).some((entry) => /^source\/(?:help|welcome)\/kb\.css$/i.test(entry.path)))
+    ) {
+      cssTexts.push("img { max-width: 100%; }");
+    }
 
     const findings = runDocChecks(
       collectDocLintInput({
@@ -131,9 +158,11 @@ export function useDocumentationFindings(): LintFinding[] {
     instantiationMode,
     historyEntryState,
     startHistoryMdText,
+    startDocCssTexts,
     startLicenseText,
     touchLayoutJson,
     baselineDocFindings,
+    docFixProposals,
     docs,
     memberStates,
     testBuildsExist,

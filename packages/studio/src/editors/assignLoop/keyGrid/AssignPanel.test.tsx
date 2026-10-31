@@ -212,6 +212,8 @@ describe("AssignPanel — the field accepts either form", () => {
 
 describe("AssignPanel — the combining-mark guard path (US2 AS4)", () => {
   it("renders the guard rule immediately before the producing rule, reusing the existing guard store", () => {
+    // #2374: the guard pair shows for a combining mark whose "start of
+    // line" box is unticked (the default — no box map here).
     const props = defaultProps();
     render(<AssignPanel {...props} />);
 

@@ -17,10 +17,13 @@
  * `../validator.ts` (`validateDeadkeyLifecycle`); they consume the scanners
  * here.
  *
- * Pure, browser-safe, no I/O. Numeric ids only — named/opaque `dk(name)`
- * deadkeys (which the codec opaques into RawKmnFragments until 076 FR-004
- * closes the codec) are listed best-effort with `id: null`; Phase 2/3 treat
- * null-id entries as delete/retarget-only.
+ * Pure, browser-safe, no I/O. Numeric ids are the primary key. Named
+ * `dk(name)` deadkeys are typed IR elements since #2238 (the 076 FR-004
+ * codec closure) and are listed with `id: null` from the typed elements;
+ * persisted pre-#2238 working copies still carry them as `named-deadkey`
+ * RawKmnFragments, recovered by the fragment scrape so both
+ * representations inventory identically. Phase 2/3 treat null-id entries
+ * as delete/retarget-only.
  *
  * @see specs/083-deadkey-lifecycle/spec.md
  * @see specs/083-deadkey-lifecycle/plan.md (Phase 1)
@@ -116,9 +119,12 @@ export interface DeadkeyInfo {
    */
   id: number | null;
   /**
-   * Opaque name for null-id entries (e.g. `"acute"` for `dk(acute)`),
-   * recovered from the codec's `named-deadkey` RawKmnFragments. Absent for
-   * numeric deadkeys.
+   * Source name for null-id entries (e.g. `"acute"` for `dk(acute)`) —
+   * the first-seen spelling of the typed `namedDeadkey` elements, or of
+   * the codec's `named-deadkey` RawKmnFragments on persisted pre-#2238
+   * copies. This is the SOURCE identity (a base-author decision, preserved
+   * verbatim); it is never an {@link authorName}. Absent for numeric
+   * deadkeys.
    */
   name?: string;
   /**
@@ -205,13 +211,56 @@ function matchFanoutRule(
 }
 
 // ---------------------------------------------------------------------------
-// Named/opaque deadkeys (pre-076 FR-004)
+// Named deadkeys — identity helpers (#2238, the ONE shared definition)
+// ---------------------------------------------------------------------------
+
+/**
+ * Case-insensitive identity key for a named deadkey. THE ONLY case fold
+ * for deadkey names in the codebase: codec keying, the typed inventory
+ * scan, and the fragment scrape all key through here, so a fresh import
+ * and a persisted pre-#2238 draft inventory the same keyboard identically.
+ *
+ * The fold is **ASCII A–Z only**, because that is what kmcmplib does —
+ * settled by compilation against the real compiler (km-lead ruling on
+ * #2238): `dk(semicolon)` and `dk(Semicolon)` compile to byte-identical
+ * .kmx (one deadkey), while `dk(café)` and `dk(CAFÉ)` stay TWO deadkeys.
+ * A Unicode fold (`toLowerCase`/`localeCompare`) would merge names the
+ * compiler keeps distinct, splitting IR identity from compiler identity.
+ */
+export function deadkeyNameKey(name: string): string {
+  return name.replace(/[A-Z]/g, (c) => c.toLowerCase());
+}
+
+/** Type guard for the typed named-deadkey element (#2238). */
+export function isNamedDeadkeyElement(
+  el: StoreItem | ContextElement | OutputElement,
+): el is { kind: "namedDeadkey"; name: string } {
+  return el.kind === "namedDeadkey";
+}
+
+/**
+ * The named-deadkey boundary, one definition shared by the codec and this
+ * module: a `dk(...)` inner identifier that is non-empty and NOT pure hex.
+ * All-hex tokens (`dk(dead)`, `dk(cafe)`) are numeric deadkeys — the hex
+ * boundary does not move. The legal name grammar is wider than the corpus
+ * (kmcmplib admits digit-leading names, hyphens, non-ASCII letters); do
+ * NOT narrow this to a corpus-shaped regex.
+ */
+export function isNamedDeadkeyName(inner: string): boolean {
+  const name = inner.trim();
+  return name.length > 0 && !/^[0-9A-Fa-f]+$/.test(name);
+}
+
+// ---------------------------------------------------------------------------
+// Named/opaque deadkeys (fragment form — persisted pre-#2238 copies)
 // ---------------------------------------------------------------------------
 
 /**
  * The codec's opaque-feature reason for `dk(name)` with a non-hex identifier
  * (engine `src/codec/opaque-reasons.ts` `NAMED_DEADKEY`). Kept as a local
  * string literal: contracts is the dependency root and cannot import engine.
+ * The codec no longer produces this reason (#2238); it stays defined
+ * because persisted working copies may carry it.
  */
 const NAMED_DEADKEY_REASON = "named-deadkey";
 
@@ -227,12 +276,6 @@ const RAW_NAMED_TRIGGER_RE =
 const RAW_NAMED_FANOUT_RE =
   /^\s*dk\(\s*([^)]*?)\s*\)\s*\+\s*any\(\s*([^)]+?)\s*\)\s*>\s*index\(\s*([^)]+?)\s*,\s*\d+\s*\)/i;
 
-/** Mirror of the codec's `isNamedDk`: non-empty and not pure hex. */
-function isNamedDkName(inner: string): boolean {
-  const name = inner.trim();
-  return name.length > 0 && !/^[0-9A-Fa-f]+$/.test(name);
-}
-
 interface NamedRawEntry {
   name: string;
   triggerKey: string | null;
@@ -241,20 +284,23 @@ interface NamedRawEntry {
 }
 
 /**
- * Recover named/opaque deadkeys from the codec's RawKmnFragments. The codec
- * opaques any rule mentioning `dk(name)` in its strict parse, so trigger and
- * fan-out rules for named deadkeys never reach the typed rule list — this
- * scan is the only way they appear in the inventory. Entries merge by name
- * across trigger- and fan-out-shaped fragments; only fragments the codec
- * attributed to the named-deadkey opaque reason are considered.
+ * Recover named deadkeys from RawKmnFragments. Since #2238 the codec types
+ * `dk(name)` instead of opaquifying it, so on a fresh import this scan
+ * finds nothing — it survives for persisted pre-#2238 working copies,
+ * whose named rules still sit in `ir.raw`. Entries merge by
+ * {@link deadkeyNameKey} across trigger- and fan-out-shaped fragments
+ * (case variants of one name are ONE deadkey — the compiler folds them);
+ * the entry's display name is the first-seen spelling. Only fragments the
+ * codec attributed to the named-deadkey opaque reason are considered.
  */
 function scanNamedRawEntries(ir: KeyboardIR): NamedRawEntry[] {
-  const byName = new Map<string, NamedRawEntry>();
+  const byKey = new Map<string, NamedRawEntry>();
   const entryFor = (name: string): NamedRawEntry => {
-    let e = byName.get(name);
+    const key = deadkeyNameKey(name);
+    let e = byKey.get(key);
     if (!e) {
       e = { name, triggerKey: null, baseStore: null, outputStore: null };
-      byName.set(name, e);
+      byKey.set(key, e);
     }
     return e;
   };
@@ -263,7 +309,7 @@ function scanNamedRawEntries(ir: KeyboardIR): NamedRawEntry[] {
     const t = RAW_NAMED_TRIGGER_RE.exec(frag.sourceText);
     if (t !== null) {
       const name = (t[4] ?? "").trim();
-      if (!isNamedDkName(name)) continue;
+      if (!isNamedDeadkeyName(name)) continue;
       const e = entryFor(name);
       if (e.triggerKey === null) {
         const bracket = t[1];
@@ -277,27 +323,127 @@ function scanNamedRawEntries(ir: KeyboardIR): NamedRawEntry[] {
     const f = RAW_NAMED_FANOUT_RE.exec(frag.sourceText);
     if (f !== null) {
       const name = (f[1] ?? "").trim();
-      if (!isNamedDkName(name)) continue;
+      if (!isNamedDeadkeyName(name)) continue;
       const e = entryFor(name);
       if (e.baseStore === null) e.baseStore = (f[2] ?? "").trim();
       if (e.outputStore === null) e.outputStore = (f[3] ?? "").trim();
     }
   }
-  return [...byName.values()];
+  return [...byKey.values()];
+}
+
+// ---------------------------------------------------------------------------
+// Named deadkeys — typed scan (#2238)
+// ---------------------------------------------------------------------------
+
+/**
+ * Named trigger rule: `+ [K] > dk(name)` — same shape as
+ * {@link matchTriggerRule}, with a name-carrying output element.
+ */
+function matchNamedTriggerRule(
+  rule: IRRule,
+): { name: string; triggerKey: string } | null {
+  const ctx = withoutPlusSeparators(rule.context);
+  if (ctx.length !== 1) return null;
+  const c0 = ctx[0] as ContextElement | undefined;
+  let triggerKey: string | null = null;
+  if (c0?.kind === "vkey") triggerKey = c0.name;
+  else if (c0?.kind === "char") triggerKey = c0.value;
+  else return null;
+  if (rule.output.length !== 1) return null;
+  const o0 = rule.output[0] as OutputElement | undefined;
+  if (o0?.kind !== "namedDeadkey") return null;
+  return { name: o0.name, triggerKey };
 }
 
 /**
- * Store names claimed by opaque named-deadkey rules. The codec opaques any
- * rule mentioning `dk(name)` with a non-hex name, so a named deadkey's
- * fan-out rules never reach the typed rule list — but its stores are still
- * typed IR stores. A store shaped `dk_<allhex>_bases|output` (e.g.
- * `dk_cafe_bases` for an all-hex name slug) would otherwise look orphaned
- * to the numeric-only liveness scan in {@link validateDeadkeyLifecycle},
- * so that check treats every store named in a named-deadkey-attributed
- * fan-out fragment as live.
+ * Named fan-out rule: `dk(name) + any(bases) > index(output, N)` — same
+ * shape as {@link matchFanoutRule}, with a name-carrying context element.
+ */
+function matchNamedFanoutRule(
+  rule: IRRule,
+): { name: string; baseStore: string; outputStore: string } | null {
+  const ctx = withoutPlusSeparators(rule.context);
+  if (ctx.length !== 2) return null;
+  const d = ctx[0] as ContextElement | undefined;
+  const a = ctx[1] as ContextElement | undefined;
+  if (d?.kind !== "namedDeadkey" || a?.kind !== "any") return null;
+  if (rule.output.length !== 1) return null;
+  const o = rule.output[0] as OutputElement | undefined;
+  if (o?.kind !== "index") return null;
+  return { name: d.name, baseStore: a.storeRef, outputStore: o.storeRef };
+}
+
+/**
+ * Scan the typed IR for named deadkeys (#2238): trigger/fan-out cluster
+ * shapes plus every bare name reference in rule contexts, rule outputs,
+ * and store items (a name referenced only in a chain rule or a store
+ * still lists, with nulls — never silently dropped). Entries merge by
+ * {@link deadkeyNameKey}; the display name is the first-seen spelling in
+ * scan order (groups/rules first, then stores), matching the runtime
+ * intuition that first use registers the state.
+ */
+function scanNamedTypedEntries(ir: KeyboardIR): NamedRawEntry[] {
+  const byKey = new Map<string, NamedRawEntry>();
+  const entryFor = (name: string): NamedRawEntry => {
+    const key = deadkeyNameKey(name);
+    let e = byKey.get(key);
+    if (!e) {
+      e = { name, triggerKey: null, baseStore: null, outputStore: null };
+      byKey.set(key, e);
+    }
+    return e;
+  };
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      const t = matchNamedTriggerRule(rule);
+      if (t !== null) {
+        const e = entryFor(t.name);
+        if (e.triggerKey === null) e.triggerKey = t.triggerKey;
+      }
+      const f = matchNamedFanoutRule(rule);
+      if (f !== null) {
+        const e = entryFor(f.name);
+        if (e.baseStore === null) e.baseStore = f.baseStore;
+        if (e.outputStore === null) e.outputStore = f.outputStore;
+      }
+      for (const el of rule.context) {
+        if (isNamedDeadkeyElement(el)) entryFor(el.name);
+      }
+      for (const el of rule.output) {
+        if (isNamedDeadkeyElement(el)) entryFor(el.name);
+      }
+    }
+  }
+  for (const store of ir.stores) {
+    for (const item of store.items) {
+      if (isNamedDeadkeyElement(item)) entryFor(item.name);
+    }
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Store names claimed by named-deadkey rules, in either representation.
+ * A named deadkey's stores are typed IR stores, but its fan-out rules
+ * historically never reached the typed rule list (the codec opaqued them
+ * as named-deadkey fragments), so a store shaped `dk_<allhex>_bases|output`
+ * (e.g. `dk_cafe_bases` for an all-hex name slug) would look orphaned to
+ * the numeric-only liveness scan in {@link validateDeadkeyLifecycle}.
+ * Since #2238 the fan-out rule is typed and claims its stores directly;
+ * persisted pre-#2238 copies still carry the fragment form, so both are
+ * scanned and every claimed store counts as live.
  */
 export function namedDeadkeyRawStoreNames(ir: KeyboardIR): Set<string> {
   const names = new Set<string>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      const f = matchNamedFanoutRule(rule);
+      if (f === null) continue;
+      names.add(f.baseStore);
+      names.add(f.outputStore);
+    }
+  }
   for (const frag of ir.raw) {
     if (frag.reason !== NAMED_DEADKEY_REASON) continue;
     const f = RAW_NAMED_FANOUT_RE.exec(frag.sourceText);
@@ -504,8 +650,10 @@ function charItemCount(store: { items: StoreItem[] } | undefined): number {
  * - escape `dk(id) + [K] > char` (detected but not surfaced; it carries no
  *   inventory field),
  * - named `+ [K] > dk(name)` / `dk(name) + any(bases) > index(output, N)`
- *   (the codec opaques these into RawKmnFragments, recovered by
- *   {@link scanNamedRawEntries}; listed with `id: null`)
+ *   (typed elements since #2238, scanned by {@link scanNamedTypedEntries};
+ *   persisted pre-#2238 copies carry them as RawKmnFragments, recovered
+ *   by {@link scanNamedRawEntries}; both merge by identity key, typed
+ *   wins; listed with `id: null`)
  * — plus every bare `dk(id)` reference in rule contexts/outputs and store
  * items.
  *
@@ -519,13 +667,18 @@ function charItemCount(store: { items: StoreItem[] } | undefined): number {
  * by name.
  */
 export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
+  // Partial IRs (studio-constructed inspection inputs) may omit any of the
+  // top-level collections — normalise once so every scanner below can
+  // iterate unconditionally (see resolveTouchProduction's groups guard).
+  ir = { ...ir, groups: ir.groups ?? [], stores: ir.stores ?? [], raw: ir.raw ?? [] };
   const triggerById = new Map<number, { rule: IRRule; triggerKey: string }>();
   const fanoutById = new Map<
     number,
     { baseStore: string; outputStore: string }
   >();
 
-  for (const group of ir.groups) {
+  // Partial IRs may omit the groups array (see resolveTouchProduction).
+  for (const group of ir.groups ?? []) {
     for (const rule of group.rules) {
       const t = matchTriggerRule(rule);
       if (t !== null) {
@@ -583,15 +736,29 @@ export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
     });
   }
 
-  // Named/opaque deadkeys last, sorted by name. The codec opaques any rule
-  // mentioning `dk(name)`, so these are recovered from RawKmnFragments (see
-  // scanNamedRawEntries) — best-effort: trigger key and fan-out stores are
-  // present only when the corresponding fragment shape was recoverable.
+  // Named deadkeys last, sorted by identity key. Typed entries (#2238)
+  // and fragment-scrape entries (persisted pre-#2238 copies) merge by
+  // deadkeyNameKey — typed wins where both exist (a dual-reason fragment's
+  // rule can be typed while the fragment survives under its second
+  // reason; it must not double-count). Trigger key and fan-out stores are
+  // present only when the corresponding cluster shape was recoverable.
   // There is no numeric id to anchor a name token to, so authorName never
-  // applies here.
-  for (const n of scanNamedRawEntries(ir).sort((a, b) =>
-    a.name.localeCompare(b.name),
-  )) {
+  // applies here — named entries are always origin "imported", and this
+  // branch never consults getDeadkeyName/hasStudioMarker (spec 083's
+  // name/authorName separation stays structural).
+  const namedByKey = new Map<string, NamedRawEntry>();
+  for (const n of scanNamedRawEntries(ir)) {
+    namedByKey.set(deadkeyNameKey(n.name), n);
+  }
+  for (const n of scanNamedTypedEntries(ir)) {
+    namedByKey.set(deadkeyNameKey(n.name), n);
+  }
+  const namedEntries = [...namedByKey.values()].sort((a, b) => {
+    const ka = deadkeyNameKey(a.name);
+    const kb = deadkeyNameKey(b.name);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  for (const n of namedEntries) {
     const baseStore = storeByName.get(n.baseStore ?? "");
     const outputStore = storeByName.get(n.outputStore ?? "");
     result.push({

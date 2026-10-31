@@ -30,6 +30,8 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { ProjectNameStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useDecisionStore } from "../stores/decisionStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 
 /** Record the identity decisions a completed identity step records. */
 function seedIdentity(autonym: string, english: string, languageSubtag: string): void {
@@ -210,6 +212,38 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     expect((slugInput as HTMLInputElement).value).toBe("bafut");
     // Sanity: the autonym alone would still collapse.
     expect(slugifyKeyboardId(autonym)).toBe("b_f");
+  });
+
+  it("a saved draft that stops at project_keyboard_id still seeds the slug", () => {
+    // A tab switch or reload remounts the runner from the step's saved draft.
+    // The replay lands on the unanswered keyboard-id question, which must
+    // arrive pre-filled exactly as a fresh Next would have left it.
+    act(() => {
+      seedIdentity("Ewondo", "Ewondo", "ewo");
+      // The display name's own Next recorded its decision before the remount.
+      useDecisionStore.getState().record({
+        id: "project-display-name",
+        value: "Ewondo (AZERTY)",
+        provenance: "asked",
+      });
+      useSurveySessionStore.setState({ activeStepId: "project_name" as never });
+      useSurveyAnswerStore.getState().setStepAnswers("project_name" as never, {
+        project_display_name: {
+          value: "Ewondo (AZERTY)",
+          answerType: "text",
+          origin: "confirmed",
+          stage: "draft",
+          evidenceKey: null,
+          screenId: "project_display_name",
+        },
+      });
+    });
+
+    render(<ProjectNameStepFactoryComponent onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
+
+    const slugInput = screen.getByRole("textbox");
+    expect(slugInput.id).toBe("project_keyboard_id");
+    expect((slugInput as HTMLInputElement).value).toBe(slugifyKeyboardId("Ewondo (AZERTY)"));
   });
 
   it("onBack fires when Back is clicked", async () => {

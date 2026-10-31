@@ -117,6 +117,36 @@ describe("compile() — oracle pinning for the empty-store guard (#523)", () => 
 });
 
 // ---------------------------------------------------------------------------
+// Oracle-pinning: SMP characters inside a system-store string literal
+// (#1811 residual AC). The store emitter bundles SMP chars (> U+FFFF) into
+// system-store strings (packages/engine/src/codec/emit.ts, isStringSafeChar
+// metadata branch) on the strength of this check: the real kmcmplib WASM
+// compiles each form below with success, a .kmx artifact, and ZERO
+// diagnostics of any severity. If a future kmcmplib upgrade starts
+// rejecting or warning on these forms, these tests fail and the emitter
+// comment's recorded verdict must be revisited.
+// ---------------------------------------------------------------------------
+
+describe("compile() — oracle pinning for SMP in system stores (#1811)", () => {
+  const cases: Array<[string, string]> = [
+    ["multi-SMP + ASCII in one literal", "'𑜠𑜡x'"],
+    ["lone SMP string", "'𑜠'"],
+    ["mixed BMP + SMP + combining mark", "'A𑜠̀z'"],
+  ];
+  it.each(cases)("&NAME %s compiles clean through kmc-kmn", async (_label, nameValue) => {
+    const kmn = minimalKmn.replace("'Minimal'", nameValue);
+    const vfs = createVirtualFS([
+      { path: "source/minimal.kmn", content: kmn, isBinary: false },
+    ]);
+    const result = await compile(vfs, "minimal");
+    expect(result.success).toBe(true);
+    const kmx = result.artifacts.find((a) => a.filename.endsWith(".kmx"));
+    expect(kmx?.sizeBytes ?? 0).toBeGreaterThan(0);
+    expect(result.diagnostics).toEqual([]);
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
 // Severity + location decode (regression). kmc-kmn's CompilerEvent has no
 // `severity` field — severity is bit-packed into the numeric `code` — and it
 // names the line field `line`, not `lineNumber`. compile() used to read both

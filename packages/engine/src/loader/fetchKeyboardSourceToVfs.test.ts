@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { fetchKeyboardSourceToVfs } from "./fetchKeyboardSourceToVfs.js";
+import { fetchKeyboardSourceToVfs, releasePathToVfsKey } from "./fetchKeyboardSourceToVfs.js";
 import type { FetchFn } from "./fetchKeyboardSourceToVfs.js";
 import type { StartKeyboard } from "@keyboard-studio/contracts";
 
@@ -615,6 +615,49 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
     expect(result.startWelcomeConvention).toBe("folder");
   });
 
+  it("fetches the welcome/help pages' stylesheets as startDocCssTexts (issue #2139)", async () => {
+    const { result } = await run({
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>folder page</body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+      [sourceUrl(euroLatinKb, "help/sil_euro_latin.php")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>help page</body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "help/kb.css")]: ok(".help { width: 90%; }"),
+    });
+    // Welcome first, then help; the conventional kb.css candidate the link
+    // already named is deduped, not fetched twice. Each text carries the
+    // path it was fetched from, so a consumer can write it back at its own
+    // location.
+    expect(result.startDocCssTexts).toEqual([
+      { path: "source/welcome/kb.css", text: ".full { width: 98%; }" },
+      { path: "source/help/kb.css", text: ".help { width: 90%; }" },
+    ]);
+  });
+
+  it("a stylesheet that fails to fetch is skipped and the surviving entry keeps its own path", async () => {
+    const { result } = await run({
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>folder page</body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+      [sourceUrl(euroLatinKb, "help/sil_euro_latin.php")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>help page</body></html>',
+      ),
+      // help/kb.css is not served (404): no entry, and the welcome entry is
+      // not misattributed to the help path.
+    });
+    expect(result.startDocCssTexts).toEqual([
+      { path: "source/welcome/kb.css", text: ".full { width: 98%; }" },
+    ]);
+  });
+
+  it("startDocCssTexts is undefined when no page names a fetchable stylesheet", async () => {
+    const { result } = await run({});
+    expect(result.startDocCssTexts).toBeUndefined();
+  });
+
   it("reports `absent` — and no page text — when nothing is served", async () => {
     const { result } = await run({});
     expect(result.startWelcomeHtmText).toBeUndefined();
@@ -722,5 +765,253 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
     expect(result.startReadmeMdText).toBeUndefined();
     expect(result.startHistoryMdText).toBeUndefined();
     expect(result.warnings.filter((w) => /README|HISTORY/.test(w))).toEqual([]);
+  });
+
+  it("carries only image files from the .kps welcome list — .htm sub-pages and kb.css are not welcome images (#2305)", async () => {
+    const { result, calls } = await run({
+      [kpsUrl]: ok(
+        kps("welcome\\welcome.htm", [
+          "welcome\\welcome.htm",
+          "welcome\\qwerty-us-en.htm",
+          "welcome\\kb.css",
+          "welcome\\sil-logo-blue.png",
+          "welcome\\chart.JPG",
+        ]),
+      ),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+      [sourceUrl(euroLatinKb, "welcome/sil-logo-blue.png")]: ok(PNG),
+      [sourceUrl(euroLatinKb, "welcome/chart.JPG")]: ok(new Uint8Array([7, 7])),
+      // kb.css IS served (the stylesheet loop fetches it on its own route);
+      // it still must not appear among the welcome IMAGES.
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+    });
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual([
+      "welcome/sil-logo-blue.png",
+      "welcome/chart.JPG",
+    ]);
+    // The prose sub-page was never fetched at all, and neither non-image
+    // entry produced a missing-image warning.
+    expect(calls).not.toContain(sourceUrl(euroLatinKb, "welcome/qwerty-us-en.htm"));
+    expect(result.warnings.filter((w) => w.includes("welcome image"))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// .kps stylesheet / font VFS paths (#2307): a keyboard-local asset takes the
+// plain source/ address; a shared/ asset keeps its release-relative address.
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — .kps asset VFS paths (#2307)", () => {
+  const ok = (body: string | Uint8Array) => ({ ok: true, status: 200, body });
+  const kmnUrl = sourceUrl(euroLatinKb, "sil_euro_latin.kmn");
+  const kpsUrl = sourceUrl(euroLatinKb, "sil_euro_latin.kps");
+
+  function kpsWithFiles(files: string[]): string {
+    const entries = files
+      .map((f) => `    <File>\n      <Name>${f}</Name>\n      <FileType>${f.slice(f.lastIndexOf("."))}</FileType>\n    </File>`)
+      .join("\n");
+    return `<?xml version="1.0" encoding="utf-8"?>\n<Package>\n  <Files>\n${entries}\n  </Files>\n</Package>\n`;
+  }
+
+  async function run(responses: Record<string, { ok: boolean; status: number; body: string | Uint8Array }>) {
+    const { fetchImpl, calls } = makeMockFetch({ [kmnUrl]: ok(kmnMinimal), ...responses });
+    const vfs = createVirtualFS();
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    return { result, calls, vfs };
+  }
+
+  it("writes a keyboard-local .kps stylesheet at source/<file>, not under the base's release path", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(kpsWithFiles(["sil_euro_latin.css"])),
+      [sourceUrl(euroLatinKb, "sil_euro_latin.css")]: ok(".kmw-keyboard-sil_euro_latin { color: red; }"),
+    });
+    expect(result.stylesheets).toEqual([
+      {
+        vfsPath: "source/sil_euro_latin.css",
+        cssRelPath: "release/sil/sil_euro_latin/source/sil_euro_latin.css",
+        cssText: ".kmw-keyboard-sil_euro_latin { color: red; }",
+      },
+    ]);
+    expect(vfs.get("source/sil_euro_latin.css")?.content).toBe(".kmw-keyboard-sil_euro_latin { color: red; }");
+    expect(vfs.get("sil/sil_euro_latin/source/sil_euro_latin.css")).toBeUndefined();
+    expect(result.filesLoaded).toContain("source/sil_euro_latin.css");
+  });
+
+  it("keeps a shared/ stylesheet at its release-relative VFS address", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(kpsWithFiles(["..\\..\\..\\shared\\styles\\common.css"])),
+      [`${PROXY}/release/shared/styles/common.css`]: ok(".shared { margin: 0; }"),
+    });
+    expect(result.stylesheets.map((s) => s.vfsPath)).toEqual(["shared/styles/common.css"]);
+    expect(vfs.get("shared/styles/common.css")?.content).toBe(".shared { margin: 0; }");
+  });
+
+  it("does not write a welcome-folder stylesheet listed in the .kps into the VFS", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(kpsWithFiles(["welcome\\kb.css"])),
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+    });
+    expect(result.stylesheets.map((s) => s.vfsPath)).toEqual(["source/welcome/kb.css"]);
+    expect(vfs.get("source/welcome/kb.css")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The base's packaged fonts, for the generated descriptor
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — packaged fonts", () => {
+  const SHARED = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets";
+  const kpsWithSharedFont = [
+    `<?xml version="1.0" encoding="utf-8"?>`,
+    `<Package>`,
+    `  <Files>`,
+    `    <File><Name>welcome\\welcome.htm</Name><FileType>.htm</FileType></File>`,
+    `    <File><Name>${SHARED}\\AndikaAfr-R.ttf</Name><FileType>.ttf</FileType></File>`,
+    `    <File><Name>${SHARED}\\OFL.txt</Name><FileType>.txt</FileType></File>`,
+    `    <File><Name>${SHARED}\\FONTLOG.txt</Name><FileType>.txt</FileType></File>`,
+    `    <File><Name>..\\LICENSE.md</Name><FileType>.md</FileType></File>`,
+    `  </Files>`,
+    `  <Keyboards><Keyboard>`,
+    `    <OSKFont>${SHARED}\\AndikaAfr-R.ttf</OSKFont>`,
+    `    <DisplayFont>${SHARED}\\AndikaAfr-R.ttf</DisplayFont>`,
+    `  </Keyboard></Keyboards>`,
+    `</Package>`,
+  ].join("\n");
+  const sharedUrl = (file: string) => `${PROXY}/release/shared/fonts/sil/andika_subsets/${file}`;
+  const FONT = "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf";
+  const OFL = "shared/fonts/sil/andika_subsets/OFL.txt";
+  const FONTLOG = "shared/fonts/sil/andika_subsets/FONTLOG.txt";
+
+  function baseResponses(kps: string) {
+    return {
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: true, status: 200, body: kps },
+      [sharedUrl("AndikaAfr-R.ttf")]: { ok: true, status: 200, body: new Uint8Array([0, 1, 0, 0]) },
+    };
+  }
+
+  it("lists the font and its same-folder companions in .kps order, fetches the companions, and keeps the selections", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      ...baseResponses(kpsWithSharedFont),
+      [sharedUrl("OFL.txt")]: { ok: true, status: 200, body: "SIL Open Font License" },
+      [sharedUrl("FONTLOG.txt")]: { ok: true, status: 200, body: "FONTLOG" },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    expect(result.packageFonts).toEqual({ files: [FONT, OFL, FONTLOG], oskFont: FONT, displayFont: FONT });
+    expect(vfs.get(OFL)).toBeDefined();
+    expect(vfs.get(FONTLOG)).toBeDefined();
+  });
+
+  it("skips a companion it cannot fetch, with a warning, and still lists the font", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      ...baseResponses(kpsWithSharedFont),
+      [sharedUrl("OFL.txt")]: { ok: true, status: 200, body: "SIL Open Font License" },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    expect(result.packageFonts?.files).toEqual([FONT, OFL]);
+    expect(result.warnings.some((w) => w.includes("FONTLOG.txt") && w.includes("not fetched"))).toBe(true);
+  });
+
+  it("takes no companions from the keyboard's own folder for a keyboard-local font", async () => {
+    const localKps = [
+      `<Package><Files>`,
+      `  <File><Name>MyFont.ttf</Name><FileType>.ttf</FileType></File>`,
+      `  <File><Name>readme.htm</Name><FileType>.htm</FileType></File>`,
+      `</Files></Package>`,
+    ].join("\n");
+    const vfs = createVirtualFS();
+    const { fetchImpl, calls } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: true, status: 200, body: localKps },
+      [sourceUrl(euroLatinKb, "MyFont.ttf")]: { ok: true, status: 200, body: new Uint8Array([0, 1, 0, 0]) },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    // A font in the keyboard's own source/ is keyed like the rest
+    // of its source, not under the starting keyboard's release path.
+    expect(result.packageFonts).toEqual({ files: ["source/MyFont.ttf"] });
+    expect(vfs.get("source/MyFont.ttf")).toBeDefined();
+    expect(vfs.list("").some((p) => p.startsWith("sil/"))).toBe(false);
+    expect(calls.some((u) => u.endsWith("/readme.htm"))).toBe(false);
+  });
+
+  it("returns no packaged fonts when the .kps packages none", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: {
+        ok: true,
+        status: 200,
+        body: "<Package><Files><File><Name>welcome.htm</Name><FileType>.htm</FileType></File></Files></Package>",
+      },
+    });
+
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    expect(result.packageFonts).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// .kps-listed stylesheets are keyed under the keyboard's source/
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — .kps-listed stylesheets", () => {
+  const kps = [
+    `<Package><Files>`,
+    `  <File><Name>sil_euro_latin.css</Name><FileType>.css</FileType></File>`,
+    `  <File><Name>welcome\\kb.css</Name><FileType>.css</FileType></File>`,
+    `</Files></Package>`,
+  ].join("\n");
+
+  async function load() {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: true, status: 200, body: kps },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.css")]: { ok: true, status: 200, body: ".kmw-keyboard-sil_euro_latin {}" },
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: { ok: true, status: 200, body: "body { margin: 0 }" },
+    });
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    return { vfs, result };
+  }
+
+  it("writes the keyboard's own stylesheet at source/, never under its release path", async () => {
+    const { vfs } = await load();
+    expect(vfs.get("source/sil_euro_latin.css")).toBeDefined();
+    expect(vfs.list("").filter((p) => p.startsWith("sil/"))).toEqual([]);
+  });
+
+  it("does not write a welcome page's stylesheet into the VFS", async () => {
+    const { vfs } = await load();
+    expect(vfs.get("source/welcome/kb.css")).toBeUndefined();
+  });
+
+  it("still reports both stylesheets, keyed under source/, for the OSK frame's own filter", async () => {
+    const { result } = await load();
+    expect(result.stylesheets.map((s) => s.vfsPath)).toEqual(["source/sil_euro_latin.css", "source/welcome/kb.css"]);
+  });
+});
+
+describe("releasePathToVfsKey", () => {
+  it("keys a file in the keyboard's own source/ as source/<rest>", () => {
+    expect(releasePathToVfsKey("release/sil/sil_euro_latin/source/a.css", "release/sil/sil_euro_latin")).toBe("source/a.css");
+    expect(releasePathToVfsKey("release/sil/sil_euro_latin/source/fonts/b.ttf", "release/sil/sil_euro_latin")).toBe(
+      "source/fonts/b.ttf",
+    );
+  });
+
+  it("keeps shared and other-folder files release-relative", () => {
+    expect(releasePathToVfsKey("release/shared/fonts/x/F.ttf", "release/sil/sil_euro_latin")).toBe("shared/fonts/x/F.ttf");
+    expect(releasePathToVfsKey("release/sil/sil_euro_latin_extra/source/a.css", "release/sil/sil_euro_latin")).toBe(
+      "sil/sil_euro_latin_extra/source/a.css",
+    );
   });
 });

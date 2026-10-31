@@ -433,6 +433,12 @@ export interface KeyInspectorProps {
    * component renders is enabled, and every click reaches the caller.
    */
   onApplyFix: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
+  /**
+   * Spec 104 T016: the selected key's recorded key-identity provenance
+   * line (already localized by the caller), rendered with the Placement
+   * provenance. Absent when no identity decision describes this key.
+   */
+  identityNote?: string;
   /** Localized panel accessible name override. */
   label?: string;
   /**
@@ -473,6 +479,7 @@ export function KeyInspector({
   onEscape,
   onSpChange,
   onApplyFix,
+  identityNote,
   label,
   embedded = false,
 }: KeyInspectorProps) {
@@ -771,6 +778,20 @@ export function KeyInspector({
                       id: "editor.assignLoop.keyGrid.inspector.provenanceDesktopSuggested",
                       message: "Auto-suggested from the desktop layout.",
                     })}
+              </span>
+            </>
+          )}
+
+          {/* Spec 104 T016: the key's recorded identity provenance — the
+              durable half of the severance record (the transient half is
+              the gallery's live-region notice). */}
+          {identityNote !== undefined && (
+            <>
+              <span style={PANEL_LABEL_STYLE}>
+                {t({ id: "editor.assignLoop.keyGrid.inspector.identityLabel", message: "Identity" })}
+              </span>
+              <span style={PANEL_HINT_STYLE} data-testid="key-inspector-identity-provenance">
+                {identityNote}
               </span>
             </>
           )}

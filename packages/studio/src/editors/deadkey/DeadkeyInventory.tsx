@@ -9,7 +9,7 @@
 // - Imported/unrecognized shapes: Pairs is disabled with the exact note
 //   "rule shape not recognized — pair editing unavailable"; retarget and
 //   delete stay enabled.
-// - id:null (named/opaque dk(name), pre-FR-004): delete/retarget only.
+// - id:null (named dk(name), typed since #2238): delete/retarget only.
 // - Duplicate-id findings (KM_WARN_DUPLICATE_DEADKEY_ID) surface as a
 //   visible repair notice with a real minimal repair (re-mint the extra
 //   trigger rules via allocateDeadkeyId); the notice says what the repair
@@ -265,8 +265,8 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
             )}
             {info.id === null && (
               <div style={noteStyle}>
-                Named deadkey (pre-FR-004): the id is opaque until the codec closure lands — delete and retarget
-                only.
+                Named deadkey: carried as dk(name) in the IR — delete and retarget only; pair editing and rename
+                are not available for named deadkeys.
               </div>
             )}
             <div style={actionsStyle}>

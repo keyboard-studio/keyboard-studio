@@ -5,7 +5,8 @@
 // fallbacks that must NOT reach for the base keyboard's values (FR-007, SC-002).
 
 import { describe, it, expect } from "vitest";
-import { buildKpsContent, buildLanguageElement, parseTargetTokens } from "./build.js";
+import { buildKpsContent, buildLanguageElement, kpsMemberRef, parseTargetTokens } from "./build.js";
+import { parseKpsFontRefs } from "../start-browser/kps-parser.js";
 
 /** A `.kmn` with web targets and a visual keyboard, so `<Files>` is fully populated. */
 const KMN = [
@@ -271,5 +272,88 @@ describe("parseTargetTokens", () => {
   it("lists the .js for a double-quoted web target", () => {
     const kmn = KMN.replace("store(&TARGETS) 'any'", 'store(&TARGETS) "any"');
     expect(buildKpsContent("bm_test", { displayName: "Bambara" }, kmn)).toContain("bm_test.js");
+  });
+});
+
+describe("buildKpsContent — carried fonts and stylesheet (#2308)", () => {
+  const OSK_FONT = {
+    ref: "../../../shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf",
+    isOskFont: true,
+  };
+  const OSK_REF_KPS = "..\\..\\..\\shared\\fonts\\sil\\andika_subsets\\AndikaAfr-R.ttf";
+
+  it("lists a carried font in <Files> with the base's backslash reference spelling", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN, "1.0", [], [OSK_FONT]);
+    expect(kps).toContain(`<Name>${OSK_REF_KPS}</Name>`);
+    expect(kps).toContain("<FileType>.ttf</FileType>");
+  });
+
+  it("names the OSK font in <OSKFont> and <DisplayFont>, between <Version> and <Languages>", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN, "1.0", [], [OSK_FONT]);
+    expect(kps).toContain(`<OSKFont>${OSK_REF_KPS}</OSKFont>`);
+    expect(kps).toContain(`<DisplayFont>${OSK_REF_KPS}</DisplayFont>`);
+    const versionAt = kps.indexOf("</Version>");
+    const oskAt = kps.indexOf("<OSKFont>");
+    const languagesAt = kps.indexOf("<Languages>");
+    expect(versionAt).toBeGreaterThan(-1);
+    expect(oskAt).toBeGreaterThan(versionAt);
+    expect(languagesAt).toBeGreaterThan(oskAt);
+  });
+
+  it("a file-only font is listed but never named as the OSK font", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN, "1.0", [], [
+      { ref: "fonts/Charis-Regular.ttf", isOskFont: false },
+    ]);
+    expect(kps).toContain("<Name>fonts\\Charis-Regular.ttf</Name>");
+    expect(kps).not.toContain("<OSKFont>");
+    expect(kps).not.toContain("<DisplayFont>");
+  });
+
+  it("lists the carried keyboard stylesheet in <Files>", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN, "1.0", [], [], ["ewondo.css"]);
+    expect(kps).toContain("<Name>ewondo.css</Name>");
+    expect(kps).toContain("<FileType>.css</FileType>");
+  });
+
+  it("with no fonts or stylesheets, emits neither (pre-#2308 shape)", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN);
+    expect(kps).not.toContain("<OSKFont>");
+    expect(kps).not.toContain(".ttf");
+    expect(kps).not.toContain(".css");
+  });
+
+  it("dedupes a font listed twice, with the OSK flag winning", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN, "1.0", [], [
+      { ref: "../../../shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf", isOskFont: false },
+      OSK_FONT,
+    ]);
+    expect(kps.match(/AndikaAfr-R\.ttf<\/Name>/g)).toHaveLength(1);
+    expect(kps).toContain(`<OSKFont>${OSK_REF_KPS}</OSKFont>`);
+  });
+
+  it("round-trips through parseKpsFontRefs: the loader reads back what the writer emitted", () => {
+    const kps = buildKpsContent("ewondo", { displayName: "Ewondo" }, KMN, "1.0", [], [OSK_FONT], ["ewondo.css"]);
+    const refs = parseKpsFontRefs(kps);
+    // The parser hands back the raw member spelling; it must be the base's own.
+    expect(refs.oskFonts).toContain(OSK_REF_KPS);
+    expect(refs.fileFonts).toContain(OSK_REF_KPS);
+    expect(refs.stylesheets).toContain("ewondo.css");
+  });
+});
+
+describe("kpsMemberRef (#2308)", () => {
+  it("an asset inside the base's own source/ is referenced below source/", () => {
+    expect(
+      kpsMemberRef("release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.css", "release/sil/sil_cameroon_qwerty"),
+    ).toBe("sil_cameroon_qwerty.css");
+    expect(
+      kpsMemberRef("release/sil/sil_cameroon_qwerty/source/fonts/Local.ttf", "release/sil/sil_cameroon_qwerty"),
+    ).toBe("fonts/Local.ttf");
+  });
+
+  it("a shared asset climbs three levels to the repo root", () => {
+    expect(
+      kpsMemberRef("release/shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf", "release/sil/sil_cameroon_qwerty"),
+    ).toBe("../../../shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf");
   });
 });

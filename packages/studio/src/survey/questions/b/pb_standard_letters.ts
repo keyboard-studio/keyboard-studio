@@ -1,7 +1,8 @@
 // Per-question module: pb_standard_letters (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 import type { IRStore } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 
@@ -51,26 +52,7 @@ const VALID_VALUES = new Set([
   "other",
 ]);
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please choose which letters your language uses.",
-    };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return {
-      ok: false,
-      code: "invalid_option",
-      message: `"${v}" is not a valid choice.`,
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose which letters your language uses.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

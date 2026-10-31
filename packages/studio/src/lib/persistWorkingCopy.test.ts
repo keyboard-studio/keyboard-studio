@@ -946,6 +946,42 @@ describe("persistWorkingCopy", () => {
     });
   });
 
+  describe("extraction-only base help text persistence (issue #2206)", () => {
+    const HELP_TEXT =
+      "<h2>Troubleshooting</h2><p>If a vowel does not combine with a consonant, make sure you have typed the consonant first.</p>";
+
+    function instantiate() {
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "basic_kbdinben", displayName: "Bengali Inscript", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+      useWorkingCopyStore.getState().setBaseHelpPhpTextForExtraction(HELP_TEXT);
+    }
+
+    it("round-trips the slice through sessionStorage snapshot/rehydrate, while the prose slice stays null", () => {
+      instantiate();
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().baseHelpPhpTextForExtraction).toBeNull();
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.baseHelpPhpTextForExtraction).toBe(HELP_TEXT);
+      // The retention is extraction-only on restore exactly as live:
+      // the prose slice a render path would read is still null.
+      expect(s.startHelpPhpText).toBeNull();
+    });
+
+    it("tolerates a pre-#2206 snapshot with no extraction field, restoring null", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.baseHelpPhpTextForExtraction;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.baseHelpPhpTextForExtraction).toBeNull();
+    });
+  });
+
   // spec 080 US3 (T025): the two documentation decisions — HISTORY proposal
   // state and the layout-chart preference — round-trip and tolerate absence.
   describe("documentation decisions persistence (spec 080 US3)", () => {
@@ -996,6 +1032,77 @@ describe("persistWorkingCopy", () => {
       );
       expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
       expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
+    });
+
+    it("round-trips docFixProposals through snapshot/rehydrate (issue #1908)", () => {
+      instantiate();
+      const proposals = { pagename: "accepted", bodySync: "help", imageWidth: "declined" } as const;
+      useWorkingCopyStore.getState().setDocFixProposals(proposals);
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().docFixProposals).toEqual(proposals);
+    });
+
+    it("tolerates a snapshot written before docFixProposals existed, restoring null (issue #1908)", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.docFixProposals;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.docFixProposals).toBeNull();
+    });
+
+    it("round-trips startDocCssTexts path/text pairs through snapshot/rehydrate", () => {
+      instantiate();
+      const entries = [
+        { path: "source/welcome/kb.css", text: ".wide { width: 90%; }" },
+        { path: "source/help/kb.css", text: ".full { width: 98%; }" },
+      ];
+      useWorkingCopyStore.getState().setStartDocCssTexts(entries);
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().startDocCssTexts).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().startDocCssTexts).toEqual(entries);
+    });
+
+    it("tolerates a legacy startDocCssTexts snapshot of plain texts, dropping them for null", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = {
+        ...snapshot,
+        startDocCssTexts: [".full { width: 98%; }", ".wide { width: 90%; }"],
+      } as unknown as WorkingCopySnapshot;
+      const prepared = prepareWorkingCopySnapshot(legacy);
+      expect(prepared.startDocCssTexts).toBeNull();
+    });
+
+    it("keeps well-formed pairs from a mixed legacy startDocCssTexts snapshot and drops the plain texts", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const mixed = {
+        ...snapshot,
+        startDocCssTexts: [
+          ".full { width: 98%; }",
+          { path: "source/help/kb.css", text: ".full { width: 98%; }" },
+        ],
+      } as unknown as WorkingCopySnapshot;
+      const prepared = prepareWorkingCopySnapshot(mixed);
+      expect(prepared.startDocCssTexts).toEqual([
+        { path: "source/help/kb.css", text: ".full { width: 98%; }" },
+      ]);
+    });
+
+    it("a fresh instantiation clears recorded doc-fix proposals (issue #1908)", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setDocFixProposals({ pagename: "accepted" });
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+      expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
     });
 
     // spec 082 FR-020/FR-022: Keep/dismiss dispositions are durable — the

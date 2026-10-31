@@ -50,6 +50,7 @@
 // a second enumeration of the WorkingCopyData field list.
 
 import type {
+  FallbackPolicy,
   RemovalCapability,
   VirtualFS,
   VirtualFSEntry,
@@ -57,11 +58,12 @@ import type {
 } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
-import type { KeyEditOverlay } from "@keyboard-studio/engine";
+import type { KeyEditOverlay, StartDocCssText } from "@keyboard-studio/engine";
 import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -99,7 +101,9 @@ export interface SerializedEntry {
  *
  * `validatorFindings` (LintFinding[]) and `axisFills` (AxisFill[], #890) flow
  * through unchanged — both are plain, JSON-safe data, so they round-trip
- * directly with no override.
+ * directly with no override. The spec 104 identity records
+ * (`keyIdentityDecisions`, `keyTransplants`, `guardSpecification`) flow the
+ * same way.
  *
  * Exported (spec 034 US3): the durable localStorage draft
  * (`../lib/draftPersistence.ts`) reuses this exact type — and the
@@ -133,7 +137,19 @@ export type WorkingCopySnapshot = Omit<
   | "keptGuardRuleIds"
   | "dismissedMissingGroups"
   | "narrowedGuardQuestions"
+  | "fallbackPolicy"
 > & {
+  /**
+   * Keyboard-wide fallback policy. Absent in drafts written before it
+   * existed; those carry the legacy `closedKeyboardCard` / `carveDispositions`
+   * below instead, and the read side folds them into a policy
+   * (`migrateFallbackPolicy`). Never written in the legacy shape.
+   */
+  fallbackPolicy?: FallbackPolicy;
+  /** LEGACY (read-only): the closed-keyboard card outcome of a pre-policy draft. */
+  closedKeyboardCard?: unknown;
+  /** LEGACY (read-only): the per-combination dispositions of a pre-policy draft. */
+  carveDispositions?: unknown;
   startVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
@@ -365,10 +381,19 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     helpDocs: s.helpDocs,
     startWelcomeHtmText: s.startWelcomeHtmText,
     startHelpPhpText: s.startHelpPhpText,
+    // Issue #2206: the extraction-only base help text round-trips with
+    // the draft — a resumed copy session must be offered the same
+    // troubleshooting suggestions the original session was. It stays
+    // extraction-only on restore exactly as in the live store.
+    baseHelpPhpTextForExtraction: s.baseHelpPhpTextForExtraction,
     // spec 080 US2: plain strings / a string literal, straight passthrough; the
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
     startReadmeMdText: s.startReadmeMdText,
     startHistoryMdText: s.startHistoryMdText,
+    // Issue #2139: plain JSON pairs, straight passthrough — a resumed draft
+    // must judge 11.8 against the same kb.css the live session saw.
+    startDocCssTexts: s.startDocCssTexts,
+    startPackageFonts: s.startPackageFonts,
     startWelcomeConvention: s.startWelcomeConvention,
     ...(startWelcomeImages !== undefined ? { startWelcomeImages } : {}),
     // Over budget => the images are omitted AND the omission is recorded, so a
@@ -379,6 +404,12 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // spec 080 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
     historyEntryState: s.historyEntryState,
     chartPreference: s.chartPreference,
+    // Issue #1908: the recorded documentation-fix proposal answers.
+    docFixProposals: s.docFixProposals,
+    // Spec 104: the touch key-identity record set — plain JSON spine
+    // records, straight passthrough; a resumed draft must not re-present
+    // choices the author already answered (FR-017).
+    touchKeyIdentity: s.touchKeyIdentity,
     startDocProfile: s.startDocProfile,
     baselineDocFindings: s.baselineDocFindings,
     ir: s.ir,
@@ -403,15 +434,20 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
-    // Closed-keyboard card + carve dispositions (076 FR-005/FR-022): plain
-    // JSON-safe data, straight passthrough like axisFills
-    // above. The read side is the tolerant half: a snapshot written before
-    // these fields existed reads as "card unanswered, no decisions".
-    closedKeyboardCard: s.closedKeyboardCard,
-    carveDispositions: s.carveDispositions,
+    // Spec 104 identity records: plain JSON-safe data, straight passthrough
+    // like axisFills above (the read side below is the tolerant half).
+    keyIdentityDecisions: s.keyIdentityDecisions,
+    keyTransplants: s.keyTransplants,
+    guardSpecification: s.guardSpecification,
+    // Keyboard-wide fallback policy (076 FR-019): a plain JSON string. The
+    // read side is the tolerant half: a pre-policy snapshot carries the
+    // legacy card/dispositions fields instead and is migrated on read.
+    fallbackPolicy: s.fallbackPolicy,
     // 076 FR-023 T020 keep-inert overrides: plain JSON-safe string array,
-    // same passthrough + tolerant-read idiom as the dispositions above.
+    // same passthrough + tolerant-read idiom as axisFills above.
     carveTouchKeepInert: s.carveTouchKeepInert,
+    displacedDeclined: s.displacedDeclined,
+    carveSuggestion: s.carveSuggestion,
     // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
@@ -472,6 +508,27 @@ function withLegacySnapshotKeys(snapshot: WorkingCopySnapshot): WorkingCopySnaps
   return (patched ?? raw) as unknown as WorkingCopySnapshot;
 }
 
+/**
+ * The `startDocCssTexts` slice entries gained their stylesheet path after
+ * drafts were already being saved with plain texts. A legacy string entry
+ * names no path, so it cannot be written back at serialize time and is
+ * dropped on restore; well-formed `{ path, text }` entries pass through.
+ * An absent or fully-legacy value restores as null.
+ */
+function normalizeStartDocCssTexts(
+  value: StartDocCssText[] | null | undefined,
+): StartDocCssText[] | null {
+  if (value === null || value === undefined) return null;
+  const entries = (value as unknown[]).filter(
+    (entry): entry is StartDocCssText =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as StartDocCssText).path === "string" &&
+      typeof (entry as StartDocCssText).text === "string",
+  );
+  return entries.length > 0 ? entries : null;
+}
+
 export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<WorkingCopyData> {
   const snapshot = withLegacySnapshotKeys(input);
   const startVfs = createVirtualFS(snapshot.startVfsEntries.map(deserializeEntry));
@@ -502,15 +559,29 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     helpDocs: snapshot.helpDocs ?? null,
     startWelcomeHtmText: snapshot.startWelcomeHtmText ?? null,
     startHelpPhpText: snapshot.startHelpPhpText ?? null,
+    // Tolerate snapshots saved before issue #2206 landed: absent
+    // restores as null (no extraction source — facet proposals only).
+    baseHelpPhpTextForExtraction: snapshot.baseHelpPhpTextForExtraction ?? null,
     // Tolerate pre-080 snapshots the same way: absent restores as null.
     startReadmeMdText: snapshot.startReadmeMdText ?? null,
     startHistoryMdText: snapshot.startHistoryMdText ?? null,
+    // Tolerate snapshots saved before issue #2139 landed: absent restores
+    // as null. Snapshots saved while the slice held plain texts (no path)
+    // restore with those entries dropped — a text whose stylesheet path is
+    // unknown cannot be written back, so it is not guessed at.
+    startDocCssTexts: normalizeStartDocCssTexts(snapshot.startDocCssTexts),
+    // Absent from a draft saved before the slice existed.
+    startPackageFonts: snapshot.startPackageFonts ?? null,
     startWelcomeConvention: snapshot.startWelcomeConvention ?? null,
     startWelcomeImages: deserializeWelcomeImages(snapshot.startWelcomeImages),
     startWelcomeImagesDropped: snapshot.startWelcomeImagesDropped === true,
     // Tolerate snapshots saved before the documentation decisions existed.
     historyEntryState: snapshot.historyEntryState ?? null,
     chartPreference: snapshot.chartPreference ?? null,
+    // Tolerate snapshots saved before the #1908 proposal answers existed.
+    docFixProposals: snapshot.docFixProposals ?? null,
+    // Tolerate snapshots saved before the spec 104 record set existed.
+    touchKeyIdentity: snapshot.touchKeyIdentity ?? null,
     startDocProfile: snapshot.startDocProfile ?? null,
     baselineDocFindings: snapshot.baselineDocFindings ?? null,
     ir: snapshot.ir,
@@ -537,12 +608,24 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
+    // Tolerate snapshots saved before these fields existed (spec 104): an
+    // absent value reads as "no identity decisions recorded", never as a
+    // clobbering undefined — same idiom as carveTouchKeepInert below.
+    keyIdentityDecisions: snapshot.keyIdentityDecisions ?? [],
+    keyTransplants: snapshot.keyTransplants ?? [],
+    guardSpecification: snapshot.guardSpecification ?? null,
     // Tolerate snapshots saved before these fields existed (076 FR-022):
     // an absent value must not clobber the store defaults with undefined —
     // same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
-    closedKeyboardCard: snapshot.closedKeyboardCard ?? null,
-    carveDispositions: snapshot.carveDispositions ?? [],
+    // Fallback policy: a current snapshot carries it; a pre-policy snapshot
+    // (closed-keyboard card / per-combo dispositions) is folded into one
+    // policy and the legacy fields are dropped. Never throws; an absent or
+    // unrecognised shape reads as the default. The choice is recorded once
+    // here and never re-prompted.
+    fallbackPolicy: migrateFallbackPolicy(snapshot),
     carveTouchKeepInert: snapshot.carveTouchKeepInert ?? [],
+    displacedDeclined: snapshot.displacedDeclined ?? [],
+    carveSuggestion: snapshot.carveSuggestion ?? null,
     // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.

@@ -276,6 +276,9 @@ export function contextToKeys(context: ContextElement[]): string[] {
       case 'deadkey':
         keys.push('‹dk›');
         break;
+      case 'namedDeadkey':
+        keys.push('‹dk›');
+        break;
       case 'any':
         // store-based — no single key representation
         break;
@@ -286,6 +289,11 @@ export function contextToKeys(context: ContextElement[]): string[] {
       case 'index':
         break;
       case 'baselayout':
+        break;
+      case 'if':
+        // A guard is a condition, not a key — it contributes no key step.
+        // The condition itself is surfaced by precedingContextLabel and
+        // buildCondition, not dropped from the rule.
         break;
       case 'raw':
         break;
@@ -305,6 +313,7 @@ export function outputToChar(output: OutputElement[]): string {
   switch (first.kind) {
     case 'char': return first.value;
     case 'deadkey': return '‹dk›';
+    case 'namedDeadkey': return '‹dk›';
     case 'index':
     case 'outs': return '…';
     case 'beep': return '🔔';
@@ -370,7 +379,10 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 
   const modLayer = ruleModifier(rule);
   const modLabel = modifierLabel(rule);
-  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey');
+  // Named fan-outs do not reach this expansion today (the engine fan-out
+  // predicate requires numeric deadkey pre-terminals); the namedDeadkey
+  // arm is display parity for if/when the predicate widens (#2238 audit).
+  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey' || el.kind === 'namedDeadkey');
 
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
@@ -831,9 +843,11 @@ function precedingContextLabel(elements: ContextElement[]): string {
       case 'notany':     parts.push(`any char not in "${el.storeRef}"`); break;
       case 'vkey':       parts.push(`[${el.name}]`); break;
       case 'deadkey':    parts.push('a dead key'); break;
+      case 'namedDeadkey': parts.push('a dead key'); break;
       case 'index':      parts.push(`indexed char from "${el.storeRef}"`); break;
       case 'context':    parts.push('context'); break;
       case 'baselayout': parts.push('base layout char'); break;
+      case 'if':         parts.push(`when ${el.store} is '${el.value}'`); break;
       case 'raw':
         // Skip structural KMN syntax tokens ('+' separator) — they're codec artifacts, not meaningful context
         if (el.text.trim() !== '+') parts.push('specific input');
@@ -1143,6 +1157,7 @@ export function triggerKeyLabel(context: ContextElement[], ir?: KeyboardIR): str
     case 'vkey':    return desktopVkeyLabel(triggerEl.name);
     case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
+    case 'namedDeadkey': return `deadkey ${triggerEl.name}`;
     // TOTAL FLOOR (#1399 follow-on): a store-triggered rule (any()/notany())
     // must never resolve to undefined — describe the store's own items
     // instead of naming a single (nonexistent) key.
@@ -1430,6 +1445,9 @@ type ConditionOutcome =
  *   context() (offset 1 only  -> "after any typed character"
  *     — context(N>1) never reaches here; it's parsed as a RawKmnFragment)
  *   baselayout(value)         -> "only on the '<value>' keyboard layout"
+ *   if(store = 'value')       -> "only when <store> is set to '<value>'"
+ *                                (a sole guard; a guard mixed with other
+ *                                preceding elements stays unrenderable)
  *   index() back-ref, or any  -> unrenderable — the whole producer entry
  *     other/mixed shape          falls back (see charProducers)
  */
@@ -1450,6 +1468,8 @@ function buildCondition(preceding: readonly ContextElement[], ir: KeyboardIR): C
         return { kind: 'text', text: 'after any typed character' };
       case 'baselayout':
         return { kind: 'text', text: `only on the '${el.value}' keyboard layout` };
+      case 'if':
+        return { kind: 'text', text: `only when ${el.store} is set to '${el.value}'` };
       default:
         return { kind: 'unrenderable' };
     }
@@ -1895,7 +1915,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
  * punctuation step's base-group caption; changing the rule is a separate
  * feature.
  */
-function isAlwaysKeepCategory(ch: string): boolean {
+export function isAlwaysKeepCategory(ch: string): boolean {
   return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
 }
 
@@ -1939,22 +1959,6 @@ function targetScriptIsLatin(bcp47: string | null | undefined): boolean {
     (subtag) => getLoadedLangtags()?.getLanguageDefaults(subtag) ?? null,
   );
   return (script ?? 'Latn').toLowerCase() === 'latn';
-}
-
-/**
- * 076 FR-022 (T016): the `sparseLatinOverlay` input to
- * `workingCopyStore.prefillCarveDispositions`.
- *
- * The store's contract documents `sparseLatinOverlay` as "true for a sparse
- * Latin overlay, false for a non-Latin script base" — at carve time the
- * only signal the gallery can read is the target script, so this is the
- * target-script-is-Latin predicate above, exported for the carve gallery's
- * pre-fill. It fails open to Latin (see `targetScriptIsLatin`): on an
- * unknown script the FR-005 proposal leans allow-host rather than
- * spuriously blocking.
- */
-export function isSparseLatinOverlayTarget(bcp47: string | null | undefined): boolean {
-  return targetScriptIsLatin(bcp47);
 }
 
 /**

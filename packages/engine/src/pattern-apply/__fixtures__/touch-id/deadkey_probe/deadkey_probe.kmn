@@ -1,0 +1,21 @@
+c Spec 104 fixture — HAND-CONSTRUCTED for T014 (Wave 3). None of the T001
+c idiom fixtures carries a deadkey, so the SC-002 deadkey+key context
+c probe class had no fixture to run against. This minimal keyboard is the
+c smallest honest shape: one touch deadkey key (T_ACUTE arms deadkey(1)),
+c two letters it composes with, and a space rule that emits the accent
+c itself. Everything else falls through unmatched on purpose.
+
+store(&VERSION) '10.0'
+store(&NAME) 'Deadkey Probe (spec 104 fixture)'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'deadkey_probe.keyman-touch-layout'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [T_ACUTE] > deadkey(1)
+deadkey(1) + [K_A] > 'á'
+deadkey(1) + [K_E] > 'é'
+deadkey(1) + [K_SPACE] > '´'

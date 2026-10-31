@@ -1,21 +1,20 @@
 // Round-trip test: generated deadkey_single_tap rule vs hand-written s02Recognizer.
 //
-// Behavioural divergence documented here:
-//   - The interpreter (generated rule) requires an escape rule in the deadkeys group;
-//     the hand-written s02Recognizer treats fallback/escape rules as optional.
-//   - The deadkeyName slot now agrees between both paths (underscore-hex,
-//     e.g. "dk_0060"): the interpreter's numeric_id_to_label transform delegates
-//     to formatDkName, matching the hand-written rule. The round-trip assertions
-//     below verify the two implementations produce identical deadkeyName values.
-//   - patternId bases differ by naming convention ("deadkey_single_tap" vs
-//     "deadkey-single-tap"); only the suffix after '#' is compared.
-//
-// Fixtures in this file include escape rules so both rules produce matches.
-// Negative cases and divergence cases are documented explicitly.
+// Since #2233 the two matchers share ONE shape definition (recognizer/
+// s02-families.ts findS02Families): the escape rule is optional for both,
+// families are keyed by the full cluster key (group, deadkey id, prefix char,
+// base store, output store), and the patternId base is "deadkey_single_tap"
+// for BOTH (the hand-written rule previously used the kebab base
+// "deadkey-single-tap" — changed deliberately: applyAssignments matches the
+// snake base verbatim). The parity contract pinned here: for every fixture
+// family the two matchers produce the SAME patternId, the SAME owned-node
+// set, the SAME slot values (excluding the interpreter-internal __hasBeep
+// marker), and lift() produces the SAME kmnFragment.
 import { describe, it, expect } from "vitest";
 import { rule as generatedDeadkeySingleTap } from "./deadkey-single-tap.js";
 import { s02Recognizer } from "../s02-deadkey-single-tap.js";
 import type { IRGroup } from "@keyboard-studio/contracts";
+import type { MatchResult } from "../../types.js";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import {
   buildCompleteGraveIR,
@@ -23,8 +22,22 @@ import {
   buildTwoTriggerGraveIR,
 } from "../__fixtures__/recognizerIr.js";
 
-function suffixId(patternId: string): string {
-  return patternId.split("#")[1]?.split(":")[0] ?? "";
+/** Assert full match parity between the two matchers' results on one IR. */
+export function expectTwinParity(refMatches: MatchResult[], genMatches: MatchResult[]): void {
+  expect(genMatches.map((m) => m.patternId).sort()).toEqual(
+    refMatches.map((m) => m.patternId).sort(),
+  );
+  for (const ref of refMatches) {
+    const gen = genMatches.find((m) => m.patternId === ref.patternId)!;
+    expect(gen.ownedNodes.map((n) => n.nodeId).sort()).toEqual(
+      ref.ownedNodes.map((n) => n.nodeId).sort(),
+    );
+    const { __hasBeep: _beep, ...genSlots } = gen.slotValues;
+    expect(genSlots).toEqual(ref.slotValues);
+    expect(generatedDeadkeySingleTap.lift(gen).kmnFragment).toBe(
+      s02Recognizer.lift(ref).kmnFragment,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -44,8 +57,10 @@ describe("generated/deadkey-single-tap round-trip vs s02Recognizer", () => {
     const ref = refMatches[0]!;
     const gen = genMatches[0]!;
 
-    // Suffix (dk_0060 in both cases) must agree
-    expect(suffixId(gen.patternId)).toBe(suffixId(ref.patternId));
+    // Full patternId equality (#2233): same snake base, same full cluster key
+    expect(gen.patternId).toBe(ref.patternId);
+    expect(ref.patternId).toBe("deadkey_single_tap#deadkeys:dk_0060:dkf0060>dkt0060");
+    expectTwinParity(refMatches, genMatches);
 
     // Both own the trigger and body nodes
     const genNodeIds = gen.ownedNodes.map((n) => n.nodeId);
@@ -84,6 +99,7 @@ describe("generated/deadkey-single-tap round-trip vs s02Recognizer", () => {
 
     const ref = refMatches[0]!;
     const gen = genMatches[0]!;
+    expectTwinParity(refMatches, genMatches);
 
     // Unshifted trigger is preferred as primary — both agree
     expect(gen.slotValues["triggerKey"]).toBe("K_QUOTE");
@@ -267,22 +283,20 @@ describe("generated/deadkey-single-tap round-trip vs s02Recognizer", () => {
     expect(generatedDeadkeySingleTap.match(ir)).toHaveLength(0);
   });
 
-  // --- Documented divergence: generated requires escape rule; hand-written does not ---
+  // --- Former divergence, reconciled in #2233: the escape rule is optional
+  // --- for BOTH matchers (basic_kbdfr ships no escape rules at all).
 
-  it("divergence: without escape rule, hand-written matches but generated does not", () => {
-    // basic_kbdfr grave without an escape rule. The two implementations differ
-    // here by design: the YAML DSL spec requires the escape rule; the
-    // hand-written rule treats it as optional.
+  it("without escape rule: BOTH rules match (escape is optional since #2233)", () => {
     const { ir, triggerNodeId, bodyNodeId } = buildGraveIR({ escape: false });
 
-    // Generated rule requires escape — no match
-    expect(generatedDeadkeySingleTap.match(ir)).toHaveLength(0);
-
-    // Hand-written rule lifts without escape, owning trigger, body and stores
     const refMatches = s02Recognizer.match(ir);
+    const genMatches = generatedDeadkeySingleTap.match(ir);
     expect(refMatches).toHaveLength(1);
+    expect(genMatches).toHaveLength(1);
+    expectTwinParity(refMatches, genMatches);
+
     const ref = refMatches[0]!;
-    expect(ref.patternId).toBe("deadkey-single-tap#dk_0060");
+    expect(ref.patternId).toBe("deadkey_single_tap#deadkeys:dk_0060:dkf0060>dkt0060");
     expect(ref.ownedNodes.map((n) => n.nodeId)).toEqual(
       expect.arrayContaining([triggerNodeId, bodyNodeId, "store#dkf0060", "store#dkt0060"]),
     );
@@ -290,6 +304,10 @@ describe("generated/deadkey-single-tap round-trip vs s02Recognizer", () => {
     expect(ref.slotValues["deadkeyName"]).toBe("dk_0060");
     expect(ref.slotValues["baseLetters"]).toBe(" aAeEiIoOuU");
     expect(ref.slotValues["accentedForms"]).toBe("`àÀèÈìÌòÒùÙ");
+    // No escape -> no accentChar slot, and the lifted fragment has no escape line
+    expect(ref.slotValues["accentChar"]).toBeUndefined();
+    expect(s02Recognizer.lift(ref).kmnFragment).not.toContain("{{accentChar}}");
+    expect(s02Recognizer.lift(ref).kmnFragment.split("\n")).toHaveLength(2);
   });
 });
 

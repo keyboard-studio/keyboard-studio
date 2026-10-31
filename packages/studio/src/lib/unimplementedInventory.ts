@@ -17,12 +17,16 @@
 // coverage locally.
 
 import type {
+  ConfirmedAlphabet,
+  KeyboardIR,
   MechanismAssignment,
+  PlacementWorklist,
   SurveyPhaseResult,
   TouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
 import { uncoveredTargets } from "@keyboard-studio/contracts";
 import { parseTouchLayout, touchCoverage } from "@keyboard-studio/engine";
+import { treatmentCreditedMarks } from "./placementInventory.ts";
 
 /**
  * Desktop/physical Phase C assignments, pulled out of the working copy's
@@ -114,6 +118,7 @@ function computeTouchState(
   inventory: readonly string[],
   ruleIndex?: TouchKeyRuleIndex,
   desktopProducedSet?: ReadonlySet<string>,
+  ir?: KeyboardIR,
 ): TouchState {
   if (touchLayoutJson === null || touchLayoutJson === "") {
     return { uncovered: [], corrupted: false };
@@ -133,7 +138,7 @@ function computeTouchState(
         ...touchCoverage(
           layout,
           inventory,
-          ruleIndex !== undefined ? { ruleIndex } : {},
+          ruleIndex !== undefined ? { ruleIndex, ...(ir !== undefined ? { ir } : {}) } : {},
           desktopProducedSet,
         ).uncovered,
       ],
@@ -158,8 +163,9 @@ export function unimplementedTouchChars(
   touchLayoutJson: string | null,
   inventory: readonly string[],
   ruleIndex?: TouchKeyRuleIndex,
+  ir?: KeyboardIR,
 ): string[] {
-  return computeTouchState(touchLayoutJson, inventory, ruleIndex).uncovered;
+  return computeTouchState(touchLayoutJson, inventory, ruleIndex, undefined, ir).uncovered;
 }
 
 /**
@@ -182,6 +188,13 @@ export interface InventoryCoverageInputs {
    */
   readonly touchRuleIndex?: TouchKeyRuleIndex;
   /**
+   * The IR `touchRuleIndex` was built from (spec 104 T025). Optional and
+   * additive, like the index itself: the production resolver requires it
+   * beside the index; an index passed without its IR keeps the legacy
+   * crediting (defined behaviour, never a crash).
+   */
+  readonly touchIr?: KeyboardIR;
+  /**
    * Session-aware desktop produced-glyph set (see `useInventoryDiff`'s
    * `producedSet` / `buildSessionProducedSet`) — folded into BOTH halves of
    * the gate (shaped-bug fix, diacritic-implementability): the desktop check
@@ -197,6 +210,24 @@ export interface InventoryCoverageInputs {
    * the prior (base-keyboard-only) behavior rather than a type error.
    */
   readonly desktopProducedSet?: ReadonlySet<string>;
+  /**
+   * The confirmed alphabet + the marks series' placement worklist
+   * (session.alphabet / session.marksWorklist). Optional and additive,
+   * like the fields above: absent, the gate behaves exactly as it did
+   * before the composed-mark credit existed. Present, a lone mark whose
+   * treatment is `composed` — never a placement unit, so no gallery
+   * walk can ever produce it — is credited on BOTH halves of the gate
+   * once every attested combination of that mark is produced in the
+   * modality being gated (see lib/placementInventory.ts's
+   * `treatmentCreditedMarks` for the rule and its guards). This is a
+   * PRODUCTION credit (the ruling of issue #2293: placement set ≠
+   * production-coverage set, credited through the other representation),
+   * not a deferral — it must not be confused with the mark-for-later-
+   * review relaxation in lib/accountedForGate.ts, which deliberately
+   * never reaches this gate.
+   */
+  readonly alphabet?: ConfirmedAlphabet;
+  readonly marksWorklist?: PlacementWorklist;
 }
 
 /**
@@ -260,27 +291,59 @@ export function formatUncoveredCharsList(
 }
 
 export function inventoryCoverageGate(inputs: InventoryCoverageInputs): InventoryCoverageGate {
+  // Composed-treatment mark credit (see the `alphabet`/`marksWorklist`
+  // input doc): a lone mark that is not a placement unit is credited in a
+  // modality once every attested combination of it is produced there.
+  // Desktop production truth is the session-aware produced set (absent
+  // it, no credit — the conservative pre-credit behaviour).
+  const creditedDesktop =
+    inputs.alphabet !== undefined && inputs.desktopProducedSet !== undefined
+      ? treatmentCreditedMarks(inputs.alphabet, inputs.marksWorklist, inputs.desktopProducedSet)
+      : new Set<string>();
   const unimplementedDesktop = unimplementedDesktopChars(
     inputs.desktopAssignments,
     inputs.lettersToAdd,
     inputs.desktopProducedSet,
-  );
+  ).filter((c) => !creditedDesktop.has(c.normalize("NFC")));
   const touchState = computeTouchState(
     inputs.touchLayoutJson,
     inputs.confirmedInventory,
     inputs.touchRuleIndex,
     inputs.desktopProducedSet,
+    inputs.touchIr,
   );
+  // Touch production truth is the layout's own covered set (the
+  // inventory minus touchCoverage's post-augmentation uncovered list,
+  // which already folds in the desktop produced set as a composability
+  // seed). The corrupted case is exempt: fail-closed means fail-closed,
+  // and a layout that cannot be read credits nothing.
+  let unimplementedTouch = touchState.uncovered;
+  if (!touchState.corrupted && inputs.alphabet !== undefined) {
+    const uncoveredSet = new Set(touchState.uncovered.map((c) => c.normalize("NFC")));
+    const touchCovered = new Set<string>(
+      inputs.confirmedInventory.filter((c) => !uncoveredSet.has(c.normalize("NFC"))),
+    );
+    const creditedTouch = treatmentCreditedMarks(
+      inputs.alphabet,
+      inputs.marksWorklist,
+      touchCovered,
+    );
+    if (creditedTouch.size > 0) {
+      unimplementedTouch = touchState.uncovered.filter(
+        (c) => !creditedTouch.has(c.normalize("NFC")),
+      );
+    }
+  }
   const blockedOnDesktop = unimplementedDesktop.length > 0;
   // Corrupted always blocks (fail closed) once a layout was actually
   // authored (touchLayoutJson !== null) — computeTouchState only ever sets
   // `corrupted: true` for a non-empty string, so this can't misfire on the
   // "absent" case.
   const blockedOnTouch =
-    inputs.touchLayoutJson !== null && (touchState.corrupted || touchState.uncovered.length > 0);
+    inputs.touchLayoutJson !== null && (touchState.corrupted || unimplementedTouch.length > 0);
   return {
     unimplementedDesktop,
-    unimplementedTouch: touchState.uncovered,
+    unimplementedTouch,
     touchLayoutCorrupted: touchState.corrupted,
     blockedOnDesktop,
     blockedOnTouch,

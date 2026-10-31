@@ -29,6 +29,18 @@ on:
   schedule:
     - cron: '17 7 * * *'
   workflow_dispatch:
+  # Reusable entry for the nightly dev soak (nightly-dev.yml,
+  # km/ci-fast-gate 2026-10-15): the caller passes checkout_ref=dev so
+  # the full-gate events' steps below run against the dev tree, giving
+  # dev an overnight full verdict before any dev -> main merge. Normal
+  # events leave the input empty and check out the triggering ref.
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: 'Ref to check out instead of the triggering ref (the nightly dev soak passes dev)'
+        type: string
+        required: false
+        default: ''
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
@@ -55,11 +67,19 @@ jobs:
   #     which no longer run in the default suite (see vitest configs).
   #   golden — the studio surfaces whose emitted bytes the walk
   #     compares, plus engine/contracts.
+  #   e2e — everything `golden` covers, plus any non-markdown change under
+  #     packages/studio/ (the SPA the desktop walks drive). Gates
+  #     `e2e-desktop`, which is not a required check, so a skip blocks
+  #     nothing. (#2367: keep PR CI under 10 minutes, target 5.)
   # ci.yml / root package.json / lockfile changes, the `run-corpus` /
   # `run-golden` / `run-all-gates` labels, and every non-PR run turn
   # every gate on; an unavailable diff fails open. The corpus gate
   # stays INSIDE `build` — the required status check in the main
-  # rulesets — so relevant PRs are blocked by it exactly as before.
+  # rulesets. Since km/ci-fast-gate (2026-10-15, owner ruling), the
+  # corpus gate and the full test suite run on non-PR events only
+  # (pushes to main, the nightly schedule, manual dispatch); per-PR,
+  # `build` relies on the `fast` job's verdict plus test:pr instead —
+  # see the `fast` job below and scripts/test-pr.mjs.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -67,10 +87,12 @@ jobs:
     outputs:
       corpus: ${{ steps.gates.outputs.corpus }}
       golden: ${{ steps.gates.outputs.golden }}
+      e2e: ${{ steps.gates.outputs.e2e }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
           fetch-depth: 0
 
       - name: Decide which expensive gates this change needs
@@ -82,15 +104,18 @@ jobs:
         run: |
           corpus=false
           golden=false
+          e2e=false
           if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
             corpus=true
             golden=true
+            e2e=true
           else
             files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" 2>/dev/null || true)"
             if [ -z "$files" ]; then
               # Diff unavailable — fail open and run everything.
               corpus=true
               golden=true
+              e2e=true
             else
               while IFS= read -r f; do
                 case "$f" in
@@ -103,7 +128,14 @@ jobs:
                   packages/studio/src/decisions/*|packages/studio/src/steps/*|packages/studio/src/stores/*|packages/studio/src/survey/*|packages/studio/src/lib/*|packages/studio/src/StudioShell.*|packages/studio/e2e/*)
                     golden=true ;;
                 esac
+                # e2e reaches everything golden does, plus the rest of the
+                # studio package (docs-only .md edits excepted).
+                case "$f" in
+                  packages/studio/*.md|packages/studio/*/*.md) ;;
+                  packages/studio/*|packages/glottolog/*) e2e=true ;;
+                esac
               done <<< "$files"
+              if [ "$golden" = "true" ]; then e2e=true; fi
             fi
             case "$PR_LABELS" in
               *'"run-corpus"'*) corpus=true ;;
@@ -112,15 +144,101 @@ jobs:
               *'"run-golden"'*) golden=true ;;
             esac
             case "$PR_LABELS" in
-              *'"run-all-gates"'*) corpus=true; golden=true ;;
+              *'"run-all-gates"'*) corpus=true; golden=true; e2e=true ;;
             esac
           fi
           echo "corpus=$corpus" >> "$GITHUB_OUTPUT"
           echo "golden=$golden" >> "$GITHUB_OUTPUT"
-          echo "Expensive gates for this run: corpus=$corpus golden=$golden (event: $GITHUB_EVENT_NAME)"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+          echo "Expensive gates for this run: corpus=$corpus golden=$golden e2e=$e2e (event: $GITHUB_EVENT_NAME)"
+
+  # Fast gate (km/ci-fast-gate, 2026-10-15 — owner ruling after the
+  # #2191 red-main incident): the cheap, high-signal slice of the build
+  # job — install, build (tsc + vite), typecheck, lint — with NO test
+  # suite and NO corpus gates. This is the slice that catches the
+  # recurring breakage class (TS2304 missing imports, unresolved
+  # modules, lint regressions) and it lands a verdict in ~5 minutes.
+  # `build` needs this job, so a tree that cannot compile stops every
+  # heavier lane before it burns runner time, and a reviewer always
+  # has a same-tree verdict worth waiting for. The inputs mirror the
+  # build job's exactly (pinned corpus for the studio postbuild, the
+  # charnames codegen, and the cached SLDR/langtags fetches the lint
+  # sub-checks read), minus the steps only the test suites need.
+  fast:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      - name: Cache SLDR extract
+        id: sldr-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/sldr/sldr
+          key: sldr-${{ hashFiles('scripts/sldr-version.json') }}
+
+      - name: Fetch SLDR (pinned — determinism-test input)
+        if: steps.sldr-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-sldr
+
+      - name: Cache langtags.json
+        id: langtags-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/langtags/langtags.json
+          key: langtags-${{ hashFiles('scripts/langtags-version.json') }}
+
+      - name: Fetch langtags (pinned — determinism-test input)
+        if: steps.langtags-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-langtags
+
+      - name: Build (all packages)
+        run: pnpm -r build
+
+      - name: Typecheck (all packages)
+        run: pnpm -r typecheck
+
+      - name: Lint (eslint + depcruise + crew-lint + facet-lint)
+        run: pnpm lint
 
   build:
-    needs: changes
+    needs: [changes, fast]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -129,6 +247,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+          # Full history: the PR test step (scripts/test-pr.mjs) diffs
+          # against the PR base via merge-base; the default shallow
+          # checkout has no merge-base and the diff silently comes
+          # back empty (caught live on #2203's first run).
+          fetch-depth: 0
 
       # The corpus-gated unit tests (codec round-trip, carveViaSplice corpus
       # sweep, recognizer integration, touch fixtures, facet-index real-corpus
@@ -247,17 +372,51 @@ jobs:
       # typechecks fail with "Cannot find module '@keyboard-studio/contracts'"
       # and trigger cascade errors (e.g. switch-exhaustiveness loss
       # because LintFinding["severity"] degrades to any).
+      #
+      # On pull requests the next three steps are skipped: the `fast`
+      # job (a required predecessor of this job) already ran build,
+      # typecheck and lint on this same merge tree, and re-running them
+      # here would only duplicate its verdict. Non-PR events keep this
+      # job self-contained and unchanged.
       - name: Build (all packages)
+        if: github.event_name != 'pull_request'
         run: pnpm -r build
 
       - name: Typecheck (all packages)
+        if: github.event_name != 'pull_request'
         run: pnpm -r typecheck
 
       - name: Lint (eslint + depcruise + crew-lint + facet-lint)
+        if: github.event_name != 'pull_request'
         run: pnpm lint
 
+      # Full suite on non-PR events only (km/ci-fast-gate, 2026-10-15):
+      # pushes to main, the nightly schedule and manual dispatch are
+      # the full-gate backstop. Per-PR, the step below runs instead.
       - name: Test (all packages)
+        if: github.event_name != 'pull_request'
         run: pnpm -r test
+
+      # Per-PR test gate (km/ci-fast-gate, 2026-10-15 — owner ruling:
+      # per-PR CI under ~10 minutes): vitest related for the files the
+      # PR touches plus the curated core suites that caught the October
+      # red-main breaks, per package. See scripts/test-pr.mjs for the
+      # lists and the fallback rules; the full suite runs overnight.
+      - name: Test (PR — affected + curated core)
+        if: github.event_name == 'pull_request'
+        run: node scripts/test-pr.mjs ${{ github.event.pull_request.base.sha }}
+
+      # The utility suites below (i18n extract, kbgen, nfd-tolerance,
+      # supportability) resolve @keyboard-studio/engine through its
+      # built dist/ entry — on non-PR events the Build step above
+      # produced it, but on the PR path that step is skipped (the fast
+      # job built on a different runner) and test:pr only builds the
+      # deps of the packages it runs. Build the workspace deps
+      # explicitly here (tsc only, no vite) so the utility steps see
+      # the same tree either way.
+      - name: Build workspace dependencies (PR path — utility suites resolve engine via dist)
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter "@keyboard-studio/studio^..." build
 
       # Corpus-sweep unit tests (km/ci-fast-gates): *.corpus.test.ts
       # files sweep the pinned corpus and accounted for
@@ -267,7 +426,7 @@ jobs:
       # the corpus surface at all. Same files, same assertions; only
       # their trigger changed.
       - name: Test (corpus sweeps — engine + studio, path-gated)
-        if: needs.changes.outputs.corpus == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
         run: |
           pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts
           pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts
@@ -279,7 +438,7 @@ jobs:
       # missing.) Runs under the corpus vitest config (km/ci-fast-gates):
       # the default config now excludes corpus files even when named.
       - name: Test (context normalization generation-time budget, corpus)
-        if: needs.changes.outputs.corpus == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
         run: pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts normalization-step/generation-time.corpus
         env:
           KS_CORPUS_PERF: "1"
@@ -327,14 +486,15 @@ jobs:
       # worker processes via --jobs, but its default is 1 — serial —
       # which is how this step took ~50 min on a 4-vCPU runner. --jobs 4
       # matches the runner; same keyboards, same verdict, ~1/4 the wall
-      # time. It still runs inside this required `build` check on every
-      # PR that can affect it, on pushes to main, and nightly.
-      - name: Corpus gate (skipped — change cannot reach the transform)
-        if: needs.changes.outputs.corpus != 'true'
-        run: echo "Corpus gate skipped — this change touches no engine/contracts/corpus path. Add the run-corpus label to force it."
+      # time. It still runs inside this required `build` check, but
+      # since km/ci-fast-gate (2026-10-15) only on the full-gate events
+      # — pushes to main, nightly, manual dispatch — not per-PR.
+      - name: Corpus gate (skipped — change cannot reach the transform, or per-PR)
+        if: github.event_name == 'pull_request' || needs.changes.outputs.corpus != 'true'
+        run: echo "Corpus gate not run in this lane — per-PR runs leave it to the overnight/full-gate events (km/ci-fast-gate, 2026-10-15), and a change that touches no engine/contracts/corpus path cannot reach the transform. Non-PR runs with corpus reach run it in the next step."
 
       - name: Corpus gate (context tolerance — zero regressed keyboards)
-        if: needs.changes.outputs.corpus == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
         run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed --jobs 4
 
       # spec 086: the committed verification record for the context normalization
@@ -361,38 +521,73 @@ jobs:
       - name: Test (supportability-scanner — outside the pnpm workspace)
         run: pnpm run test:supportability-scanner
 
-      # Non-blocking: warns in CI log and opens GitHub Issues for any spec
-      # sections whose content changed since the last acknowledgement.
+      # Non-blocking: warns in CI log and, on main-tree runs only, opens
+      # GitHub Issues for any spec sections whose content changed since
+      # the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.
       - name: Spec drift check
         continue-on-error: true
         run: node utilities/spec-trace/index.js check
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SPEC_TRACE_REPO: ${{ github.repository }}
+          # Issue sync only from a main-tree checkout (#2210). Detection and
+          # [WARN] logging run on every tree; with an empty token/repo the
+          # checker skips create/close sync gracefully. The gate keys on the
+          # EFFECTIVE ref (inputs.checkout_ref, else github.ref — the
+          # Checkout step's idiom): inside the workflow_call dev soak the
+          # github context is the caller's (event schedule, ref main) while
+          # the tree on disk is dev, so keying on github.ref or event_name
+          # alone would let the soak sync against the dev tree — the flap
+          # that closed #2136 and re-filed it as #2209. Do not simplify this
+          # condition without re-reading #2210.
+          GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' && (inputs.checkout_ref == 'main' || inputs.checkout_ref == 'refs/heads/main' || (inputs.checkout_ref == '' && github.ref == 'refs/heads/main')) && secrets.GITHUB_TOKEN) || '' }}
+          SPEC_TRACE_REPO: ${{ (github.event_name != 'pull_request' && (inputs.checkout_ref == 'main' || inputs.checkout_ref == 'refs/heads/main' || (inputs.checkout_ref == '' && github.ref == 'refs/heads/main')) && github.repository) || '' }}
 
-  # Playwright e2e — the lane that carries the spec 034 authoring-walk proof
-  # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while it beds in:
-  # `continue-on-error` keeps a red run from failing the workflow, and this
-  # job is not a required check. Starts with boot-smoke + copy-edit only;
-  # widen the spec list (or drop the filter) as specs prove stable in CI, and
-  # make it blocking once it is.
-  e2e:
-    name: e2e (Playwright, non-blocking)
+  # Playwright e2e — the lanes that carry the spec 034 authoring-walk proof
+  # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while they bed
+  # in: `continue-on-error` keeps a red run from failing the workflow, and
+  # these jobs are not required checks.
+  #
+  # Split into three parallel jobs 2026-10-18 (option A, owner ruling):
+  # the single 60-minute job was over capacity — on run 39134517399 the
+  # desktop step alone took 44m22s, the mobile step was skipped behind its
+  # failure, and the golden-walk capture was cancelled at the job cap so
+  # its verify never ran. Each lane now gets its own 60-minute envelope
+  # and its own verdict. The shared setup block repeats per job (GitHub
+  # Actions has no step-level reuse); it costs a few minutes of setup per
+  # lane and buys independent, parallel results.
+
+  #
+  # Desktop lane budget (#2367 - PR CI must finish in under 10 minutes,
+  # target 5). Measured on run 41069595484: boot-smoke ~48 s,
+  # decision-store-reload ~21 s, touch-key-identity ~4.3 m (walk 1 ~50 s),
+  # copy-edit ~10.6 m - 16.1 m of tests in total. Pull requests therefore
+  # run only the quick slice (boot-smoke, decision-store-reload and spec
+  # 104 walk 1), and only when the `changes` job says the PR can reach the
+  # SPA (outputs.e2e). Every non-PR event (the nightly schedule, push to
+  # main, workflow_dispatch, the nightly dev soak) runs the full set, and
+  # a failure there is filed by the `e2e-nightly-report` job below.
+  e2e-desktop:
+    name: e2e desktop (Playwright, non-blocking)
     needs: changes
+    if: ${{ needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 60
     permissions:
       contents: read
+    outputs:
+      pw_failed: ${{ steps.verdict.outputs.failed }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
       # Same pinned corpus as the build job: the dev server's local-keyboards
       # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
       # base keyboards the walks open from it.
+
       - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
         uses: actions/checkout@v4
         with:
@@ -429,6 +624,7 @@ jobs:
       # imports the workspace packages through their built dist/. Build only
       # studio's dependencies (`studio^...`) — studio itself is served from
       # source, and its production build + postbuild catalog are not needed.
+
       - name: Build studio's workspace dependencies
         run: pnpm --filter "@keyboard-studio/studio^..." build
 
@@ -436,8 +632,286 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright (boot-smoke + copy-edit + spec 088 live gate)
-        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit decision-store-reload
+      # PR lane: the quick slice only, in ONE command so one results.json
+      # feeds the summary step. The positional args pick the three spec
+      # files; --grep then narrows touch-key-identity to spec 104 walk 1 by
+      # describe title (never by line number). Playwright tests --grep
+      # against the project name, file name, describe titles and test title
+      # joined by spaces, so the boot-smoke and decision-store-reload
+      # alternatives match every test in those files by file name, and no
+      # touch-key-identity title contains either string. A grep that matches
+      # nothing makes Playwright exit non-zero ("No tests found").
+      - name: Playwright (PR quick slice - boot-smoke + decision-store-reload + spec 104 walk 1)
+        id: pw_pr
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload touch-key-identity --grep "boot-smoke|decision-store-reload|spec 104 walk 1:"
+
+      # Full set (nightly schedule, push to main, workflow_dispatch):
+      # boot-smoke + copy-edit + spec 088 live gate + spec 104 walks.
+      - name: Playwright (full set - boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks)
+        id: pw_full
+        if: ${{ github.event_name != 'pull_request' }}
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity
+
+      # `continue-on-error` makes this job report success even when the
+      # tests failed, so surface the real verdict as a job output for
+      # `e2e-nightly-report`. On a non-PR event anything
+      # but a passing full set counts (a failed setup step skips the test
+      # step).
+      - name: Record test verdict
+        id: verdict
+        if: ${{ !cancelled() }}
+        run: echo "failed=${{ steps.pw_pr.outcome == 'failure' || (github.event_name != 'pull_request' && steps.pw_full.outcome != 'success') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize Playwright results
+        if: always()
+        working-directory: packages/studio
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require("node:fs");
+          const file = "test-results/results.json";
+          if (!fs.existsSync(file)) { console.log("### e2e desktop\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          const r = JSON.parse(fs.readFileSync(file, "utf8"));
+          const s = r.stats ?? {};
+          console.log(`### e2e desktop: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          const rows = [];
+          const walk = (suite, trail) => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
+              if (t.status === "expected" || t.status === "skipped") continue;
+              const last = t.results?.[t.results.length - 1];
+              const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
+              const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
+              const title = [...trail, spec.title].join(" > ");
+              rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
+              const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
+              const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+              console.error(`::error title=${esc(`e2e desktop ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+            }
+            for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
+          };
+          for (const suite of r.suites ?? []) walk(suite, [suite.title]);
+          if (rows.length) console.log(["", "| status | test | first line of each error |", "|---|---|---|", ...rows].join("\n"));
+          EOF
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-desktop
+          path: |
+            packages/studio/playwright-report/
+            packages/studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+
+  # Files or updates a tracking issue when the full desktop set fails on a
+  # non-PR event, so a nightly failure is not silent (#2367). One open issue
+  # per ref: later failures comment on it instead of opening duplicates.
+  # `e2e-desktop` is `continue-on-error`, so its `result` is always
+  # success; the verdict comes from its `pw_failed` output.
+  e2e-nightly-report:
+    name: e2e nightly failure report
+    needs: e2e-desktop
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.e2e-desktop.outputs.pw_failed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TARGET_REF: ${{ inputs.checkout_ref || github.ref_name }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open or update the tracking issue
+        run: |
+          title="Nightly e2e desktop failure ($TARGET_REF)"
+          body="The full desktop Playwright set failed on $TARGET_REF (event: $GITHUB_EVENT_NAME). Run: $RUN_URL. The PR lane only runs a quick slice; copy-edit and the other long walks run on the schedule only (docs/tooling.md, PR CI budget). Reproduce locally: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number,title --jq "[.[] | select(.title == \"$title\")][0].number // empty")"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+
+  e2e-mobile:
+    name: e2e mobile (Playwright, non-blocking)
+    needs: changes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      # Same pinned corpus as the build job: the dev server's local-keyboards
+      # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
+      # base keyboards the walks open from it.
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      # The dev server (playwright.config.ts webServer: `pnpm dev` = vite)
+      # imports the workspace packages through their built dist/. Build only
+      # studio's dependencies (`studio^...`) — studio itself is served from
+      # source, and its production build + postbuild catalog are not needed.
+
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Install Playwright Chromium
+        working-directory: packages/studio
+        run: npx playwright install --with-deps chromium
+
+      # Mobile adaptation, Phase 6 lane split: the mobile project (Pixel 7)
+      # runs only the mobile-* specs (playwright.config.ts testMatch), as its
+      # own step so a mobile failure is distinguishable from a desktop one.
+      # Non-blocking while the specs bed in, matching this job's posture.
+
+      - name: Playwright (mobile specs, non-blocking)
+        continue-on-error: true
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=mobile
+
+      - name: Summarize Playwright results
+        if: always()
+        working-directory: packages/studio
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require("node:fs");
+          const file = "test-results/results.json";
+          if (!fs.existsSync(file)) { console.log("### e2e mobile\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          const r = JSON.parse(fs.readFileSync(file, "utf8"));
+          const s = r.stats ?? {};
+          console.log(`### e2e mobile: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          const rows = [];
+          const walk = (suite, trail) => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
+              if (t.status === "expected" || t.status === "skipped") continue;
+              const last = t.results?.[t.results.length - 1];
+              const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
+              const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
+              const title = [...trail, spec.title].join(" > ");
+              rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
+              const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
+              const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+              console.error(`::error title=${esc(`e2e mobile ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+            }
+            for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
+          };
+          for (const suite of r.suites ?? []) walk(suite, [suite.title]);
+          if (rows.length) console.log(["", "| status | test | first line of each error |", "|---|---|---|", ...rows].join("\n"));
+          EOF
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-mobile
+          path: |
+            packages/studio/playwright-report/
+            packages/studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+
+  e2e-golden:
+    name: e2e golden-walk (Playwright, non-blocking)
+    needs: changes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      # Same pinned corpus as the build job: the dev server's local-keyboards
+      # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
+      # base keyboards the walks open from it.
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      # The dev server (playwright.config.ts webServer: `pnpm dev` = vite)
+      # imports the workspace packages through their built dist/. Build only
+      # studio's dependencies (`studio^...`) — studio itself is served from
+      # source, and its production build + postbuild catalog are not needed.
+
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Install Playwright Chromium
+        working-directory: packages/studio
+        run: npx playwright install --with-deps chromium
 
       # Spec 089 SC-001 golden walk (owner ruling 2026-10-06: store-level
       # gates in the sandbox; live captures run in CI). The baseline zip is
@@ -448,6 +922,7 @@ jobs:
       # the captured zip is committed to the branch (from the
       # golden-walk-baseline artifact below), this step skips and the
       # verify step compares against the committed baseline.
+
       - name: Golden-walk baseline capture (from PR base, if uncommitted)
         if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
         uses: actions/checkout@v4
@@ -480,9 +955,6 @@ jobs:
           path: packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip
           if-no-files-found: ignore
 
-      # (The golden-walk verify step sits at the very end of this job, so
-      # its results.json does not displace the main lane's summary below.)
-
       # One-screen result table on the run page: counts plus each failing
       # test's first line per error, from the json reporter (CI-only, see
       # playwright.config.ts). It also emits one `::error` annotation per
@@ -490,6 +962,15 @@ jobs:
       # because the `github` reporter's per-test annotations did not surface
       # on the check run in practice — annotations are readable from the PR's
       # Checks tab without access to the job log.
+
+      # Spec 089 SC-001, verify mode: fails loudly when the baseline is
+      # missing (never a vacuous pass). Runs before the summary step so
+      # the summary reports the verify run's results.json (the capture
+      # step writes its own results under .golden-base/).
+      - name: Playwright (spec 089 golden walk, verify)
+        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
+        run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk
+
       - name: Summarize Playwright results
         if: always()
         working-directory: packages/studio
@@ -497,10 +978,10 @@ jobs:
           node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
           const fs = require("node:fs");
           const file = "test-results/results.json";
-          if (!fs.existsSync(file)) { console.log("### e2e\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          if (!fs.existsSync(file)) { console.log("### e2e golden-walk\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
           const r = JSON.parse(fs.readFileSync(file, "utf8"));
           const s = r.stats ?? {};
-          console.log(`### e2e: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          console.log(`### e2e golden-walk: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
           const rows = [];
           const walk = (suite, trail) => {
             for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
@@ -512,7 +993,7 @@ jobs:
               rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
               const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
               const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
-              console.error(`::error title=${esc(`e2e ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+              console.error(`::error title=${esc(`e2e golden-walk ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
             }
             for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
           };
@@ -524,16 +1005,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-golden
           path: |
             packages/studio/playwright-report/
             packages/studio/test-results/
           retention-days: 14
           if-no-files-found: ignore
 
-      # Spec 089 SC-001, verify mode: fails loudly when the baseline is
-      # missing (never a vacuous pass). Last in the job so its
-      # results.json does not displace the main lane's summary above.
-      - name: Playwright (spec 089 golden walk, verify)
-        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
-        run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk

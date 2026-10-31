@@ -27,6 +27,7 @@
 
 import type { MechanismRef } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
+import { isDeadkeyPatternId } from "../editors/assignLoop/patternIds.ts";
 
 export interface MechanismBaseKeyResult {
   kind: "replace" | "longpress";
@@ -56,7 +57,7 @@ export function extractMechanismBaseKey(m: MechanismRef): MechanismBaseKeyResult
   }
 
   // deadkey_single_tap / S-02 — host key derived from the first base letter.
-  if (pid === "deadkey_single_tap" || sid === "S-02") {
+  if (isDeadkeyPatternId(pid) || sid === "S-02") {
     const baseLetters = sv["baseLetters"] ?? "";
     const firstLetter = baseLetters[0];
     const baseKey =

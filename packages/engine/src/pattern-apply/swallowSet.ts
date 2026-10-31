@@ -10,16 +10,17 @@
 // answers correctly for never-carved undefined combos — they enter the set,
 // which is FR-005's core job.
 //
-// The predicate is pure and read-only: it never mutates the IR or the
-// dispositions.
+// The predicate is pure and read-only: it never mutates the IR. The author's
+// choice is the single keyboard-wide fallback policy (the per-carve override
+// is retired; see specs/076-rule-behaviours/fallback-surface-design.md).
 
-import type { CarveDisposition, KeyboardIR } from "@keyboard-studio/contracts";
+import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
 import { parseSlotId } from "./slotId.js";
 import { slotGuardNodeIdPrefix } from "./carveSuppression.js";
 
 /**
- * A carved (or undefined) combination, addressed the way dispositions
- * address it: a rule nodeId, or `<storeNodeId>#<index>` for a store-slot
+ * A carved (or undefined) combination, addressed the way the carve
+ * pipeline addresses it: a rule nodeId, or `<storeNodeId>#<index>` for a store-slot
  * carve. (The future FR-005 enumerator maps key+modifiers to these ids;
  * that mapping must not collide with rule nodeIds — see below.)
  */
@@ -30,27 +31,24 @@ export interface SwallowCombo {
 /**
  * Should this combination enter the `swallowUndefined` set? (FR-005 amendment)
  *
- * - `allow-host` disposition → NO. The author explicitly chose host fallback;
- *   the swallow must not eat what the author allowed.
+ * - Policy `pass-through` → NO. The author chose host fallback for the whole
+ *   keyboard; the swallow must not eat what the author allowed. (Deadkey
+ *   carves are the exception the compiler enforces: it suppresses them
+ *   regardless of policy, so they never reach host fallback.)
  * - Covered by a behaviour-owned rule → NO. Deterministic handling already
  *   exists (a suppression rewrite/guard, or another behaviour's rule);
  *   including the combo would double-emit or shadow-surprise.
- * - Otherwise → YES. Carved combos are undefined keys by construction and
- *   enter the set on recompile; a combo with no disposition record is
- *   treated as carved-but-unrecorded and included — fail-safe toward
+ * - Otherwise (policy `swallow`) → YES. Carved combos are undefined keys by
+ *   construction and enter the set on recompile — fail-safe toward
  *   suppression, per the ruling's "suppress host leakage by default".
  *   Never-carved undefined combos also enter, which is FR-005's core job.
- *
- * Disposition lookup is first-wins on duplicate comboIds, mirroring
- * `compileCarveSuppression`'s `processed` set.
  */
 export function isInSwallowSet(
   combo: SwallowCombo,
-  dispositions: CarveDisposition[],
+  policy: FallbackPolicy,
   ir: KeyboardIR,
 ): boolean {
-  const disposition = dispositions.find((d) => d.comboId === combo.comboId);
-  if (disposition?.disposition === "allow-host") return false;
+  if (policy === "pass-through") return false;
   if (isCoveredByBehaviourOwnedRule(combo.comboId, ir)) return false;
   return true;
 }

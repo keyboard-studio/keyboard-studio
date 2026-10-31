@@ -959,3 +959,23 @@
   src: url(/fonts/andika-700-latin.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* Script faces vendored 2026-10-15 (per-script fonts, Picks 1-2) — NOT
+   loaded through this stylesheet. noto-naskh-arabic-400-arabic.woff2,
+   noto-sans-ethiopic-400-ethiopic.woff2, noto-sans-syriac-400-syriac.woff2,
+   noto-serif-tibetan-400-tibetan.woff2,
+   noto-sans-devanagari-400-devanagari.woff2,
+   noto-sans-bengali-400-bengali.woff2,
+   noto-sans-gurmukhi-400-gurmukhi.woff2,
+   noto-sans-gujarati-400-gujarati.woff2, noto-sans-oriya-400-oriya.woff2,
+   noto-sans-tamil-400-tamil.woff2, noto-sans-telugu-400-telugu.woff2,
+   noto-sans-kannada-400-kannada.woff2,
+   noto-sans-malayalam-400-malayalam.woff2,
+   noto-sans-sinhala-400-sinhala.woff2, padauk-400-myanmar.woff2,
+   noto-sans-thai-400-thai.woff2, noto-sans-lao-400-lao.woff2, and
+   noto-sans-khmer-400-khmer.woff2 sit beside this file but are injected on
+   demand via the FontFace API by the script-font registry
+   (packages/studio/src/survey/scriptFonts.ts) only for sessions whose
+   target language or base keyboard uses that script — the same Google
+   Fonts script subsets as above, URLs rewritten to the local copies,
+   SIL OFL 1.1. */

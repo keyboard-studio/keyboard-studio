@@ -5,20 +5,22 @@
 // convention) and its `<Files>` lists them, so kmc-package fails the build
 // (KM04003, "file does not exist") if either is absent.
 //
-// These two functions are now called from exactly one place:
-// `helpDocsRender.ts`'s FR-002 placeholder fallback (spec 061) — the byte-
-// identical text shipped when the author has no Phase F answers yet, on BOTH
-// tracks. `output/ensurePackageFiles.ts` no longer writes either file itself;
-// `projectWorkingCopyForOutput`'s step 5c writes both, unconditionally, on
-// every production. `welcomeHtm`/`readmeHtm` stay exported here (rather than
-// moving into helpDocsRender.ts) so the exact placeholder strings remain
-// pinned by scaffolder.test.ts's own assertions below.
+// These two functions are the scaffolder's initial stubs for the two files
+// the descriptor names. `output/ensurePackageFiles.ts` no longer writes
+// either file itself; `projectWorkingCopyForOutput`'s step 5c re-renders
+// both, unconditionally, on every production — `welcomeHtm` renders through
+// the same `welcome` form as that re-render, so stub and shipped page share
+// one shape. `welcomeHtm`/`readmeHtm` stay exported here (rather than moving
+// into helpDocsRender.ts) so the exact placeholder strings remain pinned by
+// scaffolder.test.ts's own assertions below.
 //
 // The exact wording is pinned by scaffolder.test.ts ("HTML-escapes < > & in
 // welcome.htm", "HTML-escapes & in readme.htm" — the latter asserts the
 // "<name> keyboard" phrasing). Change it deliberately, not incidentally.
 
+import { DOC_FORMS } from "@keyboard-studio/contracts";
 import { escapeHtml, phpCommentEscape, phpSingleQuoteEscape } from "./escapeHtml.js";
+import { renderDocForm } from "./renderDocForm.js";
 
 /**
  * The standard help-site header every published keyboard's `source/help/<id>.php`
@@ -54,9 +56,35 @@ export function helpPhpStub(displayName: string): string {
   return `${helpSiteHeader(displayName)}<?php /* ${phpCommentEscape(displayName)} help */ ?>`;
 }
 
-/** `source/welcome/welcome.htm` — shown by Keyman after the package installs. */
+/**
+ * The one inline style every fresh welcome/help page carries (element spec
+ * §1: a small inline style, shared with the help page so style parity,
+ * criterion 11.10, holds by construction). Corpus convention is a small
+ * inline style — linked CSS is rare — and the rules stay minimal: readable
+ * text, layout charts that fit the page, a legible typing-guide table.
+ */
+export const DOC_PAGE_STYLE =
+  "body { font-family: sans-serif; line-height: 1.4; margin: 1em; }\n" +
+  "img { max-width: 100%; }\n" +
+  "table { border-collapse: collapse; }\n" +
+  "th, td { border: 1px solid #999; padding: 0.2em 0.5em; text-align: left; }\n" +
+  "kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 0.3em; }";
+
+/**
+ * `source/welcome/welcome.htm` — shown by Keyman after the package installs.
+ * Rendered through the same `welcome` form the output projection renders, so
+ * the scaffolder stub and the shipped page are one shape: the element-spec
+ * §1 shell (doctype, head with charset + "Start Using" title + the shared
+ * inline style) around the fallback body. The projection re-renders on every
+ * production, adding the answer-derived body and the page language.
+ */
 export function welcomeHtm(displayName: string): string {
-  return `<html><body><p>Welcome to ${escapeHtml(displayName)}</p></body></html>`;
+  const name = escapeHtml(displayName);
+  return renderDocForm(DOC_FORMS.forms.welcome, {
+    displayName: name,
+    pageStyle: DOC_PAGE_STYLE,
+    body: `<h1>${name}</h1>\n<p>Welcome to ${name}</p>`,
+  });
 }
 
 /** `source/readme.htm` — shown by Keyman in the package details. */
@@ -79,8 +107,16 @@ export function readmeHtm(displayName: string): string {
  * wrong notice reads as authoritative (spec 064 FR-004).
  *
  * Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
+ *
+ * Rendered through the `license` form (spec 102 FR-026: the copyright year
+ * appears only here). A null holder leaves the `copyrightHolder` slot empty,
+ * so the form drops the notice block. Callers pass null for a blank holder
+ * (ensurePackageFiles trims first); a whitespace-only holder would also drop
+ * the notice, where the old template emitted an empty-named one.
  */
 export function licenseMd(holder: string | null, year: number): string {
-  const notice = holder !== null ? `Copyright © ${year} ${holder}\n\n` : "";
-  return `${notice}MIT License\n`;
+  return renderDocForm(DOC_FORMS.forms.license, {
+    copyrightHolder: holder ?? "",
+    year: String(year),
+  });
 }

@@ -90,6 +90,9 @@ function renderSeries() {
   return onComplete;
 }
 
+// The fixture's one mark sits on one letter, so it has no key of its own and
+// the spec 104 guard station is skipped: the tolerance station closes the series.
+
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();

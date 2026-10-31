@@ -28,7 +28,6 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
-  CarveDisposition,
   IRRule,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
@@ -127,10 +126,6 @@ function findContextKindsRule(ir: KeyboardIR, kinds: string[]): IRRule {
   return found;
 }
 
-function block(comboId: string): CarveDisposition {
-  return { comboId, disposition: "block", provenance: "bulk-default" };
-}
-
 function ruleById(ir: KeyboardIR, nodeId: string): IRRule | undefined {
   return allRules(ir).find((r) => r.nodeId === nodeId);
 }
@@ -157,7 +152,8 @@ let blockedCombos: {
   combo: Combo | undefined;
   lhs: IRRule["context"];
 }[];
-let allowHostNodeId: string;
+let derivedPassThrough: KeyboardIR;
+let passThroughNodeId: string;
 let derivedSoft: KeyboardIR;
 let derivedLoud: KeyboardIR;
 
@@ -185,16 +181,20 @@ beforeAll(() => {
     tFcfa,
   ];
   const nodeIds = new Set(blockTargets.map((r) => r.nodeId));
-  const itemIds = new Set([...nodeIds, t003b.nodeId]);
-  const dispositions: CarveDisposition[] = [
-    ...blockTargets.map((r) => block(r.nodeId)),
-    { comboId: t003b.nodeId, disposition: "allow-host", provenance: "bulk-default" },
-  ];
+  const itemIds = new Set(nodeIds);
 
   derivedSoft = deriveCarvedIr(startIr, {
     deletedNodeIds: itemIds,
     deletedItemIds: itemIds,
-    dispositions,
+    fallbackPolicy: "swallow",
+  }).ir;
+
+  // Pass-through policy: the carved rule is removed outright, not suppressed.
+  const passIds = new Set([t003b.nodeId]);
+  derivedPassThrough = deriveCarvedIr(startIr, {
+    deletedNodeIds: passIds,
+    deletedItemIds: passIds,
+    fallbackPolicy: "pass-through",
   }).ir;
 
   // Loud run: the two BEEP rules with the A6 loud flag.
@@ -202,7 +202,7 @@ beforeAll(() => {
   derivedLoud = deriveCarvedIr(startIr, {
     deletedNodeIds: loudIds,
     deletedItemIds: loudIds,
-    dispositions: [ralt4Beep, raltSBeep].map((r) => block(r.nodeId)),
+    fallbackPolicy: "swallow",
     loud: true,
   }).ir;
 
@@ -215,7 +215,7 @@ beforeAll(() => {
     }
     return { nodeId: r.nodeId, combo, lhs: r.context };
   });
-  allowHostNodeId = t003b.nodeId;
+  passThroughNodeId = t003b.nodeId;
 });
 
 describe("T022 sil_cameroon_qwerty carve regression (real keyboard, FR-019/FR-020, SC-008)", () => {
@@ -285,15 +285,15 @@ describe("T022 sil_cameroon_qwerty carve regression (real keyboard, FR-019/FR-02
     }
   });
 
-  it("touch-layer variants: block rewrites to `nul`, allow-host removes the rule", () => {
+  it("touch-layer variants: swallow rewrites to `nul`, pass-through removes the rule", () => {
     const tFcfa = ruleById(derivedSoft, blockedCombos[7].nodeId); // + [T_FCFA] > 'FCFA'
     expect(tFcfa).toBeDefined();
     expect(tFcfa!.ownedByBehaviour).toBe("carve-suppression");
     expect(tFcfa!.output).toEqual([{ kind: "nul" }]);
 
-    // Allow-host: the rule is gone entirely — the compiler removed it and the
-    // filter found nothing to double-remove.
-    expect(ruleById(derivedSoft, allowHostNodeId)).toBeUndefined();
+    // Pass-through: the rule is gone entirely — the compiler removed it and
+    // the filter found nothing to double-remove.
+    expect(ruleById(derivedPassThrough, passThroughNodeId)).toBeUndefined();
   });
 
   it("UK-English host leak is real pre-carve: AltGr+4 is € on the host", () => {

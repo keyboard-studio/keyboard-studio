@@ -28,6 +28,7 @@ import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
+import { projectionInputFromState } from "./projectionInput.ts";
 import { stubKmnVfs } from "../test/workingCopy.ts";
 
 // ---------------------------------------------------------------------------
@@ -150,28 +151,28 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     // Seed the store (ZIP path reads from the store).
     useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
+    // Pass-through keeps a carved key falling through to the base keyboard,
+    // so the removed rule leaves no trace in the .kmn. Under the default
+    // swallow policy it would become a `+ [K_A] > nul` suppression rule,
+    // which is a different test (carvePipelineParity.test.ts).
+    useWorkingCopyStore.getState().setFallbackPolicy("pass-through");
+
     // Apply the two deletions through the store overlay (mirrors deleteNode() in the SPA).
     useWorkingCopyStore.getState().deleteNode("rule#remove");
     useWorkingCopyStore.getState().deleteNode("store#removed");
 
-    // Read back the deletion sets from the store (as both paths do).
-    const { deletedNodeIds, deletedItemIds } = useWorkingCopyStore.getState();
-
     // -----------------------------------------------------------------------
-    // PATH A: PREVIEW — projectWorkingCopyVfs directly (mirrors useWorkingCopyTransform)
+    // PATH A: PREVIEW — the same store-derived input useWorkingCopyTransform builds
     // -----------------------------------------------------------------------
 
+    const state = useWorkingCopyStore.getState();
     const previewVfs = createVirtualFS(vfs.entries());
-    const { warnings: previewWarnings } = projectWorkingCopyVfs({
-      vfs: previewVfs,
-      keyboardId,
-      startIr: ir,
-      deletedNodeIds,
-      deletedItemIds,
-      assignments: [],
-      getPattern: () => undefined,
-      identity: null,
-    });
+    const { warnings: previewWarnings } = projectWorkingCopyVfs(
+      projectionInputFromState(
+        { ...state, startIr: ir },
+        { vfs: previewVfs, keyboardId, assignments: [], getPattern: () => undefined, identity: null },
+      ),
+    );
 
     const previewKmn = previewVfs.get(`source/${keyboardId}.kmn`)?.content as string;
     expect(typeof previewKmn, "preview: .kmn must be a string").toBe("string");

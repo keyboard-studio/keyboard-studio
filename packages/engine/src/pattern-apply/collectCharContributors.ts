@@ -529,6 +529,11 @@ function contextElementTokenDisplay(
     }
     case 'deadkey':
       return triggerKeystrokeByDeadkeyId.get(el.id);
+    case 'namedDeadkey':
+      // Resolving a trigger keystroke BY NAME is consumer adoption,
+      // deferred by the #2238 ruling — abort (undefined) like the other
+      // unresolvable kinds below, never guess.
+      return undefined;
     case 'any': {
       if (slotIndex === undefined || el !== alignedAnyElement) return undefined;
       const store = storeMap.get(el.storeRef);
@@ -539,6 +544,11 @@ function contextElementTokenDisplay(
     case 'context':
     case 'index':
     case 'baselayout':
+    case 'if':
+      // A guard produces no character, so it has no contributor token —
+      // explicitly invisible here, never a dropped condition: this switch
+      // only renders characters a context element contributes.
+      return undefined;
     case 'raw':
       return undefined;
     default: {

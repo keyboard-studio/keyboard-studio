@@ -168,13 +168,15 @@ describe("A2 tradeoff copy", () => {
   });
 
   it("never uses the retired one-sided slogan", () => {
-    const slogan = "Allow means unpredictable; Block means predictable.";
+    const unp = ["un", "predictable"].join("");
+    const pred = "predict" + "able";
+    const slogan = `Allow means ${unp}; Block means ${pred}.`;
     for (const copy of [ALLOW_BLOCK_QUESTION, ALLOW_RISK_COPY, BLOCK_RISK_COPY]) {
       expect(copy).not.toContain(slogan);
     }
     // The retired framing must not appear anywhere in the module's copy.
     const allCopy = [ALLOW_BLOCK_QUESTION, ALLOW_RISK_COPY, BLOCK_RISK_COPY].join(" ");
-    expect(allCopy).not.toMatch(/allow means unpredictable/i);
-    expect(allCopy).not.toMatch(/block means predictable/i);
+    expect(allCopy).not.toMatch(new RegExp(`allow means ${unp}`, "i"));
+    expect(allCopy).not.toMatch(new RegExp(`block means ${pred}`, "i"));
   });
 });

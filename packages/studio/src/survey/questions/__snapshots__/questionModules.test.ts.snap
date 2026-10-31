@@ -142,13 +142,13 @@ exports[`live question modules > f/pf_doc_language.ts > definition contract 1`] 
 
 exports[`live question modules > f/pf_doc_language_other.ts > definition contract 1`] = `"autocomplete | optional | next pf_doc_language_second | options_source @langtags_iso639 | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_doc_language_second.ts > definition contract 1`] = `"radio | optional | next [value == 'other' -> pf_doc_language_second_other; (default) -> pf_font_guidance] | options [none, english, target, other] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_doc_language_second.ts > definition contract 1`] = `"radio | optional | next [value == 'other' -> pf_doc_language_second_other; (default) -> pf_usage_tip_2] | options [none, english, target, other] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_doc_language_second_other.ts > definition contract 1`] = `"autocomplete | optional | next pf_font_guidance | options_source @langtags_iso639 | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_doc_language_second_other.ts > definition contract 1`] = `"autocomplete | optional | next pf_usage_tip_2 | options_source @langtags_iso639 | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > f/pf_example_words.ts > definition contract 1`] = `"text | optional | next pf_troubleshooting | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_font_guidance.ts > definition contract 1`] = `"text | optional | next pf_usage_tip_2 | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_font_guidance.ts > definition contract 1`] = `"text | optional | next pf_usage_tip_1 | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > f/pf_further_reading.ts > definition contract 1`] = `"text | optional | next pf_project_url | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
@@ -182,7 +182,7 @@ exports[`live question modules > f/pf_usage_tip_4.ts > definition contract 1`] =
 
 exports[`live question modules > f/pf_usage_tip_5.ts > definition contract 1`] = `"text | optional | next pf_credits | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_welcome_paragraph.ts > definition contract 1`] = `"text | required | next pf_usage_tip_1 | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_welcome_paragraph.ts > definition contract 1`] = `"text | required | next pf_font_guidance | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > g/project_display_name.ts > definition contract 1`] = `"short_text | required | next project_keyboard_id | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [header.name]"`;
 
@@ -202,7 +202,7 @@ exports[`live question modules > gallery/helpDocs.ts > definition contract 1`] =
 
 exports[`live question modules > gallery/invisiblesInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores]"`;
+exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/physicalLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 

@@ -153,6 +153,63 @@ describe("KeyboardIRSchema round-trip (P3/SC-007/FR-010)", () => {
     expect(parsed.stores).toEqual([]);
     expect(parsed.origin).toBe("imported");
   });
+
+  it("namedDeadkey elements survive a JSON round-trip in all three positions (#2238)", () => {
+    const ir = makeTestIR(
+      [
+        {
+          nodeId: "g#main",
+          name: "main",
+          usingKeys: true,
+          readonly: false,
+          rules: [
+            {
+              nodeId: "r#1",
+              context: [{ kind: "namedDeadkey", name: "Semicolon" }],
+              output: [{ kind: "namedDeadkey", name: "acute" }],
+            },
+          ],
+        },
+      ],
+      [
+        {
+          nodeId: "s#marks",
+          name: "marks",
+          isSystem: false,
+          items: [{ kind: "namedDeadkey", name: "grave" }],
+        },
+      ],
+    );
+    const parsed = KeyboardIRSchema.parse(
+      JSON.parse(JSON.stringify(ir)),
+    ) as KeyboardIR;
+    expect(parsed.groups[0]?.rules[0]?.context).toEqual([
+      { kind: "namedDeadkey", name: "Semicolon" },
+    ]);
+    expect(parsed.groups[0]?.rules[0]?.output).toEqual([
+      { kind: "namedDeadkey", name: "acute" },
+    ]);
+    expect(parsed.stores[0]?.items).toEqual([
+      { kind: "namedDeadkey", name: "grave" },
+    ]);
+  });
+
+  it("a pre-#2238 draft carrying named-deadkey fragments still loads (#2238 back-compat)", () => {
+    const ir = makeTestIR([], [], [
+      {
+        nodeId: "raw#1",
+        origin: "imported",
+        sourceText: "+ [K_A] > dk(acute)",
+        reason: "named-deadkey",
+      },
+    ]);
+    const parsed = KeyboardIRSchema.parse(
+      JSON.parse(JSON.stringify(ir)),
+    ) as KeyboardIR;
+    expect(parsed.raw).toHaveLength(1);
+    expect(parsed.raw[0]?.reason).toBe("named-deadkey");
+    expect(parsed.raw[0]?.sourceText).toContain("dk(acute)");
+  });
 });
 
 // ---------------------------------------------------------------------------

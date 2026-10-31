@@ -218,6 +218,7 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - km-triage-app: `pnpm run test:km-triage` (`node:test`, not vitest; the glob is quoted so Node
   expands it — Node 22 does not accept a bare directory argument to `--test`)
 - supportability-scanner: `pnpm run test:supportability-scanner`
+- corpus-eval: `pnpm run test:corpus-eval` (typecheck + tests; §7.5.1 corpus evaluation — it imports engine/contracts `src/` by relative path, so this is what catches a rename in the codec/recognizer/strategy-selector it composes)
 
 ### Corpus-gated tests
 
@@ -279,12 +280,43 @@ npx playwright install chromium                       # once per version bump
 E2E stays out of the unit CI lanes (vitest and tsc both exclude `e2e/**`), but CI runs it in its
 own **non-blocking** `e2e` job in [ci.yml](../.github/workflows/ci.yml) (`continue-on-error`, not a
 required check): it checks out the pinned corpus, builds studio's workspace dependencies,
-installs Chromium, and runs `test:e2e boot-smoke copy-edit` — Playwright's positional args are
+installs Chromium, and runs `test:e2e` with the spec filters listed under
+[PR CI budget](#pr-ci-budget) — Playwright's positional args are
 file filters, so widening the lane is adding a spec name there. On failure the HTML report and
 traces (`playwright-report/`, `test-results/`, CI-only) upload as the `playwright-report`
 artifact. Make the job blocking once it has proved stable. All specs import from
 `"playwright/test"` — the `playwright` package's test entry; do not add `@playwright/test` as a
 second runner package.
+
+### PR CI budget
+
+A pull request's `CI` run must finish in **under 10 minutes; the target is about 5**. The
+required gate (`build`, after `fast`) takes about 5.5 minutes, so every other lane has to stay at
+or under that. Measured on a 2026-10-30 run (per-test times from the Playwright `list` output):
+`boot-smoke` about 48 s, `decision-store-reload` about 21 s, `touch-key-identity` about 4.3 min
+(its walk 1 about 50 s), `copy-edit` about 10.6 min, 16.1 min of tests in all. Walks that long
+run on the schedule, not on pull requests.
+
+| Where | `e2e desktop` runs | Approx. time |
+|---|---|---|
+| Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity`, narrowed by `--grep "boot-smoke|decision-store-reload|spec 104 walk 1:"`; one command, so one results summary) | about 3 min |
+| Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks) | about 17 min |
+
+- **Path gate.** On a pull request `e2e desktop` is skipped unless the `changes` job's `e2e`
+  output is true: any non-markdown change under `packages/studio/` or `packages/glottolog/`, any
+  change that turns the `golden` gate on (`packages/engine/`, `packages/contracts/`, `ci.yml`,
+  root `package.json`, the lockfile, the golden-walk studio paths), or the `run-all-gates` label.
+  Non-PR events always run it. The job is not a required check, so a skip blocks nothing; the
+  required checks stay `build` and `km-triage/review`.
+- **Failures on the schedule.** The `e2e nightly failure report` job opens (or comments on) one
+  open issue titled `Nightly e2e desktop failure (<ref>)` when the full set fails on a non-PR run.
+- **Run the nightly set by hand.** Locally:
+  `pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity`.
+  On GitHub: Actions, CI, "Run workflow" (`workflow_dispatch`) on the branch.
+- **Adding a walk.** Estimate its time first. Under about 1 minute it may join the PR filter list
+  in the `e2e-desktop` job; longer goes in the full-set step only.
+- Other lanes: `fast` about 3.5 min, `e2e golden-walk` about 2.7 min and `e2e mobile` about
+  2.7 min run in parallel with `build`; none is on the critical path.
 
 ### Shared helpers
 
@@ -315,6 +347,11 @@ Live and passing:
 
 - [carve.spec.ts](../packages/studio/e2e/carve.spec.ts)
 - [copy-edit.spec.ts](../packages/studio/e2e/copy-edit.spec.ts)
+- [touch-key-identity.spec.ts](../packages/studio/e2e/touch-key-identity.spec.ts) — spec 104
+  T023: guard-station creation walk, Cameroon copy parity + basic_kbdus repair list,
+  adapt-with-repair (OSK-verified), Track 2 choice + FR-017 decline suppression. Added
+  to the CI `e2e` job's desktop filter list by the spec 104 close-out (walk 1 only on PRs, all walks nightly); its first lane
+  run is the passing verdict.
 - [touch-derivation-us1.spec.ts](../packages/studio/e2e/touch-derivation-us1.spec.ts) — spec 035
   US1, bambara import-and-adapt walk
 - [touch-derivation-us2.spec.ts](../packages/studio/e2e/touch-derivation-us2.spec.ts) — spec 035
@@ -346,15 +383,22 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 
 Inventory: kbgen, corpus-mine, supportability-scanner, smoke-artifact, spec-trace, km-triage-app,
 Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
-welcome-sweep, nfd-tolerance-corpus. (hermes was archived out of tree 2026-10-14:
+welcome-sweep, nfd-tolerance-corpus, roundtrip-probe. (hermes was archived out of tree 2026-10-14:
 `~/workspace/archives/keyboard-studio-utilities-2026-10-14/`.)
+
+### smoke-artifact
+
+Manual pre-submission artifact producer (issue #54); not a CI gate; run when a
+KD-loadable zip from a pinned base is needed outside the browser
+(`pnpm --filter smoke-artifact run gen`, drives the real scaffolder → zip
+pipeline against the local `../keyboards` clone).
 
 ### spec-trace
 
 Two halves over the same corpus:
 
 - **Drift** — `node utilities/spec-trace check | report | acknowledge <id>` hashes each tracked
-  unit (`spec.md` sections, `specs/NNN/spec.md`, `docs/architecture.md`, `docs/lens-model.md`)
+  unit (`spec.md` sections, `specs/NNN/spec.md`, `docs/architecture.md`, `docs/archive/lens-model.md`)
   and flags un-acknowledged changes. `check` never exits non-zero; drift is a backlog item.
   Both `check` (auto-filed issue bodies) and `report` (a "Steps covered" coverage summary) join
   a drifted/tracked unit to the manifest steps and question modules that declare it as a
@@ -365,6 +409,16 @@ Two halves over the same corpus:
   which only resolve through Vite's transform pipeline). Missing or stale, spec-trace logs a
   `[WARN]` and continues — the artifact is optional for backward compatibility (FR-010);
   spec-trace never imports `packages/studio` TS directly (FR-007).
+- **Ack routing** — Acknowledgement PRs (the `docs/spec-trace.json` change from
+  `acknowledge <id>`, on its own or cherry-picked verbatim) target `main`, never
+  `dev`. `dev` picks an ack up on its next merge from `main`. This is a carve-out
+  from dev-first integration, not a contradiction of it: feature work still
+  integrates through `dev`, but the trace is a registry adjudicated from `main` —
+  the checker files and closes drift issues from the tree it runs on, and its
+  issue sync runs only on main-tree runs, so an ack that lands only on `dev` is
+  invisible to `main` and the drift is re-filed under a new number. That cycle
+  has already run once: #2136 (specs/102) was auto-closed by a dev-tree run
+  after PR #2194 landed its ack on `dev`, then re-filed from `main` as #2209.
 - **Search** — `pnpm run spec-search "<query>"` runs BM25 retrieval over `specs/**` + `docs/**` +
   root `spec.md`/`README.md`, returning heading-level chunks with a `file:line` anchor. See
   [Searching the corpus](#searching-the-corpus) below.

@@ -24,6 +24,14 @@ export interface KpsFontRefs {
    */
   oskFonts: string[];
   /**
+   * The first <OSKFont> / <DisplayFont> value, kept apart because the package
+   * descriptor re-declares each in its own element (criterion 10: the font is
+   * selected on the Keyboards tab). Backslashes intact; absent when the .kps
+   * selects none.
+   */
+  oskFont?: string;
+  displayFont?: string;
+  /**
    * Raw paths from <File> entries whose <FileType> is ".ttf" or ".otf".
    * May overlap with oskFonts; the loader deduplicates across the two lists.
    * Deduped.  Backslashes intact.
@@ -225,15 +233,16 @@ function extractFileBlocks(xml: string): {
  * they are not restricted to any particular ancestor block.
  */
 export function parseKpsFontRefs(xml: string): KpsFontRefs {
-  const oskFonts = dedup([
-    ...extractTagValues(xml, "OSKFont"),
-    ...extractTagValues(xml, "DisplayFont"),
-  ]);
+  const oskFontValues = extractTagValues(xml, "OSKFont");
+  const displayFontValues = extractTagValues(xml, "DisplayFont");
+  const oskFonts = dedup([...oskFontValues, ...displayFontValues]);
 
   const { fileFonts, stylesheetPaths } = extractFileBlocks(xml);
 
   return {
     oskFonts,
+    ...(oskFontValues[0] !== undefined ? { oskFont: oskFontValues[0] } : {}),
+    ...(displayFontValues[0] !== undefined ? { displayFont: displayFontValues[0] } : {}),
     fileFonts: dedup(fileFonts),
     stylesheets: dedup(stylesheetPaths),
   };

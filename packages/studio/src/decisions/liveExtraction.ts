@@ -37,6 +37,11 @@ import {
   proposeProvenanceBasis,
 } from "../lib/phaseFSeeds.ts";
 import type { PhaseFSeedContext } from "../lib/phaseFSeeds.ts";
+import { proposeTroubleshooting } from "../lib/troubleshootingProposal.ts";
+import {
+  combineTroubleshootingProposals,
+  extractBaseHelpTroubleshootingLines,
+} from "../lib/baseHelpTroubleshooting.ts";
 
 /** The slice of the decision store the pass writes through. */
 export interface LiveExtractionStore {
@@ -265,11 +270,48 @@ export function buildLiveExtractContext(): ExtractContext {
   };
   const projectUrlProposal = proposeProjectUrl(seedContext);
   const provenanceBasisProposal = proposeProvenanceBasis(seedContext);
+  // Issue #1800: the troubleshooting proposal derives from the working
+  // copy's CURRENT IR (not the start IR alone — a keyboard whose
+  // deadkeys were carved away must not be offered the deadkey line) and
+  // the session's mark-input-order axis. This builder re-runs at
+  // question-push time (G-9), so the derivation sees the latest IR.
+  const facetTroubleshootingProposal = proposeTroubleshooting({
+    ir: wc.ir ?? wc.startIr,
+    ...(wc.irAxes.markInputOrder !== undefined
+      ? { markInputOrder: wc.irAxes.markInputOrder }
+      : {}),
+  });
+  // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): on
+  // Track 1 only, symptom/fix lines extracted from the base help's
+  // Troubleshooting section join the facet lines in the same proposal.
+  // The extraction reads ONLY the extraction-only slice — a slice no
+  // render or serialization path reads — and the gate is the track:
+  // on Adapt the slice is null by construction (and the base's section
+  // already ships in the inherited prose, so extracting it would
+  // duplicate it; the ruling authorises no dedupe work).
+  const baseHelpTroubleshootingLines =
+    wc.instantiationMode === "new-from-base"
+      ? extractBaseHelpTroubleshootingLines(wc.baseHelpPhpTextForExtraction, {
+          ...(wc.startKeyboard?.id !== undefined
+            ? { id: wc.startKeyboard.id }
+            : {}),
+          ...(wc.startKeyboard?.displayName !== undefined
+            ? { displayName: wc.startKeyboard.displayName }
+            : {}),
+        })
+      : [];
+  const troubleshootingProposal = combineTroubleshootingProposals(
+    facetTroubleshootingProposal,
+    baseHelpTroubleshootingLines,
+  );
   ctx.phaseF = {
     ...(welcomePrefill !== undefined ? { welcomePrefill } : {}),
     ...(projectUrlProposal !== undefined ? { projectUrlProposal } : {}),
     ...(provenanceBasisProposal !== undefined
       ? { provenanceBasisProposal }
+      : {}),
+    ...(troubleshootingProposal !== undefined
+      ? { troubleshootingProposal }
       : {}),
     ...(surveyContext["author_contact"] !== undefined
       ? { authorContact: surveyContext["author_contact"] }

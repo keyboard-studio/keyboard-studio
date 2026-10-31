@@ -6,11 +6,19 @@ export type { SubstituteResult } from "./substitute.js";
 
 export { applyAssignments, resolveRenderableMechanisms } from "./applyAssignments.js";
 export type { ApplyAssignmentsResult } from "./applyAssignments.js";
+export { DEADKEY_PATTERNS, OUTPUT_FORM_SEAM_PATTERN_IDS, applyOutputFormSeam } from "./outputFormSeam.js";
+export type { OutputFormOptions, EmitUnit } from "./outputFormSeam.js";
 // DeadkeyConflict is defined in ../deadkey-lifecycle (spec 083 Phase 2) and
 // re-exported here for proximity: ApplyAssignmentsResult.conflicts uses it.
 export type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 
 export { buildSessionProducedSet } from "./sessionProducedSet.js";
+
+export {
+  findOe2SoleSourceGlyphs,
+  findSessionOe2SoleSourceGlyphs,
+  isOe2VkeyName,
+} from "./oe2SoleSource.js";
 
 export { applyAssignmentsToVfs } from "./applyAssignmentsToVfs.js";
 
@@ -36,6 +44,7 @@ export {
 } from "./applyStoreSlotRemovals.js";
 export type {
   StoreSlotRemovalResult,
+  CascadedSlotRemoval,
   StoreSlotEditMode,
   StoreSlotBlockReason,
   StorePairingDescription,
@@ -130,8 +139,19 @@ export {
 } from "./rowMetrics.js";
 export type { RowMetricKey, RowMetrics } from "./rowMetrics.js";
 
+export {
+  applyTouchCharCarve,
+  carveTouchCharacter,
+} from "./carveTouchProducers.js";
+export type {
+  TouchCharCarveRefusal,
+  TouchCharCarveResult,
+} from "./carveTouchProducers.js";
 export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
-export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
+export type {
+  EnumerateTouchMethodsOptions,
+  TouchMethodDescriptor,
+} from "./enumerateTouchMethodsForChar.js";
 
 export {
   applyTouchKeycapRemovalsToLayout,
@@ -295,6 +315,28 @@ export type {
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
 
+// Spec 104 T011/T027/T012 — the severance transplant, its FR-029 mirror,
+// and the edit-path wiring that triggers them.
+export {
+  severTouchKey,
+  relinkTouchKey,
+  applyKeyEditsWithSeverance,
+  SEVERANCE_LINE_DESCRIPTOR_ID,
+  SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID,
+} from "./severTouchKey.js";
+export type {
+  SeverTouchKeyRequest,
+  SeverTouchKeyResult,
+  RelinkTouchKeyMeta,
+  RelinkTouchKeyResult,
+  ApplyKeyEditsWithSeveranceOptions,
+  ApplyKeyEditsWithSeveranceResult,
+  SeveranceApplied,
+  SeveranceRefused,
+  RelinkApplied,
+  SeveranceNotice,
+} from "./severTouchKey.js";
+
 // Spec 065 US5 — the inherit-first wrapper and the keycap judgement.
 export { proposeTouchKeyId } from "./proposeTouchKeyId.js";
 export type {
@@ -367,4 +409,10 @@ export type {
   CompileCarveSuppressionResult,
 } from "./carveSuppression.js";
 export { isInSwallowSet } from "./swallowSet.js";
+export { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
 export type { SwallowCombo } from "./swallowSet.js";
+
+// Spec 104 Wave 3: the terminal-insertion primitive, exported so the
+// studio's severance/synthesis merge composes with the same placement
+// rule the synthesis functions themselves use (never a mirrored copy).
+export { insertBlockBeforeTerminalRules } from "./ir-insert.js";

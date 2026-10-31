@@ -1,0 +1,176 @@
+# retroactive-reph.yaml
+# Strategy: S-09 retroactive reph (post-typed ra + virama reordering)
+# Real exemplar: release/sil/sil_devanagari_phonetic — the S-09 keyboard
+# cited in spec §7.3 (reph rules at sil_devanagari_phonetic.kmn:116-118)
+
+id: retroactive_reph
+title: "Retroactive reph"
+description: >
+  Type a consonant, then a reph key, and the consonant is re-emitted
+  after ra + virama — the shaping engine draws the dead ra above the
+  syllable. If a matra was already typed, the whole sequence is
+  re-emitted in order after the prefix.
+category: desktop
+appliesTo: []
+priority: 2
+group_visibility: any
+strategyId: "S-09"
+combinesWith: []
+
+questions:
+  - id: consonantStoreName
+    prompt: >
+      Internal name for this reph rule set (e.g. reph_main).
+      Use letters and underscores only — it becomes a KMN identifier.
+    answerType: text
+    default: "reph"
+
+  - id: consonantChars
+    prompt: >
+      The consonants the reph key can follow, in order
+      (e.g. कखगघङ). Each one is re-emitted after the ra + virama
+      prefix when the reph key follows it.
+    answerType: char-list
+
+  - id: triggerChar
+    prompt: >
+      The character key typed after a consonant to make it take reph
+      (e.g. R in Devanagari phonetic layouts, where the shifted key is
+      a mnemonic for ra).
+    answerType: char-single
+
+  - id: raChar
+    prompt: >
+      The ra character of this script (e.g. र U+0930 for Devanagari).
+      It is emitted first, before the virama.
+    answerType: char-single
+
+  - id: viramaChar
+    prompt: >
+      The virama (conjunct) sign of this script (e.g. ् U+094D for
+      Devanagari). It joins the ra to the following consonant.
+    answerType: char-single
+
+kmnFragment: |
+  store(drph_{{consonantStoreName}}) '{{consonantChars}}'
+
+  any(drph_{{consonantStoreName}}) + "{{triggerChar}}" > {{raChar}} {{viramaChar}} index(drph_{{consonantStoreName}}, 1)
+
+touchLayoutFragment: null
+
+reorderRules: null
+
+tests:
+  - input: ["क", "R"]
+    expectedOutput: "र्क"
+    description: "ka then R produces ra + virama + ka (U+0930 U+094D U+0915) — the reph key reorders the typed consonant after the prefix"
+  - input: ["क", "ा", "R"]
+    expectedOutput: "र्का"
+    description: "ka + aa-matra already typed, then R — the whole sequence is re-emitted in order after the prefix (the matra scaled variant)"
+  - input: ["क", "़", "ा", "R"]
+    expectedOutput: "र्क़ा"
+    description: "ka + nukta + aa-matra, then R — the nukta+matra scaled variant, every pre-trigger element re-emitted in order"
+
+validatedForFamilies: ["Deva"]
+sourceKeyboards:
+  - "release/sil/sil_devanagari_phonetic"
+  - "release/h/hindi_modular"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-10-16"
+
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+frequency_in_corpus: >
+  The retroactive form is rare: a parser-verified scan of the release
+  corpus (933 keyboards) finds it in exactly two keyboards (five rules)
+  — sil_devanagari_phonetic (live) and hindi_modular (same form, but
+  its author annotates the rules "do not fire"). Most keyboards that do
+  reph type it pre-emptively — a bare key emits ra + virama before the
+  consonant — which needs no rule of this shape at all.
+
+provenance:
+  - keyboard: "release/sil/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kmn"
+    lines: [116, 118]
+    rules:
+      - "any(ConsonantsU) + \"R\" > U+0930 U+094D index(ConsonantsU, 1)"
+      - "any(ConsonantsU) any(MatraVsU) + \"R\" > U+0930 U+094D index(ConsonantsU, 1) index(MatraVsU, 2)"
+      - "any(ConsonantsU) U+093C any(MatraVsU) + \"R\" > U+0930 U+094D index(ConsonantsU, 1) U+093C index(MatraVsU, 3)"
+    note: >
+      The canonical S-09 exemplar from spec §7.3. Each rule is labelled
+      "c reph" in the source, and the ConsonantsU store comment reads
+      "consonants (so we can reposition the reph)". The base rule
+      re-emits one consonant; the scaled variants re-emit the consonant
+      plus an already-typed matra (and nukta) in order.
+  - keyboard: "release/h/hindi_modular/source/hindi_modular.kmn"
+    lines: [181, 184]
+    rules:
+      - "any(cl) + \"'\" > U+0930 U+094D context"
+      - "any(cl) U+093F + \"'\" > U+0930 U+094D context"
+    note: >
+      The same mechanism with the re-emission spelled as bare
+      `context`. Recorded as a form witness only: the source annotates
+      this block "These next 4 rules do not fire".
+
+demo:
+  filled_kmn: |
+    c Demo: Retroactive reph (Devanagari)
+    c Type a consonant, then R — the consonant is re-emitted after
+    c ra + virama, and the shaping engine draws the reph above it.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Retroactive Reph Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    store(drph_reph) 'कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह'
+    store(drph_matras) 'ािीुूेैोौ'
+
+    c Base: consonant + R → ra virama consonant
+    any(drph_reph) + "R" > U+0930 U+094D index(drph_reph, 1)
+    c Scaled: consonant + matra + R → the whole sequence re-emitted
+    any(drph_reph) any(drph_matras) + "R" > U+0930 U+094D index(drph_reph, 1) index(drph_matras, 2)
+
+  sample_keys:
+    - keys: ["क", "R"]
+      output: "र्क"
+      note: "ka then R — reph applied (U+0930 U+094D U+0915)"
+    - keys: ["क", "ा", "R"]
+      output: "र्का"
+      note: "ka + aa-matra, then R — sequence re-emitted after the prefix"
+
+  sample_output: >
+    Type ka then R to get र्क.
+    Type ka, aa-matra, then R to get र्का.
+
+skeleton:
+  kmn_template: |
+    store(drph_{{consonantStoreName}}) '{{consonantChars}}'
+
+    any(drph_{{consonantStoreName}}) + "{{triggerChar}}" > {{raChar}} {{viramaChar}} index(drph_{{consonantStoreName}}, 1)
+
+  parameters:
+    - id: consonantStoreName
+      description: >
+        Internal identifier for this reph rule set (e.g. "reph_main").
+        Must be a valid KMN identifier — letters and underscores only.
+    - id: consonantChars
+      description: >
+        The consonants of the script that can take reph, as a plain
+        string without spaces (e.g. the Devanagari consonant row).
+        The reph key only reorders after these characters.
+    - id: triggerChar
+      description: >
+        The single character key that applies reph after a consonant
+        (e.g. "R"). The key is consumed — it never appears in the
+        output — so it must be a key with no other job after a
+        consonant.
+    - id: raChar
+      description: >
+        The script's ra character (e.g. U+0930). Emitted first in the
+        reordered output; with the virama it forms the reph prefix.
+    - id: viramaChar
+      description: >
+        The script's virama sign (e.g. U+094D). Emitted between the ra
+        and the re-emitted consonant, marking the ra as dead.

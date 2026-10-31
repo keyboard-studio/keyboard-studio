@@ -21,30 +21,36 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
+import { DEFAULT_FALLBACK_POLICY } from "@keyboard-studio/contracts";
 import type {
   Attribution,
   AxisFill,
   StartKeyboard,
-  CarveDisposition,
-  CarveDispositionProvenance,
-  CarveDispositionValue,
+  FallbackPolicy,
+  GuardSpecification,
   HelpDocsAnswers,
   KeyboardIR,
+  KeyIdentityDecision,
   LintFinding,
   RemovalCapability,
   NormalizationRefusalReason,
   NormalizationStep,
   StoredNormalizationStep,
   ToleranceReport,
+  TransplantRecord,
   VirtualFS,
   WelcomeConvention,
   WelcomeFolderImage,
+  PackageFontSet,
   HistoryEntryState,
   ChartPreference,
+  DocFixProposals,
   StartDocumentationProfile,
+  RepairProposal,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
+  deriveRemapPosture,
   renameTouchKey,
   deriveFacets,
 } from "@keyboard-studio/engine";
@@ -52,6 +58,7 @@ import type {
   ContextToleranceOverlay,
   KeyEditOperation,
   KeyEditOverlay,
+  StartDocCssText,
 } from "@keyboard-studio/engine";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import type {
@@ -63,6 +70,7 @@ import {
   type DiscoveryAxisVector,
   type MarkInputOrder,
   type MechanismAssignment,
+  type ScriptClass,
   type SurveyPhaseResult,
   type SurveySession,
   type TouchAssignment,
@@ -330,55 +338,6 @@ export interface AppliedContextTolerance {
  */
 export type InstantiationMode = "new-from-base" | "adapt-existing" | null;
 
-/**
- * The 076 closed-keyboard card's decision (User Story 1, FR-005) — the bulk
- * control for the two-tier allow/block choice (FR-019).
- *
- * - `"accepted"`: the author closed the keyboard; undefined keys (and carved
- *   combos, by default) are swallowed rather than falling through to the host
- *   layout.
- * - `"declined"`: the author keeps host-layout fallback (the FR-005 proposal
- *   for sparse Latin overlays); carved combos default to `allow-host`.
- *
- * The card UI itself is 076 User Story 1 scope. This type is the state slot
- * the disposition pre-fill (FR-022) reads; the card step will write it.
- */
-export type ClosedKeyboardCardDecision = "accepted" | "declined";
-
-/**
- * The bulk allow/block default for a carved combination (076 FR-005/FR-019/FR-022).
- *
- * Pure function of the closed-keyboard card state and the FR-005 proposal
- * input (`sparseLatinOverlay`: true for a sparse Latin overlay, false for a
- * non-Latin script base), so the carve gallery, the test pane, and the
- * compiler all read the same default the store's pre-fill used:
- *
- * - card accepted → `block` / `closed-keyboard-card`
- * - card declined (sparse Latin overlay) → `allow-host` / `closed-keyboard-card-declined`
- * - card unanswered → the FR-005 proposal rule (declined for sparse Latin
- *   overlays, accepted for non-Latin scripts) / `bulk-default`
- */
-export function bulkDispositionDefault(
-  card: ClosedKeyboardCardDecision | null,
-  sparseLatinOverlay: boolean,
-): {
-  disposition: CarveDispositionValue;
-  provenance: CarveDispositionProvenance;
-} {
-  if (card === "accepted") {
-    return { disposition: "block", provenance: "closed-keyboard-card" };
-  }
-  if (card === "declined") {
-    return {
-      disposition: "allow-host",
-      provenance: "closed-keyboard-card-declined",
-    };
-  }
-  return sparseLatinOverlay
-    ? { disposition: "allow-host", provenance: "bulk-default" }
-    : { disposition: "block", provenance: "bulk-default" };
-}
-
 // Identity patch lives in a leaf module (see identityPatch.ts); re-exported
 // here so existing importers keep resolving.
 export type { IdentityPatch } from "./identityPatch.ts";
@@ -386,6 +345,41 @@ export type { IdentityPatch } from "./identityPatch.ts";
 // ---------------------------------------------------------------------------
 // State interface
 // ---------------------------------------------------------------------------
+
+/**
+ * The carve gallery's suggested-discard default (spec 106 FR-042). Suggested
+ * characters are only MARKED for discard until the author continues:
+ * `kept` holds the ones the author chose to keep instead, and `derived`
+ * the removal keys (`kind:id`, survey/carve/carveValue.ts `removalKey`)
+ * that Continue applied for the marked ones. `fingerprint` is the
+ * suggestion set at that Continue.
+ */
+export interface CarveSuggestionApplied {
+  fingerprint: string;
+  derived: string[];
+  /** Suggested characters (NFC) the author chose to keep. */
+  kept?: string[];
+  /** True once the author restored an applied default (keep, restore all, undo). */
+  touched?: boolean;
+}
+
+/**
+ * The applied carve suggestion after the author restored `ids` / `chars`:
+ * those removals are the author's from now on, so they leave `derived`, and
+ * the suggestion is marked touched (spec 106 FR-042: `asked` provenance).
+ */
+function pruneCarveSuggestion(
+  cs: CarveSuggestionApplied | null,
+  ids: readonly string[],
+  chars: readonly string[],
+): CarveSuggestionApplied | null {
+  if (cs === null) return null;
+  const gone = new Set([
+    ...ids.flatMap((id) => [`item:${id}`, `node:${id}`]),
+    ...chars.map((c) => `char:${c.normalize("NFC")}`),
+  ]);
+  return { ...cs, derived: cs.derived.filter((k) => !gone.has(k)), touched: true };
+}
 
 export interface WorkingCopyState {
   // -- Instantiation mode (spec §8 v1.3.0) ------------------------------------
@@ -493,6 +487,22 @@ export interface WorkingCopyState {
    */
   startHelpPhpText: string | null;
 
+  /**
+   * The base keyboard's own help text retained for EXTRACTION ONLY
+   * (issue #2206, Matthew's 2026-10-17 FR-007 carve-out ruling): the
+   * extractor in lib/baseHelpTroubleshooting.ts reads it to offer
+   * symptom/fix lines from the base help's Troubleshooting section as
+   * suggestions for `pf_troubleshooting`. Populated ONLY on Track 1,
+   * from the scaffolder's dedicated extraction field, at the same
+   * moment the prose slices are nulled.
+   *
+   * No render, preview, or serialization path may read this slice —
+   * `startHelpPhpText` stays null on Track 1 and the output projection
+   * keeps behaving exactly as FR-007 requires. The text is a source for
+   * proposals, never inherited prose.
+   */
+  baseHelpPhpTextForExtraction: string | null;
+
   // -- Base documentation bundle (spec 079 US2) --------------------------------
   /**
    * The base keyboard's own `README.md`, verbatim, or null when it has none
@@ -506,6 +516,25 @@ export interface WorkingCopyState {
    * these entries below the new one (criterion 3.4).
    */
   startHistoryMdText: string | null;
+  /**
+   * The stylesheets the base's welcome / help pages use (conventionally
+   * `kb.css` in each page's folder), each with the path it was fetched
+   * from, or null when the base ships none or on Track 1 (a copy's pages
+   * are fresh renders, so the base's page stylesheets do not govern them).
+   * Fetch-don't-write like {@link startReadmeMdText}; read by the
+   * documentation findings (criterion 11.8, issue #2139), the FR-020
+   * baseline computation, and the output projection, which writes an
+   * accepted stylesheet amendment back at the entry's own path.
+   */
+  startDocCssTexts: StartDocCssText[] | null;
+  /**
+   * The starting keyboard's packaged fonts: font files and their
+   * licence companions (all written into the VFS by the loader) plus its
+   * OSK/display selections, or null when it packages none. Set on BOTH tracks
+   * by the instance that owns the start docs; read by the output projection,
+   * which declares them in the package descriptor (criteria 8/9/10).
+   */
+  startPackageFonts: PackageFontSet | null;
   /**
    * The base's `source/welcome/` image files (spec 079 FR-006), or null when
    * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
@@ -549,6 +578,28 @@ export interface WorkingCopyState {
    * AFTER this slice was seeded still gets the right default. Persisted.
    */
   chartPreference: ChartPreference | null;
+  /**
+   * The author's recorded answers to the deterministic documentation-fix
+   * proposals for an adaptation's inherited welcome/help pages (issue
+   * #1908): null until a proposal is answered. An accepted fix is applied
+   * by the render/projection from this record; a declined one leaves the
+   * inherited bytes and their findings untouched. Clearing the record (or
+   * one field) is the undo. Only ever populated on the adapt track.
+   * Persisted.
+   */
+  docFixProposals: DocFixProposals | null;
+  /**
+   * Spec 104: the touch key-identity record set — the decision-spine records
+   * (contracts `decisionRecord.ts`) for dead-key repairs, severance /
+   * re-link / kept-by-choice identity decisions, severance transplants, and
+   * the per-keyboard combining-mark guard specification. Null until the
+   * first record is written. Records are superseded, never edited in place
+   * (data-model.md §2); pending (unanswered) presentations are DERIVED from
+   * the working IR + layout + this record set, never stored, so a track
+   * switch re-derives them while recorded answers stand (FR-017/FR-018).
+   * Persisted.
+   */
+  touchKeyIdentity: TouchKeyIdentityRecords | null;
   /**
    * The selected base's documentation profile (spec 079 FR-008), computed by
    * the base browser for the focused base and recorded at selection; null
@@ -629,44 +680,19 @@ export interface WorkingCopyState {
    * touch layout edit. */
   undoStack: UndoEntry[];
 
-  // -- Closed-keyboard card + carve dispositions (076 FR-005/FR-019/FR-022) -----
+  // -- Keyboard-wide fallback policy (076 FR-019, retired per-carve override) ---
   /**
-   * The 076 closed-keyboard card's decision state (User Story 1, FR-005) — the
-   * BULK control of the two-tier allow/block choice (FR-019). The card governs
-   * all undefined keys; the per-carve dispositions in `carveDispositions`
-   * override it for individual carved combinations.
+   * What a key that is not in the keyboard does: `"swallow"` (nothing; the
+   * default) or `"pass-through"` (the computer's own layout answers). One
+   * value per working copy, set by the author in the Assign Mechanisms step
+   * and never re-prompted on recompile. Deadkey carves always suppress
+   * regardless (engine backstop). Replaces the per-combination
+   * `carveDispositions` store and the closed-keyboard card, which are folded
+   * into it on load (see `migrateFallbackPolicy`).
    *
-   * - `"accepted"`: the author closed the keyboard → carved combos pre-fill to
-   *   `block` (provenance `closed-keyboard-card`).
-   * - `"declined"`: sparse Latin overlay, host fallback kept → carved combos
-   *   pre-fill to `allow-host` (provenance `closed-keyboard-card-declined`).
-   * - `null`: the card is unanswered → pre-fill follows the FR-005 proposal
-   *   rule (declined for sparse Latin overlays, accepted for non-Latin
-   *   scripts) with `bulk-default` provenance.
-   *
-   * The card UI itself is 076 User Story 1 scope; this field is its persisted
-   * state slot so the disposition pre-fill can read the bulk default on every
-   * recompile without re-prompting (FR-022). Null until the card is answered.
-   * Persisted with the working copy.
+   * Persisted with the working copy; never in the IR or the emitted keyboard.
    */
-  closedKeyboardCard: ClosedKeyboardCardDecision | null;
-  /**
-   * Per-carved-combination allow/block dispositions (076 FR-022).
-   * Keyed by `comboId` (the carve-node id: rule nodeId, or
-   * `<storeNodeId>#<index>` for slot carves — data-model.md "CarveDisposition").
-   *
-   * Lifecycle: pre-filled on carve from the bulk default
-   * (`prefillCarveDispositions`), flipped per row by the author (provenance
-   * becomes `author-override`), read — never re-prompted — on every recompile
-   * via `getCarveDispositions`, deleted on un-carve (`pruneCarveDispositions`
-   * and the restore actions below). Pre-fill writes ONLY for combos without an
-   * existing disposition: recompilation never re-prompts, and genuinely new
-   * combos take the current bulk default.
-   *
-   * Persisted with the working copy (carve-decision metadata on the carve
-   * overlay; never in the IR or the emitted keyboard).
-   */
-  carveDispositions: CarveDisposition[];
+  fallbackPolicy: FallbackPolicy;
 
   /**
    * Touch-layout keep-inert overrides, 076 FR-023 (T020): carved NFC
@@ -680,6 +706,30 @@ export interface WorkingCopyState {
 
   /** Set the keep-inert character set for carved touch keys (replaces wholesale). */
   setCarveTouchKeepInert: (chars: string[]) => void;
+
+  /**
+   * Declined displacement proposals (spec 106 FR-043): each entry is
+   * `displaced|vkey|sorted-modifiers|incoming`, written when the author leaves a
+   * displaced character without a new key ("Leave it" / "Keep both"). The
+   * gallery does not re-propose a declined displacement, and the
+   * physical-layout decision records the list, so the loss is a recorded
+   * choice rather than a silent one.
+   */
+  displacedDeclined: string[];
+
+  /** Record one declined displacement (idempotent). */
+  declineDisplacement: (key: string) => void;
+
+  /**
+   * The carve gallery's suggested-discard default (spec 106 FR-042): which
+   * suggested characters the author kept, and which removals Continue
+   * applied for the marked ones. The carved-layout value reads `derived`
+   * provenance from it. Null until the author first acts on carve.
+   */
+  carveSuggestion: CarveSuggestionApplied | null;
+
+  /** Record the applied carve suggestion (replaces wholesale). */
+  setCarveSuggestion: (applied: CarveSuggestionApplied | null) => void;
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
@@ -806,6 +856,30 @@ export interface WorkingCopyState {
    * through the normal validator cycle). Derived UI state — not persisted.
    */
   validatorFindings: LintFinding[];
+
+  // -- Key identity records slice (spec 104) ------------------------------------
+  /**
+   * The spec 104 spine records for touch-key identity (contracts
+   * `decisionRecord.ts`): every KeyIdentityDecision recorded for this
+   * working copy (severances, re-links, repairs, Track 2 choices), in
+   * recording order. The key property panel's identity section reads its
+   * provenance from here (FR-025); the records are how an identity change
+   * stays visible and recorded (FR-005/FR-016), never a silent edit.
+   * Plain JSON-safe data — persisted with the working copy.
+   */
+  keyIdentityDecisions: KeyIdentityDecision[];
+  /**
+   * The FR-008 transplant records for this working copy (one per severance
+   * attempt, completed or refused). The panel's FR-029 re-link offer keys
+   * off the completed ones. Plain JSON-safe data — persisted.
+   */
+  keyTransplants: TransplantRecord[];
+  /**
+   * The keyboard's guard specification (FR-013): what a combining mark
+   * does with no base character. `null` until the marks step's question is
+   * answered or an import seeds one. Persisted.
+   */
+  guardSpecification: GuardSpecification | null;
 
   // -- Context tolerance slice (spec 078) ---------------------------------------
   /** See {@link ContextToleranceState}. Derived UI state, not persisted. */
@@ -939,71 +1013,9 @@ export interface WorkingCopyState {
    */
   cascadeRestore: (ids: string[], restoredChars?: string[]) => void;
 
-  // -- Actions: closed-keyboard card + carve dispositions (076 FR-022) ------------
-  /**
-   * Record the 076 closed-keyboard card's decision (User Story 1 writes this).
-   * `null` clears the decision back to "unanswered". Dispositions already
-   * pre-filled keep their provenance — the card never rewrites a decision the
-   * author (or an earlier pre-fill) already made.
-   */
-  setClosedKeyboardCard: (decision: ClosedKeyboardCardDecision | null) => void;
-  /**
-   * Pre-fill dispositions for a set of carved comboIds from the bulk default
-   * (see {@link bulkDispositionDefault}).
-   *
-   * Writes ONLY for combos without an existing disposition — recompile never
-   * re-prompts; only genuinely new combos take the current bulk default.
-   * Unknown or stale comboIds are NOT filtered here: the caller passes the
-   * current carve set, and `pruneCarveDispositions` / the restore actions drop
-   * entries that no longer resolve. Empty input is a no-op.
-   *
-   * @param comboIds the carved combination ids to pre-fill (rule nodeIds and/or
-   *   `<storeNodeId>#<index>` slot ids).
-   * @param opts.sparseLatinOverlay the FR-005 proposal input: true when the
-   *   keyboard is a sparse Latin overlay, false for a non-Latin script base.
-   *   Only consulted while the card is unanswered.
-   * @param opts.deadkeyComboIds rule nodeIds whose rules carry deadkey
-   *   context. The ruling forbids host fallback for deadkey carves ("deadkey
-   *   carves never fall through"), so these pre-fill to `block` with
-   *   provenance `deadkey-requirement` regardless of the bulk default.
-   */
-  prefillCarveDispositions: (
-    comboIds: string[],
-    opts: {
-      sparseLatinOverlay: boolean;
-      deadkeyComboIds?: ReadonlySet<string>;
-    },
-  ) => void;
-  /**
-   * Per-row override (carve gallery): set one combo's disposition. Provenance
-   * becomes `author-override` — the value is the author's from here on and no
-   * later pre-fill may touch it.
-   *
-   * Upsert: a comboId with no existing disposition gains one, so the gallery
-   * can write the row even if pre-fill never ran for it.
-   */
-  setCarveDisposition: (
-    comboId: string,
-    disposition: CarveDispositionValue,
-  ) => void;
-  /**
-   * Un-carve bookkeeping: delete dispositions whose comboId is not in the
-   * live carve set (FR-022: un-carving deletes the metadata).
-   *
-   * The restore actions (`restoreNode`, `restoreItem`, `cascadeRestore`,
-   * `keepAll`/`restoreAll`) prune their own ids inline; this action is the
-   * compile path's sweep for entries that died any other way.
-   */
-  pruneCarveDispositions: (
-    liveComboIds: ReadonlySet<string> | readonly string[],
-  ) => void;
-  /**
-   * Read path for the compiler (076 FR-022): the dispositions for the given
-   * combos, in store order. With no argument, returns every disposition.
-   * Unknown comboIds are ignored (no record, no error). Returns copies, so
-   * callers cannot mutate store state.
-   */
-  getCarveDispositions: (comboIds?: readonly string[]) => CarveDisposition[];
+  // -- Actions: keyboard-wide fallback policy (076 FR-019) ---------------------
+  /** Record the author's fallback policy. Idempotent. */
+  setFallbackPolicy: (policy: FallbackPolicy) => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -1041,6 +1053,17 @@ export interface WorkingCopyState {
   recordAssignments: (assignments: MechanismAssignment[]) => void;
   /** Update the IR-derived axis baseline and re-derive the session. */
   setIrAxes: (irAxes: Partial<DiscoveryAxisVector>) => void;
+  /**
+   * Run the A7a remap-posture derivation (spec §7.2 rule 8) for the
+   * identity that has just landed and reconcile the `remapPosture` slot
+   * of `irAxes` with its outcome. Called from the characters step, the
+   * first surface where the recorded target script and the base IR
+   * coexist. No-op when no base IR is instantiated yet.
+   */
+  syncRemapPostureFromIdentity: (identity: {
+    scriptClass: ScriptClass;
+    targetScript: string;
+  }) => void;
   /** Lock the desktop layout (prevents MechanismGallery edits). */
   lockDesktop: () => void;
   /** Unlock the desktop layout (restores MechanismGallery editing). */
@@ -1257,12 +1280,19 @@ export interface WorkingCopyState {
 
   /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
   setStartHelpPhpText: (text: string | null) => void;
+  setBaseHelpPhpTextForExtraction: (text: string | null) => void;
 
   /** Retain the base's verbatim README.md (spec 079 FR-006). */
   setStartReadmeMdText: (text: string | null) => void;
 
   /** Retain the base's verbatim HISTORY.md (spec 079 FR-006 / criterion 3.4). */
   setStartHistoryMdText: (text: string | null) => void;
+
+  /** Retain the base's welcome/help stylesheets (criterion 11.8, issue #2139). */
+  setStartDocCssTexts: (texts: StartDocCssText[] | null) => void;
+
+  /** Retain the base's packaged fonts for the package descriptor. */
+  setStartPackageFonts: (fonts: PackageFontSet | null) => void;
 
   /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
   setStartWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
@@ -1275,6 +1305,12 @@ export interface WorkingCopyState {
 
   /** Record the author's keep-base-images / regenerate choice (spec 079 FR-015). */
   setChartPreference: (preference: ChartPreference | null) => void;
+
+  /** Record the author's documentation-fix proposal answers (issue #1908). Whole-value replace; null clears (undo). */
+  setDocFixProposals: (proposals: DocFixProposals | null) => void;
+
+  /** Replace the spec 104 touch key-identity record set (whole-value; null clears). */
+  setTouchKeyIdentity: (records: TouchKeyIdentityRecords | null) => void;
 
   /** Record the selected base's documentation profile (spec 079 FR-008). */
   setStartDocProfile: (profile: StartDocumentationProfile | null) => void;
@@ -1329,6 +1365,13 @@ export interface WorkingCopyState {
    * changes; this setter never starts a timer or async work.
    */
   setValidatorFindings: (findings: LintFinding[]) => void;
+
+  /** Append one spec 104 identity decision (recording order is display order). */
+  recordKeyIdentityDecision: (decision: KeyIdentityDecision) => void;
+  /** Append one spec 104 transplant record (completed or refused). */
+  recordTransplant: (record: TransplantRecord) => void;
+  /** Set (or clear, with `null`) the keyboard's guard specification (FR-013). */
+  setGuardSpecification: (spec: GuardSpecification | null) => void;
 
   /**
    * Publish the context-tolerance analysis state (spec 078). No-op when the
@@ -1398,6 +1441,44 @@ function seedIrAxesFromStartIr(
     ...preservedIrAxes,
     markInputOrder: markOrder.value as MarkInputOrder,
   };
+}
+
+/**
+ * Reconcile the `remapPosture` slot of `irAxes` with the A7a derivation for
+ * the identity that has just landed (spec §7.2 rule 8). Unlike A3a, this
+ * derivation cannot run at instantiation — its evidence is the mismatch
+ * between the TARGET script (recorded by the identity step, after base
+ * selection) and the base IR's letter keys — so it runs when the target
+ * script lands, via {@link WorkingCopyState.syncRemapPostureFromIdentity}.
+ *
+ * The slot is detector-owned: authors never write `irAxes` (their answers
+ * live in phase results and outrank this baseline in mergePhaseResults),
+ * so reconciling — setting the slot on a fire, clearing it when the
+ * derivation stops firing — cannot overwrite an author decision. The
+ * clearing half is load-bearing for the detector's guardrail: if the
+ * author goes back and changes the target to a Latin script, a stale
+ * "full-remap" left on the baseline would route rule 8 for a Latin
+ * target, which must never happen.
+ */
+function reconcileRemapPosture(
+  irAxes: Partial<DiscoveryAxisVector>,
+  identity: { scriptClass: ScriptClass; targetScript: string },
+  startIr: KeyboardIR | null,
+): Partial<DiscoveryAxisVector> {
+  if (startIr === null) return irAxes;
+  const derived = deriveRemapPosture({
+    scriptClass: identity.scriptClass,
+    targetScript: identity.targetScript,
+    baseIr: startIr,
+  });
+  if (derived === irAxes.remapPosture) return irAxes;
+  const next = { ...irAxes };
+  if (derived === undefined) {
+    delete next.remapPosture;
+  } else {
+    next.remapPosture = derived;
+  }
+  return next;
 }
 
 /**
@@ -1474,11 +1555,108 @@ function resolveInstantiationCase(
   return { shouldNoop: false, preservedPhaseResults, preservedIrAxes };
 }
 
+/**
+ * Shared fresh-instance tail for instantiateFromStart / instantiateFromExisting.
+ *
+ * Both tracks reset exactly these slots to the same values; the only
+ * difference in the old copies was comment wording. Deliberately NOT a
+ * spread of INITIAL_STATE: instantiation must leave the other INITIAL_STATE
+ * slots (validator findings, context tolerance, and friends) untouched.
+ * Every call builds fresh Sets, Maps, and arrays, so no two instantiations
+ * (and no instantiation and reset()) can share a mutable object.
+ */
+function freshInstantiationTail() {
+  return {
+    desktopLocked: false,
+    // Reset unconditionally: a fresh/re-instantiated working copy has no
+    // flags, and flagging only happens in Phase C (well after instantiation
+    // settles), so no in-flight value can be lost here.
+    sequenceFlaggedChars: [],
+    touchLayoutJson: null,
+    touchDraft: null,
+    galleryIntrosSeen: { mechanism: false, touch: false },
+    // Fresh instance, not carried from any preceding working copy — see
+    // reset()'s identical comment.
+    keyEditOverlay: { ops: [] },
+    deadkeyOverlay: { ops: [] },
+    // Annotated, not inferred: without it the literal widens to string and
+    // the spread no longer matches TouchEditorMode ("character" | "key").
+    touchEditorMode: "character" as TouchEditorMode,
+    staleSteps: new Set<string>(),
+    // A new working copy has no default-fill provenance yet (#890) — the
+    // pattern-loading effect re-runs defaultFillAxes and republishes it.
+    axisFills: [],
+    // The fallback policy is per-working-copy: a new one starts on the
+    // flat default (076 FR-019). The retired per-combo carveDispositions
+    // store and closed-keyboard card are NOT slots here — #2340 removed
+    // them, and re-adding them (as the shared-tail refactor did from
+    // dev's older tracks) resurrects them in the store state.
+    fallbackPolicy: DEFAULT_FALLBACK_POLICY,
+    carveTouchKeepInert: [],
+    displacedDeclined: [],
+    carveSuggestion: null,
+    // Spec 104 identity records are per-working-copy too: a fresh start
+    // has no severances, no transplants and no guard answer yet.
+    keyIdentityDecisions: [],
+    keyTransplants: [],
+    guardSpecification: null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Initial state (extracted so reset() and the initializer share one source)
 // ---------------------------------------------------------------------------
 
 const INITIAL_SURVEY = remerge({}, []);
+
+/**
+ * Spec 104: the touch key-identity record set held by the working copy —
+ * the four decision-spine record types of contracts `decisionRecord.ts`
+ * (data-model.md §2–§5) in one slice. Arrays are append-only histories:
+ * a newer record supersedes an older one via its `supersedes` field, and
+ * readers take the latest non-superseded record per subject (see
+ * `lib/touchKeyIdentity.ts`).
+ */
+export interface TouchKeyIdentityRecords {
+  readonly repairProposals: readonly RepairProposal[];
+  readonly identityDecisions: readonly KeyIdentityDecision[];
+  readonly transplantRecords: readonly TransplantRecord[];
+  readonly guardSpecifications: readonly GuardSpecification[];
+  /**
+   * Spec 104 FR-017 decline suppression for the inline (editor) identity
+   * choice: when the author answers keep-the-link or flag-for-manual on
+   * the assign path, the answer is pinned to a fingerprint of the source
+   * key's rule bindings at answer time. An identical later edit is not
+   * re-presented while the fingerprint still matches; any change to the
+   * bound rules re-opens the question. Optional because snapshots written
+   * before this field existed restore without it (readers default to []).
+   */
+  readonly identityChoiceStates?: readonly IdentityChoiceState[];
+}
+
+/**
+ * One answered inline identity choice, pinned to the bindings state the
+ * author answered against (see {@link TouchKeyIdentityRecords}).
+ */
+export interface IdentityChoiceState {
+  /** The overlay address the choice was presented for. */
+  readonly keyRef: string;
+  readonly sourceId: string;
+  readonly targetId: string;
+  /** Fingerprint of the source key's bound rules at answer time. */
+  readonly fingerprint: string;
+  /** The `KeyIdentityDecision` this answer recorded. */
+  readonly decisionRecordId: string;
+  readonly recordedAt: number;
+}
+
+/** The empty spec 104 record set — the slice's value before any record exists. */
+export const EMPTY_TOUCH_KEY_IDENTITY: TouchKeyIdentityRecords = {
+  repairProposals: [],
+  identityDecisions: [],
+  transplantRecords: [],
+  guardSpecifications: [],
+};
 
 /**
  * The store's data fields only — actions excluded. This is the single source of
@@ -1508,15 +1686,14 @@ export type WorkingCopyData = Omit<
   | "toggleFamilyDisabled"
   | "cascadeDelete"
   | "cascadeRestore"
-  | "setClosedKeyboardCard"
-  | "prefillCarveDispositions"
-  | "setCarveDisposition"
-  | "pruneCarveDispositions"
-  | "getCarveDispositions"
+  | "setFallbackPolicy"
   | "setCarveTouchKeepInert"
+  | "declineDisplacement"
+  | "setCarveSuggestion"
   | "recordPhase"
   | "recordAssignments"
   | "setIrAxes"
+  | "syncRemapPostureFromIdentity"
   | "lockDesktop"
   | "unlockDesktop"
   | "setTouchLayoutJson"
@@ -1536,17 +1713,25 @@ export type WorkingCopyData = Omit<
   | "setHelpDocs"
   | "setStartWelcomeHtmText"
   | "setStartHelpPhpText"
+  | "setBaseHelpPhpTextForExtraction"
   | "setStartReadmeMdText"
   | "setStartHistoryMdText"
+  | "setStartDocCssTexts"
+  | "setStartPackageFonts"
   | "setStartWelcomeImages"
   | "setStartWelcomeConvention"
   | "setHistoryEntryState"
   | "setChartPreference"
+  | "setDocFixProposals"
+  | "setTouchKeyIdentity"
   | "setStartDocProfile"
   | "setBaselineDocFindings"
   | "markStale"
   | "clearStale"
   | "setValidatorFindings"
+  | "recordKeyIdentityDecision"
+  | "recordTransplant"
+  | "setGuardSpecification"
   | "setContextTolerance"
   | "setContextToleranceOverlay"
   | "setContextNormalizationStep"
@@ -1573,13 +1758,18 @@ const INITIAL_STATE: WorkingCopyData = {
   helpDocs: null,
   startWelcomeHtmText: null,
   startHelpPhpText: null,
+  baseHelpPhpTextForExtraction: null,
   startReadmeMdText: null,
   startHistoryMdText: null,
+  startDocCssTexts: null,
+  startPackageFonts: null,
   startWelcomeImages: null,
   startWelcomeConvention: null,
   startWelcomeImagesDropped: false,
   historyEntryState: null,
   chartPreference: null,
+  docFixProposals: null,
+  touchKeyIdentity: null,
   startDocProfile: null,
   baselineDocFindings: null,
   // carve IR slots
@@ -1591,11 +1781,11 @@ const INITIAL_STATE: WorkingCopyData = {
   disabledFamilyIds: new Set(),
   carveChars: new Set(),
   undoStack: [],
-  // closed-keyboard card + carve dispositions (076 FR-005/FR-022):
-  // card unanswered, no carve decisions yet
-  closedKeyboardCard: null,
-  carveDispositions: [],
+  // keyboard-wide fallback policy (076 FR-019): flat swallow default
+  fallbackPolicy: DEFAULT_FALLBACK_POLICY,
   carveTouchKeepInert: [],
+  displacedDeclined: [],
+  carveSuggestion: null,
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
@@ -1612,6 +1802,10 @@ const INITIAL_STATE: WorkingCopyData = {
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
   validatorFindings: [],
+  // key identity records slice (spec 104) — no decisions recorded yet
+  keyIdentityDecisions: [],
+  keyTransplants: [],
+  guardSpecification: null,
   // context tolerance slice (spec 078) — no analysis yet
   contextTolerance: { status: "idle" },
   contextToleranceOverlay: null,
@@ -1638,10 +1832,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       // Full IR replacement: stale carve deletions correctly must not carry
-      // over — and neither may their carve-decision metadata (076 FR-022)
-      // nor the aggregated-R carved-character set (#1809 §1).
+      // over — and neither may the aggregated-R carved-character set (#1809 §1).
       carveChars: new Set(),
-      carveDispositions: [],
       carveTouchKeepInert: [],
       // 082 rule-access tracks: the family-disabled overlay is IR-scoped too.
       disabledFamilyIds: new Set(),
@@ -1739,6 +1931,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           deletedItemIds: nextItems,
           carveChars: nextCarveChars,
           undoStack: nextUndoStack,
+          carveSuggestion: pruneCarveSuggestion(
+            s.carveSuggestion,
+            [...last.nodeIds, ...last.itemIds],
+            [...undoneChars],
+          ),
         };
       }
     }),
@@ -1750,10 +1947,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return {
         deletedNodeIds: next,
         undoStack: s.undoStack.filter((e) => !(e.k === "n" && e.id === nodeId)),
-        // Un-carve deletes the carve-decision metadata (076 FR-022).
-        carveDispositions: s.carveDispositions.filter(
-          (d) => d.comboId !== nodeId,
-        ),
       };
     }),
 
@@ -1772,10 +1965,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return {
         deletedItemIds: next,
         undoStack: s.undoStack.filter((e) => !(e.k === "i" && e.id === itemId)),
-        // Un-carve deletes the carve-decision metadata (076 FR-022).
-        carveDispositions: s.carveDispositions.filter(
-          (d) => d.comboId !== itemId,
-        ),
       };
     }),
 
@@ -1824,19 +2013,20 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // undoStack — otherwise a committed key edit would be left applied with no
   // remaining way to undo it.
   keepAll: () =>
-    set({
+    set((s) => ({
+      carveSuggestion:
+        s.carveSuggestion === null
+          ? null
+          : { ...s.carveSuggestion, derived: [], touched: true },
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
       carveChars: new Set(),
       undoStack: [],
       keyEditOverlay: { ops: [] },
-      // No carve remains applied: no carve-decision metadata survives either
-      // (076 FR-022 — un-carving deletes the metadata).
-      carveDispositions: [],
       carveTouchKeepInert: [],
       deadkeyOverlay: { ops: [] },
-    }),
+    })),
 
   restoreAll: () => get().keepAll(),
 
@@ -1887,12 +2077,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         (e) =>
           !(e.k === "batch" && e.itemIds.every((id) => !nextItems.has(id))),
       );
-      // Un-carve deletes the carve-decision metadata (076 FR-022): the
-      // restored combos are live rules again, not carved combinations.
-      const restored = new Set(ids);
-      const nextDispositions = s.carveDispositions.filter(
-        (d) => !restored.has(d.comboId),
-      );
       // Issue #1809 ruling §1: drop the un-carved characters from the
       // aggregated-R set — but keep any char a REMAINING batch still claims
       // (mirrors undoDelete's still-claimed filter; a char can be carved by
@@ -1911,93 +2095,28 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         deletedItemIds: nextItems,
         carveChars: nextCarveChars,
         undoStack: nextUndoStack,
-        carveDispositions: nextDispositions,
+        carveSuggestion: pruneCarveSuggestion(s.carveSuggestion, ids, restoredChars),
       };
     });
   },
 
-  // -- closed-keyboard card + carve dispositions (076 FR-022) -------------------
+  // -- keyboard-wide fallback policy (076 FR-019) ------------------------------
 
-  setClosedKeyboardCard: (decision) => set({ closedKeyboardCard: decision }),
-
-  prefillCarveDispositions: (
-    comboIds,
-    { sparseLatinOverlay, deadkeyComboIds },
-  ) => {
-    if (comboIds.length === 0) return;
-    const { closedKeyboardCard, carveDispositions } = get();
-    const existing = new Set(carveDispositions.map((d) => d.comboId));
-    // Never overwrite: recompile never re-prompts; only genuinely new combos
-    // take the current bulk default (076 FR-022).
-    const fresh = comboIds.filter((id) => !existing.has(id));
-    if (fresh.length === 0) return;
-    const { disposition, provenance } = bulkDispositionDefault(
-      closedKeyboardCard,
-      sparseLatinOverlay,
-    );
-    set({
-      carveDispositions: [
-        ...carveDispositions,
-        ...fresh.map((comboId): CarveDisposition => {
-          // Deadkey carves never fall through (ruling A1–A3): force `block`
-          // regardless of the bulk default, with honest provenance.
-          if (deadkeyComboIds?.has(comboId)) {
-            return {
-              comboId,
-              disposition: "block",
-              provenance: "deadkey-requirement",
-            };
-          }
-          return { comboId, disposition, provenance };
-        }),
-      ],
-    });
-  },
-
-  setCarveDisposition: (comboId, disposition) => {
-    const record: CarveDisposition = {
-      comboId,
-      disposition,
-      provenance: "author-override",
-    };
-    set((s) => {
-      const idx = s.carveDispositions.findIndex((d) => d.comboId === comboId);
-      if (idx === -1)
-        return { carveDispositions: [...s.carveDispositions, record] };
-      return {
-        carveDispositions: s.carveDispositions.map((d, i) =>
-          i === idx ? record : d,
-        ),
-      };
-    });
-  },
-
-  pruneCarveDispositions: (liveComboIds) => {
-    const live =
-      liveComboIds instanceof Set ? liveComboIds : new Set(liveComboIds);
-    set((s) => {
-      const pruned = s.carveDispositions.filter((d) => live.has(d.comboId));
-      // Avoid a state write (and subscriber churn) when nothing is stale.
-      if (pruned.length === s.carveDispositions.length) return s;
-      return { carveDispositions: pruned };
-    });
-  },
+  setFallbackPolicy: (policy) => set({ fallbackPolicy: policy }),
 
   // 076 FR-023 (T020): wholesale replace; NFC-normalize so the engine seam
   // comparison stays exact.
   setCarveTouchKeepInert: (chars) =>
     set({ carveTouchKeepInert: chars.map((c) => c.normalize("NFC")) }),
 
-  getCarveDispositions: (comboIds) => {
-    const { carveDispositions } = get();
-    const wanted = comboIds === undefined ? undefined : new Set(comboIds);
-    const list =
-      wanted === undefined
-        ? carveDispositions
-        : carveDispositions.filter((d) => wanted.has(d.comboId));
-    // Copies: callers (the compiler) must not mutate store state.
-    return list.map((d) => ({ ...d }));
-  },
+  setCarveSuggestion: (applied) => set({ carveSuggestion: applied }),
+
+  declineDisplacement: (key) =>
+    set((s) =>
+      s.displacedDeclined.includes(key)
+        ? s
+        : { displacedDeclined: [...s.displacedDeclined, key] },
+    ),
 
   // -- surveyResultsStore actions --------------------------------------------
 
@@ -2039,6 +2158,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   },
 
   setIrAxes: (irAxes) => set(remerge(irAxes, get().phaseResults)),
+
+  syncRemapPostureFromIdentity: (identity) => {
+    const next = reconcileRemapPosture(get().irAxes, identity, get().startIr);
+    if (next !== get().irAxes) {
+      set(remerge(next, get().phaseResults));
+    }
+  },
 
   lockDesktop: () => set({ desktopLocked: true }),
 
@@ -2253,8 +2379,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // choice falls back to the FR-015 default.
       historyEntryState: null,
       chartPreference: null,
+      docFixProposals: null,
+      touchKeyIdentity: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
       baselineDocFindings: null,
+      startDocCssTexts: null,
       startKeyboard: base,
       startVfs: vfs,
       startIr: ir,
@@ -2277,28 +2406,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         seedIrAxesFromStartIr(ir, preservedIrAxes),
         preservedPhaseResults,
       ),
-      desktopLocked: false,
-      // Reset unconditionally: a fresh/re-instantiated working copy has no
-      // flags, and flagging only happens in Phase C (well after instantiation
-      // settles), so no in-flight value can be lost here.
-      sequenceFlaggedChars: [],
-      touchLayoutJson: null,
-      touchDraft: null,
-      galleryIntrosSeen: { mechanism: false, touch: false },
-      // Fresh instance, not carried from any preceding working copy — see
-      // reset()'s identical comment.
-      keyEditOverlay: { ops: [] },
-      deadkeyOverlay: { ops: [] },
-      touchEditorMode: "character",
-      staleSteps: new Set<string>(),
-      // A new working copy has no default-fill provenance yet (#890) — the
-      // pattern-loading effect re-runs defaultFillAxes and republishes it.
-      axisFills: [],
-      // A new working copy has no closed-keyboard decision and no carve
-      // decisions yet — both are per-working-copy (076 FR-022).
-      closedKeyboardCard: null,
-      carveDispositions: [],
-      carveTouchKeepInert: [],
+      ...freshInstantiationTail(),
     });
   },
 
@@ -2329,7 +2437,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // See instantiateFromStart: documentation decisions are per working copy.
       historyEntryState: null,
       chartPreference: null,
+      docFixProposals: null,
+      touchKeyIdentity: null,
       baselineDocFindings: null,
+      startDocCssTexts: null,
       startKeyboard: keyboard,
       startVfs: vfs,
       startIr: ir,
@@ -2365,25 +2476,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         seedIrAxesFromStartIr(ir, preservedIrAxes),
         preservedPhaseResults,
       ),
-      desktopLocked: false,
-      sequenceFlaggedChars: [],
-      touchLayoutJson: null,
-      touchDraft: null,
-      galleryIntrosSeen: { mechanism: false, touch: false },
-      // Fresh instance, not carried from any preceding working copy — see
-      // reset()'s identical comment.
-      keyEditOverlay: { ops: [] },
-      deadkeyOverlay: { ops: [] },
-      touchEditorMode: "character",
-      staleSteps: new Set<string>(),
-      // A new working copy has no default-fill provenance yet (#890) — the
-      // pattern-loading effect re-runs defaultFillAxes and republishes it.
-      axisFills: [],
-      // A new working copy has no closed-keyboard decision and no carve
-      // decisions yet — both are per-working-copy (076 FR-022).
-      closedKeyboardCard: null,
-      carveDispositions: [],
-      carveTouchKeepInert: [],
+      ...freshInstantiationTail(),
     });
   },
 
@@ -2402,10 +2495,15 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setStartWelcomeHtmText: (text) => set({ startWelcomeHtmText: text }),
 
   setStartHelpPhpText: (text) => set({ startHelpPhpText: text }),
+  setBaseHelpPhpTextForExtraction: (text) =>
+    set({ baseHelpPhpTextForExtraction: text }),
 
   setStartReadmeMdText: (text) => set({ startReadmeMdText: text }),
 
   setStartHistoryMdText: (text) => set({ startHistoryMdText: text }),
+
+  setStartDocCssTexts: (texts) => set({ startDocCssTexts: texts }),
+  setStartPackageFonts: (fonts) => set({ startPackageFonts: fonts }),
 
   // A fresh carry supersedes any earlier "dropped on reload" state.
   setStartWelcomeImages: (images) =>
@@ -2417,6 +2515,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setHistoryEntryState: (state) => set({ historyEntryState: state }),
 
   setChartPreference: (preference) => set({ chartPreference: preference }),
+
+  setDocFixProposals: (proposals) => set({ docFixProposals: proposals }),
+
+  setTouchKeyIdentity: (records) => set({ touchKeyIdentity: records }),
 
   setStartDocProfile: (profile) => set({ startDocProfile: profile }),
 
@@ -2468,6 +2570,17 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set((s) =>
       s.validatorFindings === findings ? s : { validatorFindings: findings },
     ),
+
+  // -- Key identity record actions (spec 104) ----------------------------------
+
+  recordKeyIdentityDecision: (decision) =>
+    set((s) => ({ keyIdentityDecisions: [...s.keyIdentityDecisions, decision] })),
+
+  recordTransplant: (record) =>
+    set((s) => ({ keyTransplants: [...s.keyTransplants, record] })),
+
+  setGuardSpecification: (spec) =>
+    set((s) => (s.guardSpecification === spec ? s : { guardSpecification: spec })),
 
   // -- Context tolerance actions (spec 078) ------------------------------------
 

@@ -20,12 +20,14 @@
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type ChangeEvent } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
-import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap, StartKeyboard } from "@keyboard-studio/contracts";
+import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
 import { composeStack } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
+import { TextSampleAffordance } from "./TextSampleAffordance.tsx";
+import { RefreshExemplarsAffordance } from "./RefreshExemplarsAffordance.tsx";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
@@ -35,6 +37,7 @@ import {
   useInventoryDraft,
 } from "./useInventoryDraft.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import { useFlaggedNextGate } from "../hooks/useFlaggedNextGate.ts";
 import { deriveCharacterFlags, ADDITION_ANSWER_PREFIX, CHARACTERS_BUILD_LIST_SCREEN_ID } from "./characterFlags.ts";
@@ -50,16 +53,20 @@ import {
   upperCounterpartOf,
 } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
+import { matchesQuery } from "./characterSearch.ts";
 import { collate, codePointCompare, collateInventory } from "./collation.ts";
-import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
+import { glyphCategory, isCombiningMarkChar, caseCounterpart, getEffectiveFacet, CASING_FACET_ID } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
-import { charactersInTier, getCharacterDiscoveryService } from "../lib/services.ts";
+import { charactersInTier } from "../lib/services.ts";
 import type {
   ExemplarSource,
+  ExemplarInventory,
   SourcedInventory,
 } from "../lib/services.ts";
 import { useSourcedExemplars } from "./useSourcedExemplars.ts";
-import { RadioGroup, SelectMenu } from "../ui/index.ts";
+import { useSourcedExemplarsBoth } from "./useSourcedExemplarsBoth.ts";
+import { CpLabel } from "./CpLabel.tsx";
+import { RadioGroup } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -77,13 +84,10 @@ import {
   primaryButton,
   charChip,
   chipGlyph,
-  chipCodepoint,
   chipIndicator,
   chipIndicatorColor,
   chipIndicatorText,
   visuallyHidden,
-  FONT_OPTIONS,
-  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // Question id that begins the manual step-by-step path.
@@ -192,27 +196,35 @@ function isLinguisticChar(c: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// CpLabel — chip code-point label with the FR-014 multi-code-point affordance
+// ---------------------------------------------------------------------------
+// useIsCasedBase — the character step's casing gate (spec 048 FR-006)
+//
+// Whether ANY case behaviour happens on this step is decided once, from the
+// BASE keyboard: the working-copy IR's `casing` facet, read through the
+// effective-value accessor — the same signal the marks step reads
+// (MarksSeriesStep) and the work-to-do hook reads. "cased"/"mixed" opens the
+// gate; a caseless base (or no base yet, facet undetermined) closes it, and
+// every case behaviour on this step — the type-in fold, the lowercase
+// collapse and its "Show uppercase" toggles, pair-wise chip removal, loanword
+// pairing, and the Done pass-through that records both cases for carve — is
+// skipped, so a stray Latin loanword letter on a caseless base is never
+// auto-paired to an uppercase. `caseCounterpart` is unchanged: it still
+// derives the actual pairs, but only once this gate is open.
 // ---------------------------------------------------------------------------
 
-/**
- * Renders a chip's code-point label (spec 047 FR-014): the base code point in
- * U+XXXX notation, followed — for a multi-code-point grapheme — by a bracketed
- * "[+<extra marks>]" badge in a contrasting (accent) color that shows the extra
- * combining mark(s) themselves. The full space-separated stack is exposed on
- * the chip's hover title/accessible name by the caller.
- */
-function CpLabel({ grapheme }: { grapheme: string }) {
-  const { base, extras } = codepointLabel(grapheme);
-  return (
-    <span style={chipCodepoint()}>
-      {base}
-      {extras !== "" && (
-        <span style={{ color: ACCENT, fontWeight: 700 }}>{`[+${extras}]`}</span>
-      )}
-    </span>
-  );
+function useIsCasedBase(): boolean {
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
+  return casingValue === "cased" || casingValue === "mixed";
 }
+
+/**
+ * Inventory size above which the "Your alphabet" chip list gets a clutter
+ * filter (issue 543). The threshold follows the carve Inspector precedent
+ * (glyph sets over 40 items get a filter): at or below it the whole alphabet
+ * scans fine as one chip grid, and a filter control would itself be clutter.
+ */
+export const INVENTORY_FILTER_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
 // CharChipEditor — reusable type-in input + chip list (no state of its own)
@@ -244,10 +256,12 @@ interface CharChipEditorProps {
 }
 
 function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }: CharChipEditorProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const glyphFontStack = useGlyphFontStack();
-  const { provenance, proposalConfidence } = useInventoryDraft("characters");
+  const isCasedBase = useIsCasedBase();
+  const { provenance, proposalConfidence, proposalRelease } = useInventoryDraft("characters");
   const [inputVal, setInputVal] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -277,8 +291,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
     // lowercase counterpart — and a lowercase with no uppercase (IPA) — is left
     // exactly as chosen (caseCounterpart returns null, so no fold). Only the
     // uppercase→lowercase direction ever folds; lowercase is never touched.
+    // The fold itself sits behind the casing-facet gate (useIsCasedBase): on
+    // a caseless base nothing folds — entries stay exactly as chosen.
     const folded = harvested.map((c) => {
-      const cc = caseCounterpart(c, bcp47);
+      const cc = isCasedBase ? caseCounterpart(c, bcp47) : null;
       return cc?.direction === "toLower" ? cc.counterpart : c;
     });
     onChange(nfcDedup(chars, folded));
@@ -307,17 +323,41 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
   // hide an uppercase only when its lowercase is actually present; a lowercase or
   // caseless (or uppercase-only) letter is shown as entered.
   // Single source of truth with the marks step (spec 049, FR-006).
-  const displayLetters = collate(lowercaseBaseView(letters, bcp47));
+  // Facet-gated (useIsCasedBase): a caseless base shows the letters exactly as
+  // entered — no collapse, and no "Show uppercase" toggle below.
+  const displayLetters = collate(isCasedBase ? lowercaseBaseView(letters, bcp47) : letters);
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
-  const hasCasedLetter = letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
+  // Clutter filter (issue 543): offered only for long inventories (see
+  // INVENTORY_FILTER_THRESHOLD). Filtering is VIEW-ONLY — it narrows which
+  // chips render, never `chars`, so the underlying inventory, provenance,
+  // and the Done payload are untouched, and clearing the query restores the
+  // full grid exactly. Matching reuses CharacterMapPane's predicate
+  // (characterSearch.ts: glyph, code point, base letter), so the two search
+  // boxes in this step behave the same way.
+  const filterOffered = unitCount > INVENTORY_FILTER_THRESHOLD;
+  const filterActive = filterOffered && filterQuery.trim() !== "";
+  const visibleLetters = filterActive
+    ? displayLetters.filter((c) => matchesQuery({ char: c }, filterQuery))
+    : displayLetters;
+  const visibleMarks = filterActive
+    ? bareMarks.filter((c) => matchesQuery({ char: c }, filterQuery))
+    : bareMarks;
+  const visibleCount = visibleLetters.length + visibleMarks.length;
+  // If removals shrink the inventory back under the threshold, the filter
+  // control unmounts — clear the query with it, so regrowing the alphabet
+  // later never re-applies a filter the author can no longer see.
+  useEffect(() => {
+    if (!filterOffered && filterQuery !== "") setFilterQuery("");
+  }, [filterOffered, filterQuery]);
+  const hasCasedLetter = isCasedBase && letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
   // Distinct proposal attributions currently represented in the draft — the
   // legend names them rather than leaving the dashed outline to speak for itself.
   const proposedAttributions = [
     ...new Set(
       Object.values(provenance)
         .filter((o) => o !== "author")
-        .map((o) => attributionText(o, proposalConfidence[o], t)),
+        .map((o) => attributionText(o, proposalConfidence[o], i18n, proposalRelease[o])),
     ),
   ];
 
@@ -402,10 +442,78 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
             <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
           </label>
         )}
+        {/* Clutter filter (issue 543) — long inventories only. Enter inside
+            the filter is swallowed (preventDefault + stopPropagation): this
+            editor can sit inside an Enter-to-advance container
+            (enterToAdvance.ts / SurveyRunner), and pressing Enter while
+            filtering must neither advance the step nor add a character. */}
+        {filterOffered && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "0 0 8px 0" }}>
+            <input
+              type="text"
+              data-testid="alphabet-filter"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              placeholder={t({
+                id: "survey.phaseB.charChipEditor.filterPlaceholder",
+                message: "Filter by character, code point (U+…), or base letter",
+              })}
+              aria-label={t({
+                id: "survey.phaseB.charChipEditor.filterAriaLabel",
+                message: "Filter your alphabet",
+              })}
+              style={{
+                flex: 1,
+                background: BG_PAGE,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 6,
+                color: TEXT_MAIN,
+                fontSize: 14,
+                fontFamily: FONT,
+                padding: "6px 10px",
+                boxSizing: "border-box",
+              }}
+            />
+            {filterQuery !== "" && (
+              <button
+                type="button"
+                data-testid="alphabet-filter-clear"
+                onClick={() => setFilterQuery("")}
+                style={{ ...secondaryButton, whiteSpace: "nowrap", padding: "4px 12px", fontSize: 12 }}
+              >
+                <Trans id="survey.phaseB.charChipEditor.filterClear">Show all</Trans>
+              </button>
+            )}
+          </div>
+        )}
+        {filterActive && (
+          <p
+            role="status"
+            data-testid="alphabet-filter-status"
+            style={{ margin: "0 0 8px 0", fontSize: 12, color: TEXT_DIM }}
+          >
+            {t({
+              id: "survey.phaseB.charChipEditor.filterStatus",
+              message: `Showing ${{ visible: visibleCount }} of ${{ total: unitCount }} characters — filtering changes only what you see, not your alphabet.`,
+            })}
+          </p>
+        )}
         {unitCount === 0 ? (
           <p style={mutedParaFlush}>
             <Trans id="survey.phaseB.charChipEditor.empty">
               No characters yet — type your whole alphabet above.
+            </Trans>
+          </p>
+        ) : filterActive && visibleCount === 0 ? (
+          <p style={mutedParaFlush} data-testid="alphabet-filter-no-match">
+            <Trans id="survey.phaseB.charChipEditor.filterNoMatch">
+              No characters match your filter.
             </Trans>
           </p>
         ) : (
@@ -417,7 +525,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
-            {displayLetters.flatMap((c) => {
+            {visibleLetters.flatMap((c) => {
               // Removable chip for the lowercase/caseless (or uppercase-only)
               // letter. The charChip/chipGlyph booleans are FIXED literals
               // reproducing the original inline hex (unchecked shell + accent
@@ -430,7 +538,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
               const origin = provenance[c];
               const isProposed = origin !== undefined && origin !== "author";
               const attribution = isProposed
-                ? attributionText(origin, proposalConfidence[origin], t)
+                ? attributionText(origin, proposalConfidence[origin], i18n, proposalRelease[origin])
                 : null;
               const cells = [
                 <button
@@ -443,7 +551,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
                     // Removing a letter removes BOTH cases (the inverse of the
                     // map, which adds both) — even the uppercase hidden by the
                     // case-collapse, so it never re-appears as an orphan chip.
-                    const pair = casePairOf(c, bcp47);
+                    // Facet-gated: on a caseless base the pair is just the
+                    // letter itself — the author's other-case entry is a
+                    // separate entry, not a pair member.
+                    const pair = isCasedBase ? casePairOf(c, bcp47) : [c];
                     if (onRemove !== undefined) {
                       onRemove(pair);
                     } else {
@@ -474,8 +585,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
                 </button>,
               ];
               // Derived uppercase (display-only) when the toggle is on — mirrors
-              // the breakdown Letters section; not a removable pick.
-              const upper = showUppercase ? upperCounterpartOf(c, bcp47) : null;
+              // the breakdown Letters section; not a removable pick. The
+              // toggle itself only renders behind the casing gate, so the
+              // derivation is gated here too.
+              const upper = showUppercase && isCasedBase ? upperCounterpartOf(c, bcp47) : null;
               if (upper !== null) {
                 const upperTitle = codepointLabel(upper).title;
                 cells.push(
@@ -492,7 +605,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
               }
               return cells;
             })}
-            {bareMarks.map((c) => {
+            {visibleMarks.map((c) => {
               const { title } = codepointLabel(c);
               return (
                 <button
@@ -540,6 +653,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
     useInventoryDraft("characters");
   const [showUppercase, setShowUppercase] = useState(false);
   const glyphFontStack = useGlyphFontStack();
+  const isCasedBase = useIsCasedBase();
 
   // Render once the alphabet has any content to break down. Spec 047 US3 shows
   // the Letters section (with its lowercase/uppercase toggle) even for a
@@ -600,11 +714,13 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   // letter; a present uppercase is hidden behind its lowercase (never the
   // reverse) and revealed only under the toggle.
   // Single source of truth with the marks step (spec 049, FR-006).
+  // Facet-gated (useIsCasedBase): a caseless base shows every base as
+  // entered and gets no toggle — there is no case behaviour to reveal.
   // NOT migrated to collateInventory: `bases` is its own pre-partitioned
   // store category (marks live separately in `marks` below, rendered in
   // their own section) — there is no letters/bare-mark mix here to
   // partition, so a bare `collate()` is already the right call.
-  const displayBases = collate(lowercaseBaseView(bases, bcp47));
+  const displayBases = collate(isCasedBase ? lowercaseBaseView(bases, bcp47) : bases);
 
   const uppercaseToggle = (
     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer" }}>
@@ -627,12 +743,12 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           `Letters (${displayBases.length})`,
           "Letters that stand on their own.",
           displayBases.flatMap((b) => {
-            const u = showUppercase ? upperCounterpartOf(b, bcp47) : null;
+            const u = showUppercase && isCasedBase ? upperCounterpartOf(b, bcp47) : null;
             const cells = [chip(b, b, justAddedBases.has(b))];
             if (u !== null) cells.push(chip(u, u, false));
             return cells;
           }),
-          uppercaseToggle,
+          isCasedBase ? uppercaseToggle : undefined,
         )}
       {/* NOT migrated to collateInventory: `marks` is rendered in its OWN
           section, entirely separate from Letters — the exact "different
@@ -742,6 +858,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
   const removeLoanword = draft.ops.removeLoanword;
   const remove = draft.ops.remove;
   const glyphFontStack = useGlyphFontStack();
+  const isCasedBase = useIsCasedBase();
 
   const loanwords = useMemo(() => {
     if (inventory === null) return [];
@@ -762,9 +879,12 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
    * Add or remove one loanword letter together with its case pair. Adding
    * goes to the loanword list; removing takes the letter out of whichever
    * list holds it, so the chip always reflects what the keyboard will type.
+   * Facet-gated (useIsCasedBase): on a caseless base the "pair" is the
+   * letter alone — a loanword letter is never auto-paired to an uppercase
+   * the author didn't choose.
    */
   const setLetter = (ch: string, on: boolean): void => {
-    for (const c of casePairOf(ch, bcp47)) {
+    for (const c of isCasedBase ? casePairOf(ch, bcp47) : [ch]) {
       const nfc = c.normalize("NFC");
       const state = getCharacterInventoryValue();
       if (on) addLoanword(nfc);
@@ -813,7 +933,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {loanwords.map((ch) => {
-          const pair = casePairOf(ch, bcp47);
+          const pair = isCasedBase ? casePairOf(ch, bcp47) : [ch];
           const selected = isAdded(ch);
           const letters = pair.join(" ");
           const { title } = codepointLabel(ch);
@@ -865,8 +985,6 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const draft = useInventoryDraft("characters");
   const chars = draft.chars;
   const setAll = draft.ops.setAll;
-  const selectedFont = draft.selectedFont;
-  const setSelectedFont = draft.ops.setSelectedFont;
   const provenance = draft.provenance;
   const exemplarDigraphs = draft.exemplarDigraphs;
   const loanwordChars = draft.loanwordChars;
@@ -919,6 +1037,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   // that surfaces flags (T080).
   const nextGate = useFlaggedNextGate(flaggedWorkItems, [CHARACTERS_BUILD_LIST_SCREEN_ID], CHARACTERS_BUILD_LIST_SCREEN_ID);
   const doneDisabled = chars.length === 0 || nextGate.blocked;
+  const isCasedBase = useIsCasedBase();
 
   // Chip removal goes through the store's per-character remove(), not setAll,
   // so removing a PROPOSED character is recorded as a rejection and never
@@ -951,10 +1070,14 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
     // inventory with each cased letter's locale-correct counterpart via
     // the engine's caseCounterpart, deduped. A null counterpart
     // (caseless script, or a multi-character expansion like ß→SS)
-    // contributes nothing (FR-010).
-    const derivedUppercases = chars
-      .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
-      .filter((u): u is string => u != null);
+    // contributes nothing (FR-010). The augmentation sits behind the
+    // casing-facet gate (useIsCasedBase): on a caseless base nothing is
+    // derived — the recorded inventory is exactly what the author chose.
+    const derivedUppercases = isCasedBase
+      ? chars
+          .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
+          .filter((u): u is string => u != null)
+      : [];
     onComplete({
       phase: "B",
       answers: [],
@@ -1016,32 +1139,9 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         )}
       </h2>
 
-      {/* Font selection — custom SelectMenu (webview-safe dropdown): native
-          <select> popups don't open in the VS Code Simple Browser, so this is
-          a DOM-rendered menu. Applies to every character glyph on this step,
-          incl. the character map — see the character-inventory value's selectedFont. */}
-      <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
-        {/* Not a <label>: the control is named via ariaLabelledby on the
-            SelectMenu below, and an un-associated label element (no htmlFor,
-            no nesting) adds no semantics or click-focus behavior. */}
-        <span id="phase-b-font-select-label"
-              style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
-          <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
-        </span>
-        <SelectMenu
-          id="phase-b-font-select-control"
-          value={selectedFont}
-          options={FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-          ariaLabelledby="phase-b-font-select-label"
-          renderOptionLabel={(opt) => (
-            <span style={{ fontFamily: phaseBFontStack(opt.value) }}>{opt.label}</span>
-          )}
-          onChange={(v) => {
-            const opt = FONT_OPTIONS.find((o) => o.value === v);
-            if (opt) setSelectedFont(opt.value);
-          }}
-        />
-      </div>
+      {/* Font selection lives in the NavBar now (#1895): the FontSwitcher
+          control edits the same character-inventory selectedFont from every
+          step, so this step no longer carries its own picker. */}
 
       {/* Instructions */}
       <div
@@ -1068,10 +1168,10 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
 
       {/* Section 2: Type-in characters */}
       <section
-        aria-label={t({ id: "survey.phaseB.buildList.typeSectionAriaLabel", message: "Type your alphabet" })}
+        aria-label={t({ id: "survey.phaseB.buildList.typeSectionAriaLabel", message: "List your letters" })}
       >
         <h3 style={sectionHeading}>
-          <Trans id="survey.phaseB.buildList.typeAlphabetHeading">Type your alphabet</Trans>
+          <Trans id="survey.phaseB.buildList.typeAlphabetHeading">List your letters</Trans>
         </h3>
         <p style={{ ...mutedParaFlush, margin: "0 0 12px 0" }}>
           <Trans id="survey.phaseB.buildList.typeAlphabetHelp">
@@ -1099,6 +1199,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           route back to it, and choosing it must not remove the manual routes. */}
       <ExemplarApplyAffordance context={context} />
       <TextSampleAffordance />
+      <RefreshExemplarsAffordance bcp47={context.bcp47_tag} />
 
       {/* Section 3: visible three-store decomposition (spec 071 US5) + the
           spec-047 category sections — renders once the alphabet implies marks,
@@ -1141,7 +1242,7 @@ function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
   const [expanded, setExpanded] = useState(false);
 
   const alreadyApplied = Object.values(provenance).some(
-    (p) => p === "cldr" || p === "sldr",
+    (p) => p === "cldr" || p === "sldr" || p === "cldr-live",
   );
   if (inventory === null || alreadyApplied) return null;
 
@@ -1181,214 +1282,71 @@ function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
               </Trans>
             </button>
           </div>
+          <SldrUnionAction
+            bcp47={context.bcp47_tag}
+            currentInventory={inventory}
+            seedFromProposal={seedFromProposal}
+          />
         </div>
       )}
     </section>
   );
 }
 
-// ---------------------------------------------------------------------------
-// TextSampleAffordance — the third fill affordance's surface (spec 050)
-//
-// Paste a paragraph or upload a .txt file; either converges on the same
-// harvestFromText() extraction, and each resulting character is proposed via
-// addProposed(char, "text") (FR-004/FR-005/FR-006). No second extraction path,
-// no store/engine change (research R1-R6) — this is a UI + adapter only.
-//
-// Unlike ExemplarApplyAffordance, this affordance never hides itself once
-// used: a second paste/upload is a legitimate re-run, not a one-shot offer
-// (research R6).
-// ---------------------------------------------------------------------------
+/**
+ * The CLDR/SLDR union action (#1369).
+ *
+ * When the current exemplar offer is CLDR and the index also has an SLDR
+ * side with characters CLDR doesn't cover, offers "Also add N characters
+ * from SLDR". The SLDR characters union into the proposal via the same
+ * seedFromProposal path (per-character source attribution is preserved),
+ * and they arrive unticked — the author reviews them like any other
+ * proposed character. Renders nothing when there's no SLDR side, when the
+ * current offer is already SLDR, or while loading.
+ */
+function SldrUnionAction({
+  bcp47,
+  currentInventory,
+  seedFromProposal,
+}: {
+  bcp47: string | undefined;
+  currentInventory: SourcedInventory;
+  seedFromProposal: (inventory: SourcedInventory, tag: string) => void;
+}) {
+  const { sldr, loading } = useSourcedExemplarsBoth(bcp47);
+  const [added, setAdded] = useState(false);
 
-// harvestFromText's `base` parameter is unused by its implementation today
-// (see CharacterDiscoveryServiceImpl.ts's TODO(#141-followup) — an ASCII
-// proxy stands in for the real base-keyboard output-set lookup). PhaseB has
-// no StartKeyboard in scope at this step, so a minimal fixture stands in,
-// mirroring the "exact values do not matter" fixture already used by the
-// engine's own harvestFromText tests.
-const TEXT_SAMPLE_BASE: StartKeyboard = {
-  id: "basic_kbdus",
-  path: "release/b/basic_kbdus",
-  // ISO-15924 script code, not user-facing text; falls outside the rule's
-  // ALL-CAPS/lowercase ignore patterns because it's Title-case.
-  // eslint-disable-next-line lingui/no-unlocalized-strings
-  script: "Latn",
-  targets: ["windows"],
-  displayName: "US English",
-  version: "1.0",
-};
+  if (loading || added || bcp47 === undefined) return null;
+  // Only when the current offer is the CLDR side and SLDR exists too.
+  if (currentInventory.source !== "cldr" || sldr === null) return null;
 
-function TextSampleAffordance() {
-  const { t } = useLingui();
-  const addProposed = useInventoryDraft("characters").ops.addProposed;
-  const [rawInput, setRawInput] = useState("");
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [emptyMessage, setEmptyMessage] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Shared by both paste (submit) and upload (file selection) — the one
-  // extraction call FR-004 requires. Deferred to submit/selection time, never
-  // on keystroke, so a large paste cannot block first paint (Performance
-  // Goals).
-  async function extractAndPropose(sample: string): Promise<void> {
-    setUploadError(null);
-    if (sample.trim() === "") {
-      setEmptyMessage(true);
-      return;
-    }
-    setEmptyMessage(false);
-    setIsExtracting(true);
-    try {
-      const service = await getCharacterDiscoveryService();
-      const harvested = await service.harvestFromText(sample, TEXT_SAMPLE_BASE);
-      for (const { char } of harvested) {
-        addProposed(char, "text");
-      }
-    } catch {
-      // getCharacterDiscoveryService() does a real dynamic import() in
-      // production — a chunk-load/network failure must surface to the user,
-      // not vanish as an unhandled rejection behind handleSubmit's `void`.
-      setUploadError(
-        t({
-          id: "survey.phaseB.buildList.textSampleExtractError",
-          message: "Something went wrong reading that text — try again.",
-        }),
-      );
-    } finally {
-      setIsExtracting(false);
-    }
-  }
-
-  function handleSubmit(): void {
-    void extractAndPropose(rawInput);
-  }
-
-  async function handleFileChange(e: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = e.target.files?.[0];
-    // Reset the input so the SAME file can be re-selected later (a browser
-    // does not fire onChange for an unchanged file list otherwise).
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (file === undefined) return;
-    setUploadError(null);
-    let decoded: string;
-    try {
-      decoded = await file.text();
-    } catch {
-      // A genuine FileReader failure (test-setup.ts's Blob.text() polyfill's
-      // reader.onerror path, or a native rejection) — surface it rather than
-      // let handleFileChange's `void` caller swallow an unhandled rejection.
-      setEmptyMessage(false);
-      setUploadError(
-        t({
-          id: "survey.phaseB.buildList.textSampleUploadError",
-          message: "This file could not be read as plain text — try pasting the text instead.",
-        }),
-      );
-      return;
-    }
-    // File.text() does not throw on invalid UTF-8 — it substitutes U+FFFD
-    // REPLACEMENT CHARACTER instead. Detecting that heuristic (research R4)
-    // is the only signal available for "this file did not decode as text".
-    if (decoded.includes("�")) {
-      setEmptyMessage(false);
-      setUploadError(
-        t({
-          id: "survey.phaseB.buildList.textSampleUploadError",
-          message: "This file could not be read as plain text — try pasting the text instead.",
-        }),
-      );
-      return;
-    }
-    await extractAndPropose(decoded);
-  }
+  const cldrChars = new Set(currentInventory.characters.map((c) => c.char));
+  const sldrExtra = sldr.characters.filter((c) => !cldrChars.has(c.char));
+  if (sldrExtra.length === 0) return null;
 
   return (
-    <section
-      data-testid="text-sample-placeholder"
-      aria-label={t({
-        id: "survey.phaseB.buildList.textSampleAriaLabel",
-        message: "Paste or upload a text sample",
-      })}
-    >
-      <h3 style={sectionHeading}>
-        <Trans id="survey.phaseB.buildList.textSampleHeading">Paste or upload a text sample</Trans>
-      </h3>
-      <p style={mutedParaFlush}>
-        <Trans id="survey.phaseB.buildList.textSampleHelp">
-          Paste a paragraph of your language, or upload a plain-text (.txt)
-          file — every distinct character in it will be proposed, alongside
-          anything already in your alphabet.
+    <div style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        data-testid="sldr-union-action"
+        onClick={() => {
+          seedFromProposal(sldr, bcp47);
+          setAdded(true);
+        }}
+        className="ks-focus-ring ks-hit-target"
+        style={{ ...secondaryButton, fontSize: 13 }}
+      >
+        <Trans id="survey.phaseB.buildList.sldrUnionButton">
+          Also add {{ n: sldrExtra.length }} characters from SLDR
+        </Trans>
+      </button>
+      <p style={{ margin: "4px 0 0", fontSize: 12, color: TEXT_DIM }}>
+        <Trans id="survey.phaseB.buildList.sldrUnionHint">
+          SLDR sometimes has characters CLDR omits. These arrive as a separate
+          proposal — review them before keeping.
         </Trans>
       </p>
-      <textarea
-        data-testid="text-sample-textarea"
-        value={rawInput}
-        onChange={(e) => setRawInput(e.target.value)}
-        rows={5}
-        placeholder={t({
-          id: "survey.phaseB.buildList.textSampleTextareaPlaceholder",
-          message: "Paste a paragraph of your language here…",
-        })}
-        aria-label={t({
-          id: "survey.phaseB.buildList.textSampleTextareaAriaLabel",
-          message: "Text sample",
-        })}
-        style={{
-          width: "100%",
-          background: BG_PAGE,
-          border: `1px solid ${BORDER}`,
-          borderRadius: 6,
-          color: TEXT_MAIN,
-          fontSize: 15,
-          fontFamily: FONT,
-          padding: "8px 12px",
-          boxSizing: "border-box",
-          resize: "vertical",
-        }}
-      />
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          data-testid="text-sample-submit"
-          disabled={isExtracting}
-          onClick={handleSubmit}
-          style={primaryButton(isExtracting)}
-        >
-          <Trans id="survey.phaseB.buildList.textSampleSubmitButton">Add these characters</Trans>
-        </button>
-        <label style={{ fontSize: 13, color: TEXT_DIM, display: "flex", alignItems: "center", gap: 6 }}>
-          <Trans id="survey.phaseB.buildList.textSampleUploadLabel">or upload a .txt file</Trans>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,text/plain"
-            data-testid="text-sample-file-input"
-            aria-label={t({
-              id: "survey.phaseB.buildList.textSampleUploadAriaLabel",
-              message: "Upload a text sample file",
-            })}
-            onChange={(e) => void handleFileChange(e)}
-          />
-        </label>
-      </div>
-      {emptyMessage && (
-        <p data-testid="text-sample-empty-message" style={{ ...mutedParaFlush, marginTop: 8 }}>
-          <Trans id="survey.phaseB.buildList.textSampleEmptyMessage">
-            Nothing to add — paste or upload some text first.
-          </Trans>
-        </p>
-      )}
-      {uploadError !== null && (
-        <p
-          data-testid="text-sample-upload-error"
-          role="alert"
-          style={{ fontSize: 12, color: ERROR_RED, marginTop: 8 }}
-        >
-          {uploadError}
-        </p>
-      )}
-    </section>
+    </div>
   );
 }
 
@@ -1694,7 +1652,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
 // breakdown and character-map pages.
 // ---------------------------------------------------------------------------
 
-function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
+function ExemplarOfferDetail({ inventory }: { inventory: ExemplarInventory }) {
   const glyphFontStack = useGlyphFontStack();
   const main = charactersInTier(inventory, "main");
   // ICU collation, matching the "Your alphabet" list and the breakdown
@@ -1716,6 +1674,8 @@ function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
         <ExemplarAttribution
           source={inventory.source}
           confidence={inventory.confidence}
+          live={inventory.live}
+          release={inventory.release}
         />{" "}
         <Trans id="survey.phaseB.intro.exemplars.count">
           {{ n: main.length }} characters
@@ -1767,14 +1727,23 @@ const UNCONFIRMED_CONFIDENCES = new Set([
 // The attribution wordings as extractable descriptors.
 //
 // These MUST be `msg` macro descriptors rather than inline `t({ id, message })`
-// objects: `attributionText` below receives `t` as a PARAMETER, and the babel
-// macro only rewrites `t(...)` where it can see the `useLingui()` binding in
-// the same scope. An inline object there still renders correctly at runtime
-// (it reaches `i18n._` and falls back to `message`), but the extractor never
-// sees the id, so the string cannot be translated. Three of these were rescued
+// objects: `attributionText` below receives the i18n instance as a PARAMETER,
+// and the babel macro only rewrites `t(...)` where it can see the
+// `useLingui()` binding in the same scope. An inline object there still
+// renders correctly at runtime (it reaches `i18n._` and falls back to
+// `message`), but the extractor never sees the id, so the string cannot be
+// translated. Three of these were rescued
 // by accident — `ExemplarAttribution` below repeats them as <Trans> under the
 // same ids — but `fromText` has no component twin and was invisible to Crowdin.
 const MSG_FROM_CLDR = msg({ id: "survey.phaseB.exemplars.fromCldr", message: "from CLDR" });
+const MSG_FROM_CLDR_PINNED = msg({
+  id: "survey.phaseB.exemplars.fromCldrPinned",
+  message: "from CLDR {version}",
+});
+const MSG_FROM_CLDR_LIVE = msg({
+  id: "survey.phaseB.exemplars.fromCldrLive",
+  message: "from CLDR {version} (live refresh)",
+});
 const MSG_FROM_TEXT = msg({
   id: "survey.phaseB.exemplars.fromText",
   message: "from your text sample",
@@ -1793,27 +1762,63 @@ const MSG_FROM_SLDR = msg({ id: "survey.phaseB.exemplars.fromSldr", message: "fr
 function attributionText(
   source: string,
   confidence: string | undefined,
-  t: ReturnType<typeof useLingui>["t"],
+  i18n: ReturnType<typeof useLingui>["i18n"],
+  release?: string,
 ): string {
+  // Live-refreshed CLDR (#1367): the wording MUST name the fetched release
+  // and say it was a live refresh — rendering it as plain "from CLDR" would
+  // collapse exactly the pinned/unpinned distinction the feature exists to
+  // keep visible. The release rides in the draft's proposalRelease, keyed
+  // by this provenance, so it survives reload.
+  //
+  // Parameterized strings go through i18n._(id, values): the macro t()
+  // accepts a descriptor but no values, while the I18n instance's id
+  // overload does. The msg() descriptors above keep the ids extractable.
+  if (source === "cldr-live") {
+    return release !== undefined
+      ? i18n._(MSG_FROM_CLDR_LIVE.id, { version: release })
+      : i18n._(MSG_FROM_CLDR);
+  }
   if (source === "cldr") {
-    return t(MSG_FROM_CLDR);
+    return release !== undefined
+      ? i18n._(MSG_FROM_CLDR_PINNED.id, { version: release })
+      : i18n._(MSG_FROM_CLDR);
   }
   if (source === "text") {
-    return t(MSG_FROM_TEXT);
+    return i18n._(MSG_FROM_TEXT);
   }
   if (confidence !== undefined && UNCONFIRMED_CONFIDENCES.has(confidence)) {
-    return t(MSG_FROM_SLDR_UNCONFIRMED);
+    return i18n._(MSG_FROM_SLDR_UNCONFIRMED);
   }
-  return t(MSG_FROM_SLDR);
+  return i18n._(MSG_FROM_SLDR);
 }
 
 function ExemplarAttribution({
   source,
   confidence,
+  live,
+  release,
 }: {
   source: ExemplarSource;
   confidence: string;
+  /** True for a live-refreshed inventory (#1367) — wording names the release. */
+  live?: boolean | undefined;
+  release?: string | undefined;
 }) {
+  if (source === "cldr" && live === true && release !== undefined) {
+    return (
+      <Trans id="survey.phaseB.exemplars.fromCldrLive">
+        from CLDR {{ version: release }} (live refresh)
+      </Trans>
+    );
+  }
+  if (source === "cldr" && release !== undefined) {
+    return (
+      <Trans id="survey.phaseB.exemplars.fromCldrPinned">
+        from CLDR {{ version: release }}
+      </Trans>
+    );
+  }
   if (source === "cldr") {
     return <Trans id="survey.phaseB.exemplars.fromCldr">from CLDR</Trans>;
   }

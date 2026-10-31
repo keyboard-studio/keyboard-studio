@@ -336,8 +336,9 @@ describe("emit — quoted store values", () => {
   // when a rule consumes the (now-empty) store via any() — that combination
   // compiles with a warning-level "zero characters" diagnostic and produces
   // NO .kmx artifact at all. The pattern-apply "drop" edit class (see
-  // applyStoreSlotRemovals) refuses to empty a store that is any()-referenced,
-  // but allows it for unreferenced stores, matching this evidence. This test
+  // applyStoreSlotRemovals) removes a store emptied by a carve together with
+  // the rules that reference it, so a real carve never hands emit() an empty
+  // any()-consumed store. This test
   // pins emit()'s own behavior for any caller that hands it an empty store.
   it("emits a bare `store(name) ` line (trailing space, no value) for an emptied store", () => {
     const out = emit(makeUserStoreIR("emptied", []));
@@ -1149,9 +1150,19 @@ group(main) using keys
     expect(storeLine(emit(ir), "&MESSAGE")).not.toContain("..");
   });
 
-  it("system store keeps SMP characters as tokens, not inside a string", () => {
-    const { ir } = parse(kmn("store(&NAME) U+11680"), "smp");
-    expect(storeLine(emit(ir), "&NAME")).not.toMatch(/'[^']*\u{11680}[^']*'/u);
+  it("system store bundles SMP characters inside the string literal (#1811)", () => {
+    // Old per-character form: each SMP char its own quoted literal.
+    const { ir } = parse(kmn("store(&NAME) '𐮀' '𐮁' 'x'"), "smp");
+    expect(storeLine(emit(ir), "&NAME")).toBe("store(&NAME) '𐮀𐮁x'");
+  });
+
+  it("system store: the bundled SMP form parses to the same items as the per-character form", () => {
+    expect(nameChars("store(&NAME) '𐮀𐮁x'")).toBe(nameChars("store(&NAME) '𐮀' '𐮁' 'x'"));
+  });
+
+  it("processing store keeps SMP characters as per-character literals", () => {
+    const { ir } = parse(kmn("store(w) '𐮀𐮁'"), "proc-smp");
+    expect(storeLine(emit(ir), "w")).toBe("store(w) '𐮀' '𐮁'");
   });
 
   it("&CasedKeys keeps its token form", () => {

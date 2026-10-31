@@ -1,8 +1,8 @@
 // Per-question module: q_ip1_keep_strategies (spec 038 US2, inheritance-posture).
 //
-// A §3c CONFIRMATION rendered through the InheritancePostureStep (one keep/
-// propose/discard answer governs every input-strategy proposal site — the
-// en-masse lever, FR-005), NOT through the linear Phase B walk. Like the q_sa*
+// A §3c CONFIRMATION (one keep/propose/discard answer governs every
+// input-strategy proposal site — the en-masse lever, FR-005), NOT through
+// the linear Phase B walk. Like the q_sa*
 // script-alignment modules, this is a RESERVE module: it exists on disk so
 // adaptation-catalog-lint / facet-lint (which key off the raw `id` literal)
 // resolve content/adaptation-questions/q_ip1_keep_strategies.yaml (renders: true)
@@ -12,7 +12,8 @@
 // character walk, violating the non-interruption bar (SC-002 / SC-003). It fires
 // only when the base has a recognized strategy fingerprint.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeRequiredOptionValidator } from "../validators.ts";
 
 export const definition = {
   id: "q_ip1_keep_strategies",
@@ -32,18 +33,8 @@ export const definition = {
   next: null,
 } satisfies import("../../types.ts").FlowQuestion;
 
-const VALID_VALUES = new Set(["keep", "propose", "discard"]);
 
-export function validate(value: string | string[] | undefined): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (!v) {
-    return { ok: false, code: "required", message: "Please choose a strategy posture." };
-  }
-  if (!VALID_VALUES.has(v)) {
-    return { ok: false, code: "invalid_option", message: `"${v}" is not a valid choice.` };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredOptionValidator(definition.options.map((o) => o.value), "Please choose a strategy posture.", (v) => `"${v}" is not a valid choice.`);
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

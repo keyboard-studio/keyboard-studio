@@ -15,10 +15,18 @@
 // (survey/carve/CarveDecisionRenderer) is the same gallery hosted by
 // the decision host: it reports the value through onChange on
 // completion instead of recording directly.
+//
+// Spec 106 FR-042: while the removals are exactly the gallery's suggested
+// default, Continue approves it and the decision is `default`-provenance;
+// once the author has changed anything it is `asked`.
 
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { currentCarvedLayoutValue } from "../../survey/carve/carveValue.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import {
+  currentCarvedLayoutValue,
+  isUntouchedSuggestion,
+} from "../../survey/carve/carveValue.ts";
 import { CarveGalleryV2 } from "../carve/CarveGalleryV2.tsx";
 
 /**
@@ -29,10 +37,12 @@ export function CarveAdapter({ onComplete, onBack }: EditorStepProps) {
   return (
     <CarveGalleryV2
       onComplete={() => {
+        const value = currentCarvedLayoutValue();
+        const suggestion = useWorkingCopyStore.getState().carveSuggestion;
         useDecisionStore.getState().record({
           id: "carved-layout",
-          value: currentCarvedLayoutValue(),
-          provenance: "asked",
+          value,
+          provenance: isUntouchedSuggestion(value, suggestion) ? "default" : "asked",
         });
         onComplete(undefined);
       }}

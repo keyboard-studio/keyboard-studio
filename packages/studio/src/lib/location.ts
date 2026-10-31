@@ -84,17 +84,22 @@ const SEGMENT = /^[a-z0-9_]+$/;
  * `StudioShell`'s dev-gated `VALID_ROUTES`: whether `flowmap` is reachable in
  * this build is a routing decision, not a grammar one, and keeping the two
  * separate means a parse failure always means "malformed", never "gated off".
+ *
+ * Keyed by `RouteId` so the compiler rejects a union member left out here —
+ * a missing token silently sends its hash to the landing route.
  */
-const ROUTES: ReadonlySet<RouteId> = new Set<RouteId>([
-  "welcome",
-  "survey",
-  "preview",
-  "output",
-  "flowmap",
-  "trail",
-  "criteria",
-  "profile",
-]);
+const ROUTE_TOKENS: Record<RouteId, true> = {
+  welcome: true,
+  survey: true,
+  preview: true,
+  output: true,
+  flowmap: true,
+  trail: true,
+  criteria: true,
+  privacy: true,
+  profile: true,
+};
+const ROUTES: ReadonlySet<RouteId> = new Set(Object.keys(ROUTE_TOKENS) as RouteId[]);
 
 /**
  * Parse a raw hash, with or without the leading `#`.

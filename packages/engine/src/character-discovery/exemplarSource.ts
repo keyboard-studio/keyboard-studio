@@ -20,6 +20,8 @@ import {
 import {
   loadExemplarIndex,
   lookup,
+  lookupOverrideRelease,
+  pinnedIndexVersion,
   type IndexLocaleEntry,
   type IndexTierSets,
 } from "./exemplarIndex.js";
@@ -31,6 +33,7 @@ import {
   type ExemplarTier,
   type SourcedCharacter,
   type SourcedInventory,
+  type ExemplarInventory,
 } from "./exemplarTypes.js";
 
 export { exemplarLocaleCandidates } from "./cldr.js";
@@ -40,6 +43,7 @@ export type {
   ExemplarTier,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
 } from "./exemplarTypes.js";
 
 const KEY_FOR_TIER: Record<ExemplarTier, keyof IndexTierSets> = {
@@ -199,7 +203,7 @@ export async function loadExemplarSource(): Promise<void> {
  * Synchronous and offline. Returns `null` if the index chunk has not loaded
  * yet — await `loadExemplarSource()` first.
  */
-export function sourceExemplars(bcp47: string): SourcedInventory | null {
+export function sourceExemplars(bcp47: string): ExemplarInventory | null {
   if (typeof bcp47 !== "string") return null;
 
   for (const candidate of exemplarLocaleCandidates(bcp47)) {
@@ -224,7 +228,75 @@ export function sourceExemplars(bcp47: string): SourcedInventory | null {
       confidence,
       characters,
       digraphs,
+      ...cldrStamp(candidate, chosen.source),
     };
+  }
+
+  return null;
+}
+
+/**
+ * The provenance stamp for one resolved inventory (#1367): a CLDR inventory
+ * names its release — the override's fetched release when a live refresh
+ * served this candidate (marked `live`), otherwise the pinned index's CLDR
+ * release. SLDR inventories carry no CLDR stamp.
+ */
+function cldrStamp(
+  candidate: string,
+  source: ExemplarSource,
+): { release?: string; live?: boolean } {
+  if (source !== "cldr") return {};
+  const overrideRelease = lookupOverrideRelease(candidate);
+  if (overrideRelease !== undefined) return { release: overrideRelease, live: true };
+  const pinned = pinnedIndexVersion();
+  return pinned !== null ? { release: pinned.cldr } : {};
+}
+
+/**
+ * Both sides of an index entry, for the CLDR/SLDR union action (#1369).
+ *
+ * Returns the CLDR and SLDR inventories separately (either may be null when
+ * that side doesn't cover the tag or its gate fires). The caller decides how
+ * to present the union — the per-character `source` attribution on each
+ * `SourcedCharacter` lets the UI show which characters came from where.
+ *
+ * Returns null when neither side covers the tag (same as `sourceExemplars`).
+ */
+export function sourceExemplarsBoth(bcp47: string): {
+  resolvedTag: string;
+  cldr: SourcedInventory | null;
+  sldr: SourcedInventory | null;
+} | null {
+  if (typeof bcp47 !== "string") return null;
+
+  for (const candidate of exemplarLocaleCandidates(bcp47)) {
+    const entry = lookup(candidate);
+    if (entry === undefined) continue;
+
+    const build = (
+      tiers: IndexTierSets | undefined,
+      source: ExemplarSource,
+      gated: boolean,
+    ): SourcedInventory | null => {
+      if (tiers === undefined || gated) return null;
+      const confidence: ExemplarConfidence =
+        source === "cldr" ? "approved" : toExemplarConfidence(tiers.d);
+      const { characters, digraphs } = extractTiers(tiers, source, confidence);
+      if (characters.length === 0) return null;
+      return {
+        resolvedTag: candidate,
+        source,
+        confidence,
+        characters,
+        digraphs,
+        ...cldrStamp(candidate, source),
+      };
+    };
+
+    const cldr = build(entry.c, "cldr", isGatedTag(bcp47, "cldr"));
+    const sldr = build(entry.s, "sldr", isGatedTag(bcp47, "sldr"));
+    if (cldr === null && sldr === null) return null;
+    return { resolvedTag: candidate, cldr, sldr };
   }
 
   return null;

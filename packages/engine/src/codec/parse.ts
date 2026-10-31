@@ -26,6 +26,8 @@ import type {
   StoreItem,
 } from "@keyboard-studio/contracts";
 
+import { isNamedDeadkeyName } from "@keyboard-studio/contracts";
+
 import { tokenize } from "./tokenize.js";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
@@ -84,8 +86,13 @@ function unquote(s: string): string {
  *   - quoted strings (single or double) together
  *   - bracket groups [...] together
  *   - parenthesised groups (...) together (e.g. index(store, N), dk(XXXX))
+ * When `splitSeparatorPlus` is set (rule-context lists only), a top-level
+ * `+` (the context/keystroke separator) also tokenises on its own, spaced
+ * or not — except the `+` inside a `U+XXXX` literal (#2247). Store and
+ * output lists pass false: `+` has no separator meaning there, so their
+ * tokenisation is unchanged.
  */
-function splitTokens(text: string): string[] {
+function splitTokens(text: string, splitSeparatorPlus = false): string[] {
   const result: string[] = [];
   let i = 0;
   while (i < text.length) {
@@ -115,6 +122,24 @@ function splitTokens(text: string): string[] {
     // tokens such as `dk(1)" "` (deadkey followed by a quoted literal, no
     // whitespace required by kmcmplib) tokenise as two tokens rather than
     // one malformed run.
+    // ALSO, for rule-context lists only (splitSeparatorPlus), stop at a
+    // top-level `+` — the context/keystroke separator. kmcmplib lexes `+`
+    // as its own token whether or not whitespace surrounds it, so an
+    // unspaced form such as `dk(3)+ any(mey1)` (#2247) must tokenise as
+    // `dk(3)`, `+`, `any(mey1)` — exactly the spaced form — instead of one
+    // glued raw token `dk(3)+` that hides the deadkey from every typed-IR
+    // consumer. This applies to the whole unspaced class (any `X+` / `+X`
+    // where X is a bare token: dk(...), any(...), deadkey(...), a bareword
+    // like `nul`, a paren group, …), on either side of the `+`. The one
+    // exception is a `U+XXXX` codepoint literal: its `+` follows `U`/`u` and
+    // precedes a hex digit and is never the separator (the same test the
+    // validator's contextOrdering check uses). A `+` at the very start of a
+    // bare token is emitted as a single-character token, so `+any(x)` and
+    // `+[K_A]` also split. Store/output lists do not pass the flag: `+` is
+    // not a separator there, and a corpus audit for #2247 found no typed
+    // token glued by `+` in those positions (the sole glued output token in
+    // 933 files is a raw word inside a misparsed comment tail, whose
+    // segmentation is literal text, not separator structure).
     let j = i;
     let depth = 0;
     while (j < text.length) {
@@ -124,6 +149,15 @@ function splitTokens(text: string): string[] {
       if (depth === 0) {
         if (c === " " || c === "\t") break;
         if (c === "'" || c === '"' || c === "[") break;
+        if (c === "+" && splitSeparatorPlus) {
+          if (j === i) { j++; break; } // the separator itself: one-char token
+          const prev = text[j - 1] ?? "";
+          const next = text[j + 1] ?? "";
+          const isCodepointPlus =
+            (prev === "U" || prev === "u") && /[0-9A-Fa-f]/.test(next);
+          if (!isCodepointPlus) break; // end this token before the separator
+          // else: internal to a U+XXXX literal — consume and continue.
+        }
       }
       j++;
     }
@@ -133,12 +167,19 @@ function splitTokens(text: string): string[] {
   return result.filter(t => t.length > 0);
 }
 
-/** Return true if tok matches dk(...) with a named (non-hex) identifier. */
-function isNamedDk(tok: string): boolean {
+/**
+ * Parse a dk(name) token with a named (non-hex) identifier → the name
+ * VERBATIM (the spelling of this occurrence is the element's stored form;
+ * identity folding happens only through contracts' deadkeyNameKey), or
+ * null. The named/hex boundary is contracts' isNamedDeadkeyName — one
+ * definition: all-hex tokens are numeric deadkeys and never reach here
+ * as names (#2238; the boundary does not move).
+ */
+function parseNamedDk(tok: string): string | null {
   const m = /^dk\s*\(\s*([^)]+)\s*\)$/i.exec(tok);
-  if (!m) return false;
+  if (!m) return null;
   const inner = (m[1] ?? "").trim();
-  return !/^[0-9A-Fa-f]+$/.test(inner);
+  return isNamedDeadkeyName(inner) ? inner : null;
 }
 
 /** Parse a dk(NNNN) token where NNNN is hex → deadkey id number, or null. */
@@ -225,6 +266,36 @@ function parseBaselayout(tok: string): string | null {
 
 /** Parse outs(storeName) → storeName, or null. */
 const parseOuts = makeStoreParser("outs");
+
+// Compiled once — parseIfGuard runs on every if(...) context token.
+/** Parse `if(store = 'value')` (equality form only) → {store, value}, or null. */
+const IF_GUARD_RE = new RegExp(
+  String.raw`^if\s*\(\s*(${KMN_IDENT})\s*=\s*('[^']*'|"[^"]*")\s*\)$`,
+  "i",
+);
+
+function parseIfGuard(tok: string): { store: string; value: string } | null {
+  const m = IF_GUARD_RE.exec(tok);
+  if (!m) return null;
+  return { store: m[1] ?? "", value: unquote(m[2] ?? "") };
+}
+
+/**
+ * True when every element parsed so far belongs to a rule's head cluster —
+ * the only position a guard may be typed in (spec 103): leading guards
+ * themselves, a `baselayout` head element, or a `platform(...)` head element
+ * (which the codec carries as a raw element). A guard after any content
+ * element or after the `+` keystroke separator (also a raw element) is not
+ * typed; the caller keeps the rule opaque.
+ */
+function isHeadClusterSoFar(elements: ContextElement[]): boolean {
+  return elements.every(
+    (el) =>
+      el.kind === "if" ||
+      el.kind === "baselayout" ||
+      (el.kind === "raw" && /^platform\s*\(/i.test(el.text.trim())),
+  );
+}
 
 // Compiled once — parseUse runs on every output token, same rationale as
 // INDEX_RE above.
@@ -408,11 +479,16 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
       i++;
       continue;
     }
-    // dk(name) — named (non-hex) deadkey identifier: opaque. Mirrors the
-    // context (parseContextElements) and output (parseOutputElements) parsers,
-    // which both classify a named deadkey as OPAQUE_REASONS.NAMED_DEADKEY.
+    // dk(name) — named (non-hex) deadkey identifier: a typed name-carrying
+    // element since #2238 (was opaque NAMED_DEADKEY pre-#2238). Mirrors the
+    // context (parseContextElements) and output (parseOutputElements) parsers.
     // Checked before parseDk so a non-hex dk(...) is not silently dropped to raw.
-    if (isNamedDk(tok)) return { items, opaqueReason: OPAQUE_REASONS.NAMED_DEADKEY };
+    const namedStoreDk = parseNamedDk(tok);
+    if (namedStoreDk !== null) {
+      items.push({ kind: "namedDeadkey", name: namedStoreDk });
+      i++;
+      continue;
+    }
     // dk(NNNN)
     const dkId = parseDk(tok);
     if (dkId !== null) {
@@ -468,7 +544,8 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
 /**
  * Lenient sketch of a store body for an opaque store fragment: flattens
  * `outs(name)` from previously seen stores, keeps SMP literals as char items and
- * named deadkeys as deadkey items (ids allocated per parse via `namedDk`).
+ * named deadkeys as typed name-carrying items (verbatim name — #2238 deleted
+ * the per-parse synthetic-id interning; no synthetic ids exist anywhere now).
  * Unresolvable tokens are skipped. Returns undefined when nothing resolves.
  */
 /** Largest sketch (in items) kept for one opaque store; past it the sketch is dropped, never truncated. */
@@ -476,8 +553,7 @@ const MAX_SKETCH_ITEMS = 0x20000;
 
 function sketchStoreItems(
   rawValue: string,
-  known: Map<string, StoreItem[]>,
-  namedDk: Map<string, number>
+  known: Map<string, StoreItem[]>
 ): StoreItem[] | undefined {
   const out: StoreItem[] = [];
   const toks = splitTokens(rawValue);
@@ -508,11 +584,9 @@ function sketchStoreItems(
       if (out.length > MAX_SKETCH_ITEMS) return undefined;
       continue;
     }
-    if (isNamedDk(tok)) {
-      const name = (/^dk\s*\(\s*([^)]+?)\s*\)$/i.exec(tok)?.[1] ?? "").toLowerCase();
-      let id = namedDk.get(name);
-      if (id === undefined) { id = NAMED_DK_ID_BASE + namedDk.size; namedDk.set(name, id); }
-      out.push({ kind: "deadkey", id });
+    const namedSketchDk = parseNamedDk(tok);
+    if (namedSketchDk !== null) {
+      out.push({ kind: "namedDeadkey", name: namedSketchDk });
       continue;
     }
     const dkId = parseDk(tok);
@@ -534,9 +608,6 @@ function sketchStoreItems(
   }
   return out.length > 0 ? out : undefined;
 }
-
-/** Id base for named-deadkey sketch items; above any hex id a .kmn author writes. */
-const NAMED_DK_ID_BASE = 0x7f000000;
 
 // ---------------------------------------------------------------------------
 // Context / output element parsers
@@ -580,10 +651,12 @@ function parseContextElements(
       elements.push({ kind: "vkey", name: vk.name, modifiers: vk.modifiers });
       continue;
     }
-    // dk(name) — named (non-hex) deadkey identifier: opaque
-    if (isNamedDk(tok)) {
-      opaqueOut.reason = OPAQUE_REASONS.NAMED_DEADKEY;
-      return null;
+    // dk(name) — named (non-hex) deadkey identifier: typed name-carrying
+    // element since #2238 (was opaque NAMED_DEADKEY pre-#2238).
+    const namedCtxDk = parseNamedDk(tok);
+    if (namedCtxDk !== null) {
+      elements.push({ kind: "namedDeadkey", name: namedCtxDk });
+      continue;
     }
     // dk(NNNN)
     const dkId = parseDk(tok);
@@ -635,8 +708,17 @@ function parseContextElements(
       opaqueOut.reason = OPAQUE_REASONS.OUTS_EXPANSION;
       return null;
     }
-    // if(...) — opaque
+    // if(store = 'value') — a typed guard element when the guard is an
+    // equality guard inside the head cluster (spec 103 FR-002). Anything
+    // else — a not-equal or comma-form guard, an unparseable head, or a
+    // guard after content / the keystroke separator — stays opaque with
+    // the existing reason (FR-003): never mistyped, never dropped.
     if (/^if\s*\(/i.test(tok)) {
+      const guard = parseIfGuard(tok);
+      if (guard !== null && isHeadClusterSoFar(elements)) {
+        elements.push({ kind: "if", store: guard.store, value: guard.value });
+        continue;
+      }
       opaqueOut.reason = OPAQUE_REASONS.IF_OPTION_STORE;
       return null;
     }
@@ -708,13 +790,12 @@ function parseOutputElementsCore(
       }
       continue;
     }
-    // dk(name) — named (non-hex) deadkey identifier: opaque
-    if (isNamedDk(tok)) {
-      if (mode === "strict") {
-        opaqueOut.reason = OPAQUE_REASONS.NAMED_DEADKEY;
-        return null;
-      }
-      elements.push({ kind: "raw", text: tok });
+    // dk(name) — named (non-hex) deadkey identifier: typed name-carrying
+    // element since #2238 in BOTH modes (was opaque in strict mode and a
+    // raw placeholder in the lenient produced-output sketch pre-#2238).
+    const namedOutDk = parseNamedDk(tok);
+    if (namedOutDk !== null) {
+      elements.push({ kind: "namedDeadkey", name: namedOutDk });
       continue;
     }
     // dk(NNNN)
@@ -983,7 +1064,6 @@ export function parse(text: string, keyboardId: string): ParseResult {
   const rawFragments: RawKmnFragment[] = [];
   // Store bodies seen so far (lowercased name), for flattening outs() in sketches.
   const knownStoreItems = new Map<string, StoreItem[]>();
-  const namedDkIds = new Map<string, number>();
 
   // Opaque feature count map.
   const opaqueCount = new Map<string, number>();
@@ -1099,7 +1179,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
             reason: opaqueReason,
             sourceLine: tok.line,
           };
-          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems, namedDkIds);
+          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems);
           if (sketch !== undefined) {
             frag.storeSketch = sketch;
             knownStoreItems.set(parsed.name.toLowerCase(), sketch);
@@ -1210,8 +1290,10 @@ export function parse(text: string, keyboardId: string): ParseResult {
         // Quick opaque surface check before deep parse.
         const opaqueCheck = { reason: null as string | null };
 
-        // Parse context
-        const ctxToks = splitTokens(parsedLine.contextRaw);
+        // Parse context — the only list where `+` is the context/keystroke
+        // separator, so the only list tokenised with separator splitting
+        // (#2247).
+        const ctxToks = splitTokens(parsedLine.contextRaw, true);
         const ctxElements = parseContextElements(ctxToks, opaqueCheck);
 
         let outElements: OutputElement[] | null = null;

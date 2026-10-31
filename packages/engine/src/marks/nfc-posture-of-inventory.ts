@@ -53,7 +53,11 @@ export function nfcPostureOfInventory(alphabet: ConfirmedAlphabet): PosturePair[
     const nfc = composeStack(stack);
     const hasReadyMadeForm = [...nfc].length === 1;
     pairs.push({
-      stack: { base: stack.base, marks: [...stack.marks] },
+      stack: {
+        base: stack.base,
+        marks: [...stack.marks],
+        ...(stack.source !== undefined ? { source: stack.source } : {}),
+      },
       hasReadyMadeForm,
       ...(hasReadyMadeForm ? { readyMadeForm: nfc } : {}),
     });

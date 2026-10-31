@@ -23,7 +23,7 @@
 // PickerPane render (it is the component under test here, so it is NOT stubbed).
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, cleanup } from "@testing-library/react";
+import { screen, cleanup, fireEvent } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
@@ -99,14 +99,18 @@ describe("OutputScreen — left-pane scope", () => {
     expect(provenance.querySelector("button")).toBeNull();
   });
 
-  it("with a working copy: the identity form and KMN editor still render", async () => {
+  it("with a working copy: the identity form renders, and the KMN editor sits behind the advanced toggle", async () => {
     seedInstantiatedWorkingCopy(undefined, { attributed: true });
 
     const { OutputScreen } = await import("./OutputScreen.tsx");
     render(<OutputScreen />);
 
-    // Naming the keyboard and a final source tweak are legitimate at ship time.
+    // Naming the keyboard is legitimate at ship time. A final source tweak
+    // is too, but the raw editor is opt-in: hidden until the author asks
+    // for it via the "Advanced: view source" toggle.
     expect(screen.getByLabelText("Keyboard ID")).toBeTruthy();
+    expect(screen.queryByTestId("kmn-editor-stub")).toBeNull();
+    fireEvent.click(screen.getByTestId("advanced-view-source-toggle"));
     expect(screen.getByTestId("kmn-editor-stub")).toBeTruthy();
   });
 

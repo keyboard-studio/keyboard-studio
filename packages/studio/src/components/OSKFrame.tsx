@@ -17,6 +17,7 @@ import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { BREAKPOINTS } from "../ui/breakpoints.ts";
 import { useViewport } from "../hooks/useViewport.ts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
+import { plainEngineErrorMessage } from "../lib/plainDiagnosticMessage.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useOskChannel } from "../hooks/useOskChannel.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -83,7 +84,7 @@ export function OSKFrame({
   autoFocus = false,
   fullBleed = false,
 }: OSKFrameProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef);
   // Viewport-relative sizing: narrow or scarce-height viewports shrink the
@@ -216,6 +217,9 @@ export function OSKFrame({
     send({ type: "FOCUS_TARGET" });
   }, [autoFocus, keyboardActivations, send]);
 
+  const enginePlain =
+    channel.engineError !== null ? plainEngineErrorMessage(channel.engineError, i18n) : null;
+
   if (startKeyboard !== null && isExcludedScript(startKeyboard.script)) {
     return <UnsupportedScriptStub script={startKeyboard.script} />;
   }
@@ -268,7 +272,7 @@ export function OSKFrame({
         aria-busy={stage.kind !== "ready" && stage.kind !== "idle"}
       />
       <PreviewPaneOverlay stage={stage} onRetry={retry} />
-      {channel.engineError !== null && (
+      {enginePlain !== null && (
         <div
           style={{
             position: "absolute",
@@ -281,10 +285,25 @@ export function OSKFrame({
             color: "var(--app-warning-text)",
             border: "1px solid var(--app-warning-border)",
             borderRadius: 6,
-            fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
           }}
         >
-          <Trans id="osk.engineError">KMW: {channel.engineError}</Trans>
+          <span style={{ display: "block" }}>{enginePlain.whatHappened}</span>
+          <span style={{ display: "block", marginTop: 2 }}>{enginePlain.whatToTry}</span>
+          <details style={{ marginTop: 4 }}>
+            <summary style={{ cursor: "pointer" }}>
+              <Trans id="diagnostics.plain.technicalDetails">Technical details</Trans>
+            </summary>
+            <span
+              style={{
+                display: "block",
+                fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                marginTop: 4,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {enginePlain.technicalDetail}
+            </span>
+          </details>
         </div>
       )}
     </div>

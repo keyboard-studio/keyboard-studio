@@ -1,15 +1,27 @@
 import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
+import { s06Recognizer } from "./rules/s06-deadkey-chained-two-tier.js";
 import { s01Recognizer } from "./rules/s01-simple-swap.js";
 import { s02Recognizer } from "./rules/s02-deadkey-single-tap.js";
-import { simpleSwapRule, deadkeySingleTapRule } from "./rules/generated/index.js";
+import { simpleSwapRule, deadkeySingleTapRule, sequenceReplaceRule, diacriticCyclingRule, retroactiveRephRule } from "./rules/generated/index.js";
 import type { RecognizerRule, RecognizeResult, MatchResult } from "./types.js";
 import { isBehaviourOwned } from "./utils.js";
 
-const DEFAULT_RULES: RecognizerRule[] = [
+// S-06 (two-trigger chain) runs FIRST, by ruling (queue-2235-ruling.md §3):
+// recognizePatterns stamps ownedByPattern in rule order and later matchers
+// skip stamped rules, so S-06-first is the replace/merge-before-lift
+// constraint — the grouped S-06 Pattern pre-empts the S-02 family matches
+// its tier-2 resolutions would otherwise form, never as an additional
+// claiming pass. Exported so corpus gates can A/B the pipeline with and
+// without a single rule (the #2235 capability non-regression diff).
+export const DEFAULT_RULES: RecognizerRule[] = [
+  s06Recognizer,
   s01Recognizer,
   s02Recognizer,
   simpleSwapRule,
   deadkeySingleTapRule,
+  sequenceReplaceRule,
+  diacriticCyclingRule,
+  retroactiveRephRule,
 ];
 
 export function recognizePatterns(

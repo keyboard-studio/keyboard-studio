@@ -40,8 +40,11 @@ describe("proposeKeyId", () => {
     expect(proposal.alternative?.reason).toEqual({ kind: "shared-candidate", count: 3 });
   });
 
-  it("combining mark -> T_<UPPERHEX>, guard AND producing rule required, no U_ alternative", () => {
-    // U+0300 COMBINING GRAVE ACCENT
+  it("combining mark with NO start-of-line box -> guarded T_<UPPERHEX> (unticked default, #2374 arm d′)", () => {
+    // U+0300 COMBINING GRAVE ACCENT. #2374 replaces spec 104 FR-013's
+    // keyboard-wide guard specification with the mark's per-mark "start of
+    // line" box: unticked (or absent — a late-added mark with no survey
+    // row) mints guarded T_, the old "swallow" semantics per mark.
     const proposal = proposeKeyId({ chars: "̀", capsHandled: false });
     expect(proposal.path).toBe("combining-mark-guard");
     expect(proposal.id).toBe("T_0300");
@@ -49,6 +52,49 @@ describe("proposeKeyId", () => {
     expect(proposal.guardRequired).toBe(true);
     expect(proposal.ruleLines).toEqual(["+ [T_0300] > U+0300"]);
     expect(proposal.alternative).toBeUndefined();
+  });
+
+  it("combining mark with unticked start-of-line box -> T_<UPPERHEX>, guard AND producing rule required (arm d′)", () => {
+    const proposal = proposeKeyId({
+      chars: "̀",
+      capsHandled: false,
+      bareMarkAllowed: false,
+    });
+    expect(proposal.path).toBe("combining-mark-guard");
+    expect(proposal.id).toBe("T_0300");
+    expect(proposal.ruleRequired).toBe(true);
+    expect(proposal.guardRequired).toBe(true);
+    expect(proposal.ruleLines).toEqual(["+ [T_0300] > U+0300"]);
+    expect(proposal.alternative).toBeUndefined();
+  });
+
+  it("combining mark with ticked start-of-line box -> U_<HEX> (arm d)", () => {
+    const proposal = proposeKeyId({
+      chars: "̀",
+      capsHandled: false,
+      bareMarkAllowed: true,
+    });
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.id).toBe("U_0300");
+    expect(proposal.ruleRequired).toBe(false);
+    expect(proposal.guardRequired).toBe(false);
+  });
+
+  it("fixed string at &VERSION 15.0 -> multi-segment U_ id, no rule (arm c)", () => {
+    const proposal = proposeKeyId({ chars: "ch", capsHandled: false, keyboardVersion: "15.0" });
+    expect(proposal.path).toBe("multi-codepoint-string");
+    expect(proposal.id).toBe("U_0063_0068");
+    expect(proposal.ruleRequired).toBe(false);
+    expect(proposal.guardRequired).toBe(false);
+    expect(proposal.ruleLines).toBeUndefined();
+  });
+
+  it("fixed string below &VERSION 15.0 -> T_ + rule (arm c′)", () => {
+    const proposal = proposeKeyId({ chars: "ch", capsHandled: false, keyboardVersion: "10.0" });
+    expect(proposal.path).toBe("multi-codepoint-string");
+    expect(proposal.id).toBe("T_CH");
+    expect(proposal.ruleRequired).toBe(true);
+    expect(proposal.ruleLines).toEqual(["+ [T_CH] > 'ch'"]);
   });
 
   it("multi-codepoint / string output (ASCII digraph) -> T_<MNEMONIC>, producing rule only", () => {
@@ -170,7 +216,11 @@ describe("proposeKeyId", () => {
       capsHandled: true,
       caseTripleRequested: true,
     });
+    // No start-of-line box in this request, so the mark takes the unticked
+    // default and mints guarded T_ (#2374 arm d′) — the not-cased reason is
+    // independent of that route.
     expect(proposal.path).toBe("combining-mark-guard");
+    expect(proposal.id).toBe("T_0300");
     expect(proposal.noCaseTripleReason).toBe("combining-mark");
   });
 });

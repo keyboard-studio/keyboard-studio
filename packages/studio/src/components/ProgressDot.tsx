@@ -37,7 +37,7 @@
 
 import type { CSSProperties } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { msg } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { CSS_ACCENT, CSS_BORDER, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
 import type { ProgressDot as ProgressDotData, WorkKind } from "../decisions/progressDots.ts";
@@ -72,6 +72,10 @@ const BADGE_MESSAGE: Record<WorkKind, ReturnType<typeof msg>> = {
   "now-applicable": msg({
     id: "footer.dot.badge.nowApplicable.ariaLabel",
     message: "work waiting: newly applicable",
+  }),
+  warnings: msg({
+    id: "footer.dot.badge.warnings.ariaLabel",
+    message: "work waiting: warnings to review",
   }),
 };
 
@@ -123,7 +127,23 @@ export function ProgressDot({ dot, onActivate, layout = "dot" }: ProgressDotProp
 
   const badgeSuffix =
     dot.badge !== undefined && dot.badge.length > 0
-      ? dot.badge.map((kind) => ` — ${resolveMessage(i18n, BADGE_MESSAGE[kind])}`).join("")
+      ? dot.badge
+          .map((kind) => {
+            // #2145: a warnings badge states its count — the number comes
+            // from the same work items that badged the dot, so the name
+            // can never disagree with the in-page flags.
+            if (kind === "warnings" && dot.badgeCounts?.warnings !== undefined) {
+              return ` — ${t({
+                id: "footer.dot.badge.warningsCount.ariaLabel",
+                message: plural(dot.badgeCounts.warnings, {
+                  one: "work waiting: # warning to review",
+                  other: "work waiting: # warnings to review",
+                }),
+              })}`;
+            }
+            return ` — ${resolveMessage(i18n, BADGE_MESSAGE[kind])}`;
+          })
+          .join("")
       : "";
 
   const ariaLabel = `${baseAriaLabel}${badgeSuffix}`;

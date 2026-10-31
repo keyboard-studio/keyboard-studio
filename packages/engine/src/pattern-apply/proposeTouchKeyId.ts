@@ -26,9 +26,30 @@
  * unshifted one. A key whose shift output was reassigned elsewhere fails the
  * check and falls through to minting. That is the correct outcome: keeping the
  * id would silently claim an output the key no longer produces.
+ *
+ * ## Spec 104 (FR-010): the gate is evaluated through the production resolver
+ *
+ * The production set {@link coversAll} tests is the FR-003 resolver's
+ * production set for the id, state-collapsed: the `rule` source (the join's
+ * produced set) PLUS the `u-decode` source — a `U_` key's intrinsic decode,
+ * which the resolver credits both as an unruled key's production and as a
+ * ruled key's fall-through for keystrokes no rule matches. Before spec 104
+ * the gate read the join alone, so an intrinsically producing `U_` key
+ * failed coverage and was re-minted under a fresh id. The collapse over
+ * states is forced by this module's shape, not chosen: the request
+ * deliberately carries no occurrence and no layer (FR-030's structural
+ * guarantee), so the resolver's per-state record cannot be addressed —
+ * and its remaining sources cannot apply to the inherit question anyway
+ * (`k-fallback` is a property of a physical key in a state, not of a touch
+ * id being inherited; `emulation` ids are frame-class and produce no
+ * characters to cover).
  */
 
-import { producedByKeyId, type TouchKeyRuleIndex } from "@keyboard-studio/contracts";
+import {
+  decodeUnicodeKeyId,
+  producedByKeyId,
+  type TouchKeyRuleIndex,
+} from "@keyboard-studio/contracts";
 import {
   proposeKeyId,
   type KeyIdMintingProposal,
@@ -87,6 +108,15 @@ export interface TouchKeyIdProposalRequest {
   readonly caseTripleRequested?: boolean;
   /** How many other layers/platforms already carry a candidate `T_` id. */
   readonly sharedCandidateCount?: number;
+  /**
+   * The mark's per-mark "start of line" box (#2374), forwarded to the
+   * minter: a mark is minted to guarded `T_` only when the box is
+   * unticked; ticked (or absent — a late-added mark with no survey row)
+   * the mark mints `U_`.
+   */
+  readonly bareMarkAllowed?: boolean;
+  /** The keyboard's `&VERSION` (e.g. `"15.0"`), forwarded to the minter (FR-005 arm c/c′). */
+  readonly keyboardVersion?: string;
 }
 
 /** A proposal, or a stated reason there is none. Never silence (FR-032). */
@@ -153,7 +183,15 @@ function refusalFor(chars: string): NoProposalReason | undefined {
   return undefined;
 }
 
-/** Does `keyId` produce every one of `expectedOutputs`? Compared under NFC. */
+/**
+ * Does `keyId` produce every one of `expectedOutputs`? Compared under NFC.
+ *
+ * The produced set is the resolver's set for the id (see the module doc):
+ * the join's rule productions plus, for a `U_` id, its intrinsic decode —
+ * the production an unruled `U_` key has by construction and a ruled one
+ * keeps for unmatched keystrokes. Crediting it here is FR-010: a `U_` key
+ * that already produces the wanted character is inherited, not re-minted.
+ */
 function coversAll(
   ruleIndex: TouchKeyRuleIndex,
   keyId: string,
@@ -161,6 +199,8 @@ function coversAll(
 ): boolean {
   if (expectedOutputs.length === 0) return false;
   const produced = new Set(producedByKeyId(ruleIndex, keyId).map((c) => c.normalize("NFC")));
+  const decoded = decodeUnicodeKeyId(keyId.toUpperCase());
+  if (decoded !== undefined) produced.add(decoded.normalize("NFC"));
   return expectedOutputs.every((o) => produced.has(o.normalize("NFC")));
 }
 
@@ -229,6 +269,10 @@ export function proposeTouchKeyId(req: TouchKeyIdProposalRequest): TouchKeyIdPro
     ...(req.sharedCandidateCount !== undefined
       ? { sharedCandidateCount: req.sharedCandidateCount }
       : {}),
+    ...(req.bareMarkAllowed !== undefined
+      ? { bareMarkAllowed: req.bareMarkAllowed }
+      : {}),
+    ...(req.keyboardVersion !== undefined ? { keyboardVersion: req.keyboardVersion } : {}),
   };
   return { ...proposeKeyId(mintRequest), because: { kind: "minted" } };
 }

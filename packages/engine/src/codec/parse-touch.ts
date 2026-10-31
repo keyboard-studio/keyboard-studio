@@ -8,7 +8,11 @@
  */
 
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
-import { parseTouchLayoutString, PROVENANCE_WIRE_KEY } from "@keyboard-studio/contracts";
+import {
+  parseTouchLayoutString,
+  PROVENANCE_WIRE_KEY,
+  resolveWireEncoding,
+} from "@keyboard-studio/contracts";
 
 /**
  * Parse a .keyman-touch-layout JSON string into a TouchLayoutIR.
@@ -52,13 +56,32 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   // wire property so it survives emit → re-parse. The Keyman Developer
   // touch-layout reader (kmc-kmn's TouchLayoutFileReader.read()) passes it
   // through on the build path; see the wire-key note in the canonical parser.
-  if (key.provenance !== undefined) out[PROVENANCE_WIRE_KEY] = key.provenance;
+  //
+  // #2083: the tag is written ONLY for a non-default provenance. A
+  // `"hand-set"` tag (or an absent one, which parses as `hand-set` per FR-009)
+  // re-parses to `hand-set` whether or not the wire property is present, so
+  // omitting it is semantically lossless — and it stops the emitter from
+  // materializing `"p": "hand-set"` onto every key whose source omitted it.
+  if (key.provenance !== undefined && key.provenance !== "hand-set") {
+    out[PROVENANCE_WIRE_KEY] = key.provenance;
+  }
   if (key.text !== undefined) out["text"] = key.text;
   if (key.output !== undefined) out["output"] = key.output;
   if (key.hint !== undefined) out["hint"] = key.hint;
-  if (key.sp !== undefined) out["sp"] = String(key.sp);
-  if (key.width !== undefined) out["width"] = String(key.width);
-  if (key.pad !== undefined) out["pad"] = String(key.pad);
+  // #2083: write back the SOURCE encoding (string vs number) instead of
+  // re-encoding, so an unedited key round-trips byte-faithfully. The
+  // encoding carries no semantics — every consumer reads the normalized
+  // numeric value (the scaffolder's `nextlayer` defaulting included,
+  // #2215). Synthesized keys (no wire hint) use the Keyman-canonical
+  // string form.
+  //
+  // #2216: the hint is honoured only while it still denotes the current
+  // numeric value (`resolveWireEncoding`). A mutator that changed the
+  // numeric without clearing its hint must not silently resurrect the old
+  // source value — the current value wins, in canonical string form.
+  if (key.sp !== undefined) out["sp"] = resolveWireEncoding(key.spWire, key.sp);
+  if (key.width !== undefined) out["width"] = resolveWireEncoding(key.widthWire, key.width);
+  if (key.pad !== undefined) out["pad"] = resolveWireEncoding(key.padWire, key.pad);
   if (key.nextlayer !== undefined) out["nextlayer"] = key.nextlayer;
   // Per-key modifier override and longpress preselect (spec 063 FR-030). Both
   // are standard wire properties; `default` is emitted as a real JSON boolean,
@@ -70,6 +93,11 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   if (key.layer !== undefined) out["layer"] = key.layer;
   else if (key.layerAnnotation !== undefined) out["layer"] = key.layerAnnotation;
   if (key.default !== undefined) out["default"] = key.default;
+  // Per-key display fields (standard wire members the parser previously
+  // dropped; #2083). Carried opaquely — written back verbatim.
+  if (key.font !== undefined) out["font"] = key.font;
+  if (key.fontsize !== undefined) out["fontsize"] = key.fontsize;
+  if (key.dk !== undefined) out["dk"] = key.dk;
   if (key.sk !== undefined && key.sk.length > 0) {
     out["sk"] = key.sk.map(emitKey);
   }
@@ -102,20 +130,23 @@ export function emitTouchLayout(ir: TouchLayoutIR): string {
     const layer = platform.layers.map((l) => ({
       id: l.id,
       row: l.rows.map((r, rowIdx) => ({
-        // row.id is required by the kmc-kmn TouchLayoutFileWriter (fixup calls
-        // row.id.toString()); emit 1-based numeric ids matching the Keyman schema.
-        id: rowIdx + 1,
+        // #2083: write back the source row id instead of regenerating it.
+        // The 1-based fallback is for synthesized rows only (and matches what
+        // the kmc-kmn TouchLayoutFileWriter fixup requires: row.id.toString()).
+        id: r.id ?? rowIdx + 1,
         key: r.keys.map(emitKey),
       })),
     }));
-    const platformOut: Record<string, unknown> = {
-      layer,
-      // defaultHint is required on TouchLayoutPlatform per the vendor type.
-      // "dot" causes the Keyman runtime to render a generic dot (•) hint on any
-      // key that has longpress sub-keys (sk), rather than showing the first
-      // sub-key character. Per-key explicit `hint` fields still override this.
-      defaultHint: "dot",
-    };
+    // #2083: platform-level display fields are preserved verbatim. Notably
+    // `defaultHint` is NOT materialized here: a platform whose source omits it
+    // emits without it (Keyman applies its own default), instead of gaining a
+    // hard-written `"dot"`.
+    const platformOut: Record<string, unknown> = { layer };
+    if (platform.displayUnderlying !== undefined) {
+      platformOut["displayUnderlying"] = platform.displayUnderlying;
+    }
+    if (platform.fontsize !== undefined) platformOut["fontsize"] = platform.fontsize;
+    if (platform.defaultHint !== undefined) platformOut["defaultHint"] = platform.defaultHint;
     if (platform.font !== undefined) platformOut["font"] = platform.font;
     out[platform.id] = platformOut;
   }

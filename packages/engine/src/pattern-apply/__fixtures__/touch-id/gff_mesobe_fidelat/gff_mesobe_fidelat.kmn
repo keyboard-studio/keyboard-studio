@@ -1,0 +1,19 @@
+c Spec 104 fixture — HAND-CONSTRUCTED (no gff_* keyboard is in this
+c machine's partial corpus checkout). It reproduces the idiom attested
+c in the spec 104 corpus census for gff_mesobe_fidelat / the gff_*
+c Ethiopic family: each fidel base is a T_<HEX> key that is
+c simultaneously a producer (+ [T_1280] > 'ኀ'), a layer switch
+c (nextlayer to a per-base layer), and a longpress host whose family
+c is U_ subkeys (U_1281…U_1286). Reduced to one base (ኀ, U+1280).
+
+store(&VERSION) '10.0'
+store(&NAME) 'Mesobe Fidelat (spec 104 fixture)'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'gff_mesobe_fidelat.keyman-touch-layout'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [T_1280] > U+1280

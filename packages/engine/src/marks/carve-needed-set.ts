@@ -47,6 +47,7 @@ import type {
   PlacementWorklist,
 } from "@keyboard-studio/contracts";
 import { deriveConfirmedInventory, makeConfirmedAlphabet } from "@keyboard-studio/contracts";
+import { outputStringForStack } from "./output-form-policy.js";
 
 export interface CarveNeededSet {
   /** Never a removal candidate. */
@@ -101,8 +102,11 @@ function hasWorklistContent(worklist: PlacementWorklist | undefined): worklist i
  * this helper to re-derive NFC/NFD composition for itself.
  */
 function composeCombo(base: string, marks: readonly string[], outputForm: OutputForm | undefined): string {
-  const literal = base + marks.join("");
-  return outputForm === "base-plus-mark" ? literal : literal.normalize("NFC");
+  // Delegates to the shared emission seam (#2297): under the ready-made
+  // policy this NFC-composes, which IS the automatic fallback — a combo
+  // with no ready-made form stays literal, a composable one becomes its
+  // single character.
+  return outputStringForStack({ base, marks }, outputForm);
 }
 
 export interface DeriveCarveNeededSetArgs {

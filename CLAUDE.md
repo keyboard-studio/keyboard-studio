@@ -80,14 +80,13 @@ validation lives in `engine/src/validator`.
   does before proposing changes.
 - **[README.md](README.md)** — external-facing description. Keep it accurate and lean; the
   package inventory and build commands live in `docs/`, not there.
-- **`strategy tree/strategies.md`** — **superseded**, now a stub pointer. Do not edit it or treat
-  it as a source. Its content merged into **spec.md §7** (extracted to
+- **`strategy tree/strategies.md`** — **deleted** (it was a superseded stub pointer). Its content merged into **spec.md §7** (extracted to
   [specs/007-strategy-selection/](specs/007-strategy-selection/)). §7.1/§7.2/§7.3 and the §7.5
   validation table are mutually consistent by design — keep them that way across any edit; the
   table is a self-consistency regression suite with two documented v1.1 gaps (EuroLatin, IPA).
 
 The spec embeds external docs by reference (§19): `docs/KM-Questionnaire.md`, `docs/lint.md`,
-`docs/criteria.md`, `docs/making-a-template.md`.
+`docs/criteria.md`, `docs/archive/making-a-template.md`.
 
 ### Contract source-of-truth chain
 
@@ -126,6 +125,9 @@ upstream, or corpus-calibrated tests (e.g. the recognizer `basic_kbdfr` fixtures
 whenever you introduce, cite, or otherwise reference a keyboard not yet in the table, you MUST
 add its row in the same change (read the keyboard's `<id>.kps` for name, BCP47 languages, and
 author — see the "Keep this current" recipe in that file). Treat a stale phonebook as a defect.
+One exception: whole-corpus listings such as
+[docs/design-notes/keyboard-grouping.html](docs/design-notes/keyboard-grouping.html) do not
+need a row per keyboard (details in the recipe).
 
 ## Architecture invariants
 
@@ -217,8 +219,7 @@ not silently empty the gallery.
 
 A specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in
 `.claude/agents/km-*.md`. The only slash commands are `/km-lead`, `/km-triage`, and
-`/km-archivist` (`.claude/commands/`); the per-role commands are archived under
-`.claude/archive/commands/`. **The full
+`/km-archivist` (`.claude/commands/`). **The full
 roster — who does what, when to invoke each — is
 [.claude/agents/km-README.md](.claude/agents/km-README.md).**
 
@@ -352,19 +353,9 @@ so check `gh pr list --state open --json number,title,headRefName` before pickin
   readers' legacy-key fallbacks) — do not "fix" those strings.
 - Don't cite specific GitHub issue numbers inside shipped code or comments — cross-link via
   commit messages and PR bodies (spec §18).
-- **Accessibility** (spec 056): studio UI code follows the house rules in
-  [docs/accessibility.md](docs/accessibility.md) — semantic HTML first, keyboard-operable
-  everything, programmatic labels, ARIA APG patterns for composite widgets, codepoint-derived
-  accessible names for glyphs, aria-live riding existing cycles (D3). Conformance state lives in
-  [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md](specs/056-ada-accessibility/wcag-2.2-aa-tracker.md);
-  a tracker row flips to `pass` only with named evidence.
-- **i18n message ids** (spec 046): `area ( "." segment )+`, lowercase, dot-separated — e.g.
-  `welcome.title`, `output.submit.button.submit`. An id is a permanent handle; renaming one
-  orphans its translations, so only do it when the string's *meaning* changed, not its wording.
-  Full authoring rules (JSX `<Trans>` vs. the `t` macro, variable interpolation, ICU plurals,
-  what not to wrap) live in
-  [specs/046-i18n-localization/contracts/catalog-format.md](specs/046-i18n-localization/contracts/catalog-format.md);
-  rationale in [docs/i18n-spike.md](docs/i18n-spike.md).
+- **Studio-only conventions** (accessibility, spec 056; i18n message ids, spec 046) live in
+  [packages/studio/CLAUDE.md](packages/studio/CLAUDE.md), which loads when working under
+  `packages/studio/`.
 
 ## Commit and issue title style
 

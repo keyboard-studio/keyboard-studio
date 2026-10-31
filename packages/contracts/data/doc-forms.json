@@ -1,0 +1,81 @@
+{
+  "forms": {
+    "readmeMd": [
+      "{{#displayName}}",
+      "# {{displayName}}",
+      "{{/displayName}}",
+      "{{#description}}",
+      "",
+      "{{description}}",
+      "{{/description}}",
+      "{{#hasLinks}}",
+      "",
+      "## Links",
+      "{{#projectHomeUrl}}",
+      "- Keyboard homepage: {{projectHomeUrl}}",
+      "{{/projectHomeUrl}}",
+      "{{#helpPageUrl}}",
+      "- Online help: {{helpPageUrl}}",
+      "{{/helpPageUrl}}",
+      "{{/hasLinks}}",
+      "{{#platforms}}",
+      "",
+      "## Supported Platforms",
+      "{{platforms}}",
+      "{{/platforms}}"
+    ],
+    "readmeHtm": [
+      "<html><body>{{#description}}<h1>{{displayName}}</h1><p>{{description}}</p>{{/description}}{{#noDescription}}<p>{{displayName}} keyboard</p>{{/noDescription}}{{#helpPageUrl}}<p>Help: <a href=\"{{helpPageUrl}}\">{{helpPageUrl}}</a></p>{{/helpPageUrl}}</body></html>"
+    ],
+    "welcome": [
+      "<!DOCTYPE html>",
+      "<html{{#docLang}} lang=\"{{docLang}}\"{{/docLang}}>",
+      "<head>",
+      "<meta charset=\"utf-8\">",
+      "<title>Start Using {{displayName}}</title>",
+      "{{#pageStyle}}<style>{{pageStyle}}</style>{{/pageStyle}}",
+      "</head>",
+      "<body>",
+      "{{body}}{{#layoutPictures}}",
+      "{{layoutPictures}}{{/layoutPictures}}</body>",
+      "</html>"
+    ],
+    "help": [
+      "{{helpHeader}}{{#pageStyle}}<style>{{pageStyle}}</style>{{/pageStyle}}",
+      "{{body}}"
+    ],
+    "body": [
+      "{{#pageHeading}}<h1>{{displayName}}</h1>{{/pageHeading}}",
+      "{{#description}}<p>{{description}}</p>{{/description}}",
+      "{{#noDescription}}<p>Welcome to {{displayName}}</p>{{/noDescription}}",
+      "{{#languages}}<p>{{languages}}</p>{{/languages}}",
+      "{{#fontNote}}{{fontNote}}{{/fontNote}}",
+      "{{#usageTips}}<h2>Usage Tips</h2>{{usageTips}}{{/usageTips}}",
+      "{{#credits}}<h2>Credits</h2>{{credits}}{{/credits}}",
+      "{{#contactInfo}}<h2>Contact</h2>{{contactInfo}}{{/contactInfo}}",
+      "{{#additionalDetail}}<h2>Additional Detail</h2>",
+      "{{additionalDetail}}{{/additionalDetail}}",
+      "{{#typingGuide}}<h2>Typing Guide</h2>{{typingGuide}}{{/typingGuide}}",
+      "{{#mechanisms}}<h2>How This Keyboard Works</h2>{{mechanisms}}{{/mechanisms}}",
+      "{{#touchNotes}}<h2>On Phones and Tablets</h2>{{touchNotes}}{{/touchNotes}}",
+      "{{#characterInventory}}<h2>Characters on This Keyboard</h2>{{characterInventory}}{{/characterInventory}}"
+    ],
+    "history": [
+      "## {{version}} ({{date}})",
+      "{{#lineage}}* {{lineage}}",
+      "{{/lineage}}{{historyEntries}}"
+    ],
+    "license": [
+      "{{#copyrightHolder}}Copyright © {{year}} {{copyrightHolder}}",
+      "",
+      "{{/copyrightHolder}}MIT License",
+      ""
+    ]
+  },
+  "mechanisms": {
+    "deadkeys": "Some characters are typed in two steps. First press a dead key, which types nothing on its own, then press the letter. The typing guide lists each dead key sequence.",
+    "rightAlt": "Some characters are on a second layer reached with the right Alt key (AltGr). Hold right Alt and press the key shown in the typing guide.",
+    "repeatToCycle": "Some keys type a different character when pressed again. Press the key repeatedly to step through its characters.",
+    "combiningOrder": "Accents and other marks are typed after the letter they belong to. Type the base letter first, then the mark."
+  }
+}

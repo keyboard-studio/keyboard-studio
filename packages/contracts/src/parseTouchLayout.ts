@@ -70,6 +70,21 @@ interface RawKey {
   /** Wire format encodes pad as a JSON string (e.g. `"pad": "50"`); also accept a number. */
   pad?: string | number;
   /**
+   * Per-key display font family (standard wire member; #2083). Carried
+   * opaquely as the raw string.
+   */
+  font?: string;
+  /**
+   * Per-key display font size (standard wire member, e.g. `".6em"`; #2083).
+   * Carried opaquely — Keyman accepts CSS-ish sizes, so no numeric
+   * normalization.
+   */
+  fontsize?: string;
+  /**
+   * Deadkey identifier (standard wire member; #2083). Carried opaquely.
+   */
+  dk?: string;
+  /**
    * Per-key provenance (spec-014 FR-008/-010). Non-standard `.keyman-touch-layout`
    * property; ignored by kmcmplib's reader. Absent/legacy ⇒ `"hand-set"`.
    */
@@ -91,6 +106,13 @@ interface RawPlatform {
   layer?: RawLayer[];
   displayUnderlying?: boolean;
   font?: string;
+  /** Platform-level display font size (standard wire member; #2083). */
+  fontsize?: string;
+  /**
+   * Longpress hint style (standard wire member, e.g. `"dot"`; #2083).
+   * Preserved verbatim — the emitter no longer materializes a default.
+   */
+  defaultHint?: string;
 }
 
 type RawTouchLayout = Record<string, RawPlatform>;
@@ -161,6 +183,24 @@ function toNumber(v: string | number | undefined): number | undefined {
 }
 
 /**
+ * Resolve the wire encoding to write for a numeric `sp`/`width`/`pad` field
+ * (#2216). A `*Wire` hint is honoured ONLY while it still denotes the
+ * field's current numeric value; the moment a mutator changes the numeric,
+ * the hint is stale and the Keyman-canonical string form of the CURRENT
+ * value is written instead. This makes the hint a self-validating cache:
+ * readers never need to trust that every writer maintained it. Mutators
+ * additionally delete the hint when they change the numeric (so the IR
+ * itself never carries a stale pair), but emit correctness does not depend
+ * on them having done so.
+ */
+export function resolveWireEncoding(
+  wire: string | number | undefined,
+  value: number,
+): string | number {
+  return wire !== undefined && toNumber(wire) === value ? wire : String(value);
+}
+
+/**
  * Coerce a wire-format boolean field to a boolean, or undefined.
  *
  * `default` is written as a real JSON boolean, so the string/number arms are
@@ -208,11 +248,28 @@ function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   if (preselect !== undefined) key.default = preselect;
 
   const sp = toNumber(raw.sp);
-  if (sp !== undefined) key.sp = sp;
+  if (sp !== undefined) {
+    key.sp = sp;
+    // Record the source encoding so the emitter writes back the source form
+    // instead of re-encoding (#2083: a numeric `1` must not become `"1"`).
+    if (raw.sp !== undefined) key.spWire = raw.sp;
+  }
   const width = toNumber(raw.width);
-  if (width !== undefined) key.width = width;
+  if (width !== undefined) {
+    key.width = width;
+    if (raw.width !== undefined) key.widthWire = raw.width;
+  }
   const pad = toNumber(raw.pad);
-  if (pad !== undefined) key.pad = pad;
+  if (pad !== undefined) {
+    key.pad = pad;
+    if (raw.pad !== undefined) key.padWire = raw.pad;
+  }
+
+  // Per-key display fields (standard wire members the parser previously
+  // dropped; #2083). Carried opaquely as raw strings.
+  if (typeof raw.font === "string" && raw.font.length > 0) key.font = raw.font;
+  if (typeof raw.fontsize === "string" && raw.fontsize.length > 0) key.fontsize = raw.fontsize;
+  if (typeof raw.dk === "string" && raw.dk.length > 0) key.dk = raw.dk;
 
   if (Array.isArray(raw.sk) && raw.sk.length > 0) {
     key.sk = raw.sk.map((k) => convertKey(k, nextId));
@@ -294,16 +351,28 @@ export function parseTouchLayoutString(json: string): TouchLayoutIR {
             }
           }
         }
-        rows.push({ keys });
+        // Preserve the source row id so the emitter writes it back instead of
+        // regenerating `rowIdx + 1` (#2083). Absent on synthesized layouts.
+        const rowOut: TouchLayoutIR["platforms"][number]["layers"][number]["rows"][number] =
+          typeof rawRow.id === "number" ? { id: rawRow.id, keys } : { keys };
+        rows.push(rowOut);
       }
       layers.push({ id, rows });
     }
 
-    platforms.push({
+    // Platform-level display fields (standard wire members the parser
+    // previously dropped; #2083). Preserved verbatim — notably `defaultHint`
+    // is NOT defaulted here; the emitter writes back only what the source
+    // stated.
+    const platformOut: TouchLayoutIR["platforms"][number] = {
       id: platform,
       ...(p.font !== undefined ? { font: p.font } : {}),
+      ...(typeof p.fontsize === "string" && p.fontsize.length > 0 ? { fontsize: p.fontsize } : {}),
+      ...(typeof p.displayUnderlying === "boolean" ? { displayUnderlying: p.displayUnderlying } : {}),
+      ...(typeof p.defaultHint === "string" && p.defaultHint.length > 0 ? { defaultHint: p.defaultHint } : {}),
       layers,
-    });
+    };
+    platforms.push(platformOut);
   }
 
   return { platforms, nodeIds };

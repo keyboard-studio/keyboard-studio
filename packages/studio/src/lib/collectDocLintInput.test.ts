@@ -167,4 +167,37 @@ describe("computeBaselineDocFindings (FR-020)", () => {
     // The base's HISTORY agrees with the base's own &KEYBOARDVERSION (1.2).
     expect(findings.map((f) => f.code)).not.toContain("KM_LINT_HISTORY_VERSION_MISMATCH");
   });
+
+  it("judges the base's help images against its kb.css (issue #2139)", () => {
+    const helpPhpText =
+      '<html><body><p>Base.</p><img src="QwertyColor.png" class="full qw"><img src="globe.png"></body></html>';
+    const base = {
+      welcomeHtmText: "<html><body><p>Base.</p></body></html>",
+      helpPhpText,
+      readmeMdText: null,
+      historyMdText: null,
+      licenseText: null,
+    };
+    const args = {
+      keyboardId: "kbd",
+      displayName: "Kbd",
+      kmnText: KMN,
+      kpsText: null,
+      kvksText: null,
+      touchLayoutJson: null,
+      base,
+    };
+    // With the kb.css texts, the .full-constrained image is not a baseline
+    // defect; the genuinely unconstrained globe.png still is.
+    const withCss = computeBaselineDocFindings({ ...args, cssTexts: [".full { width: 98%; min-width: 700px; }"] });
+    const finding = withCss.find((f) => f.code === "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED");
+    expect(finding).toBeDefined();
+    expect(finding!.message).toContain("globe.png");
+    expect(finding!.message).not.toContain("QwertyColor.png");
+    // Without them (the pre-#2139 behaviour) both images are named.
+    const withoutCss = computeBaselineDocFindings(args);
+    expect(withoutCss.find((f) => f.code === "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED")!.message).toContain(
+      "QwertyColor.png",
+    );
+  });
 });

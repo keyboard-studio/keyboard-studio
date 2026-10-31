@@ -1,0 +1,4996 @@
+{
+  "summary": {
+    "generatedAt": "2026-10-18T03:30:32.806Z",
+    "roots": [
+      "/home/hatch/workspace/keyboards/release"
+    ],
+    "keyboardsFound": 15,
+    "keyboardsProbed": 13,
+    "keyboardsNoTouchLayout": 2,
+    "keyboardsParseError": 0,
+    "linkedKeys": 745,
+    "completed": 613,
+    "refused": 132,
+    "refusalRate": 0.17718120805369128,
+    "emulationRefusals": 45,
+    "candidateKeys": 700,
+    "candidateRefused": 87,
+    "candidateRefusalRate": 0.12428571428571429,
+    "refusedButCompletesWhenOpaqueAcknowledged": 87,
+    "causeCounts": {
+      "emulation": 45,
+      "opaque-fragments (passes once acknowledged)": 87
+    }
+  },
+  "keyboards": [
+    {
+      "keyboardId": "akan",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/a/akan/source/akan.kmn",
+      "linkedKeys": 53,
+      "completed": 50,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_oE2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "arabic_izza",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/a/arabic_izza/source/arabic_izza.kmn",
+      "linkedKeys": 98,
+      "completed": 92,
+      "refused": 6,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_NUMLOCK",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "bambara",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/b/bambara/source/bambara.kmn",
+      "linkedKeys": 50,
+      "completed": 47,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_NUMLOCK",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "shift",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "shift",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "basic_kbdfr",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/basic/basic_kbdfr/source/basic_kbdfr.kmn",
+      "linkedKeys": 56,
+      "completed": 53,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RALT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "rightalt",
+          "sourceId": "K_oE2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "basic_kbdgr",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/basic/basic_kbdgr/source/basic_kbdgr.kmn",
+      "linkedKeys": 55,
+      "completed": 52,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RALT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "basic_kbduk",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/basic/basic_kbduk/source/basic_kbduk.kmn",
+      "linkedKeys": 55,
+      "completed": 52,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RALT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "basic_kbdus",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/basic/basic_kbdus/source/basic_kbdus.kmn",
+      "linkedKeys": 54,
+      "completed": 51,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "basic_kbdusx",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/basic/basic_kbdusx/source/basic_kbdusx.kmn",
+      "linkedKeys": 55,
+      "completed": 52,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKQUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_QUOTE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COMMA",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_RALT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "bj_cree_woods",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/bj/bj_cree_woods/source/bj_cree_woods.kmn",
+      "linkedKeys": 0,
+      "completed": 0,
+      "refused": 0,
+      "attempts": [],
+      "status": "no-touch-layout"
+    },
+    {
+      "keyboardId": "nias",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/n/nias/source/nias.kmn",
+      "linkedKeys": 100,
+      "completed": 94,
+      "refused": 6,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_NUMLOCK",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_NUMLOCK",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_RBRKT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_EQUAL",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_SLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_BKSLASH",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "phone",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "pid_piaroa",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/p/pid_piaroa/source/pid_piaroa.kmn",
+      "linkedKeys": 0,
+      "completed": 0,
+      "refused": 0,
+      "attempts": [],
+      "status": "no-touch-layout"
+    },
+    {
+      "keyboardId": "sil_cameroon_azerty",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn",
+      "linkedKeys": 33,
+      "completed": 30,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_COLON",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_LOWER",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "sil_cameroon_qwerty",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kmn",
+      "linkedKeys": 43,
+      "completed": 40,
+      "refused": 3,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_HYPHEN",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_1",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_2",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_3",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_4",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_5",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_6",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_7",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_8",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_9",
+          "outcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "symbol",
+          "sourceId": "K_0",
+          "outcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "sil_euro_latin",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/sil/sil_euro_latin/source/sil_euro_latin.kmn",
+      "linkedKeys": 46,
+      "completed": 0,
+      "refused": 46,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_Q\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_W\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_E\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_R\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_T\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_Y\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_U\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_I\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_O\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_P\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_A\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_S\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_D\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_F\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_G\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_H\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_J\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_K\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_L\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_SHIFT\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_Z\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_X\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_C\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_V\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_B\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_N\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_M\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_PERIOD\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_NUMERALS",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_NUMERALS\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_SPACE\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_1",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_1\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_2",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_2\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_3",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_3\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_4",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_4\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_5",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_5\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_6",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_6\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_7",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_7\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_8",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_8\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_9",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_9\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_0",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_0\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_CURRENCIES",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_CURRENCIES\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LOWER",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_LOWER\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "currency",
+          "sourceId": "K_SYMBOLS",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (1) — a fragment can hold a rule for \"K_SYMBOLS\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        }
+      ],
+      "status": "probed"
+    },
+    {
+      "keyboardId": "sil_ipa",
+      "kmnPath": "/home/hatch/workspace/keyboards/release/sil/sil_ipa/source/sil_ipa.kmn",
+      "linkedKeys": 47,
+      "completed": 0,
+      "refused": 47,
+      "attempts": [
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Q",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_Q\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_W",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_W\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_E",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_E\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_R",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_R\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_T",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_T\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Y",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_Y\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_U",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_U\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_I",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_I\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_O",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_O\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_P",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_P\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_A",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_A\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_S",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_S\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_D",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_D\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_F",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_F\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_G",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_G\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_H",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_H\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_J",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_J\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_K",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_K\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_L",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_L\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SHIFT",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_SHIFT\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_Z",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_Z\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_X",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_X\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_C",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_C\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_V",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_V\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_B",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_B\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_N",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_N\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_M",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_M\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_PERIOD",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_PERIOD\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_BKSP",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_BKSP\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_NUMLOCK",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_NUMLOCK\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_LOPT",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_LOPT\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_SPACE",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_SPACE\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "default",
+          "sourceId": "K_ENTER",
+          "outcome": "refused",
+          "refusalBinding": "source key \"K_ENTER\" is an emulation-class key (contracts §1) and is excluded from severance",
+          "cause": "emulation"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_1",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_1\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_2",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_2\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_3",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_3\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_4",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_4\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_5",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_5\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_6",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_6\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_7",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_7\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_8",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_8\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_9",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_9\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_0",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_0\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_EQUAL",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_EQUAL\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LBRKT",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_LBRKT\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_RBRKT",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_RBRKT\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        },
+        {
+          "platformId": "tablet",
+          "anchorLayerId": "numeric",
+          "sourceId": "K_LOWER",
+          "outcome": "refused",
+          "refusalBinding": "opaque fragments present (4) — a fragment can hold a rule for \"K_LOWER\" the rule-join cannot see, so transplant completeness is unprovable until acknowledged",
+          "cause": "opaque-fragments",
+          "acknowledgedOutcome": "completed"
+        }
+      ],
+      "status": "probed"
+    }
+  ]
+}

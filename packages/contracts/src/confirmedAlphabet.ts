@@ -16,6 +16,21 @@
 export type DeclaredRole = "letter" | "mark";
 
 /**
+ * Where an attested stack's pairing evidence came from (#1784 — the
+ * pair-level version of spec 050 FR-007's exemplar-vs-text attribution).
+ * Additive optional: absent means the pairing was attested by non-text
+ * means (exemplar list, author addition, …) — only text-sample evidence is
+ * recorded explicitly, as `"text"`. Attribution is first-origin, mirroring
+ * the character-level provenance rule (spec 044 T053): the pick that first
+ * attested the pairing decides, so a pairing first attested by an exemplar
+ * and later re-attested by a text sample keeps its absent attribution.
+ * There is deliberately no `"both"` (or `"exemplar"`) state: picks are
+ * NFC-deduped to a single provenance before stacks derive, so no producer
+ * could ever emit one, and no consumer distinguishes it.
+ */
+export type AttestedStackSource = "text";
+
+/**
  * One attested base+marks combination, exactly as confirmed present in the
  * language's orthography. Order-preserving: `marks` lists marks closest to the
  * base first, so the same two marks in the other order are a distinct stack.
@@ -25,6 +40,8 @@ export interface AttestedStack {
   base: string;
   /** One or more marks (lone combining characters), order preserved (closest to base first). */
   marks: string[];
+  /** Pair-level provenance; absent = attested by non-text means (see {@link AttestedStackSource}). */
+  source?: AttestedStackSource;
 }
 
 /**
@@ -66,14 +83,40 @@ export interface BlockedCombination {
 }
 
 /**
- * The S4 whole-keyboard output-form decision (spec 071, FR-013..FR-016):
- * ready-made single (precomposed) characters vs base-plus-mark sequences.
+ * The S4 whole-keyboard output-form decision (issue #2297; scope ruling
+ * 2026-10-19, #2297 comment 6277630830): ONE keyboard-wide composition
+ * policy — ready-made single (precomposed, NFC) characters vs base-plus-mark
+ * (NFD) sequences. Never per-mark/per-class/per-combination: under
+ * "ready-made", a combination with no precomposed form emits base plus mark
+ * automatically (Unicode necessity, not a mixture). Recorded separately
+ * from input order and from placement treatment, which are #2293's axes.
  * Canonical home for the union — the engine's `output-form-policy.ts` (which
  * owns the decision LOGIC, not the type) re-exports this rather than
  * declaring a divergent copy, since engine depends on contracts and contracts
  * cannot depend on engine.
  */
 export type OutputForm = "ready-made" | "base-plus-mark";
+
+/**
+ * The S4 backspace decision (issue #2302; spec 071 amendment 2026-10-19):
+ * what one backspace press does to a marked letter, recorded as its OWN
+ * whole-keyboard answer alongside {@link OutputForm} — interrelated with
+ * composition (the proposal follows it) yet independent (either behaviour
+ * is choosable under either form; the off-pairings are realised by
+ * generated rules, "extra code" in Matthew's model):
+ *
+ * - `"peel"` — backspace removes one mark at a time, stepping the letter
+ *   down to its plain base before clearing it. Native under
+ *   `"base-plus-mark"` output; generated (stepwise unwrap rules) under
+ *   `"ready-made"`.
+ * - `"whole-stack"` — backspace clears the letter and all its marks in one
+ *   press. Native under `"ready-made"` output; generated (whole-stack
+ *   deletion rules) under `"base-plus-mark"`.
+ *
+ * Canonical home is here, beside `OutputForm`, for the same reason: the
+ * engine's policy module owns the decision LOGIC, not the type.
+ */
+export type BackspaceBehaviour = "peel" | "whole-stack";
 
 /**
  * The classification the marks series hands the mechanism gallery: every
@@ -86,6 +129,21 @@ export interface PlacementWorklist {
   markUnits: MarkUnit[];
   /** Combinations that must be unreachable by ordinary typing. */
   blockedCombinations: BlockedCombination[];
+  /**
+   * Per mark, the non-base contexts the author allowed it after (spec 106
+   * FR-013): today only U+0020, from the attachment station's space column.
+   * Never a base and never a blocked combination. Absent on worklists recorded
+   * before the column existed, which allow no extra context.
+   */
+  allowedContexts?: Record<string, string[]>;
+  /**
+   * Per mark, whether the attachment station's "start of line" box is ticked
+   * (issue #2374): ticked marks pass at buffer start and after line breaks,
+   * unticked marks are swallowed there. Only ticked marks are recorded;
+   * absent (or absent per mark) means unticked — the default. Absent on
+   * worklists recorded before the column existed, which behave as unticked.
+   */
+  bareMarkAllowed?: Record<string, boolean>;
 }
 
 /** Factory: an empty three-store alphabet. */

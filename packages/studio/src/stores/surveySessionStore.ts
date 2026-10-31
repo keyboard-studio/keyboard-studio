@@ -31,6 +31,20 @@
 
 import { create } from "zustand";
 import type { StartKeyboard } from "@keyboard-studio/contracts";
+// Issue #2374 retired the marks-series guard question and with it
+// `GuardReevaluationItem` (survey/marks/marksValue.ts). The session field
+// below is durable-draft compat — old drafts may still carry the list — so
+// the item shape is restated here locally. Never written after #2374
+// (MarksStepHost's mirror is gone); never read by any UI.
+/** One touch key whose minted form disagreed with the retired guard specification. */
+interface LegacyGuardReevaluationItem {
+  mark: string;
+  keyId: string;
+  platformId: string;
+  layerId: string;
+  currentForm: "unicode" | "guarded-t";
+  specBehaviour: "swallow" | "emit";
+}
 // Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
 // types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
 // PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
@@ -293,6 +307,18 @@ export interface SurveySessionState {
    */
   marksMigrationNeeded: boolean;
 
+  /**
+   * Spec 104 (US1 scenario 6, recorded consequence, not acted on): the
+   * marks completion report's guard re-evaluation — touch keys minted
+   * before the keyboard's guard specification existed whose form the
+   * landed specification contradicts. Mirrored here by MarksStepHost on
+   * the same channel as `marksMigrationNeeded`; the list only RECORDS
+   * the contradictions (nothing re-mints from it silently), and like the
+   * flag it is written, never cleared, by the host — session reset owns
+   * clearing.
+   */
+  marksGuardReevaluation: readonly LegacyGuardReevaluationItem[];
+
   // Spec 089 FR-005/T017: identityResult, identityPhaseResult, surveyContext,
   // and scaffoldSpec are NO LONGER session fields — they are derived from the
   // decision store (decisions/identitySelectors.ts: deriveIdentityResult,
@@ -358,6 +384,9 @@ export interface SurveySessionState {
 
   /** Record the spec 071 R10 migration-need consequence (see marksMigrationNeeded). */
   setMarksMigrationNeeded: (needed: boolean) => void;
+
+  /** Record the spec 104 guard re-evaluation report (see marksGuardReevaluation). */
+  setMarksGuardReevaluation: (items: readonly LegacyGuardReevaluationItem[]) => void;
 
   /**
    * Generic back. Pops the last entry off history and sets it as activeStepId.
@@ -566,7 +595,7 @@ type SurveySessionData = Omit<
   | "backToUnfinishedGallery" | "backToChooseStart" | "reset" | "hydrate"
   | "setLocalStart" | "setCharactersSubStage"
   | "setStartConfirmed" | "setDiscoveryMethod"
-  | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
+  | "setMarksMigrationNeeded" | "setMarksGuardReevaluation" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
 /**
@@ -598,6 +627,7 @@ const INITIAL_STATE = {
   visited: ["identity"] as readonly ActiveStepId[],
   lastNavigation: "advance" as const,
   marksMigrationNeeded: false,
+  marksGuardReevaluation: [],
 
   localStart: null,
   startConfirmed: false,
@@ -777,9 +807,12 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       visited: normalizeVisited(snapshot),
       markedForLaterDesktop: [...(snapshot.markedForLaterDesktop ?? [])],
       markedForLaterTouch: [...(snapshot.markedForLaterTouch ?? [])],
+      marksGuardReevaluation: [...(snapshot.marksGuardReevaluation ?? [])],
     }),
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
+
+  setMarksGuardReevaluation: (items) => set({ marksGuardReevaluation: items }),
 
 
   setLocalStart: (b) => set({ localStart: b }),
@@ -830,6 +863,7 @@ export function snapshotTraversal(): TraversalSnapshot {
     visited: s.visited,
     lastNavigation: s.lastNavigation,
     marksMigrationNeeded: s.marksMigrationNeeded,
+    marksGuardReevaluation: s.marksGuardReevaluation,
 
     localStart: s.localStart,
     startConfirmed: s.startConfirmed,

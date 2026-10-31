@@ -5,6 +5,35 @@
 // The VirtualFS is mutated in-place; the studio never writes to host disk
 // during authoring (spec §11).
 //
+// Case B by adjudication (km-lead ruling, 2026-10-16, recorded on issue
+// 2217): this patcher stays a raw splice permanently — it is NOT awaiting
+// an IR conversion. A 2026-06-17 comment on issue 313 expected it to
+// convert to the IR-native emitter once the touch-layout cleanup landed;
+// that cleanup's ruling excluded it, and the follow-on adjudication
+// assigned it to Case B on the record. Spec 035 R9 never governed this
+// function; the assignment is by analogy to the R9 applier family in this
+// directory, for the same three reasons those appliers stay raw:
+//   - It runs at VFS-projection time (projectWorkingCopyVfs step 3.5) on
+//     whatever layout string the VFS holds; no live TouchLayoutIR is
+//     handed to it, and its call contract is VFS-in, VFS-out.
+//   - The touch half changes only matched keys' `text`. Splicing the
+//     parsed tree keeps every other member — modelled or not — intact at
+//     the parsed level, where a parse → emit round trip would drop the
+//     parser's unmodelled surface (members outside the closed platform
+//     set, unknown members below the top level, empty-string display
+//     fields, string row ids, ordering and formatting — the enumerated
+//     list is in applyTouchAssignmentsToRawJson.ts's header).
+//   - The .kvks half cannot convert as the code stands: a KvksIR read
+//     model exists (parseKvks), but there is no .kvks emitter anywhere,
+//     and the parser is a lossy subset (it drops the key102 flag, the
+//     encoding fontsize, displayunderlying elements, and the BOM).
+//     Converting only the touch half would split one atomic patch into
+//     an IR path and a raw path patching the same targets in lockstep.
+// Revisit trigger: if a full-fidelity .kvks emitter or a live touch IR
+// at projection time ever exists, re-scope BOTH halves together as a new
+// item — that is a new fact, not a continuation of the 2026-06-17
+// expectation.
+//
 // Mapping of strategy → layer ids (GATE-confirmed):
 //   S-01 unshifted        → kvks shift="" / touch layer "default"
 //   S-01 shift            → kvks shift="S" / touch layer "shift"

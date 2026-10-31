@@ -234,6 +234,81 @@ describe("helpDocsFromDecisions — opt-in additional-detail battery (spec 061 U
     });
   });
 
+  it("AC3 (#1800): a seeded troubleshooting proposal the author never confirmed does not compose", () => {
+    const seeded: DecisionSet = {
+      "help-welcome-paragraph": {
+        id: "help-welcome-paragraph",
+        value: "A keyboard for Piaroa.",
+        provenance: "asked",
+      },
+      // The extraction pass seeded this at setup (e.g. the author then
+      // answered the more-detail gate "No" and never saw the question).
+      "help-troubleshooting": {
+        id: "help-troubleshooting",
+        value: "Nothing appears when I press a key - press the next key.",
+        provenance: "extracted",
+        source: "base_kbd",
+      },
+    };
+    expect(helpDocsFromDecisions(seeded)?.troubleshooting).toBeUndefined();
+
+    const defaulted: DecisionSet = {
+      ...seeded,
+      "help-troubleshooting": {
+        id: "help-troubleshooting",
+        value: "Nothing appears when I press a key - press the next key.",
+        provenance: "default",
+      },
+    };
+    expect(helpDocsFromDecisions(defaulted)?.troubleshooting).toBeUndefined();
+  });
+
+  it("AC3 (#1800): an author-committed troubleshooting answer composes, kept or edited", () => {
+    const committed = helpDocsFromDecisions(
+      decisions({
+        "help-welcome-paragraph": "A keyboard for Piaroa.",
+        "help-troubleshooting": "Nothing appears when I press a key - press the next key.",
+      }),
+    );
+    expect(committed?.troubleshooting).toBe(
+      "Nothing appears when I press a key - press the next key.",
+    );
+  });
+
+  it("AC3 (#2206): an extracted base-help troubleshooting line never composes unconfirmed — including the never-saw-it path", () => {
+    // The line below is the surviving pair extracted from
+    // basic_kbdinben's help page (lib/baseHelpTroubleshooting.ts). It
+    // reaches the decision set only as an `extracted` seed; an author
+    // who answered the more-detail gate "No" never saw the question,
+    // so a still-extracted record must not reach the help page.
+    const extractedLine =
+      "If a vowel does not combine with a consonant, make sure you have typed the consonant first.";
+    const seeded: DecisionSet = {
+      "help-welcome-paragraph": {
+        id: "help-welcome-paragraph",
+        value: "A keyboard for Bengali.",
+        provenance: "asked",
+      },
+      "help-troubleshooting": {
+        id: "help-troubleshooting",
+        value: extractedLine,
+        provenance: "extracted",
+        source: "basic_kbdinben",
+      },
+    };
+    expect(helpDocsFromDecisions(seeded)?.troubleshooting).toBeUndefined();
+
+    // The same line, once the author has seen the field and committed
+    // it (kept as-is), composes — the carve-out is propose-then-confirm.
+    const committed = helpDocsFromDecisions(
+      decisions({
+        "help-welcome-paragraph": "A keyboard for Bengali.",
+        "help-troubleshooting": extractedLine,
+      }),
+    );
+    expect(committed?.troubleshooting).toBe(extractedLine);
+  });
+
   it("includes canonicalOrder only when the survey routed the author to it", () => {
     const nonLatin = helpDocsFromDecisions(
       decisions({

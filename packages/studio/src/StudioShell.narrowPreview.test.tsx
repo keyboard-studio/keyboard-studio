@@ -87,6 +87,24 @@ describe("SurveyView — narrow preview trigger on the characters step", () => {
     expect(screen.getByTestId("survey-show-preview")).toBeTruthy();
   });
 
+  it("#1911: characters step shows the trigger even when discoveryMethod hasn't synced yet", async () => {
+    // Regression: the trigger gating must not depend on the session store's
+    // discoveryMethod having caught up. The characters step declares
+    // rightPane:"character-map", so the map content exists regardless of
+    // whether the store's discoveryMethod has been set to "build-list" yet
+    // (state-sync lag between PhaseB's render and the store write).
+    await mountAtWidth(412);
+    advanceToCharactersStep();
+    act(() => {
+      useSurveySessionStore.getState().setLocalStart(null);
+      // Deliberately NOT setting discoveryMethod — simulating the lag.
+      useSurveySessionStore.getState().setDiscoveryMethod(null);
+    });
+
+    // The trigger renders because the step declares rightPane:"character-map".
+    expect(screen.getByTestId("survey-show-preview")).toBeTruthy();
+  });
+
   it("intro chooser with a base chosen: the trigger opens the keyboard preview", async () => {
     await mountAtWidth(412);
     advanceToCharactersStep();

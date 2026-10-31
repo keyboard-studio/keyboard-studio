@@ -12,6 +12,7 @@
 // AUTHOR's identity. Declaring the base's language was the defect, not a feature
 // to preserve.
 
+import type { PackageFontSet } from "@keyboard-studio/contracts";
 import { escapeHtml } from "../shared/escapeHtml.js";
 
 /**
@@ -130,6 +131,41 @@ export function welcomeFolderKpsRef(fileName: string): string {
 }
 
 /**
+ * A packaged font file's `.kps` member reference from its VFS key
+ * (`shared/fonts/sil/x/Font.ttf` → `..\..\..\shared\fonts\sil\x\Font.ttf`).
+ *
+ * The VFS keeps fonts at their release-relative path, so the reference is the
+ * one a keymanapp/keyboards descriptor writes from `release/<group>/<id>/source/`
+ * (criterion 8: fonts referenced from `shared/fonts`). The in-browser `.kmp`
+ * build resolves it to the same VFS key, because the rootless path normaliser
+ * drops the `..` segments that climb past the keyboard root.
+ *
+ * A keyboard-local font (keyed `source/…` by the loader) sits
+ * beside the `.kps`, so its reference is relative to `source/`.
+ */
+export function packageFontKpsRef(vfsPath: string): string {
+  if (vfsPath.startsWith("source/")) return vfsPath.slice("source/".length).replace(/\//g, "\\");
+  return `..\\..\\..\\${vfsPath.replace(/\//g, "\\")}`;
+}
+
+/** `<File>` entries for a font set, in its order (the base `.kps` order). */
+function fontFileRefs(fonts: PackageFontSet | undefined): string[] {
+  return fonts?.files.map(packageFontKpsRef) ?? [];
+}
+
+/** The `<OSKFont>` / `<DisplayFont>` lines for `<Keyboard>`, indented, or `""`. */
+export function buildFontSelectionLines(fonts: PackageFontSet | undefined, indent = "      "): string {
+  let out = "";
+  if (fonts?.oskFont !== undefined) {
+    out += `${indent}<OSKFont>${escapeHtml(packageFontKpsRef(fonts.oskFont))}</OSKFont>\n`;
+  }
+  if (fonts?.displayFont !== undefined) {
+    out += `${indent}<DisplayFont>${escapeHtml(packageFontKpsRef(fonts.displayFont))}</DisplayFont>\n`;
+  }
+  return out;
+}
+
+/**
  * Normalise the caller's `welcomeFolderFiles` into distinct bare file names in
  * deterministic (caller) order: strips a `welcome/` or `welcome\` prefix if one
  * was passed, drops blanks, and drops the page itself (it is always listed
@@ -150,10 +186,97 @@ export function normaliseWelcomeFolderFiles(welcomeFolderFiles: readonly string[
 }
 
 /**
+ * A font the descriptor must carry (#2308), in the writer's vocabulary: its
+ * `.kps` member reference relative to `source/` (forward slashes; may climb
+ * with `../` to reach the repo-level `shared/` tree) and whether the base
+ * declared it as the keyboard's OSK/display font.
+ */
+export interface KpsFontDescriptorEntry {
+  ref: string;
+  isOskFont: boolean;
+}
+
+export function isKpsFontEntries(
+  fonts: PackageFontSet | readonly KpsFontDescriptorEntry[] | undefined,
+): fonts is readonly KpsFontDescriptorEntry[] {
+  return Array.isArray(fonts);
+}
+
+/**
+ * The `.kps` member reference for a loader-carried asset (a font, the keyboard
+ * stylesheet), from its repo-relative path and the base keyboard's repo path.
+ *
+ * An asset inside the base's own `source/` ships inside the copy's `source/`
+ * too, so its reference is the part below `source/`. Anything else — the
+ * `shared/` fonts — lives at the keyboards-repo root, three levels up from
+ * `<group>/<id>/source/`, which is the spelling the corpus writes
+ * (`..\..\..\shared\fonts\…`).
+ */
+export function kpsMemberRef(relPath: string, baseKeyboardPath: string): string {
+  const ownSourcePrefix = `${baseKeyboardPath}/source/`;
+  if (relPath.startsWith(ownSourcePrefix)) {
+    return relPath.slice(ownSourcePrefix.length);
+  }
+  const belowRelease = relPath.startsWith("release/")
+    ? relPath.slice("release/".length)
+    : relPath;
+  return `../../../${belowRelease}`;
+}
+
+/**
+ * Normalise the caller's font entries: trims refs, drops blanks, dedupes by
+ * ref (case-insensitive — a base listing the same font as both a `<File>` and
+ * an `<OSKFont>` must yield ONE entry, with the OSK flag winning).
+ */
+export function normaliseKpsFontEntries(
+  fonts: readonly KpsFontDescriptorEntry[],
+): KpsFontDescriptorEntry[] {
+  const out: KpsFontDescriptorEntry[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const font of fonts) {
+    const ref = font.ref.trim().replace(/\\/g, "/");
+    if (ref === "") continue;
+    const key = ref.toLowerCase();
+    const existingIdx = indexByKey.get(key);
+    if (existingIdx !== undefined) {
+      const prev = out[existingIdx];
+      if (font.isOskFont && prev !== undefined) {
+        out[existingIdx] = { ref: prev.ref, isOskFont: true };
+      }
+      continue;
+    }
+    indexByKey.set(key, out.length);
+    out.push({ ref, isOskFont: font.isOskFont });
+  }
+  return out;
+}
+
+/** A member reference in the `.kps`'s backslash spelling. */
+function toKpsRef(ref: string): string {
+  return ref.replace(/\//g, "\\");
+}
+
+/**
+ * The `<OSKFont>` / `<DisplayFont>` lines for `<Keyboard>`, or "" when no
+ * carried font is the OSK font. The schema allows ONE of each element, and
+ * the corpus points both at the same font, so the first OSK-flagged entry
+ * fills both. Extra OSK-flagged fonts still ship via their `<File>` entries.
+ */
+function buildFontElements(fonts: readonly KpsFontDescriptorEntry[]): string {
+  const osk = fonts.find((f) => f.isOskFont);
+  if (osk === undefined) return "";
+  const ref = escapeHtml(toKpsRef(osk.ref));
+  return `      <OSKFont>${ref}</OSKFont>\n      <DisplayFont>${ref}</DisplayFont>\n`;
+}
+
+/**
  * @param welcomeFolderFiles the OTHER files shipped in `source/welcome/` beside
  *   the page — inherited base images and generated layout charts — as bare
  *   names relative to that folder (spec 080 FR-002/FR-006). Each is listed as
  *   `welcome\<name>`. The page itself is always listed and never needs passing.
+ * @param fonts the starting keyboard's packaged fonts: each file
+ *   is listed in `<Files>` and the OSK/display selections are declared on
+ *   `<Keyboard>` (criteria 8 and 10).
  */
 export function buildKpsContent(
   keyboardId: string,
@@ -161,6 +284,14 @@ export function buildKpsContent(
   kmnText: string,
   version = "1.0",
   welcomeFolderFiles: readonly string[] = [],
+  fonts?: PackageFontSet | readonly KpsFontDescriptorEntry[],
+  /**
+   * The base's carried keyboard stylesheet(s) (#2308), as member references
+   * relative to `source/` — listed in `<Files>` beside the fonts. The caller
+   * names the copy's file (the id-named sibling already renamed), matching
+   * the file the loader carried.
+   */
+  stylesheets: readonly string[] = [],
 ): string {
   const targetTokens = parseTargetTokens(kmnText);
   const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
@@ -177,11 +308,21 @@ export function buildKpsContent(
     files.push(welcomeFolderKpsRef(name));
   }
   files.push("readme.htm");
+  const carriedFonts = isKpsFontEntries(fonts) ? normaliseKpsFontEntries(fonts) : undefined;
+  const packageFonts = isKpsFontEntries(fonts) ? undefined : fonts;
+  files.push(
+    ...(carriedFonts?.map((font) => toKpsRef(font.ref)) ?? fontFileRefs(packageFonts)),
+  );
   // LICENSE.md lives at the keyboard root, one level above this .kps's own
   // `source/` directory — like the `..\build\` artifacts, not like
   // welcome\welcome.htm/readme.htm, which sit alongside (or below) the .kps
   // itself (criterion 8.4-kps-includes-license-md).
   files.push("..\\LICENSE.md");
+  // #2308: the keyboard stylesheet the loader carried is a package member too.
+  for (const sheet of stylesheets) {
+    const ref = sheet.trim().replace(/\\/g, "/");
+    if (ref !== "") files.push(toKpsRef(ref));
+  }
 
   const fileEntries = files
     .map((f) => {
@@ -207,6 +348,9 @@ export function buildKpsContent(
     `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${website}${buildAttributionBlock(identity)}  </Info>\n` +
     `  <Files>\n${fileEntries}\n  </Files>\n` +
     `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n` +
+    (carriedFonts !== undefined
+      ? buildFontElements(carriedFonts)
+      : buildFontSelectionLines(packageFonts)) +
     buildLanguagesBlock(identity) +
     `    </Keyboard>\n  </Keyboards>\n` +
     `</Package>\n`

@@ -77,12 +77,17 @@ import type {
   MechanismAssignment,
   MechanismRef,
   PlacementMap,
-  PlacementWorklist,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
+import { toUPlusNotation, toUPlusSequence, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import {
+  communityContextFromAnswers,
+  CHARACTERS_STEP_ID,
+} from "../../survey/communityContext.ts";
+import { provenanceForCandidate } from "../../survey/placementProvenance.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/stepIds.ts";
@@ -109,6 +114,7 @@ import {
   collectCompositionMethod,
   type ModifierToken,
   type CharContributors,
+  OUTPUT_FORM_SEAM_PATTERN_IDS,
 } from "@keyboard-studio/engine";
 import {
   useKeyboardArtifact,
@@ -117,6 +123,10 @@ import {
 } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
+import {
+  usePlacementInventory,
+  useTreatmentFilteredChars,
+} from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
@@ -145,6 +155,23 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import { useDisplacementProposal } from "./useDisplacementProposal.ts";
+import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
+import {
+  assignmentSlotKeys,
+  buildSlotOccupancy,
+  displacedFor,
+  isProducedOnOtherSlot,
+  isStillNeeded,
+  mechanismSlotEntries,
+  orthographyTier,
+  slotKeyFor,
+} from "../../survey/slotOccupancy.ts";
+import {
+  buildRationaleLine,
+  scoreCandidate,
+  type ScoredCandidate,
+} from "../../survey/placementRationale.ts";
 import { isGatedAccentCompositionCandidate } from "./siblingAccents.ts";
 import {
   appendNotDeletableSuffix,
@@ -166,6 +193,7 @@ import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
+import { MethodCard } from "./parts/MethodCard.tsx";
 import {
   RemovableChipRow,
   HoverDangerChip,
@@ -199,15 +227,12 @@ import {
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectMenuStyle,
-  galleryHeaderBtnStyle as headerBtnStyle,
-  galleryCardHeaderRowStyle as cardHeaderRowStyle,
-  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
-  galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
 import {
   PATTERN_SEQUENCE,
   PATTERN_DEADKEY,
+  isDeadkeyPatternId,
   PATTERN_SWAP,
   PATTERN_RALT,
   isSequenceAssignmentForChar,
@@ -222,6 +247,17 @@ import {
 } from "../deadkey/deadkeyTriggerOptions.ts";
 import { allocateDeadkeyId } from "@keyboard-studio/contracts";
 import { hex4 } from "../deadkey/deadkeyWrite.ts";
+// One deadkey per purpose: trigger proposal, id reuse, and base-clash guard.
+import {
+  formatDeadkeyEscapes,
+  proposeS02TriggerKey,
+  recordedDeadkeyEscapes,
+  rememberedDeadkeyEscapes,
+  s02BaseClash,
+  sessionDeadkeys,
+  type DeadkeyEscape,
+} from "./deadkeyPurpose.ts";
+import { DeadkeyEscapesBanner } from "./DeadkeyEscapesBanner.tsx";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
@@ -287,7 +323,8 @@ function methodLabel(
 ): string {
   const sv = ref.slotValues ?? {};
   switch (ref.patternId) {
-    case "deadkey_single_tap": {
+    case "deadkey_single_tap":
+    case "deadkey_single_tap_nfd": {
       const label = resolveMessage(
         i18n,
         msg({
@@ -411,6 +448,10 @@ function excludeSequenceMechanisms(
 // Ids are numeric-only (hex4 for the deadkeyName slot): the "dead0" forced
 // derivation is gone — every mint goes through allocateDeadkeyId.
 //
+// One deadkey per trigger: a placement on a trigger the session already gave
+// a deadkey reuses that id rather than minting a second, unreachable one
+// (deadkeyPurpose.ts proposes the trigger by the mark the character adds).
+//
 // Honest seam note: allocateDeadkeyId(workingIr) alone is NOT enough. The
 // working IR does not carry this session's phase-C assignments
 // (recordAssignments stores them in phaseResults; the working IR only sees
@@ -433,7 +474,7 @@ function sessionMintedDeadkeyIds(
   const ids = new Set<number>();
   for (const a of sessionAssignments) {
     for (const m of a.mechanisms) {
-      if (m.patternId !== PATTERN_DEADKEY) continue;
+      if (!isDeadkeyPatternId(m.patternId)) continue;
       const name = m.slotValues?.["deadkeyName"];
       // 1–8 hex digits — matches the deadkey editors' parseIdText: the
       // pipeline imposes no 0xffff cap, so a 5-digit session-minted id
@@ -479,7 +520,12 @@ export interface S02DeadkeyIdentity {
  * Resolve the identity for a new S-02 deadkey assignment — the single seam
  * the manual deadkey card and the S-02 suggestion accept derive
  * deadkeyName/accentChar through. accentChar keeps the old convention (the
- * trigger key's literal character); the id is always freshly allocated.
+ * trigger key's literal character).
+ *
+ * A trigger key carries ONE deadkey: when a session placement already put a
+ * deadkey on the resolved trigger, its id and accentChar are reused, so
+ * applyAssignments merges the two into one bases/output store pair (see
+ * deadkeyPurpose.ts). Only a trigger with no session deadkey mints a fresh id.
  */
 export function resolveS02DeadkeyIdentity(params: {
   /** Raw key-picker value (one of DEADKEY_OPTIONS or ""). */
@@ -490,6 +536,11 @@ export function resolveS02DeadkeyIdentity(params: {
   sessionAssignments: readonly MechanismAssignment[];
 }): S02DeadkeyIdentity {
   const { triggerKey, triggerResolution, workingIr, sessionAssignments } = params;
+  const vkey = resolvedVkeyOf(triggerResolution);
+  const existing = vkey !== null ? sessionDeadkeys(sessionAssignments).get(vkey) : undefined;
+  if (existing !== undefined) {
+    return { deadkeyName: existing.deadkeyName, accentChar: existing.accentChar };
+  }
   const id = allocateS02DeadkeyId(workingIr, sessionAssignments);
   const accentChar =
     triggerResolution.kind === "customOk"
@@ -542,8 +593,10 @@ function buildDeadkeyAssignment(params: {
   triggerVkey: string;
   deadkeyName: string;
   accentChar: string;
+  /** Set only on a deadkey's FIRST placement (see deadkeyPurpose.ts's trigger escapes). */
+  escapes?: string | undefined;
 }): MechanismAssignment {
-  const { currentChar, baseLetter, triggerVkey, deadkeyName, accentChar } = params;
+  const { currentChar, baseLetter, triggerVkey, deadkeyName, accentChar, escapes } = params;
   return {
     scope: "individual",
     target: currentChar,
@@ -558,6 +611,7 @@ function buildDeadkeyAssignment(params: {
           baseLetters: baseLetter,
           accentedForms: currentChar,
           accentChar,
+          ...(escapes !== undefined ? { escapes } : {}),
         },
       },
     ],
@@ -596,6 +650,7 @@ function GalleryPreviewWithPatterns({
       stage={stage}
       retry={retry}
       defaultOskMode="desktop"
+      allowTouch={false}
       heading={t({
         id: "editor.assignLoop.preview.heading",
         message: "Live preview",
@@ -744,6 +799,11 @@ interface MethodChooserProps {
   onTriggerKeyCustomCharChange: (v: string) => void;
   deadkeyBaseLetter: string;
   onDeadkeyBaseLetterChange: (v: string) => void;
+  /**
+   * What the chosen trigger + base letter already type, when that is another
+   * character (one deadkey per trigger — see deadkeyPurpose.ts). Blocks Apply.
+   */
+  deadkeyClashOutput: string | null;
   /** The single physical key picker for the combined "swap" card — the base
    *  key of the layer combo when raltTokens is non-empty, or the plain
    *  assigned key when it is empty. */
@@ -780,10 +840,11 @@ interface MethodChooserProps {
 // SelectMenus); the base-key picker itself uses KeyPickerField, which carries
 // its own internal style.
 
-// inputStyle, headerBtnStyle, configStyle, and cardStyle are
+// inputStyle and configStyle are
 // imported (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte
-// with SequenceBuilderPanel.tsx (and, for headerBtnStyle/
-// configStyle/cardStyle, TouchGallery.tsx) rather than redefined here. The
+// with SequenceBuilderPanel.tsx (and, for configStyle, TouchGallery.tsx)
+// rather than redefined here. The card shell itself (header button,
+// header row, card container) now lives in parts/MethodCard.tsx. The
 // page-level wrapper style (pageStyle) is no longer imported directly here —
 // it's used via GalleryEmptyState.tsx (the no-base-keyboard/no-inventory
 // guards) rather than inline.
@@ -851,6 +912,7 @@ function MethodChooser({
   onTriggerKeyCustomCharChange,
   deadkeyBaseLetter,
   onDeadkeyBaseLetterChange,
+  deadkeyClashOutput,
   selectedSwapKey,
   onSwapKeyChange,
   selectedSwapKeyCustomChar,
@@ -928,6 +990,7 @@ function MethodChooser({
   const deadkeyBaseSummaryDisplay = deadkeyBaseLetterDisplay
     ? displayChar(deadkeyBaseLetterDisplay)
     : t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" });
+  const deadkeyClashDisplay = displayChar(deadkeyClashOutput ?? "");
   const deadkeyBasePreviewDisplay = deadkeyBaseLetterDisplay
     ? displayChar(deadkeyBaseLetterDisplay)
     : t({
@@ -935,8 +998,9 @@ function MethodChooser({
         message: "[base letter]",
       });
 
-  // Each method is one card: transparent header button + inline config when
-  // selected. cardStyle is imported from ../../lib/galleryTheme.ts.
+  // Each method is one MethodCard: transparent header button + inline config
+  // when selected. The shell lives in parts/MethodCard.tsx, shared with
+  // TouchMethodChooser.
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -961,41 +1025,26 @@ function MethodChooser({
       {/* S-01 — always shown. Rendered FIRST: "Assign to a key" is the
           per-character default method (see MechanismGallery's
           useState<Method>("swap")), so its card leads the list. */}
-      <div style={cardStyle(method === "swap")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "swap"}
-            onClick={() => onMethodChange("swap")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "swap" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.method.swap.title">
-                Assign to a key
-              </Trans>
-            </span>
-            {method !== "swap" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.method.swap.summary">
-                  Dedicate one physical key to produce {currentCharDisplay}
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "swap" && (
-            <CardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="mechanism-apply-swap"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "swap"}
+        onSelect={() => onMethodChange("swap")}
+        title={
+          <Trans id="editor.assignLoop.method.swap.title">Assign to a key</Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.method.swap.summary">
+            Dedicate one physical key to produce {currentCharDisplay}
+          </Trans>
+        }
+        applyRow={
+          <CardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="mechanism-apply-swap"
+          />
+        }
+      >
         {method === "swap" &&
           (() => {
             const filledRaltTokens = raltTokens.filter(
@@ -1285,35 +1334,21 @@ function MethodChooser({
               </div>
             );
           })()}
-      </div>
+      </MethodCard>
 
       {/* S-03 — always shown */}
-      <div style={cardStyle(method === "sequence")}>
-        <button
-          type="button"
-          aria-pressed={method === "sequence"}
-          onClick={() => onMethodChange("sequence")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "sequence" ? ACCENT : TEXT_MAIN,
-            }}
-          >
-            <Trans id="editor.assignLoop.method.sequence.title">
-              Type a sequence
-            </Trans>
-          </span>
-          {method !== "sequence" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.sequence.summary">
-                Type two or more keystrokes in a row to produce{" "}
-                {currentCharDisplay}
-              </Trans>
-            </span>
-          )}
-        </button>
+      <MethodCard
+        selected={method === "sequence"}
+        onSelect={() => onMethodChange("sequence")}
+        title={
+          <Trans id="editor.assignLoop.method.sequence.title">Type a sequence</Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.method.sequence.summary">
+            Type two or more keystrokes in a row to produce {currentCharDisplay}
+          </Trans>
+        }
+      >
         {method === "sequence" && (
           <div style={configStyle}>
             <p
@@ -1341,45 +1376,31 @@ function MethodChooser({
             </p>
           </div>
         )}
-      </div>
+      </MethodCard>
 
       {/* S-02 — always shown */}
-      <div style={cardStyle(method === "deadkey")}>
-        <div style={cardHeaderRowStyle}>
-          <button
-            type="button"
-            aria-pressed={method === "deadkey"}
-            onClick={() => onMethodChange("deadkey")}
-            style={headerTitleBtnStyle}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                color: method === "deadkey" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.assignLoop.method.deadkey.title">
-                Tap a trigger key, then a letter
-              </Trans>
-            </span>
-            {method !== "deadkey" && (
-              <span style={{ fontSize: 11, color: TEXT_DIM }}>
-                <Trans id="editor.assignLoop.method.deadkey.summary">
-                  Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr;{" "}
-                  {currentCharDisplay}
-                </Trans>
-              </span>
-            )}
-          </button>
-          {method === "deadkey" && (
-            <CardApplyRow
-              currentChar={currentChar}
-              canApply={canApply}
-              onApply={onApply}
-              testId="mechanism-apply-deadkey"
-            />
-          )}
-        </div>
+      <MethodCard
+        selected={method === "deadkey"}
+        onSelect={() => onMethodChange("deadkey")}
+        title={
+          <Trans id="editor.assignLoop.method.deadkey.title">
+            Tap a trigger key, then a letter
+          </Trans>
+        }
+        summary={
+          <Trans id="editor.assignLoop.method.deadkey.summary">
+            Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr; {currentCharDisplay}
+          </Trans>
+        }
+        applyRow={
+          <CardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="mechanism-apply-deadkey"
+          />
+        }
+      >
         {method === "deadkey" && (
           <div style={configStyle}>
             <div
@@ -1483,6 +1504,24 @@ function MethodChooser({
                     </Trans>
                   </span>
                 )}
+                {deadkeyClashOutput !== null && (
+                  <span
+                    role="alert"
+                    data-testid="deadkey-base-clash"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--app-danger-text)",
+                      opacity: 0.85,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.deadkey.baseClash">
+                      {triggerKeyDisplay} then {deadkeyBasePreviewDisplay}{" "}
+                      already types {deadkeyClashDisplay}. Pick another
+                      trigger key.
+                    </Trans>
+                  </span>
+                )}
               </span>
             </div>
             <p
@@ -1509,7 +1548,7 @@ function MethodChooser({
             </p>
           </div>
         )}
-      </div>
+      </MethodCard>
     </div>
   );
 }
@@ -1529,16 +1568,6 @@ export interface MechanismGalleryProps {
    * No kbgen data => no row; gallery behaves exactly as today.
    */
   placementMap?: PlacementMap;
-  /**
-   * Optional marks-series placement worklist (spec 071, FR-020 — the
-   * placementMap seam pattern). When supplied, composed units covered by a
-   * PRODUCTIVE mark key (a `markUnits` entry: base key + mark key reach them)
-   * are dropped from the walk — the mark itself is walked instead (it is in
-   * the inventory via the marks store). Own-letter units keep their whole-unit
-   * walk entries. Absent (or empty — a skipped series) ⇒ the existing flat
-   * `lettersToAdd` behavior, unchanged.
-   */
-  worklist?: PlacementWorklist;
 }
 
 export function MechanismGallery({
@@ -1546,7 +1575,6 @@ export function MechanismGallery({
   onComplete,
   onBack,
   placementMap,
-  worklist,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
   // Narrow-viewport branch (mobile adaptation, Phase 4): the
@@ -1632,6 +1660,15 @@ export function MechanismGallery({
     producedSet: sessionProducedSet,
     rawProducedSet: sharedRawProducedSet,
   } = useInventoryDiff();
+
+  // The placement walk set (issue #2293): the marks series' answers,
+  // derived ONCE upstream (hooks/usePlacementInventory.ts) — worklist
+  // units + the non-alphabet inventory, or the flat inventory itself when
+  // there is nothing to filter by. The walk below intersects the flat
+  // diff with this set; coverage (session.confirmedInventory via
+  // useInventoryDiff's producedSet and the SHOW-ALL `inventory` below) is
+  // untouched — composed forms remain must-produce, just not walked.
+  const placementInventory = usePlacementInventory();
 
   // Collated display order (spec 047 FR-007's default-ICU comparator, reused
   // — not reinvented; see survey/collation.ts): puts a lowercase letter
@@ -1728,19 +1765,25 @@ export function MechanismGallery({
   // second time per render.
   const baseProducedSet = sharedRawProducedSet;
 
-  // Spec 071 worklist filter (FR-020): a composed unit whose marks are ALL
-  // productive mark keys is reachable via base key + mark key — it needs no
-  // whole-unit placement of its own, so it leaves the walk. Everything else
-  // (plain bases, own-letter units, the productive marks themselves) keeps its
-  // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
+  // Placement-set filter (issue #2293, superseding the spec 071 FR-020
+  // render-time filter that lived here): the walk is the flat diff
+  // (`inventoryLettersToAdd`) intersected with the upstream placement set
+  // (`usePlacementInventory` — derived once from the marks series'
+  // answers, shared with TouchGallery). A composed unit whose mark is a
+  // productive mark key is not in the placement set, so it leaves the
+  // walk (reachable via base key + mark key); a lone mark whose treatment
+  // is `composed` is likewise absent (the mirror case the old filter
+  // missed). Promoted combinations ARE in the set and keep their walk
+  // entries. With no worklist (or an empty one) the placement set IS the
+  // flat inventory, so this is identity — the pre-#2293 behavior.
   //
-  // The worklist-filtered result is then collated (same `collateInventory`
-  // helper as `inventory` above) before being returned — this is the list
+  // The filtered result is then collated (same `collateInventory` helper
+  // as `inventory` above) before being returned — this is the list
   // usePositionalCharNav's `list` walks and the "first uncovered" default
   // below reads, so sorting it puts a lowercase letter immediately before
   // its uppercase counterpart in the Back/Next walk too. The SET of
-  // characters (the coverage/gate denominator, criterion 18.6) is never
-  // widened or narrowed by this — only its order changes.
+  // characters the coverage/gate denominates over (criterion 18.6) is
+  // never widened or narrowed by this — that stays the flat inventory.
   //
   // `nfcDedup([], inventoryLettersToAdd)` — same duplicate-walk-entry fix as
   // `inventory` above: `inventoryLettersToAdd` (from useInventoryDiff.ts)
@@ -1753,18 +1796,10 @@ export function MechanismGallery({
   // matching `touchLettersToAdd`.
   const lettersToAdd = useMemo(() => {
     const deduped = nfcDedup([], inventoryLettersToAdd);
-    let filtered = deduped;
-    if (worklist !== undefined && worklist.markUnits.length > 0) {
-      const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
-      filtered = deduped.filter((c) => {
-        const units = [...c.normalize("NFD")];
-        if (units.length < 2) return true;
-        const marks = units.slice(1);
-        return !marks.every((m) => productiveMarks.has(m));
-      });
-    }
+    const placementSet = new Set(placementInventory.map((c) => c.normalize("NFC")));
+    const filtered = deduped.filter((c) => placementSet.has(c.normalize("NFC")));
     return collateInventory(filtered, loanwordSet);
-  }, [inventoryLettersToAdd, worklist, loanwordSet]);
+  }, [inventoryLettersToAdd, placementInventory, loanwordSet]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
@@ -1946,11 +1981,32 @@ export function MechanismGallery({
             },
           ]
         : [];
+    // remapPosture="full-remap" reaching `axes` is likewise always derived:
+    // the script-class prior structurally never emits it (same invariant)
+    // and the survey elicits it nowhere — it is derived from the target
+    // identity + base IR and reconciled onto irAxes when the identity
+    // lands (spec §7.2 rule 8). The author's characters-step confirmation
+    // records the same value as a tier-1 answer when kept, or "addition"
+    // when changed (in which case no fill is reconstructed here).
+    // defaultFillAxes() leaves an already-present axis out of its own
+    // axisFills, so reconstruct the ir-derived provenance here too,
+    // alongside its import-derived twin above.
+    const irDerivedFills: AxisFill[] =
+      axes.remapPosture === "full-remap"
+        ? [
+            {
+              axis: "remapPosture",
+              value: "full-remap",
+              source: "ir-derived",
+            },
+          ]
+        : [];
     // Publish provenance for the current keyboard; clear any stale fills from a
     // prior keyboard/run when scale/scriptClass aren't answered yet, so the
     // Flow Map never shows provenance that doesn't belong to this selection.
     setAxisFills([
       ...importDerivedFills,
+      ...irDerivedFills,
       ...(prefilled !== null ? prefilled.axisFills : []),
     ]);
     const candidateAxes = prefilled !== null ? prefilled.axes : axes;
@@ -1977,6 +2033,7 @@ export function MechanismGallery({
         // assignment.
         const ids = new Set<string>(ranked.map((m) => m.patternId));
         ids.add(PATTERN_DEADKEY);
+        for (const id of OUTPUT_FORM_SEAM_PATTERN_IDS) ids.add(id);
         ids.add(PATTERN_SWAP);
         ids.add(PATTERN_RALT);
         // PATTERN_SEQUENCE — the sequence builder now records real
@@ -2018,6 +2075,20 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   const identity = useWorkingCopyStore((s) => s.identity);
+  // Issue #331: the author's placement-habit answers (Phase B's
+  // pb_existing_keyboards / pb_co_installed_keyboards) read at proposal
+  // time from the characters step's saved answers — the community
+  // context the suggestion chips' provenance line is framed by (see
+  // survey/communityContext.ts). Derived fresh from the live answers on
+  // every render of this hook chain, never cached into the decision
+  // spine, so editing an answer reframes the next proposal shown.
+  const charactersAnswers = useSurveyAnswerStore(
+    (s) => s.steps[CHARACTERS_STEP_ID],
+  );
+  const communityContext = useMemo(
+    () => communityContextFromAnswers(charactersAnswers),
+    [charactersAnswers],
+  );
   const galleryScaffoldSpec = useMemo<ScaffoldSpec | null>(
     () =>
       identity?.keyboardId != null
@@ -2072,7 +2143,21 @@ export function MechanismGallery({
     propose: proposeCompanion,
     dismiss: dismissCompanion,
     clear: clearCompanion,
+    rebase: rebaseCompanion,
   } = useCasePairCompanion();
+
+  // Demotion proposal for a displaced glyph (#2300, gate G3) — its own
+  // state slot, exactly like SiblingAccent's: one Apply can raise BOTH a
+  // case-pair companion and a displacement proposal, and the two banners
+  // co-render rather than fighting over a shared slot. The hook never
+  // records; the confirm handler below records the demotion assignment.
+  const {
+    proposal: pendingDisplacement,
+    propose: proposeDisplacement,
+    dismiss: dismissDisplacement,
+    clear: clearDisplacement,
+    rebase: rebaseDisplacement,
+  } = useDisplacementProposal();
 
   /** The base assignment a proposal was raised for, when it has one (physical
    *  and combo do; touch tracks a mechanism ref instead). */
@@ -2080,6 +2165,12 @@ export function MechanismGallery({
     pendingCompanion !== null && pendingCompanion.mechanism !== "touch"
       ? pendingCompanion.baseAssignment
       : null;
+
+  /** The base assignment the pending displacement proposal was raised for
+   *  (#2300 — the remove handlers below dismiss it proactively when that
+   *  assignment goes away, exactly like the companion's). */
+  const pendingDisplacementBase: MechanismAssignment | null =
+    pendingDisplacement?.baseAssignment ?? null;
 
   // Working IR used to plan shift-layer assignments — prefer the carve
   // working IR (ir), falling back to startIr before the carve step has run.
@@ -2098,6 +2189,192 @@ export function MechanismGallery({
   const shiftLayerAllowed = useMemo(
     () => workingIr !== null && !isMnemonicLayout(workingIr),
     [workingIr],
+  );
+
+  // -- #2300 occupancy ledger ---------------------------------------------
+  // Per-key slot → incumbent ledger over the working IR + this session's
+  // assignments (survey/slotOccupancy.ts). Feeds BOTH the weighted
+  // suggestion rationale (placementRationale.ts — the consumption layer
+  // that orders the chips; the producer order in contracts is untouched)
+  // and the displacement check on the apply paths below. Memoized on the
+  // same inputs the ledger is built from.
+  const slotOccupancy = useMemo(
+    () => buildSlotOccupancy(workingIr, sessionAssignments),
+    [workingIr, sessionAssignments],
+  );
+  const needSets = useMemo(
+    () => ({
+      confirmedInventory: new Set(rawInventory.map((c) => c.normalize("NFC"))),
+      baseProducedSet,
+    }),
+    [rawInventory, baseProducedSet],
+  );
+
+  /**
+   * Raise the demotion proposal when the assignment just recorded took a
+   * slot whose incumbent glyph is a DIFFERENT character that is still
+   * needed and not otherwise produced after this assignment (#2300 G3).
+   * The slot(s) checked are derived from the RECORDED assignment itself
+   * (`assignmentSlotKeys` — the same parsers the occupancy overlay uses),
+   * never from the candidate or picker tokens that produced it: the two
+   * can differ (Cycle 4 P1-2 — a case-pair-inherited S-01 candidate
+   * carries ["SHIFT"], while the S-01 accept writes a bare `[vkey]`
+   * rule, so the displaced incumbent lives on the BARE slot).
+   * Reads the PRE-apply ledger: at handler time `slotOccupancy` /
+   * `sessionAssignments` are still the render-time values the assignment
+   * was appended to, so the incumbent named here is the glyph the new
+   * assignment shadows. Never blocks the apply itself — the author chose
+   * the key; this only proposes the incumbent's new home.
+   */
+  const maybeRaiseDisplacement = useCallback(
+    (assignment: MechanismAssignment) => {
+      if (currentChar === null) return;
+      // A deadkey's trigger slot is not handled here: its own character's
+      // escapes (double-tap / space / AltGr) are the escape banner's job.
+      for (const slot of assignmentSlotKeys(assignment)) {
+      const displaced = displacedFor(
+        slotOccupancy,
+        slot.vkey,
+        slot.modifiers,
+        currentChar,
+      );
+      if (displaced === null) continue;
+      if (!isStillNeeded(displaced.char, needSets)) continue;
+      const takenSlotKey = slot.key;
+      // Still reachable elsewhere → nothing is lost, so no proposal.
+      // "Elsewhere" means another SLOT (the ledger check), or a recorded
+      // assignment for the displaced glyph that does not live on the slot
+      // just taken — an assignment ON this slot is the very occupancy
+      // being displaced, not another production. Non-slot mechanisms
+      // (deadkey / sequence) always count as another production.
+      if (isProducedOnOtherSlot(slotOccupancy, displaced.char, takenSlotKey)) continue;
+      const producedElsewhereByAssignment = sessionAssignments.some((a) => {
+        if (a.target !== displaced.char.normalize("NFC")) return false;
+        return a.mechanisms.some((m) => {
+          if (m.patternId === PATTERN_RALT || m.patternId === PATTERN_SWAP) {
+            // Parsed through the same helper as the overlay. A parse
+            // failure yields NO slot entries and so counts as NOT
+            // produced elsewhere (Cycle 4 P2-c): a spurious proposal is
+            // author-dismissable; a suppressed one is a silent loss.
+            return mechanismSlotEntries(m).some((e) => e.key !== takenSlotKey);
+          }
+          return true;
+        });
+      });
+      if (producedElsewhereByAssignment) continue;
+      // Demotion rank: RAlt on the SAME key first; deadkey only when the
+      // RAlt slot is taken or IS the slot just taken.
+      const raltSlotKey = slotKeyFor(slot.vkey, ["RALT"]);
+      const demotionMethod: "ralt" | "deadkey" =
+        raltSlotKey !== takenSlotKey && !slotOccupancy.has(raltSlotKey)
+          ? "ralt"
+          : "deadkey";
+      // WHO gets demoted follows the orthography tier (steer 2 — no
+      // frequency data exists, so tier decides): both core → neither by
+      // default; core incumbent + non-core incoming → the INCOMING char
+      // loses the primary slot; otherwise the incumbent is demoted.
+      // "demote-incoming" fires when a punctuation, digit or symbol
+      // currentChar (convenience even in the inventory: punctuation is
+      // never core, spec 106 FR-043) lands on a core letter's slot.
+      const displacedTier = orthographyTier(displaced.char, needSets);
+      const incomingTier = orthographyTier(currentChar, needSets);
+      const direction =
+        displacedTier === "core" && incomingTier === "core"
+          ? ("both-core" as const)
+          : displacedTier === "core"
+            ? ("demote-incoming" as const)
+            : ("demote-incumbent" as const);
+      proposeDisplacement({
+        displacedChar: displaced.char,
+        incomingChar: currentChar,
+        vkey: slot.vkey,
+        modifiers: [...slot.modifiers],
+        demotionMethod,
+        direction,
+        baseAssignment: assignment,
+        alreadyDemoted: () =>
+          sessionAssignments.some(
+            (a) =>
+              a.target === displaced.char.normalize("NFC") &&
+              a.mechanisms.some((m) => m.patternId === PATTERN_RALT),
+          ),
+      });
+      // One proposal per apply: the hook holds a single pending proposal.
+      return;
+      }
+    },
+    [currentChar, slotOccupancy, needSets, sessionAssignments, proposeDisplacement],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Deadkey trigger escapes (DeadkeyEscapesBanner). A deadkey's FIRST
+  // placement records the remembered escapes on its `escapes` slot (the
+  // engine emits each one, AltGr included) and raises the banner; each
+  // checkbox then edits that slot live.
+  // ---------------------------------------------------------------------------
+
+  const [escapePrompt, setEscapePrompt] = useState<{
+    triggerKey: string;
+    deadkeyName: string;
+    accentChar: string;
+  } | null>(null);
+
+  /** The `escapes` value for a deadkey about to be placed on `triggerVkey`:
+   *  the remembered choice when the trigger has no session deadkey yet, else
+   *  undefined (that deadkey already chose). AltGr drops out when AltGr + the
+   *  trigger already types something. */
+  const newTriggerEscapes = useCallback(
+    (triggerVkey: string): string | undefined => {
+      if (sessionDeadkeys(sessionAssignments).has(triggerVkey)) return undefined;
+      const escapes = rememberedDeadkeyEscapes(sessionAssignments);
+      if (slotOccupancy.has(slotKeyFor(triggerVkey, ["RALT"]))) escapes.delete("altgr");
+      return formatDeadkeyEscapes(escapes);
+    },
+    [sessionAssignments, slotOccupancy],
+  );
+
+  /** Raise the escape banner when `assignment` is a deadkey's first
+   *  placement (it carries an `escapes` slot). */
+  const raiseDeadkeyEscapes = useCallback((assignment: MechanismAssignment) => {
+    const sv = assignment.mechanisms.find(
+      (m) => isDeadkeyPatternId(m.patternId) && typeof m.slotValues?.["escapes"] === "string",
+    )?.slotValues;
+    if (sv === undefined) return;
+    setEscapePrompt({
+      triggerKey: sv["triggerKey"] ?? "",
+      deadkeyName: sv["deadkeyName"] ?? "",
+      accentChar: sv["accentChar"] ?? "",
+    });
+  }, []);
+
+  const handleEscapeToggle = useCallback(
+    (escape: DeadkeyEscape, on: boolean) => {
+      if (escapePrompt === null) return;
+      const { deadkeyName } = escapePrompt;
+      const escapes = recordedDeadkeyEscapes(sessionAssignments, deadkeyName) ?? new Set<DeadkeyEscape>();
+      if (on) escapes.add(escape);
+      else escapes.delete(escape);
+      const value = formatDeadkeyEscapes(escapes);
+      const carriesEscapes = (m: MechanismRef) =>
+        isDeadkeyPatternId(m.patternId) &&
+        m.slotValues?.["deadkeyName"] === deadkeyName &&
+        typeof m.slotValues?.["escapes"] === "string";
+      const next = sessionAssignments.map((a) => {
+        if (!a.mechanisms.some(carriesEscapes)) return a;
+        const edited: MechanismAssignment = {
+          ...a,
+          mechanisms: a.mechanisms.map((m) =>
+            carriesEscapes(m) ? { ...m, slotValues: { ...m.slotValues, escapes: value } } : m,
+          ),
+        };
+        // Pending banners hold the placement by identity — keep them on it.
+        rebaseCompanion(a, edited);
+        rebaseDisplacement(a, edited);
+        return edited;
+      });
+      recordAssignments(next);
+    },
+    [escapePrompt, sessionAssignments, rebaseCompanion, rebaseDisplacement, recordAssignments],
   );
 
   // S-08 layer-combo picker: the modifier tokens already used elsewhere in
@@ -2249,6 +2526,39 @@ export function MechanismGallery({
     [suggestions, currentChar, recordedSuggestionStrategyIds, dismissedSuggestionEntries],
   );
 
+  // -- #2300 weighted rationale -------------------------------------------
+  // Score every ranked suggestion against the occupancy ledger and order
+  // the VISIBLE chips by score. This is the studio consumption layer the
+  // lead ruling scopes the weights to: `getRankedSuggestionsForChar` and
+  // the contracts producer order are untouched — only the chips' display
+  // order and their rationale lines derive from the score.
+  const suggestionScores = useMemo(() => {
+    const scores = new Map<PlacementSeedEntry, ScoredCandidate>();
+    if (currentChar !== null) {
+      for (const entry of suggestions) {
+        scores.set(
+          entry,
+          scoreCandidate(entry.topCandidate, currentChar, {
+            occupancy: slotOccupancy,
+            ...needSets,
+            occupancyVerified: workingIr !== null,
+          }),
+        );
+      }
+    }
+    return scores;
+  }, [suggestions, currentChar, slotOccupancy, needSets, workingIr]);
+
+  const orderedVisibleSuggestions = useMemo(
+    () =>
+      [...visibleSuggestions].sort(
+        (a, b) =>
+          (suggestionScores.get(b)?.total ?? 0) -
+          (suggestionScores.get(a)?.total ?? 0),
+      ),
+    [visibleSuggestions, suggestionScores],
+  );
+
   // Whether currentChar already has at least one recorded (non-sequence)
   // mechanism whose strategyId is NOT among the strategyIds `suggestions`
   // is currently offering for this char — i.e. the char is covered by
@@ -2375,16 +2685,41 @@ export function MechanismGallery({
   // chip through it would be a no-op — deliberately, since Back/Next/Skip
   // must never step onto a char outside lettersToAdd's walk order. This
   // sibling handler is the one CharScrollStrip actually calls: it jumps to
-  // ANY character in the full `inventory` (in or out of lettersToAdd) purely
-  // for inspection, without touching the positional walk state. A no-op
+  // a character in the full `inventory` (in or out of lettersToAdd) for
+  // inspection, without touching the positional walk state. A no-op
   // when `char` isn't in `inventory` at all (defense-in-depth — every chip
   // CharScrollStrip renders is itself drawn from `inventory`).
+  //
+  // One class of inventory member is NOT selectable (issue #2293): a
+  // character the marks treatment answer filtered out of placement — a
+  // composed form whose mark is a productive own-key mark, or a lone
+  // mark under `composed` treatment (`useTreatmentFilteredChars`). The
+  // strip still renders it (coverage is denominated over the flat
+  // inventory), and its producer badge still reports how it is produced,
+  // but opening the placement pane for it would ask the author to place
+  // a character the treatment answer already decided how to type —
+  // placement follows the treatment answer, so selection stops here.
+  // Arrow-key cycling shares this handler, so it is gated identically.
+  const treatmentFilteredChars = useTreatmentFilteredChars();
   const handleSelectDisplayChar = useCallback(
     (char: string) => {
       if (!inventory.includes(char)) return;
+      if (treatmentFilteredChars.has(char.normalize("NFC"))) return;
       setCurrentChar(char);
     },
-    [inventory, setCurrentChar],
+    [inventory, treatmentFilteredChars, setCurrentChar],
+  );
+  // The strip's second row: the treatment-filtered COMPOSED forms (a letter
+  // plus marks the author types on their own keys or via deadkeys). Lone
+  // marks stay on the main row.
+  const composedStripSet = useMemo(
+    () =>
+      new Set(
+        inventory.filter(
+          (c) => treatmentFilteredChars.has(c.normalize("NFC")) && [...c.normalize("NFD")].length > 1,
+        ),
+      ),
+    [inventory, treatmentFilteredChars],
   );
 
   // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
@@ -2428,11 +2763,34 @@ export function MechanismGallery({
     setRaltTokens([]);
   }, []);
 
+  // Latest session deadkeys + IR for the per-character trigger proposal below.
+  // Read through a ref so the reset effect still fires only on a character
+  // change, not on every assignment the author records.
+  const triggerProposalInputsRef = useRef({ sessionAssignments, workingIr });
+  triggerProposalInputsRef.current = { sessionAssignments, workingIr };
+  // The trigger the reset effect proposed for the current character — the
+  // S-02 suggestion accept re-proposes with its own base letter while the
+  // author has left this proposal untouched.
+  const proposedTriggerKeyRef = useRef<string>("K_COLON");
+
   // Reset method inputs (not suggestionResolved — that persists per char)
   // whenever currentChar changes.
   useEffect(() => {
     clearCompanion();
+    clearDisplacement();
+    setEscapePrompt(null);
     resetMethodState();
+    if (currentChar !== null) {
+      // One deadkey per purpose: propose the trigger of the session deadkey
+      // that already adds this character's mark, else a free trigger.
+      const proposed = proposeS02TriggerKey({
+        currentChar,
+        baseLetter: [...currentChar.normalize("NFD")][0] ?? "",
+        ...triggerProposalInputsRef.current,
+      });
+      proposedTriggerKeyRef.current = proposed;
+      setTriggerKey(proposed);
+    }
     // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
     // reasoning (also used by TouchGallery's longpress suggestion memo).
     if (
@@ -2445,7 +2803,7 @@ export function MechanismGallery({
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
       setMethod("deadkey");
     }
-  }, [currentChar, resetMethodState, clearCompanion, axes.scriptClass]);
+  }, [currentChar, resetMethodState, clearCompanion, clearDisplacement, axes.scriptClass]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
@@ -2468,13 +2826,11 @@ export function MechanismGallery({
     // AFTER recordAssignments below, once `assignment` is the exact object
     // the proposal must reference (FR-008 identity guard).
     let raltCompanionModifiers: ModifierToken[] | null = null;
+    // The #2300 displacement check derives the taken slot(s) from the
+    // recorded assignment itself (see maybeRaiseDisplacement) — S-02
+    // takes no slot (a deadkey composes on top of a base keystroke and
+    // shadows nothing) and yields no slot entries there.
     if (entry.strategyId === "S-01") {
-      const cp =
-        currentChar
-          .codePointAt(0)
-          ?.toString(16)
-          .toUpperCase()
-          .padStart(4, "0") ?? "0000";
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -2483,7 +2839,9 @@ export function MechanismGallery({
           {
             patternId: PATTERN_SWAP,
             strategyId: "S-01",
-            slotValues: { kmnRules: `+ [${vkey}] > U+${cp}` },
+            // Every code point: a character with no single ready-made form
+            // (ɛ̌) is a base plus its mark, and both must reach the rule.
+            slotValues: { kmnRules: `+ [${vkey}] > ${toUPlusSequence(currentChar)}` },
           },
         ],
         source: "user",
@@ -2575,30 +2933,46 @@ export function MechanismGallery({
         );
         return;
       }
+      // While the author has left the proposed trigger untouched, re-propose
+      // with the suggestion's own base letter (ɛ is typed as trigger + e, not
+      // trigger + ɛ) so a base clash on the shared deadkey is avoided.
+      const acceptTriggerKey =
+        triggerKey === proposedTriggerKeyRef.current
+          ? proposeS02TriggerKey({ currentChar, baseLetter, sessionAssignments, workingIr })
+          : triggerKey;
       const triggerResolution = resolveKeyPickerSelection(
-        triggerKey,
+        acceptTriggerKey,
         triggerKeyCustomChar,
         TRIGGER_KEY_RESOLVE_OPTIONS,
       );
       const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
-      if (resolvedTriggerVkey === null) {
-        // The currently-held trigger-key state doesn't resolve (e.g. a
-        // custom trigger character left blank) — fall back to prefilling
-        // the deadkey method card (defaults-first, §3c) rather than
-        // dismissing outright, so the author can pick a trigger and Apply
-        // manually. Dismisses THIS chip only — a sibling chip (e.g. S-08)
-        // stays offered.
+      if (
+        resolvedTriggerVkey === null ||
+        s02BaseClash({
+          triggerKey: resolvedTriggerVkey,
+          baseLetter,
+          currentChar,
+          sessionAssignments,
+        }) !== null
+      ) {
+        // The trigger doesn't resolve (e.g. a custom trigger character left
+        // blank), or its deadkey already maps this base letter to another
+        // character — fall back to prefilling the deadkey method card
+        // (defaults-first, §3c) rather than dismissing outright, so the
+        // author can pick a trigger and Apply manually. Dismisses THIS chip
+        // only — a sibling chip (e.g. S-08) stays offered.
         setMethod("deadkey");
+        setTriggerKey(acceptTriggerKey);
         setDeadkeyBaseLetter(baseLetter);
         markSuggestionEntryDismissed(currentChar, entry.strategyId);
         return;
       }
       // The id + accent char come from the shared S-02 seam
       // (resolveS02DeadkeyIdentity) — the same call handleApply's manual
-      // deadkey method makes, so the two write paths cannot drift. The
-      // numeric id is freshly allocated (never the "dead0" fallback).
+      // deadkey method makes, so the two write paths cannot drift. The id is
+      // the trigger's existing session deadkey, else freshly allocated.
       const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
-        triggerKey,
+        triggerKey: acceptTriggerKey,
         triggerResolution,
         workingIr,
         sessionAssignments,
@@ -2609,6 +2983,7 @@ export function MechanismGallery({
         triggerVkey: resolvedTriggerVkey,
         deadkeyName,
         accentChar,
+        escapes: newTriggerEscapes(resolvedTriggerVkey),
       });
       // S-02 case-pair proposal — same companion the manual deadkey Apply
       // raises (see handleApply's method === "deadkey" branch): the base
@@ -2631,7 +3006,7 @@ export function MechanismGallery({
               a.target === counterpart &&
               a.mechanisms.some(
                 (m) =>
-                  m.patternId === PATTERN_DEADKEY &&
+                  isDeadkeyPatternId(m.patternId) &&
                   m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
               ),
           ),
@@ -2644,12 +3019,16 @@ export function MechanismGallery({
       return;
     }
     recordAssignments([...sessionAssignments, assignment]);
+    raiseDeadkeyEscapes(assignment);
     // The successful accept's own mechanism is now recorded with this
     // strategyId — recordedSuggestionStrategyIds (above) filters this ONE
     // chip out of visibleSuggestions on the next render; a sibling chip with
     // a DIFFERENT strategyId is untouched. Marking it dismissed here too is
     // redundant-but-harmless belt-and-braces (it never needs to reappear).
     markSuggestionEntryDismissed(currentChar, entry.strategyId);
+    // #2300 G3: if this accept shadowed a still-needed glyph, propose its
+    // demotion (never blocks the accept — it already happened).
+    maybeRaiseDisplacement(assignment);
     if (raltCompanionModifiers !== null) {
       proposeCompanion({
         mechanism: "ralt-layer",
@@ -2686,8 +3065,11 @@ export function MechanismGallery({
     sessionAssignments,
     recordAssignments,
     resetMethodState,
+    raiseDeadkeyEscapes,
+    newTriggerEscapes,
     markSuggestionEntryDismissed,
     proposeCompanion,
+    maybeRaiseDisplacement,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2698,6 +3080,32 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
   // Apply action
   // ---------------------------------------------------------------------------
+
+  // The character the deadkey card's trigger already types with its base
+  // letter, when that isn't the current character — applying would leave the
+  // current character unreachable, so Apply is blocked and the card says so.
+  const deadkeyClashOutput = useMemo(() => {
+    if (currentChar === null || method !== "deadkey") return null;
+    const vkey = resolvedVkeyOf(
+      resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, TRIGGER_KEY_RESOLVE_OPTIONS),
+    );
+    const base = resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions);
+    if (vkey === null || !base.ok) return null;
+    return s02BaseClash({
+      triggerKey: vkey,
+      baseLetter: base.value,
+      currentChar,
+      sessionAssignments,
+    });
+  }, [
+    currentChar,
+    method,
+    triggerKey,
+    triggerKeyCustomChar,
+    deadkeyBaseLetter,
+    deadkeyBaseLetterResolveOptions,
+    sessionAssignments,
+  ]);
 
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
@@ -2732,7 +3140,8 @@ export function MechanismGallery({
           TRIGGER_KEY_RESOLVE_OPTIONS,
         ),
       ) !== null &&
-      resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions).ok
+      resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions).ok &&
+      deadkeyClashOutput === null
     );
   }, [
     currentChar,
@@ -2744,6 +3153,7 @@ export function MechanismGallery({
     selectedSwapKeyCustomChar,
     raltTokens,
     deadkeyBaseLetterResolveOptions,
+    deadkeyClashOutput,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2809,6 +3219,10 @@ export function MechanismGallery({
     // SequenceBuilderPanel), so the guard above already returned.
 
     let assignment: MechanismAssignment;
+    // The #2300 displacement check derives the taken slot(s) from the
+    // recorded assignment itself (see maybeRaiseDisplacement) — the
+    // deadkey branch takes no slot (a deadkey composes on top of a base
+    // keystroke and shadows nothing) and yields no slot entries there.
 
     if (method === "deadkey") {
       const base = resolveCharInput(
@@ -2826,9 +3240,9 @@ export function MechanismGallery({
       // (resolveS02DeadkeyIdentity) — the same call the S-02 suggestion
       // accept makes, so the two write paths cannot drift. accentChar keeps
       // the old convention (the trigger key's literal character, so
-      // trigger+trigger escapes back to the bare character); the id is
-      // always freshly allocated via allocateDeadkeyId — the "dead0"
-      // forced derivation is gone.
+      // trigger+trigger escapes back to the bare character); the id is the
+      // trigger's existing session deadkey, else freshly allocated via
+      // allocateDeadkeyId — the "dead0" forced derivation is gone.
       const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
         triggerKey,
         triggerResolution,
@@ -2841,6 +3255,7 @@ export function MechanismGallery({
         triggerVkey: resolvedTriggerVkey,
         deadkeyName,
         accentChar,
+        escapes: newTriggerEscapes(resolvedTriggerVkey),
       });
 
       // S-02 case-pair proposal: the parallel combo case-shifts the BASE
@@ -2868,7 +3283,7 @@ export function MechanismGallery({
               a.target === counterpart &&
               a.mechanisms.some(
                 (m) =>
-                  m.patternId === PATTERN_DEADKEY &&
+                  isDeadkeyPatternId(m.patternId) &&
                   m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
               ),
           ),
@@ -3068,6 +3483,10 @@ export function MechanismGallery({
     }
 
     recordAssignments([...sessionAssignments, assignment]);
+    raiseDeadkeyEscapes(assignment);
+    // #2300 G3: if this apply shadowed a still-needed glyph, propose its
+    // demotion (never blocks the apply — it already happened).
+    maybeRaiseDisplacement(assignment);
     resetMethodState();
   }, [
     currentChar,
@@ -3086,6 +3505,9 @@ export function MechanismGallery({
     sessionAssignments,
     resetMethodState,
     deadkeyBaseLetterResolveOptions,
+    maybeRaiseDisplacement,
+    raiseDeadkeyEscapes,
+    newTriggerEscapes,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -3342,6 +3764,170 @@ export function MechanismGallery({
     confirmComboCompanion,
   ]);
 
+  // ---------------------------------------------------------------------------
+  // Displacement (demotion) — confirm handler (#2300, gate G3)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build the demotion assignment for `targetChar` under the pending
+   * proposal: an S-08 RAlt assignment on the SAME key (rank 1), or — only
+   * when the RAlt slot was taken/unavailable at propose time — an S-02
+   * deadkey assignment built through the shared buildDeadkeyAssignment /
+   * resolveS02DeadkeyIdentity seam (the demoted glyph is its own base
+   * letter: trigger + its old key's letter produces it again). Returns
+   * null when the shape cannot be built (unresolvable trigger / combo).
+   */
+  const buildDemotionAssignment = useCallback(
+    (targetChar: string): MechanismAssignment | null => {
+      if (pendingDisplacement === null) return null;
+      if (pendingDisplacement.demotionMethod === "ralt") {
+        let altgrKeyList: string;
+        try {
+          altgrKeyList = comboToKeySpec(
+            canonicalizeCombo(["RALT"]),
+            pendingDisplacement.vkey,
+          );
+        } catch {
+          return null;
+        }
+        return {
+          scope: "individual",
+          target: targetChar,
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_RALT,
+              strategyId: "S-08",
+              slotValues: {
+                altgrKeyList,
+                altgrOutputList: targetChar,
+              },
+            },
+          ],
+          source: "user",
+        };
+      }
+      // The demoted glyph is typed as trigger + itself — propose its trigger
+      // on its own (one deadkey per purpose), not the current character's.
+      const demotionTriggerKey = proposeS02TriggerKey({
+        currentChar: targetChar,
+        baseLetter: targetChar,
+        sessionAssignments,
+        workingIr,
+      });
+      const triggerResolution = resolveKeyPickerSelection(
+        demotionTriggerKey,
+        "",
+        TRIGGER_KEY_RESOLVE_OPTIONS,
+      );
+      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
+      if (resolvedTriggerVkey === null) return null;
+      if (
+        s02BaseClash({
+          triggerKey: resolvedTriggerVkey,
+          baseLetter: targetChar,
+          currentChar: targetChar,
+          sessionAssignments,
+        }) !== null
+      ) {
+        return null;
+      }
+      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
+        triggerKey: demotionTriggerKey,
+        triggerResolution,
+        workingIr,
+        sessionAssignments,
+      });
+      return buildDeadkeyAssignment({
+        currentChar: targetChar,
+        baseLetter: targetChar,
+        triggerVkey: resolvedTriggerVkey,
+        deadkeyName,
+        accentChar,
+      });
+    },
+    [pendingDisplacement, workingIr, sessionAssignments],
+  );
+
+  /**
+   * Confirm the demotion proposal. Direction (orthography tier, steer 2):
+   *   - demote-incumbent: record the demotion for the displaced glyph.
+   *   - demote-incoming: the convenience character loses the primary slot
+   *     — record the demotion for the INCOMING character and REMOVE its
+   *     primary-slot assignment, so the core character's primary is
+   *     never shadowed.
+   * Stale-proposal guard mirrors the companion's (FR-008): the displacing
+   * assignment must still be present by reference, or the proposal is
+   * dismissed and nothing is recorded. (The both-core proposal never
+   * reaches this handler — its confirm is "Keep both", a dismissal; its
+   * demotion override is handleBothCoreDemoteOverride below.)
+   */
+  const handleDisplacementConfirm = useCallback(() => {
+    if (pendingDisplacement === null) return;
+    if (!sessionAssignments.includes(pendingDisplacement.baseAssignment)) {
+      clearDisplacement();
+      return;
+    }
+    if (pendingDisplacement.direction === "demote-incoming") {
+      const demotionAssignment = buildDemotionAssignment(
+        pendingDisplacement.incomingChar,
+      );
+      if (demotionAssignment === null) {
+        clearDisplacement();
+        return;
+      }
+      const withoutPrimary = sessionAssignments.filter(
+        (a) => a !== pendingDisplacement.baseAssignment,
+      );
+      recordAssignments([...withoutPrimary, demotionAssignment]);
+      clearDisplacement();
+      return;
+    }
+    const demotionAssignment = buildDemotionAssignment(
+      pendingDisplacement.displacedChar,
+    );
+    if (demotionAssignment === null) {
+      clearDisplacement();
+      return;
+    }
+    recordAssignments([...sessionAssignments, demotionAssignment]);
+    clearDisplacement();
+  }, [
+    pendingDisplacement,
+    sessionAssignments,
+    recordAssignments,
+    clearDisplacement,
+    buildDemotionAssignment,
+  ]);
+
+  /**
+   * Both-core explicit author override: the author chose to demote the
+   * displaced core glyph anyway (the banner's non-default choice). This
+   * is never the default button — the default keeps both primaries.
+   */
+  const handleBothCoreDemoteOverride = useCallback(() => {
+    if (pendingDisplacement === null) return;
+    if (!sessionAssignments.includes(pendingDisplacement.baseAssignment)) {
+      clearDisplacement();
+      return;
+    }
+    const demotionAssignment = buildDemotionAssignment(
+      pendingDisplacement.displacedChar,
+    );
+    if (demotionAssignment === null) {
+      clearDisplacement();
+      return;
+    }
+    recordAssignments([...sessionAssignments, demotionAssignment]);
+    clearDisplacement();
+  }, [
+    pendingDisplacement,
+    sessionAssignments,
+    recordAssignments,
+    clearDisplacement,
+    buildDemotionAssignment,
+  ]);
+
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
   // dimension — see excludeSequenceMechanisms above).
@@ -3405,12 +3991,23 @@ export function MechanismGallery({
       ) {
         clearCompanion();
       }
+      // Same proactive dismissal for a pending displacement proposal
+      // (Cycle 4 P2-d): its confirm-time includes() guard is the backstop,
+      // not a reason to leave the banner standing over a removed base.
+      if (
+        pendingDisplacementBase !== null &&
+        !next.includes(pendingDisplacementBase)
+      ) {
+        clearDisplacement();
+      }
     },
     [
       sessionAssignments,
       recordAssignments,
       pendingCompanionBase,
       clearCompanion,
+      pendingDisplacementBase,
+      clearDisplacement,
     ],
   );
 
@@ -3448,12 +4045,21 @@ export function MechanismGallery({
       ) {
         clearCompanion();
       }
+      // Same for a pending displacement proposal (Cycle 4 P2-d).
+      if (
+        pendingDisplacementBase !== null &&
+        !next.includes(pendingDisplacementBase)
+      ) {
+        clearDisplacement();
+      }
     },
     [
       sessionAssignments,
       recordAssignments,
       pendingCompanionBase,
       clearCompanion,
+      pendingDisplacementBase,
+      clearDisplacement,
     ],
   );
 
@@ -4195,6 +4801,7 @@ export function MechanismGallery({
             preAugmentSessionAwareSet={baseProducedSet}
             markedSet={markedDesktopSet}
             loanwordSet={loanwordSet}
+            composedSet={composedStripSet}
           />
         )}
 
@@ -4315,7 +4922,7 @@ export function MechanismGallery({
                   gap: 10,
                 }}
               >
-                {visibleSuggestions.map((entry) => {
+                {orderedVisibleSuggestions.map((entry) => {
                   // Keycap convention (physical-key-naming ambiguity fix): the
                   // physical key is named by its unshifted, lowercase glyph and
                   // boxed as a keycap, with the word "key" in the surrounding
@@ -4337,6 +4944,70 @@ export function MechanismGallery({
                   const quotedChar =
                     currentChar !== null ? `'${displayChar(currentChar)}'` : "";
                   const comboTokens = suggestionComboTokensFor(entry);
+                  // Issue #331: provenance expressed ON the chip (spec
+                  // 085 FR-A2's pattern) — the candidate's stored
+                  // priorSource/priorCount metadata, framed by the
+                  // author's community context when they gave one.
+                  // Display only: ranking, gating, and accept/deny are
+                  // untouched, and the proposal stays overridable.
+                  const provenance = provenanceForCandidate(
+                    entry.topCandidate,
+                    communityContext,
+                  );
+                  // Issue #2300: the weighted rationale line — why this
+                  // slot, in plain words, with the cost and its demotion
+                  // named when the slot is occupied (gate G2 chips carry
+                  // the trade-off wording from buildRationaleLine itself).
+                  // Display only, like provenance: the score ordered the
+                  // chips (orderedVisibleSuggestions) but accept/deny
+                  // behaviour is unchanged.
+                  const scored = suggestionScores.get(entry);
+                  const rationaleText =
+                    scored !== undefined && currentChar !== null
+                      ? buildRationaleLine(scored, currentChar)
+                      : null;
+                  let provenanceText: string | null = null;
+                  if (provenance !== null) {
+                    if (provenance.kind === "corpus-community") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceCommunity",
+                        message: plural(provenance.priorCount, {
+                          one: "Communities like yours chose this placement — attested by # keyboard in the corpus.",
+                          other:
+                            "Communities like yours chose this placement — attested by # keyboards in the corpus.",
+                        }),
+                      });
+                    } else if (provenance.kind === "corpus") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceCorpus",
+                        message: plural(provenance.priorCount, {
+                          one: "Attested by # keyboard in the corpus.",
+                          other: "Attested by # keyboards in the corpus.",
+                        }),
+                      });
+                    } else if (provenance.anchor === "unicode-decomp") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceDecomp",
+                        message:
+                          "Suggested from this character's own parts (its Unicode decomposition).",
+                      });
+                    } else if (provenance.anchor === "phonetic") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenancePhonetic",
+                        message: `Suggested because this character sounds like the ${keyName} key.`,
+                      });
+                    } else if (provenance.anchor === "confusable") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceConfusable",
+                        message: `Suggested because this character looks like the ${keyName} key.`,
+                      });
+                    } else {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceManual",
+                        message: "Suggested from the studio's curated placements.",
+                      });
+                    }
+                  }
 
                   let text: ReactNode;
                   let acceptAriaLabel: string;
@@ -4412,6 +5083,39 @@ export function MechanismGallery({
                       >
                         {text}
                       </p>
+                      {provenanceText !== null && (
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 11,
+                            // Same green family as the suggestion text
+                            // above — provenance is part of the proposal,
+                            // not a separate state. Regular weight: it is
+                            // the evidence line, not the headline.
+                            color: GREEN_CHIP_TEXT,
+                            fontFamily: FONT,
+                            fontWeight: 400,
+                          }}
+                        >
+                          {provenanceText}
+                        </p>
+                      )}
+                      {rationaleText !== null && (
+                        <p
+                          data-testid="suggestion-rationale"
+                          style={{
+                            margin: 0,
+                            fontSize: 11,
+                            color: GREEN_CHIP_TEXT,
+                            fontFamily: FONT,
+                            // A gated (G2) chip is a trade-off, not a clean
+                            // suggestion — its line carries the emphasis.
+                            fontWeight: scored?.gated === "G2" ? 600 : 400,
+                          }}
+                        >
+                          {rationaleText}
+                        </p>
+                      )}
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
                           type="button"
@@ -4485,6 +5189,7 @@ export function MechanismGallery({
               onTriggerKeyCustomCharChange={setTriggerKeyCustomChar}
               deadkeyBaseLetter={deadkeyBaseLetter}
               onDeadkeyBaseLetterChange={setDeadkeyBaseLetter}
+              deadkeyClashOutput={deadkeyClashOutput}
               selectedSwapKey={selectedSwapKey}
               onSwapKeyChange={setSelectedSwapKey}
               selectedSwapKeyCustomChar={selectedSwapKeyCustomChar}
@@ -4514,6 +5219,48 @@ export function MechanismGallery({
                 proposal={pendingCompanion}
                 onConfirm={handleCompanionConfirm}
                 onDismiss={dismissCompanion}
+              />
+            )}
+
+            {/* Displacement (demotion) proposal — propose-then-confirm,
+                  never a silent loss (#2300, gate G3). Its own state slot:
+                  it can co-render with the case-pair companion above when
+                  one Apply raised both. */}
+            {pendingDisplacement !== null && (
+              <DisplacementProposalBanner
+                proposal={pendingDisplacement}
+                // Both-core: the DEFAULT action keeps both primaries (a
+                // recorded dismissal — no demotion is picked without
+                // frequency data); demoting the displaced glyph is the
+                // explicit override on the other button. Every other
+                // direction confirms the demotion / dismisses as usual.
+                onConfirm={
+                  pendingDisplacement.direction === "both-core"
+                    ? dismissDisplacement
+                    : handleDisplacementConfirm
+                }
+                onDismiss={
+                  pendingDisplacement.direction === "both-core"
+                    ? handleBothCoreDemoteOverride
+                    : dismissDisplacement
+                }
+              />
+            )}
+
+            {/* Deadkey trigger escapes — raised by a deadkey's first
+                placement; the choice is already applied, the checkboxes
+                edit it live. */}
+            {escapePrompt !== null && (
+              <DeadkeyEscapesBanner
+                triggerKey={escapePrompt.triggerKey}
+                triggerChar={escapePrompt.accentChar}
+                escapes={
+                  recordedDeadkeyEscapes(sessionAssignments, escapePrompt.deadkeyName) ??
+                  new Set<DeadkeyEscape>()
+                }
+                altgrAvailable={!slotOccupancy.has(slotKeyFor(escapePrompt.triggerKey, ["RALT"]))}
+                onToggle={handleEscapeToggle}
+                onDone={() => setEscapePrompt(null)}
               />
             )}
 

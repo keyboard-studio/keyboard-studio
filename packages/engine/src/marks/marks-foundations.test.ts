@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
-import { groupMarkClasses, attestedBasesOf } from "./mark-classes.js";
+import { groupMarkClasses, attestedBasesOf, marksLackingPairingEvidence } from "./mark-classes.js";
 import { proposeAttachments, deriveCaseCounterparts } from "./attachment-proposals.js";
 import {
   dominantTreatment,
@@ -32,6 +32,55 @@ describe("attestedBasesOf", () => {
       ],
     });
     expect([...(attestedBasesOf(a).get(ACUTE) ?? [])]).toEqual(["a", "e"]);
+  });
+});
+
+describe("marksLackingPairingEvidence (#1784)", () => {
+  const CIRCUMFLEX = "̂"; // U+0302
+  const CARON = "̌"; // U+030C
+
+  it("flags every mark when the exemplar lists bare combining marks with no stacks (Bafut bfd)", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "b", "d", "e"],
+      marks: [GRAVE, CIRCUMFLEX, CARON],
+      attestedStacks: [],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([GRAVE, CIRCUMFLEX, CARON]);
+  });
+
+  it("flags only the marks with zero attested bases, in first-appearance order", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "e"],
+      marks: [ACUTE, GRAVE],
+      attestedStacks: [{ base: "e", marks: [ACUTE] }],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([GRAVE]);
+  });
+
+  it("is satisfied by a single attested base (the text-sample harvest case)", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "e"],
+      marks: [GRAVE],
+      attestedStacks: [{ base: "a", marks: [GRAVE] }],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([]);
+  });
+
+  it("never fires for alphabets whose exemplars already pair marks with letters", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "e"],
+      marks: [ACUTE],
+      attestedStacks: [
+        { base: "a", marks: [ACUTE] },
+        { base: "e", marks: [ACUTE] },
+      ],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([]);
+  });
+
+  it("never fires when there are no marks at all", () => {
+    const a = makeConfirmedAlphabet({ bases: ["a", "b"], marks: [], attestedStacks: [] });
+    expect(marksLackingPairingEvidence(a)).toEqual([]);
   });
 });
 
@@ -114,7 +163,7 @@ describe("groupMarkClasses (FR-010)", () => {
     expect(classes).toHaveLength(3);
     expect(classes.map((c) => c.id)).toEqual(["fixed-30-1", "fixed-32-1", "fixed-33-1"]);
     expect(classes.map((c) => c.marks)).toEqual([[FATHA], [KASRA], [SHADDA]]);
-    expect(classes[0]?.label).toBe("Fixed-position marks (position class 30)");
+    expect(classes[0]?.label).toBe("Marks in a fixed position");
   });
 
   it("buckets ccc 233 (double breve below) as below — the hand-rolled table got this wrong", () => {

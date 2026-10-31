@@ -323,3 +323,107 @@ describe("runLiveExtraction — failure and idempotence", () => {
     expect(store.decisions["copyright-holder"]).toBe(before);
   });
 });
+
+describe("runLiveExtraction — pf_troubleshooting proposal (issue #1800)", () => {
+  const proposal =
+    "Nothing appears when I press a key - press the next key, and the character appears; some characters on this keyboard are typed in two steps.";
+
+  it("seeds help-troubleshooting from phaseF.troubleshootingProposal when the gate is open", async () => {
+    const gateMod = (await import("../survey/questions/f/pf_more_detail_gate.ts")).default;
+    const troubleshootingMod = (await import("../survey/questions/f/pf_troubleshooting.ts")).default;
+    const store = fakeStore({
+      "help-more-detail": { id: "help-more-detail", value: "true", provenance: "asked" },
+    });
+    const result = runLiveExtraction({
+      modules: [gateMod, troubleshootingMod],
+      ctx: ctx({ phaseF: { troubleshootingProposal: proposal } }),
+      store,
+    });
+    expect(result.seeded).toContain("help-troubleshooting");
+    expect(store.decisions["help-troubleshooting"]).toEqual({
+      id: "help-troubleshooting",
+      value: proposal,
+      provenance: "extracted",
+      source: "basic_kbdfr",
+      inputs: { "help-more-detail": "true" },
+    });
+  });
+
+  it("seeds nothing when the wiring computed no proposal", async () => {
+    const gateMod = (await import("../survey/questions/f/pf_more_detail_gate.ts")).default;
+    const troubleshootingMod = (await import("../survey/questions/f/pf_troubleshooting.ts")).default;
+    const store = fakeStore({
+      "help-more-detail": { id: "help-more-detail", value: "true", provenance: "asked" },
+    });
+    const result = runLiveExtraction({
+      modules: [gateMod, troubleshootingMod],
+      ctx: ctx({ phaseF: {} }),
+      store,
+    });
+    expect(result.seeded).not.toContain("help-troubleshooting");
+    expect(store.decisions["help-troubleshooting"]).toBeUndefined();
+  });
+});
+
+describe("buildLiveExtractContext — base-help troubleshooting extraction (issue #2206)", () => {
+  // The surviving pair from basic_kbdinben's real help page, with its
+  // Fonts-subsection boilerplate (see lib/baseHelpTroubleshooting.test).
+  const BASE_HELP = `<h2>Troubleshooting</h2>
+<h4> Fonts</h4>
+<p class='keymanweb'>If you see squares when you type, please read the <a href="https://help.keyman.com/troubleshooting/#boxes">KeymanWeb troubleshooting guide</a>.</p>
+<h4>Problem Solving</h4>
+<p>If a vowel does not combine with a consonant, make sure you have typed the consonant first.</p>`;
+  const EXTRACTED_LINE =
+    "If a vowel does not combine with a consonant, make sure you have typed the consonant first.";
+
+  async function buildCtx(mode: "copy" | "adapt") {
+    const { buildLiveExtractContext } = await import("./liveExtraction.ts");
+    const { useWorkingCopyStore } = await import("../stores/workingCopyStore.ts");
+    const { createVirtualFS } = await import("@keyboard-studio/contracts");
+    const catalog = {
+      id: "basic_kbdinben",
+      displayName: "Bengali Inscript",
+      languages: ["bn"],
+    } as StartKeyboard;
+    if (mode === "copy") {
+      useWorkingCopyStore
+        .getState()
+        .instantiateFromStart(catalog, { vfs: createVirtualFS(), ir: fixtureIR() });
+      // The Track 1 retention shape: prose slice null, extraction slice set.
+      useWorkingCopyStore.getState().setStartHelpPhpText(null);
+      useWorkingCopyStore.getState().setBaseHelpPhpTextForExtraction(BASE_HELP);
+    } else {
+      useWorkingCopyStore
+        .getState()
+        .instantiateFromExisting(catalog, { vfs: createVirtualFS(), ir: fixtureIR() });
+      useWorkingCopyStore.getState().setStartHelpPhpText(BASE_HELP);
+      useWorkingCopyStore.getState().setBaseHelpPhpTextForExtraction(null);
+    }
+    return { ctx: buildLiveExtractContext(), useWorkingCopyStore };
+  }
+
+  it("on Track 1, offers the extracted line through phaseF.troubleshootingProposal while the prose slice stays null", async () => {
+    const { ctx, useWorkingCopyStore } = await buildCtx("copy");
+    expect(ctx.phaseF?.troubleshootingProposal).toBe(EXTRACTED_LINE);
+    expect(useWorkingCopyStore.getState().startHelpPhpText).toBeNull();
+    useWorkingCopyStore.getState().reset();
+  });
+
+  it("on Track 2 (adapt), offers no extracted lines — the section already ships in the inherited prose", async () => {
+    const { ctx, useWorkingCopyStore } = await buildCtx("adapt");
+    expect(ctx.phaseF?.troubleshootingProposal).toBeUndefined();
+    useWorkingCopyStore.getState().reset();
+  });
+
+  it("on Track 1 with no retained help text, offers nothing from extraction", async () => {
+    const { buildLiveExtractContext } = await import("./liveExtraction.ts");
+    const { useWorkingCopyStore } = await import("../stores/workingCopyStore.ts");
+    const { createVirtualFS } = await import("@keyboard-studio/contracts");
+    useWorkingCopyStore.getState().instantiateFromStart(
+      { id: "basic_kbdinben", displayName: "Bengali Inscript", languages: ["bn"] } as StartKeyboard,
+      { vfs: createVirtualFS(), ir: fixtureIR() },
+    );
+    expect(buildLiveExtractContext().phaseF?.troubleshootingProposal).toBeUndefined();
+    useWorkingCopyStore.getState().reset();
+  });
+});

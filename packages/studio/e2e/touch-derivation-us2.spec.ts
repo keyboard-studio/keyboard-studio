@@ -249,6 +249,8 @@ async function carveCharacters(
   for (const ch of chars) {
     const glyph = page.getByRole("button", { name: new RegExp(`^${ch}\\s`, "u") });
     await expect(glyph).toBeVisible();
+    // Spec 106 FR-042: a suggested discard arrives marked (Continue applies it).
+    if ((await glyph.getAttribute("aria-pressed")) === "true") continue;
     await glyph.click();
 
     // A character that belongs to a recognized pattern (e.g. an S-01 "Simple
@@ -263,6 +265,8 @@ async function carveCharacters(
 
   const survivorGlyph = page.getByRole("button", { name: new RegExp(`^${survivor}\\s`, "u") });
   await expect(survivorGlyph).toBeVisible();
+  // A survivor marked as a suggested discard is kept explicitly.
+  if ((await survivorGlyph.getAttribute("aria-pressed")) === "true") await survivorGlyph.click();
   await expect(survivorGlyph).toHaveAttribute("aria-pressed", "false");
 
   await page.getByTestId("carve-continue").click();
@@ -510,16 +514,16 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     // tablet skeleton landed, and every assertion under them stopped running.
     expect(Object.keys(touchJson), "reseed emits exactly one tablet platform").toEqual(["tablet"]);
 
-    // default + shift + numeric layers present. The "rightalt" secondary layer
-    // is also expected here — pid_piaroa's surviving RALT-modified rules put
-    // it there (see the fixture-choice rationale above), and it is where the
-    // survivor character below lives; its presence does not contradict
-    // SC-002's "default + shift + numeric" wording, which names the
-    // always-present trio, not an exhaustive layer list.
+    // default + shift layers present, and no symbols layer: a reseed emits
+    // only layers of physical keys. The "rightalt" secondary layer is also
+    // expected here — pid_piaroa's surviving RALT-modified rules put it there
+    // (see the fixture-choice rationale above), and it is where the survivor
+    // character below lives.
     const layerIds = touchJson.tablet?.layer?.map((l) => l.id) ?? [];
-    for (const requiredLayer of ["default", "shift", "numeric"]) {
+    for (const requiredLayer of ["default", "shift"]) {
       expect(layerIds, `expected a "${requiredLayer}" layer`).toContain(requiredLayer);
     }
+    expect(layerIds, "a reseed emits no symbols layer").not.toContain("numeric");
     expect(layerIds, 'surviving RALT rules must produce a "rightalt" layer').toContain("rightalt");
 
     // NOTE: no "<=10 keys per row" assertion here any more. That was

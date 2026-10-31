@@ -914,6 +914,52 @@ describe("applyAssignments — deadkey_single_tap (S-02) merge by triggerKey acr
     ).toHaveLength(1);
     expect(kmn.match(/\+ \[K_QUOTE\] > dk\(acute\)/g) ?? []).toHaveLength(1);
   });
+
+  describe("escapes slot — which trigger escapes the author kept", () => {
+    const caron = (target: string, base: string, escapes?: string): MechanismAssignment => {
+      const a = makeDeadkeyAssignment(target, {
+        triggerKey: "K_COLON",
+        deadkeyName: "3000",
+        baseLetters: base,
+        accentedForms: target,
+        accentChar: ";",
+      });
+      if (escapes !== undefined) a.mechanisms[0]!.slotValues!["escapes"] = escapes;
+      return a;
+    };
+    const apply = (assignments: MechanismAssignment[]) => {
+      const pattern = getById("deadkey_single_tap")!;
+      return applyAssignments(assignments, (id) => (id === pattern.id ? pattern : undefined), BASE_KMN_DEADKEY);
+    };
+
+    it("keeps both the double-tap and the space escape when no escapes slot was recorded", () => {
+      const { kmn } = apply([caron("ǎ", "a")]);
+      expect(kmn).toContain("dk(3000) + [K_COLON] > ';'");
+      expect(kmn).toContain("dk(3000) + [K_SPACE] > ';'");
+    });
+
+    it("drops the escapes the author left out", () => {
+      const { kmn } = apply([caron("ǎ", "a", "double-tap")]);
+      expect(kmn).toContain("dk(3000) + [K_COLON] > ';'");
+      expect(kmn).not.toContain("[K_SPACE]");
+      expect(kmn).not.toContain("[RALT K_COLON]");
+      expect(apply([caron("ǎ", "a", "")]).kmn).not.toMatch(/dk\(3000\) \+ \[K_(COLON|SPACE)\] >/);
+    });
+
+    it("adds AltGr + trigger for the altgr escape", () => {
+      const { kmn } = apply([caron("ǎ", "a", "double-tap space altgr")]);
+      expect(kmn).toContain("+ [RALT K_COLON] > U+003B");
+      // Only once for a merged deadkey.
+      expect(apply([caron("ǎ", "a", "altgr"), caron("ě", "e")]).kmn.match(/\[RALT K_COLON\]/g)).toHaveLength(1);
+    });
+
+    it("a merged deadkey keeps the escapes its first placement recorded", () => {
+      const { kmn } = apply([caron("ǎ", "a", "space"), caron("ě", "e")]);
+      expect(kmn).toContain("store(dk_3000_bases)  'ae'");
+      expect(kmn).toContain("dk(3000) + [K_SPACE] > ';'");
+      expect(kmn).not.toContain("dk(3000) + [K_COLON] >");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1140,5 +1186,78 @@ describe("applyAssignments — deadkey_single_tap cross-name trigger collision (
     // And the interleaved acute refs still merged (no pairs lost).
     expect(kmn).toContain("store(dk_acute_bases)  'ae'");
     expect(kmn).toContain("store(dk_acute_output) 'áé'");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Group names are case-insensitive in Keyman: a fragment's `group(main)` must
+// merge into a base keyboard's `group(Main)` rather than append a duplicate
+// group that kmcmplib rejects.
+// ---------------------------------------------------------------------------
+
+describe("applyAssignments — case-insensitive group-name merge", () => {
+  const BASE_CAPITAL_MAIN =
+    "store(&VERSION) '10.0'\n" +
+    "begin Unicode > use(Main)\n" +
+    "\n" +
+    "group(Main) using keys\n" +
+    "\n" +
+    "+ [K_A] > 'a'\n";
+
+  const RULES_PATTERN: Pattern = makePattern({
+    id: "case_group_rules_pattern",
+    title: "Case group rules (test fixture)",
+    description: "Fragment declaring a lowercase group(main).",
+    category: "substitute",
+    appliesTo: [],
+    questions: [{ id: "kmnRules", prompt: "rules", answerType: "text" }],
+    kmnFragment: "group(main) using keys\n{{kmnRules}}\n",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "",
+    reviewDate: "2026-01-01",
+  });
+
+  const BARE_PATTERN: Pattern = makePattern({
+    ...RULES_PATTERN,
+    id: "case_bare_rules_pattern",
+    kmnFragment: "{{kmnRules}}\n",
+  });
+
+  function assign(patternId: string): MechanismAssignment {
+    return {
+      scope: "individual",
+      target: "b",
+      modality: "physical",
+      mechanisms: [{ patternId, slotValues: { kmnRules: "+ [K_B] > 'b'" } }],
+    };
+  }
+
+  for (const pattern of [RULES_PATTERN, BARE_PATTERN]) {
+    it(`merges into group(Main) without a duplicate (${pattern.id})`, () => {
+      const { kmn } = applyAssignments([assign(pattern.id)], makeResolver([pattern]), BASE_CAPITAL_MAIN);
+      const { ir } = parseKmn(kmn, "case-group-test");
+      expect(ir.groups).toHaveLength(1);
+      expect(ir.groups[0]?.name).toBe("Main");
+      expect(kmn).toMatch(/group\(Main\) using keys/);
+      expect(kmn).not.toMatch(/group\(main\)/);
+      expect(kmn).toContain("+ [K_B] > 'b'");
+      expect(kmn).toContain("+ [K_A] > 'a'");
+    });
+  }
+
+  it("folds bare rules into a fragment's group(Main) block (one group, base header kept)", () => {
+    const mixed: Pattern = makePattern({
+      ...RULES_PATTERN,
+      id: "case_bare_plus_group_pattern",
+      kmnFragment: "+ [K_C] > 'c'\ngroup(Main) using keys\n{{kmnRules}}\n",
+    });
+    const { kmn } = applyAssignments([assign(mixed.id)], makeResolver([mixed]), BASE_CAPITAL_MAIN);
+    const { ir } = parseKmn(kmn, "case-group-bare-test");
+    expect(ir.groups).toHaveLength(1);
+    expect(ir.groups[0]?.name).toBe("Main");
+    expect(kmn).toContain("+ [K_C] > 'c'");
+    expect(kmn).toContain("+ [K_B] > 'b'");
   });
 });

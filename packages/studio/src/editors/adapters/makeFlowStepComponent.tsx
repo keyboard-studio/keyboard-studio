@@ -81,7 +81,7 @@ const SCREEN_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
 // ---------------------------------------------------------------------------
 
 export interface FlowStepDeps {
-  localStart: { displayName: string } | null;
+  localStart: { displayName: string; languages?: string[] } | null;
   /**
    * The live decision set (spec 089 FR-005). Everything the per-flow options
    * used to read from stored session fields — the identity result, the
@@ -177,6 +177,13 @@ export interface FlowStepOptions<Extracted = unknown> {
      * seed is still saved as a proposal, just with no source.
      */
     getSeedSource?: (questionId: string, deps: FlowStepDeps) => DecisionProposalSource | undefined;
+    /**
+     * Optional one-line reason for a seed, shown under the field as the
+     * seed's provenance caption (forwarded to SurveyRunner's
+     * getSeedProvenance). A flow supplies this when its proposal has a
+     * human-readable "why" the author should see before confirming it.
+     */
+    getSeedCaption?: (questionId: string, deps: FlowStepDeps) => string | undefined;
     onAnswerCommit?: (questionId: string, value: string | string[] | undefined, deps: FlowStepDeps) => void;
     /**
      * Optional per-question `required` override (spec 079 FR-009). Forwarded
@@ -312,6 +319,17 @@ export function makeFlowStepComponent<Extracted>(
       [],
     );
 
+    const getSeedProvenance = useCallback(
+      options.seeds?.getSeedCaption
+        ? (questionId: string) => {
+            const caption = options.seeds!.getSeedCaption!(questionId, depsRef.current);
+            return caption !== undefined ? { caption } : undefined;
+          }
+        : (_questionId: string) => undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    );
+
     const onAnswerCommit = useCallback(
       options.seeds?.onAnswerCommit
         ? (questionId: string, value: string | string[] | undefined) =>
@@ -360,6 +378,7 @@ export function makeFlowStepComponent<Extracted>(
         {...(onBack ? { onBack } : {})}
         {...(options.seeds ? { getSeedValue } : {})}
         {...(options.seeds?.getSeedSource ? { getSeedSource } : {})}
+        {...(options.seeds?.getSeedCaption ? { getSeedProvenance } : {})}
         {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
         {...(options.seeds?.getRequiredOverride ? { getRequiredOverride } : {})}
         {...(options.usesFindings ? { findingsByQuestionId } : {})}

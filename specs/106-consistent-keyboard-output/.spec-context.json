@@ -1,0 +1,455 @@
+{
+  "workflow": "speckit",
+  "specName": "Consistent keyboard output from base + decisions + carve",
+  "branch": "106-consistent-keyboard-output",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-29T21:31:10.885Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-29T21:42:02.447Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-29T21:42:06.648Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-29T21:43:42.066Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-29T22:22:49.929Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:24:02.799Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:24:03.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:24:40.994Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:33:44.848Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:33:45.201Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:33:45.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T22:42:30.656Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:20.737Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:20.997Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:21.263Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:21.533Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:21.801Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:22.073Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:22.360Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:01:22.647Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-29T23:08:05.130Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T02:34:21.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.639Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.639Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-30T03:37:44.639Z"
+    }
+  ],
+  "telemetryInstanceId": "c5ffbd69-afee-4690-a346-3b60c164a673",
+  "currentTask": "T070",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Stack base unchanged (PR #2358 head 5d3a3e44 = merge-base), ../keyboards at keyboard-studio fork origin/master 435f82d69; pnpm build running"
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added cabecar and dega rows from their .kps (winchus already listed)",
+      "files": [
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Extracted 4 decision records (kbdus/camqwerty/kbdfr/camazerty) plus the p1 walk kmn, with PROVENANCE.md",
+      "files": [
+        "packages/studio/src/lib/__fixtures__/decision-points/records/"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "projectionInputFromState: store-derived input incl. fallbackPolicy, disabled families (+suppressionExemptIds), keep-inert; keyEditOps only via live override (store touchLayoutJson already carries committed edits)",
+      "files": [
+        "packages/studio/src/lib/projectionInput.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Download and preview both build input via projectionInputFromState; hook memo keys unchanged and cover every field",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/hooks/useWorkingCopyTransform.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Parity test (swallow/pass-through, carved rule + disabled family); fails on old callers, passes now; fragment test preview path switched to shared input",
+      "files": [
+        "packages/studio/src/lib/projectionInput.parity.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.fragmentBearing.carve.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Committed 6e01070d and pushed to 106-consistent-keyboard-output (studio 10036/10037, known flake; lint 0 err / 389 warn)"
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Exported loadVfs from sc004Harness and widened it to { id, group }",
+      "files": [
+        "packages/studio/src/test/sc004Harness.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "recordToDecisionSet with explicit per-point allow-lists, decisionPointBases matrix, unit tests incl. committed-fixture drift guard",
+      "files": [
+        "packages/studio/src/test/recordToDecisionSet.ts",
+        "packages/studio/src/test/decisionPointBases.ts",
+        "packages/studio/src/test/recordToDecisionSet.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "checkConsistencyGates G1-G8 (G8 split generated/starting) with pass and fail unit tests per gate",
+      "files": [
+        "packages/studio/src/test/consistencyGates.ts",
+        "packages/studio/src/test/consistencyGates.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "buildDecisionPointFixture: instantiate, replay, install unreplayed slices, buildOutputBundle, simulate, gates",
+      "files": [
+        "packages/studio/src/test/decisionPointFixture.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "fixtures:decision-points script and 20 deterministic decision-point fixtures",
+      "files": [
+        "packages/studio/scripts/genDecisionPoints.ts",
+        "packages/studio/package.json",
+        "packages/studio/src/lib/__fixtures__/decision-points"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "decisionPoint.corpus.test.ts: 4 bases x 5 points x gates, known gaps as it.fails with owning story",
+      "files": [
+        "packages/studio/src/test/decisionPoint.corpus.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Fidelity assertion: p1 kbdus tolerance fixture .kmn is byte-identical to the walk zip .kmn",
+      "files": [
+        "packages/studio/src/test/decisionPoint.corpus.test.ts"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "G8 gate in checkConsistencyGates: generated stores enforced, starting stores it.fails citing #2361",
+      "files": [
+        "packages/studio/src/test/consistencyGates.ts",
+        "packages/studio/src/test/decisionPoint.corpus.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Gate green (corpus 160+41 xfail, unit 58, engine 1429, tsc, lint 0/389); committed 2362f40e, pushed, PR #2362 against km/s02-deadkey-purpose"
+    }
+  }
+}

@@ -278,10 +278,38 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
     const platform = result.layout.platforms.find((p) => p.id === "tablet")!;
 
-    expect(platform.layers.map((l) => l.id)).toEqual(["default", "shift", "numeric"]);
+    expect(platform.layers.map((l) => l.id)).toEqual(["default", "shift"]);
     const defaultLayer = getLayer(result.layout, "default", "tablet")!;
     const row3 = defaultLayer.rows[2]!;
     expect(row3.keys.find((k) => k.id === "T_ks_specials")).toBeUndefined();
+  });
+
+  it("a reseed emits no symbols layer: no numeric layer, no K_SYMBOLS key, exactly five rows on every layer", () => {
+    const result = scaffoldTouchLayoutWithDiagnostics(makeEwondoLikeIR(), "tablet");
+    const platform = result.layout.platforms.find((p) => p.id === "tablet")!;
+
+    expect(platform.layers.map((l) => l.id)).not.toContain("numeric");
+    for (const layer of platform.layers) {
+      expect(layer.rows, `layer ${layer.id}`).toHaveLength(5);
+      const ids = layer.rows.flatMap((r) => r.keys.map((k) => k.id));
+      expect(ids).not.toContain("K_SYMBOLS");
+      expect(ids.filter((id) => id === "K_SPACE")).toHaveLength(1);
+    }
+  });
+
+  it("a symbol the phone path would leave to its numeric layer's literal keys still lands somewhere on the tablet", () => {
+    const ir = makeMinimalIR({
+      groups: [makeGroup([
+        makeCharRule("K_A", [], "a"),
+        makeCharRule("K_3", ["SHIFT"], "#"),
+      ])],
+    });
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+
+    expect(result.unplacedChars).not.toContain("#");
+    const space = getLayer(result.layout, "default", "tablet")!
+      .rows.flatMap((r) => r.keys).find((k) => k.id === "K_SPACE")!;
+    expect((space.sk ?? []).map((k) => k.text)).toContain("#");
   });
 
   it("scaffoldTouchLayoutWithDiagnostics without platformStyle still defaults to 'phone' (phone path unaffected)", () => {

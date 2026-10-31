@@ -11,7 +11,8 @@
 // a few screens. Answering "yes" opens the optional documentation battery.
 // Follows the established Phase B gate pattern (see pb_punctuation_gate).
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
+import { makeBoolValidator } from "../validators.ts";
 
 export const definition = {
   id: "pf_more_detail_gate",
@@ -19,8 +20,8 @@ export const definition = {
   help_text:
     "No is a perfectly good answer — you already have a working help page, and " +
     "answering No finishes with just credits and contact details. Say Yes only " +
-    "if you already know things worth writing down: fonts that render your " +
-    "alphabet, the standard the layout follows, example words, known problems, " +
+    "if you already know things worth writing down: the standard the layout " +
+    "follows, example words, known problems, " +
     "or related keyboards. These are for information you already have, not " +
     "research to go and do. You can come back and add them later.",
   type: "bool" as const,
@@ -31,19 +32,7 @@ export const definition = {
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const v = typeof value === "string" ? value : "";
-  if (v !== "true" && v !== "false") {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please answer Yes or No.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeBoolValidator("Please answer Yes or No.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

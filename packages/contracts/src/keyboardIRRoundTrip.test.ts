@@ -32,6 +32,22 @@ function ruleKB(): IRRule {
 // ---------------------------------------------------------------------------
 
 describe("assertSemanticEquivalence", () => {
+  // #2238: the round-trip oracle keys named deadkeys by VERBATIM name —
+  // identity folds case, fidelity does not. Two IRs differing only in a
+  // named deadkey's spelling are NOT equivalent for round-trip purposes:
+  // a case flip is exactly the fidelity loss the oracle exists to catch.
+  it("distinguishes named deadkeys whose names differ only in case (#2238)", () => {
+    const namedRule = (name: string): IRRule => ({
+      nodeId: "r#named",
+      context: [{ kind: "vkey", name: "K_S", modifiers: [] }],
+      output: [{ kind: "namedDeadkey", name }],
+    });
+    const lower = makeTestIR([makeGroup([namedRule("semicolon")])]);
+    const upper = makeTestIR([makeGroup([namedRule("Semicolon")])]);
+    expect(assertSemanticEquivalence(lower, lower).equivalent).toBe(true);
+    expect(assertSemanticEquivalence(lower, upper).equivalent).toBe(false);
+  });
+
   it("reports equivalent for two identical IRs", () => {
     const ir = makeTestIR([makeGroup([ruleKA(), ruleKB()])]);
     const result = assertSemanticEquivalence(ir, ir);

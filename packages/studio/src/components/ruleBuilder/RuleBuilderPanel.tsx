@@ -112,6 +112,8 @@ function fmtContextElement(el: ContextElement): string {
       return el.modifiers.length > 0 ? `[${el.modifiers.join(" ")} ${el.name}]` : `[${el.name}]`;
     case "deadkey":
       return fmtDeadkey(el.id);
+    case "namedDeadkey":
+      return `dk(${el.name})`;
     case "any":
       return `any(${el.storeRef})`;
     case "notany":
@@ -122,6 +124,8 @@ function fmtContextElement(el: ContextElement): string {
       return `index(${el.storeRef}, ${el.offset})`;
     case "baselayout":
       return el.value ? `baselayout('${el.value}')` : "baselayout";
+    case "if":
+      return `if(${el.store} = '${el.value}')`;
     case "raw":
       return el.text;
   }
@@ -133,6 +137,8 @@ function fmtOutputElement(el: OutputElement): string {
       return fmtCodepoint(el.value);
     case "deadkey":
       return fmtDeadkey(el.id);
+    case "namedDeadkey":
+      return `dk(${el.name})`;
     case "beep":
       return "beep";
     case "nul":

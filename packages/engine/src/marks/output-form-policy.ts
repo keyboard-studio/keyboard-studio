@@ -1,22 +1,44 @@
-// Output-form proposal (spec 071, FR-013..FR-016): ONE whole-keyboard decision
-// — ready-made single characters vs base-plus-mark sequences — computed from
-// the shared posture table (nfc-posture-of-inventory.ts) as an ordered,
-// first-match-wins decision table with authored explanation text and a
-// mandatory default row, modeled on facet-transform/house-target-policy.ts
-// (ordered rows, first-match-wins, authored explanation, mandatory default)
-// with simpler predicate matching.
+// Output-form policy (issue #2297, as narrowed by Matthew's scope ruling
+// 2026-10-19): ONE keyboard-wide composition policy — every marked character
+// the keyboard sends is either a single ready-made character (NFC) or a
+// base-plus-mark sequence (NFD). The author picks ONE policy for the whole
+// keyboard. There is deliberately NO per-mark, per-class, or per-combination
+// composition answer and no author-facing "mixed" option: the only variation
+// is Unicode necessity, applied automatically — under the ready-made policy
+// a combination with no ready-made single character is sent as base plus
+// mark, because there is no single character to send.
+//
+// This supersedes spec 071 FR-013..FR-016's policy table, which derived the
+// proposal from the S2 TREATMENT answer (an own-key mark pushed the keyboard
+// to base-plus-mark) and, when any pair lacked a ready-made form, FORBADE
+// the ready-made answer for the whole keyboard. Both were the conflation
+// #2297 exists to remove: output composition is independent of input order
+// (#2293) and of placement treatment. The proposal here derives from the
+// INPUT ORDER alone — letter first, then mark pairs naturally with
+// base-plus-mark; mark first (or a mark key that waits for the letter) pairs
+// naturally with ready-made — and it is a suggestion only (Art. X): the
+// author confirms or overturns it as the answer to THIS question, and the
+// non-suggested pairing stays choosable (Keyman can rewrite context, so
+// postfix input can emit ready-made characters and mark-first input can
+// emit base plus mark).
 //
 // Designer-facing constraint (SC-005): no explanation below may contain the
-// words "Unicode" or "normalization" — asserted mechanically in tests.
+// words "Unicode" or "normalization" — asserted mechanically in tests. (The
+// fallback above is phrased as "no single character exists to send" for the
+// same reason.)
 
 import type { PosturePair } from "./nfc-posture-of-inventory.js";
-import type { OutputForm } from "@keyboard-studio/contracts";
+import type {
+  BackspaceBehaviour,
+  MarkInputOrder,
+  OutputForm,
+} from "@keyboard-studio/contracts";
 import type { CharNormalizationForm } from "../character-discovery/suggestMissing.js";
 
 // Canonical declaration lives in contracts (confirmedAlphabet.ts) — engine
 // re-exports rather than declaring a divergent copy (contracts is the
 // dependency root and cannot import engine's type back).
-export type { OutputForm };
+export type { BackspaceBehaviour, OutputForm };
 
 /**
  * Maps the chosen whole-keyboard output form to the Unicode normalization
@@ -33,135 +55,100 @@ export function normalizationFormForOutputForm(outputForm: OutputForm | undefine
 }
 
 export interface OutputFormProposal {
+  /** The suggested policy — a proposal (Art. X), never a silent derivation. */
   form: OutputForm;
-  /** Which FR branch fired: a pre-explained notice, or the open FR-016 choice. */
-  presentedAs: "notice" | "open-choice";
   /** Plain-language reason shown with the proposal (consequence-led, no jargon). */
   explanation: string;
   /**
-   * True when at least one attested/accepted pair has NO ready-made form — i.e.
-   * {@link OutputFormInputs.anyPairLacksReadyMade} fired. "ready-made" is then
-   * not a selectable answer for this keyboard at all, so the station must not
-   * offer it as an override.
-   *
-   * DERIVED, never authored per row — see {@link readyMadeUnavailableFor}. A
-   * row that set `form`/`presentedAs` correctly but forgot this flag would
-   * silently re-offer an unrealisable override.
+   * True when at least one attested/accepted pair has NO ready-made form.
+   * Under the ready-made policy those pairs are sent as base plus mark
+   * automatically (Unicode necessity, not an author-facing mix — see the
+   * module doc); the station surfaces that fact as a note, never as a
+   * per-pair question, and it never makes ready-made unchoosable.
    */
-  readyMadeUnavailable: boolean;
-}
-
-/** A policy row's authored outcome: everything on the proposal that is not derived. */
-type OutputFormOutcome = Omit<OutputFormProposal, "readyMadeUnavailable">;
-
-/**
- * `ready-made` is unavailable exactly when the table lands on a base-plus-mark
- * NOTICE. That is the shape of row 1 and of row 1 only: row 2 also proposes
- * base-plus-mark but as an `open-choice`, which by definition fires only when
- * every pair HAS a ready-made form (row 1 would have matched first otherwise),
- * and row 3 proposes `ready-made` itself. Deriving it from the outcome — rather
- * than restating it on each row — means a new row cannot forget it.
- */
-function readyMadeUnavailableFor(outcome: OutputFormOutcome): boolean {
-  return outcome.presentedAs === "notice" && outcome.form === "base-plus-mark";
-}
-
-interface OutputFormPolicyRow {
-  order: number;
-  matches: (inputs: OutputFormInputs) => boolean;
-  result: OutputFormOutcome;
-  isDefault: boolean;
-}
-
-export interface OutputFormInputs {
-  /** True when at least one attested/accepted pair has NO ready-made form. */
   anyPairLacksReadyMade: boolean;
-  /**
-   * True when at least one mark resolves to `own-key` at S2 (spec 052) — i.e.
-   * the keyboard will carry a productive mark key. Replaces the retired
-   * `hasLetterPlusMarkClass`, which asked the same question of an answer type
-   * that no longer exists.
-   */
-  hasOwnKeyMark: boolean;
 }
 
 /**
- * The ordered policy. Row 1 (FR-014): any pair without a ready-made form
- * forces base-plus-mark for the WHOLE keyboard, as a notice. Row 2 (FR-016):
- * everything composes but at least one mark earns a key of its own — both
- * forms are viable, so the decision renders as an open choice with
- * base-plus-mark recommended first. Row 3 (FR-015, default): everything
- * composes and no mark has a key of its own — ready-made, as a notice.
+ * The exact text a base+marks stack is sent as under the recorded policy —
+ * the single emission seam every consumer (carve's needed-set composition,
+ * the produced-vs-needed comparison, generated rules) shares, so they can
+ * never disagree about what a combination IS under a policy.
+ *
+ * - `"base-plus-mark"` (NFD): the literal base followed by its marks, even
+ *   where a ready-made single character exists — and however the combination
+ *   was called up (a mark key after the letter, a mark key before it, a
+ *   waiting mark key, or a dedicated key of its own).
+ * - `"ready-made"` (NFC, also the unset default): the sequence composed as
+ *   far as single characters exist. A combination with a ready-made form
+ *   becomes that one character; a combination without one stays base plus
+ *   mark — automatically, because no single character exists for it.
  */
-const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
-  {
-    order: 1,
-    matches: (i) => i.anyPairLacksReadyMade,
-    result: {
-      form: "base-plus-mark",
-      presentedAs: "notice",
-      explanation:
-        "Backspace will peel one mark off at a time: some of your accented " +
-        "letters have no single ready-made character, so every accented " +
-        "letter is built from its letter plus its mark — keeping backspace " +
-        "and searching consistent across your whole keyboard.",
-    },
-    isDefault: false,
-  },
-  {
-    order: 2,
-    matches: (i) => i.hasOwnKeyMark,
-    result: {
-      form: "base-plus-mark",
-      presentedAs: "open-choice",
-      explanation:
-        "Backspace can work either way for your alphabet. With letter plus " +
-        "mark, one press peels off one mark at a time — matching how your " +
-        "marks attach to many letters. With ready-made characters, one press " +
-        "removes the whole accented letter.",
-    },
-    isDefault: false,
-  },
-  {
-    order: 3,
-    matches: () => true,
-    result: {
-      form: "ready-made",
-      presentedAs: "notice",
-      explanation:
-        "Backspace will remove a whole accented letter in one press: every " +
-        "accented letter in your alphabet has a single ready-made character, " +
-        "and no mark on your keyboard gets a key of its own.",
-    },
-    isDefault: true,
-  },
-];
+export function outputStringForStack(
+  stack: { base: string; marks: readonly string[] },
+  outputForm: OutputForm | undefined,
+): string {
+  const literal = stack.base + stack.marks.join("");
+  return outputForm === "base-plus-mark" ? literal : literal.normalize("NFC");
+}
 
 /**
- * Resolve the whole-keyboard output-form proposal from the posture table and the
- * S2 treatment outcome. First-match-wins over the ordered rows; the table ends
- * in a mandatory default, so this always returns.
+ * Any emitted string under the recorded policy — the seam generated rules
+ * pass every output slot through (spec 106 FR-020). Unlike
+ * {@link outputStringForStack}, the input may itself be precomposed (an
+ * assignment's target `ǎ`), so base-plus-mark decomposes it fully (NFD).
+ * Ready-made composes as far as single characters exist (NFC). `undefined`
+ * (no decision yet) returns `s` untouched, so a keyboard whose author never
+ * reached the marks series emits exactly what it did before.
+ */
+export function outputFormString(s: string, outputForm: OutputForm | undefined): string {
+  if (outputForm === undefined) return s;
+  return s.normalize(outputForm === "base-plus-mark" ? "NFD" : "NFC");
+}
+
+/**
+ * Resolve the output-form SUGGESTION from the author's input-order answer
+ * and the posture table. First-match on the order only:
  *
- * The output-form decision stays a SEPARATE whole-keyboard question (spec 052
- * FR-022) and keeps deriving its proposal from the marks station's answers —
- * only the signal it reads has changed, from the retired mental-model enum to
- * "at least one mark resolves to `own-key`".
+ * - `postfix` (letter, then mark) → suggest `base-plus-mark`: the letter is
+ *   already sent when the mark arrives, so sending letter and mark
+ *   separately is the path that needs no rewriting.
+ * - `prefix` (mark, then letter — including a mark key that waits for its
+ *   letter) → suggest `ready-made`: nothing is sent until the combination is
+ *   complete, so sending the single character is the clean path.
+ *
+ * The posture table contributes NO suggestion input — only the
+ * `anyPairLacksReadyMade` fact the station notes under a ready-made answer.
+ * Treatment contributes nothing at all (#2297 boundary: placement follows
+ * the treatment answer alone; output form must not be inferred from it).
  */
 export function resolveOutputFormProposal(
   posture: PosturePair[],
-  hasOwnKeyMark: boolean,
+  inputOrder: MarkInputOrder,
 ): OutputFormProposal {
-  const inputs: OutputFormInputs = {
-    anyPairLacksReadyMade: posture.some((p) => !p.hasReadyMadeForm),
-    hasOwnKeyMark,
-  };
-  for (const row of OUTPUT_FORM_POLICY) {
-    if (row.matches(inputs)) {
-      return { ...row.result, readyMadeUnavailable: readyMadeUnavailableFor(row.result) };
-    }
+  const anyPairLacksReadyMade = posture.some((p) => !p.hasReadyMadeForm);
+  if (inputOrder === "postfix") {
+    return {
+      form: "base-plus-mark",
+      anyPairLacksReadyMade,
+      explanation:
+        "You type the letter first and then its mark, so we suggest your " +
+        "keyboard sends the letter and the mark as separate characters, in " +
+        "the order they were typed. You can choose single ready-made " +
+        "characters instead — when the mark is typed, your keyboard can " +
+        "replace the letter with the single character.",
+    };
   }
-  // Unreachable: the last row always matches.
-  throw new Error("resolveOutputFormProposal: no policy row matched (missing default row)");
+  return {
+    form: "ready-made",
+    anyPairLacksReadyMade,
+    explanation:
+      "You press the mark before the letter, so nothing is sent until the " +
+      "letter completes the combination — we suggest your keyboard sends " +
+      "each accented letter as one single ready-made character. You can " +
+      "choose letter plus mark instead — the letter and its mark are sent " +
+      "as separate characters once the combination is complete.",
+  };
 }
 
 /**
@@ -171,4 +158,60 @@ export function resolveOutputFormProposal(
  */
 export function hasDecidablePairs(posture: PosturePair[]): boolean {
   return posture.length > 0;
+}
+
+export interface BackspaceProposal {
+  /** The suggested behaviour — a proposal (Art. X), never a silent derivation. */
+  behaviour: BackspaceBehaviour;
+  /** Plain-language reason shown with the proposal (consequence-led, no jargon). */
+  explanation: string;
+}
+
+/**
+ * Resolve the backspace SUGGESTION from the author's CHOSEN output form
+ * (issue #2302; Matthew's model, 2026-10-19: input order, output
+ * composition and backspace are "all interrelated, yet independent").
+ *
+ * The consistent pairings are the proposal: base-plus-mark output pairs
+ * with `peel` (the letter and its marks are separate characters, so a
+ * press can take one mark off), ready-made output pairs with
+ * `whole-stack` (the letter is one character, so a press naturally clears
+ * it whole). The proposal FOLLOWS the composition answer — it is derived
+ * from nothing else — and it is a suggestion only: the author may
+ * override to the other behaviour under either form, and the off-pairings
+ * are realised by generated rules (the stepwise unwrap under ready-made;
+ * whole-stack deletion under base-plus-mark — pattern-apply/mark-guards).
+ */
+export function resolveBackspaceProposal(outputForm: OutputForm): BackspaceProposal {
+  if (outputForm === "base-plus-mark") {
+    return {
+      behaviour: "peel",
+      explanation:
+        "Your keyboard sends the letter and its mark as separate characters, " +
+        "so a backspace press can take the mark off first — we suggest " +
+        "backspace removes one mark at a time. You can choose the whole " +
+        "letter at once instead: your keyboard can add the extra rules " +
+        "that clear a letter and all its marks in a single press.",
+    };
+  }
+  return {
+    behaviour: "whole-stack",
+    explanation:
+      "Your keyboard sends each accented letter as one single character, " +
+      "so backspace naturally removes the whole letter at once — we " +
+      "suggest it does exactly that. You can choose one mark at a time " +
+      "instead: your keyboard can add the extra rules that step a letter " +
+      "down mark by mark before clearing it.",
+  };
+}
+
+/**
+ * The behaviour a form produces with NO generated rules at all — what
+ * backspace does to the emitted text by construction. `peel` under
+ * base-plus-mark (one emitted code point per press), `whole-stack` under
+ * ready-made (the single emitted character clears whole). The other
+ * pairing under each form is the one generation must supply.
+ */
+export function nativeBackspaceBehaviour(outputForm: OutputForm): BackspaceBehaviour {
+  return outputForm === "base-plus-mark" ? "peel" : "whole-stack";
 }

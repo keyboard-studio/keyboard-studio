@@ -1,28 +1,21 @@
 /**
- * Tests for the Layer A' entry-point barrel (index-import-fidelity.ts)
- * and the buildImportReport assembler (import-keyboard.ts).
+ * Tests for the Layer A' entry-point barrel (index-import-fidelity.ts).
  *
  * Covers:
  *   - runImportFidelityParseChecks → returns I1 + I4 findings (no I2, no I3)
- *   - runImportFidelityEmitChecks  → returns I2-stub + I3 findings (no I1, no I4)
- *   - buildImportReport status mapping:
- *       ParseFailure       (parseError set)
- *       RoundTripDivergence (hasRoundTripDivergence = true — future-wired branch)
- *       CleanWithOpaque     (opaqueFeatures present)
- *       Clean               (no errors, no opaque)
- *   - recognizedRatio + opaqueFeatureInventory are surfaced on the report
+ *   - the split emit stage: runImportFidelityEmitChecksSync (I3 + I6, no I2)
+ *     and runImportFidelityRoundTripCheck (I2 only)
  *   - checkSidecarHash re-export from the barrel
  */
 
 import { describe, it, expect } from "vitest";
 import {
   runImportFidelityParseChecks,
-  runImportFidelityEmitChecks,
+  runImportFidelityEmitChecksSync,
+  runImportFidelityRoundTripCheck,
   checkSidecarHash,
 } from "./index-import-fidelity.js";
-import { buildImportReport, importKeyboard } from "../codec/import-keyboard.js";
 import { parse } from "../codec/parse.js";
-import { ImportStatus, createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
@@ -103,11 +96,11 @@ describe("runImportFidelityParseChecks", () => {
     expect(codes).toContain("KM_INFO_OPAQUE_FEATURE_INVENTORY");
   });
 
-  it("does NOT include I2 (KM_HINT_ROUND_TRIP_DEFERRED) — that is an emit-stage check", () => {
+  it("does NOT include I2 (KM_HINT_ROUND_TRIP_UNAVAILABLE) — that is an emit-stage check", () => {
     const parseResult = parse(CLEAN_KMN, "test");
     const findings = runImportFidelityParseChecks(parseResult, CLEAN_KMN);
     const codes = findings.map((f) => f.code);
-    expect(codes).not.toContain("KM_HINT_ROUND_TRIP_DEFERRED");
+    expect(codes).not.toContain("KM_HINT_ROUND_TRIP_UNAVAILABLE");
   });
 
   it("does NOT include I3 (KM_WARN_HEADER_FIELD_MISSING) — that is an emit-stage check", () => {
@@ -135,43 +128,46 @@ describe("runImportFidelityParseChecks", () => {
 });
 
 // ---------------------------------------------------------------------------
-// runImportFidelityEmitChecks
+// The split emit stage (publish-after-ready): the studio's pre-`ready` path
+// runs only the sync half; I2 runs separately after `ready` publishes.
 // ---------------------------------------------------------------------------
 
-describe("runImportFidelityEmitChecks", () => {
-  it("includes KM_HINT_ROUND_TRIP_DEFERRED (I2 stub) finding", async () => {
+/** Emitted text missing the &COPYRIGHT store the IR header carries — I3 fires. */
+const EMITTED_MISSING_COPYRIGHT = [
+  "store(&VERSION) '10.0'",
+  "store(&NAME) 'Test Keyboard'",
+  "store(&KEYBOARDVERSION) '1.0'",
+  "",
+  "begin Unicode > use(main)",
+  "",
+  "group(main) using keys",
+  "",
+  "+ [K_A] > 'a'",
+].join("\n");
+
+describe("runImportFidelityEmitChecksSync / runImportFidelityRoundTripCheck", () => {
+  it("sync half carries the emit-stage checks but NO I2 finding of any kind", () => {
     const ir = makeIR();
-    const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
+    const findings = runImportFidelityEmitChecksSync(ir, EMITTED_MISSING_COPYRIGHT);
     const codes = findings.map((f) => f.code);
-    expect(codes).toContain("KM_HINT_ROUND_TRIP_DEFERRED");
+    expect(codes).toContain("KM_WARN_HEADER_FIELD_MISSING");
+    expect(codes.some((c) => c.includes("ROUND_TRIP"))).toBe(false);
   });
 
-  it("does NOT include I1 (KM_ERROR_PARSE_INCOMPLETE) -- parse-stage only", async () => {
+  it("sync half reports no header finding when the emitted text preserves the headers", () => {
     const ir = makeIR();
-    const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
+    const findings = runImportFidelityEmitChecksSync(ir, EMITTED_WITH_HEADERS);
     const codes = findings.map((f) => f.code);
-    expect(codes).not.toContain("KM_ERROR_PARSE_INCOMPLETE");
+    expect(codes).not.toContain("KM_WARN_HEADER_FIELD_MISSING");
   });
 
-  it("does NOT include I4 (KM_INFO_OPAQUE_FEATURE_INVENTORY) -- parse-stage only", async () => {
+  it("round-trip half returns only I2 findings (unavailable hint without a harness)", async () => {
     const ir = makeIR();
-    const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
-    const codes = findings.map((f) => f.code);
-    expect(codes).not.toContain("KM_INFO_OPAQUE_FEATURE_INVENTORY");
-  });
-
-  it("returns at least 1 finding (the I2 deferred hint)", async () => {
-    const ir = makeIR();
-    const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
+    const findings = await runImportFidelityRoundTripCheck(ir);
     expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings.every((f) => f.code.includes("ROUND_TRIP"))).toBe(true);
   });
 
-  it("returns a finding with severity 'hint' for the I2 stub", async () => {
-    const ir = makeIR();
-    const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
-    const hintFinding = findings.find((f) => f.code === "KM_HINT_ROUND_TRIP_DEFERRED");
-    expect(hintFinding?.severity).toBe("hint");
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -185,249 +181,5 @@ describe("checkSidecarHash re-export from index-import-fidelity", () => {
       "0000000000000000000000000000000000000000000000000000000000000000");
     // Hash mismatch expected (stale zeros vs real hash of 'sidecar text')
     expect(findings[0]?.code).toBe("KM_ERROR_SIDECAR_HASH_MISMATCH");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildImportReport — status mapping
-// ---------------------------------------------------------------------------
-
-describe("buildImportReport", () => {
-  it("status is ParseFailure when parseError is set", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: "unexpected token at line 5",
-      opaqueFeatures: [],
-      recognizedRatio: 0,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.status).toBe(ImportStatus.ParseFailure);
-  });
-
-  it("parseErrors array contains the error message when parseError is set", () => {
-    const errMsg = "unexpected token at line 5";
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: errMsg,
-      opaqueFeatures: [],
-      recognizedRatio: 0,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.parseErrors).toContain(errMsg);
-  });
-
-  it("status is RoundTripDivergence when hasRoundTripDivergence is true (future-wired branch)", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 1,
-      hasRoundTripDivergence: true,
-    });
-    expect(report.status).toBe(ImportStatus.RoundTripDivergence);
-  });
-
-  it("status is CleanWithOpaque when opaqueFeatures.length > 0 and no errors", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [{ feature: "option-store-directive", count: 2 }],
-      recognizedRatio: 0.8,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.status).toBe(ImportStatus.CleanWithOpaque);
-  });
-
-  it("status is Clean when no errors and no opaque features", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 1.0,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.status).toBe(ImportStatus.Clean);
-  });
-
-  it("ParseFailure takes priority over RoundTripDivergence", () => {
-    // parseError is set AND hasRoundTripDivergence is true → ParseFailure wins
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: "boom",
-      opaqueFeatures: [],
-      recognizedRatio: 0,
-      hasRoundTripDivergence: true,
-    });
-    expect(report.status).toBe(ImportStatus.ParseFailure);
-  });
-
-  it("ParseFailure takes priority over CleanWithOpaque", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: "boom",
-      opaqueFeatures: [{ feature: "option-store-directive", count: 1 }],
-      recognizedRatio: 0,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.status).toBe(ImportStatus.ParseFailure);
-  });
-
-  it("RoundTripDivergence takes priority over CleanWithOpaque", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [{ feature: "option-store-directive", count: 1 }],
-      recognizedRatio: 0.5,
-      hasRoundTripDivergence: true,
-    });
-    expect(report.status).toBe(ImportStatus.RoundTripDivergence);
-  });
-
-  it("opaqueFeatureInventory is populated on the report", () => {
-    const features = [
-      { feature: "option-store-directive", count: 3 },
-      { feature: "outs-expansion", count: 1 },
-    ];
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: features,
-      recognizedRatio: 0.6,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.opaqueFeatureInventory).toEqual(features);
-  });
-
-  it("recognizedRatio is surfaced on the report", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 0.75,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.recognizedRatio).toBe(0.75);
-  });
-
-  it("keyboardId is reflected on the report", () => {
-    const report = buildImportReport({
-      keyboardId: "my-special-keyboard",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 1,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.keyboardId).toBe("my-special-keyboard");
-  });
-
-  it("parseErrors is empty array when parseError is null", () => {
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 1,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.parseErrors).toEqual([]);
-  });
-
-  it("synthetic RoundTripDiff: report does NOT include roundTripDiff when status is Clean", () => {
-    // The buildImportReport function doesn't accept a roundTripDiff directly;
-    // it only sets status. Confirm roundTripDiff is absent on Clean reports.
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 1,
-      hasRoundTripDivergence: false,
-    });
-    expect(report.roundTripDiff).toBeUndefined();
-  });
-
-  it("removalCapabilities is ABSENT on the report when not provided (parse-failure path)", () => {
-    // When parse() throws, importKeyboard returns early without classifying removal
-    // capabilities. buildImportReport is called without removalCapabilities, so the
-    // report must NOT carry the field — consumers use its absence to gate IR-dependent
-    // features gracefully rather than operating on an empty/stale map.
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: "codec gap: unexpected token at line 3",
-      opaqueFeatures: [],
-      recognizedRatio: 0,
-      hasRoundTripDivergence: false,
-      // removalCapabilities intentionally omitted
-    });
-    expect(report.removalCapabilities).toBeUndefined();
-  });
-
-  it("removalCapabilities IS present on the report when provided (success path)", () => {
-    // On a successful parse + classify, buildImportReport receives the entries array
-    // and must surface it on the report.
-    const entries: Array<[string, import("@keyboard-studio/contracts").RemovalCapability]> = [
-      ["rule#1", "removable:simple"],
-      ["rule#2", "removable:slot-fill"],
-    ];
-    const report = buildImportReport({
-      keyboardId: "kb",
-      parseError: null,
-      opaqueFeatures: [],
-      recognizedRatio: 1.0,
-      hasRoundTripDivergence: false,
-      removalCapabilities: entries,
-    });
-    expect(report.removalCapabilities).toBeDefined();
-    expect(report.removalCapabilities).toEqual(entries);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// importKeyboard() step 2c — base-derived axis-fill detection (spec §7.2 3a)
-// ---------------------------------------------------------------------------
-
-describe("importKeyboard() — axisFills (step 2c, spec §7.2 rule 3a)", () => {
-  const HEADER = `store(&VERSION) '10.0'
-store(&NAME) 'axis-fill test'
-store(&TARGETS) 'any'
-store(&COPYRIGHT) '(c) SIL'
-store(&KEYBOARDVERSION) '1.0'
-
-store(equalD) "b" "d" "g"
-store(equalU) U+0253 U+0257 U+0260
-
-begin Unicode > use(Unicode)
-
-group(Unicode) using keys
-`;
-
-  it("surfaces markInputOrder='postfix' (import-derived) when the base has an unconditional postfix rule", async () => {
-    const kmn = `${HEADER}\nany(equalD) + "=" > index(equalU,1)\n`;
-    const vfs = createVirtualFS([]);
-    const { axisFills } = await importKeyboard(kmn, "postfix-kb", vfs);
-    expect(axisFills).toEqual([
-      { axis: "markInputOrder", value: "postfix", source: "import-derived" },
-    ]);
-  });
-
-  it("returns no axisFills for an if()-guarded postfix rule (opaque at parse — documented boundary)", async () => {
-    // The guard makes the whole rule opaque (IF_OPTION_STORE), so it never
-    // reaches group.rules; matches the live sil_ipa shape. Locks the scope
-    // boundary at the pipeline level, not just the detector unit.
-    const kmn = `${HEADER}\nif(option_key = '') any(equalD) + "=" > index(equalU,2)\n`;
-    const vfs = createVirtualFS([]);
-    const { axisFills } = await importKeyboard(kmn, "guarded-kb", vfs);
-    expect(axisFills).toEqual([]);
-  });
-
-  it("returns no axisFills for a base with no postfix structure", async () => {
-    const kmn = `${HEADER}\n+ [K_A] > U+0061\n`;
-    const vfs = createVirtualFS([]);
-    const { axisFills } = await importKeyboard(kmn, "plain-kb", vfs);
-    expect(axisFills).toEqual([]);
-  });
-
-  it("returns no axisFills on a parse failure", async () => {
-    const vfs = createVirtualFS([]);
-    const { axisFills } = await importKeyboard("this is not valid kmn {{{", "broken-kb", vfs);
-    expect(axisFills).toEqual([]);
   });
 });

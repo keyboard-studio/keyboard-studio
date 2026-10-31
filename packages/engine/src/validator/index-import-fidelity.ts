@@ -11,10 +11,15 @@
  *            rejection instead, with no finding at all. Deliberately NOT a Layer C
  *            check: see checkTouchLayoutIdentifiers' header.
  *
- *   runImportFidelityEmitChecks   — runs after emit(), with the emitted text in hand
- *     I2: round-trip stub (non-blocking)
+ *   runImportFidelityEmitChecksSync — runs after emit(), with the emitted
+ *     text in hand
  *     I3: header preservation
  *     I6: ownership consistency (Pattern↔node back-reference)
+ *
+ *   runImportFidelityRoundTripCheck — I2 on its own (functional round-trip
+ *     via simulate(), #882; blocking on compared divergence, honest
+ *     no-coverage/unavailable states otherwise). Split from the sync half
+ *     because it is far too slow for a path a user is waiting on.
  *
  * I5 (sidecar hash) fires at output time and is re-exported standalone so
  * callers can invoke it independently.
@@ -35,6 +40,15 @@ import {
   checkOwnershipConsistency,
   checkBehaviourNulOnTextContext,
 } from "./layer-a-prime.js";
+import type { RoundTripDeps } from "./layer-a-prime.js";
+
+export type { RoundTripDeps, RoundTripSourceFile } from "./layer-a-prime.js";
+export {
+  ROUND_TRIP_DIVERGENCE_CODE,
+  ROUND_TRIP_NO_COVERAGE_CODE,
+  ROUND_TRIP_UNAVAILABLE_CODE,
+  ROUND_TRIP_CORPUS_TRUNCATED_CODE,
+} from "./layer-a-prime.js";
 
 /**
  * Run Layer A' parse-stage checks (I1 + I4).
@@ -52,22 +66,44 @@ export function runImportFidelityParseChecks(
 }
 
 /**
- * Run Layer A' emit-stage checks (I2 stub + I3 + I6).
+ * Run the synchronous Layer A' emit-stage checks (I3 + I6 + the NUL-behaviour
+ * check) — everything except I2. Cheap and deterministic: safe on a
+ * latency-critical path (the studio's pre-`ready` preview pipeline runs this
+ * half before publishing the preview).
  * Call after emit(), passing the emitted .kmn text.
- *
- * Returns a Promise so that when the Keyman Core runtime lands and I2 becomes
- * truly async, callers require no further signature changes.
  */
-export async function runImportFidelityEmitChecks(
+export function runImportFidelityEmitChecksSync(
   ir: KeyboardIR,
   emitted: string,
-): Promise<LintFinding[]> {
+): LintFinding[] {
   return [
-    ...checkRoundTrip(ir),
     ...checkHeaderPreservation(ir, emitted),
     ...checkOwnershipConsistency(ir),
     ...checkBehaviourNulOnTextContext(ir),
   ];
+}
+
+/**
+ * Run I2 (functional round-trip via simulate(), #882) on its own.
+ *
+ * I2 compiles the original and emitted .kmn and simulates the generated
+ * corpus through the KeymanWeb runtime — seconds to minutes on a real base
+ * keyboard. It must NEVER sit on a path a user is waiting on: the studio
+ * live path runs it after the preview stage reaches `ready` and delivers
+ * the findings when they land (the spec-078 publish-after-ready posture).
+ * Callers needing the full emit stage compose this with
+ * {@link runImportFidelityEmitChecksSync} themselves.
+ *
+ * `roundTripDeps` supplies the compile/simulate harness (see
+ * {@link RoundTripDeps}). When omitted, I2 reports its unavailable state
+ * (a non-blocking hint) rather than silently passing — hosts that can
+ * compile and simulate (the studio live path, Node hosts) should pass it.
+ */
+export async function runImportFidelityRoundTripCheck(
+  ir: KeyboardIR,
+  roundTripDeps?: RoundTripDeps,
+): Promise<LintFinding[]> {
+  return checkRoundTrip(ir, roundTripDeps);
 }
 
 // I5 is standalone — fires at output time.

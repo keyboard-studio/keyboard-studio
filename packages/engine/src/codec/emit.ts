@@ -85,11 +85,13 @@ function fmtContextElement(el: ContextElement): string {
                       ? `[${el.modifiers.join(" ")} ${el.name}]`
                       : `[${el.name}]`;
     case "deadkey": return fmtDk(el.id);
+    case "namedDeadkey": return `dk(${el.name})`;
     case "any":     return `any(${el.storeRef})`;
     case "notany":  return `notany(${el.storeRef})`;
     case "context": return `context(${el.offset})`;
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "baselayout": { if (el.value.includes("'")) throw new Error(`baselayout value must not contain single-quote: ${el.value}`); return el.value ? `baselayout('${el.value}')` : "baselayout"; }
+    case "if":      { if (el.value.includes("'")) throw new Error(`if() guard value must not contain single-quote: ${el.value}`); return `if(${el.store} = '${el.value}')`; }
     case "raw":     return el.text;
   }
 }
@@ -98,6 +100,7 @@ function fmtOutputElement(el: OutputElement): string {
   switch (el.kind) {
     case "char":    return fmtCodepoint(el.value);
     case "deadkey": return fmtDk(el.id);
+    case "namedDeadkey": return `dk(${el.name})`;
     case "beep":    return "beep";
     case "nul":     return "nul";
     case "context": return el.offset === 0 ? "context" : `context(${el.offset})`;
@@ -113,6 +116,7 @@ function fmtStoreItem(item: StoreItem): string {
     case "char":    return fmtCodepoint(item.value);
     case "vkey":    return `[${item.name}]`;
     case "deadkey": return fmtDk(item.id);
+    case "namedDeadkey": return `dk(${item.name})`;
     case "any":     return "any";
     case "raw":     return item.text;
   }
@@ -177,8 +181,9 @@ export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
  *   - control / DEL (< U+0020, U+007F) — would terminate the lexer's line scan
  *   - combining marks (\p{M}) — would attach to surrounding chars in source
  *     view and round-trip through the parser as a different visible run
- *   - SMP codepoints (> U+FFFF) — fmtCodepoint handles these via single-quote
- *     literals individually; never bundle them into a charRun string
+ *   - SMP codepoints (> U+FFFF) in processing stores — fmtCodepoint handles
+ *     these via single-quote literals individually; never bundle them into a
+ *     charRun string. System stores are exempt (see the metadata branch).
  *
  * The two quote characters (' and ") are NOT excluded here — delimiter
  * selection in flushBuf picks whichever the buffer doesn't contain.
@@ -186,14 +191,18 @@ export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
 function isStringSafeChar(ch: string, metadata = false): boolean {
   const cp = ch.codePointAt(0) ?? 0;
   if (cp < 0x20 || cp === 0x7f) return false;
-  // SMP codepoints stay per-character tokens even in system stores: acceptance
-  // by kmcmplib inside a string literal has not been verified, so the
-  // conservative (known-compiling) form is kept.
-  if (cp > 0xffff) return false;
   // System stores (&NAME, &COPYRIGHT, ...) are human-facing metadata that rules
   // never match against: combining marks and format characters stay inside the
-  // string so the value reads naturally.
+  // string so the value reads naturally. SMP codepoints (> U+FFFF) may join
+  // the string too — VERIFIED against kmcmplib (issue #1811 residual AC):
+  // @keymanapp/kmc-kmn 19.0.240-alpha compiles `store(&NAME) '𑜠𑜡x'`, a lone
+  // SMP string `'𑜠'`, and a mixed BMP+SMP+combining string with zero
+  // diagnostics and a valid .kmx. The check is pinned by the oracle tests in
+  // packages/engine/src/compiler/compile.test.ts ("SMP in system store
+  // (#1811)"), which fail if a future kmcmplib stops accepting this form.
   if (metadata) return true;
+  // Processing stores: SMP codepoints stay per-character quoted literals.
+  if (cp > 0xffff) return false;
   // Processing stores: spell out everything invisible or attaching — combining
   // marks, format characters (ZWJ, ZWNJ, LRM, soft hyphen, ...) and unusual
   // spaces (NBSP, narrow NBSP, ...) — so the author can see what is stored.
@@ -309,7 +318,9 @@ function emitStoreItems(items: StoreItem[], metadata = false): string {
   // It is also suppressed when it would produce more than
   // KMCMPLIB_STORE_RANGE_BUDGET ranges in this one store — see that constant's
   // comment for the compiler crash this avoids.
-  const hasDeadkey = items.some((it) => it.kind === "deadkey");
+  // Any dk() token suppresses re-collapse — numeric or named (#2238): the
+  // kmcmplib restriction is on the dk() statement form, not the id shape.
+  const hasDeadkey = items.some((it) => it.kind === "deadkey" || it.kind === "namedDeadkey");
   const suppressRanges =
     metadata || hasDeadkey || countProspectiveRanges(items) > KMCMPLIB_STORE_RANGE_BUDGET;
 

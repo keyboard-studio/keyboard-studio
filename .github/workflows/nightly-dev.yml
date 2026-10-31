@@ -1,0 +1,32 @@
+# Nightly dev soak — the full CI gate run against the `dev` branch
+# overnight (km/ci-fast-gate, 2026-10-15, owner ruling).
+#
+# Per-PR CI is deliberately light (fast gate + test:pr, under ~10
+# minutes) and the full suite + corpus gates run only on full-gate
+# events. This workflow gives `dev` that full verdict every night —
+# 06:47 UTC, half an hour before the main nightly (07:17 UTC in
+# ci.yml) — so breakage integrated into dev is found overnight,
+# before a dev -> main merge is proposed, instead of on main.
+#
+# It reuses ci.yml as a callable workflow with checkout_ref=dev;
+# inside the called run the event is `schedule`, so every full-gate
+# step runs (the `changes` job turns all gates on for non-PR events).
+# Note: scheduled workflows only fire once this file is on the default
+# branch (main).
+
+name: Nightly dev soak
+
+on:
+  schedule:
+    - cron: '47 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      checkout_ref: dev

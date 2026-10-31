@@ -29,7 +29,6 @@ import {
   type CSSProperties,
 } from "react";
 import { SurveyQuestionsPane } from "./components/SurveyQuestionsPane.tsx";
-import { DocumentationFindingsSummary } from "./components/DocumentationFindingsSummary.tsx";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type {
@@ -99,12 +98,11 @@ import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
+import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
-import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
-import { LintSummary } from "./lint/index.ts";
-import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
+import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
@@ -112,7 +110,7 @@ import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { ReviewScreen } from "./review/ReviewScreen.tsx";
@@ -145,7 +143,7 @@ import {
   clearServerDraft,
   serverMetaToDraftMeta,
 } from "./lib/serverDraftStore.ts";
-import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
+import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
 import { useStartPreviewStatusStore, type StartPreviewStatus } from "./stores/startPreviewStatusStore.ts";
 import {
   useRulesDemoArtifactStore,
@@ -1187,6 +1185,8 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
     );
     if (ids.size === 0) return;
+    // The output-form seam swaps in these shapes at emit time (spec 106 US3).
+    for (const id of OUTPUT_FORM_SEAM_PATTERN_IDS) ids.add(id);
     const svc = getPatternLibraryService();
     Promise.all([...ids].map((id) => svc.getById(id)))
       .then((patterns) => {
@@ -1219,7 +1219,11 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // Use localStart (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   // spec 078: only this main-walk preview runs the context-tolerance analysis;
-  // every other useKeyboardArtifact caller is unchanged.
+  // every other useKeyboardArtifact caller is unchanged. The functional I2
+  // round-trip check is designated the same way (#2249): this instance's
+  // full run is the base import, so its pass is the import's verdict —
+  // gallery/Output/Criteria instances capture no I2 input and start no
+  // pass behind their readies.
   const { stage: artifactStage, retry } = useKeyboardArtifact(
     localStart,
     scaffoldSpec,
@@ -1227,15 +1231,16 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     onInstantiate,
     {
       analyseContextTolerance: true,
+      runRoundTripCheck: true,
+      startDocs: "by-branch",
     },
   );
-  const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
-  // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply();
-  const showContextTolerance =
-    contextTolerance.status !== "idle" &&
-    contextTolerance.status !== "analysing";
+  // never by the marks step, so the effect stays mounted here even though
+  // its stale/refused notes are no longer rendered: the context-tolerance
+  // finding's only home is the Marks station (warnings-placement model),
+  // not this pane-top region.
+  useContextToleranceApply();
 
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
@@ -1310,12 +1315,17 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // so they render, publish, and classify exactly like every other finding.
   // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
   const documentationFindings = useDocumentationFindings();
+  // The sole-source oe2 Layer C warning rides the same findings array on
+  // the same terms (memoised synchronous hook, no second timer): it is
+  // owned by the mechanisms step via the lintToQuestion mapping for its
+  // code, so it chips and badges there rather than rendering here.
+  const oe2Findings = useOe2SoleSourceFindings();
   const findings = useMemo(
     () =>
-      documentationFindings.length === 0
+      documentationFindings.length === 0 && oe2Findings.length === 0
         ? validatorFindingsOnly
-        : [...validatorFindingsOnly, ...documentationFindings],
-    [validatorFindingsOnly, documentationFindings],
+        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings],
+    [validatorFindingsOnly, documentationFindings, oe2Findings],
   );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
@@ -1324,45 +1334,14 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   useEffect(() => {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
-  const globalFindings = useMemo(
-    () => selectUnmappedFindings(findings),
-    [findings],
-  );
-  // Warning-severity global findings render as a bare advisory line above the step content
-  // — no card background/border/code-badge/hint-button/location chrome; see
-  // the survey-pane render below. Non-warning severities keep the existing
-  // boxed LintSummary treatment untouched.
-  const globalWarnings = useMemo(
-    () => globalFindings.filter((f) => f.severity === "warning"),
-    [globalFindings],
-  );
-  // Documentation (Layer C) findings are warning-only by the Layer C
-  // ceiling, so they all land in globalWarnings — but full-weight blocks
-  // above the step content pushed the current question down, and the block
-  // render never consulted origin, so upstream findings (inherited from the
-  // base keyboard) rendered at full weight. Collapse the doc-sourced
-  // subset into one collapsed-by-default summary row instead; everything
-  // else keeps the existing full-block render untouched. Identity survives
-  // the findings pipeline — the findings array is built with spread and
-  // selectUnmappedFindings is an Array.filter, both of which preserve
-  // element references — so a Set over documentationFindings identifies
-  // exactly the doc-sourced warnings.
-  const documentationFindingSet = useMemo(
-    () => new Set(documentationFindings),
-    [documentationFindings],
-  );
-  const docGlobalWarnings = useMemo(
-    () => globalWarnings.filter((f) => documentationFindingSet.has(f)),
-    [globalWarnings, documentationFindingSet],
-  );
-  const authoredGlobalWarnings = useMemo(
-    () => globalWarnings.filter((f) => !documentationFindingSet.has(f)),
-    [globalWarnings, documentationFindingSet],
-  );
-  const globalNonWarnings = useMemo(
-    () => globalFindings.filter((f) => f.severity !== "warning"),
-    [globalFindings],
-  );
+  // Issue #2145 (adopted warnings-placement model): findings are NOT
+  // rendered here any more. A warning lives only where it can be acted
+  // on — mapped findings render as chips at their owning question
+  // (lint/lintToQuestion.ts) with a count badge on the owning step's
+  // journey dot, and the unmapped set (documentation + everything else)
+  // accumulates to the Output screen. The findings array above is still
+  // published to the store (setValidatorFindings) for those surfaces and
+  // for completeness; nothing persistent renders at the top of this pane.
 
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
@@ -1660,8 +1639,21 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // trigger at all. Steps declaring rightPane:"none" (identity/layout)
   // never show a preview pane, divider, or mobile trigger, even when a
   // base already exists (e.g. a resumed draft).
+  //
+  // #1911: the trigger must not depend on fragile state sync. `showCharacterMap`
+  // requires discoveryMethod === "build-list" in the session store, and
+  // `localStart` requires the startKeyboard-prop sync effect to have fired.
+  // Either can lag the actual UI (the build-list page renders from the same
+  // store, but the effect ordering isn't guaranteed). The character map is
+  // available whenever the step declares rightPane:"character-map", and the
+  // OSK preview is available whenever the startKeyboard prop is set — so
+  // gate on those directly, not on the derived/synced values.
   const hasPreviewContent =
-    showPreviewPane && (showCharacterMap || localStart !== null);
+    showPreviewPane &&
+    (activeRightPane === "character-map" ||
+      showCharacterMap ||
+      localStart !== null ||
+      startKeyboard !== null);
   // The sheet never reopens by itself: when its content goes away (a step
   // without a preview), forget that it was open.
   if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {
@@ -1741,78 +1733,12 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
           )}
           {
             // Always mounted, so content inserted later is announced (a live
-            // region inserted together with its content often is not); it only
-            // takes up space when it has something to say.
-            // Rendered flush on "var(--app-bg)" — the same token the container above
-            // paints and the one CharacterMapPane's own root implicitly sits on
-            // (it sets no background of its own, so it shows through to the
-            // container's var(--app-bg) too). Pinned explicitly here rather than left
-            // to accidental non-override, so a future change to questionsPaneStyle's
-            // background doesn't silently drag this along. No border/card fill/
-            // padding-as-box — this is text on the character-map surface, not a
-            // card. The context-tolerance notice (spec 078) shares this live
-            // region rather than adding an announcer of its own (FR-014).
-            <div
-              role="status"
-              aria-live="polite"
-              style={
-                authoredGlobalWarnings.length > 0 ||
-                docGlobalWarnings.length > 0 ||
-                showContextTolerance
-                  ? {
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                      marginBottom: 12,
-                      background: "var(--app-bg)",
-                    }
-                  : undefined
-              }
-            >
-              {authoredGlobalWarnings.map((f, i) => (
-                <div
-                  key={`${f.code}-${i}`}
-                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      lineHeight: 1.5,
-                      color: TEXT_MAIN,
-                    }}
-                  >
-                    <span aria-hidden="true">⚠</span>{" "}
-                    <Trans id="common.warningLabel">Warning:</Trans> {f.message}
-                  </p>
-                  {f.hint !== undefined && (
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        color: TEXT_DIM,
-                      }}
-                    >
-                      {f.hint}
-                    </p>
-                  )}
-                </div>
-              ))}
-              {docGlobalWarnings.length > 0 && (
-                <DocumentationFindingsSummary findings={docGlobalWarnings} />
-              )}
-              {showContextTolerance && (
-                <ContextToleranceNotice
-                  state={contextTolerance}
-                  applyNotes={contextToleranceApplyNotes}
-                />
-              )}
-            </div>
+            // region inserted together with its content often is not). Kept
+            // for transient announcements only: warnings render at their
+            // owning step/station, never at the pane top (#2145), and the
+            // context-tolerance notice lives at the Marks station (#2156).
+            <div role="status" aria-live="polite" />
           }
-          {globalNonWarnings.length > 0 && (
-            <LintSummary findings={globalNonWarnings} />
-          )}
           {stepHost}
         </SurveyQuestionsPane>
       }
@@ -2220,6 +2146,23 @@ export function StudioShell() {
         background: "var(--app-bg)",
       }}
     >
+      {/* Bypass block for keyboard authors: the first focusable element in
+          the shell. The footer step navigation sits after the whole step
+          body in Tab order, so without this link reaching it takes over a
+          hundred Tabs on long steps. A native anchor — not a keyboard
+          shortcut, which could collide with typing in the keyboard test
+          surfaces — moves focus to the footer nav cluster (the element
+          carrying `id="step-navigation"` and `tabIndex={-1}` in
+          StepNavCluster). Visually hidden until focused (`.ks-skip-link`
+          in index.css). Decision recorded in the WCAG tracker's Bypass
+          Blocks row. */}
+      <a
+        href="#step-navigation"
+        className="ks-skip-link ks-focus-ring"
+        data-testid="skip-to-step-navigation"
+      >
+        {t({ id: "shell.skipToStepNavigation", message: "Skip to step navigation" })}
+      </a>
       <NavBar
         active={route}
         outputBlocked={outputNavBlocked}

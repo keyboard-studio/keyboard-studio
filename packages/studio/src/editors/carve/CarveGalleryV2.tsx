@@ -7,11 +7,20 @@
 // cascades through the shared workingCopyStore actions
 // (cascadeDelete/cascadeRestore) — no gallery-specific write path.
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { recommendedRemovalChars, displayChar, isSparseLatinOverlayTarget } from '../../lib/irToCarveNodes.ts';
+import {
+  currentCarvedLayoutValue,
+  partitionRemovalKeys,
+  removalKey,
+  suggestionFingerprintOf,
+} from '../../survey/carve/carveValue.ts';
+import { resolveCarvedCombos } from '../../lib/carvedCombo.ts';
+import { pairedCascadeChars } from '../../lib/carveCascadePreview.ts';
+import { ReviewCarvedKeysDialog } from './ReviewCarvedKeys.tsx';
+import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import {
   irToCharacterView, groupCharacterCells, characterCellIds, characterCellIsToggleable,
@@ -46,8 +55,8 @@ const GROUP_HINTS: Record<string, string> = {
   'punctuation-symbol': 'Punctuation, currency, and other symbols.',
   'direct-key': 'Typed with a single key press.',
   'deadkey-sequence': 'Typed by pressing a dead key, then a base letter.',
-  store: 'Lives in an internal list rather than a single key.',
-  'advanced-rule': 'Produced by an advanced rule kept verbatim — the keystroke can\'t be shown.',
+  store: 'Comes from a list of characters (called a store) rather than a single key.',
+  'advanced-rule': 'Produced by a complex rule that is kept exactly as written — the keystroke can\'t be shown.',
   // spec §8 / #1606. These characters ARE produced, and are still discardable
   // like any other rule-backed character — the set exists so they are not
   // filed under "typed with a single key press" when no desktop key types
@@ -136,7 +145,10 @@ function isRowDiscarded(row: RecommendedRemovalChar, isItemDeleted: (id: string)
   return ids.every((id) => isItemDeleted(id));
 }
 
-type CellFlag = 'discarded' | 'suggested' | 'yours' | null;
+// Spec 106 FR-042: 'marked' — a suggested discard not yet applied (Continue
+// applies it, one click keeps it); 'suggested-discard' — a suggested discard
+// Continue applied, not the author's own (one click keeps it).
+type CellFlag = 'discarded' | 'marked' | 'suggested-discard' | 'suggested' | 'yours' | null;
 
 interface CharacterCellButtonProps {
   cell: CharacterCell;
@@ -160,6 +172,9 @@ interface CharacterCellButtonProps {
  * length, gave the grid ragged, uneven cells.
  */
 function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onToggle }: CharacterCellButtonProps) {
+  const { t } = useLingui();
+  const suggestedDiscard = t({ id: "carve.cell.suggestedDiscard", message: "discarded, suggested — click to keep" });
+  const markedDiscard = t({ id: "carve.cell.markedDiscard", message: "marked to discard when you continue — click to keep" });
   return (
     <button
       type="button"
@@ -167,7 +182,12 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
       onFocus={onSelect}
       onClick={onToggle}
       aria-pressed={discarded}
-      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${discarded ? ', discarded' : ''}`}
+      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${
+        flag === 'marked'
+          ? `, ${markedDiscard}`
+          : flag === 'suggested-discard' ? `, ${suggestedDiscard}` : discarded ? ', discarded' : ''
+      }`}
+      {...(flag === 'marked' ? { title: markedDiscard } : flag === 'suggested-discard' ? { title: suggestedDiscard } : {})}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: '10px 4px 8px', borderRadius: 8, cursor: 'pointer',
@@ -218,8 +238,7 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           every glyph was redundant — and because sequences vary in length
           (one key vs. "acute then a"), it made the cells ragged and uneven.
           The codepoint above stays: it is fixed-width and identifies the
-          character even when the glyph has no font coverage. `cell.keys` is
-          still searchable (see the filter below). */}
+          character even when the glyph has no font coverage. */}
       {flag !== null && (
         <span style={{
           fontSize: 8.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
@@ -234,13 +253,17 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           // surface-2 cell) — a real failure, not a thin-margin pass. Muted
           // clears every theme/background combination this cell can render.
           color:
-            flag === 'discarded'
+            flag === 'discarded' || flag === 'suggested-discard' || flag === 'marked'
               ? 'var(--app-text-muted)'
               : flag === 'suggested'
                 ? 'var(--app-warning-text)'
                 : 'var(--app-success-text)',
         }}>
-          {flag}
+          {flag === 'suggested-discard'
+            ? t({ id: "carve.cell.flag.suggestedDiscard", message: "suggested" })
+            : flag === 'marked'
+              ? t({ id: "carve.cell.flag.marked", message: "marked" })
+              : flag}
         </span>
       )}
     </button>
@@ -259,6 +282,10 @@ interface RecommendedGroupCardProps {
   rows: RecommendedRemovalChar[];
   cellsByCh: ReadonlyMap<string, CharacterCell>;
   isItemDeleted: (id: string) => boolean;
+  /** True for a row the gallery's suggested default discarded (spec 106 FR-042). */
+  isDerivedRow?: (row: RecommendedRemovalChar) => boolean;
+  /** True for a row marked for discard, applied on Continue (spec 106 FR-042). */
+  isMarkedRow?: (row: RecommendedRemovalChar) => boolean;
   onToggleRow: (row: RecommendedRemovalChar) => void;
   onBulkToggle: (discard: boolean) => void;
   discardAllLabel: (count: number) => string;
@@ -291,11 +318,11 @@ interface RecommendedGroupCardProps {
  */
 function RecommendedGroupCard({
   testId, toggleAllTestId, regionAriaLabel, topBorderColor, chipBackground, chipColor, heading, body,
-  rows, cellsByCh, isItemDeleted, onToggleRow, onBulkToggle, discardAllLabel, restoreAllLabel,
+  rows, cellsByCh, isItemDeleted, isDerivedRow, isMarkedRow, onToggleRow, onBulkToggle, discardAllLabel, restoreAllLabel,
   selectedCh, onSelectCh, collapsible, destructiveBulkButton,
 }: RecommendedGroupCardProps) {
   if (rows.length === 0) return null;
-  const allDiscarded = rows.every((r) => isRowDiscarded(r, isItemDeleted));
+  const allDiscarded = rows.every((r) => isRowDiscarded(r, isItemDeleted) || isMarkedRow?.(r) === true);
   const bulkLabel = allDiscarded ? restoreAllLabel : discardAllLabel(rows.length);
   const showBody = collapsible === undefined || collapsible.open;
   // Red destructive fill only while offering to DISCARD (never while offering
@@ -408,13 +435,14 @@ function RecommendedGroupCard({
               // the ?? fallback here is belt-and-suspenders, not the fix.
               const cell = cellsByCh.get(row.ch.normalize('NFC')) ?? synthesizeFallbackCell(row.ch, row.contributors);
               const discarded = isRowDiscarded(row, isItemDeleted);
+              const marked = !discarded && isMarkedRow?.(row) === true;
               return (
                 <div key={row.ch} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <CharacterCellButton
                     cell={cell}
-                    discarded={discarded}
+                    discarded={discarded || marked}
                     isSelected={selectedCh === cell.ch}
-                    flag={discarded ? 'discarded' : 'suggested'}
+                    flag={marked ? 'marked' : discarded ? (isDerivedRow?.(row) === true ? 'suggested-discard' : 'discarded') : 'suggested'}
                     onSelect={() => onSelectCh(cell.ch)}
                     onToggle={() => onToggleRow(row)}
                   />
@@ -494,7 +522,7 @@ if (ways.length === 0) {
     <>
       {label}
       <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-        Produced by an advanced rule — the keystroke can't be shown
+        Produced by a complex rule kept exactly as written — the keystroke can't be shown
       </span>
     </>
   );
@@ -538,14 +566,35 @@ return (
 }
 
 /**
+ * Plain-language heads-up that discarding a character also discards the
+ * characters paired with it (a store slot tied to a partner store by
+ * position). Shown before the author discards, on both details surfaces.
+ * Renders nothing when there is no cascade.
+ */
+function CascadeNotice({ ch, partners }: { ch: string; partners: readonly string[] }) {
+  if (partners.length === 0) return null;
+  const chosen = displayChar(ch);
+  const alsoRemoved = partners.map(displayChar).join(' ');
+  return (
+    <p
+      role="note"
+      data-testid="carve-cascade-notice"
+      style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: 'var(--app-text)' }}
+    >
+      <Trans id="carve.details.pairedCascade">Discarding {chosen} also discards {alsoRemoved}. They are paired in a keyboard rule (for example, Backspace turns one back into the other), so they can only go together.</Trans>
+    </p>
+  );
+}
+
+/**
  * Narrow-viewport character-details card (mobile adaptation, Phase 3).
  * Replaces the 290px details rail under 479px: a collapsible card pinned
- * above the chip grid showing the selected character, Keep/Carve actions,
+ * above the chip grid showing the selected character, Keep/Discard actions,
  * and an expandable "How it's typed" section — the hover-driven detail text
  * moved here so it is reachable by tap.
  *
  * The parent owns the card's expanded state and collapses it by default once
- * the author has recorded a keep/carve disposition for the selected
+ * the author has recorded a keep/discard disposition for the selected
  * character; this component owns only the inner "How it's typed" disclosure
  * (reset per selection via the parent's `key`).
  */
@@ -557,9 +606,12 @@ function CarveDetailsCard({
   onToggleOpen,
   onKeep,
   onCarve,
+  cascadePartners,
 }: {
   cell: CharacterCell | undefined;
-  /** Whether the author has recorded a keep/carve disposition for this character. */
+  /** Paired characters that discarding this one also discards (pairedCascadeChars). */
+  cascadePartners: readonly string[];
+  /** Whether the author has recorded a keep/discard disposition for this character. */
   decided: boolean;
   /** Whether the character is currently discarded. */
   discarded: boolean;
@@ -579,8 +631,8 @@ function CarveDetailsCard({
     font: '600 13.5px var(--app-font)',
     minHeight: 'var(--app-touch-target)',
     padding: '10px 12px',
-    // Keep is the solid action, Carve the ghost (mockup) — discarding is
-    // reversible until Continue, so neither gets the destructive red fill.
+    // Keep is the solid action, Discard the ghost (mockup) — discarding is
+    // reversible at any time, so neither gets the destructive red fill.
     color: primary ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
     background: primary ? 'var(--app-accent)' : 'transparent',
     border: primary ? 'none' : '1px solid var(--app-border-strong)',
@@ -646,7 +698,7 @@ function CarveDetailsCard({
         >
           {decided
             ? (discarded
-              ? <Trans id="carve.detailsCard.carvedBadge">carved</Trans>
+              ? <Trans id="carve.detailsCard.carvedBadge">discarded</Trans>
               : <Trans id="carve.detailsCard.keptBadge">kept</Trans>)
             : <Trans id="carve.detailsCard.undecidedBadge">keep?</Trans>}
         </span>
@@ -676,12 +728,16 @@ function CarveDetailsCard({
               <HowItsTyped cell={cell} showLabel={false} />
             </div>
           )}
+          <CascadeNotice ch={cell.ch} partners={cascadePartners} />
+          <p style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+            <Trans id="carve.details.discardBlurb">If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.</Trans>
+          </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" onClick={onKeep} style={actionStyle(true)}>
               <Trans id="carve.detailsCard.keep">Keep</Trans>
             </button>
             <button type="button" onClick={onCarve} style={actionStyle(false)}>
-              <Trans id="carve.detailsCard.carve">Carve</Trans>
+              <Trans id="carve.detailsCard.carve">Discard</Trans>
             </button>
           </div>
         </div>
@@ -706,6 +762,16 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // reference, so Zustand's Object.is comparison never re-renders on its
   // own.
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const startIrForReview = useWorkingCopyStore((s) => s.startIr);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const carvedCombos = useMemo(
+    () =>
+      startIrForReview === null
+        ? []
+        : resolveCarvedCombos(startIrForReview, [...deletedNodeIds, ...deletedItemIds]),
+    [startIrForReview, deletedNodeIds, deletedItemIds],
+  );
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
@@ -754,8 +820,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [orthographyNeededSet, retainedSet],
   );
 
+  // False while the needed set or the IR is still loading: `recommended` is
+  // then an empty placeholder, not "nothing to suggest".
+  const recommendationReady = instantiationMode !== null && hasSignal && ir !== null;
   const recommended = useMemo(
-    () => (instantiationMode !== null && hasSignal && ir
+    () => (recommendationReady && ir
       ? recommendedRemovalChars({
         ir,
         needed: neededSet,
@@ -764,7 +833,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
         blockCandidateChars,
       })
       : []),
-    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
+    [ir, recommendationReady, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
   );
   // irToCharacterView's internal lookup key is always NFC-normalized
   // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on
@@ -802,45 +871,20 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const primaryRows = useMemo(() => recommended.filter((r) => r.reason !== 'cross-script-latin'), [recommended]);
   const optionalLatinRows = useMemo(() => recommended.filter((r) => r.reason === 'cross-script-latin'), [recommended]);
 
-  // The Allow/Block UI was archived (docs/archive/carve-disposition-ui); the
-  // bulk-default pre-fill below stays so engine carve suppression still gets its
-  // dispositions.
-  // 076 FR-022 (T016): the FR-005 `sparseLatinOverlay` input for disposition
-  // pre-fill — the target script is the only signal the gallery can read at
-  // carve time (see isSparseLatinOverlayTarget's doc).
-  const sparseLatinOverlay = isSparseLatinOverlayTarget(identityBcp47);
-  // Ruling (A1–A3): deadkey carves never fall through — rule nodeIds whose
-  // rules carry deadkey context. Rows touching these combos offer no Allow
-  // option and pre-fill to `block` with `deadkey-requirement` provenance.
-  const deadkeyComboIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (!ir) return ids;
-    for (const group of ir.groups ?? []) {
-      for (const rule of group.rules ?? []) {
-        if (rule.context?.some((el) => el.kind === "deadkey")) ids.add(rule.nodeId);
-      }
-    }
-    return ids;
-  }, [ir]);
-  const prefillCarveDispositions = useWorkingCopyStore((s) => s.prefillCarveDispositions);
-  const closedKeyboardCard = useWorkingCopyStore((s) => s.closedKeyboardCard);
-  const recommendedComboIds = useMemo(() => recommended.flatMap(recommendedRowIds), [recommended]);
-  // Pre-fill per-carve dispositions for every carve-candidate row from the
-  // bulk default (closed-keyboard card / FR-005 proposal). The store writes
-  // ONLY for combos without an existing disposition, so re-running when the
-  // card is answered later fills genuinely new combos without ever
-  // re-prompting (FR-022: recompile never re-prompts).
-  useEffect(() => {
-    if (recommendedComboIds.length === 0) return;
-    prefillCarveDispositions(recommendedComboIds, { sparseLatinOverlay, deadkeyComboIds });
-  }, [recommendedComboIds, sparseLatinOverlay, deadkeyComboIds, closedKeyboardCard, prefillCarveDispositions]);
-
-  // "...for a {descriptor} keyboard" — descriptor is the display name +
-  // "-only" when available (e.g. "Russian-only"), else the neutral
-  // "single-script" fallback.
-  const keyboardDescriptor = identityDisplayName !== undefined && identityDisplayName.length > 0
-    ? `${identityDisplayName}-only`
-    : 'single-script';
+  // "...for a {descriptor} keyboard" — descriptor is translatable (#1588):
+  // either "{name}-only" (e.g. "Russian-only") via the catalog, or the
+  // translated "single-script" fallback. Never assemble English fragments
+  // in TS and interpolate them into a translated string.
+  const keyboardDescriptor =
+    identityDisplayName !== undefined && identityDisplayName.length > 0
+      ? t({
+          id: "carve.keyboardDescriptor.named",
+          message: `${identityDisplayName}-only`,
+        })
+      : t({
+          id: "carve.keyboardDescriptor.singleScript",
+          message: "single-script",
+        });
 
   const toggleRecommendedRow = useCallback((row: RecommendedRemovalChar) => {
     const ids = recommendedRowIds(row);
@@ -873,6 +917,92 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     }
   }, [cascadeDelete, cascadeRestore]);
 
+  // Spec 106 FR-042: the suggested discards are the default, but nothing is
+  // removed until the author confirms on Continue. A suggested row that is
+  // neither discarded nor kept is MARKED; one click keeps it, another
+  // re-marks it. Continue discards every marked row as a `derived` removal
+  // (and restores earlier defaults that are no longer suggested); Skip keeps
+  // them all; Back leaves them marked. The author's keeps live in the
+  // working copy, so a returning author's choice stands.
+  const carveSuggestion = useWorkingCopyStore((s) => s.carveSuggestion);
+  const setCarveSuggestion = useWorkingCopyStore((s) => s.setCarveSuggestion);
+  const suggestionFingerprint = useMemo(
+    () => suggestionFingerprintOf(primaryRows.map((r) => r.ch)),
+    [primaryRows],
+  );
+  const primaryRowSet = useMemo(() => new Set(primaryRows), [primaryRows]);
+  const keptSuggested = useMemo(() => new Set(carveSuggestion?.kept ?? []), [carveSuggestion]);
+  const isMarkedRow = useCallback(
+    (row: RecommendedRemovalChar) =>
+      primaryRowSet.has(row) &&
+      recommendedRowIds(row).length > 0 &&
+      !isRowDiscarded(row, isItemDeleted) &&
+      !keptSuggested.has(row.ch.normalize('NFC')),
+    [primaryRowSet, isItemDeleted, keptSuggested],
+  );
+  const setSuggestedKept = useCallback((chars: readonly string[], keep: boolean) => {
+    const cs = useWorkingCopyStore.getState().carveSuggestion;
+    const next = new Set(cs?.kept ?? []);
+    for (const c of chars) {
+      if (keep) next.add(c.normalize('NFC'));
+      else next.delete(c.normalize('NFC'));
+    }
+    setCarveSuggestion({
+      fingerprint: cs?.fingerprint ?? suggestionFingerprint,
+      derived: cs?.derived ?? [],
+      kept: [...next].sort(),
+      ...(cs?.touched === true ? { touched: true } : {}),
+    });
+  }, [setCarveSuggestion, suggestionFingerprint]);
+  /** A suggested row's click: an applied default is restored and kept; otherwise keep ⇄ marked. */
+  const toggleSuggestedRow = useCallback((row: RecommendedRemovalChar) => {
+    if (isRowDiscarded(row, isItemDeleted)) {
+      toggleRecommendedRow(row);
+      setSuggestedKept([row.ch], true);
+    } else {
+      setSuggestedKept([row.ch], !keptSuggested.has(row.ch.normalize('NFC')));
+    }
+  }, [isItemDeleted, toggleRecommendedRow, setSuggestedKept, keptSuggested]);
+  /** Continue: discard every marked row as the confirmed suggested default. */
+  const applySuggestion = useCallback(() => {
+    if (!recommendationReady) return;
+    const cs = useWorkingCopyStore.getState().carveSuggestion;
+    const currentIds = new Set(primaryRows.flatMap(recommendedRowIds));
+    const currentChars = new Set(
+      primaryRows.flatMap((r) => (r.caseGroup ?? [r.ch]).map((c) => c.normalize('NFC'))),
+    );
+    const isCurrent = (key: string): boolean => {
+      const id = key.slice(key.indexOf(':') + 1);
+      return key.startsWith('char:') ? currentChars.has(id) : currentIds.has(id);
+    };
+    const stale = (cs?.derived ?? []).filter((k) => !isCurrent(k));
+    if (stale.length > 0) {
+      const { ids, chars } = partitionRemovalKeys(stale);
+      cascadeRestore(ids, chars);
+    }
+    const before = new Set(currentCarvedLayoutValue().removals.map(removalKey));
+    toggleRecommendedRows(primaryRows.filter(isMarkedRow), true);
+    const added = currentCarvedLayoutValue().removals.map(removalKey).filter((k) => !before.has(k));
+    if (cs === null && added.length === 0) return;
+    setCarveSuggestion({
+      fingerprint: suggestionFingerprint,
+      derived: [...(cs?.derived ?? []).filter(isCurrent), ...added],
+      kept: (cs?.kept ?? []).filter((c) => currentChars.has(c)),
+      ...(cs?.touched === true ? { touched: true } : {}),
+    });
+  }, [recommendationReady, primaryRows, cascadeRestore, toggleRecommendedRows, isMarkedRow, setCarveSuggestion, suggestionFingerprint]);
+  const derivedIds = useMemo(
+    () => new Set(partitionRemovalKeys(carveSuggestion?.derived ?? []).ids),
+    [carveSuggestion],
+  );
+  const isDerivedRow = useCallback(
+    (row: RecommendedRemovalChar) => {
+      const ids = recommendedRowIds(row);
+      return ids.length > 0 && ids.every((id) => derivedIds.has(id));
+    },
+    [derivedIds],
+  );
+
   const [selectedCh, setSelectedCh] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>('category');
   // Optional-Latin card starts collapsed, since it is deliberately
@@ -898,7 +1028,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   /**
    * Narrow viewports: selecting a character opens the details card unless
-   * the author already recorded a keep/carve disposition for it — the card
+   * the author already recorded a keep/discard disposition for it — the card
    * is collapsed by default once a disposition exists. Desktop keeps the
    * always-visible rail, so this is a no-op there.
    */
@@ -944,7 +1074,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   }, [cascadeDelete, cascadeRestore]);
 
   // --- Narrow details-card decision plumbing (mobile adaptation, Phase 3) ---
-  // The card's Keep/Carve buttons need an EXPLICIT direction (not a toggle),
+  // The card's Keep/Discard buttons need an EXPLICIT direction (not a toggle),
   // and every toggle path records the author's disposition so the card can
   // collapse by default once one exists.
 
@@ -963,13 +1093,20 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const setRowDiscarded = useCallback((row: RecommendedRemovalChar, discard: boolean): boolean => {
     const ids = recommendedRowIds(row);
     if (ids.length === 0) return false;
+    if (primaryRowSet.has(row)) {
+      // A suggested row: Discard re-marks it, Keep keeps it (restoring an
+      // applied default). Nothing is removed before Continue.
+      if (!discard && isRowDiscarded(row, isItemDeleted)) cascadeRestore(ids);
+      setSuggestedKept([row.ch], !discard);
+      return true;
+    }
     if (discard) {
       cascadeDelete(row.contributors.ruleNodeIds, row.contributors.storeSlotIds);
     } else {
       cascadeRestore(ids);
     }
     return true;
-  }, [cascadeDelete, cascadeRestore]);
+  }, [cascadeDelete, cascadeRestore, primaryRowSet, isItemDeleted, setSuggestedKept]);
 
   // Narrow-aware wrappers: record the disposition and collapse the card.
   // Desktop behavior is unchanged (collapseCardNarrow is a no-op there).
@@ -982,10 +1119,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const toggleRowDecide = useCallback((row: RecommendedRemovalChar) => {
     if (recommendedRowIds(row).length === 0) return;
-    toggleRecommendedRow(row);
+    if (primaryRowSet.has(row)) toggleSuggestedRow(row);
+    else toggleRecommendedRow(row);
     recordDecision(row.ch);
     collapseCardNarrow();
-  }, [toggleRecommendedRow, recordDecision, collapseCardNarrow]);
+  }, [primaryRowSet, toggleSuggestedRow, toggleRecommendedRow, recordDecision, collapseCardNarrow]);
 
   const toggleGroupDecide = useCallback((groupCells: CharacterCell[], discard: boolean) => {
     toggleGroup(groupCells, discard);
@@ -996,12 +1134,19 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   }, [toggleGroup, recordDecision, collapseCardNarrow]);
 
   const toggleRowsDecide = useCallback((rows: RecommendedRemovalChar[], discard: boolean) => {
-    toggleRecommendedRows(rows, discard);
+    if (rows.length > 0 && rows.every((r) => primaryRowSet.has(r))) {
+      // Suggested rows: "Discard all" marks them all, "Restore all" keeps
+      // them all (restoring applied defaults). Continue still confirms.
+      if (!discard) toggleRecommendedRows(rows.filter((r) => isRowDiscarded(r, isItemDeleted)), false);
+      setSuggestedKept(rows.map((r) => r.ch), !discard);
+    } else {
+      toggleRecommendedRows(rows, discard);
+    }
     for (const row of rows) {
       if (recommendedRowIds(row).length > 0) recordDecision(row.ch);
     }
     collapseCardNarrow();
-  }, [toggleRecommendedRows, recordDecision, collapseCardNarrow]);
+  }, [primaryRowSet, isItemDeleted, setSuggestedKept, toggleRecommendedRows, recordDecision, collapseCardNarrow]);
 
   // Kept / total / removed counts over EVERY cell.
   const { kept, total } = useMemo(() => {
@@ -1049,8 +1194,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [cellsByCh, cells, selectedCh],
   );
 
+  // Characters paired with the selected one that discarding it would also
+  // discard — shown before the author acts, so the cascade is never silent.
+  const cascadePartners = useMemo(
+    () => (ir && selectedCell ? pairedCascadeChars(ir, selectedCell) : []),
+    [ir, selectedCell],
+  );
+
   // The recommendation row behind a reco selected cell (for the card's
-  // discarded state and Keep/Carve actions) — case-merged row semantics,
+  // discarded state and Keep/Discard actions) — case-merged row semantics,
   // mirroring RecommendedGroupCard's isRowDiscarded usage.
   const selectedRow = useMemo(
     () => (selectedCell?.reco === true
@@ -1059,10 +1211,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [selectedCell, recommended],
   );
   const selectedDiscarded = selectedRow !== undefined
-    ? isRowDiscarded(selectedRow, isItemDeleted)
+    ? isRowDiscarded(selectedRow, isItemDeleted) || isMarkedRow(selectedRow)
     : selectedCell !== undefined && isCellDiscarded(selectedCell, isItemDeleted);
 
-  /** Card Keep/Carve: explicit disposition for the selected character, then collapse. */
+  /** Card Keep/Discard: explicit disposition for the selected character, then collapse. */
   const decideSelected = useCallback((discard: boolean) => {
     const cell = selectedCell;
     if (cell === undefined) return;
@@ -1085,6 +1237,24 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // Skip and Continue wait for the IR — there is nothing to keep or carve yet.
   // The nav ids are the ones Carve v1 used, restored so their existing
   // translations come back (FR-044).
+  // Spec 106 FR-042 / Art. X: Continue is the confirmation — it applies the
+  // marked suggestions. Skip keeps every suggested character. Back leaves
+  // the marks as they are; nothing was removed.
+  const handleContinue = useCallback(() => {
+    applySuggestion();
+    onComplete();
+  }, [applySuggestion, onComplete]);
+  const handleSkip = useCallback(() => {
+    keepAll();
+    setCarveSuggestion({
+      fingerprint: suggestionFingerprint,
+      derived: [],
+      kept: suggestionFingerprint === '[]' ? [] : primaryRows.map((r) => r.ch.normalize('NFC')).sort(),
+      touched: true,
+    });
+    onComplete();
+  }, [keepAll, setCarveSuggestion, suggestionFingerprint, primaryRows, onComplete]);
+
   const backAction =
     onBack !== undefined
       ? {
@@ -1102,12 +1272,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           ...backAction,
           secondary: {
             label: t({ id: 'editor.carve.skipButton', message: 'Skip' }),
-            onClick: () => { keepAll(); onComplete(); },
+            onClick: handleSkip,
             testId: 'carve-skip',
           },
           forward: {
             label: t({ id: 'editor.carve.continueButton', message: 'Continue →' }),
-            onClick: onComplete,
+            onClick: handleContinue,
             testId: 'carve-continue',
           },
         },
@@ -1132,10 +1302,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: 0, font: "500 23px/1.1 'Playfair Display', serif", color: 'var(--app-text)' }}>
-            Everything this keyboard can type
+            <Trans id="carve.header.heading">Everything this keyboard can type</Trans>
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-muted)', maxWidth: 620, lineHeight: 1.5 }}>
-            Every printable character your starting keyboard can produce, in one panel. Click any character to discard it — nothing is deleted until you continue.
+            <Trans id="carve.header.body">Every printable character your starting keyboard can produce, in one panel. Click any character to discard it — discarding applies straight away, and you can restore a character at any time.</Trans>
           </p>
         </div>
       </div>
@@ -1144,10 +1314,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>
         <div>
           <div style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>
-            <b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept
+            <Trans id="carve.status.keptLine"><b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept</Trans>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--app-text-subtle)', marginTop: 2 }}>
-            {removedCount} discarded · reversible until you continue
+            <Trans id="carve.status.discardedLine">{removedCount} discarded · you can restore them at any time</Trans>
           </div>
         </div>
         {/* Grouping toggle — native fieldset/radio group so "Group by" is a
@@ -1194,7 +1364,17 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             Source
           </label>
         </fieldset>
+        <button
+          type="button"
+          className="ks-focus-ring"
+          data-testid="review-carved-keys-button"
+          onClick={() => setReviewOpen(true)}
+          style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'var(--app-surface-2)', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '6px 12px' }}
+        >
+          <Trans id="carve.review.open">Review carved keys</Trans>
+        </button>
         <RemovedDropdown list={removedList} onRestore={restoreRemovedItem} onRestoreAll={restoreAll} />
+        <ReviewCarvedKeysDialog open={reviewOpen} combos={carvedCombos} onClose={() => setReviewOpen(false)} />
       </div>
 
       {/* Two-panel body — narrow viewports stack the details card above the
@@ -1210,6 +1390,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             onToggleOpen={() => setDetailsCardOpen((v) => !v)}
             onKeep={() => decideSelected(false)}
             onCarve={() => decideSelected(true)}
+            cascadePartners={cascadePartners}
           />
         ) : (
           <>
@@ -1322,8 +1503,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     control in this panel. Toggling a character happens only
                     by clicking its grid cell, a suggested-group card, or the
                     removed-characters dropdown above. */}
+                <CascadeNotice ch={cell.ch} partners={cascadePartners} />
                 <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-                  Discarding a character removes the rules that produce it. If a rule also produces a character you kept, that rule stays.
+                  <Trans id="carve.details.discardBlurb">If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.</Trans>
                 </p>
               </div>
             );
@@ -1348,10 +1530,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 chipBackground="color-mix(in srgb, var(--sil-red) 14%, var(--app-surface-2))"
                 chipColor="var(--app-danger-text-on-surface-2)"
                 heading={<Trans id="carve.suggested.heading">Suggested to discard</Trans>}
-                body={<Trans id="carve.suggested.startingBody">Your starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
+                body={<Trans id="carve.suggested.bodyMarked">Your starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. They are marked to discard — click any character below to keep it instead. Marked characters are discarded when you continue, and you can restore a character at any time.</Trans>}
                 rows={primaryRows}
                 cellsByCh={cellsByCh}
                 isItemDeleted={isItemDeleted}
+                isDerivedRow={isDerivedRow}
+                isMarkedRow={isMarkedRow}
                 onToggleRow={toggleRowDecide}
                 onBulkToggle={(discard) => toggleRowsDecide(primaryRows, discard)}
                 discardAllLabel={(count) => t({ id: "carve.recommended.discardAll", message: `Discard all ${count}` })}
@@ -1363,14 +1547,14 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
               <RecommendedGroupCard
                 testId="carve-v2-optional-latin-group"
                 toggleAllTestId="carve-v2-optional-latin-toggle-all"
-                regionAriaLabel={t({ id: "editor.assignLoop.removalBanner.latinOptionalGroupAriaLabel", message: "Latin alphabet, optional removal" })}
+                regionAriaLabel={t({ id: "editor.assignLoop.removalBanner.latinOptionalGroupAriaLabel", message: "Latin alphabet — discarding is optional" })}
                 topBorderColor="var(--app-border-strong)"
                 chipBackground="var(--app-surface-2)"
                 chipColor="var(--app-text-subtle)"
                 heading={<Trans id="editor.assignLoop.removalBanner.latinOptionalHeading">Latin alphabet (optional)</Trans>}
                 body={t({
                   id: "editor.assignLoop.removalBanner.latinOptionalBody",
-                  message: `Keep these for URLs, code, and English words — or remove them for a ${{ descriptor: keyboardDescriptor }} keyboard.`,
+                  message: `Keep these for URLs, code, and English words — or discard them for a ${{ descriptor: keyboardDescriptor }} keyboard.`,
                 })}
                 rows={optionalLatinRows}
                 cellsByCh={cellsByCh}

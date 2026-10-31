@@ -12,6 +12,7 @@ import {
   isGatedTag,
   loadExemplarSource,
   sourceExemplars,
+  sourceExemplarsBoth,
 } from "./exemplarSource.js";
 import { exemplarLocaleCandidates } from "./cldr.js";
 import { loadExemplarIndex } from "./exemplarIndex.js";
@@ -242,5 +243,41 @@ describe("committed index integrity", () => {
     expect(index.version.generated).toBe(
       `cldr:${index.version.cldr}+sldr:${index.version.sldrCommit.slice(0, 7)}`,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1369 — CLDR/SLDR union: sourceExemplarsBoth
+// ---------------------------------------------------------------------------
+
+describe("sourceExemplarsBoth (#1369)", () => {
+  it("returns both sides when the tag has CLDR and SLDR coverage", () => {
+    const both = sourceExemplarsBoth("ewo");
+    expect(both).not.toBeNull();
+    expect(both!.resolvedTag).toBe("ewo");
+    expect(both!.cldr).not.toBeNull();
+    expect(both!.sldr).not.toBeNull();
+    expect(both!.cldr!.source).toBe("cldr");
+    expect(both!.sldr!.source).toBe("sldr");
+    // Per-character attribution is preserved on each side.
+    expect(both!.cldr!.characters.every((c) => c.source === "cldr")).toBe(true);
+    expect(both!.sldr!.characters.every((c) => c.source === "sldr")).toBe(true);
+  });
+
+  it("agrees with sourceExemplars on the winning side", () => {
+    const single = sourceExemplars("ewo");
+    const both = sourceExemplarsBoth("ewo");
+    expect(single).not.toBeNull();
+    expect(both).not.toBeNull();
+    // CLDR wins per R5 precedence.
+    expect(single!.source).toBe("cldr");
+    expect(both!.cldr!.characters.map((c) => c.char)).toEqual(
+      single!.characters.map((c) => c.char),
+    );
+  });
+
+  it("returns null when neither side covers the tag", () => {
+    expect(sourceExemplarsBoth("zzz")).toBeNull();
+    expect(sourceExemplarsBoth("")).toBeNull();
   });
 });

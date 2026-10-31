@@ -22,19 +22,33 @@
  *     sharing for untouched platforms/layers/rows (Case A shape).
  *   - `applyTouchKeycapRemovalsToRawJson` — raw `.keyman-touch-layout` JSON
  *     string in, parse → splice-in-place → stringify, preserving every
- *     unmodified field verbatim (Case B shape).
+ *     unmodified member's value verbatim (Case B shape).
  * `applyTouchKeycapRemovalsToVfs` (the actual projection step wired into
  * `projectWorkingCopyVfs`) always uses the RAW-JSON variant: by the time this
  * step runs, `.keyman-touch-layout` in the VFS is already a fully-derived
  * JSON string (either freshly injected `touchLayoutJson`, Case A or B, or the
- * base VFS's shipped file) — there is no live `TouchLayoutIR` to hand it, and
- * splicing the raw JSON in place (rather than round-tripping it through
- * `parseTouchLayoutString`/`emitTouchLayout`) avoids re-losing the same
- * IR-unrepresented fields `applyDesktopModificationsToRawJson` documents
- * (per-key `layer`, `displayUnderlying`, `font`/`fontsize`, string-vs-int
- * `sp`/`width`/`pad`) — exactly the reasoning that motivates
- * `applyCarveKeycapRemovalsToVfs`'s own choice of a direct JSON-object splice
- * over an IR round-trip.
+ * base VFS's shipped file) — there is no live `TouchLayoutIR` to hand it.
+ *
+ * Why raw (spec 035 R9, Case B) — basis restated 2026-10-16. An earlier
+ * version of this header claimed splicing avoids re-losing
+ * IR-unrepresented fields (per-key `layer`, `displayUnderlying`,
+ * `font`/`fontsize`, string-vs-int `sp`/`width`/`pad`). Those fields all
+ * round-trip since the full-fidelity codec landed (issue 2083). What a
+ * round trip still drops or normalises is the parser's unmodelled
+ * surface: members outside the closed platform set (desktop/tablet/
+ * phone), incl. top-level non-platform members; unknown members at every
+ * level below the top; a platform with no `layer` array; non-canonical
+ * flick directions; empty `sk`/`multitap` arrays; empty-string display
+ * fields treated as absent; non-numeric `sp`/`width`/`pad`; string row
+ * ids regenerated as numbers; and member/platform ordering and
+ * formatting (the full list is in `applyTouchAssignmentsToRawJson.ts`'s
+ * header; `parseTouchLayout` in contracts and `codec/parse-touch.ts`
+ * are the authority). Splicing in place keeps all of it, at the parsed
+ * level, for a shipped file — exactly the reasoning that motivates
+ * `applyCarveKeycapRemovalsToVfs`'s own choice of a direct JSON-object
+ * splice over an IR round-trip. Converting this applier means accepting
+ * those losses plus supplying an IR at this call site, proven by a
+ * twin-equivalence test — a judgement call, not a codec-fidelity fix.
  *
  * Idempotency / desktop-cascade safety: addresses are resolved by
  * PLATFORM + LAYER + key/sub-key id, recomputed from whatever the touch
@@ -222,8 +236,8 @@ type RawTouchLayout = Record<string, unknown>;
 
 /**
  * Splice `deletedTouchKeyIds` deletions directly onto a copy of the raw
- * `.keyman-touch-layout` JSON string, preserving every unmodified field
- * verbatim (never round-tripped through the IR — see module doc).
+ * `.keyman-touch-layout` JSON string, preserving every unmodified member's
+ * value verbatim (never round-tripped through the IR — see module doc).
  */
 export function applyTouchKeycapRemovalsToRawJson(
   rawJson: string,

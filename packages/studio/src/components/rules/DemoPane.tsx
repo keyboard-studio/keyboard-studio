@@ -16,7 +16,8 @@
 // output — while the artifact is not "ready" the trace table is hidden.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type {
   CompileResult,
   IRRule,
@@ -36,6 +37,7 @@ import {
   rulesLabel,
   rulesLegend,
   rulesNote,
+  rulesOutputPreview,
   rulesSection,
   rulesSectionHeading,
   rulesTable,
@@ -57,6 +59,13 @@ import {
   extractFiredRule,
   type DemoTraceRow,
 } from "./demoTrace.ts";
+import {
+  CODE_UNREACHABLE_RULE,
+  groupDemoDiagnostics,
+  totalDemoDiagnostics,
+  type DemoDiagnosticGroup,
+} from "./demoDiagnostics.ts";
+import { plainDiagnosticMessage } from "../../lib/plainDiagnosticMessage.ts";
 import { familyOfRule, groupRules } from "./ruleFamilies.ts";
 import { buildFiredRuleResolver } from "./firedRuleMapping.ts";
 import { humanizeId } from "./ruleNaming.ts";
@@ -73,6 +82,46 @@ import {
   type BaseLayoutId,
   type LayoutFamilyAnswer,
 } from "./baseLayouts.ts";
+
+/** One row per diagnostic code: plain-language text and a count; raw code and message behind a disclosure. */
+function DemoDiagnosticList({ groups }: { groups: readonly DemoDiagnosticGroup[] }) {
+  const { t, i18n } = useLingui();
+  return (
+    <ul style={{ ...rulesBody, paddingLeft: 18 }}>
+      {groups.map((g) => {
+        const plain = plainDiagnosticMessage(g.representative, i18n);
+        return (
+          <li key={g.code} data-testid="rules-demo-diagnostic-row">
+            {g.code === CODE_UNREACHABLE_RULE ? (
+              <>
+                <strong>
+                  <Trans id="rules.demo.unreachableTitle">Rules that can never fire</Trans>
+                </strong>{" "}
+                {t({
+                  id: "rules.demo.unreachableBody",
+                  message: plural(g.count, {
+                    one: "# rule repeats an earlier rule for the same keystroke and will not be used. Your keyboard still types the same.",
+                    other: "# rules repeat an earlier rule for the same keystroke and will not be used. Your keyboard still types the same.",
+                  }),
+                })}
+              </>
+            ) : (
+              <>
+                {plain.whatHappened} ({g.count}) {plain.whatToTry}
+              </>
+            )}
+            <details>
+              <summary>
+                <Trans id="rules.demo.technicalDetails">Technical details</Trans>
+              </summary>
+              <code style={{ ...rulesCode, overflowWrap: "anywhere" }}>{plain.technicalDetail}</code>
+            </details>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export interface DemoPaneProps {
   /** Injected simulate implementation (tests). Defaults to the lazy browser-safe engine. */
@@ -93,6 +142,7 @@ const patternTitleCache = new Map<string, string>();
 export function DemoPane(props: DemoPaneProps = {}) {
   const storeArtifact = useRulesDemoArtifactStore((s) => s.artifact);
   const artifact = props.artifact !== undefined ? props.artifact : storeArtifact;
+  const { t } = useLingui();
   const storeIr = useWorkingCopyStore((s) => s.ir);
   const ir = props.ir !== undefined ? props.ir : storeIr;
   const storeBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
@@ -156,11 +206,16 @@ export function DemoPane(props: DemoPaneProps = {}) {
   }, [likelyBases, handPicked]);
 
   // --- Simulator engine (lazy, once per session; no debounce, no compile) ---
-  const [simulate, setSimulate] = useState<DemoSimulate | null>(props.simulateImpl ?? null);
+  // NOTE: the initializer is wrapped in an arrow function — useState would
+  // otherwise INVOKE a function-valued simulateImpl as a lazy initializer
+  // (any impl that reads its arguments crashes on mount; #2384).
+  const [simulate, setSimulate] = useState<DemoSimulate | null>(() => props.simulateImpl ?? null);
   const [engineError, setEngineError] = useState<string | null>(null);
   useEffect(() => {
     if (props.simulateImpl !== undefined) {
-      setSimulate(props.simulateImpl);
+      // Wrapped: setSimulate would otherwise invoke a function-valued impl
+      // as a state updater (same footgun as the useState initializer above).
+      setSimulate(() => props.simulateImpl ?? null);
       setEngineError(null);
       return;
     }
@@ -334,6 +389,18 @@ export function DemoPane(props: DemoPaneProps = {}) {
 
   const showTrace = artifactStatus === "ready" && rows.length > 0;
 
+  // Desktop demo: info diagnostics are filtered in the helper, then identical
+  // codes collapse into one counted row. The error branch keeps every severity.
+  const diagnosticGroups = useMemo(
+    () => groupDemoDiagnostics(artifact.diagnostics),
+    [artifact.diagnostics],
+  );
+  const diagnosticTotal = totalDemoDiagnostics(diagnosticGroups);
+  const errorGroups = useMemo(
+    () => groupDemoDiagnostics(artifact.diagnostics, { includeInfo: true }),
+    [artifact.diagnostics],
+  );
+
   return (
     <section aria-label="Rule demo" data-testid="rules-demo-pane" style={rulesSection}>
       <h3 style={rulesSectionHeading}>
@@ -369,18 +436,7 @@ export function DemoPane(props: DemoPaneProps = {}) {
           <p style={rulesBody}>
             <strong>{artifact.errorStep ?? "compile"}</strong>: {artifact.errorMessage}
           </p>
-          {artifact.diagnostics.length > 0 && (
-            <ul style={{ ...rulesBody, paddingLeft: 18 }}>
-              {artifact.diagnostics.map((d, i) => (
-                <li key={i}>
-                  <code style={rulesCode}>{d.code}</code> — {d.message}
-                  {d.location !== undefined
-                    ? ` (${d.location.file}:${d.location.line})`
-                    : ""}
-                </li>
-              ))}
-            </ul>
-          )}
+          {errorGroups.length > 0 && <DemoDiagnosticList groups={errorGroups} />}
         </div>
       )}
 
@@ -432,17 +488,44 @@ export function DemoPane(props: DemoPaneProps = {}) {
             </p>
           )}
 
-          {artifactStatus === "ready" && artifact.diagnostics.length > 0 && (
-            <p data-testid="rules-demo-warnings" style={rulesNote}>
-              <Trans id="rules.demo.warnings">
-                Compiled with {artifact.diagnostics.length} warning(s):
-              </Trans>{" "}
-              {artifact.diagnostics.map((d) => d.code).join(", ")}
-            </p>
+          {artifactStatus === "ready" && diagnosticGroups.length > 0 && (
+            <details data-testid="rules-demo-warnings" style={rulesNote}>
+              <summary>
+                {t({
+                  id: "rules.demo.diagnosticsSummary",
+                  message: plural(diagnosticTotal, {
+                    one: "The compiler left # note about the rules",
+                    other: "The compiler left # notes about the rules",
+                  }),
+                })}
+              </summary>
+              <DemoDiagnosticList groups={diagnosticGroups} />
+            </details>
           )}
 
           {showTrace && (
             <>
+              {/* #2384: the typing box above keeps the author's raw keystrokes
+                  exactly as typed (Matthew's ruling — never rewritten). This
+                  read-only box shows what the keyboard WOULD output —
+                  result.finalOutput, the same SimulationResult that feeds the
+                  play-by-play trace table below. */}
+              <div style={{ margin: "0 0 12px 0" }}>
+                <label style={rulesLabel}>
+                  <Trans id="rules.demo.outputPreviewLabel">Output preview</Trans>
+                  <output
+                    data-testid="rules-demo-output-preview"
+                    aria-live="polite"
+                    style={rulesOutputPreview}
+                  >
+                    {result !== null && result.finalOutput !== "" ? (
+                      result.finalOutput
+                    ) : (
+                      <em>—</em>
+                    )}
+                  </output>
+                </label>
+              </div>
               {!enrichmentPresent && (
                 <p data-testid="rules-demo-no-enrichment" style={rulesNote}>
                   <Trans id="rules.demo.noEnrichment">

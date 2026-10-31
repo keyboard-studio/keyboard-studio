@@ -22,6 +22,11 @@ export const OPAQUE_REASONS = {
   // bracketed entries are key sequences, not literal characters, so the
   // store is preserved opaque rather than expanded character by character.
   MENU_STORE_SYNTAX: "menu-store-syntax",
+  // Retained for persisted working copies: pre-#2238 parses attributed
+  // dk(name) rules/stores to this reason. The codec no longer produces it
+  // (#2238 types named deadkeys as {kind:"namedDeadkey"} elements);
+  // consumers that recover named deadkeys from fragments (contracts'
+  // scanNamedRawEntries) key off this string for old drafts.
   NAMED_DEADKEY: "named-deadkey",
   UNKNOWN_PRE_BEGIN: "unknown-pre-begin",
   // Store-body range notation (`X .. Y`, spec 042). A well-formed range is

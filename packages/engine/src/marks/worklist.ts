@@ -14,7 +14,13 @@
 //   - markUnits — each mark resolving to `own-key`, carrying the keyboard's
 //     confirmed input order;
 //   - blockedCombinations — every mark × base left unchecked at the attachment
-//     station (must never be reachable by ordinary typing, FR-021).
+//     station (must never be reachable by ordinary typing, FR-021);
+//   - allowedContexts — per mark, the non-base contexts ticked at the station
+//     (spec 106 FR-013: the space column). Space is never a base, so it never
+//     becomes a keyed unit or a blocked combination.
+//   - bareMarkAllowed — per mark, whether the "start of line" box is ticked
+//     (issue #2374). The row's symbolic sentinel key feeds this channel only,
+//     never allowedContexts.
 //
 // The field name `ownLetterUnits` is now a misnomen — it holds keyed units, not
 // "own letters" — and is left alone deliberately: renaming it would touch the
@@ -30,10 +36,27 @@ import type { MarkClass } from "./mark-classes.js";
 import { treatmentFor, type MarkTreatmentAnswer } from "./treatment.js";
 import type { MarkTreatmentPrefill } from "./treatment-prefill.js";
 
+/** The attachment station's space column key (spec 106 FR-013). */
+const SPACE = " ";
+
+/**
+ * The attachment row's symbolic "start of line" column key (issue #2374).
+ *
+ * A SYMBOLIC sentinel, never a real character and never `""`: buffer start
+ * has no character, so this key must NEVER enter `allowedContexts` (which is
+ * `Record<string, string[]>` of real chars) — it feeds `bareMarkAllowed`
+ * only. The survey layer's `ATTACHMENT_START_OF_LINE` must be this exact
+ * value (import it from here rather than redefining it).
+ */
+export const ATTACHMENT_START_OF_LINE = "<start-of-line>";
+
 export interface WorklistInputs {
   alphabet: ConfirmedAlphabet;
   classes: MarkClass[];
-  /** Per mark, per base: checked = reachable (attested or plausible-accepted). */
+  /**
+   * Per mark, per base: checked = reachable (attested or plausible-accepted).
+   * The `" "` key is the space column, not a base.
+   */
   attachments: Record<string, Record<string, boolean>>;
   /**
    * The recorded S2 answer (spec 052) — REPLACES `mentalModel` + `markOverrides`
@@ -67,6 +90,10 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
 
   const markUnits: PlacementWorklist["markUnits"] = [];
   const blockedCombinations: PlacementWorklist["blockedCombinations"] = [];
+  const allowedContexts: Record<string, string[]> = {};
+  // Per-mark "start of line" box (issue #2374): only ticked marks are
+  // recorded; absent means unticked (swallow at buffer start).
+  const bareMarkAllowed: Record<string, boolean> = {};
 
   for (const mark of alphabet.marks) {
     const row = attachments[mark] ?? {};
@@ -85,6 +112,11 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
     for (const base of alphabet.bases) {
       if (row[base] !== true) blockedCombinations.push({ base, mark });
     }
+
+    if (row[SPACE] === true) allowedContexts[mark] = [SPACE];
+    // The start-of-line sentinel is symbolic: it must never enter
+    // allowedContexts (chars only). It feeds the per-mark boolean channel.
+    if (row[ATTACHMENT_START_OF_LINE] === true) bareMarkAllowed[mark] = true;
   }
 
   // Promoted composed characters earn dedicated keys REGARDLESS of their mark's
@@ -93,7 +125,13 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
   // composed-produced and promoted yields exactly one entry.
   for (const promoted of treatment.promoted) pushUnit(promoted);
 
-  return { ownLetterUnits, markUnits, blockedCombinations };
+  return {
+    ownLetterUnits,
+    markUnits,
+    blockedCombinations,
+    ...(Object.keys(allowedContexts).length > 0 ? { allowedContexts } : {}),
+    ...(Object.keys(bareMarkAllowed).length > 0 ? { bareMarkAllowed } : {}),
+  };
 }
 
 /**

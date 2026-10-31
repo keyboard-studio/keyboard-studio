@@ -124,7 +124,7 @@ interface RuleLocation {
   rule: IRRule;
 }
 
-function stampOwnership(rule: IRRule, output: OutputElement[]): IRRule {
+export function stampOwnership(rule: IRRule, output: OutputElement[]): IRRule {
   // FR-002: the two ownership markers are mutually exclusive on one rule.
   const { ownedByPattern: _dropped, ...rest } = rule;
   return { ...structuredClone(rest), output, ownedByBehaviour: CARVE_SUPPRESSION_OWNER };
@@ -180,6 +180,9 @@ function compileSlotGuards(
   // Lazily built once: the pairing graph resolves which stores are
   // positionally tied to the carved store (coordinated drop targets).
   let analysis: ReturnType<typeof analyzeStores> | undefined;
+  // Carved item indices per store name (each slot's index counts for every
+  // store in its pair-set: the coordinated drop splices them all).
+  const carvedIndicesByStore = new Map<string, Set<number>>();
 
   for (const disposition of slotDispositions) {
     const comboId = disposition.comboId;
@@ -210,6 +213,11 @@ function compileSlotGuards(
       if (item?.kind === "char") selectorChars.set(name, item.value);
     }
     if (selectorChars.size === 0) continue;
+    for (const name of selectorChars.keys()) {
+      const set = carvedIndicesByStore.get(name) ?? new Set<number>();
+      set.add(slot.itemsIndex);
+      carvedIndicesByStore.set(name, set);
+    }
 
     // Paired rules: unowned rules whose context consumes a paired store via
     // any(). One guard per any() occurrence (each occurrence is an
@@ -219,9 +227,22 @@ function compileSlotGuards(
       if (!nextGroup) continue;
       group.rules.forEach((rule, originalIndex) => {
         if (rule.ownedByBehaviour !== undefined) return;
+        // Key position only: a guard exists to stop a KEYSTROKE falling
+        // through to the base keyboard once the slot is removed. An any()
+        // left of the `+` separator matches already-typed text; the carved
+        // char can no longer be typed, so a rule keyed on it protects nothing
+        // (and would break e.g. Backspace after a pasted char). No `+` means
+        // no key element, hence no guard.
+        const plusIdx = rule.context.findIndex((el) => el.kind === "raw" && el.text === "+");
+        if (plusIdx === -1) return;
+        // Guards are emitted per slot, so a store whose EVERY item is carved is
+        // only known once all slot dispositions have been seen; the dead
+        // consumer sweep below handles it after this loop.
         const occurrences: number[] = [];
         rule.context.forEach((el, contextIdx) => {
-          if (el.kind === "any" && selectorChars.has(el.storeRef)) occurrences.push(contextIdx);
+          if (contextIdx > plusIdx && el.kind === "any" && selectorChars.has(el.storeRef)) {
+            occurrences.push(contextIdx);
+          }
         });
         occurrences.forEach((contextIdx, occNum) => {
           const anyEl = rule.context[contextIdx];
@@ -237,6 +258,20 @@ function compileSlotGuards(
           const guardContext: ContextElement[] = rule.context.map((el, idx) =>
             idx === contextIdx ? { kind: "char", value: selectorChar } : el,
           );
+          // Dedupe by emitted LHS, not nodeId: positionally paired stores
+          // carved at the same index (or two consuming rules sharing an LHS
+          // after substitution) would otherwise yield identical guards, and
+          // every copy after the first is an unreachable rule.
+          const lhsKey = JSON.stringify(guardContext);
+          if (
+            nextGroup.rules.some(
+              (r) =>
+                r.ownedByBehaviour === CARVE_SUPPRESSION_OWNER &&
+                JSON.stringify(r.context) === lhsKey,
+            )
+          ) {
+            return;
+          }
           const verb = suppressionVerb(guardContext);
           const guard: IRRule = {
             nodeId: guardNodeId,
@@ -263,6 +298,77 @@ function compileSlotGuards(
     }
   }
 
+  restorations.push(
+    ...removeDeadConsumers(ir, nextGroups, dispositions, ruleIndex, analysis, carvedIndicesByStore),
+  );
+
+  return restorations;
+}
+
+/**
+ * Remove consumer rules that the slot guards have made wholly unreachable.
+ *
+ * When EVERY item of an `any()` store is carved, the per-char guards sit
+ * ahead of the consumer and match every key the consumer's `any()` could
+ * take, so the consumer can never fire; kmcmplib reports it as an unreachable
+ * rule. The guards already swallow each key, so dropping the dead consumer
+ * changes no behaviour and keeps the swallow semantics. (The slot-removal
+ * stage then drops the emptied stores; any other rule still referencing them
+ * goes with them, so nothing is removed twice.)
+ *
+ * Only key-position (right of `+`) occurrences count, matching guard
+ * synthesis. A consumer carrying its own rule disposition is left to the
+ * rule-disposition pass. Recorded as a "removed" restoration so un-carve
+ * re-inserts the rule at its original index.
+ */
+function removeDeadConsumers(
+  ir: KeyboardIR,
+  nextGroups: Map<string, IRGroup>,
+  dispositions: CarveDisposition[],
+  ruleIndex: Map<string, RuleLocation>,
+  analysis: ReturnType<typeof analyzeStores> | undefined,
+  carvedIndicesByStore: Map<string, Set<number>>,
+): SuppressionRestoration[] {
+  const restorations: SuppressionRestoration[] = [];
+  if (!analysis) return restorations;
+
+  const fullyCarved = new Set<string>();
+  for (const [name, carved] of carvedIndicesByStore) {
+    const store = analysis.storeByName.get(name);
+    if (!store || store.items.length === 0) continue;
+    if (store.items.every((item, i) => item.kind === "char" && carved.has(i))) {
+      fullyCarved.add(name);
+    }
+  }
+  if (fullyCarved.size === 0) return restorations;
+
+  const ruleDispositionIds = new Set(
+    dispositions.filter((d) => ruleIndex.has(d.comboId)).map((d) => d.comboId),
+  );
+
+  for (const group of ir.groups) {
+    const nextGroup = nextGroups.get(group.nodeId);
+    if (!nextGroup) continue;
+    group.rules.forEach((rule, originalIndex) => {
+      if (rule.ownedByBehaviour !== undefined) return;
+      if (ruleDispositionIds.has(rule.nodeId)) return;
+      const plusIdx = rule.context.findIndex((el) => el.kind === "raw" && el.text === "+");
+      if (plusIdx === -1) return;
+      const dead = rule.context.some(
+        (el, idx) => idx > plusIdx && el.kind === "any" && fullyCarved.has(el.storeRef),
+      );
+      if (!dead) return;
+      const at = nextGroup.rules.findIndex((r) => r.nodeId === rule.nodeId);
+      if (at === -1) return;
+      nextGroup.rules.splice(at, 1);
+      restorations.push({
+        kind: "removed",
+        groupNodeId: group.nodeId,
+        index: originalIndex,
+        originalRule: structuredClone(rule),
+      });
+    });
+  }
   return restorations;
 }
 

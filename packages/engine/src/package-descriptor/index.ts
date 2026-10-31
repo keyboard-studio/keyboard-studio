@@ -21,11 +21,13 @@ export {
   buildLanguageElement,
   buildLanguagesBlock,
   parseTargetTokens,
+  kpsMemberRef,
+  normaliseKpsFontEntries,
   WELCOME_PAGE_KPS_REF,
   welcomeFolderKpsRef,
   normaliseWelcomeFolderFiles,
 } from "./build.js";
-export type { PackageDescriptorIdentity } from "./build.js";
+export type { PackageDescriptorIdentity, KpsFontDescriptorEntry } from "./build.js";
 export { applyIdentityToKps } from "./patch.js";
 export type { ApplyIdentityToKpsResult } from "./patch.js";
 

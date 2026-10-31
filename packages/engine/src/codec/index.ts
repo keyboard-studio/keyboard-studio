@@ -24,4 +24,9 @@ export type { OpaqueReason } from "./opaque-reasons.js";
 
 export { computeSha256Hex } from "./hash.js";
 
+// The full import pipeline (parse → recognize → Layer A′ fidelity → emit)
+// is composed by the caller: the studio's live import path runs the
+// fidelity stages inline (see validator/index-import-fidelity.js). There
+// is no engine-side orchestrator.
+
 export { normaliseForComparison } from "./normalise-ir.js";

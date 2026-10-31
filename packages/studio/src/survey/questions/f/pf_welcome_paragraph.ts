@@ -1,7 +1,8 @@
 // Per-question module: pf_welcome_paragraph (Phase F)
 // Ported verbatim from content/flows/phase_f_helpdocs.yaml.
 
-import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import { makeRequiredTextValidator } from "../validators.ts";
 import {
   helpDocsFromDecisions,
   historyEntryStateFromDecisions,
@@ -41,7 +42,10 @@ export const definition = {
   // static default is what a caller that supplies neither override still
   // sees — the value this module's own fixtures/tests exercise directly.
   required: true,
-  next: "pf_usage_tip_1",
+  // Routing: the font note (pf_font_guidance) follows the description — it is
+  // core intro matter (element spec §2), asked of every author, not part of
+  // the opt-in battery. Its own `next` converges back on pf_usage_tip_1.
+  next: "pf_font_guidance",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // ---------------------------------------------------------------------------
@@ -55,24 +59,7 @@ export const definition = {
 // standalone content-i18n extractor can load them. flowStepOptions.tsx's
 // phaseFOptions applies it to this question at seed time.
 
-export function validate(
-  value: string | string[] | undefined,
-): ValidationResult {
-  const text =
-    typeof value === "string"
-      ? value.trim()
-      : Array.isArray(value)
-        ? value.join("").trim()
-        : "";
-  if (text.length === 0) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please write a short description of what this keyboard is for.",
-    };
-  }
-  return { ok: true };
-}
+export const validate = makeRequiredTextValidator("Please write a short description of what this keyboard is for.");
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

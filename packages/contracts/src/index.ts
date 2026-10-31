@@ -9,6 +9,7 @@ export * from "./axes";
 export * from "./axisFill";
 export * from "./startKeyboard";
 export * from "./carveDisposition";
+export * from "./fallbackPolicy";
 export * from "./compileResult";
 export * from "./confirmedAlphabet";
 export * from "./copyright";
@@ -41,6 +42,7 @@ export * from "./placementStrategy";
 export * from "./provenance";
 export * from "./simulation";
 export * from "./strategy";
+export * from "./strategyDivergence";
 export * from "./surveyPhaseResult";
 export * from "./surveySession";
 export * from "./toleranceReport";
@@ -90,6 +92,10 @@ export * from "./touch-coverage";
 // keyboard-lint must consume it and cannot import engine — the same forced
 // placement as buildProducedSet and computeTouchCoverage.
 export * from "./touch-key-rule-join";
+// The one production resolver + the key-id destination decision (spec 104
+// FR-003/FR-005). Built on the rule-join above; same forced placement —
+// keyboard-lint consumes production verdicts and cannot import engine.
+export * from "./touchProduction";
 // The touch-node address scheme (spec 063 T114). Defined in engine originally;
 // moved here because the diagnostics detectors below build addresses and are
 // pinned to contracts. `engine/src/pattern-apply/touchKeyAddress.ts` is now a
@@ -124,6 +130,7 @@ export * from "./utils/bcp47";
 // re-export as typed `readonly` arrays / records.
 // ---------------------------------------------------------------------------
 export * from "./axisPriors";
+export * from "./docForms";
 export * from "./criteriaData";
 export * from "./fontEntry";
 export * from "./langtags";

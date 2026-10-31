@@ -27,6 +27,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`docs/discus-principles-integration.md`](discus-principles-integration.md) | DISCUS principles integration notes | Changes to criteria.json DISCUS rows | live |
 | [`content/facets/**`](../content/facets/) + [`utilities/facet-lint/index.js`](../utilities/facet-lint/index.js) | Facet catalog (23 records) and its plain-node structural checker | New/changed facet record; facet-lint rule changes | live |
 | [`docs/accessibility.md`](accessibility.md) | ADA/WCAG 2.2 AA approach: measurement contract, UI house rules, curated resources | House-rule changes; new a11y tooling; spec 056 cycle closes | live |
+| [`docs/advance-labels.md`](advance-labels.md) | Advance-button label rule (#1900): mid-journey steps say "Continue"; "Finish"/"Done" reserved for the journey-end step; enforced by `advanceLabels.test.ts` | Label-rule changes; journey-end allowlist changes | live |
 | [`docs/working-agreement.md`](working-agreement.md) | Team working agreement | Team process changes | live |
 | [`docs/github_flow.md`](github_flow.md) | Delivery-option progress (Options A/B/C) | Scaffolder, VFS, or output-path work lands | live |
 
@@ -34,9 +35,9 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 
 | Doc | Purpose | Update Triggers | Status |
 |---|---|---|---|
-| [`docs/making-a-template.md`](making-a-template.md) | Template authoring guide | Template pipeline changes | live |
+| [`docs/archive/making-a-template.md`](archive/making-a-template.md) | Template authoring guide | Template pipeline changes | archived |
 | [`docs/keyboard-documentation-plan.md`](keyboard-documentation-plan.md) | Generic plan/checklist for writing an authored keyboard's docs (README, HISTORY, LICENSE, welcome/readme.htm, help.php) | Doc-generation stubs change; criteria.md doc-section changes | live |
-| [`docs/Checking Keyman Keyboard Pull Requests.md`](<Checking Keyman Keyboard Pull Requests.md>) | PR review checklist | Criteria or review-process changes | live |
+| [`docs/archive/Checking Keyman Keyboard Pull Requests.md`](<archive/Checking Keyman Keyboard Pull Requests.md>) | PR review checklist | Criteria or review-process changes | archived |
 | [`docs/triage-scheduling.md`](triage-scheduling.md) | Issue triage and scheduling guide | Process changes | live |
 | [`docs/workflow-model.md`](workflow-model.md) | Hybrid authoring flow (Track 1 + Track 2), working-copy spine, node vocabulary, question inventory, efficiency findings, decisions; spec §8 is authoritative | Spec §8 workflow changes; two-track authoring changes | live |
 
@@ -45,10 +46,10 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | Doc | Purpose | Update Triggers | Status |
 |---|---|---|---|
 | [`docs/spec-signoff.md`](spec-signoff.md) | Spec review-cycle log and decision summary (D1-D9) | New spec version sign-off | live |
-| [`docs/survey-gap-analysis.md`](survey-gap-analysis.md) | Survey gap analysis | Survey changes | live |
+| [`docs/archive/survey-gap-analysis.md`](archive/survey-gap-analysis.md) | Survey gap analysis | Survey changes | archived |
 | [`docs/placement-intelligence-review.md`](placement-intelligence-review.md) | Placement intelligence review findings | Placement algorithm changes | live |
 | [`docs/keyboard-index.md`](keyboard-index.md) | Keyboard phonebook (BCP47, author, path per keyboard referenced) | Any keyboard cited or introduced in the repo | live |
-| [`docs/review-loop/STATUS.md`](review-loop/STATUS.md) | Automated review-loop iteration queue | New review-loop iterations | live |
+| [`docs/archive/review-loop/STATUS.md`](archive/review-loop/STATUS.md) | Automated review-loop iteration queue | New review-loop iterations | archived |
 
 ## Design notes (investigation / proposal records)
 
@@ -81,9 +82,8 @@ Regenerate (do not hand-edit) via each artifact's tool.
 
 | Doc | Purpose | Update Triggers | Status |
 |---|---|---|---|
-| [`docs/spec-amendment-2026-06-08-keyboardir.md`](spec-amendment-2026-06-08-keyboardir.md) | v1.1.0 KeyboardIR import amendment record | Superseded by spec.md §19 | archived |
-| [`docs/spec-amendment-2026-06-11-placement-priors.md`](spec-amendment-2026-06-11-placement-priors.md) | v1.1.1 placement-priors amendment record | Superseded by spec.md §19 | archived |
-| [`docs/archive/workflow-models-pre-hybrid.md`](archive/workflow-models-pre-hybrid.md) | Pre-hybrid authoring models: as-built two-island flow (Model 1) and intermediate intended model (Model 2); retained for provenance only | No update triggers — archived 2026-06-14; superseded by docs/workflow-model.md | archived |
+| [`docs/archive/spec-amendment-2026-06-08-keyboardir.md`](archive/spec-amendment-2026-06-08-keyboardir.md) | v1.1.0 KeyboardIR import amendment record | Superseded by spec.md §19 | archived |
+| [`docs/archive/spec-amendment-2026-06-11-placement-priors.md`](archive/spec-amendment-2026-06-11-placement-priors.md) | v1.1.1 placement-priors amendment record | Superseded by spec.md §19 | archived |
 
 ## Project guidance
 

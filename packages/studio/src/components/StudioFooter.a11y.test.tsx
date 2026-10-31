@@ -905,3 +905,38 @@ describe("StudioFooter — narrow viewport contents button", () => {
     expect(useJourneyContentsStore.getState().available).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Skip-link target: the shell's "Skip to step navigation" anchor points at
+// this cluster. The cluster carries the matching id and is programmatically
+// focusable (`tabIndex={-1}`), so activating the link lands focus on the
+// navigation itself — the forward button is the next Tab stop from there.
+// The link itself is rendered by the shell; StudioShell.test.tsx pins the
+// pairing through the mounted shell.
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — skip-link target", () => {
+  it("the nav cluster carries the skip link's target id and is focusable", () => {
+    publishNav(FULL_SPEC);
+    render(<StudioFooter />);
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    expect(group.id).toBe("step-navigation");
+    expect(group.getAttribute("tabindex")).toBe("-1");
+    expect(document.querySelector("#step-navigation")).toBe(group);
+    group.focus();
+    expect(document.activeElement).toBe(group);
+  });
+
+  it("the forward button is the cluster's last Tab stop after the target", async () => {
+    publishNav(FULL_SPEC);
+    const user = userEvent.setup();
+    render(<StudioFooter />);
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    group.focus();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-back"));
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-continue"));
+  });
+});

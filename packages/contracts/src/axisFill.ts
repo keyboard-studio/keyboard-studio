@@ -12,9 +12,16 @@ import type { DiscoveryAxisVector } from "./axes";
  *   `KeyboardIR` (e.g. postfix mark-input-order detection on the Track 2
  *   import path, spec §7.2 rule 3a); MAY emit a marked value because it is
  *   evidence, not a guess.
+ * - "ir-derived" — a value derived in the live studio from the target
+ *   identity plus the base's `KeyboardIR` (e.g. remap-posture detection,
+ *   spec §7.2 rule 8: an alphabetic non-Latin target whose base types Latin
+ *   letters on its letter keys); MAY emit a marked value because it is
+ *   evidence, not a guess. Unlike "import-derived", the evidence is only
+ *   complete once the target script is known, so the fill lands after
+ *   instantiation, when the identity lands.
  * The union shape leaves room for future fill sources without a breaking change.
  */
-export type AxisFillSource = "script-class-prior" | "import-derived";
+export type AxisFillSource = "script-class-prior" | "import-derived" | "ir-derived";
 
 /**
  * Provenance record for one axis value that was filled by a default-fill

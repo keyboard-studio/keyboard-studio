@@ -285,6 +285,47 @@ describe("projectWorkingCopyVfs step 1.8 (deadkey overlay wiring)", () => {
     expect(text).toContain("@deadkey:3001 name=acute_renamed");
   });
 
+  // #2238 (ruling D10): persisted delete-named / retarget-named ops were
+  // recorded against fragment-era keyboards; replayed at download over a
+  // .kmn that now parses TYPED, they must keep working.
+  const NAMED_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'named-replay-test'
+store(&TARGETS) 'any'
+store(acuteIn) 'ae'
+store(acuteOut) 'áé'
+begin Unicode > use(main)
+
+group(main) using keys
++ [K_X] > dk(acute)
+dk(acute) + any(acuteIn) > index(acuteOut, 2)
++ 'a' > 'a'
+`;
+
+  it("delete-named replay removes the typed named cluster from the projection", () => {
+    const vfs = makeVfs(NAMED_KMN);
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      { kind: "delete-named", name: "acute" },
+    ]);
+    expect(result.warnings).toEqual([]);
+    expect(result.changed).toBe(true);
+    const { text, deadkeys } = projectedDeadkeys(vfs);
+    expect(text).not.toContain("dk(acute");
+    expect(deadkeys.map((d) => d.name)).not.toContain("acute");
+    // The unrelated base rule survives the projection.
+    expect(text).toContain("U+0061");
+  });
+
+  it("retarget-named replay rewrites the typed trigger in the projection", () => {
+    const vfs = makeVfs(NAMED_KMN);
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      { kind: "retarget-named", name: "acute", newTrigger: { vkey: "K_Y" } },
+    ]);
+    expect(result.warnings).toEqual([]);
+    const { text, deadkeys } = projectedDeadkeys(vfs);
+    expect(text).toContain("[K_Y] > dk(acute)");
+    expect(deadkeys.find((d) => d.name === "acute")?.triggerKey).toBe("K_Y");
+  });
+
   it("an empty deadkey log leaves the projection untouched by the deadkey pass", () => {
     const { vfs, warnings } = project([]);
     expect(warnings.filter((w) => w.includes("deadkey"))).toEqual([]);

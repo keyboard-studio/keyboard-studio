@@ -17,7 +17,7 @@ import { caseCounterpart, confirmedCaseCounterpart } from "../character-discover
 export interface MarkClass {
   /** Stable within a session (deterministic from the alphabet). */
   id: string;
-  /** Plain-language label (never "Unicode"/"normalization" wording). */
+  /** Plain-language label (never "Unicode"/"ccc"/"normalization" wording). */
   label: string;
   /** Member marks, first-appearance order. */
   marks: string[];
@@ -56,8 +56,9 @@ function bucketLabel(bucket: FunctionBucket): string {
   if (bucket === "above") return "Marks above the letter";
   if (bucket === "below") return "Marks below the letter";
   if (bucket === "other") return "Other marks";
-  // `fixed-<ccc>`: each Arabic fixed-position class is its own bucket.
-  return `Fixed-position marks (position class ${bucket.slice("fixed-".length)})`;
+  // `fixed-<ccc>`: each Arabic fixed-position class is its own bucket;
+  // classes stay distinct by id and by their listed marks, not by label.
+  return "Marks in a fixed position";
 }
 
 function bucketOf(mark: string): FunctionBucket {
@@ -148,6 +149,23 @@ export function attestedBasesOf(
     }
   }
   return byMark;
+}
+
+/**
+ * Marks with no letter+mark pairing evidence: no attested stack pairs the
+ * mark with any base letter (#1784). This is the bare-combining-mark
+ * exemplar symptom — e.g. Bafut (`bfd`) lists U+0300/U+0302/U+030C with no
+ * letter clusters, so every mark lands here and the attachment proposals
+ * have nothing to pre-check. The studio uses this as the trigger to ask for
+ * a large text sample before the marks series' attachment step.
+ *
+ * Pure; marks keep first-appearance order. Case-folding cannot change the
+ * answer (folding only adds counterparts of already-attested bases, and an
+ * empty attested set stays empty), so no fold parameter is needed.
+ */
+export function marksLackingPairingEvidence(alphabet: ConfirmedAlphabet): string[] {
+  const attested = attestedBasesOf(alphabet);
+  return alphabet.marks.filter((mark) => (attested.get(mark) ?? new Set<string>()).size === 0);
 }
 
 /**

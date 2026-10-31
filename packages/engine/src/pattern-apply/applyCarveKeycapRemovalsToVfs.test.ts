@@ -16,6 +16,9 @@
 //      touch layout; a char surviving via another group keeps its keycap.
 
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
   applyCarveKeycapRemovalsToVfs,
   collectCarvedKeycapTexts,
@@ -23,6 +26,8 @@ import {
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
 import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
+import { parse } from "../codec/parse.js";
+import { makeSlotId } from "./slotId.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -720,5 +725,146 @@ describe("applyCarveKeycapRemovalsToVfs — group-level carve (#1803)", () => {
     // ("kept, does nothing") is covered by the T020 suite above.
     expect(keys.some((k) => k.id === "K_Q")).toBe(false);
     expect(keys).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 104 T009 — resolver production matching in the touch keycap pass
+// ---------------------------------------------------------------------------
+
+describe("applyCarveKeycapRemovalsToVfs — resolver matching (spec 104 T009)", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const fixtureDir = resolve(here, "__fixtures__/touch-id/sil_cameroon_qwerty");
+  const kmn = readFileSync(resolve(fixtureDir, "sil_cameroon_qwerty.kmn"), "utf8");
+  const layoutJson = readFileSync(
+    resolve(fixtureDir, "sil_cameroon_qwerty.keyman-touch-layout"),
+    "utf8",
+  );
+  const ir = parse(kmn, "sil_cameroon_qwerty").ir;
+
+  function bareMarkRuleId(): string {
+    for (const group of ir.groups) {
+      for (const rule of group.rules) {
+        const hasVkey = rule.context.some((el) => el.kind === "vkey" && el.name === "T_0300");
+        const outChars = rule.output.filter((el) => el.kind === "char");
+        if (hasVkey && outChars.length === 1 && outChars[0]?.value === "̀") {
+          return rule.nodeId;
+        }
+      }
+    }
+    throw new Error("fixture: bare T_0300 rule not found");
+  }
+
+  function makeFixtureVfs() {
+    return createVirtualFS([
+      { path: "source/sil_cameroon_qwerty.kmn", content: kmn, isBinary: false },
+      {
+        path: "source/sil_cameroon_qwerty.keyman-touch-layout",
+        content: layoutJson,
+        isBinary: false,
+      },
+    ]);
+  }
+
+  it("removes the ruled T_0300 keys on every layer — their keycap text never spelled U+0300", () => {
+    const vfs = makeFixtureVfs();
+    const warnings = applyCarveKeycapRemovalsToVfs(vfs, "sil_cameroon_qwerty", ir, {
+      slotIds: new Set(),
+      wholeNodeIds: new Set([bareMarkRuleId()]),
+    });
+    expect(warnings.warnings).toEqual([]);
+
+    const data = JSON.parse(
+      vfs.get("source/sil_cameroon_qwerty.keyman-touch-layout")?.content as string,
+    );
+    const allIds: string[] = [];
+    for (const layer of data.tablet.layer) {
+      for (const row of layer.row) {
+        for (const key of row.key) allIds.push(`${layer.id}:${key.id}`);
+      }
+    }
+    // T_0300 (default + shift) is gone; the un-carved T_030D keys remain.
+    expect(allIds).not.toContain("default:T_0300");
+    expect(allIds).not.toContain("shift:T_0300");
+    expect(allIds).toContain("default:T_030D");
+    expect(allIds).toContain("shift:T_030D");
+    expect(allIds).toContain("default:T_002E");
+  });
+
+  it("keep-inert override keeps a production-matched T_ key, id neutralized to T_carved_*", () => {
+    const vfs = makeFixtureVfs();
+    applyCarveKeycapRemovalsToVfs(vfs, "sil_cameroon_qwerty", ir, {
+      slotIds: new Set(),
+      wholeNodeIds: new Set([bareMarkRuleId()]),
+      keepInertTouchChars: new Set(["̀"]),
+    });
+
+    const data = JSON.parse(
+      vfs.get("source/sil_cameroon_qwerty.keyman-touch-layout")?.content as string,
+    );
+    const defaultKeys = data.tablet.layer[0].row[0].key as { id: string }[];
+    expect(defaultKeys.some((k) => k.id === "T_carved_T_0300")).toBe(true);
+    expect(defaultKeys.some((k) => k.id === "T_0300")).toBe(false);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — emulation keys survive a carve", () => {
+  // The Cameroon backspace idiom: a context rule on K_BKSP strips a mark,
+  // emitting the base it leaves behind. Carving that base must not take the
+  // backspace key out of the touch layout.
+  const kmn = [
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "store(composed) 'ḉ'",
+    "store(comp-dia) 'ç'",
+    "any(composed) + [K_BKSP] > index(comp-dia,1)",
+    "+ [K_C] > 'ç'",
+    "+ [K_A] > 'a'",
+    "",
+  ].join("\n");
+  const layout = {
+    tablet: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "K_A", text: "a" },
+                { id: "K_C", text: "ç" },
+                { id: "K_BKSP", text: "*BkSp*", sp: 1, width: 150 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("keeps K_BKSP when a character its context rule emits is carved", () => {
+    const ir = parse(kmn, "test").ir;
+    const carvedRule = ir.groups
+      .flatMap((g) => g.rules)
+      .find((r) => r.context.some((el) => el.kind === "vkey" && el.name === "K_C"));
+    expect(carvedRule).toBeDefined();
+
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: JSON.stringify(layout) },
+    ]);
+    // The comp-dia slot goes with it, or the backspace rule keeps ç alive.
+    const compDia = ir.stores.find((s) => s.name === "comp-dia");
+    expect(compDia).toBeDefined();
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: [carvedRule!.nodeId],
+      slotIds: [makeSlotId(compDia!.nodeId, 0)],
+    }));
+
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const ids = (data.tablet.layer[0].row[0].key as { id: string }[]).map((k) => k.id);
+    expect(ids).not.toContain("K_C");
+    expect(ids).toContain("K_BKSP");
+    expect(ids).toContain("K_A");
   });
 });

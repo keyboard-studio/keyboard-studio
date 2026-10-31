@@ -14,6 +14,8 @@
 // Projection order (spec §12 "re-projected layers"):
 //   0. Touch layout     — inject Phase E touchLayoutJson into .keyman-touch-layout
 //   1. Carve deletions  — applyCarveToVfs (re-emits filtered IR into .kmn)
+//                         Also drops the starting rules an assignment shadows
+//                         (claimedInputs.ts, spec 106 US4) — per projection only.
 //   1.5 Carve keycaps   — applyCarveKeycapRemovalsToVfs (blanks carved chars off
 //                         .kvks / .keyman-touch-layout keycaps in place)
 //   1.6 Touch method deletions — applyTouchKeycapRemovalsToVfs (blanks/drops
@@ -36,16 +38,27 @@
 //                         in the SAME projection (contracts/
 //                         key-edit-overlay.md §6.2, R10.2 — the working IR
 //                         is never emitted into the artifact, so this pass
-//                         cannot be inherited from applyMarkGuards). Rule
+//                         cannot be inherited from the working IR). Rule
 //                         SYNTHESIS policy (minting a new producing/guard
 //                         rule pair for a freshly assigned character) is
 //                         Phase 6/touchRuleSynthesis.ts, not this pass —
 //                         see the step's own comment below for the seam.
-//   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
+//   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns).
+//                         With a marks decision recorded, the output form and
+//                         the mark attachment matrix ride along so every
+//                         emitted string follows the one form (spec 106 US3);
+//                         a uniformity scan then warns on wrong-form text the
+//                         assignments introduced
 //   2.5 Layer propagation — propagateDesktopLayersToTouch (surfaces S-08
 //                         generalized modifier-combo layers onto the
 //                         .keyman-touch-layout written by step 0; no-op when
 //                         the VFS has no touch layout file)
+//   2.6 Mark guards     — applyMarkGuards from the recorded marks-treatment
+//                         decision (spec 106 FR-010/FR-011): the guard group
+//                         and the backspace rules. The only place they are
+//                         generated; after 2 so they see assignment rules,
+//                         before 2.7 because that step repoints the entry group
+//   2.7 Context tolerance — applyContextToleranceOverlay (spec 078)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
@@ -69,12 +82,17 @@
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
 import type {
+  AttestedStack,
+  BackspaceBehaviour,
   KeyboardIR,
+  OutputForm,
+  PackageFontSet,
   Pattern,
+  PlacementWorklist,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import type { CarveDisposition } from "@keyboard-studio/contracts";
+import type { FallbackPolicy } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
@@ -96,6 +114,7 @@ import {
   collectLayerCombosInUse,
   applyIdentityToKps,
   applyContextToleranceOverlay,
+  applyMarkGuards,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
@@ -109,6 +128,23 @@ import {
 
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
+import { markAttachmentsFromWorklist } from "./markAttachments.ts";
+import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
+import { claimedInputRuleIds } from "./claimedInputs.ts";
+
+/** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
+function safeFormViolations(
+  kmn: string | undefined,
+  keyboardId: string,
+  form: OutputForm,
+): Set<string> | undefined {
+  if (kmn === undefined) return undefined;
+  try {
+    return formViolations(kmn, keyboardId, form);
+  } catch {
+    return undefined;
+  }
+}
 import {
   spliceRuleAdditions,
   hasRuleAdditions,
@@ -170,13 +206,19 @@ export interface ProjectWorkingCopyVfsInput {
   deletedItemIds?: ReadonlySet<string>;
   /**
   /**
-   * Carve dispositions (T015, FR-019) for the suppression stage. The caller
-   * (useWorkingCopyTransform) reads them from the working-copy store's
-   * `getCarveDispositions`. They are scoped to the live carve set here, so a
-   * stale disposition can never rewrite an uncarved rule. Empty/omitted
-   * degrades to the legacy carve behavior, content-identical.
+   * Keyboard-wide fallback policy (T015, FR-019) for the suppression stage.
+   * The caller (useWorkingCopyTransform) reads it from the working-copy
+   * store. The engine expands it over the live carve set, so it can never
+   * rewrite an uncarved rule. Omitted degrades to the legacy carve behavior,
+   * content-identical.
    */
-  carveDispositions?: CarveDisposition[];
+  fallbackPolicy?: FallbackPolicy;
+  /**
+   * Ids inside `deletedItemIds` that are plain removals rather than carves
+   * (disabled-family rules). They are removed outright, never rewritten into
+   * suppression rules by the fallback policy.
+   */
+  suppressionExemptIds?: ReadonlySet<string>;
   /**
    * A6 loud/soft for the suppression stage (FR-009). Default false (soft).
    * Follows the A6 survey answer when it exists.
@@ -251,6 +293,13 @@ export interface ProjectWorkingCopyVfsInput {
    */
   welcomeFolderFiles?: readonly string[];
   /**
+   * The starting keyboard's packaged fonts, which step 3.6's
+   * descriptor declares (`<Files>` + OSK/display selection; criteria 8/9/10).
+   * Optional for the same reason as `welcomeFolderFiles`: the OSK preview
+   * builds no package, so only the output projection passes it.
+   */
+  packageFonts?: PackageFontSet;
+  /**
    * The base keyboard's own display name — the value the `.kmn`'s existing
    * `store(&NAME)` already holds. Step 3 treats the overlay's display name as an
    * EDIT and rewrites the name store ONLY when it DIFFERS from this. It is the
@@ -265,6 +314,12 @@ export interface ProjectWorkingCopyVfsInput {
    * the exact value it fell back to.
    */
   baseDisplayName?: string;
+  /**
+   * The recorded marks-treatment decision's guard inputs (spec 106 FR-010),
+   * generated into the .kmn by step 2.6. Absent or `null` when the marks
+   * series has not completed.
+   */
+  marksGuards?: MarksGuardsInput | null;
   /**
    * The applied context-tolerance fix (spec 078): verified generated rules,
    * replayed by step 2.7. Absent or `null` when no fix is applied.
@@ -282,6 +337,14 @@ export interface ProjectWorkingCopyVfsInput {
    * `.kmn`, never rewrite the no-edit fast path.
    */
   ruleAdditions?: DerivedRuleAdditions;
+}
+
+/** Step 2.6's input: the marks completion payload (buffer-start behaviour is per mark on the worklist, issue #2374). */
+export interface MarksGuardsInput {
+  worklist: PlacementWorklist;
+  outputForm: OutputForm;
+  backspace?: BackspaceBehaviour;
+  stacks?: readonly AttestedStack[];
 }
 
 /**
@@ -378,7 +441,8 @@ export function projectWorkingCopyVfs(
     deletedItemIds = new Set<string>(),
     carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
-    carveDispositions = [],
+    fallbackPolicy,
+    suppressionExemptIds,
     carveLoud = false,
     carveTouchKeepInert,
     keyEditOps = [],
@@ -388,6 +452,7 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     baseDisplayName,
+    marksGuards = null,
     contextToleranceOverlay = null,
     ruleAdditions,
   } = input;
@@ -428,11 +493,23 @@ export function projectWorkingCopyVfs(
   // Union the aggregated pass over the incremental per-character union before
   // partitioning, so the .kmn slot pruning, the whole-node filter, and the
   // keycap projection below all consume the same pruned result (§11).
-  const effectiveItemIds = unionAggregatedCarveIds(
+  const aggregatedItemIds = unionAggregatedCarveIds(
     startIr,
     deletedItemIds,
     carveChars,
   );
+
+  // Spec 106 US4 (FR-040): starting rules an assignment shadows (same key,
+  // same modifiers, merged ahead of them in step 2) are dropped here, fresh
+  // every projection and never stored — removing the assignment restores
+  // them. They are plain removals, not carves: exempt from the fallback
+  // policy's suppression rewrite, and kept out of the keycap cascade (step
+  // 1.5), whose key the assignment itself still needs.
+  const claimedRuleIds = claimedInputRuleIds(startIr, assignments, getPattern);
+  const effectiveItemIds =
+    claimedRuleIds.size === 0
+      ? aggregatedItemIds
+      : new Set([...aggregatedItemIds, ...claimedRuleIds]);
 
   const slotIds = new Set<string>();
   const wholeNodeItemIds = new Set<string>();
@@ -446,19 +523,10 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // T015 — scope dispositions to the live carve set. The store persists
-  // dispositions per combination; prune-on-uncarve (T010) keeps them fresh,
-  // but this scope is the backstop: a stale disposition must never rewrite
-  // an uncarved rule. Scoped to the #1809 §1 union (effectiveItemIds), the
-  // same id set the slot partition above consumed.
-  const carveIdSet = new Set([...deletedNodeIds, ...effectiveItemIds]);
-  const activeDispositions = carveDispositions.filter((d) =>
-    carveIdSet.has(d.comboId),
-  );
   // 1a/1b: Whole-node deletions + store-slot removals + VFS re-emit.
   //
   // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
-  // in the engine). When dispositions are present, the pipeline derives the
+  // in the engine). When a fallback policy is present, the pipeline derives the
   // carved IR from the PRE-carve startIr — the T013 constraint: guard selector
   // chars are read from the pre-removal stores and are unrecoverable after
   // slot removal. Since spec 089 T021 the pipeline runs through the mutate
@@ -470,6 +538,16 @@ export function projectWorkingCopyVfs(
   // The slot partition above is kept for that legacy path and for the keycap
   // cascade (step 1.5), which is driven off startIr.
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
+  // The same set without the claimed-only rules (US4): the keycap cascade's
+  // input. A rule the author also carved stays in it.
+  const carvedWholeNodeIds =
+    claimedRuleIds.size === 0
+      ? allWholeNodeIds
+      : new Set(
+        [...allWholeNodeIds].filter(
+          (id) => !claimedRuleIds.has(id) || deletedNodeIds.has(id) || aggregatedItemIds.has(id),
+        ),
+      );
 
   // spec-014 T016c — carve IR-projection via the single mutate() write seam.
   //
@@ -532,7 +610,15 @@ export function projectWorkingCopyVfs(
       effectiveItemIds,
       undefined,
       {
-        dispositions: activeDispositions,
+        ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
+        ...(suppressionExemptIds !== undefined || claimedRuleIds.size > 0
+          ? {
+            suppressionExemptIds: new Set([
+              ...(suppressionExemptIds ?? []),
+              ...claimedRuleIds,
+            ]),
+          }
+          : {}),
         loud: carveLoud,
         // The pipeline's slot-removal warnings (blocked stores, skips) are
         // part of this projection's warning surface — the legacy path
@@ -591,7 +677,7 @@ export function projectWorkingCopyVfs(
   // case it is kept visibly inert ("does nothing"). Runs before Step 3.5 so a
   // subsequent assignment label re-populates a blanked keycap, and before
   // Step 4 so paths resolve against the pre-rename source/<keyboardId>.* filenames.
-  if (hasCarveEdit) {
+  if (carvedWholeNodeIds.size > 0 || slotIds.size > 0) {
     try {
       const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(
         vfs,
@@ -599,7 +685,7 @@ export function projectWorkingCopyVfs(
         startIr,
         {
           slotIds,
-          wholeNodeIds: allWholeNodeIds,
+          wholeNodeIds: carvedWholeNodeIds,
           // exactOptionalPropertyTypes: only pass the seam when non-empty —
           // an explicit undefined is not assignable to the optional field.
           ...(carveTouchKeepInert !== undefined && carveTouchKeepInert.size > 0
@@ -682,9 +768,52 @@ export function projectWorkingCopyVfs(
   // pass can respond to without that policy, so they are a no-op here today;
   // Phase 6's touchRuleSynthesis.ts is the seam that extends this switch
   // with `ensure` (mint) and `remove` (orphan cleanup) passes of its own.
-  const renameOps = keyEditOps.filter(
-    (op): op is RenameKeyOp => op.kind === "rename",
-  );
+  //
+  // One composition is NOT Phase 6 policy and does not wait for it: the
+  // spec-104 key-identity commit (severance transplant composed with the
+  // AssignPanel's synthesis by `mergeSeveranceWithSynthesis`). Its rules
+  // are already fully decided in the working IR, so they reach the artifact
+  // through the step-1.8 additions seam (stamped `rulesStepAdded`), and
+  // this pass must not re-decide them — see the severance exception at the
+  // `renameOps` filter below.
+  // Severance exception (spec 104): the key-identity commit re-keys the
+  // transplant's sibling layer occurrences with ordinary `rename` ops, but
+  // those renames are NOT pure renames — their rule half was decided by
+  // the severance composition in the working IR (the source key KEEPS its
+  // bindings; the target's clones and synthesized rules are composed, not
+  // copied), and that composition reaches this projection through the
+  // step-1.8 additions seam (the composed delta is stamped
+  // `rulesStepAdded` by `mergeSeveranceWithSynthesis`). Running the
+  // mechanical fix-up for such a rename would rewrite the source key's
+  // producing rule onto the target id — a guarded T_0301 minted from K_1
+  // typed K_1's "&" in the OSK preview and the download (walk 1). So a
+  // rename whose target id is already bound by a projected addition is
+  // skipped here, loudly: its layout half (step 1.7) still applies, and
+  // its rule half is the additions splice, never this rewrite. A rename
+  // whose target carries no composed rules (the RenameDialog case) is
+  // unaffected.
+  const additionBoundIds = new Set<string>();
+  if (additions !== undefined) {
+    for (const group of additions.groups) {
+      for (const rule of group.added) {
+        for (const el of rule.context) {
+          if (el.kind === "vkey") additionBoundIds.add(el.name.toUpperCase());
+        }
+      }
+    }
+  }
+  const renameOps = keyEditOps.filter((op): op is RenameKeyOp => {
+    if (op.kind !== "rename") return false;
+    if (additionBoundIds.has(op.toId.toUpperCase())) {
+      warnings.push(
+        `[project-working-copy] key edit rule projection: rename to "${op.toId}" ` +
+          `skipped — the working IR already carries composed rules for this id ` +
+          `(severance/synthesis); its rule half is projected via the rule additions.`,
+      );
+      return false;
+    }
+    return true;
+  });
   if (renameOps.length > 0) {
     const kmnPathForRename = `source/${keyboardId}.kmn`;
     const kmnTextForRename = readVfsText(vfs, kmnPathForRename);
@@ -744,13 +873,35 @@ export function projectWorkingCopyVfs(
     (a) => a.modality === "physical",
   );
   if (physicalAssignments.length > 0) {
-    const assignResult = applyAssignmentsToVfs(
-      vfs,
-      keyboardId,
-      physicalAssignments,
-      getPattern,
-    );
+    // Spec 106 US3: the recorded output form reaches the engine here, so every
+    // string the assignments emit follows it (FR-020..FR-023). Stored
+    // assignments stay form-independent; the engine picks the shape.
+    const formOptions =
+      marksGuards !== null
+        ? {
+            outputForm: marksGuards.outputForm,
+            markAttachments: markAttachmentsFromWorklist(marksGuards.worklist),
+          }
+        : undefined;
+    const kmnPathForForm = `source/${keyboardId}.kmn`;
+    const violationsBefore =
+      marksGuards !== null
+        ? safeFormViolations(readVfsText(vfs, kmnPathForForm), keyboardId, marksGuards.outputForm)
+        : undefined;
+    const assignResult =
+      formOptions === undefined
+        ? applyAssignmentsToVfs(vfs, keyboardId, physicalAssignments, getPattern)
+        : applyAssignmentsToVfs(vfs, keyboardId, physicalAssignments, getPattern, formOptions);
     warnings.push(...assignResult.warnings);
+    // Plan P2.4 uniformity assertion: wrong-form text the assignments added
+    // (runs already wrong before step 2 belong to the starting keyboard).
+    if (marksGuards !== null && violationsBefore !== undefined) {
+      const after = safeFormViolations(readVfsText(vfs, kmnPathForForm), keyboardId, marksGuards.outputForm);
+      if (after !== undefined) {
+        const warning = outputFormWarning(violationsBefore, after, marksGuards.outputForm);
+        if (warning !== undefined) warnings.push(warning);
+      }
+    }
 
     // spec-014 T017 — add-gallery IR projection via the single mutate() seam.
     //
@@ -834,6 +985,41 @@ export function projectWorkingCopyVfs(
             `[project-working-copy] desktop-to-touch layer propagation skipped: ${msg}`,
           );
         }
+      }
+    }
+  }
+
+  // Step 2.6: Mark guards (spec 106 FR-010/FR-011). The marks decision's
+  // guard group and backspace rules are generated here and nowhere else:
+  // the working IR never reaches the artifact (see step 1.7b), so a guard
+  // generated only there would be missing from the preview and the zip.
+  // After step 2 so the guards see the assignment rules; before step 2.7,
+  // whose replay repoints the entry group the guard hop is added to.
+  // applyMarkGuards strips and rebuilds its own artifacts, so a starting
+  // keyboard that already carries them is not doubled; the .kmn is only
+  // re-emitted when the IR changed.
+  if (marksGuards !== null) {
+    const kmnPathForGuards = `source/${keyboardId}.kmn`;
+    const kmnTextForGuards = readVfsText(vfs, kmnPathForGuards);
+    if (kmnTextForGuards !== undefined) {
+      try {
+        const parsedForGuards = parseKmn(kmnTextForGuards, keyboardId).ir;
+        const guarded = applyMarkGuards(
+          parsedForGuards,
+          marksGuards.worklist,
+          marksGuards.outputForm,
+          marksGuards.backspace ?? "peel",
+          marksGuards.stacks ?? [],
+        );
+        if (guarded.ir !== parsedForGuards) vfs.set(kmnPathForGuards, emitKmn(guarded.ir), false);
+        if (guarded.guardHopSkipped === true) {
+          warnings.push(
+            "[project-working-copy] mark guards not reached: the entry group's match rule already ends in another use()",
+          );
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] mark guard projection skipped: ${msg}`);
       }
     }
   }
@@ -990,6 +1176,7 @@ export function projectWorkingCopyVfs(
       // Warnings name the file the author will actually receive: step 4 renames
       // it, so the pre-rename (base) id must not appear in them.
       targetKeyboardId ?? keyboardId,
+      input.packageFonts,
     );
     warnings.push(...kpsResult.warnings);
   }
@@ -1013,15 +1200,10 @@ export function projectWorkingCopyVfs(
     if (kmnText !== undefined) {
       try {
         const parsed = parseKmn(kmnText, keyboardId);
-        // Preserve the base keyboard's release version on the copy path. Without
-        // this, resetIdentity() defaults &KEYBOARDVERSION to "1.0" while the .kps
-        // <Version> and the zip filename both keep the base version (serialize-
-        // WorkingCopy uses startIr.header.version) — leaving the three disagreeing
-        // inside one package. An explicit identity.version still wins; an empty
-        // base version falls through so resetIdentity applies its "1.0" default
-        // (matching serializeWorkingCopy's `|| "1.0"`).
-        const copyVersion =
-          identity?.version ?? (parsed.ir.header.version?.trim() || undefined);
+        // The release version is the overlay's (serializeWorkingCopy always sets
+        // it to the shipped version, spec 102 FR-009) or resetIdentity's "1.0"
+        // default; the start keyboard's own version is never carried over.
+        const overlayVersion = identity?.version;
         resetIdentity(parsed.ir, {
           keyboardId: targetKeyboardId,
           displayName:
@@ -1029,7 +1211,7 @@ export function projectWorkingCopyVfs(
           ...(identity?.bcp47 !== undefined && identity.bcp47 !== ""
             ? { bcp47: [identity.bcp47] }
             : {}),
-          ...(copyVersion !== undefined ? { version: copyVersion } : {}),
+          ...(overlayVersion !== undefined ? { version: overlayVersion } : {}),
           ...(identity?.copyright !== undefined
             ? { copyright: identity.copyright }
             : {}),

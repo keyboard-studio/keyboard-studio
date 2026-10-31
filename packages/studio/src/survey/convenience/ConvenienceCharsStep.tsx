@@ -27,7 +27,8 @@
 // needed-set (see CarveGalleryV2's retainedSet).
 //
 // spec 079 US3 (T079/T080): this step never shows a `reproposed` "needs
-// reconfirming" flag — see `./convenienceFlags.ts` for why (in short: a
+// reconfirming" flag — see hooks/useWorkToDo.ts's spec-079 note for why
+// (in short: a
 // per-candidate `offeredKey` is either the SAME "offered" key or `null`,
 // never a stale one, so there is nothing for `reconcile()` to classify as
 // `reproposed`). The `not-asked` -> `applies` transition (FR-067) is a

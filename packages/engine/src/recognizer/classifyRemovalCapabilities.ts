@@ -14,6 +14,51 @@
  *
  * Classification decision order (first match wins, per km-strategy):
  *   1. not-removable:opaque           -- node is a RawKmnFragment (in ir.raw)
+ *  1b. not-removable:opaque           -- rule contains a name-carrying deadkey
+ *                                        element (#2238 guard, km-lead ruling:
+ *                                        named-deadkey rules keep the posture
+ *                                        they had as fragments until a separate
+ *                                        consumer ruling reclassifies them).
+ *                                        MUST precede the alias emission and
+ *                                        Decision 2: the alias would otherwise
+ *                                        leak "removable:slot-fill" for a named
+ *                                        fan-out's output store, and ownership
+ *                                        inheritance would override the posture.
+ *  1c. S-06 settlement (#2235, queue-2235-ruling.md §2) -- doctrine:
+ *                                        capability follows shape. Ownership
+ *                                        inheritance is the exception and must
+ *                                        be argued per strategy with shape
+ *                                        evidence (as S-02's was); it is never
+ *                                        the default consequence of being
+ *                                        recognized. For S-06-owned rules:
+ *                                        Decision 1b YIELDS (scoped exemption —
+ *                                        S-06 ownership only; the F3 pin, an
+ *                                        S-02-owned named body stays opaque,
+ *                                        is preserved), Decision 2 blanket
+ *                                        inheritance does NOT apply, and each
+ *                                        member takes a per-member shape
+ *                                        verdict on the cleaned context over
+ *                                        the deadkey-element union: a
+ *                                        single-`index` parallel fan-out
+ *                                        member -> removable:slot-fill (+ the
+ *                                        output-store alias); every other
+ *                                        member takes its ordinary unowned
+ *                                        shape verdict (arming -> catch-all;
+ *                                        edge / notany-fallback / double-press
+ *                                        -> context-sensitive). Net effect is
+ *                                        exactly the unowned shape table —
+ *                                        recognition is non-regressive by
+ *                                        construction (gate 2 of #2235).
+ *                                        STAMP-SCOPING CONDITION: these
+ *                                        verdicts are sound BECAUSE the
+ *                                        recognizer issues the
+ *                                        `strategyId: "S-06"` stamp only for
+ *                                        the two-trigger chain sense (spec
+ *                                        007 §7.3 citation forms). Any future
+ *                                        rule-6 (family selection) or rule-8
+ *                                        (pending-letter) recognizer must
+ *                                        re-open this settlement before
+ *                                        stamping "S-06".
  *   2. Inherit ownedByPattern         -- rule is co-owned by a recognizer cluster
  *                                        (e.g. S-02 trigger/fallback/escape rules);
  *                                        inherits the cluster's removal story via
@@ -55,7 +100,12 @@
  * label came from ownership (step 2) or the shape checks (steps 3/3b). This keeps
  * the alias contract intact for IRs where recognizePatterns() was not applied.
  * (fanShape is a strict superset of bodyShape, so the alias always fires for S-02
- * bodies too.)
+ * bodies too.) Since #2233 the alias ALSO fires for a rule with a single index()
+ * output that is owned by an S-02 pattern: the generalised S-02 fan-out shapes
+ * (codec `+` separator in the raw context, postfix prefix char) are invisible to
+ * the raw-context fanShape check, and ownership is the authoritative signal.
+ * Un-owned generalised shapes earn no alias — shape-based admission stays
+ * exactly as conservative as before.
  *
  * Scope: walks ir.groups / ir.stores / ir.raw only.
  * Touch-layout (S-13) nodes are not classified and receive no map entry.
@@ -63,14 +113,19 @@
 
 import type { KeyboardIR, Pattern, ContextElement } from "@keyboard-studio/contracts";
 import type { RemovalCapability } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyElement } from "@keyboard-studio/contracts";
 import { isS01 } from "./rules/s01-simple-swap.js";
 import { isBody } from "./rules/s02-deadkey-single-tap.js";
 import { isParallelIndexFanOut } from "./rules/parallel-index-fanout.js";
+import { isS06FanOutMember } from "./s06-families.js";
 
 /** Resolve the RemovalCapability for an owning pattern by strategyId. */
 function capabilityForStrategy(strategyId: string | undefined): RemovalCapability {
   if (strategyId === "S-01") return "removable:simple";
   if (strategyId === "S-02") return "removable:slot-fill";
+  // S-06 deliberately grants nothing by strategy alone (#2235 settlement,
+  // Decision 1c above): S-06-owned rules never reach this function — they
+  // take per-member shape verdicts in the rule loop.
   // Other recognized strategies are not yet removable in v1.
   return "not-removable:unknown";
 }
@@ -104,6 +159,37 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
   // --- Walk all groups ---
   for (const group of ir.groups) {
     for (const rule of group.rules) {
+      // Ownership context for this rule, resolved once: the #2235 S-06
+      // settlement (Decision 1c) keys both the 1b exemption and the
+      // per-member verdicts off the OWNING PATTERN's strategy, consulted
+      // via patternById (built above, before the rule loop).
+      const owningPattern =
+        rule.ownedByPattern !== undefined
+          ? patternById.get(rule.ownedByPattern)
+          : undefined;
+      const ownedByS06 = owningPattern?.strategyId === "S-06";
+      const s06FanOut = ownedByS06 && isS06FanOutMember(rule);
+
+      // Decision 1b (#2238 guard): a rule containing a name-carrying deadkey
+      // element in context or output keeps the not-removable:opaque posture
+      // it had when the codec represented it as a RawKmnFragment. This check
+      // is FIRST in the loop — before the alias emission below and before
+      // Decision 2 (ownership) — and depends on nothing but the element kind,
+      // so no present or future shape predicate can leak a removable verdict
+      // for a name-keyed rule.
+      // Scoped exemption (#2235 settlement §2.3): the guard YIELDS for a
+      // rule owned by an S-06 pattern — those rules take the per-member
+      // shape verdicts below. S-06-ownership-scoped only: an S-02-owned
+      // named body stays opaque (test F3's pin is preserved).
+      if (
+        !ownedByS06 &&
+        (rule.context.some(isNamedDeadkeyElement) ||
+          rule.output.some(isNamedDeadkeyElement))
+      ) {
+        result.set(rule.nodeId, "not-removable:opaque");
+        continue;
+      }
+
       // Compute shape predicates once — used both for alias emission and branching.
       // fanShape is a superset of bodyShape; both are computed early and independently
       // of which branch assigns the final label.
@@ -116,7 +202,22 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
       // the rule.  Gating on fanShape (not bodyShape) ensures the alias is also
       // emitted for output stores referenced by bare-any rules like Bamum's
       // any(defaultK) > index(defaultU, 1).
-      if (fanShape) {
+      //
+      // #2233: fanShape reads the RAW context, so it cannot see the S-02
+      // generalised fan-out shapes (the codec's `+` separator element and the
+      // postfix prefix char both break its raw alignment check).  An S-02
+      // Pattern's ownership is the stronger signal: a rule owned by an S-02
+      // pattern with a single index() output earns the alias through
+      // ownership.  isParallelIndexFanOut itself is NOT widened — it also
+      // fires for un-owned rules at Decision 3b, where shape-only admission
+      // must stay conservative.
+      const ownedByS02 =
+        rule.ownedByPattern !== undefined &&
+        patternById.get(rule.ownedByPattern)?.strategyId === "S-02";
+      // #2235: an S-06-owned fan-out member earns the alias through its
+      // cleaned/union shape (s06FanOut) — the raw fanShape check cannot see
+      // named deadkeys or a `+`-separated context.
+      if (fanShape || ownedByS02 || s06FanOut) {
         const outEl = rule.output[0];
         // fanShape already guarantees a single index() output; this re-check is a
         // type narrow for outEl, not a fresh condition.
@@ -133,11 +234,23 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
       // the cluster's removal story; avoids labeling one co-owned member not-removable
       // while siblings are removable, e.g. an S-02 escape/fallback rule whose
       // context.length===2 would otherwise trigger the context-sensitive branch).
+      //
+      // S-06 exception (#2235 settlement, Decision 1c): blanket inheritance
+      // does NOT apply. A fan-out member earns slot-fill by shape; every
+      // other member falls THROUGH to the ordinary unowned shape decisions
+      // below (3/3b/4/5/6) — exactly the verdict it would carry unrecognized.
       if (rule.ownedByPattern !== undefined) {
-        const owningPattern = patternById.get(rule.ownedByPattern);
-        const inherited = capabilityForStrategy(owningPattern?.strategyId);
-        result.set(rule.nodeId, inherited);
-        continue;
+        if (ownedByS06) {
+          if (s06FanOut) {
+            result.set(rule.nodeId, "removable:slot-fill");
+            continue;
+          }
+          // Not a fan-out member: no inheritance — fall through.
+        } else {
+          const inherited = capabilityForStrategy(owningPattern?.strategyId);
+          result.set(rule.nodeId, inherited);
+          continue;
+        }
       }
 
       // Decision 3: S-02 body rule (un-owned bodies — when the classifier runs on

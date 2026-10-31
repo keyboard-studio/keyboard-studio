@@ -52,6 +52,17 @@ export interface PhaseFSeedInputs {
    * pattern as `projectUrlProposal`.
    */
   provenanceBasisProposal?: string;
+  /**
+   * `pf_troubleshooting`'s proposal — the facet template lines
+   * (`lib/troubleshootingProposal.ts`' `proposeTroubleshooting`,
+   * computed by the wiring (G-17) from the working copy's current IR
+   * and the session's mark-input-order axis, same pattern as
+   * `projectUrlProposal`), joined with any symptom/fix lines extracted
+   * from the base help's Troubleshooting section
+   * (`lib/baseHelpTroubleshooting.ts`) — Track 1 only, under Matthew's
+   * 2026-10-17 FR-007 carve-out ruling on issue #2206.
+   */
+  troubleshootingProposal?: string;
   authorContact?: string;
   bcp47Tag?: string;
 }

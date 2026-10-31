@@ -7,6 +7,21 @@ export {
   runAllChecks,
 } from "./validator/index.js";
 
+// Layer A′ import-fidelity checks (I1–I6). Deliberately NOT part of the
+// runAllChecks path above: they run once at import time, outside the 300 ms
+// debounce cycle (see validator/index-import-fidelity.ts). The studio's live
+// import path invokes both stages when it parses a base keyboard.
+export {
+  runImportFidelityParseChecks,
+  runImportFidelityEmitChecksSync,
+  runImportFidelityRoundTripCheck,
+  ROUND_TRIP_DIVERGENCE_CODE,
+} from "./validator/index-import-fidelity.js";
+export type {
+  RoundTripDeps,
+  RoundTripSourceFile,
+} from "./validator/index-import-fidelity.js";
+
 // Issue #20 — base-browser GitHub API client.
 export { createStartBrowser } from "./start-browser/index.js";
 export type { StartBrowserConfig } from "./start-browser/index.js";
@@ -52,6 +67,7 @@ export type {
   FetchKeyboardSourceResult,
   KpsFontEntry,
   KpsStylesheetEntry,
+  StartDocCssText,
 } from "./loader/fetchKeyboardSourceToVfs.js";
 
 // Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).
@@ -195,6 +211,8 @@ export {
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
+  kpsMemberRef,
+  normaliseKpsFontEntries,
   // spec 080 FR-002 — the welcome page's folder-convention member reference.
   WELCOME_PAGE_KPS_REF,
   welcomeFolderKpsRef,
@@ -202,6 +220,7 @@ export {
 export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
+  KpsFontDescriptorEntry,
 } from "./package-descriptor/index.js";
 
 // spec 065 — help-docs rendering. The one implementation both the output
@@ -223,8 +242,22 @@ export {
 } from "./shared/helpDocsRender.js";
 export type {
   DocSection,
+  GeneratedDocSlots,
   HelpDocsRenderInput,
 } from "./shared/helpDocsRender.js";
+
+// spec 102 — documentation forms: the renderer, the slot vocabulary, the
+// per-file escapers and the markers around Track 2's generated sections.
+export { renderDocForm, parseDocForm, DocFormParseError } from "./shared/renderDocForm.js";
+export {
+  DOC_SLOT_IDS,
+  DOC_GENERATED_START,
+  DOC_GENERATED_END,
+  stripGeneratedBlocks,
+  escapeDocHtml,
+  escapeDocMarkdown,
+} from "./shared/docSlots.js";
+export type { DocSlotModel, DocSlotId } from "./shared/docSlots.js";
 
 // spec 080 FR-022 — the one derivation of each documentation member's source
 // tier + placeholder state (research R5); the Output checklist and the
@@ -249,9 +282,10 @@ export {
   renderHistoryMd,
   HISTORY_INITIAL_RELEASE_BULLET,
   adaptedFromBullet,
+  createdFromBullet,
   splitHistoryPreamble,
 } from "./shared/renderHistoryMd.js";
-export type { RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
+export type { HistoryLineage, RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
 
 // spec 080 FR-013..016 — deterministic SVG layout charts (research R1/R2).
 export {
@@ -366,6 +400,8 @@ export { defaultFillAxes } from "./strategy-selector/default-fill.js";
 export type { DefaultFillResult } from "./strategy-selector/default-fill.js";
 // §7.2 rule 3a — base-derived A3a detection on the Track 2 import path.
 export { detectMarkInputOrderFromImport } from "./strategy-selector/import-mark-order.js";
+// §7.2 rule 8 — derived A7a (remap posture) detection from target identity + base IR.
+export { deriveRemapPosture } from "./strategy-selector/derive-remap-posture.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
@@ -392,12 +428,23 @@ export type {
 export {
   createFetchCldrLoader,
   createFetchCldrFullLoader,
+  compareCldrVersions,
+  latestStableCldrVersion,
+  LEGACY_FETCH_CLDR_VERSION,
 } from "./character-discovery/cldr.js";
+// Opt-in live refresh of exemplar data (#1367): author-initiated only,
+// version-guarded, installed inside the single sourcing path above.
+export {
+  refreshExemplars,
+  pinnedCldrRelease,
+} from "./character-discovery/exemplarRefresh.js";
+export type { ExemplarRefreshResult } from "./character-discovery/exemplarRefresh.js";
 // The single exemplar-sourcing path (spec 044 FR-015): offline, deterministic,
 // version-pinned, covering both CLDR and SLDR with per-character attribution.
 export {
   loadExemplarSource,
   sourceExemplars,
+  sourceExemplarsBoth,
   exemplarLocaleCandidates,
   isGatedTag,
   charactersInTier,
@@ -405,9 +452,11 @@ export {
 export type {
   ExemplarTier,
   ExemplarSource,
+  TextSampleSource,
   ExemplarConfidence,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
 } from "./character-discovery/exemplarTypes.js";
 // Phase B high-confidence missing-character suggestions, now CLDR+SLDR-grounded.
 export {
@@ -494,6 +543,7 @@ export {
   attestedBasesOf,
   attestedLetterCount,
   buildAttestationFold,
+  marksLackingPairingEvidence,
   ATTACHMENT_SIMILARITY_THRESHOLD,
 } from "./marks/mark-classes.js";
 export type { AttestationCaseFold, MarkClass } from "./marks/mark-classes.js";
@@ -508,10 +558,16 @@ export type {
 } from "./marks/attachment-proposals.js";
 export {
   resolveOutputFormProposal,
+  resolveBackspaceProposal,
+  nativeBackspaceBehaviour,
   hasDecidablePairs,
   normalizationFormForOutputForm,
+  outputStringForStack,
+  outputFormString,
 } from "./marks/output-form-policy.js";
 export type {
+  BackspaceBehaviour,
+  BackspaceProposal,
   OutputForm,
   OutputFormProposal,
 } from "./marks/output-form-policy.js";
@@ -569,10 +625,16 @@ export type {
 export {
   applyMarkGuards,
   MARKS_GUARD_GROUP,
+  MARKS_ALLOWED_STORE_PREFIX,
   MARKS_UNWRAP_FROM_STORE,
   MARKS_UNWRAP_TO_STORE,
+  MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
+// Issue #2374: the per-mark "start of line" sentinel lives on the attachment
+// row; the worklist builder reads it into `bareMarkAllowed`. Re-exported so
+// the survey layer uses this exact value instead of redefining it.
+export { ATTACHMENT_START_OF_LINE } from "./marks/worklist.js";
 
 // spec 065 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
 // sanctioned door to the inherit-first proposer and the keycap judgement.
@@ -581,6 +643,28 @@ export {
   proposeKeycap,
   isKeycapRelated,
   isCombiningMark,
+} from "./pattern-apply/index.js";
+
+// spec 104 — severance transplant, its FR-029 re-link mirror, and the
+// edit-path wiring (T011/T027/T012).
+export {
+  severTouchKey,
+  relinkTouchKey,
+  applyKeyEditsWithSeverance,
+  SEVERANCE_LINE_DESCRIPTOR_ID,
+  SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID,
+} from "./pattern-apply/index.js";
+export type {
+  SeverTouchKeyRequest,
+  SeverTouchKeyResult,
+  RelinkTouchKeyMeta,
+  RelinkTouchKeyResult,
+  ApplyKeyEditsWithSeveranceOptions,
+  ApplyKeyEditsWithSeveranceResult,
+  SeveranceApplied,
+  SeveranceRefused,
+  RelinkApplied,
+  SeveranceNotice,
 } from "./pattern-apply/index.js";
 export type {
   TouchKeyIdProposalRequest,
@@ -800,6 +884,7 @@ export type {
 } from "./pattern-apply/index.js";
 export {
   ensureTouchKeyRule,
+  insertBlockBeforeTerminalRules,
   planGuardSynthesis,
   applyGuardSynthesis,
   checkOpaqueGate,
@@ -842,6 +927,9 @@ export {
   substituteSlots,
   applyAssignments,
   applyAssignmentsToVfs,
+  DEADKEY_PATTERNS,
+  OUTPUT_FORM_SEAM_PATTERN_IDS,
+  applyOutputFormSeam,
   applyCarveToVfs,
   carveFilterIr,
   deriveCarvedIr,
@@ -901,10 +989,15 @@ export {
   applyTouchKeycapRemovalsToRawJson,
   applyTouchKeycapRemovalsToVfs,
   buildSessionProducedSet,
+  findOe2SoleSourceGlyphs,
+  findSessionOe2SoleSourceGlyphs,
+  isOe2VkeyName,
 } from "./pattern-apply/index.js";
 export type {
   SubstituteResult,
   ApplyAssignmentsResult,
+  OutputFormOptions,
+  EmitUnit,
   ApplyTouchAssignmentsResult,
   ApplyTouchAssignmentsToRawJsonResult,
   DesktopModifications,
@@ -918,6 +1011,7 @@ export type {
   CarvePipelineResult,
   CarveKeycapRemovalInput,
   StoreSlotRemovalResult,
+  CascadedSlotRemoval,
   StoreSlotEditMode,
   StoreSlotBlockReason,
   StorePairingDescription,
@@ -1038,3 +1132,6 @@ export type {
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
 } from "./deadkey-lifecycle/index.js";
+export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
+export type { RgbaImage } from "./icon/icoEncoder.js";
+export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";

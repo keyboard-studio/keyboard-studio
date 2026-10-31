@@ -29,9 +29,10 @@
  *                        surface of Layer A' I4 (checkOpaqueFeatureInventory).
  *   - recognizedRatio  — from the pattern recognizer (issue #234).
  *
- * I2-functional and I5 are deliberately NOT wired: I2's functional check
- * (checkRoundTrip) is a deferred stub requiring the Keyman Core keystroke
- * runtime (absent from this build), so the structural proxy stands in; I5
+ * I2-functional and I5 are deliberately NOT wired: the functional I2 check
+ * (checkRoundTrip, #882) runs via simulate() at the import/emit gate, but at
+ * ~2 ms/input a batch scan of the whole corpus would take hours, so the
+ * scanner keeps the structural proxy; I5
  * (checkSidecarHash) needs a per-keyboard import sidecar that release/
  * keyboards do not have. The scanner's `--check` JSON is therefore still a
  * superset of the contract `ImportReport`; consumers need not change.
@@ -247,9 +248,10 @@ type I2Result = "structural-pass" | "structural-divergence" | "error";
 
 /**
  * Structural round-trip proxy. The functional I2 check (`checkRoundTrip`,
- * Layer A' #236) is a DEFERRED STUB — it needs the Keyman Core keystroke
- * runtime, absent from this build — so this proxy remains the only real
- * RoundTripDivergence signal. Takes the already-emitted text (emitted once in
+ * Layer A' #236, functional since #882) runs via simulate() at the
+ * import/emit gate; the batch scanner deliberately keeps this structural
+ * proxy because functional I2 over the whole corpus would take hours.
+ * Takes the already-emitted text (emitted once in
  * scanOne and shared with the I3 header check) to avoid a second emit() pass.
  */
 function structuralRoundTrip(
@@ -394,18 +396,15 @@ function scanOne(
   }
 
   // I3 — header preservation (emit-stage; needs the emitted text).
-  // Scope caveat: BCP47 language tags live in the .kps / .keyboard_info, NOT in
-  // the .kmn the scanner parses, so `ir.header.bcp47` is always empty here and
-  // the check's bcp47 dimension is a guaranteed false positive in a .kmn-only
-  // scan. Drop it; name/copyright/version come from .kmn stores and stay. The
-  // bcp47 dimension remains valid on the import path (where package metadata
-  // populates ir.header.bcp47) — this filter is scanner-context-only.
+  // The check covers .kmn header fields only (keyboardId, name, copyright,
+  // version). Language tags live in the .kps / .keyboard_info, not the .kmn,
+  // so they are not part of I3 and need no filtering here.
   const i3HeaderMissing: string[] =
     emitted === null
       ? []
-      : checkHeaderPreservation(ir, emitted)
-          .map((f) => headerFieldLabel(f) ?? f.message)
-          .filter((label) => !label.startsWith("bcp47"));
+      : checkHeaderPreservation(ir, emitted).map(
+          (f) => headerFieldLabel(f) ?? f.message,
+        );
 
   // The keyboard parsed, so Layer A' actually ran — record the result object
   // (vs. the null default that marks a ParseFailure where the checks never ran).

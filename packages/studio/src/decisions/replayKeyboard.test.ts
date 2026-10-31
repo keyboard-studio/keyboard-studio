@@ -278,8 +278,6 @@ describe("replayKeyboard — carve-overlay fold", () => {
       { kind: "node", id: "n1", provenance: "asked" },
       { kind: "char", id: "é", provenance: "asked" },
     ],
-    dispositions: [],
-    closedKeyboardCard: "accepted",
   };
 
   it("folds the carved-layout value into the overlay slice at its own position", () => {
@@ -298,7 +296,7 @@ describe("replayKeyboard — carve-overlay fold", () => {
     expect(out.checkpoints[1]!.overlay.carve).toBeDefined();
     expect([...out.state.overlay.carve!.deletedNodeIds]).toEqual(["n1"]);
     expect([...out.state.overlay.carve!.carveChars]).toEqual(["é"]);
-    expect(out.state.overlay.carve!.closedKeyboardCard).toBe("accepted");
+    expect(out.state.overlay.carve!.legacyFallbackPolicy).toBeNull();
   });
 
   it("an inactive carve record folds nothing", () => {

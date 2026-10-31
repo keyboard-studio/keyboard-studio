@@ -14,6 +14,8 @@
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { historyEntryHeading, resolvePublishVersion } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -28,6 +30,7 @@ import {
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 import { hasTestBuilds } from "../../stores/testingStore.ts";
+import { proposeTrack, type TrackProposalBasis } from "../../lib/proposeTrack.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../../decisions/extractContext.ts";
@@ -50,10 +53,16 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
 //   will produce a null return to match).
 // Seeds: track_choice from the session's currently-recorded selectedTrack, so
 //   arriving at this step by deep link or by walking Back shows the recorded
-//   answer instead of an empty radio group (spec 057 FR-031). `undefined`
-//   before any choice has ever been recorded — SurveyRunner's "seed once, then
-//   the user owns it" contract leaves the field genuinely unset in that case,
-//   same as project_name below.
+//   answer instead of an empty radio group (spec 057 FR-031). A recorded
+//   track always wins and is never re-proposed over. Before any choice has
+//   ever been recorded, the seed is proposeTrack's proposal (lib/proposeTrack.ts):
+//   adapt only when the base's single declared language matches the target
+//   tag's language and script, copy otherwise. SurveyRunner's "seed once,
+//   then the user owns it" contract makes that seed a proposal — the saved
+//   answer records origin "proposed" when the author keeps it and
+//   "overturned" when they change it, with getSeedSource naming where the
+//   proposal came from and getSeedCaption showing its one-line reason under
+//   the radio group.
 // Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
 // Effects: none here (spec 089) — the recorded authoring-track decision IS
 //   the effect; routing reads it via selectTrack and the scaffold
@@ -63,6 +72,43 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
 // ---------------------------------------------------------------------------
 
 export type TrackPayload = { track: "copy" | "adapt" };
+
+/**
+ * The catalogue message for each proposeTrack basis arm. The caption is
+ * catalogue copy resolved through i18n at seed time (the active UI locale),
+ * never a string composed by the proposer — one msg() descriptor per arm,
+ * so the catalogue extractor sees every key.
+ */
+const TRACK_PROPOSAL_REASONS: Record<TrackProposalBasis, MessageDescriptor> = {
+  "no-target": msg({
+    id: "track.proposal.reason.no-target",
+    message:
+      "Suggested because no target language is recorded yet, so starting a new keyboard is the safe choice.",
+  }),
+  "no-base-languages": msg({
+    id: "track.proposal.reason.no-base-languages",
+    message:
+      "Suggested because this base does not declare which languages it serves, so it cannot be shown to be a {target} keyboard.",
+  }),
+  "multiple-languages": msg({
+    id: "track.proposal.reason.multiple-languages",
+    message: "Suggested because this base serves {count} languages, not just {target}.",
+  }),
+  "different-language": msg({
+    id: "track.proposal.reason.different-language",
+    message: "Suggested because this base is for {base}, not your target language {target}.",
+  }),
+  "different-script": msg({
+    id: "track.proposal.reason.different-script",
+    message:
+      "Suggested because this base writes {base} in a different script from your target {target}.",
+  }),
+  "same-language": msg({
+    id: "track.proposal.reason.same-language",
+    message:
+      "Suggested because this base is a {target} keyboard — the same single language and script as your target.",
+  }),
+};
 
 export const trackOptions: FlowStepOptions<TrackPayload> = {
   flowRef: "track",
@@ -76,7 +122,21 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
       if (questionId !== "track_choice") return undefined;
-      return deps.selectedTrack ?? undefined;
+      if (deps.selectedTrack !== null) return deps.selectedTrack;
+      return proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages).track;
+    },
+    getSeedSource(questionId: string, deps: FlowStepDeps): DecisionProposalSource | undefined {
+      if (questionId !== "track_choice") return undefined;
+      // A recorded track is the author's own — it names no proposal source.
+      // The first-arrival proposal is the studio's analysis of the target
+      // tag against the base's declared languages.
+      return deps.selectedTrack !== null ? undefined : "analysis";
+    },
+    getSeedCaption(questionId: string, deps: FlowStepDeps): string | undefined {
+      if (questionId !== "track_choice") return undefined;
+      if (deps.selectedTrack !== null) return undefined;
+      const proposal = proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages);
+      return i18n._(TRACK_PROPOSAL_REASONS[proposal.basis].id, proposal.params);
     },
   },
 
@@ -176,10 +236,13 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
           return recordedKeyboardId;
         }
 
+        // The per-mount ref is empty when the runner remounted onto this
+        // question (a draft replay never re-commits the display name), so the
+        // recorded display-name decision stands in for it.
         const committedName =
           deps.displayNameRef.current !== ""
             ? deps.displayNameRef.current
-            : defaultDisplayName;
+            : recordedDisplayName ?? defaultDisplayName;
 
         // Author edited the display name away from the identity default —
         // re-derive from their edit when the slug keeps most of the letters.

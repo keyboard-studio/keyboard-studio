@@ -20,12 +20,16 @@ import {
   renderHelpPhp,
   type HelpDocsRenderInput,
 } from "@keyboard-studio/engine";
+import { buildDocContent, parseTouchLayoutOrNull } from "../lib/docContent.ts";
+import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 
 export interface DocsPreview {
   readmeMd: string;
   readmeHtm: string;
   welcomeHtm: string;
   helpPhp: string;
+  /** spec 102 FR-034: the generated typing guide was left out because the inherited docs already hold one. */
+  typingGuideSuppressed: boolean;
 }
 
 export function useDocsPreview(): DocsPreview {
@@ -33,12 +37,28 @@ export function useDocsPreview(): DocsPreview {
   const identity = useWorkingCopyStore((s) => s.identity);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const startIr = useWorkingCopyStore((s) => s.startIr);
-  const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
-  const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
+  // spec 102 FR-032: the start prose is inherited on an adaptation only. The
+  // slices are session state another screen's artifact run can refill, so a
+  // copy is guarded by its track, never by the slices being null.
+  const startWelcomeHtmText = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.startWelcomeHtmText : null,
+  );
+  const startHelpPhpText = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.startHelpPhpText : null,
+  );
+  // spec 102 US2: the derived sections come from the working-copy IR as built.
+  const workingIr = useWorkingCopyStore((s) => s.ir);
+  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   // spec 080 FR-006: the base README is inherited on an adaptation only; the
   // slice is null on Track 1 by construction, and the track guard keeps it so.
   const startReadmeMdText = useWorkingCopyStore((s) =>
     s.instantiationMode === "adapt-existing" ? s.startReadmeMdText : null,
+  );
+  // Issue #1908: the recorded documentation-fix proposals. Read under the
+  // same adapt guard as the README inheritance — the copy track never
+  // carries inherited prose, so its fixes can never engage there.
+  const docFixProposals = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.docFixProposals : null,
   );
 
   return useMemo(() => {
@@ -48,17 +68,43 @@ export function useDocsPreview(): DocsPreview {
     // reads instead, after carve/identity/rename have run). Good enough for a
     // live preview; not claimed byte-identical to the eventual output list.
     const platforms = startIr?.header.targets.map((t) => t.toLowerCase()) ?? [];
+    // Same input the output projection passes (serializeWorkingCopy step 5c):
+    // the start prose is non-null on Track 2 only.
+    const ir = workingIr ?? startIr;
+    const docContent =
+      ir !== null
+        ? buildDocContent({
+            ir,
+            touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+            inheritedProse: startWelcomeHtmText ?? startHelpPhpText,
+          })
+        : null;
+    // Only ACCEPTED proposals become render fixes; a declined or unanswered
+    // proposal leaves the inherited pages byte-identical (issue #1908).
+    const inheritedFixes = {
+      ...(docFixProposals?.pagename === "accepted" ? { pagename: true } : {}),
+      ...(docFixProposals?.bodySync === "welcome" || docFixProposals?.bodySync === "help"
+        ? { bodySync: docFixProposals.bodySync }
+        : {}),
+    };
     const input: HelpDocsRenderInput = {
       answers: helpDocs,
       displayName,
       ...(identity?.bcp47 !== undefined && identity.bcp47 !== "" ? { primaryBcp47: identity.bcp47 } : {}),
+      ...(identity?.languageName !== undefined && identity.languageName !== ""
+        ? { languageName: identity.languageName }
+        : {}),
+      ...(startKeyboard !== null ? { keyboardId: resolveOutputKeyboardId(identity, startKeyboard) } : {}),
       platforms,
+      ...(docContent !== null ? { generated: docContent.slots } : {}),
+      ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
     };
     return {
       readmeMd: renderReadmeMd(input, startReadmeMdText),
       readmeHtm: renderReadmeHtm(input),
-      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText),
+      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
       helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
+      typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, startWelcomeHtmText, startHelpPhpText, startReadmeMdText]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals]);
 }

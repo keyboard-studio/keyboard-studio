@@ -42,7 +42,7 @@
 // preserves ALL user stores (not just those referenced by typed rules).
 
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
-import type { CarveDisposition } from "@keyboard-studio/contracts";
+import type { FallbackPolicy } from "@keyboard-studio/contracts";
 import { emit } from "../codec/emit.js";
 import { reconcileSiblingAssetPaths } from "../compiler/reconcileSiblingAssetPaths.js";
 import { carveFilterIr } from "./carveFilterIr.js";
@@ -59,8 +59,10 @@ import { deriveCarvedIr } from "./carvePipeline.js";
 export interface CarvePipelineOpts {
   /** Glyph-level carve item ids (store-slot ids plus bare node ids). */
   deletedItemIds: ReadonlySet<string>;
-  /** Per-combination dispositions for the suppression stage (FR-019). */
-  dispositions: CarveDisposition[];
+  /** Keyboard-wide fallback policy for the suppression stage (FR-019). Omitted = no suppression. */
+  fallbackPolicy?: FallbackPolicy;
+  /** Removal ids that are not carves (see CarvePipelineInput.suppressionExemptIds). */
+  suppressionExemptIds?: ReadonlySet<string>;
   /** A6 loud/soft for the suppression stage. Default false (soft). */
   loud?: boolean;
 }
@@ -139,8 +141,7 @@ export function applyCarveToVfs(
   // text-splice is ineligible.
   const pipelineEdit =
     pipeline !== undefined &&
-    (pipeline.dispositions.length > 0 ||
-      pipeline.deletedItemIds.size > 0 ||
+    (pipeline.deletedItemIds.size > 0 ||
       deletedNodeIds.size > 0);
   const irRewritten = opts?.irRewritten === true || pipelineEdit;
 
@@ -182,7 +183,10 @@ export function applyCarveToVfs(
     const derived = deriveCarvedIr(startIr, {
       deletedNodeIds,
       deletedItemIds: pipeline.deletedItemIds,
-      dispositions: pipeline.dispositions,
+      ...(pipeline.fallbackPolicy !== undefined ? { fallbackPolicy: pipeline.fallbackPolicy } : {}),
+      ...(pipeline.suppressionExemptIds !== undefined
+        ? { suppressionExemptIds: pipeline.suppressionExemptIds }
+        : {}),
       ...(pipeline.loud === true ? { loud: true as const } : {}),
     });
     warnings.push(...derived.warnings);

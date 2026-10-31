@@ -99,16 +99,26 @@ group(main) using keys
 + '\`' > dk(grave)
 `;
 
-  it("produces RawKmnFragment with reason named-deadkey for dk(grave)", () => {
+  // DELIBERATE FLIP (#2238, constraint 7 of the #2232 ruling): pre-#2238
+  // these two tests pinned dk(grave) as a RawKmnFragment with reason
+  // named-deadkey. The codec now types named deadkeys, so the rule is a
+  // typed rule carrying a name-carrying element and NO fragment exists.
+  // The NAMED_DEADKEY constant stays defined for persisted working copies.
+  it("types dk(grave) as a namedDeadkey element — no named-deadkey fragment (#2238 flip)", () => {
     const { ir } = parse(NAMED_DK_KMN, "named-dk-test");
     const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.NAMED_DEADKEY);
+    expect(reasons).not.toContain(OPAQUE_REASONS.NAMED_DEADKEY);
+    expect(ir.raw.length).toBe(0);
+    const main = ir.groups.find(g => g.name === "main");
+    const rule = main?.rules[0];
+    expect(rule?.output).toEqual([{ kind: "namedDeadkey", name: "grave" }]);
   });
 
-  it("named-deadkey fragment preserves the source line", () => {
+  it("named deadkey name is preserved verbatim in the typed rule (#2238 flip)", () => {
     const { ir } = parse(NAMED_DK_KMN, "named-dk-test");
-    const frag = ir.raw.find(r => r.reason === OPAQUE_REASONS.NAMED_DEADKEY);
-    expect(frag?.sourceText).toContain("dk(grave)");
+    const main = ir.groups.find(g => g.name === "main");
+    const out = main?.rules[0]?.output[0];
+    expect(out).toEqual({ kind: "namedDeadkey", name: "grave" });
   });
 });
 
@@ -149,8 +159,23 @@ group(main) using keys
 if(myFlag = 'a') + [K_A] > use(g)
 `;
 
-  it("produces RawKmnFragment with reason if-option-store", () => {
+  it("a head-position equality guard parses typed since spec 103 (no fragment)", () => {
     const { ir } = parse(IF_KMN, "if-test");
+    const reasons = ir.raw.map(r => r.reason);
+    expect(reasons).not.toContain(OPAQUE_REASONS.IF_OPTION_STORE);
+    const rule = ir.groups.flatMap((g) => g.rules)[0];
+    expect(rule?.context[0]).toEqual({
+      kind: "if",
+      store: "myFlag",
+      value: "a",
+    });
+  });
+
+  it("an untypeable guard still produces RawKmnFragment with reason if-option-store", () => {
+    const { ir } = parse(
+      IF_KMN.replace("if(myFlag = 'a')", "if(myFlag <> 'a')"),
+      "if-test-neq",
+    );
     const reasons = ir.raw.map(r => r.reason);
     expect(reasons).toContain(OPAQUE_REASONS.IF_OPTION_STORE);
   });

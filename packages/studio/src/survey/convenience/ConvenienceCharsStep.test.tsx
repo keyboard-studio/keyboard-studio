@@ -369,7 +369,8 @@ describe("ConvenienceCharsStep — the question", () => {
 // ---------------------------------------------------------------------------
 // spec 079 US3 T048/T079 — a shape change (a new surplus letter appears)
 // proposes it pre-checked while an earlier un-tick survives; there is
-// structurally no `reproposed` flag to show (see ./convenienceFlags.ts).
+// structurally no `reproposed` flag to show (see useWorkToDo.ts's
+// spec-079 note).
 // ---------------------------------------------------------------------------
 
 describe("ConvenienceCharsStep — shape change: new surplus proposed, un-ticks kept, no flags (spec 079 US3 T048/T079)", () => {

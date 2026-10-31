@@ -17,7 +17,7 @@
 // IR, ensuring idempotency and reversibility.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { CarveDisposition } from "@keyboard-studio/contracts";
+import type { FallbackPolicy } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import {
   parseSlotId,
@@ -71,13 +71,16 @@ function partitionItemIds(
 /**
 /**
  * Options for the carve mutate path (T015): the suppression stage inputs.
- * When `dispositions` is non-empty, the shared engine pipeline
- * (suppression → slot removals → filter) derives the carve arrays; otherwise
- * the legacy slot-removals → filter derivation runs, content-identical.
+ * When `fallbackPolicy` is given, the shared engine pipeline
+ * (suppression → slot removals → filter) expands it over the carved combos and
+ * derives the carve arrays; otherwise the legacy slot-removals → filter
+ * derivation runs, content-identical.
  */
 export interface CarveMutateOptions {
-  /** Per-combination dispositions for the suppression stage (FR-019). */
-  dispositions?: CarveDisposition[];
+  /** Keyboard-wide fallback policy for the suppression stage (FR-019). */
+  fallbackPolicy?: FallbackPolicy;
+  /** Removal ids that are not carves, e.g. disabled-family rules (never rewritten into suppression rules). */
+  suppressionExemptIds?: ReadonlySet<string>;
   /** A6 loud/soft for the suppression stage. Default false (soft). */
   loud?: boolean;
   /**
@@ -125,10 +128,10 @@ export function unionAggregatedCarveIds(
  * Build the carve patch (the carve-affected IR arrays) from `startIr` and the
  * current carve overlay.
  *
- * T015: when dispositions are provided, the shared engine pipeline
+ * T015: when a fallback policy is provided, the shared engine pipeline
  * (deriveCarvedIr: suppression → slot removals → whole-node filter) derives
  * the arrays — byte-identical to the applyCarveToVfs pipeline path. Without
- * dispositions, the legacy derivation runs: slot-item nul-rewrites
+ * policy, the legacy derivation runs: slot-item nul-rewrites
  * (applyStoreSlotRemovals) first, then whole-node deletions (carveFilterIr).
  *
  * Always derived from `startIr` so the patch is a pure function of the overlay
@@ -155,18 +158,15 @@ export function buildCarvePatch(
     startIr,
     effectiveItemIds,
   );
-  const dispositions = opts?.dispositions ?? [];
-
   if (
     deletedNodeIds.size === 0 &&
     slotIds.size === 0 &&
-    wholeNodeItemIds.size === 0 &&
-    dispositions.length === 0
+    wholeNodeItemIds.size === 0
   ) {
     return {};
   }
 
-  // T015: the shared pipeline. With empty dispositions the suppression stage
+  // T015: the shared pipeline. With no carved combos the suppression stage
   // is a structural no-op and the result is content-identical to the legacy
   // derivation below. deletedItemIds carries the #1809 §1 aggregated union
   // (effectiveItemIds) so the pipeline and the legacy derivation consume the
@@ -174,7 +174,10 @@ export function buildCarvePatch(
   const { ir: carved, warnings: carveWarnings } = deriveCarvedIr(startIr, {
     deletedNodeIds,
     deletedItemIds: effectiveItemIds,
-    dispositions,
+    ...(opts?.fallbackPolicy !== undefined ? { fallbackPolicy: opts.fallbackPolicy } : {}),
+    ...(opts?.suppressionExemptIds !== undefined
+      ? { suppressionExemptIds: opts.suppressionExemptIds }
+      : {}),
     ...(opts?.loud === true ? { loud: true as const } : {}),
   });
   if (carveWarnings.length > 0) opts?.onWarnings?.(carveWarnings);
@@ -197,7 +200,7 @@ export function buildCarvePatch(
  * @param startIr          The source-of-truth carve IR. Never mutated.
  * @param deletedNodeIds  Whole-node carve deletions (group/rule/store/raw nodeIds).
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
- * @param opts            Optional suppression inputs (T015: dispositions + loud).
+ * @param opts            Optional suppression inputs (T015: fallbackPolicy + loud).
  * @param carveChars      Issue #1809, ruling §1: the aggregated carved character
  *                        set; unioned over `deletedItemIds` (see buildCarvePatch).
 
@@ -318,10 +321,12 @@ export function applyAddGalleryMutate(
  * The engine's deadkey-lifecycle mutations (packages/engine) touch only
  * rules (trigger, fan-out, escape) and the two fan-out stores; the author
  * name rides the trigger rule's `trailingComment`, which lives inside
- * `groups[]` as well. Named deadkeys (id null, pre-FR-004) live as opaque
- * `raw[]` fragments — their delete/retarget rewrites those fragments, so
- * `raw[]` is in scope too. `header`, `comments`, and `touchLayout` are
- * never touched, so a patch reaching them fails the M3 containment check.
+ * `groups[]` as well. Named deadkeys (id null) are typed rules in
+ * `groups[]` since #2238 — and opaque `raw[]` fragments on persisted
+ * pre-#2238 copies — and their delete/retarget rewrites either
+ * representation, so both arrays are in scope. `header`, `comments`, and
+ * `touchLayout` are never touched, so a patch reaching them fails the M3
+ * containment check.
  *
  * Mirrors ADD_GALLERY_WRITES (same arrays — deadkeys are IR entities,
  * not session answers).

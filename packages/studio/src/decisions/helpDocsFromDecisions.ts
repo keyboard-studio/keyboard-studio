@@ -141,9 +141,20 @@ export function helpDocsFromDecisions(decisions: DecisionSet): HelpDocsAnswers |
 
   for (const [field, decisionId] of OPT_IN_DECISION_IDS) {
     const value = decisionString(decisions, decisionId).trim();
-    if (value !== "") {
-      helpDocs[field] = value;
+    if (value === "") continue;
+    // Issue #1800 AC3 guard: a troubleshooting value the extraction pass
+    // seeded (provenance "extracted"/"default") is a proposal the author
+    // has not confirmed — and because extraction seeds gated questions
+    // against the pre-pass store, an author who closed the more-detail
+    // gate never saw it at all. Only an author-committed record
+    // ("asked": kept, edited, or written in the field, per spec 079
+    // FR-008) may compose into the help page. Scoped to troubleshooting:
+    // #1800's AC3 is explicit about proposals, and the sibling fields'
+    // long-standing behaviour is not this change's to alter.
+    if (field === "troubleshooting" && decisions[decisionId]?.provenance !== "asked") {
+      continue;
     }
+    helpDocs[field] = value;
   }
 
   return helpDocs;

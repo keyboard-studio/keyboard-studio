@@ -61,7 +61,15 @@
  * @see touch-layout-wire-format.ts — shared raw-JSON wire-format types (with applyTouchAssignmentsToRawJson.ts).
  */
 
-import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
+import {
+  buildTouchKeyRuleIndex,
+  resolveTouchProduction,
+  touchKeyStateFromLayerId,
+  type KeyboardIR,
+  type MechanismAssignment,
+  type TouchKeyIR,
+  type TouchKeyRuleIndex,
+} from "@keyboard-studio/contracts";
 import {
   buildComboKeyMap,
   canonicalizeCombo,
@@ -70,6 +78,7 @@ import {
   parseKeySpec,
   type ModifierToken,
 } from "./modifierCombos.js";
+import { touchKeyIdFamily } from "./touch-mechanism-shared.js";
 import {
   isRawLayer,
   isRawPlatform,
@@ -153,6 +162,15 @@ export function propagateDesktopLayersToTouch(
 
   for (const combo of collectLayerCombosInUse(ir)) addCombo(combo);
 
+  // Spec 104 FR-021 (T018): the BARE combo is part of the propagation set.
+  // collectLayerCombosInUse deliberately reports only non-empty combos (a
+  // bare rule set is not a "layer" to it), but T_ rules are typically bare
+  // — without the bare combo their productions never reach any key map and
+  // the default layer's T_ keys go stale. The bare combo's layer id is
+  // "default" (comboToTouchLayerId([])), which always exists on a processed
+  // platform, so it takes the patch path below, never the clone path.
+  addCombo([]);
+
   for (const assignment of assignments) {
     if (assignment.modality !== "physical") continue;
     for (const ref of assignment.mechanisms) {
@@ -162,6 +180,12 @@ export function propagateDesktopLayersToTouch(
       if (parsed) addCombo(parsed.tokens);
     }
   }
+
+  // Spec 104 FR-021 (T018): the production resolver's rule-join index over
+  // this same IR — the backstop that establishes what a T_/U_ key produces
+  // in a combo's state when the (character-only) combo key map has no
+  // entry for it.
+  const ruleIndex = buildTouchKeyRuleIndex(ir);
 
   // -------------------------------------------------------------------------
   // Step 2 — build a per-combo (vkey → output char) map from the IR, and
@@ -194,7 +218,10 @@ export function propagateDesktopLayersToTouch(
       const existingLayer = platformVal.layer.find((l) => isRawLayer(l) && l.id === layerId);
 
       if (isRawLayer(existingLayer)) {
-        patchExistingComboLayer(existingLayer, keyMap);
+        // The bare combo patches the platform's own default layer: its job
+        // is to surface rule production as the working-copy `output`, not
+        // to re-keycap the author's shipped keys (preserveKeycapText).
+        patchExistingComboLayer(existingLayer, keyMap, layerId === "default");
         continue;
       }
 
@@ -211,11 +238,11 @@ export function propagateDesktopLayersToTouch(
           ? platformVal.layer.find((l) => isRawLayer(l) && l.id === aliasId)
           : undefined;
       if (isRawLayer(aliasLayer)) {
-        patchExistingComboLayer(aliasLayer, keyMap);
+        patchExistingComboLayer(aliasLayer, keyMap, false);
         continue;
       }
 
-      const newLayer = cloneLayerForCombo(defaultLayer, layerId, keyMap);
+      const newLayer = cloneLayerForCombo(defaultLayer, layerId, keyMap, ir, ruleIndex);
       platformVal.layer.push(newLayer);
 
       ensureReachability(platformVal, defaultLayer, layerId, warnings);
@@ -236,13 +263,24 @@ export function propagateDesktopLayersToTouch(
  * disambiguator); `conformTouchLayoutToKeymanSchema` strips it on the final
  * output projection before the artifact reaches kmc/Keyman Developer.
  */
-function patchExistingComboLayer(layer: RawLayer, keyMap: Map<string, string>): void {
+function patchExistingComboLayer(
+  layer: RawLayer,
+  keyMap: Map<string, string>,
+  preserveKeycapText: boolean,
+): void {
   for (const row of layer.row) {
     for (const key of row.key) {
       const char = keyMap.get(key.id);
       if (char === undefined) continue;
-      key.text = char;
       key.output = char;
+      // On the author's own default layer (the bare combo's patch), the
+      // shipped keycap is the author's display choice — a ruled T_ key's
+      // keycap ("◌̀") is not its production — so text follows the key map
+      // only where the key carries no keycap of its own. Derived combo
+      // layers take the key map's text outright, as before.
+      if (!preserveKeycapText || key.text === undefined || key.text === "") {
+        key.text = char;
+      }
     }
   }
 }
@@ -258,18 +296,86 @@ function cloneLayerForCombo(
   defaultLayer: RawLayer,
   layerId: string,
   keyMap: Map<string, string>,
+  ir: KeyboardIR,
+  ruleIndex: TouchKeyRuleIndex,
 ): RawLayer {
   return {
     ...defaultLayer,
     id: layerId,
     row: defaultLayer.row.map((row) => ({
       ...row,
-      key: row.key.map((key) => cloneKeyForCombo(key, keyMap)),
+      key: row.key.map((key) => cloneKeyForCombo(key, keyMap, layerId, ir, ruleIndex)),
     })),
   };
 }
 
-function cloneKeyForCombo(key: RawKey, keyMap: Map<string, string>): RawKey {
+/** Minimal TouchKeyIR view of a raw key, for production-resolver reads only. */
+function rawKeyToResolverKey(key: RawKey): TouchKeyIR {
+  const rawSp = key["sp"];
+  const sp =
+    typeof rawSp === "number"
+      ? rawSp
+      : typeof rawSp === "string" && rawSp.trim() !== "" && !Number.isNaN(Number(rawSp))
+        ? Number(rawSp)
+        : undefined;
+  return {
+    nodeId: "",
+    id: key.id,
+    ...(key.text !== undefined ? { text: key.text } : {}),
+    ...(key.output !== undefined ? { output: key.output } : {}),
+    ...(key.nextlayer !== undefined ? { nextlayer: key.nextlayer } : {}),
+    ...(typeof key["layer"] === "string" ? { layer: key["layer"] } : {}),
+    ...(sp !== undefined ? { sp } : {}),
+  };
+}
+
+/**
+ * What a cloned combo layer's key should carry when the combo's key map
+ * does not redefine it — spec 104 FR-021 (T018). For a T_/U_ key the answer
+ * comes from the production resolver, not from the key's family alone:
+ *   - a text production in the combo's state → that text (a U_ key decodes
+ *     in every state; a T_ key may be ruled for this state in ways the
+ *     character-only key map cannot see);
+ *   - a non-text production (deadkey, layer switch) → the source key's own
+ *     keycap: the key still DOES something on this layer and must not be
+ *     blanked into looking dead;
+ *   - no production (`none` / `unknown` / unclassified) → undefined: the
+ *     legacy blank, which is also the truth (e.g. a T_ key whose only
+ *     rules are bare produces nothing under RALT).
+ * K_ keys always take the legacy blank — no fallback exists for them in a
+ * non-SHIFT modifier state, and SHIFT-family clones are the key map's job.
+ */
+function preservedCloneText(
+  key: RawKey,
+  layerId: string,
+  ir: KeyboardIR,
+  ruleIndex: TouchKeyRuleIndex,
+): string | undefined {
+  const family = touchKeyIdFamily(key.id);
+  if (family !== "T_" && family !== "U_") return undefined;
+
+  const record = resolveTouchProduction(
+    { ir, ruleIndex },
+    rawKeyToResolverKey(key),
+    touchKeyStateFromLayerId(layerId),
+  );
+  for (const entry of record.productions) {
+    if (entry.output.kind === "text") return entry.output.text;
+  }
+  const producesSomething = record.productions.some(
+    (e) => e.output.kind !== "none" && e.output.kind !== "unknown",
+  );
+  if (producesSomething) return key.text ?? "";
+  return undefined;
+}
+
+function cloneKeyForCombo(
+  key: RawKey,
+  keyMap: Map<string, string>,
+  layerId: string,
+  ir: KeyboardIR,
+  ruleIndex: TouchKeyRuleIndex,
+): RawKey {
   const { sk: _sk, flick: _flick, multitap: _multitap, output: _output, text: _text, ...rest } =
     key;
   const cloned: RawKey = { ...rest, id: key.id };
@@ -281,7 +387,13 @@ function cloneKeyForCombo(key: RawKey, keyMap: Map<string, string>): RawKey {
     // conformTouchLayoutToKeymanSchema (same pattern as the `p` provenance tag).
     cloned.output = char;
   } else {
-    cloned.text = "";
+    const preserved = preservedCloneText(key, layerId, ir, ruleIndex);
+    if (preserved !== undefined) {
+      cloned.text = preserved;
+      if (preserved !== "") cloned.output = preserved;
+    } else {
+      cloned.text = "";
+    }
   }
 
   if (typeof cloned["nextlayer"] === "string") {
