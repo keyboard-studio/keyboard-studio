@@ -203,7 +203,8 @@ export const MANDATED_CHAR_CODE = "KM_LINT_MANDATED_CHAR_MISSING";
 /** §8.13's code: named here because an undeclared .kps target list is a missing input. */
 export const KPS_TARGETS_MISMATCH_CODE = "KM_LINT_KPS_TARGETS_MISMATCH";
 
-const MISSING_KPS_TARGETS = "the .kps package file's declared target list";
+const MISSING_KPS_TARGETS =
+  "a <Targets> list in the .kps (the package does not declare targets)";
 
 export interface AssembleLintContextInput {
   vfs: VirtualFS;
