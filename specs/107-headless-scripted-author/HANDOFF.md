@@ -6,8 +6,8 @@ read those before anything else. Everything below is pushed.
 ## Where things are
 
 - **Update (2026-10-31, after merge):** PR #2410 merged and its branch is deleted. T051, T052 and
-  T073 are closed on branch `km/107-ci-cap` (cap `timeout-minutes: 4`; research R3). 78 of 80 done;
-  open below are T062 and T077 only.
+  T073 are closed on branch `km/107-ci-cap` (cap `timeout-minutes: 4`; research R3), and so is T062
+  (sweep dispatched; see its As built note). 79 of 80 done; only T077 (owner) is open.
 - Worktree `D:/Github/_Projects/_KM/ks-107-resume`, originally branch `107-headless-scripted-author`.
 - At merge, 75 of 80 tasks done. Every phase gate is green locally:
   - US1 (`authorCase`) 26/26;
@@ -18,11 +18,10 @@ read those before anything else. Everything below is pushed.
   - default-config suites;
   - `pnpm lint` (0 errors); studio and engine typecheck.
 
-## Open tasks (all need CI or the owner)
+## Open tasks (owner only)
 
 | Task | What | How |
 |---|---|---|
-| T062 | Dispatch `headless-sweep.yml` once (`tier=latin, shards=1`) plus a seeded failure | The workflow is on `main` now, so `gh workflow run headless-sweep.yml`. It files real issues (`--file-issues`): confirm the volume with the owner first |
 | T077 | Make `headless-author` a required check | **Owner/admin only**. Precondition met: green on `main` in run 41220294641 |
 
 ## What this session found and fixed (product defects the author exposed)
