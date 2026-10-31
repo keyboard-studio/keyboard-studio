@@ -26,6 +26,7 @@ import type {
 } from "./criteriaTypes.ts";
 import { CriteriaSummary } from "./CriteriaSummary.tsx";
 import { CriterionRow } from "./CriterionRow.tsx";
+import type { GithubLink } from "./githubLink.ts";
 
 export interface CriteriaPageProps {
   result: CriteriaResult;
@@ -52,7 +53,7 @@ export interface CriteriaPageProps {
    * GitHub link context for the /review report: when present, "File: <path>"
    * evidence lines become links to the file at the pinned sha (open in new tab).
    */
-  githubLink?: { owner: string; repo: string; sha: string } | null;
+  githubLink?: GithubLink | null;
   /**
    * Optional per-criterion severity override for the /review report
    * ("met" | "warning" | "error"), keyed by criterion id. When present,

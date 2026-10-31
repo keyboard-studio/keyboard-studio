@@ -25,6 +25,7 @@ import { msg } from "@lingui/core/macro";
 
 import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
+import { githubBlobUrl, type GithubLink } from "./githubLink.ts";
 import {
   ACCENT,
   BORDER,
@@ -66,7 +67,7 @@ export interface CriterionRowProps {
    * GitHub link context: when present, "File: <path>" evidence lines become
    * links to the file at the pinned sha (open in new tab).
    */
-  githubLink?: { owner: string; repo: string; sha: string } | null;
+  githubLink?: GithubLink | null;
   /**
    * /review severity override ("met" | "warning" | "error"), set by the
    * health report. When present, the status label is color-coded.
@@ -222,10 +223,8 @@ export function CriterionRow({
       if (m) {
         const path = m[1]!;
         const lineNum = m[3];
-        const url =
-          `https://github.com/${githubLink.owner}/${githubLink.repo}/blob/${githubLink.sha}/${path}` +
-          (lineNum ? `#L${lineNum}` : "");
-        const display = lineNum ? `${path}#L${lineNum}` : path;
+        const file = lineNum ? `${path}#L${lineNum}` : path;
+        const url = githubBlobUrl(githubLink, file);
         return (
           <>
             File:{" "}
@@ -235,7 +234,7 @@ export function CriterionRow({
               rel="noopener noreferrer"
               style={{ color: ACCENT, fontFamily: FONT_MONO, fontSize: 12 }}
             >
-              {display}
+              {file}
             </a>
           </>
         );
