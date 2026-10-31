@@ -93,6 +93,206 @@ export function readmeHtm(displayName: string): string {
 }
 
 /**
+ * `README.md` — comprehensive keyboard documentation for users and contributors.
+ *
+ * Generates a professional, informative README that includes:
+ * - Keyboard purpose and features
+ * - Languages supported
+ * - How to type special characters (generic guide)
+ * - Installation instructions for all platforms
+ * - Links to help resources
+ * - Contributing guidelines
+ *
+ * This is suitable for Keyman repository submissions and provides sufficient
+ * documentation for end users. For keyboards with complex diacritics or
+ * deadkeys, authors can manually enhance this template with specifics about
+ * their keyboard's unique typing methods.
+ *
+ * Not HTML-escaped: README.md is Markdown/plain text, not markup.
+ */
+export function readmeMd(
+  displayName: string,
+  keyboardId: string,
+  languages: string[] = [],
+  baseKeyboardName?: string,
+): string {
+  const languageList =
+    languages.length > 0
+      ? languages.map((tag) => `- **${languageNameForTag(tag)}** (code: \`${tag}\`)`).join("\n")
+      : "- Language support information to be confirmed";
+
+  const baseKeyboardSection = baseKeyboardName
+    ? `- Based on ${baseKeyboardName}`
+    : "- Adapted from a standard keyboard layout";
+
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  return `# ${displayName}
+
+Type text in the ${displayName} language with comprehensive character and diacritics support.
+
+## Languages Supported
+
+${languageList}
+
+## Features
+
+- Comprehensive character and diacritic support
+${baseKeyboardSection}
+- Touch-friendly layouts for mobile and tablet
+- Desktop and web support
+- Keyman-compatible on all platforms
+
+## How to Type Special Characters
+
+Use the following methods to access extended characters and diacritics:
+
+### Method 1: On-Screen Keyboard Layout
+
+When you start typing, Keyman displays a visual keyboard showing:
+- Regular characters on the base layer
+- Shift combinations for capitals and punctuation
+- Modifier combinations (AltGr/Option/Right Alt) for accents and special characters
+- Tap or click any key to insert that character
+
+### Method 2: Touch Layout (Mobile & Tablet)
+
+On mobile and tablet devices:
+- Tap and hold a base character key to see available accented variants
+- Select the accented version from the popup menu
+- Smart suggestions help you type faster
+
+### Method 3: Key Sequences
+
+Some keyboards use sequences to type accented characters:
+- Press the diacritic key (such as an accent key)
+- Follow with the base letter to combine them
+- Consult the visual keyboard for available combinations
+
+## Platform Support
+
+- **Windows, macOS, Linux** — via Keyman Desktop
+- **iOS, Android** — via Keyman Mobile
+- **Web** — via Keyman Online at keyman.com/keyboard
+
+## Installation
+
+### Step 1: Get Keyman
+
+1. Visit [keyman.com](https://keyman.com)
+2. Download Keyman Engine for your device:
+   - **Windows/Mac/Linux:** Keyman Desktop
+   - **iOS:** Keyman for iPhone/iPad
+   - **Android:** Keyman for Android
+3. Install and follow the setup instructions
+
+### Step 2: Install This Keyboard
+
+1. Open Keyman
+2. Go to the keyboard store or catalog
+3. Search for "${displayName}"
+4. Click "Install" and follow prompts
+5. Select "${displayName}" from your active keyboard list
+
+### Getting Help
+
+- **Online Help:** [help.keyman.com/keyboard/${keyboardId}](https://help.keyman.com/keyboard/${keyboardId})
+- **Keyman Community:** [keyman.com/community](https://keyman.com/community)
+- **Developer Resources:** [Keyman Developer](https://help.keyman.com/developer)
+
+## Keyboard Layout
+
+This keyboard is based on ${baseKeyboardName || "a standard keyboard layout"} and provides comprehensive support for:
+- Base Latin characters (A-Z, a-z)
+- Diacritical marks (accents, tone marks, and other modifiers)
+- Special punctuation and symbols
+- Language-specific characters and variants
+
+Refer to the visual keyboard layout displayed in Keyman for exact key positions and available character combinations.
+
+## Contributing
+
+Found an issue? Have a suggestion or want to help improve this keyboard?
+
+1. **Report an Issue:** [keyboard-studio Issues](https://github.com/keyboard-studio/keyboard-studio/issues)
+2. **Submit Changes:** [keyboard-studio Pull Requests](https://github.com/keyboard-studio/keyboard-studio/pulls)
+3. **Community Keyboards:** [keymanapp/keyboards Repository](https://github.com/keymanapp/keyboards)
+
+## License
+
+See [LICENSE.md](LICENSE.md) for copyright and license information.
+
+## Credits
+
+Created with [keyboard-studio](https://github.com/keyboard-studio/keyboard-studio) —
+an open-source authoring system by [SIL International](https://www.sil.org/)
+for creating Keyman keyboards with guided workflows.
+
+---
+
+**Version:** 1.0 | **Updated:** ${dateStr}
+`;
+}
+
+/**
+ * Map ISO 639-3 language codes to human-readable language names.
+ *
+ * Covers common languages and language codes encountered in keyboard
+ * authoring. Can be extended as needed; unknown codes fall back to
+ * capitalized form of the code itself.
+ *
+ * @internal
+ */
+function languageNameForTag(tag: string): string {
+  // Common language code mappings
+  const languageNames: Record<string, string> = {
+    // Major European languages
+    en: "English",
+    fr: "French",
+    de: "German",
+    es: "Spanish",
+    pt: "Portuguese",
+    it: "Italian",
+    nl: "Dutch",
+    pl: "Polish",
+    ru: "Russian",
+
+    // African languages
+    sw: "Swahili",
+    ha: "Hausa",
+    yo: "Yoruba",
+    am: "Amharic",
+    ti: "Tigrinya",
+    om: "Oromo",
+    ewo: "Ewondo",
+    bm: "Bambara",
+
+    // Asian languages
+    hi: "Hindi",
+    bn: "Bengali",
+    ta: "Tamil",
+    te: "Telugu",
+    th: "Thai",
+    vi: "Vietnamese",
+
+    // Other
+    ar: "Arabic",
+    he: "Hebrew",
+  };
+
+  return languageNames[tag] || capitalizeTag(tag);
+}
+
+/**
+ * Capitalize the first letter of a language tag.
+ *
+ * @internal
+ */
+function capitalizeTag(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
  * `LICENSE.md` — the MIT stub every package must ship so it is redistributable.
  *
  * Called by `output/ensurePackageFiles` (the adapt/`.kmp` track). Track 1 goes
