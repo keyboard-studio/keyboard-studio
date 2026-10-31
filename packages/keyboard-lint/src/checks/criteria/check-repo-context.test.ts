@@ -34,11 +34,11 @@ function facts(overrides: Partial<ReviewContext> = {}): RepoContextFacts {
 
 describe("repo-context twins", () => {
   it("passes a well-placed keyboard", () => {
-    expect(checkRepoContext(facts())).toEqual([]);
+    expect(checkRepoContext(facts()).findings).toEqual([]);
   });
 
   it("1.2b flags a folder outside release/ or experimental/", () => {
-    const f = checkRepoPlacementBad(
+    const { findings: f } = checkRepoPlacementBad(
       facts({ repoPath: "staging/gff/gff_amharic" }),
     );
     expect(f).toHaveLength(1);
@@ -47,12 +47,14 @@ describe("repo-context twins", () => {
 
   it("1.2b accepts experimental/", () => {
     expect(
-      checkRepoPlacementBad(facts({ repoPath: "experimental/gff/gff_amharic" })),
+      checkRepoPlacementBad(
+        facts({ repoPath: "experimental/gff/gff_amharic" }),
+      ).findings,
     ).toEqual([]);
   });
 
   it("1.3b flags a folder without an organizing subfolder", () => {
-    const f = checkRepoNoOrganizingFolder(
+    const { findings: f } = checkRepoNoOrganizingFolder(
       facts({ repoPath: "release/gff_amharic" }),
     );
     expect(f).toHaveLength(1);
@@ -60,7 +62,7 @@ describe("repo-context twins", () => {
   });
 
   it("1.4b flags a source file at the repo root", () => {
-    const f = checkRepoRootSource(
+    const { findings: f } = checkRepoRootSource(
       facts({ treePaths: ["stray.kmn", "release/gff/gff_amharic/HISTORY.md"] }),
     );
     expect(f).toHaveLength(1);
@@ -70,12 +72,12 @@ describe("repo-context twins", () => {
 
   it("1.4b ignores non-source root files", () => {
     expect(
-      checkRepoRootSource(facts({ treePaths: ["README.md"] })),
+      checkRepoRootSource(facts({ treePaths: ["README.md"] })).findings,
     ).toEqual([]);
   });
 
   it("Group C flags extraneous files outside the folder", () => {
-    const f = checkFilesOutsideFolder(
+    const { findings: f } = checkFilesOutsideFolder(
       facts({
         treePaths: [
           "release/gff/gff_amharic/HISTORY.md",
@@ -91,12 +93,12 @@ describe("repo-context twins", () => {
     expect(
       checkFilesOutsideFolder(
         facts({ treePaths: ["release/other/other.kmn"] }),
-      ),
-    ).toEqual([]);
+      ).findings,
+      ).toEqual([]);
   });
 
   it("19.1b passes a complete attribution block", () => {
-    const f = checkPrAttributionBad(
+    const { findings: f } = checkPrAttributionBad(
       facts({
         isPr: true,
         prBody:
@@ -107,7 +109,7 @@ describe("repo-context twins", () => {
   });
 
   it("19.1b flags an incomplete attribution block", () => {
-    const f = checkPrAttributionBad(
+    const { findings: f } = checkPrAttributionBad(
       facts({ isPr: true, prBody: "Adapted from release/sil/sil_x." }),
     );
     expect(f).toHaveLength(1);
@@ -117,12 +119,12 @@ describe("repo-context twins", () => {
 
   it("19.1b stays silent without an adaptation signal", () => {
     expect(
-      checkPrAttributionBad(facts({ isPr: true, prBody: "Fix a typo." })),
+      checkPrAttributionBad(facts({ isPr: true, prBody: "Fix a typo." })).findings,
     ).toEqual([]);
   });
 
   it("19.2b flags a missing Adapted-from bullet", () => {
-    const f = checkHistoryAttributionBad(
+    const { findings: f } = checkHistoryAttributionBad(
       facts({ historyMd: "# History\n\n## 1.0\n\n- Initial release.\n" }),
     );
     // The check fires on the missing bullet; the resolver's isAdaptation
@@ -133,7 +135,7 @@ describe("repo-context twins", () => {
   });
 
   it("19.2b flags a malformed Adapted-from bullet", () => {
-    const f = checkHistoryAttributionBad(
+    const { findings: f } = checkHistoryAttributionBad(
       facts({ historyMd: "Adapted from\n" }),
     );
     expect(f).toHaveLength(1);
@@ -144,8 +146,31 @@ describe("repo-context twins", () => {
     expect(
       checkHistoryAttributionBad(
         facts({ historyMd: "- Adapted from release/sil/sil_x\n" }),
-      ),
-    ).toEqual([]);
+      ).findings,
+      ).toEqual([]);
+  });
+
+  it("19.1b/19.2b name the moot reason when the precondition is absent", () => {
+    expect(checkPrAttributionBad(facts({ isPr: false })).verified).toEqual([
+      "No PR body to check.",
+    ]);
+    expect(
+      checkPrAttributionBad(facts({ isPr: true, prBody: "Fix a typo." }))
+        .verified,
+    ).toEqual(["No adaptation signal in the PR body."]);
+    expect(
+      checkHistoryAttributionBad(facts({ historyMd: undefined })).verified,
+    ).toEqual(["No HISTORY.md to check (absence is 3.1b's check)."]);
+  });
+
+  it("1.4b/Group C are moot with an empty tree, naming why", () => {
+    const empty = facts({ treePaths: [] });
+    expect(checkRepoRootSource(empty).verified).toEqual([
+      "No files in the tree to check.",
+    ]);
+    expect(checkFilesOutsideFolder(empty).verified).toEqual([
+      "No files in the tree to check.",
+    ]);
   });
 
   it("reports repo codes through the aggregate", () => {
@@ -154,7 +179,9 @@ describe("repo-context twins", () => {
         repoPath: "staging/x",
         treePaths: ["stray.kmn", "staging/gff_amharic_backup.kmn"],
       }),
-    ).map((x) => x.code).sort();
+    )
+      .findings.map((x) => x.code)
+      .sort();
     expect(f).toEqual(
       [
         "KM_LINT_REPO_PLACEMENT_BAD",
@@ -172,7 +199,9 @@ describe("repo-context twins", () => {
         prBody: "Adapted from release/sil/sil_x.",
         historyMd: "Adapted from\n",
       }),
-    ).map((x) => x.code).sort();
+    )
+      .findings.map((x) => x.code)
+      .sort();
     expect(f).toEqual(
       ["KM_LINT_PR_ATTRIBUTION_BAD", "KM_LINT_HISTORY_ATTRIBUTION_BAD"].sort(),
     );

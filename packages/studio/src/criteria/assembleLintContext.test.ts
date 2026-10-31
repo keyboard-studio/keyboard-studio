@@ -224,7 +224,7 @@ describe("assembleLintContext", () => {
     });
     expect(ctx.criteriaInput?.kpsTargets).toEqual([]);
     expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBe(
-      "the .kps package file's declared target list",
+      "a <Targets> list in the .kps (the package does not declare targets)",
     );
   });
 
@@ -290,7 +290,7 @@ describe("assembleLintContext", () => {
       { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
     ]);
     const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
-    const findings = await new KeyboardLintEngine().lintWithContext(
+    const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
       vfs,
       KEYBOARD_ID,
       ctx,
@@ -332,7 +332,7 @@ describe("assembleLintContext", () => {
       // The fixture .kps declares no <Targets> element, so §8.13's
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
-        "the .kps package file's declared target list",
+        "a <Targets> list in the .kps (the package does not declare targets)",
       // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
@@ -444,7 +444,7 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       keyboardId: KEYBOARD_ID,
     });
 
-    const findings = await new KeyboardLintEngine().lintWithContext(
+    const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
       vfs,
       KEYBOARD_ID,
       ctx,
@@ -475,7 +475,7 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // The fixture .kps declares no <Targets> element, so §8.13's
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
-        "the .kps package file's declared target list",
+        "a <Targets> list in the .kps (the package does not declare targets)",
       // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
@@ -506,7 +506,7 @@ describe("engine run over the assembled context (fixture VFS)", () => {
         "the repository context (repo path and file list)",
     });
 
-    const findings = await new KeyboardLintEngine().lintWithContext(
+    const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
       vfs,
       KEYBOARD_ID,
       ctx,

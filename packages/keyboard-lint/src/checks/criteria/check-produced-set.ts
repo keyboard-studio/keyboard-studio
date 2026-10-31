@@ -15,10 +15,16 @@
 // Source: buildProducedSet (contracts) over the judged IR — every
 // character the keyboard's rules can emit.
 
-import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 import type { CriteriaPlacement } from "@keyboard-studio/contracts";
-import { criteriaFinding, kmnPath } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+  criteriaFinding,
+  kmnPath,
+} from "./_shared.js";
 
 export interface ProducedRanges {
   /** Distinct produced codepoints in the Private Use Area U+E000–U+F8FF. */
@@ -74,16 +80,23 @@ export function checkPuaPlacement(
   ir: KeyboardIR,
   placement: CriteriaPlacement,
   ranges: ProducedRanges = scanProducedRanges(ir),
-): LintFinding[] {
-  if (ranges.pua.length === 0 || placement === "experimental") return [];
-  return [
+): CheckResult {
+  if (ranges.pua.length === 0)
+    return checkPassed("KM_LINT_PUA_KEYBOARD_PLACEMENT", [
+      "No PUA codepoints in the produced output.",
+    ]);
+  if (placement === "experimental")
+    return checkPassed("KM_LINT_PUA_KEYBOARD_PLACEMENT", [
+      `In experimental/; PUA codepoints: ${ranges.pua.join(", ")}.`,
+    ]);
+  return checkFailed("KM_LINT_PUA_KEYBOARD_PLACEMENT", [
     criteriaFinding({
       code: "KM_LINT_PUA_KEYBOARD_PLACEMENT",
       file: kmnPath(ir.header.keyboardId),
       message: `The keyboard outputs Private Use Area codepoint(s) ${ranges.pua.join(", ")} but is not in the experimental/ folder.`,
       hint: "Keyboards using PUA codepoints belong in experimental/, or the output should use assigned Unicode codepoints.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -97,16 +110,23 @@ export function checkPuaNotInExperimental(
   ir: KeyboardIR,
   placement: CriteriaPlacement,
   ranges: ProducedRanges = scanProducedRanges(ir),
-): LintFinding[] {
-  if (ranges.pua.length === 0 || placement === "experimental") return [];
-  return [
+): CheckResult {
+  if (ranges.pua.length === 0)
+    return checkPassed("KM_LINT_PUA_NOT_IN_EXPERIMENTAL", [
+      "No PUA codepoints in the produced output.",
+    ]);
+  if (placement === "experimental")
+    return checkPassed("KM_LINT_PUA_NOT_IN_EXPERIMENTAL", [
+      `In experimental/; PUA codepoints: ${ranges.pua.join(", ")}.`,
+    ]);
+  return checkFailed("KM_LINT_PUA_NOT_IN_EXPERIMENTAL", [
     criteriaFinding({
       code: "KM_LINT_PUA_NOT_IN_EXPERIMENTAL",
       file: kmnPath(ir.header.keyboardId),
       message: `The keyboard outputs Private Use Area codepoint(s) ${ranges.pua.join(", ")}, so it belongs in experimental/ rather than release/.`,
       hint: "Move the keyboard to experimental/, or replace the PUA output with assigned Unicode codepoints.",
     }),
-  ];
+  ]);
 }
 
 /** The &DISPLAYMAP reference as a single string, when the .kmn declares one. */
@@ -144,31 +164,41 @@ export function checkPuaFontDisplayMap(
   ir: KeyboardIR,
   input: { hasBundledFont: boolean },
   ranges: ProducedRanges = scanProducedRanges(ir),
-): LintFinding[] {
-  if (ranges.pua.length === 0 || !input.hasBundledFont) return [];
-  if (displayMapReference(ir) !== undefined) return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_PUA_FONT_NO_DISPLAYMAP";
+  if (ranges.pua.length === 0)
+    return checkPassed(code, ["No PUA codepoints in the produced output."]);
+  if (!input.hasBundledFont)
+    return checkPassed(code, ["No bundled font."]);
+  const displayMap = displayMapReference(ir);
+  if (displayMap !== undefined)
+    return checkPassed(code, [`Found: store(&DISPLAYMAP) -> ${displayMap}.`]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PUA_FONT_NO_DISPLAYMAP",
       file: kmnPath(ir.header.keyboardId),
       message: `The keyboard outputs Private Use Area codepoint(s) ${ranges.pua.join(", ")} and bundles a font, but the .kmn declares no store(&DISPLAYMAP).`,
       hint: "Add a store(&DISPLAYMAP) referencing the display-map file so the PUA glyphs render with the bundled font.",
     }),
-  ];
+  ]);
 }
 
 /** 13.4 — any mathematical Latin look-alike in the output → finding. */
 export function checkMathLatinLookalikes(
   ir: KeyboardIR,
   ranges: ProducedRanges = scanProducedRanges(ir),
-): LintFinding[] {
-  if (ranges.mathLatinLookalikes.length === 0) return [];
-  return [
+): CheckResult {
+  const code = "KM_LINT_MATH_LATIN_LOOKALIKE";
+  if (ranges.mathLatinLookalikes.length === 0)
+    return checkPassed(code, [
+      "No mathematical Latin look-alikes in the produced output.",
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_MATH_LATIN_LOOKALIKE",
       file: kmnPath(ir.header.keyboardId),
       message: `The keyboard outputs mathematical Latin look-alike character(s): ${ranges.mathLatinLookalikes.join(", ")}.`,
       hint: "Output the regular Latin letters instead of mathematical alphanumeric characters.",
     }),
-  ];
+  ]);
 }

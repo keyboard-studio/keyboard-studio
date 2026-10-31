@@ -29,7 +29,7 @@ import { lintWithContext, type LintContext } from "./lintContext.js";
  */
 export class KeyboardLintEngine implements LintEngineService {
   async lint(fs: VirtualFS, keyboardId: string): Promise<LintFinding[]> {
-    return lintWithContext(fs, keyboardId, {});
+    return (await lintWithContext(fs, keyboardId, {})).findings;
   }
 
   /**
@@ -37,9 +37,17 @@ export class KeyboardLintEngine implements LintEngineService {
    * in `ctx` (18.6 desktop and/or 18.6 touch — see LintContext). Exposed as an
    * engine method so callers holding a single engine instance (e.g.
    * useTouchLint) can route through it without importing the standalone
-   * `lintWithContext` function directly.
+   * `lintWithContext` function directly. Also returns per-code verified
+   * details for the met-case evidence.
    */
-  async lintWithContext(fs: VirtualFS, keyboardId: string, ctx: LintContext): Promise<LintFinding[]> {
+  async lintWithContext(
+    fs: VirtualFS,
+    keyboardId: string,
+    ctx: LintContext,
+  ): Promise<{
+    findings: LintFinding[];
+    verifiedByCode: Map<string, string[]>;
+  }> {
     return lintWithContext(fs, keyboardId, ctx);
   }
 }

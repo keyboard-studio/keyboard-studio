@@ -246,11 +246,17 @@ function resolveRow(
         criterion,
         status: "met",
         controls: null,
-        evidence: () => ({
-          kind: "lint-pass",
-          lines: ["This check ran and reported no problems."],
-          lintRuleId,
-        }),
+        evidence: (): EvidenceModel => {
+          const verified = input.verifiedByCode?.get(lintRuleId) ?? [];
+          return {
+            kind: "lint-pass",
+            lines:
+              verified.length > 0
+                ? verified
+                : ["This check ran and reported no problems."],
+            lintRuleId,
+          };
+        },
       });
     }
 

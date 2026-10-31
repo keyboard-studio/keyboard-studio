@@ -13,8 +13,13 @@
 // affected codes (except 11.1b, where the .php's existence is itself the
 // criterion, so absence is the finding).
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  criteriaFinding,
+  mergeResults,
+  type CheckResult,
+} from "./_shared.js";
 
 export interface TextContentFacts {
   keyboardId: string;
@@ -50,18 +55,29 @@ const HTML_LANG = /<html[^>]*\blang\s*=\s*["']([^"']+)["']/i;
 const PHP_OPEN = /<\?php/i;
 const PHP_HEADER_BLOCK = /<\?php[\s\S]*?\/\*[\s\S]*?Name\s*:/i;
 
+/** First line matching `re` in `text`, trimmed — for evidence. */
+function firstMatchingLine(text: string, re: RegExp): string | undefined {
+  return text
+    .split("\n")
+    .find((l) => re.test(l))
+    ?.trim();
+}
+
 /** 4.1b — LICENSE.md has no copyright statement with year(s). */
-export function checkCopyrightAbsent(facts: TextContentFacts): LintFinding[] {
-  if (facts.licenseMd === undefined) return [];
-  if (COPYRIGHT_YEAR.test(facts.licenseMd)) return [];
-  return [
+export function checkCopyrightAbsent(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_COPYRIGHT_ABSENT";
+  if (facts.licenseMd === undefined)
+    return checkPassed(code, ["No LICENSE.md to check."]);
+  const line = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
+  if (line !== undefined) return checkPassed(code, [`Found: "${line}"`]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_ABSENT",
       file: "LICENSE.md",
       message: "LICENSE.md has no copyright statement with year(s).",
       hint: "Add a copyright line with year(s) to LICENSE.md.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -69,19 +85,27 @@ export function checkCopyrightAbsent(facts: TextContentFacts): LintFinding[] {
  * `Copyright (C) <year> <holder>` syntax. Only runs when a copyright
  * line exists at all (absence is 4.1b's finding).
  */
-export function checkCopyrightSyntax(facts: TextContentFacts): LintFinding[] {
-  if (facts.licenseMd === undefined) return [];
-  if (!COPYRIGHT_YEAR.test(facts.licenseMd)) return [];
-  if (COPYRIGHT_SYNTAX.test(facts.licenseMd)) return [];
-  return [
+export function checkCopyrightSyntax(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_COPYRIGHT_SYNTAX";
+  if (facts.licenseMd === undefined)
+    return checkPassed(code, ["No LICENSE.md to check."]);
+  if (!COPYRIGHT_YEAR.test(facts.licenseMd))
+    return checkPassed(code, [
+      "No copyright line in LICENSE.md (absence is 4.1b's check).",
+    ]);
+  const line = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
+  if (COPYRIGHT_SYNTAX.test(facts.licenseMd))
+    return checkPassed(code, line ? [`Found: "${line}"`] : []);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_SYNTAX",
       file: "LICENSE.md",
       message:
-        "The LICENSE.md copyright line does not follow the `Copyright (C) <year> <holder>` syntax.",
+        "The LICENSE.md copyright line does not follow the `Copyright (C) <year> <holder>` syntax." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Rewrite the copyright line as `Copyright (C) <year> <holder>`.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -91,27 +115,35 @@ export function checkCopyrightSyntax(facts: TextContentFacts): LintFinding[] {
  */
 export function checkCopyrightYearEmbedded(
   facts: TextContentFacts,
-): LintFinding[] {
-  if (facts.kmn === undefined && facts.kps === undefined) return [];
+): CheckResult {
+  const code = "KM_LINT_COPYRIGHT_YEAR_EMBEDDED";
+  if (facts.kmn === undefined && facts.kps === undefined)
+    return checkPassed(code, ["No .kmn or .kps to check."]);
   const hits: string[] = [];
+  let offending: string | undefined;
   if (facts.kmn !== undefined && COPYRIGHT_YEAR.test(facts.kmn)) {
     hits.push("the .kmn");
+    offending ??= firstMatchingLine(facts.kmn, COPYRIGHT_YEAR);
   }
   if (facts.kps !== undefined) {
     const copyrightEl = /<Copyright[^>]*>([^<]*)<\/Copyright>/i.exec(facts.kps);
     if (copyrightEl !== null && /\d{4}/.test(copyrightEl[1] ?? "")) {
       hits.push("the .kps");
+      offending ??= copyrightEl[0].trim();
     }
   }
-  if (hits.length === 0) return [];
-  return [
+  if (hits.length === 0)
+    return checkPassed(code, ["No copyright year in .kmn or .kps."]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_YEAR_EMBEDDED",
       file: facts.kps !== undefined ? "package" : "source",
-      message: `A copyright year is embedded in ${hits.join(" and ")} copyright strings.`,
+      message:
+        `A copyright year is embedded in ${hits.join(" and ")} copyright strings.` +
+        (offending ? ` Found: "${offending}"` : ""),
       hint: "Remove the year from the .kmn/.kps copyright strings — years live in LICENSE.md and HISTORY.md.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -119,27 +151,40 @@ export function checkCopyrightYearEmbedded(
  * welcome.htm, or the help .php. Heuristic: any X.Y[.Z] pattern — a
  * warning-level lint, not a proof.
  */
-export function checkVersionInDocs(facts: TextContentFacts): LintFinding[] {
+export function checkVersionInDocs(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_VERSION_IN_DOCS";
   const docs: Array<[string, string | undefined]> = [
     ["README.md", facts.readmeMd],
     ["source/readme.htm", facts.readmeHtm],
     ["source/welcome.htm", facts.welcomeHtm],
     [facts.phpPath ?? "help .php", facts.php],
   ];
-  const hits = docs.filter(([, text]) => text !== undefined && VERSION_LIKE.test(text));
-  if (hits.length === 0) return [];
-  return [
+  const hits = docs.filter(
+    ([, text]) => text !== undefined && VERSION_LIKE.test(text),
+  );
+  const present = docs.filter(([, t]) => t !== undefined).map(([n]) => n);
+  if (hits.length === 0) {
+    if (present.length === 0)
+      return checkPassed(code, ["No documentation files to check."]);
+    return checkPassed(code, [`Checked: ${present.join(", ")}.`]);
+  }
+  const versionMatch = hits[0]![1]!.match(VERSION_LIKE);
+  const version = versionMatch ? versionMatch[0] : "";
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_VERSION_IN_DOCS",
       file: hits[0]![0],
-      message: `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.`,
+      message:
+        `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.` +
+        (version ? ` Found: "${version}"` : ""),
       hint: "Remove the hardcoded version from the documentation; the package version is the single source of truth.",
     }),
-  ];
+  ]);
 }
 
 /** 5.3b — a copyright year/statement is in README.md, readme.htm, or welcome.htm. */
-export function checkCopyrightInDocs(facts: TextContentFacts): LintFinding[] {
+export function checkCopyrightInDocs(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_COPYRIGHT_IN_DOCS";
   const docs: Array<[string, string | undefined]> = [
     ["README.md", facts.readmeMd],
     ["source/readme.htm", facts.readmeHtm],
@@ -148,55 +193,69 @@ export function checkCopyrightInDocs(facts: TextContentFacts): LintFinding[] {
   const hits = docs.filter(
     ([, text]) => text !== undefined && COPYRIGHT_YEAR.test(text),
   );
-  if (hits.length === 0) return [];
-  return [
+  if (hits.length === 0) {
+    if (docs.every(([, t]) => t === undefined))
+      return checkPassed(code, ["No documentation files to check."]);
+    return checkPassed(code, [
+      "No copyright statement in the documentation.",
+    ]);
+  }
+  const line = firstMatchingLine(hits[0]![1]!, COPYRIGHT_YEAR);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_IN_DOCS",
       file: hits[0]![0],
-      message: `A copyright statement is embedded in ${hits.map(([n]) => n).join(", ")}.`,
+      message:
+        `A copyright statement is embedded in ${hits.map(([n]) => n).join(", ")}.` +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Remove the copyright statement from the documentation — it belongs in LICENSE.md.",
     }),
-  ];
+  ]);
 }
 
 /** 5.5b — README.md does not link to https://keyman.com/keyboards/<id>. */
 export function checkReadmeKeymanLinkAbsent(
   facts: TextContentFacts,
-): LintFinding[] {
-  if (facts.readmeMd === undefined) return [];
+): CheckResult {
+  const code = "KM_LINT_README_KEYMAN_LINK_ABSENT";
+  if (facts.readmeMd === undefined)
+    return checkPassed(code, ["No README.md to check."]);
   const want = `https://keyman.com/keyboards/${facts.keyboardId}`.toLowerCase();
-  if (facts.readmeMd.toLowerCase().includes(want)) return [];
-  return [
+  if (facts.readmeMd.toLowerCase().includes(want))
+    return checkPassed(code, [`Found: ${want}`]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_README_KEYMAN_LINK_ABSENT",
       file: "README.md",
       message: `README.md does not link to https://keyman.com/keyboards/${facts.keyboardId}.`,
       hint: `Add a link to https://keyman.com/keyboards/${facts.keyboardId} in README.md.`,
     }),
-  ];
+  ]);
 }
 
 /** 5.6b — README.md does not link to http(s)://help.keyman.com/keyboard/<id>. */
 export function checkReadmeHelpLinkAbsent(
   facts: TextContentFacts,
-): LintFinding[] {
-  if (facts.readmeMd === undefined) return [];
+): CheckResult {
+  const code = "KM_LINT_README_HELP_LINK_ABSENT";
+  if (facts.readmeMd === undefined)
+    return checkPassed(code, ["No README.md to check."]);
   const lowered = facts.readmeMd.toLowerCase();
   const id = facts.keyboardId.toLowerCase();
-  if (
-    lowered.includes(`http://help.keyman.com/keyboard/${id}`) ||
-    lowered.includes(`https://help.keyman.com/keyboard/${id}`)
-  ) {
-    return [];
+  const http = `http://help.keyman.com/keyboard/${id}`;
+  const https = `https://help.keyman.com/keyboard/${id}`;
+  if (lowered.includes(http) || lowered.includes(https)) {
+    const found = lowered.includes(https) ? https : http;
+    return checkPassed(code, [`Found: ${found}`]);
   }
-  return [
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_README_HELP_LINK_ABSENT",
       file: "README.md",
       message: `README.md does not link to http://help.keyman.com/keyboard/${facts.keyboardId}.`,
       hint: `Add a link to http://help.keyman.com/keyboard/${facts.keyboardId} in README.md.`,
     }),
-  ];
+  ]);
 }
 
 /**
@@ -205,14 +264,19 @@ export function checkReadmeHelpLinkAbsent(
  */
 export function checkWelcomeLangMismatch(
   facts: TextContentFacts,
-): LintFinding[] {
-  if (facts.welcomeHtm === undefined || facts.primaryBcp47 === undefined) {
-    return [];
-  }
+): CheckResult {
+  const code = "KM_LINT_WELCOME_LANG_MISMATCH";
+  if (facts.welcomeHtm === undefined)
+    return checkPassed(code, ["No welcome.htm to check."]);
+  if (facts.primaryBcp47 === undefined)
+    return checkPassed(code, ["Primary BCP47 tag unknown."]);
   const m = HTML_LANG.exec(facts.welcomeHtm);
   const lang = (m?.[1] ?? "").trim().toLowerCase();
-  if (lang === facts.primaryBcp47.toLowerCase()) return [];
-  return [
+  if (lang === facts.primaryBcp47.toLowerCase())
+    return checkPassed(code, [
+      `welcome.htm <html lang="${m?.[1]}"> matches "${facts.primaryBcp47}".`,
+    ]);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_WELCOME_LANG_MISMATCH",
       file: "source/welcome.htm",
@@ -222,21 +286,27 @@ export function checkWelcomeLangMismatch(
           : `welcome.htm <html lang="${m?.[1]}"> does not match the keyboard's primary BCP47 tag "${facts.primaryBcp47}".`,
       hint: `Set <html lang="${facts.primaryBcp47}"> in welcome.htm.`,
     }),
-  ];
+  ]);
 }
 
 /** 7.11b — the author name is in a .kmn Author store (it belongs in the .kps). */
-export function checkAuthorInKmn(facts: TextContentFacts): LintFinding[] {
-  if (facts.kmn === undefined) return [];
-  if (!KMN_AUTHOR_STORE.test(facts.kmn)) return [];
-  return [
+export function checkAuthorInKmn(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_AUTHOR_IN_KMN";
+  if (facts.kmn === undefined)
+    return checkPassed(code, ["No .kmn to check."]);
+  if (!KMN_AUTHOR_STORE.test(facts.kmn))
+    return checkPassed(code, ["No store(&Author) in the .kmn."]);
+  const line = firstMatchingLine(facts.kmn, KMN_AUTHOR_STORE);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_AUTHOR_IN_KMN",
       file: `source/${facts.keyboardId}.kmn`,
-      message: "The author name is in a .kmn Author store — it belongs in the .kps.",
+      message:
+        "The author name is in a .kmn Author store — it belongs in the .kps." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Remove the store(&Author) from the .kmn; set the author in the .kps Info tab.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -245,77 +315,100 @@ export function checkAuthorInKmn(facts: TextContentFacts): LintFinding[] {
  * Existence is part of the criterion, so absence is the finding
  * (not a missing input).
  */
-export function checkPhpHeaderBad(facts: TextContentFacts): LintFinding[] {
+export function checkPhpHeaderBad(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_PHP_HEADER_BAD";
+  const phpFile = facts.phpPath ?? "source/help/" + facts.keyboardId + ".php";
   if (facts.php === undefined) {
-    return [
+    return checkFailed(code, [
       criteriaFinding({
         code: "KM_LINT_PHP_HEADER_BAD",
-        file: "source/help/" + facts.keyboardId + ".php",
+        file: phpFile,
         message: "No <name>.php help file found.",
-        hint: "Add source/help/" + facts.keyboardId + ".php with the standard PHP header.",
+        hint:
+          "Add source/help/" + facts.keyboardId + ".php with the standard PHP header.",
       }),
-    ];
+    ]);
   }
   // Strip a BOM before checking the open tag.
   const text = facts.php.replace(/^\ufeff/, "");
-  if (PHP_OPEN.test(text) && PHP_HEADER_BLOCK.test(text)) return [];
-  return [
+  if (PHP_OPEN.test(text) && PHP_HEADER_BLOCK.test(text))
+    return checkPassed(code, [`Found: ${phpFile} with PHP header.`]);
+  const firstLine = text.split("\n")[0]?.trim();
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PHP_HEADER_BAD",
-      file: facts.phpPath ?? "source/help/" + facts.keyboardId + ".php",
-      message: "The help .php does not have the proper PHP header.",
+      file: phpFile,
+      message:
+        "The help .php does not have the proper PHP header." +
+        (firstLine ? ` First line: "${firstLine}"` : ""),
       hint: "Start the .php with <?php and the /* Name: ... */ header block.",
     }),
-  ];
+  ]);
 }
 
 /** 11.3b — style information (<style> tags) is outside the PHP header block. */
-export function checkPhpStyleOutside(facts: TextContentFacts): LintFinding[] {
-  if (facts.php === undefined) return [];
+export function checkPhpStyleOutside(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_PHP_STYLE_OUTSIDE";
+  if (facts.php === undefined)
+    return checkPassed(code, ["No .php file to check."]);
+  const phpFile = facts.phpPath ?? "source/help/" + facts.keyboardId + ".php";
   // Everything after the closing ?> is outside the PHP header.
   const closeIdx = facts.php.indexOf("?>");
   const outside = closeIdx >= 0 ? facts.php.slice(closeIdx + 2) : facts.php;
-  if (!/<style[\s>]/i.test(outside)) return [];
-  return [
+  if (!/<style[\s>]/i.test(outside))
+    return checkPassed(code, ["No <style> outside the PHP header block."]);
+  const line = firstMatchingLine(outside, /<style[\s>]/i);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PHP_STYLE_OUTSIDE",
-      file: facts.phpPath ?? "source/help/" + facts.keyboardId + ".php",
-      message: "Style information (<style>) is outside the PHP header block.",
+      file: phpFile,
+      message:
+        "Style information (<style>) is outside the PHP header block." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Move style information inside the PHP header block (the $pagestyle variable).",
     }),
-  ];
+  ]);
 }
 
 /** 11.4b — the help .php contains closing </body> or </html> tags. */
-export function checkPhpClosingTags(facts: TextContentFacts): LintFinding[] {
-  if (facts.php === undefined) return [];
-  if (!/<\/(body|html)\s*>/i.test(facts.php)) return [];
-  return [
+export function checkPhpClosingTags(facts: TextContentFacts): CheckResult {
+  const code = "KM_LINT_PHP_CLOSING_TAGS";
+  if (facts.php === undefined)
+    return checkPassed(code, ["No .php file to check."]);
+  const phpFile = facts.phpPath ?? "source/help/" + facts.keyboardId + ".php";
+  if (!/<\/(body|html)\s*>/i.test(facts.php))
+    return checkPassed(code, ["No closing </body> or </html> tags."]);
+  const line = firstMatchingLine(facts.php, /<\/(body|html)\s*>/i);
+  return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_PHP_CLOSING_TAGS",
-      file: facts.phpPath ?? "source/help/" + facts.keyboardId + ".php",
-      message: "The help .php contains closing </body> or </html> tags.",
+      file: phpFile,
+      message:
+        "The help .php contains closing </body> or </html> tags." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Remove the closing </body> / </html> tags — the site template supplies them.",
     }),
-  ];
+  ]);
 }
 
 /** Run all twelve text-content checks over one judged text set. */
-export function checkTextContent(facts: TextContentFacts): LintFinding[] {
-  return [
-    ...checkCopyrightAbsent(facts),
-    ...checkCopyrightSyntax(facts),
-    ...checkCopyrightYearEmbedded(facts),
-    ...checkVersionInDocs(facts),
-    ...checkCopyrightInDocs(facts),
-    ...checkReadmeKeymanLinkAbsent(facts),
-    ...checkReadmeHelpLinkAbsent(facts),
-    ...checkWelcomeLangMismatch(facts),
-    ...checkAuthorInKmn(facts),
-    ...checkPhpHeaderBad(facts),
-    ...checkPhpStyleOutside(facts),
-    ...checkPhpClosingTags(facts),
-  ];
+export function checkTextContent(
+  facts: TextContentFacts,
+): ReturnType<typeof mergeResults> {
+  return mergeResults(
+    checkCopyrightAbsent(facts),
+    checkCopyrightSyntax(facts),
+    checkCopyrightYearEmbedded(facts),
+    checkVersionInDocs(facts),
+    checkCopyrightInDocs(facts),
+    checkReadmeKeymanLinkAbsent(facts),
+    checkReadmeHelpLinkAbsent(facts),
+    checkWelcomeLangMismatch(facts),
+    checkAuthorInKmn(facts),
+    checkPhpHeaderBad(facts),
+    checkPhpStyleOutside(facts),
+    checkPhpClosingTags(facts),
+  );
 }
 
 /**

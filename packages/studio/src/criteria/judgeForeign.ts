@@ -38,6 +38,7 @@ import { ALL_CRITERIA } from "@keyboard-studio/contracts";
 import type {
   CompileResult,
   CriteriaPlacement,
+  LintFinding,
   ReviewContext,
   VirtualFS,
 } from "@keyboard-studio/contracts";
@@ -138,15 +139,16 @@ export async function judgeForeignKeyboard(
   const docFindings = runDocChecks(
     collectDocLintInputFromVfs(vfs, keyboardId, displayName),
   );
-  let engineFindings: Awaited<
-    ReturnType<KeyboardLintEngine["lintWithContext"]>
-  > = [];
+  let engineFindings: LintFinding[] = [];
+  let verifiedByCode = new Map<string, string[]>();
   try {
-    engineFindings = await new KeyboardLintEngine().lintWithContext(
+    const engine = await new KeyboardLintEngine().lintWithContext(
       vfs,
       keyboardId,
       ctx,
     );
+    engineFindings = engine.findings;
+    verifiedByCode = engine.verifiedByCode;
   } catch {
     engineFindings = [];
   }
@@ -162,6 +164,7 @@ export async function judgeForeignKeyboard(
     criteria: ALL_CRITERIA,
     mode: "foreign",
     lintFindings: mergeLintFindings(docFindings, engineFindings),
+    verifiedByCode,
     record: EMPTY_CRITERIA_RECORD,
     facts,
     contextMissing,

@@ -5,6 +5,11 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
 import { makeLocation } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  type CheckResult,
+} from "./criteria/_shared.js";
 
 const RULES: Partial<Record<string, { min: number; max: number }>> = {
   phone: { min: 4, max: 5 },
@@ -15,18 +20,32 @@ const RULES: Partial<Record<string, { min: number; max: number }>> = {
 /**
  * Check that each touch platform uses the expected number of rows per layer.
  *
+ * When met, the verified details name the measured row count per
+ * platform — a numeric check shows its measured value.
+ *
  * @param ir - Parsed touch layout.
  * @param touchLayoutPath - Virtual FS path used in `location.file`.
  */
 export function checkTouchRows(
   ir: TouchLayoutIR,
   touchLayoutPath: string
-): LintFinding[] {
+): CheckResult {
+  const code = "KM_WARN_TOUCH_ROW_COUNT";
   const findings: LintFinding[] = [];
+  const measured: string[] = [];
 
   for (const platform of ir.platforms) {
     const rule = RULES[platform.id];
     if (!rule) continue;
+
+    const counts = [
+      ...new Set(platform.layers.map((l) => l.rows.length)),
+    ].sort((a, b) => a - b);
+    if (counts.length > 0) {
+      const label =
+        platform.id.charAt(0).toUpperCase() + platform.id.slice(1);
+      measured.push(`${label}: ${counts.join("/")} rows`);
+    }
 
     for (const layer of platform.layers) {
       const rowCount = layer.rows.length;
@@ -36,6 +55,7 @@ export function checkTouchRows(
             ? `exactly ${rule.min}`
             : `${rule.min}-${rule.max}`;
         findings.push({
+          // Literal for the source scanner (criteriaCatalog.test.ts).
           code: "KM_WARN_TOUCH_ROW_COUNT",
           severity: "warning",
           layer: "C",
@@ -47,5 +67,6 @@ export function checkTouchRows(
     }
   }
 
-  return findings;
+  if (findings.length > 0) return checkFailed(code, findings);
+  return checkPassed(code, measured);
 }

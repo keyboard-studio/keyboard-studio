@@ -110,7 +110,7 @@ async function judgeAuthored(
       ? { kind: "built", inventory: build.inventory }
       : { kind: "skipped", missingTag: build.missingTag },
   );
-  const lintFindings = await new KeyboardLintEngine().lintWithContext(
+  const { findings: lintFindings } = await new KeyboardLintEngine().lintWithContext(
     vfs,
     KEYBOARD_ID,
     ctx,

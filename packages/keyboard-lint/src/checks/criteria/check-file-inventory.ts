@@ -11,23 +11,33 @@
 // keyboards corpus has mixed-case history), paths use forward slashes
 // (the VFS normalizes to POSIX).
 
-import type { LintFinding } from "@keyboard-studio/contracts";
-import { criteriaFinding } from "./_shared.js";
+import {
+  checkFailed,
+  checkPassed,
+  criteriaFinding,
+  mergeResults,
+  type CheckResult,
+} from "./_shared.js";
 
 /** 1.7b — a `keyboard.info` file is present in the keyboard folder. */
-export function checkKeyboardInfoPresent(paths: readonly string[]): LintFinding[] {
+export function checkKeyboardInfoPresent(
+  paths: readonly string[],
+): CheckResult {
   const hit = paths.find(
     (p) => (p.split("/").pop() ?? "").toLowerCase() === "keyboard.info",
   );
-  if (hit === undefined) return [];
-  return [
+  if (hit === undefined)
+    return checkPassed("KM_LINT_KEYBOARD_INFO_PRESENT", [
+      "No keyboard.info file present.",
+    ]);
+  return checkFailed("KM_LINT_KEYBOARD_INFO_PRESENT", [
     criteriaFinding({
       code: "KM_LINT_KEYBOARD_INFO_PRESENT",
       file: hit,
       message: "A `keyboard.info` file is present in the keyboard folder.",
       hint: "Remove `keyboard.info` — it is a legacy artifact the scaffolder never emits.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -36,7 +46,17 @@ export function checkKeyboardInfoPresent(paths: readonly string[]): LintFinding[
  */
 export function checkDuplicateDocsSubfolder(
   paths: readonly string[],
-): LintFinding[] {
+): CheckResult {
+  const hasDocsFolder = paths.some((p) =>
+    p
+      .toLowerCase()
+      .split("/")
+      .some((s) => /^(docs?|documentation)$/.test(s)),
+  );
+  if (!hasDocsFolder)
+    return checkPassed("KM_LINT_DOCS_SUBFOLDER_DUPLICATES", [
+      "No docs/ folder to check.",
+    ]);
   const dups = paths.filter((p) => {
     const segments = p.toLowerCase().split("/");
     // A docs-like folder: docs, doc, documentation — not at the root.
@@ -47,49 +67,58 @@ export function checkDuplicateDocsSubfolder(
     const base = segments[segments.length - 1] ?? "";
     return /^(history|readme|install)/.test(base);
   });
-  if (dups.length === 0) return [];
-  return [
+  if (dups.length === 0)
+    return checkPassed("KM_LINT_DOCS_SUBFOLDER_DUPLICATES", [
+      "No duplicate documentation subfolders found.",
+    ]);
+  return checkFailed("KM_LINT_DOCS_SUBFOLDER_DUPLICATES", [
     criteriaFinding({
       code: "KM_LINT_DOCS_SUBFOLDER_DUPLICATES",
       file: dups[0]!,
       message: `A docs subfolder contains duplicate documentation files: ${dups.join(", ")}.`,
       hint: "Keep a single HISTORY.md / README.md at the keyboard root; remove the docs/ duplicates.",
     }),
-  ];
+  ]);
 }
 
 /** 1.11b — a `.kpj.user` file is committed. */
-export function checkKpjUserPresent(paths: readonly string[]): LintFinding[] {
+export function checkKpjUserPresent(paths: readonly string[]): CheckResult {
   const hit = paths.find((p) => p.toLowerCase().endsWith(".kpj.user"));
-  if (hit === undefined) return [];
-  return [
+  if (hit === undefined)
+    return checkPassed("KM_LINT_KPJ_USER_PRESENT", [
+      "No .kpj.user file committed.",
+    ]);
+  return checkFailed("KM_LINT_KPJ_USER_PRESENT", [
     criteriaFinding({
       code: "KM_LINT_KPJ_USER_PRESENT",
       file: hit,
       message: "A `.kpj.user` file is committed.",
       hint: "Remove the `.kpj.user` file — it holds per-user IDE state and must not be committed.",
     }),
-  ];
+  ]);
 }
 
 /** 1.12b — `build/` folder contents are committed. */
-export function checkBuildFolderPresent(paths: readonly string[]): LintFinding[] {
+export function checkBuildFolderPresent(paths: readonly string[]): CheckResult {
   const hits = paths.filter((p) =>
     p.toLowerCase().split("/").includes("build"),
   );
-  if (hits.length === 0) return [];
-  return [
+  if (hits.length === 0)
+    return checkPassed("KM_LINT_BUILD_FOLDER_PRESENT", [
+      "No build/ folder contents committed.",
+    ]);
+  return checkFailed("KM_LINT_BUILD_FOLDER_PRESENT", [
     criteriaFinding({
       code: "KM_LINT_BUILD_FOLDER_PRESENT",
       file: hits[0]!,
       message: `Committed build output found (${hits.length} file(s) under build/).`,
       hint: "Remove the build/ folder contents — compiled artifacts are built by CI, never committed.",
     }),
-  ];
+  ]);
 }
 
 /** 3.1b — `HISTORY.md` is absent from the keyboard root. */
-export function checkHistoryMdAbsent(paths: readonly string[]): LintFinding[] {
+export function checkHistoryMdAbsent(paths: readonly string[]): CheckResult {
   const hit = paths.find((p) => {
     const segments = p.toLowerCase().split("/");
     return (
@@ -97,31 +126,31 @@ export function checkHistoryMdAbsent(paths: readonly string[]): LintFinding[] {
       (segments[0] === "history.md" || segments[0] === "history.txt")
     );
   });
-  if (hit !== undefined) return [];
-  return [
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_HISTORY_MD_ABSENT", [`Found: ${hit}`]);
+  return checkFailed("KM_LINT_HISTORY_MD_ABSENT", [
     criteriaFinding({
       code: "KM_LINT_HISTORY_MD_ABSENT",
       file: "HISTORY.md",
       message: "No HISTORY.md at the keyboard root.",
       hint: "Add a HISTORY.md change log at the keyboard root.",
     }),
-  ];
+  ]);
 }
 
 /** 6.1b — `readme.htm` is absent from `source/`. */
-export function checkReadmeHtmAbsent(paths: readonly string[]): LintFinding[] {
-  const hit = paths.find(
-    (p) => p.toLowerCase() === "source/readme.htm",
-  );
-  if (hit !== undefined) return [];
-  return [
+export function checkReadmeHtmAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => p.toLowerCase() === "source/readme.htm");
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_README_HTM_ABSENT", [`Found: ${hit}`]);
+  return checkFailed("KM_LINT_README_HTM_ABSENT", [
     criteriaFinding({
       code: "KM_LINT_README_HTM_ABSENT",
       file: "source/readme.htm",
       message: "No readme.htm in source/.",
       hint: "Add source/readme.htm — the package's read-me page.",
     }),
-  ];
+  ]);
 }
 
 /**
@@ -129,29 +158,32 @@ export function checkReadmeHtmAbsent(paths: readonly string[]): LintFinding[] {
  * (`source/welcome.htm`) and the folder (`source/welcome/welcome.htm`)
  * conventions — the loader resolves them in that order.
  */
-export function checkWelcomeHtmAbsent(paths: readonly string[]): LintFinding[] {
-  const lowered = new Set(paths.map((p) => p.toLowerCase()));
-  if (lowered.has("source/welcome.htm")) return [];
-  if (lowered.has("source/welcome/welcome.htm")) return [];
-  return [
+export function checkWelcomeHtmAbsent(paths: readonly string[]): CheckResult {
+  const lowered = new Map(paths.map((p) => [p.toLowerCase(), p]));
+  const hit =
+    lowered.get("source/welcome.htm") ??
+    lowered.get("source/welcome/welcome.htm");
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_WELCOME_HTM_ABSENT", [`Found: ${hit}`]);
+  return checkFailed("KM_LINT_WELCOME_HTM_ABSENT", [
     criteriaFinding({
       code: "KM_LINT_WELCOME_HTM_ABSENT",
       file: "source/welcome.htm",
       message: "No welcome.htm in source/ (flat or source/welcome/ folder).",
       hint: "Add source/welcome.htm — the package's welcome page.",
     }),
-  ];
+  ]);
 }
 
 /** Run all seven file-inventory checks over one VFS path list. */
-export function checkFileInventory(paths: readonly string[]): LintFinding[] {
-  return [
-    ...checkKeyboardInfoPresent(paths),
-    ...checkDuplicateDocsSubfolder(paths),
-    ...checkKpjUserPresent(paths),
-    ...checkBuildFolderPresent(paths),
-    ...checkHistoryMdAbsent(paths),
-    ...checkReadmeHtmAbsent(paths),
-    ...checkWelcomeHtmAbsent(paths),
-  ];
+export function checkFileInventory(paths: readonly string[]): ReturnType<typeof mergeResults> {
+  return mergeResults(
+    checkKeyboardInfoPresent(paths),
+    checkDuplicateDocsSubfolder(paths),
+    checkKpjUserPresent(paths),
+    checkBuildFolderPresent(paths),
+    checkHistoryMdAbsent(paths),
+    checkReadmeHtmAbsent(paths),
+    checkWelcomeHtmAbsent(paths),
+  );
 }

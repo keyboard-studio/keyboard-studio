@@ -35,12 +35,12 @@ const GOOD: KpsListingFacts = {
 };
 
 function codes(facts: KpsListingFacts): string[] {
-  return checkKpsListing(facts).map((f) => f.code);
+  return checkKpsListing(facts).findings.map((f) => f.code);
 }
 
 describe("kps-listing twins", () => {
   it("passes a complete .kps listing", () => {
-    expect(checkKpsListing(GOOD)).toEqual([]);
+    expect(checkKpsListing(GOOD).findings).toEqual([]);
   });
 
   it("passes without .js when there is no touch layout", () => {
@@ -49,7 +49,7 @@ describe("kps-listing twins", () => {
       hasTouchLayout: false,
       fileNames: GOOD.fileNames.filter((n) => !n.endsWith(".js")),
     };
-    expect(checkKpsJsAbsent(noJs)).toEqual([]);
+    expect(checkKpsJsAbsent(noJs).findings).toEqual([]);
   });
 
   it("8.1b flags a missing .kmx", () => {
@@ -57,7 +57,7 @@ describe("kps-listing twins", () => {
       ...GOOD,
       fileNames: GOOD.fileNames.filter((n) => !n.endsWith(".kmx")),
     };
-    const findings = checkKpsKmxAbsent(facts);
+    const { findings } = checkKpsKmxAbsent(facts);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPS_KMX_ABSENT");
     expect(findings[0]!.location.file).toBe(KPS);
@@ -68,7 +68,14 @@ describe("kps-listing twins", () => {
       ...GOOD,
       fileNames: GOOD.fileNames.filter((n) => !n.endsWith(".js")),
     };
-    expect(checkKpsJsAbsent(facts)[0]!.code).toBe("KM_LINT_KPS_JS_ABSENT");
+    expect(checkKpsJsAbsent(facts).findings[0]!.code).toBe("KM_LINT_KPS_JS_ABSENT");
+  });
+
+  it("8.3b is moot without a touch layout, naming why", () => {
+    const facts: KpsListingFacts = { ...GOOD, hasTouchLayout: false };
+    const { findings, verified } = checkKpsJsAbsent(facts);
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["No touch layout; no .js required."]);
   });
 
   it("8.4b/8.5b flag missing LICENSE.md / readme.htm", () => {
@@ -78,10 +85,10 @@ describe("kps-listing twins", () => {
         (n) => !/license\.md$/i.test(n) && !/readme\.htm$/i.test(n),
       ),
     };
-    expect(checkKpsLicenseAbsent(facts)[0]!.code).toBe(
+    expect(checkKpsLicenseAbsent(facts).findings[0]!.code).toBe(
       "KM_LINT_KPS_LICENSE_ABSENT",
     );
-    expect(checkKpsReadmeAbsent(facts)[0]!.code).toBe(
+    expect(checkKpsReadmeAbsent(facts).findings[0]!.code).toBe(
       "KM_LINT_KPS_README_ABSENT",
     );
   });
@@ -93,7 +100,7 @@ describe("kps-listing twins", () => {
         (n) => !/welcome\.htm$/i.test(n) && !/\.bmp$/i.test(n),
       ),
     };
-    const findings = checkKpsWelcomeAbsent(facts);
+    const { findings } = checkKpsWelcomeAbsent(facts);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPS_WELCOME_ABSENT");
     expect(findings[0]!.message).toContain("welcome.htm");
@@ -105,7 +112,7 @@ describe("kps-listing twins", () => {
       ...GOOD,
       fileNames: [...GOOD.fileNames, "help\\gff_amharic.php"],
     };
-    expect(checkKpsPhpListed(facts)[0]!.code).toBe("KM_LINT_KPS_PHP_LISTED");
+    expect(checkKpsPhpListed(facts).findings[0]!.code).toBe("KM_LINT_KPS_PHP_LISTED");
   });
 
   it("8.9b flags listed help/ files", () => {
@@ -113,11 +120,11 @@ describe("kps-listing twins", () => {
       ...GOOD,
       fileNames: [...GOOD.fileNames, "help\\index.html"],
     };
-    expect(checkKpsHelpListed(facts)[0]!.code).toBe("KM_LINT_KPS_HELP_LISTED");
+    expect(checkKpsHelpListed(facts).findings[0]!.code).toBe("KM_LINT_KPS_HELP_LISTED");
   });
 
   it("8.9b does not flag welcome/ files", () => {
-    expect(checkKpsHelpListed(GOOD)).toEqual([]);
+    expect(checkKpsHelpListed(GOOD).findings).toEqual([]);
   });
 
   it("8.10b flags listed uncompiled sources", () => {
@@ -126,7 +133,7 @@ describe("kps-listing twins", () => {
         ...GOOD,
         fileNames: [...GOOD.fileNames, `source\\gff_amharic${ext}`],
       };
-      expect(checkKpsSourceListed(facts)[0]!.code).toBe(
+      expect(checkKpsSourceListed(facts).findings[0]!.code).toBe(
         "KM_LINT_KPS_SOURCE_LISTED",
       );
     }
@@ -137,7 +144,7 @@ describe("kps-listing twins", () => {
       ...GOOD,
       fileNames: [...GOOD.fileNames, "fonts\\displaymap.json"],
     };
-    expect(checkKpsJsonListed(facts)[0]!.code).toBe("KM_LINT_KPS_JSON_LISTED");
+    expect(checkKpsJsonListed(facts).findings[0]!.code).toBe("KM_LINT_KPS_JSON_LISTED");
   });
 
   it("reports every violation code through the aggregate", () => {

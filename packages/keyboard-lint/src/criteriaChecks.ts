@@ -97,7 +97,7 @@ import {
   checkAttribution,
   checkRepoContext,
 } from "./checks/criteria/check-repo-context.js";
-import { kmnPath } from "./checks/criteria/_shared.js";
+import { kmnPath, type CheckResult } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
 function readText(fs: VirtualFS, path: string): string | undefined {
@@ -174,8 +174,33 @@ export function runCriteriaChecks(
   keyboardId: string,
   keyboardIR: KeyboardIR | undefined,
   input: CriteriaLintInput,
-): LintFinding[] {
+): {
+  findings: LintFinding[];
+  verifiedByCode: Map<string, string[]>;
+} {
   const findings: LintFinding[] = [];
+  const verifiedByCode = new Map<string, string[]>();
+  /**
+   * Fold one check result (or an aggregate's merged { findings,
+   * verifiedByCode }) into the run.
+   */
+  const collect = (
+    r:
+      | CheckResult
+      | {
+          findings: LintFinding[];
+          verifiedByCode: Map<string, string[]>;
+        },
+  ) => {
+    findings.push(...r.findings);
+    if ("code" in r) {
+      if (r.verified.length > 0) verifiedByCode.set(r.code, r.verified);
+    } else {
+      for (const [code, lines] of r.verifiedByCode) {
+        verifiedByCode.set(code, lines);
+      }
+    }
+  };
   const filePaths = fs.list();
   const kpsPath = filePaths.find((p) => p.toLowerCase().endsWith(".kps")) ?? "";
   const touchLayout = parseTouchLayout(fs, keyboardId);
@@ -258,7 +283,7 @@ export function runCriteriaChecks(
   // twins: pure VFS path-list checks, no parsing. They run in both modes;
   // for a studio-built keyboard the scaffolder guarantees them, so the
   // twins double-verify rather than newly constrain.
-  findings.push(...checkFileInventory(filePaths));
+  collect(checkFileInventory(filePaths));
 
   // 8.1b–8.6b / 8.8b–8.11b — the .kps-listing twins: pure functions of the
   // .kps <File> names. An absent .kps never reaches here — the assembly
@@ -267,8 +292,8 @@ export function runCriteriaChecks(
   // functions of the pre-parsed package-tab details. Same absent-.kps
   // gate via the assembly's contextMissing.
   if (kpsPath !== "") {
-    findings.push(
-      ...checkKpsListing({
+    collect(
+      checkKpsListing({
         fileNames: input.kpsFileNames,
         hasTouchLayout,
         kpsPath,
@@ -277,8 +302,8 @@ export function runCriteriaChecks(
     const normNames = input.kpsFileNames.map((n) =>
       n.trim().replace(/\\/g, "/").toLowerCase(),
     );
-    findings.push(
-      ...checkKpsMetadata({
+    collect(
+      checkKpsMetadata({
         kpsPath,
         fontSelected: input.kpsFontSelected,
         fontsInFiles: normNames.some(
@@ -298,8 +323,10 @@ export function runCriteriaChecks(
   // 11.1b / 11.3b / 11.4b — the text-content twins: pure functions of the
   // judged texts. Missing source files are the assembly's contextMissing
   // (except 11.1b, where the .php's existence is the criterion).
-  findings.push(
-    ...checkTextContent(resolveTextFacts(fs, filePaths, keyboardId, keyboardIR, input)),
+  collect(
+    checkTextContent(
+      resolveTextFacts(fs, filePaths, keyboardId, keyboardIR, input),
+    ),
   );
 
   // 1.2b / 1.3b / 1.4b / 19.1b / 19.2b + Group C — the /review-only
@@ -308,8 +335,8 @@ export function runCriteriaChecks(
   // assembly names the missing context for the four repo codes.
   if (input.reviewContext !== undefined) {
     const repoFacts = { keyboardId, review: input.reviewContext };
-    findings.push(...checkRepoContext(repoFacts));
-    findings.push(...checkAttribution(repoFacts));
+    collect(checkRepoContext(repoFacts));
+    collect(checkAttribution(repoFacts));
   }
 
   if (keyboardIR !== undefined) {
@@ -416,18 +443,14 @@ export function runCriteriaChecks(
 
     // 13.1 / 13.4 / 7.12 / 7.14 — one produced-set scan, all four checks.
     const ranges = scanProducedRanges(keyboardIR);
-    findings.push(...checkPuaPlacement(keyboardIR, input.placement, ranges));
-    findings.push(...checkMathLatinLookalikes(keyboardIR, ranges));
-    findings.push(
-      ...checkPuaNotInExperimental(keyboardIR, input.placement, ranges),
-    );
+    collect(checkPuaPlacement(keyboardIR, input.placement, ranges));
+    collect(checkMathLatinLookalikes(keyboardIR, ranges));
+    collect(checkPuaNotInExperimental(keyboardIR, input.placement, ranges));
     const hasBundledFont =
       input.kpsFontRefs.length > 0 ||
       filePaths.some((p) => /\.(ttf|otf)$/i.test(p));
-    findings.push(
-      ...checkPuaFontDisplayMap(keyboardIR, { hasBundledFont }, ranges),
-    );
+    collect(checkPuaFontDisplayMap(keyboardIR, { hasBundledFont }, ranges));
   }
 
-  return findings;
+  return { findings, verifiedByCode };
 }

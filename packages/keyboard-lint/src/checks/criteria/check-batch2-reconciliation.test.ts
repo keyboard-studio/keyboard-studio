@@ -32,29 +32,43 @@ function irWithOutput(value: string): KeyboardIR {
 
 describe("checkPuaNotInExperimental (7.12)", () => {
   it("flags PUA output in release/ placement", () => {
-    const findings = checkPuaNotInExperimental(irWithOutput("\u{E001}"), "release");
+    const { findings } = checkPuaNotInExperimental(
+      irWithOutput("\u{E001}"),
+      "release",
+    );
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_PUA_NOT_IN_EXPERIMENTAL");
   });
 
-  it("passes PUA output in experimental/ and non-PUA output anywhere", () => {
-    expect(
-      checkPuaNotInExperimental(irWithOutput("\u{E001}"), "experimental"),
-    ).toEqual([]);
-    expect(checkPuaNotInExperimental(irWithOutput("a"), "release")).toEqual([]);
+  it("passes PUA output in experimental/, naming the codepoints", () => {
+    const { findings, verified } = checkPuaNotInExperimental(
+      irWithOutput("\u{E001}"),
+      "experimental",
+    );
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["In experimental/; PUA codepoints: U+E001."]);
+  });
+
+  it("passes non-PUA output anywhere, noting the absence", () => {
+    const { findings, verified } = checkPuaNotInExperimental(
+      irWithOutput("a"),
+      "release",
+    );
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["No PUA codepoints in the produced output."]);
   });
 });
 
 describe("checkPuaFontDisplayMap (7.14)", () => {
   it("flags PUA output + bundled font + no &DISPLAYMAP", () => {
-    const findings = checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
+    const { findings } = checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
       hasBundledFont: true,
     });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_PUA_FONT_NO_DISPLAYMAP");
   });
 
-  it("passes when a &DISPLAYMAP store is declared", () => {
+  it("passes when a &DISPLAYMAP store is declared, naming it", () => {
     const ir = makeTestIR({
       header: { keyboardId: "demo" },
       stores: [
@@ -82,18 +96,26 @@ describe("checkPuaFontDisplayMap (7.14)", () => {
       ],
     });
     expect(displayMapReference(ir)).toBe("demo.json");
-    expect(checkPuaFontDisplayMap(ir, { hasBundledFont: true })).toEqual([]);
+    const { findings, verified } = checkPuaFontDisplayMap(ir, {
+      hasBundledFont: true,
+    });
+    expect(findings).toEqual([]);
+    expect(verified).toEqual(["Found: store(&DISPLAYMAP) -> demo.json."]);
   });
 
-  it("is silent without PUA output, and without a bundled font", () => {
-    expect(
-      checkPuaFontDisplayMap(irWithOutput("a"), { hasBundledFont: true }),
-    ).toEqual([]);
-    expect(
-      checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
-        hasBundledFont: false,
-      }),
-    ).toEqual([]);
+  it("is moot without PUA output, and without a bundled font", () => {
+    const noPua = checkPuaFontDisplayMap(irWithOutput("a"), {
+      hasBundledFont: true,
+    });
+    expect(noPua.findings).toEqual([]);
+    expect(noPua.verified).toEqual([
+      "No PUA codepoints in the produced output.",
+    ]);
+    const noFont = checkPuaFontDisplayMap(irWithOutput("\u{E001}"), {
+      hasBundledFont: false,
+    });
+    expect(noFont.findings).toEqual([]);
+    expect(noFont.verified).toEqual(["No bundled font."]);
   });
 });
 

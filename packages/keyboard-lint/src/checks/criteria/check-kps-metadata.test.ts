@@ -28,29 +28,29 @@ const GOOD: KpsMetadataFacts = {
 
 describe("kps-metadata twins", () => {
   it("passes a complete .kps", () => {
-    expect(checkKpsMetadata(GOOD)).toEqual([]);
+    expect(checkKpsMetadata(GOOD).findings).toEqual([]);
   });
 
   it("10.1b flags an unselected font when fonts are in the files", () => {
-    const findings = checkKpsFontUnselected({ ...GOOD, fontSelected: "" });
+    const { findings } = checkKpsFontUnselected({ ...GOOD, fontSelected: "" });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPS_FONT_UNSELECTED");
   });
 
   it("10.1b passes when no fonts are in the files", () => {
     expect(
-      checkKpsFontUnselected({ ...GOOD, fontSelected: "", fontsInFiles: false }),
+      checkKpsFontUnselected({ ...GOOD, fontSelected: "", fontsInFiles: false }).findings,
     ).toEqual([]);
   });
 
   it("10.2b flags missing language tags", () => {
-    const findings = checkKpsLanguagesUnselected({ ...GOOD, languages: [] });
+    const { findings } = checkKpsLanguagesUnselected({ ...GOOD, languages: [] });
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_KPS_LANGUAGES_UNSELECTED");
   });
 
   it("10.7b names each unselected details file", () => {
-    const findings = checkKpsDetailsUnselected({
+    const { findings } = checkKpsDetailsUnselected({
       ...GOOD,
       detailsWelcome: "",
       detailsLicense: "",
@@ -63,7 +63,7 @@ describe("kps-metadata twins", () => {
   });
 
   it("10.8b flags an unset follow-version", () => {
-    const findings = checkKpsFollowVersionUnset({
+    const { findings } = checkKpsFollowVersionUnset({
       ...GOOD,
       followKeyboardVersion: false,
     });
@@ -72,11 +72,11 @@ describe("kps-metadata twins", () => {
   });
 
   it("10.9b flags an empty description", () => {
-    const findings = checkKpsDescriptionEmpty({ ...GOOD, description: "  " });
+    const { findings } = checkKpsDescriptionEmpty({ ...GOOD, description: "  " });
     // Whitespace-only is not empty at the check level (the parser trims);
     // an actually-empty description fails.
     expect(findings).toEqual([]);
-    const empty = checkKpsDescriptionEmpty({ ...GOOD, description: "" });
+    const { findings: empty } = checkKpsDescriptionEmpty({ ...GOOD, description: "" });
     expect(empty).toHaveLength(1);
     expect(empty[0]!.code).toBe("KM_LINT_KPS_DESCRIPTION_EMPTY");
   });
@@ -93,7 +93,7 @@ describe("kps-metadata twins", () => {
       followKeyboardVersion: false,
       description: "",
     };
-    expect(checkKpsMetadata(facts).map((f) => f.code).sort()).toEqual(
+    expect(checkKpsMetadata(facts).findings.map((f) => f.code).sort()).toEqual(
       [
         "KM_LINT_KPS_FONT_UNSELECTED",
         "KM_LINT_KPS_LANGUAGES_UNSELECTED",

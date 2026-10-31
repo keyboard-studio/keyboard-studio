@@ -20,7 +20,7 @@ import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { ACCENT, BG_CARD, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { ReviewPicker } from "./ReviewPicker.tsx";
 import { ReviewReport } from "./ReviewReport.tsx";
-import { useReviewIndex } from "./useReviewIndex.ts";
+import { fetchPrAuthorInfo, useReviewIndex, type PrAuthorInfo } from "./useReviewIndex.ts";
 import { useReviewJudge } from "./useReviewJudge.ts";
 import { useReviewSnapshot } from "./useReviewSnapshot.ts";
 import {
@@ -86,6 +86,7 @@ export function ReviewScreen() {
   const [result, setResult] = useState<CriteriaResult | null>(null);
   const [judgedAt, setJudgedAt] = useState<string>("");
   const [runNonce, setRunNonce] = useState(0);
+  const [authorInfo, setAuthorInfo] = useState<PrAuthorInfo | null>(null);
 
   // Deep link: ?source=&path=&sha=(&pr=) jumps straight to the run.
   // Hard link: /review/<owner>/keyboards/pull/<N> or
@@ -164,8 +165,13 @@ export function ReviewScreen() {
   const startRun = (t: ReviewTarget) => {
     setTarget(t);
     setResult(null);
+    setAuthorInfo(null);
     setPhase("running");
     setRunNonce((n) => n + 1);
+    // Fetch PR author info for the §17 context banner (PR targets only).
+    if (t.prNumber !== undefined) {
+      fetchPrAuthorInfo(t.owner, t.repo, t.prNumber).then(setAuthorInfo);
+    }
   };
 
   const runningDetail = useMemo(() => {
@@ -286,11 +292,13 @@ export function ReviewScreen() {
             result={result}
             skipped={snapshot.kind === "ready" ? snapshot.snapshot.skipped : []}
             judgedAt={judgedAt}
+            authorInfo={authorInfo}
             onRerun={() => startRun(target)}
             onBack={() => {
               setPhase("pick");
               setTarget(null);
               setResult(null);
+              setAuthorInfo(null);
             }}
           />
         )}
