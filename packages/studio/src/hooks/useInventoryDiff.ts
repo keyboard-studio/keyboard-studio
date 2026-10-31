@@ -96,64 +96,20 @@
 // reaches it."
 
 import { useMemo } from "react";
-import {
-  augmentWithComposable,
-  buildProducedSet,
-  buildReachableProducedSet,
-} from "@keyboard-studio/contracts";
-import { buildSessionProducedSet } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { lowercaseFirst } from "../lib/caseOrder.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
-import { getPatternByIdSync } from "../lib/services.ts";
+import {
+  baseProducedSetForWalk as computeBaseProducedSetForWalk,
+  orphanedProducedSet,
+  rawSessionProducedSet,
+  sessionProducedSet,
+  splitInventory,
+  type InventoryDiff,
+} from "../lib/inventoryDiff.ts";
 
-export interface InventoryDiff {
-  /**
-   * Characters still needing mechanism assignment (coverage measured over
-   * these) — stable-sorted lowercase-before-uppercase (see module doc and
-   * lib/caseOrder.ts); the relative order of two entries of the same case (or
-   * any non-letter entry) is unchanged from confirmedInventory. Computed from
-   * the STATIC base-only produced set — see module doc for why this must not
-   * react to this session's own assignments.
-   */
-  lettersToAdd: string[];
-  /** Characters already produced by the base (informational display only). */
-  alreadyProduced: string[];
-  /**
-   * Inventory characters the base's RULES produce but that no reachable key can
-   * actually type (spec 063 FR-011) — the honest delta between the two
-   * producibility views.
-   *
-   * A strict SUBSET of `alreadyProduced`: these characters still count as
-   * produced for every existing arithmetic, deliberately, so adding this array
-   * moved no author's workload and no coverage denominator. It exists so the UI
-   * can say what is true — the base declares a rule for this character but no
-   * key reaches it — instead of the author discovering it at compile time.
-   *
-   * Empty when the base has no touch layout, because then nothing is
-   * layout-unreachable.
-   */
-  producedButUnreachable: string[];
-  /**
-   * The augmented, SESSION-AWARE produced-glyph set (NFC) — base .kmn PLUS
-   * this session's physical assignments (see `buildSessionProducedSet`).
-   * Informational/gate use ONLY — see module doc for why this must not be
-   * used to compute `lettersToAdd`/`alreadyProduced`.
-   */
-  producedSet: ReadonlySet<string>;
-  /**
-   * The SESSION-AWARE produced-glyph set BEFORE composability augmentation —
-   * i.e. the raw `buildSessionProducedSet(startIr, sessionAssignments,
-   * getPatternByIdSync)` result this hook already computes internally to
-   * derive `producedSet`. Exposed so consumers that only need the
-   * pre-augment set (MechanismGallery's `baseProducedSet` composition-row
-   * feed, TouchGallery's `desktopDirectProducedSet`) don't re-run the same
-   * expensive round-trip a second time per render — perf dedup, no behavior
-   * change (same startIr/sessionAssignments/getPatternByIdSync inputs as
-   * before).
-   */
-  rawProducedSet: ReadonlySet<string>;
-}
+// The pure pieces live in lib/inventoryDiff.ts (spec 107 FR-040); this hook
+// memoizes each one separately over its own store slices.
+export type { InventoryDiff };
 
 /**
  * Derives the §8 inventory diff against the base keyboard's produced-glyph set.
@@ -186,90 +142,33 @@ export function useInventoryDiff(): InventoryDiff {
   // STATIC (base-only) — drives lettersToAdd/alreadyProduced. See module doc:
   // must NOT depend on sessionAssignments.
   const baseProducedSetForWalk = useMemo<Set<string>>(
-    () =>
-      startIr !== null
-        ? augmentWithComposable(
-            buildProducedSet(startIr, { excludeBackspaceCorrections: true }),
-            inventory,
-          )
-        : new Set<string>(),
+    () => computeBaseProducedSetForWalk(startIr, inventory),
     [startIr, inventory],
   );
 
   // The orphaned delta, memoized SEPARATELY so the frozen arithmetic above is
   // visibly independent of it. Same options as the plain call, so the two views
   // are asked the same question and differ only in reachability.
-  const orphanedSet = useMemo<Set<string>>(
-    () =>
-      startIr !== null
-        ? buildReachableProducedSet(startIr, { excludeBackspaceCorrections: true }).orphaned
-        : new Set<string>(),
-    [startIr],
-  );
+  const orphanedSet = useMemo<Set<string>>(() => orphanedProducedSet(startIr), [startIr]);
 
   // SESSION-AWARE, PRE-AUGMENT — the raw round-trip, computed once and
   // exposed as `rawProducedSet` so other consumers (MechanismGallery's
   // `baseProducedSet`, TouchGallery's `desktopDirectProducedSet`) don't
   // redo it (perf dedup — km-synthesis).
   const rawProducedSet = useMemo<Set<string>>(
-    () =>
-      startIr !== null
-        ? buildSessionProducedSet(startIr, sessionAssignments, getPatternByIdSync)
-        : new Set<string>(),
+    () => rawSessionProducedSet(startIr, sessionAssignments),
     [startIr, sessionAssignments],
   );
 
   // SESSION-AWARE, augmented — returned as `producedSet` for
   // informational/gate consumers only (see module doc).
   const producedSet = useMemo<Set<string>>(
-    () => (startIr !== null ? augmentWithComposable(rawProducedSet, inventory) : new Set<string>()),
+    () => sessionProducedSet(startIr, rawProducedSet, inventory),
     [startIr, inventory, rawProducedSet],
   );
 
-  return useMemo<InventoryDiff>(() => {
-    if (startIr === null) {
-      // The startIr-null fallback must return ALL THREE arrays (FR-011): a caller
-      // destructuring `producedButUnreachable` here would otherwise read
-      // `undefined` before instantiation and throw on `.length`.
-      return {
-        lettersToAdd: lowercaseFirst(inventory),
-        alreadyProduced: [],
-        producedButUnreachable: [],
-        producedSet,
-        rawProducedSet,
-      };
-    }
-
-    const lettersToAdd: string[] = [];
-    const alreadyProduced: string[] = [];
-    const producedButUnreachable: string[] = [];
-
-    for (const raw of inventory) {
-      // NFC-normalize the inventory entry before lookup. producedSet is already
-      // NFC, so a decomposed entry that NFC-rounds to a precomposed form will
-      // correctly hit the set (e.g. "é" → "é" → hit if base produces "é").
-      const nfc = raw.normalize("NFC");
-      if (baseProducedSetForWalk.has(nfc)) {
-        // Keep the raw (original) form in the result so callers can display the
-        // inventory character as the author entered it, while the lookup used
-        // the normalized form.
-        alreadyProduced.push(raw);
-        // ADDITIVE: also reported as unreachable when the ONLY thing producing it
-        // is an unreachable-key rule. Note this does NOT remove it from
-        // `alreadyProduced` — that is precisely the point of extending rather
-        // than switching (see the note at the top of this file).
-        if (orphanedSet.has(nfc)) producedButUnreachable.push(raw);
-      } else {
-        lettersToAdd.push(raw);
-      }
-    }
-
-    return {
-      lettersToAdd: lowercaseFirst(lettersToAdd),
-      alreadyProduced,
-      producedButUnreachable,
-      producedSet,
-      rawProducedSet,
-    };
-  }, [startIr, baseProducedSetForWalk, orphanedSet, producedSet, rawProducedSet, inventory]);
+  return useMemo<InventoryDiff>(
+    () => splitInventory(startIr, inventory, baseProducedSetForWalk, orphanedSet, producedSet, rawProducedSet),
+    [startIr, baseProducedSetForWalk, orphanedSet, producedSet, rawProducedSet, inventory],
+  );
 }

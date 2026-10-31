@@ -188,24 +188,35 @@ export interface GalleryHostProps<V> {
 }
 
 /**
- * Render a gallery module's renderer with its recorded decision. The
- * renderer's only write path is the host's onChange: record + apply.
+ * The onChange a hosted renderer receives: record the reported value with the
+ * host's provenance (default `"asked"`), then run the module's apply. Also
+ * the call the headless author makes for a renderer's change (spec 107).
  */
-export function GalleryHost<V>(props: GalleryHostProps<V>): React.JSX.Element {
-  const { module: mod, record, stepId, deps } = props;
-  const Renderer = mod.renderer;
-  const onChange = (value: V): void => {
+export function makeGalleryOnChange<V>(
+  props: Pick<GalleryHostProps<V>, "module" | "stepId" | "deps" | "provenance" | "source">,
+): (value: V) => void {
+  return (value) => {
     decideGalleryValue(
-      mod,
+      props.module,
       value,
       {
         provenance: props.provenance ?? "asked",
         ...(props.source !== undefined && { source: props.source }),
       },
-      stepId,
-      deps,
+      props.stepId,
+      props.deps,
     );
   };
+}
+
+/**
+ * Render a gallery module's renderer with its recorded decision. The
+ * renderer's only write path is the host's onChange: record + apply.
+ */
+export function GalleryHost<V>(props: GalleryHostProps<V>): React.JSX.Element {
+  const { module: mod, record } = props;
+  const Renderer = mod.renderer;
+  const onChange = makeGalleryOnChange(props);
   const renderer = (
     <Renderer
       value={record?.value as V | undefined}

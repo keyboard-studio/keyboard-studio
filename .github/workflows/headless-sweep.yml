@@ -1,0 +1,221 @@
+# Headless author sweep (spec 107 US4). Never triggered by pull_request and
+# never a required check: the PR set is the `headless-author` job in ci.yml.
+# This is the breadth run: nightly the `cases` tier (the 32 canonical harness
+# cases plus the PR set x all 8 profile variants), weekly the Latin codec-clean
+# slice in 4 shards, or either/the whole eligible corpus on demand.
+#
+# The run goes red on any new failure (visible on the Actions tab); nothing
+# gates on it. Failures not owned by a known gap are filed as `headless-sweep`
+# issues by scripts/file-sweep-issues.mjs, or commented on if already open.
+
+name: Headless sweep
+
+on:
+  schedule:
+    - cron: '23 5 * * *'   # nightly: cases tier
+    - cron: '41 3 * * 0'   # weekly (Sunday): latin tier, 4 shards
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Slice to sweep'
+        type: choice
+        options: [cases, latin, eligible]
+        default: latin
+      shards:
+        description: 'Number of shards (1-8)'
+        type: string
+        default: '1'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: headless-sweep-${{ github.event.schedule || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  # Same pin as ci.yml (KEYBOARDS_CORPUS_SHA); keep the two in step.
+  KEYBOARDS_CORPUS_SHA: 435f82d69bfc926eb03c2d8632571b41b6da3266
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tier: ${{ steps.p.outputs.tier }}
+      shards: ${{ steps.p.outputs.shards }}
+      matrix: ${{ steps.p.outputs.matrix }}
+    steps:
+      - name: Decide tier and shard matrix
+        id: p
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          IN_TIER: ${{ inputs.tier }}
+          IN_SHARDS: ${{ inputs.shards }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            tier="$IN_TIER"
+            shards="$IN_SHARDS"
+          elif [ "$SCHEDULE" = "41 3 * * 0" ]; then
+            tier=latin
+            shards=4
+          else
+            tier=cases
+            shards=1
+          fi
+          case "$shards" in
+            [1-8]) ;;
+            *) echo "[ERROR] shards must be 1-8, got '$shards'"; exit 1 ;;
+          esac
+          matrix="["
+          for k in $(seq 1 "$shards"); do
+            [ "$k" -gt 1 ] && matrix="$matrix,"
+            matrix="$matrix\"$k/$shards\""
+          done
+          matrix="$matrix]"
+          echo "tier=$tier" >> "$GITHUB_OUTPUT"
+          echo "shards=$shards" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "[INFO] tier=$tier shards=$shards matrix=$matrix"
+
+  sweep:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      # The default ref is the triggering branch; the `cases` tier reads the
+      # committed HA/cases/harness-cases.json from this checkout and fetches
+      # no other branch.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames, offline build input)
+        run: pnpm run codegen-charnames
+
+      - name: Cache SLDR extract
+        id: sldr-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/sldr/sldr
+          key: sldr-${{ hashFiles('scripts/sldr-version.json') }}
+
+      - name: Fetch SLDR (pinned)
+        if: steps.sldr-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-sldr
+
+      - name: Cache langtags.json
+        id: langtags-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/langtags/langtags.json
+          key: langtags-${{ hashFiles('scripts/langtags-version.json') }}
+
+      - name: Fetch langtags (pinned)
+        if: steps.langtags-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-langtags
+
+      - name: Build studio dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      # Ends the step before the 120-minute job limit so the report upload below
+      # (and then the summarise job) still run; the sweep rewrites its report
+      # before every case, so a hang leaves the case it was on in the file.
+      - name: Sweep
+        timeout-minutes: 105
+        env:
+          KS_AUTHOR_SWEEP: ${{ needs.plan.outputs.tier }}
+          KS_AUTHOR_SHARD: ${{ matrix.shard }}
+          KS_AUTHOR_REPORT_DIR: ${{ github.workspace }}/reports
+        run: >
+          pnpm --filter @keyboard-studio/studio exec vitest run
+          --config vitest.corpus.config.ts src/test/headlessAuthor/sweep
+
+      - name: Upload shard report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-report-${{ needs.plan.outputs.tier }}-${{ strategy.job-index }}
+          path: reports/headless-report-*.json
+          retention-days: 90
+          if-no-files-found: warn
+
+  summarise:
+    needs: [plan, sweep]
+    if: ${{ always() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: headless-report-${{ needs.plan.outputs.tier }}-*
+          path: shards
+          merge-multiple: true
+
+      - name: Merge, summarise and file issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TIER: ${{ needs.plan.outputs.tier }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          shopt -s nullglob
+          files=(shards/headless-report-*.json)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "[ERROR] no shard reports were uploaded"
+            exit 1
+          fi
+          node scripts/file-sweep-issues.mjs \
+            --merge-out "headless-report-$TIER.json" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --run-url "$RUN_URL" \
+            --file-issues \
+            "${files[@]}"
+
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-report-${{ needs.plan.outputs.tier }}
+          path: headless-report-${{ needs.plan.outputs.tier }}.json
+          retention-days: 90
+          if-no-files-found: ignore

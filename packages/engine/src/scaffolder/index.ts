@@ -44,7 +44,7 @@ import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 // No licenseMd here: Track 1's LICENSE.md comes from the accumulated copyright
 // block (attributionText -> renderLicense), because a derived keyboard must
 // RETAIN the base's holders rather than state a single one (spec 064 US2).
-import { welcomeHtm, readmeHtm, helpPhpStub } from "../shared/packageDocs.js";
+import { welcomeHtm, readmeHtm, helpPhpStub, readmeMd } from "../shared/packageDocs.js";
 import { HISTORY_INITIAL_RELEASE_BULLET } from "../shared/renderHistoryMd.js";
 import {
   buildKpsContent,
@@ -496,6 +496,12 @@ export function generateStubs(
    */
   packageFonts?: import("@keyboard-studio/contracts").PackageFontSet,
   stylesheets: readonly string[] = [],
+  /**
+   * The name of the base keyboard this was derived from, for use in the
+   * generated README.md. Optional; if omitted, the README will reference
+   * "a standard keyboard layout".
+   */
+  baseKeyboardName?: string,
 ): void {
   const now = new Date();
   const yyyy = emitYear;
@@ -587,7 +593,7 @@ export function generateStubs(
     },
     {
       path: `README.md`,
-      content: `# ${displayName}\n`,
+      content: readmeMd(displayName, keyboardId, languages, baseKeyboardName),
     },
     {
       path: `tests/${keyboardId}_tests.kmn`,
@@ -785,6 +791,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         inheritedHolders,
         packageFonts,
         kpsStylesheets,
+        base.displayName,
       );
 
       // The base's icon came across with the rest of source/ (loader) and was

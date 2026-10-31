@@ -634,6 +634,41 @@ describe("compileCarveSuppression — composition guarantees", () => {
 });
 
 describe("store-slot guard rules (T013)", () => {
+  // Cameroon backspace-decompose shape: any(composed) + [K_BKSP] > index(comp-dia,1).
+  // Carving BOTH sides of the pair used to emit the same guard once per slot.
+  const bkspPairIR = (): KeyboardIR => ({
+    nodeId: "kbd",
+    stores: [
+      charStore({ nodeId: "store#composed", name: "composed", chars: ["à", "è"] }),
+      charStore({ nodeId: "store#compdia", name: "comp-dia", chars: ["a", "e"] }),
+    ],
+    groups: [
+      {
+        nodeId: "group#main",
+        rules: [
+          charRule({
+            nodeId: "bksp",
+            context: [
+              { kind: "any", storeRef: "composed" },
+              { kind: "raw", text: "+" },
+              { kind: "vkey", name: "K_BKSP", modifiers: [] },
+            ],
+            output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+          }),
+        ],
+      },
+    ],
+  });
+
+  it("carving only one side yields the same guards as carving both", () => {
+    const one = compileCarveSuppression(bkspPairIR(), ["store#composed#0", "store#composed#1"].map(blockDisposition));
+    const both = compileCarveSuppression(
+      bkspPairIR(),
+      ["store#composed#0", "store#compdia#0", "store#composed#1", "store#compdia#1"].map(blockDisposition),
+    );
+    expect(both.ir.groups[0]!.rules.map((r) => r.context)).toEqual(one.ir.groups[0]!.rules.map((r) => r.context));
+  });
+
   // Deadkey fan-out pair (Cameroon pattern): the paired rule consumes the
   // input store via any() and emits from the output store via index().
   const deadkeySlotIR = (): KeyboardIR => ({

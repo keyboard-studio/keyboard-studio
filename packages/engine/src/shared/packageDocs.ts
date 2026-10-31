@@ -20,6 +20,7 @@
 
 import { DOC_FORMS } from "@keyboard-studio/contracts";
 import { escapeHtml, phpCommentEscape, phpSingleQuoteEscape } from "./escapeHtml.js";
+import { getLanguageDefaults } from "../langtags/index.js";
 import { renderDocForm } from "./renderDocForm.js";
 
 /**
@@ -90,6 +91,189 @@ export function welcomeHtm(displayName: string): string {
 /** `source/readme.htm` — shown by Keyman in the package details. */
 export function readmeHtm(displayName: string): string {
   return `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`;
+}
+
+/**
+ * Escape Markdown-special characters in an author-supplied value so a name
+ * containing e.g. `[`, `]`, or `#` can't break the README's rendering.
+ *
+ * Underscores are left alone: they are legal in keyboard ids and form no
+ * emphasis intra-word in CommonMark, so escaping them would only corrupt
+ * pinned ids such as `base_keyboard`.
+ *
+ * @internal
+ */
+function escapeMarkdown(s: string): string {
+  return s.replace(/([\\`*{}[\]()<>#+.!-])/g, "\\$1");
+}
+
+/**
+ * `README.md` — comprehensive keyboard documentation for users and contributors.
+ *
+ * Generates a professional, informative README that includes:
+ * - Keyboard purpose and features
+ * - Languages supported
+ * - How to type special characters (generic guide)
+ * - Installation instructions for all platforms
+ * - Links to help resources
+ * - Contributing guidelines
+ *
+ * This is suitable for Keyman repository submissions and provides sufficient
+ * documentation for end users. For keyboards with complex diacritics or
+ * deadkeys, authors can manually enhance this template with specifics about
+ * their keyboard's unique typing methods.
+ *
+ * Not HTML-escaped: README.md is Markdown/plain text, not markup.
+ */
+export function readmeMd(
+  displayName: string,
+  keyboardId: string,
+  languages: string[] = [],
+  baseKeyboardName?: string,
+): string {
+  // Escape Markdown-special characters in author-supplied values so a name
+  // containing e.g. `[`, `]`, or `#` can't break the rendered README.
+  const name = escapeMarkdown(displayName);
+  const id = escapeMarkdown(keyboardId);
+  const base = baseKeyboardName ? escapeMarkdown(baseKeyboardName) : undefined;
+
+  const languageList =
+    languages.length > 0
+      ? languages.map((tag) => `- **${languageNameForTag(tag)}** (code: \`${tag}\`)`).join("\n")
+      : "- Language support information to be confirmed";
+
+  const baseKeyboardSection = base
+    ? `- Based on ${base}`
+    : "- Adapted from a standard keyboard layout";
+
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  return `# ${name}
+
+Type text with the ${name} keyboard, with comprehensive character and diacritic support.
+
+## Languages Supported
+
+${languageList}
+
+## Features
+
+- Comprehensive character and diacritic support
+${baseKeyboardSection}
+- Touch-friendly layouts for mobile and tablet
+- Desktop and web support
+- Keyman-compatible on all platforms
+
+## How to Type Special Characters
+
+Use the following methods to access extended characters and diacritics:
+
+### Method 1: On-Screen Keyboard Layout
+
+When you start typing, Keyman displays a visual keyboard showing:
+- Regular characters on the base layer
+- Shift combinations for capitals and punctuation
+- Modifier combinations (AltGr/Option/Right Alt) for accents and special characters
+- Tap or click any key to insert that character
+
+### Method 2: Touch Layout (Mobile & Tablet)
+
+On mobile and tablet devices:
+- Tap and hold a base character key to see available accented variants
+- Select the accented version from the popup menu
+- Smart suggestions help you type faster
+
+### Method 3: Key Sequences
+
+Some keyboards use sequences to type accented characters:
+- Press the diacritic key (such as an accent key)
+- Follow with the base letter to combine them
+- Consult the visual keyboard for available combinations
+
+## Platform Support
+
+- **Windows, macOS, Linux** — via Keyman Desktop
+- **iOS, Android** — via Keyman Mobile
+- **Web** — via Keyman Online at keyman.com/keyboard
+
+## Installation
+
+### Step 1: Get Keyman
+
+1. Visit [keyman.com](https://keyman.com)
+2. Download Keyman Engine for your device:
+   - **Windows/Mac/Linux:** Keyman Desktop
+   - **iOS:** Keyman for iPhone/iPad
+   - **Android:** Keyman for Android
+3. Install and follow the setup instructions
+
+### Step 2: Install This Keyboard
+
+1. Open Keyman
+2. Go to the keyboard store or catalog
+3. Search for "${name}"
+4. Click "Install" and follow prompts
+5. Select "${name}" from your active keyboard list
+
+### Getting Help
+
+- **Online Help:** [help.keyman.com/keyboard/${id}](https://help.keyman.com/keyboard/${id})
+- **Keyman Community:** [keyman.com/community](https://keyman.com/community)
+- **Developer Resources:** [Keyman Developer](https://help.keyman.com/developer)
+
+## Keyboard Layout
+
+This keyboard is based on ${base ?? "a standard keyboard layout"} and provides comprehensive support for:
+- Base Latin characters (A-Z, a-z)
+- Diacritical marks (accents, tone marks, and other modifiers)
+- Special punctuation and symbols
+- Language-specific characters and variants
+
+Refer to the visual keyboard layout displayed in Keyman for exact key positions and available character combinations.
+
+## Contributing
+
+Found an issue? Have a suggestion or want to help improve this keyboard?
+
+1. **Report an Issue:** [keyboard-studio Issues](https://github.com/keyboard-studio/keyboard-studio/issues)
+2. **Submit Changes:** [keyboard-studio Pull Requests](https://github.com/keyboard-studio/keyboard-studio/pulls)
+3. **Community Keyboards:** [keymanapp/keyboards Repository](https://github.com/keymanapp/keyboards)
+
+## License
+
+See [LICENSE.md](LICENSE.md) for copyright and license information.
+
+## Credits
+
+Created with [keyboard-studio](https://github.com/keyboard-studio/keyboard-studio) —
+an open-source authoring system by [SIL International](https://www.sil.org/)
+for creating Keyman keyboards with guided workflows.
+
+---
+
+**Version:** 1.0 | **Updated:** ${dateStr}
+`;
+}
+
+/**
+ * Human-readable name for a language tag, from the canonical langtags
+ * dataset (the same source the studio's language picker uses), so the
+ * README names languages exactly as the rest of the studio does.
+ * Unknown codes fall back to the capitalized code itself.
+ *
+ * @internal
+ */
+function languageNameForTag(tag: string): string {
+  return getLanguageDefaults(tag)?.englishName ?? capitalizeTag(tag);
+}
+
+/**
+ * Capitalize the first letter of a language tag.
+ *
+ * @internal
+ */
+function capitalizeTag(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**

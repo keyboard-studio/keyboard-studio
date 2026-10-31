@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from "react";
 import type { ExemplarInventory } from "../lib/services.ts";
-import { sourcedExemplars } from "../lib/services.ts";
+import { resolveSourcedExemplars } from "./sourcedExemplarsLookup.ts";
 
 export interface SourcedExemplarsState {
   /** null once resolved with no coverage; also null while still loading. */
@@ -44,15 +44,11 @@ export function useSourcedExemplars(bcp47: string | undefined): SourcedExemplars
   useEffect(() => {
     if (bcp47 === undefined || !hasTag) return;
     let cancelled = false;
-    sourcedExemplars(bcp47)
-      .then((inventory) => {
-        if (!cancelled) setState({ tag: bcp47, inventory });
-      })
-      .catch(() => {
-        // Degrade to "no proposal available" rather than surfacing an error:
-        // the author still has every pre-044 way to build their alphabet.
-        if (!cancelled) setState({ tag: bcp47, inventory: null });
-      });
+    // A failed lookup degrades to "no proposal available" rather than surfacing
+    // an error: the author still has every pre-044 way to build their alphabet.
+    void resolveSourcedExemplars(bcp47).then((inventory) => {
+      if (!cancelled) setState({ tag: bcp47, inventory });
+    });
     return () => {
       cancelled = true;
     };

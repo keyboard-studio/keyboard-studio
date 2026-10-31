@@ -45,24 +45,16 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { InventoryChar, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { InventoryChar } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
-import {
-  startPunctuationCoverage,
-  buildPunctuationProposal,
-  computeInventoryDelta,
-  glyphCategory,
-} from "@keyboard-studio/engine";
+import { computeInventoryDelta } from "@keyboard-studio/engine";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import {
-  getCharacterInventoryValue,
-  useInventoryDraft,
-} from "../useInventoryDraft.ts";
+import { useInventoryDraft } from "../useInventoryDraft.ts";
 import type { DraftProvenance, InventoryDecisionValue } from "../phaseBDraftOps.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { punctuationKey } from "../../steps/evidence.ts";
@@ -71,10 +63,19 @@ import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
 import { reproposalCueMessage } from "../reproposalReason.ts";
 import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useSourcedExemplars } from "../useSourcedExemplars.ts";
-import { charactersInTier } from "../../lib/services.ts";
+import {
+  PUNCTUATION_INVENTORY_ANSWER_ID,
+  PUNCTUATION_STEP_ID,
+  baseCoverageOf,
+  completePunctuation,
+  isPunctuationAlreadyConfirmed,
+  isPunctuationChar,
+  punctuationTier,
+  seedPunctuationBase,
+  seedPunctuationTier,
+} from "./punctuationStepRules.ts";
 import { containsFormatChar, harvestChars, isFormatChar } from "../charNormUtils.ts";
 import { codepointLabel } from "../codepointLabel.ts";
-import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 import { useGlyphFontStack } from "../useGlyphFontStack.ts";
 import {
   BG_PAGE,
@@ -105,27 +106,6 @@ import {
  * See the module header for why the label is "C" and never "B", and why the
  * inventory is the shared phase-C union rather than this page's slice alone.
  */
-/** Manifest step id — matches steps/manifest.ts's "punctuation" entry. */
-const PUNCTUATION_STEP_ID = "punctuation";
-
-/**
- * The saved answer that carries the evidence key the confirmed inventory was
- * built on (spec 079 R-07, FR-022). The inventory itself stays where it always
- * was (the shared draft + the phase-C result); this answer records only what
- * it was confirmed FOR, so the FR-023 guard can tell "confirmed here" from
- * "confirmed for another language or base".
- */
-const PUNCTUATION_INVENTORY_ANSWER_ID = "punctuation.inventory";
-
-function punctuationResult(): SurveyPhaseResult {
-  return { phase: "C", answers: [], confirmedInventory: phaseCConfirmedInventory() };
-}
-
-/** True for the one category this page collects. */
-function isPunctuationChar(c: string): boolean {
-  return glyphCategory(c) === "punctuation";
-}
-
 /** The separators the type-in box treats as "nothing typed" — mirrors harvestChars' skip set. */
 const ASCII_WHITESPACE: ReadonlySet<string> = new Set([" ", "\t", "\r", "\n"]);
 
@@ -272,7 +252,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // base whose output is UNKNOWABLE (opaque fragments), not for a missing one.
   const ir = useWorkingCopyStore((s) => s.ir);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
-  const baseCoverage = useMemo(() => (ir === null ? null : startPunctuationCoverage(ir)), [ir]);
+  const baseCoverage = useMemo(() => baseCoverageOf(ir), [ir]);
   const baseCoverageIncomplete = baseCoverage === null || !baseCoverage.coverageComplete;
 
   const evidenceKey = punctuationKey(inventory?.resolvedTag, startKeyboard?.id);
@@ -284,9 +264,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // change the defaults are proposed again. A confirmation with no recorded
   // key predates spec 079 and is honoured as before.
   const alreadyConfirmed = useMemo(
-    () =>
-      phaseResults.some((p) => p.phase === "C" && p.confirmedInventory !== undefined) &&
-      (confirmedForKey === undefined || confirmedForKey === null || confirmedForKey === evidenceKey),
+    () => isPunctuationAlreadyConfirmed({ phaseResults, confirmedForKey, evidenceKey }),
     [phaseResults, confirmedForKey, evidenceKey],
   );
 
@@ -330,58 +308,28 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   const displayName =
     languageName ?? bcp47 ?? t({ id: "survey.punctuation.genericLanguage", message: "this language" });
 
-  const tier = useMemo(
-    () => (inventory === null ? [] : charactersInTier(inventory, "punctuation").map((c) => c.normalize("NFC"))),
-    [inventory],
-  );
+  const tier = useMemo(() => punctuationTier(inventory), [inventory]);
 
   // Seed the CLDR/SLDR tier ONCE per resolved locale when the lookup settles
-  // (FR-001). `seedProposals` is a no-op on a repeated key, honours the
-  // author's rejections (FR-022) and never downgrades an author pick (FR-005).
-  // Under the FR-023 guard the key is still recorded, with nothing to seed,
-  // so the guard is evaluated once rather than on every visit.
+  // (FR-001); see seedPunctuationTier for the rules.
   useEffect(() => {
     if (loading || inventory === null) return;
-    const seedKey = "punctuation:" + inventory.resolvedTag;
-    seedProposals(alreadyConfirmed ? [] : tier, inventory.source, seedKey);
+    seedPunctuationTier({ inventory, alreadyConfirmed, seedProposals });
   }, [loading, inventory, tier, alreadyConfirmed, seedProposals]);
 
   // Seed the base group ONCE per base keyboard, after the exemplar lookup has
-  // settled so the group already excludes the CLDR tier (FR-006). The two
-  // proposed groups are disjoint by construction: the base group is what the
-  // base produces MINUS the CLDR group, the rejections and the author's own
-  // picks (FR-010), derived from the inventory rather than the seeded draft so
-  // it is the same whichever seed fires first. One-way floor rule
-  // (FR-007..FR-009): the builder substitutes the ASCII floor when the base's
-  // output is not fully known, and the provenance says which it was.
-  //
-  // The rejection ledger and the author's picks are read from the decision
-  // record WHEN the effect fires rather than subscribed to: subscribing would
-  // re-run this on every provenance change (including the CLDR seed's own
-  // writes) for no purpose, since the seed key makes every re-run a no-op
-  // anyway.
+  // settled so the group already excludes the CLDR tier (FR-006); see
+  // seedPunctuationBase. The decision record is read when the effect fires
+  // rather than subscribed to: the seed key makes every re-run a no-op anyway.
   useEffect(() => {
     if (loading || baseCoverage === null) return;
-    const seedKey = "punctuation-base:" + (startKeyboard?.id ?? "working-copy");
-    const currentDraft = getCharacterInventoryValue();
-    const proposal = buildPunctuationProposal({
-      exemplars: inventory,
+    seedPunctuationBase({
+      inventory,
       baseCoverage,
-      rejected: new Set(currentDraft.rejected),
-      authorChosen: new Set(
-        Object.keys(currentDraft.provenance).filter((c) => currentDraft.provenance[c] === "author"),
-      ),
+      startKeyboardId: startKeyboard?.id,
+      alreadyConfirmed,
+      seedProposals,
     });
-    // This page collects Unicode PUNCTUATION only, so the floor's nine symbol
-    // members ($ + < = > ^ ` | ~) are not proposed here: they would land in
-    // the draft's unrendered `symbols` bucket and reach the alphabet result
-    // unseen (FR-025). Symbols stay shielded by carve's always-keep rule and
-    // are out of this feature's scope (FR-012, family default 5).
-    seedProposals(
-      alreadyConfirmed ? [] : proposal.baseGroup.filter(isPunctuationChar),
-      proposal.baseCoverageIncomplete ? "ascii-floor" : "base",
-      seedKey,
-    );
   }, [loading, baseCoverage, startKeyboard, inventory, alreadyConfirmed, seedProposals]);
 
   // FR-011: how many of the chosen marks the base cannot type yet — the
@@ -477,16 +425,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   function complete(): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    const result = punctuationResult();
-    saveAnswer(PUNCTUATION_STEP_ID, PUNCTUATION_INVENTORY_ANSWER_ID, {
-      value: result.confirmedInventory ?? [],
-      answerType: "char-list",
-      origin: "confirmed",
-      stage: "confirmed",
-      evidenceKey,
-      screenId: PUNCTUATION_STEP_ID,
-    });
-    onComplete(result);
+    onComplete(completePunctuation({ evidenceKey, saveAnswer }));
   }
 
   // NOT `inputVal.trim() === ""`: String#trim strips U+FEFF (and every other

@@ -11,16 +11,19 @@ import { useState, useMemo, useCallback } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
+import { partitionRemovalKeys, suggestionFingerprintOf } from '../../survey/carve/carveValue.ts';
 import {
-  currentCarvedLayoutValue,
-  partitionRemovalKeys,
-  removalKey,
-  suggestionFingerprintOf,
-} from '../../survey/carve/carveValue.ts';
+  applyCarveSkip,
+  applyCarveSuggestion,
+  isMarkedCarveRow,
+  isRowDiscarded,
+  recommendedRowIds,
+} from '../../survey/carve/carveContinue.ts';
 import { resolveCarvedCombos } from '../../lib/carvedCombo.ts';
 import { pairedCascadeChars } from '../../lib/carveCascadePreview.ts';
 import { ReviewCarvedKeysDialog } from './ReviewCarvedKeys.tsx';
-import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
+import { displayChar } from '../../lib/irToCarveNodes.ts';
+import { carveRecommendation } from '../../survey/carve/carveRecommendation.ts';
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import {
   irToCharacterView, groupCharacterCells, characterCellIds, characterCellIsToggleable,
@@ -134,16 +137,8 @@ function isCellDiscarded(cell: CharacterCell, isItemDeleted: (id: string) => boo
 // action, matching the recommender's own semantics.
 // ---------------------------------------------------------------------------
 
-function recommendedRowIds(row: RecommendedRemovalChar): string[] {
-  return [...row.contributors.ruleNodeIds, ...row.contributors.storeSlotIds];
-}
-
-/** Mirrors isCellDiscarded, but over a recommendation row's (possibly case-group-merged) ids. */
-function isRowDiscarded(row: RecommendedRemovalChar, isItemDeleted: (id: string) => boolean): boolean {
-  const ids = recommendedRowIds(row);
-  if (ids.length === 0) return false;
-  return ids.every((id) => isItemDeleted(id));
-}
+// recommendedRowIds / isRowDiscarded live in survey/carve/carveContinue.ts
+// (the marked-until-Continue rule the headless author shares).
 
 // Spec 106 FR-042: 'marked' — a suggested discard not yet applied (Continue
 // applies it, one click keeps it); 'suggested-discard' — a suggested discard
@@ -775,7 +770,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
-  const keepAll = useWorkingCopyStore((s) => s.keepAll);
 
   // irToCharacterView's `confirmedInventory` param drives ONLY the "in your
   // alphabet" (inAlpha) flag and is documented NFC-normalized regardless of
@@ -801,39 +795,30 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   } = useCarveNeededSet();
 
   // Base characters the author chose to KEEP at the pre-carve convenience
-  // question — letters their orthography does not use but they still need for
-  // borrowed words, email addresses, and web addresses. They are not part of
-  // the orthography (deliberately absent from confirmedInventory, see
-  // SurveyPhaseResult.retainedConvenienceChars), but for carve's purposes they
-  // are needed: shielding them here is the whole point of having asked.
-  // useCarveNeededSet deliberately excludes these (see its header doc), so the
-  // gallery unions them on top at this call site.
+  // question (letters their orthography does not use but they still need for
+  // borrowed words, email addresses, and web addresses) shield those letters
+  // from carve. useCarveNeededSet deliberately excludes them (see its header
+  // doc); carveRecommendation unions them on top.
   const retainedConvenienceChars = useWorkingCopyStore((s) => s.session.retainedConvenienceChars);
-  const retainedSet = useMemo(
-    () => new Set((retainedConvenienceChars ?? []).map((ch) => ch.normalize(carveNormalizationForm))),
-    [retainedConvenienceChars, carveNormalizationForm],
-  );
-  const neededSet = useMemo(
-    () => (retainedSet.size === 0
-      ? orthographyNeededSet
-      : new Set([...orthographyNeededSet, ...retainedSet])),
-    [orthographyNeededSet, retainedSet],
-  );
 
-  // False while the needed set or the IR is still loading: `recommended` is
-  // then an empty placeholder, not "nothing to suggest".
-  const recommendationReady = instantiationMode !== null && hasSignal && ir !== null;
-  const recommended = useMemo(
-    () => (recommendationReady && ir
-      ? recommendedRemovalChars({
-        ir,
-        needed: neededSet,
-        bcp47: identityBcp47,
+  // The recommendation itself is survey/carve/carveRecommendation.ts, shared
+  // with the headless author. `recommendationReady` is false while the needed
+  // set or the IR is still loading: `recommended` is then an empty
+  // placeholder, not "nothing to suggest".
+  const { recommendationReady, recommended, primaryRows, optionalLatinRows } = useMemo(
+    () => carveRecommendation({
+      ir,
+      instantiationMode,
+      retainedConvenienceChars,
+      needed: {
+        neededSet: orthographyNeededSet,
         form: carveNormalizationForm,
+        bcp47: identityBcp47,
+        hasSignal,
         blockCandidateChars,
-      })
-      : []),
-    [ir, recommendationReady, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
+      },
+    }),
+    [ir, instantiationMode, retainedConvenienceChars, orthographyNeededSet, carveNormalizationForm, identityBcp47, hasSignal, blockCandidateChars],
   );
   // irToCharacterView's internal lookup key is always NFC-normalized
   // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on
@@ -864,12 +849,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     }
     return map;
   }, [cells, recommended]);
-
-  // Post-#526 split (inherited from the v1 removal banner): cross-script-Latin
-  // rows never drive the primary "Suggested to discard" group — they get their
-  // own optional, low-priority group instead of being suppressed or mixed in.
-  const primaryRows = useMemo(() => recommended.filter((r) => r.reason !== 'cross-script-latin'), [recommended]);
-  const optionalLatinRows = useMemo(() => recommended.filter((r) => r.reason === 'cross-script-latin'), [recommended]);
 
   // "...for a {descriptor} keyboard" — descriptor is translatable (#1588):
   // either "{name}-only" (e.g. "Russian-only") via the catalog, or the
@@ -934,10 +913,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const keptSuggested = useMemo(() => new Set(carveSuggestion?.kept ?? []), [carveSuggestion]);
   const isMarkedRow = useCallback(
     (row: RecommendedRemovalChar) =>
-      primaryRowSet.has(row) &&
-      recommendedRowIds(row).length > 0 &&
-      !isRowDiscarded(row, isItemDeleted) &&
-      !keptSuggested.has(row.ch.normalize('NFC')),
+      isMarkedCarveRow(row, primaryRowSet, isItemDeleted, keptSuggested),
     [primaryRowSet, isItemDeleted, keptSuggested],
   );
   const setSuggestedKept = useCallback((chars: readonly string[], keep: boolean) => {
@@ -964,33 +940,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     }
   }, [isItemDeleted, toggleRecommendedRow, setSuggestedKept, keptSuggested]);
   /** Continue: discard every marked row as the confirmed suggested default. */
-  const applySuggestion = useCallback(() => {
-    if (!recommendationReady) return;
-    const cs = useWorkingCopyStore.getState().carveSuggestion;
-    const currentIds = new Set(primaryRows.flatMap(recommendedRowIds));
-    const currentChars = new Set(
-      primaryRows.flatMap((r) => (r.caseGroup ?? [r.ch]).map((c) => c.normalize('NFC'))),
-    );
-    const isCurrent = (key: string): boolean => {
-      const id = key.slice(key.indexOf(':') + 1);
-      return key.startsWith('char:') ? currentChars.has(id) : currentIds.has(id);
-    };
-    const stale = (cs?.derived ?? []).filter((k) => !isCurrent(k));
-    if (stale.length > 0) {
-      const { ids, chars } = partitionRemovalKeys(stale);
-      cascadeRestore(ids, chars);
-    }
-    const before = new Set(currentCarvedLayoutValue().removals.map(removalKey));
-    toggleRecommendedRows(primaryRows.filter(isMarkedRow), true);
-    const added = currentCarvedLayoutValue().removals.map(removalKey).filter((k) => !before.has(k));
-    if (cs === null && added.length === 0) return;
-    setCarveSuggestion({
-      fingerprint: suggestionFingerprint,
-      derived: [...(cs?.derived ?? []).filter(isCurrent), ...added],
-      kept: (cs?.kept ?? []).filter((c) => currentChars.has(c)),
-      ...(cs?.touched === true ? { touched: true } : {}),
-    });
-  }, [recommendationReady, primaryRows, cascadeRestore, toggleRecommendedRows, isMarkedRow, setCarveSuggestion, suggestionFingerprint]);
+  const applySuggestion = useCallback(
+    () => applyCarveSuggestion(primaryRows, recommendationReady),
+    [recommendationReady, primaryRows],
+  );
   const derivedIds = useMemo(
     () => new Set(partitionRemovalKeys(carveSuggestion?.derived ?? []).ids),
     [carveSuggestion],
@@ -1245,15 +1198,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     onComplete();
   }, [applySuggestion, onComplete]);
   const handleSkip = useCallback(() => {
-    keepAll();
-    setCarveSuggestion({
-      fingerprint: suggestionFingerprint,
-      derived: [],
-      kept: suggestionFingerprint === '[]' ? [] : primaryRows.map((r) => r.ch.normalize('NFC')).sort(),
-      touched: true,
-    });
+    applyCarveSkip(primaryRows);
     onComplete();
-  }, [keepAll, setCarveSuggestion, suggestionFingerprint, primaryRows, onComplete]);
+  }, [primaryRows, onComplete]);
 
   const backAction =
     onBack !== undefined

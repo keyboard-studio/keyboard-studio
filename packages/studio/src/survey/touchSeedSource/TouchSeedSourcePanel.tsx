@@ -51,8 +51,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { emitTouchLayout } from "@keyboard-studio/engine";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
@@ -63,8 +61,14 @@ import type { TouchSeedSourceValue } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { type TouchSeedSource } from "../../stores/surveySessionStore.ts";
 import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
-import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
-import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
+import { touchDesktopModifications } from "../../lib/touchStepCompletion.ts";
+import {
+  clearTouchDraftOnSeedChange,
+  defaultTouchSeedSource,
+  deriveSeedPreview,
+  parseBaseTouchPreview,
+  startShipsUsableTouch,
+} from "./touchSeedSourceContinue.ts";
 import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
@@ -79,64 +83,8 @@ import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT,
 } from "../../lib/galleryTheme.ts";
 
-/** No desktop work to replay when there is no startIr yet (mirrors TouchGallery's EMPTY_MODS). */
-const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
-// ---------------------------------------------------------------------------
-// Raw `.keyman-touch-layout` metadata parsing — for the advisory notes only
-// (which platforms the base ships, whether the JSON is malformed). The actual
-// keycap rendering is now the real OSK, so this no longer needs to walk
-// layers/rows/keys — only the platform id list.
-//
-// Deliberately NOT the engine's parseTouchLayout (engine/src/codec/parse-touch.ts)
-// — this is a lightweight shape sniff for the advisory text, not a full parse.
-// ---------------------------------------------------------------------------
-
-interface RawPreviewPlatform {
-  layer?: unknown[];
-}
-type RawPreviewTouchLayout = Record<string, RawPreviewPlatform | undefined>;
-
-function isRawPlatform(v: unknown): v is RawPreviewPlatform {
-  return typeof v === "object" && v !== null && Array.isArray((v as RawPreviewPlatform).layer);
-}
-
-/** Preference order for which platform's layers to preview when several ship. */
-const PREVIEW_PLATFORM_ORDER = ["phone", "tablet", "desktop"] as const;
-
-function pickPreviewPlatformId(platformIds: readonly string[]): string | undefined {
-  return PREVIEW_PLATFORM_ORDER.find((id) => platformIds.includes(id)) ?? platformIds[0];
-}
-
-export interface StartTouchLayoutSummary {
-  /** Platform ids the source layout ships, e.g. ["phone", "tablet"]. */
-  platformIds: string[];
-  /** The platform id preferred for display, per {@link PREVIEW_PLATFORM_ORDER}. */
-  previewPlatformId: string;
-}
-
-/**
- * Parse a base's raw `.keyman-touch-layout` JSON string into a lightweight
- * platform-id summary. Returns null for absent or malformed input — both are
- * treated as "no usable base layout" by the caller (R4): the malformed case is
- * reported with a distinct note, but neither case blocks either choice.
- */
-export function parseBaseTouchPreview(json: string | undefined): StartTouchLayoutSummary | null {
-  if (json === undefined) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-  const obj = parsed as RawPreviewTouchLayout;
-  const platformIds = Object.keys(obj).filter((id) => isRawPlatform(obj[id]));
-  if (platformIds.length === 0) return null;
-
-  const previewPlatformId = pickPreviewPlatformId(platformIds) ?? platformIds[0]!;
-  return { platformIds, previewPlatformId };
-}
+export { parseBaseTouchPreview, type StartTouchLayoutSummary } from "./touchSeedSourceContinue.ts";
 
 // ---------------------------------------------------------------------------
 // Styles — gallery look (galleryTheme tokens), matching IntroSplash / TouchGallery.
@@ -249,15 +197,14 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
   const mods = useMemo<DesktopModifications>(() => {
-    if (startIr === null) return EMPTY_MODS;
-    return deriveDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
+    return touchDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startIr, modsDepsKey]);
 
   const rawJson = useMemo(() => resolveStartTouchJson(startVfs), [startVfs]);
   const preview = useMemo(() => parseBaseTouchPreview(rawJson), [rawJson]);
 
-  const hasUsableBaseLayout = preview !== null;
+  const hasUsableBaseLayout = useMemo(() => startShipsUsableTouch(startVfs), [startVfs]);
   const isMalformed = rawJson !== undefined && preview === null;
   const hasPhonePlatform = preview !== null && preview.platformIds.includes("phone");
   const hasOtherPlatforms = preview !== null && preview.platformIds.some((id) => id !== "phone");
@@ -267,8 +214,9 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
   // re-deriving the default, so returning to this step doesn't silently
   // flip the selection back.
   const [selected, setSelected] = useState<TouchSeedSource>(
-    storedSeedSource ?? (hasUsableBaseLayout ? "import-adapt" : "reseed-from-desktop"),
+    defaultTouchSeedSource(startVfs, storedSeedSource),
   );
+
 
   // ---------------------------------------------------------------------------
   // Live OSK preview (spec 035 R4b) — the SAME seed-derivation mechanism
@@ -280,22 +228,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
 
   const currentSeedPreview = useMemo<{ json: string; unplacedChars: string[] } | null>(() => {
     if (startIr === null) return null;
-    try {
-      const baseTouchJson = selected === "reseed-from-desktop" ? undefined : rawJson;
-      const { layout, unplacedChars } = deriveSeedLayout(startIr, {
-        ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
-        mods,
-        seedSource: selected,
-      });
-      return { json: emitTouchLayout(layout), unplacedChars };
-    } catch (err) {
-      // A genuine derivation failure (as opposed to "no startIr yet", handled
-      // by the guard above) has no other signal — the graceful fallback note
-      // still renders, but this is otherwise silent, so log it for anyone
-      // debugging in devtools.
-      devLog.error("[TouchSeedSourcePanel] seed preview derivation failed:", err);
-      return null;
-    }
+    return deriveSeedPreview(startIr, rawJson, selected, mods);
   }, [startIr, selected, rawJson, mods]);
 
   // Named string locals computed BEFORE the JSX below — the message body
@@ -373,9 +306,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
     // charTouch entries reference host keys of the other seed and would
     // half-apply. A no-op re-confirm of the same value leaves it untouched.
     // (This side effect used to ride on the session store's seed setter.)
-    if (selected !== storedSeedSource) {
-      useWorkingCopyStore.getState().setTouchDraft(null);
-    }
+    clearTouchDraftOnSeedChange(selected, storedSeedSource);
     // Spec 090 T012: the record itself is the host's — onChange records the
     // touch-seed-source decision (provenance "asked", this step) and runs
     // the module's apply.

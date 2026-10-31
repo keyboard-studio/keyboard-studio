@@ -11,7 +11,7 @@
 // spec carries it separately. A spec that omits it runs with the store default,
 // which is what every recorded walk before this field ran with.
 
-import { makeStartKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard, type StartKeyboard } from "@keyboard-studio/contracts";
 import type {
   CompileResult,
   FallbackPolicy,
@@ -37,9 +37,9 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { resetRebuildTrail, rebuildWorkingCopyFromStores } from "../decisions/rebuildWorkingCopy.ts";
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
-import { buildOutputBundle } from "../lib/buildOutputBundle.ts";
+import { buildOutputBundle, type OutputBundle } from "../lib/buildOutputBundle.ts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
-import { analyseContextTolerance } from "../lib/contextToleranceAnalysis.ts";
+import { analyseWorkingCopyContextTolerance } from "../lib/contextToleranceRun.ts";
 import { applyContextToleranceDecision } from "../lib/contextToleranceApply.ts";
 import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
@@ -56,10 +56,19 @@ export interface DecisionPointFixtureSpec {
   group: string;
   script: string;
   displayName: string;
+  /** The start keyboard's BCP47 languages (the catalog record's), when known. */
+  languages?: string[];
   track: "copy" | "adapt";
   point: DecisionPoint;
   /** Already cut at `point` (see recordToDecisionSet). */
   decisions: DecisionSet;
+  /**
+   * The touch layout the touch step left in the working copy (spec 107 FR-050): the
+   * replay does not reproduce that step, so a caller that walked it passes the result
+   * (null when the step emitted nothing). When given, the projection carries it and
+   * G6 is evaluated on the bundle; absent, G6 stays walk-only.
+   */
+  touchLayoutJson?: string | null;
   /** The keyboard-wide carve fallback policy the walk ended with. Default: the store's. */
   fallbackPolicy?: FallbackPolicy;
 }
@@ -72,6 +81,14 @@ export interface DecisionPointFixture {
   simulate(keys: SimKeyInput[], seed?: SimulatorContextSeed): SimulationResult;
   /** The starting keyboard's IR, for fidelity comparisons. */
   startIr: KeyboardIR;
+  /** The download-path bundle the gates were checked on (spec 107 FR-006). */
+  bundle: OutputBundle;
+  /**
+   * Sites of a recorded accept/partial tolerance decision the replay dropped as stale
+   * (the product drops it the same way once later steps change the keyboard).
+   * Absent when the decision applied, was declined, or none was recorded.
+   */
+  toleranceStaleSiteIds?: string[];
 }
 
 function resetStores(): void {
@@ -81,11 +98,16 @@ function resetStores(): void {
   resetRebuildTrail();
 }
 
-/**
- * Instantiate the way the open-base run does: the loader's asset clean-up, parse,
- * pattern recognition and the base's touch layout, then the track's entry point.
- */
-function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
+/** The starting keyboard as loaded, before any store sees it. */
+export interface StartingPoint {
+  vfs: VirtualFS;
+  ir: KeyboardIR;
+  base: StartKeyboard;
+  removalCapabilities: ReturnType<typeof classifyRemovalCapabilities>;
+}
+
+/** Load and parse the starting keyboard, touching no store (the first half of instantiate). */
+export function loadStartingPoint(spec: DecisionPointFixtureSpec): StartingPoint {
   const vfs = loadVfs({ id: spec.base, group: spec.group });
   const kmnPath = `source/${spec.base}.kmn`;
   const fetched = readVfsText(vfs, kmnPath);
@@ -109,9 +131,20 @@ function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
     targets: ["windows"],
     displayName: spec.displayName,
     version: "1.0",
+    ...(spec.languages !== undefined ? { languages: spec.languages } : {}),
   });
+  return { vfs, ir, base, removalCapabilities: classifyRemovalCapabilities(ir) };
+}
+
+/**
+ * Instantiate the way the open-base run does: the loader's asset clean-up, parse,
+ * pattern recognition and the base's touch layout, then the track's entry point.
+ * Shared with the headless author (spec 107 T013), which instantiates the same way.
+ */
+export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
+  const { vfs, ir, base, removalCapabilities } = loadStartingPoint(spec);
   const store = useWorkingCopyStore.getState();
-  const opts = { vfs, ir, removalCapabilities: classifyRemovalCapabilities(ir) };
+  const opts = { vfs, ir, removalCapabilities };
   if (spec.track === "copy") store.instantiateFromStart(base, opts);
   else store.instantiateFromExisting(base, opts);
   return ir;
@@ -143,9 +176,9 @@ function installUnreplayedSlices(decisions: DecisionSet): void {
  * the product of an async compile and simulation against the keyboard as
  * projected so far. Mirrors useContextToleranceApply.
  */
-async function installToleranceOverlay(decisions: DecisionSet): Promise<void> {
+async function installToleranceOverlay(decisions: DecisionSet): Promise<string[] | undefined> {
   const decision = (decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined)?.contextTolerance;
-  if (decision === undefined || decision === null || decision.decision === "decline") return;
+  if (decision === undefined || decision === null || decision.decision === "decline") return undefined;
 
   const interim = await projectWorkingCopyForOutput();
   if (interim === null) throw new Error("tolerance: working copy not instantiated");
@@ -153,14 +186,19 @@ async function installToleranceOverlay(decisions: DecisionSet): Promise<void> {
   if (kmn === undefined) throw new Error("tolerance: projected .kmn missing");
   const ir = parseKmn(kmn, interim.keyboardId).ir;
 
-  const analysed = await analyseContextTolerance(ir, () => true);
-  if (analysed === null) return;
+  const analysed = await analyseWorkingCopyContextTolerance(ir, () => true);
+  if (analysed === null) return undefined;
   const engine = await loadContextToleranceEngine();
   const outcome = await applyContextToleranceDecision(
     decision,
     { status: "ready", runId: 0, ...analysed },
     { engine, applyFacetTransform },
   );
+  // The product drops a decision whose fingerprint no longer matches the keyboard
+  // as it now stands (useContextToleranceApply): no tolerance rules are applied
+  // and the author is told which sites went stale. The replay does the same and
+  // reports the sites on the fixture rather than throwing.
+  if (outcome.kind === "stale") return outcome.staleSiteIds;
   if (outcome.kind !== "applied") {
     throw new Error(`tolerance: recorded decision did not apply (${outcome.kind})`);
   }
@@ -169,6 +207,7 @@ async function installToleranceOverlay(decisions: DecisionSet): Promise<void> {
     acceptedSiteIds: [...decision.acceptedSiteIds],
     overlay: outcome.overlay,
   });
+  return undefined;
 }
 
 export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec): Promise<DecisionPointFixture> {
@@ -182,8 +221,9 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
 
   // 5. install what replay leaves elsewhere.
   installUnreplayedSlices(spec.decisions);
+  if (spec.touchLayoutJson !== undefined) useWorkingCopyStore.getState().setTouchLayoutJson(spec.touchLayoutJson);
   if (spec.fallbackPolicy !== undefined) useWorkingCopyStore.getState().setFallbackPolicy(spec.fallbackPolicy);
-  if (spec.point === "tolerance") await installToleranceOverlay(spec.decisions);
+  const toleranceStaleSiteIds = spec.point === "tolerance" ? await installToleranceOverlay(spec.decisions) : undefined;
 
   // 6. the real download path.
   const bundle = await buildOutputBundle();
@@ -211,6 +251,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     decisions: spec.decisions,
     point: spec.point,
     startIr,
+    ...(spec.touchLayoutJson !== undefined ? { includeTouch: true } : {}),
     ...(again !== null ? { repeatVfs: again.vfs } : {}),
   });
 
@@ -222,5 +263,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     gates,
     simulate: (keys, seed) => simulate(compiled, keys, seed),
     startIr,
+    bundle,
+    ...(toleranceStaleSiteIds !== undefined ? { toleranceStaleSiteIds } : {}),
   };
 }

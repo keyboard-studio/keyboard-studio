@@ -8,10 +8,11 @@
 // the apply effect passes `createContextToleranceMigrationRule(...)` as
 // `ruleOverride`, because the rule is built from an async-computed result.
 
-import type { RuleToleranceFinding, SimKeyInput } from "@keyboard-studio/contracts";
+import type { MarksContextToleranceDecision, RuleToleranceFinding, SimKeyInput } from "@keyboard-studio/contracts";
 import type { TransformProposal } from "@keyboard-studio/engine";
 
 import { vkeyLabel } from "../../lib/irToCarveNodes.ts";
+import type { ContextToleranceState } from "../../stores/workingCopyStore.ts";
 
 /** Plain-text pieces the builder needs; the caller localizes them. */
 export interface ContextToleranceProposalText {
@@ -124,4 +125,57 @@ export function buildNormalizationStepProposal(args: {
     migrationRuleId: "context-tolerance",
     namedLosses: [],
   };
+}
+
+/** Wording-free text: the decision a proposal yields never depends on it. */
+const NO_TEXT: ContextToleranceProposalText = { siteFraming: () => "", description: () => "" };
+
+/**
+ * The station's proposal for the latest analysis (spec 078): `null` when there
+ * is nothing to propose (no analysis yet, failed, or no fixable rule;
+ * could-not-check items are never author-facing). A generated normalization
+ * step is one all-or-nothing site; otherwise one site per fixable rule.
+ * `text` is the caller's localized wording; omit it where only the proposal's
+ * sites matter.
+ */
+export function toleranceProposalFor(
+  tolerance: ContextToleranceState,
+  text: ContextToleranceProposalText = NO_TEXT,
+): TransformProposal | null {
+  if (tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
+  if (tolerance.normalizationStep !== undefined) {
+    // The station's own intro, examples and disclosure carry the wording; the
+    // panel's description and the (hidden) site framing stay empty.
+    return buildNormalizationStepProposal({
+      ruleCount: tolerance.normalizationStep.ruleCount,
+      framing: "",
+      description: "",
+    });
+  }
+  const fixable = new Set(tolerance.fixableRuleIds);
+  const addedRuleCount = tolerance.proposal.variants.filter((v) => fixable.has(v.sourceRuleId)).length;
+  return buildContextToleranceProposal({
+    fixableRuleIds: tolerance.fixableRuleIds,
+    findings: tolerance.report.findings,
+    addedRuleCount,
+    siteIds: tolerance.siteKeys,
+    text,
+  });
+}
+
+/** Whether the series shows the context-tolerance station: the analysis is running, or it produced a proposal. */
+export function toleranceStationShown(tolerance: ContextToleranceState, proposal: TransformProposal | null): boolean {
+  return tolerance.status === "analysing" || proposal !== null;
+}
+
+/** Map the panel's confirmed dispositions onto the decision shape. */
+export function decisionFromProposal(
+  confirmed: TransformProposal,
+  fingerprint: string,
+): Omit<MarksContextToleranceDecision, "appliedFingerprint"> {
+  const proposedSiteIds = confirmed.affectedSites.map((s) => s.siteId);
+  const acceptedSiteIds = confirmed.affectedSites.filter((s) => s.userDisposition === "accepted").map((s) => s.siteId);
+  const decision =
+    acceptedSiteIds.length === proposedSiteIds.length ? "accept" : acceptedSiteIds.length === 0 ? "decline" : "partial";
+  return { decision, acceptedSiteIds, proposedSiteIds, fingerprint };
 }

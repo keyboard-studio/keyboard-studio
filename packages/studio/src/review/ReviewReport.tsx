@@ -299,7 +299,7 @@ export function ReviewReport({
           <div
             role="note"
             style={{
-              borderLeft: "4px solid var(--sil-green-dark, #2e7d32)",
+              borderLeft: "4px solid var(--sil-green-dark)",
               background: BG_INSET,
               borderRadius: "0 10px 10px 0",
               padding: "10px 14px",

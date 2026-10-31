@@ -1177,3 +1177,61 @@ group(main) using keys
     );
   });
 });
+
+describe("emit: unsourced rules keep their group position", () => {
+  const SRC = [
+    "store(&VERSION) '14.0'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [K_A] > 'a'",
+    "+ [K_B] > 'b'",
+    "",
+  ].join("\n");
+
+  const synth = (nodeId: string, key: string): IRRule => ({
+    nodeId,
+    context: [{ kind: "vkey", name: key, modifiers: [] }],
+    output: [{ kind: "char", value: "z" }],
+  });
+
+  const rulesOf = (out: string): string[] =>
+    out.split(/\r?\n/).filter((l) => l.startsWith("+ "));
+
+  // Parametrised over the fragment-free path and the position-faithful
+  // (fragment-bearing) path, which sorts by sourceLine.
+  for (const withFragment of [false, true]) {
+    describe(withFragment ? "fragment-bearing IR" : "fragment-free IR", () => {
+      const build = (): KeyboardIR => {
+        const ir = parse(SRC, "emit_pos_test").ir;
+        if (withFragment) {
+          ir.raw.push({
+            nodeId: "raw#0",
+            origin: "imported",
+            sourceText: "c opaque",
+            reason: "option-store-directive",
+            sourceLine: 1,
+          });
+        }
+        return ir;
+      };
+
+      it("places a synthesized rule immediately ahead of the next sourced rule", () => {
+        const ir = build();
+        const g = ir.groups[0]!;
+        g.rules.splice(1, 0, synth("gen-1", "K_X"), synth("gen-2", "K_Y"));
+        const rules = rulesOf(emit(ir));
+        const idx = (k: string): number => rules.findIndex((l) => l.includes(k));
+        expect(idx("K_A")).toBeLessThan(idx("K_X"));
+        expect(idx("K_X")).toBeLessThan(idx("K_Y"));
+        expect(idx("K_Y")).toBeLessThan(idx("K_B"));
+      });
+
+      it("keeps a trailing unsourced rule at the end", () => {
+        const ir = build();
+        ir.groups[0]!.rules.push(synth("gen-3", "K_T"));
+        const rules = rulesOf(emit(ir));
+        expect(rules[rules.length - 1]).toContain("K_T");
+      });
+    });
+  }
+});

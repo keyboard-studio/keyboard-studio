@@ -515,6 +515,10 @@ jobs:
       - name: Test (km-triage-app — outside the pnpm workspace)
         run: pnpm run test:km-triage
 
+      # The headless-sweep issue filer (spec 107) tests with node:test too.
+      - name: Test (headless-sweep issue filer)
+        run: pnpm run test:sweep-issues
+
       # supportability-scanner's own vitest suite — supportability-scan.yml
       # only runs `scan.ts --check`, so the scanner's unit tests (including
       # the provenance fix) ran nowhere.
@@ -735,6 +739,103 @@ jobs:
           else
             gh issue create --title "$title" --body "$body"
           fi
+
+  # Headless scripted author, PR lane (spec 107 FR-031, SC-002). Its own job
+  # beside `build`: it needs only `changes`, and `build` does not need it, so
+  # it adds no wall time to the fast -> build chain. Same path gate as
+  # e2e-desktop (outputs.e2e). The job id and name are the required-check
+  # name once it is added to the `main: CI + integrity` ruleset: do not
+  # rename either without updating the ruleset in the same change.
+  headless-author:
+    name: headless-author
+    needs: changes
+    if: ${{ needs.changes.outputs.e2e == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      # Same pinned corpus as the build job (KEYBOARDS_CORPUS_SHA).
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames - offline, build input)
+        run: pnpm run codegen-charnames
+
+      # Raw SLDR and langtags inputs, cached on their pin files exactly as in
+      # the build job (a pin bump misses the key and forces a verified fetch).
+      - name: Cache SLDR extract
+        id: sldr-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/sldr/sldr
+          key: sldr-${{ hashFiles('scripts/sldr-version.json') }}
+
+      - name: Fetch SLDR (pinned)
+        if: steps.sldr-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-sldr
+
+      - name: Cache langtags.json
+        id: langtags-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/langtags/langtags.json
+          key: langtags-${{ hashFiles('scripts/langtags-version.json') }}
+
+      - name: Fetch langtags (pinned)
+        if: steps.langtags-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-langtags
+
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Headless author (PR set, parity, drift guard)
+        run: >-
+          pnpm --filter @keyboard-studio/studio exec vitest run
+          --config vitest.corpus.config.ts
+          src/test/headlessAuthor/prSet
+          src/test/headlessAuthor/parity
+          src/test/headlessAuthor/driftGuard
+
+      # driftGuard and boundary are plain unit tests: the corpus config above
+      # only matches *.corpus.test.ts, so they need the default config.
+      - name: Headless author (drift guard, boundary)
+        run: >-
+          pnpm --filter @keyboard-studio/studio exec vitest run
+          src/test/headlessAuthor/driftGuard
+          src/test/headlessAuthor/boundary
 
   e2e-mobile:
     name: e2e mobile (Playwright, non-blocking)

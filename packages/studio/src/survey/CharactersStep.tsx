@@ -19,17 +19,14 @@
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import type {
-  ConfirmedAlphabet,
   LintFinding,
   RemapPosture,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
-import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
-import { deriveRemapPosture, marksLackingPairingEvidence } from "@keyboard-studio/engine";
 import type { SurveyContext } from "./types.ts";
 import type { Decision, DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../steps/galleryHost.tsx";
-import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
+import { alphabetKeyOf } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
@@ -37,7 +34,6 @@ import { deriveIdentityResult, deriveSurveyContext } from "../decisions/identity
 import { draftConfirmedAlphabet, type CharacterInventoryValue } from "./phaseBDraftOps.ts";
 import {
   getCharacterInventoryValue,
-  inventoryOps,
   useCharacterInventoryValue,
 } from "./useInventoryDraft.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
@@ -45,9 +41,23 @@ import type { KeyboardIR, StartKeyboard } from "@keyboard-studio/contracts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
-import { ADDITION_ANSWER_PREFIX } from "./characterFlags.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
 import { MarksTextSamplePrompt } from "./MarksTextSamplePrompt.tsx";
+import {
+  TEXT_SAMPLE_PROMPT_ANSWER_ID,
+  proposeTextSample,
+  textSampleSkipAnswer,
+} from "./marksTextSample.ts";
+import {
+  REMAP_POSTURE_ANSWER_ID,
+  confirmPrefill,
+  charactersCompletion,
+  derivedRemapPostureOf,
+  remapPostureAnswer,
+  savedRemapChoiceOf,
+  shouldPromptTextSample,
+  syncRemapPostureFromPrefill,
+} from "./charactersStepRules.ts";
 // The substage views (Prefill, PhaseB) arrive through the gallery
 // host's step-context extras, supplied by CharactersStepHost — NOT by
 // import. Both views transitively import the question registry
@@ -96,7 +106,6 @@ export interface CharactersStepExtras {
 // The survey-answer id recording a #1784 text-sample-prompt dismissal. The
 // value is `skipped:<alphabet key>` — keyed by alphabet content so a
 // genuinely changed alphabet re-arms the prompt.
-const TEXT_SAMPLE_PROMPT_ANSWER_ID = "characters.textSamplePrompt";
 
 // Manifest step id — matches steps/manifest.ts's "characters" entry.
 //
@@ -119,91 +128,6 @@ const TEXT_SAMPLE_PROMPT_ANSWER_ID = "characters.textSamplePrompt";
 // ahead of the remount that reads it) or a bare mock (a mocked PhaseB in a
 // unit test) that never reaches PhaseB's own state to restore it.
 const CHARACTERS_STEP_ID = "characters";
-
-/** The survey-answer id the A7a remap-posture confirmation records under. */
-const REMAP_POSTURE_ANSWER_ID = "characters.remapPosture";
-
-/** Seed-key prefixes the punctuation step records (see PunctuationStep's seed effects). */
-const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const;
-
-/**
- * The prefill confirm — the ONE chokepoint every route into the build list
- * passes (Back from Phase B, Done on Project name, Done on the adapt track:
- * steps/advance.ts leaves them all at substage "prefill"), so FR-020 holds on
- * every route by construction (spec 079 R-07).
- *
- * - Unchanged evidence with a built alphabet: nothing is reset. The author
- *   returns to the build list where they were — `discoveryMethod` survives the
- *   trip through prefill, so PhaseB reopens on the same screen (FR-004).
- * - A different key is a real shape change: fresh alphabet, the punctuation
- *   seeds tied to the old evidence cleared so its defaults are proposed again
- *   (FR-022), and the new key stamped. Carrying the author's edits across is
- *   US3's carry-over reset.
- * - No stamp is a first build — or a new working copy, whose instantiate
- *   cleared the stamp but not the previous project's draft — so it resets
- *   too. A draft saved before spec 079 is stamped on restore instead
- *   (lib/draftPersistence.ts `loadDraft`), so it is never mistaken for one.
- *
- * A REAL change is a carry-over reset (spec 079 US3 T059, R-07 steps 1-7),
- * so nothing the author already decided is silently dropped:
- *   1. snapshot the author's own additions (provenance "author") before
- *      `reset()` wipes `picks`/`provenance` — proposal-origin characters are
- *      re-seeded by the normal proposal path (IntroChooser / seedProposals),
- *      not carried here;
- *   2-3. reset, then clear the punctuation seed keys tied to the old
- *      evidence (unchanged from before this task);
- *   4. re-seeding for the NEW evidence happens the normal way once PhaseB
- *      re-renders against the fresh (empty) draft;
- *   5. `rejected` is untouched by `reset()` (phaseBDraftOps.ts), so a
- *      removal the author made of a PROPOSED character is re-applied for
- *      free — nothing here needs to replay it;
- *   6-7. every author addition is re-added regardless of fit (`draft.add`
- *      never drops one); an addition whose codepoints no longer belong to
- *      the new target script is ALSO saved as a `characters.addition.<ch>`
- *      answer stamped with the OLD key, so `reconcile()`/`characterFlags.ts`
- *      renders it `reproposed{outside-script}` until the author reconfirms
- *      or removes it (T080).
- */
-function confirmPrefill(identity: IdentityLiteResult, base: StartKeyboard): void {
-  const draft = getCharacterInventoryValue();
-  const ops = inventoryOps(CHARACTERS_STEP_ID);
-  const key = alphabetKeyOf(identity, base);
-  const oldKey = draft.alphabetEvidenceKey;
-  if (draft.chars.length > 0 && oldKey === key) return;
-
-  // A real shape change only when there was a built alphabet to carry over —
-  // a first build (no stamp yet) or an already-empty draft has nothing to
-  // snapshot.
-  const authorAdditions =
-    oldKey !== undefined && draft.chars.length > 0
-      ? Object.entries(draft.provenance)
-          .filter(([, origin]) => origin === "author")
-          .map(([grapheme]) => grapheme)
-      : [];
-
-  ops.reset();
-  if (oldKey !== undefined) {
-    ops.clearSeededProposals(PUNCTUATION_SEED_PREFIXES);
-  }
-  ops.setAlphabetEvidenceKey(key);
-
-  if (authorAdditions.length === 0) return;
-  const targetScript = identity.prefill.script;
-  const saveAnswer = useSurveyAnswerStore.getState().saveAnswer;
-  for (const grapheme of authorAdditions) {
-    ops.add(grapheme);
-    if (!graphemeFitsScript(grapheme, targetScript)) {
-      saveAnswer(CHARACTERS_STEP_ID, `${ADDITION_ANSWER_PREFIX}${grapheme}`, {
-        value: grapheme,
-        answerType: "char-list",
-        origin: "confirmed",
-        stage: "confirmed",
-        evidenceKey: oldKey ?? null,
-        screenId: "build-list",
-      });
-    }
-  }
-}
 
 /**
  * Self-contained characters step adapter — the `character-inventory`
@@ -253,14 +177,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const syncRemapPosture = useWorkingCopyStore((s) => s.syncRemapPostureFromIdentity);
   const identityPrefill = identityResult?.prefill;
-  const derivedRemapPosture =
-    identityPrefill !== undefined && startIr !== null
-      ? deriveRemapPosture({
-          scriptClass: identityPrefill.scriptClass,
-          targetScript: identityPrefill.script,
-          baseIr: startIr,
-        })
-      : undefined;
+  const derivedRemapPosture = derivedRemapPostureOf(identityPrefill, startIr);
 
   // The derivation runs when the target script lands — the identity is
   // composed before this step renders — reconciling the irAxes baseline.
@@ -268,7 +185,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   const prefillScriptClass = identityPrefill?.scriptClass;
   useEffect(() => {
     if (prefillScript !== undefined && prefillScriptClass !== undefined) {
-      syncRemapPosture({ scriptClass: prefillScriptClass, targetScript: prefillScript });
+      syncRemapPostureFromPrefill({ scriptClass: prefillScriptClass, script: prefillScript }, syncRemapPosture);
     }
   }, [prefillScript, prefillScriptClass, startIr, syncRemapPosture]);
 
@@ -283,19 +200,16 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   const savedRemapAnswer = useSurveyAnswerStore(
     (s) => s.steps[CHARACTERS_STEP_ID]?.answers[REMAP_POSTURE_ANSWER_ID],
   );
-  const savedRemapChoice: RemapPosture | undefined =
-    savedRemapAnswer?.evidenceKey === remapEvidenceKey &&
-    (savedRemapAnswer?.value === "addition" || savedRemapAnswer?.value === "full-remap")
-      ? savedRemapAnswer.value
-      : undefined;
+  const savedRemapChoice: RemapPosture | undefined = savedRemapChoiceOf(savedRemapAnswer, remapEvidenceKey);
   const [remapChoice, setRemapChoice] = useState<RemapPosture | null>(null);
   useEffect(() => {
     setRemapChoice(null);
   }, [remapEvidenceKey]);
-  const remapAnswer: RemapPosture | undefined =
-    derivedRemapPosture !== undefined
-      ? (remapChoice ?? savedRemapChoice ?? derivedRemapPosture)
-      : undefined;
+  const remapAnswer: RemapPosture | undefined = remapPostureAnswer({
+    derived: derivedRemapPosture,
+    chosen: remapChoice,
+    saved: savedRemapChoice,
+  });
 
   // --- Prefill inline edits (issue 542) ---
   // The Language / Script rows on the prefill screen edit the identity
@@ -359,51 +273,16 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
 
   /** The pre-existing completion path: attach the confirmed alphabet and advance. */
   function completeCharacters(result: SurveyPhaseResult): void {
-    // Commit the three-store ConfirmedAlphabet alongside the flat
-    // confirmedInventory (spec 071 US5): the character-inventory
-    // decision value is canonical for it; a manual-flow completion
-    // leaves the draft empty, so the field stays absent there
-    // (additive optional). Read the draft NOW so pairs harvested in
-    // the #1784 prompt land in the attached alphabet.
-    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
-    const hasStores =
-      alphabet.bases.length > 0 ||
-      alphabet.marks.length > 0 ||
-      alphabet.attestedStacks.length > 0;
-    // A7a (spec §7.2 rule 8): when the derivation fired for this evidence,
-    // the confirmed remap posture (the derived prefill, or the author's
-    // change to it) rides the result as a tier-1 computed axis so it
-    // outranks the irAxes baseline. When it no longer fires (the author
-    // went back and changed the target script), strip a stale posture a
-    // previous completion recorded — recordPhase merges over the prior
-    // same-phase entry, so omitting the axis would keep the old value.
-    let computedAxes = result.computedAxes;
-    if (remapAnswer !== undefined) {
-      computedAxes = { ...computedAxes, remapPosture: remapAnswer };
-    } else if (computedAxes?.remapPosture !== undefined) {
-      const { remapPosture: _stalePosture, ...restAxes } = computedAxes;
-      computedAxes = restAxes;
-    }
-    const withAxes =
-      computedAxes === result.computedAxes ? result : { ...result, computedAxes };
-    onComplete(hasStores ? { ...withAxes, alphabet } : withAxes);
-  }
-
-  /** The #1784 prompt was dismissed for this exact alphabet already. */
-  function textSamplePromptDismissed(alphabet: ConfirmedAlphabet): boolean {
-    const saved =
-      useSurveyAnswerStore.getState().steps[CHARACTERS_STEP_ID]?.answers[
-        TEXT_SAMPLE_PROMPT_ANSWER_ID
-      ];
-    return saved?.value === `skipped:${confirmedAlphabetKey(alphabet)}`;
+    // Read the draft NOW so pairs harvested in the #1784 prompt land in the
+    // attached alphabet; see charactersCompletion for the alphabet and the A7a
+    // remap-posture axis.
+    onComplete(charactersCompletion(result, draftConfirmedAlphabet(getCharacterInventoryValue()), remapAnswer));
   }
 
   function handlePhaseBComplete(result: SurveyPhaseResult): void {
     const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
-    if (
-      marksLackingPairingEvidence(alphabet).length > 0 &&
-      !textSamplePromptDismissed(alphabet)
-    ) {
+    const savedPrompt = useSurveyAnswerStore.getState().steps[CHARACTERS_STEP_ID]?.answers[TEXT_SAMPLE_PROMPT_ANSWER_ID];
+    if (shouldPromptTextSample(alphabet, savedPrompt)) {
       setDeferredResult(result);
       return;
     }
@@ -411,20 +290,8 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   }
 
   function handlePromptSkip(): void {
-    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
-    const key = confirmedAlphabetKey(alphabet);
-    useSurveyAnswerStore.getState().saveAnswer(
-      CHARACTERS_STEP_ID,
-      TEXT_SAMPLE_PROMPT_ANSWER_ID,
-      {
-        value: `skipped:${key}`,
-        answerType: "select",
-        origin: "confirmed",
-        stage: "confirmed",
-        evidenceKey: key,
-        screenId: "text-sample-prompt",
-      },
-    );
+    const { answerId, answer } = textSampleSkipAnswer(draftConfirmedAlphabet(getCharacterInventoryValue()));
+    useSurveyAnswerStore.getState().saveAnswer(CHARACTERS_STEP_ID, answerId, answer);
     const done = deferredResult;
     setDeferredResult(null);
     if (done !== null) completeCharacters(done);
@@ -435,7 +302,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // deferred completion with the enriched alphabet.
   useEffect(() => {
     if (deferredResult === null) return;
-    if (marksLackingPairingEvidence(draftConfirmedAlphabet(draftValue)).length === 0) {
+    if (proposeTextSample(draftConfirmedAlphabet(draftValue)) === null) {
       setDeferredResult(null);
       completeCharacters(deferredResult);
     }
@@ -511,14 +378,12 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // place of PhaseB until the harvest covers the marks or the designer
   // skips. Back returns to the build list (Done re-fires the prompt).
   if (deferredResult !== null) {
-    const alphabet = draftConfirmedAlphabet(draftValue);
-    const lacking = marksLackingPairingEvidence(alphabet);
-    if (lacking.length > 0) {
-      const hadTextSample = alphabet.attestedStacks.some((s) => s.source === "text");
+    const proposal = proposeTextSample(draftConfirmedAlphabet(draftValue));
+    if (proposal !== null) {
       return (
         <MarksTextSamplePrompt
-          lackingMarks={lacking}
-          hadTextSample={hadTextSample}
+          lackingMarks={proposal.lackingMarks}
+          hadTextSample={proposal.hadTextSample}
           onBack={() => setDeferredResult(null)}
           onSkip={handlePromptSkip}
         />

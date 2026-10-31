@@ -438,3 +438,17 @@ describe("spec 088 — decision-keyed slots (C-5)", () => {
     expect(entries[1]!.supersedes).toBe("d1");
   });
 });
+
+describe("reset restarts the entry ids", () => {
+  it("issues the same first id after a reset, so two sessions in one process agree", () => {
+    const store = useDecisionLogStore.getState();
+    const firstId = (): string => {
+      store.reset();
+      store.append({ stepId: "identity", payload: answer("q_name", "Hausa"), provenance: HAND_SET });
+      return store.record === undefined ? "" : useDecisionLogStore.getState().record.entries[0]!.entryId;
+    };
+    const a = firstId();
+    store.append({ stepId: "identity", payload: answer("q_code", "ha"), provenance: HAND_SET });
+    expect(firstId()).toBe(a);
+  });
+});

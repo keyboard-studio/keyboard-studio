@@ -24,6 +24,7 @@ import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
+import { languageResultsFor, resolveTypedLanguage } from "./resolveTypedLanguage.ts";
 import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
 import { interpolate } from "./interpolate.ts";
 
@@ -362,7 +363,7 @@ function LangtagsComboboxField({
         // is undefined.)
         const current = latestValueRef.current;
         if (current.trim() !== "") {
-          const results = current.trim() ? mod.lookupByName(current) : mod.listLanguages();
+          const results = languageResultsFor(mod, current);
           setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
           resolveTyped(current, results);
         }
@@ -391,51 +392,18 @@ function LangtagsComboboxField({
     // ref.current is the current prop, so this path is unchanged.
     const onResolved = onEntryResolvedRef.current;
     if (onResolved === undefined) return;
-    // Normalize before case-folding so NFC/NFD variants of the same name
-    // compare equal — matches the own-name dedup key in IdentityLite.getSeedOptions.
-    const trimmed = normalizeForCompare(text);
-    if (trimmed === "") {
-      onResolved(null);
-      return;
-    }
-    // Match the primary English name OR any alternate English name (langtags
-    // aliases, e.g. "Otuo" → Ghotuo) so a resolvable alias seeds downstream
-    // fields, not just the canonical name. Alternate names live on
-    // LanguageDefaults (getLanguageDefaults), not the LanguageSummary row, so
-    // read them through the loaded module.
+    // The resolution rule (primary name, then alias, unique match only) is
+    // survey/resolveTypedLanguage.ts; alternate names live on LanguageDefaults,
+    // so they are read through the loaded module.
     const mod = modRef.current;
-    const primaryMatch = (r: LanguageSummary): boolean =>
-      normalizeForCompare(r.englishName ?? "") === trimmed;
-    const aliasMatch = (r: LanguageSummary): boolean => {
-      const altNames = mod?.getLanguageDefaults(r.code)?.englishNames;
-      return altNames?.some((n) => normalizeForCompare(n) === trimmed) ?? false;
-    };
-
-    // The primary English name takes precedence over aliases: a *unique*
-    // primary-name match resolves even when the same text is also an alias of a
-    // different entry. This keeps alias resolution strictly additive — it never
-    // turns a query that previously auto-resolved (by primary name) into an
-    // ambiguous null. Aliases decide only when no single primary name matches.
-    // This precedence is local to resolveTyped: lookupByName folds aliases into
-    // the same ranking tier as the primary name (it has no primary-over-alias
-    // precedence of its own), so there is nothing there to mirror.
-    const primary = results.filter(primaryMatch);
-    if (primary.length >= 1) {
-      // >1 primary match is genuinely ambiguous by canonical name alone → null.
-      onResolved(primary.length === 1 ? primary[0]! : null);
-      return;
-    }
-    // No primary-name match: fall back to aliases. An alias shared by >1 entry
-    // stays ambiguous (null), same as an ambiguous primary name.
-    const byAlias = results.filter(aliasMatch);
-    onResolved(byAlias.length === 1 ? byAlias[0]! : null);
+    onResolved(resolveTypedLanguage(text, results, (code) => mod?.getLanguageDefaults(code)?.englishNames));
   }
 
   function handleType(text: string): void {
     onChange(text);
     const mod = modRef.current;
     if (mod === null) return;
-    const results = text.trim() ? mod.lookupByName(text) : mod.listLanguages();
+    const results = languageResultsFor(mod, text);
     setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
     resolveTyped(text, results);
   }
@@ -444,7 +412,7 @@ function LangtagsComboboxField({
     const mod = modRef.current;
     if (mod === null) return;
     const cur = strVal.trim();
-    const results = cur ? mod.lookupByName(cur) : mod.listLanguages();
+    const results = languageResultsFor(mod, cur);
     setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
   }
 

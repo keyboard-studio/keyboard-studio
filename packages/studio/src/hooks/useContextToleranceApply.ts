@@ -16,58 +16,13 @@
 // decision it was built for. No timer (D3): it runs when its inputs change.
 
 import { useEffect, useRef, useState } from "react";
-import {
-  applyContextToleranceOverlay,
-  applyFacetTransform,
-  removeContextToleranceOverlay,
-  type ContextToleranceOverlay,
-} from "@keyboard-studio/engine";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
-import {
-  getMarksTreatmentValue,
-  recordMarksTreatmentValue,
-  type MarksTreatmentValue,
-} from "../survey/marks/marksValue.ts";
-import { applyMutatePatch } from "../steps/mutateApply.ts";
-import { CONTEXT_TOLERANCE_WRITES } from "../steps/contextToleranceWrites.ts";
-import { applyContextToleranceDecision, contextTolerancePatch } from "../lib/contextToleranceApply.ts";
-import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
+import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
+import { applyToleranceDecision, commitOverlay } from "../lib/contextToleranceCommit.ts";
 import type { ContextToleranceApplyNotes } from "../lint/ContextToleranceNotice.tsx";
-
-const OVERLAY_OPS = { applyContextToleranceOverlay, removeContextToleranceOverlay };
-
-/** Commit `next` (or its removal, with `null`) to the working IR and the overlay slice. */
-function commitOverlay(
-  next: { fingerprint: string; acceptedSiteIds: string[]; overlay: ContextToleranceOverlay } | null,
-): void {
-  const store = useWorkingCopyStore.getState();
-  const previous = store.contextToleranceOverlay?.overlay ?? null;
-  if (store.ir !== null) {
-    const patch = contextTolerancePatch(store.ir, previous, next?.overlay ?? null, OVERLAY_OPS);
-    store.setWorkingIR(applyMutatePatch(store.ir, patch, CONTEXT_TOLERANCE_WRITES));
-  }
-  store.setContextToleranceOverlay(next);
-}
-
-/**
- * Record `appliedFingerprint` on the decision that carries it (spec 090
- * T023: the marks-treatment decision value — before T023 this mutated the
- * phase result). The re-record goes through the decide core with the
- * marks stub, whose apply is a no-op: stamping the fingerprint must not
- * re-run the mark guards.
- */
-function markApplied(fingerprint: string): void {
-  const value = getMarksTreatmentValue();
-  if (value?.contextTolerance == null) return;
-  if (value.contextTolerance.appliedFingerprint === fingerprint) return;
-  recordMarksTreatmentValue({
-    ...value,
-    contextTolerance: { ...value.contextTolerance, appliedFingerprint: fingerprint },
-  });
-}
 
 const decisionKey = (d: { fingerprint: string; acceptedSiteIds: readonly string[] }): string =>
   `${d.fingerprint}|${d.acceptedSiteIds.join(",")}`;
@@ -109,22 +64,8 @@ export function useContextToleranceApply(): ContextToleranceApplyNotes | null {
     let live = true;
     void (async () => {
       try {
-        const engine = await loadContextToleranceEngine();
-        const outcome = await applyContextToleranceDecision(decision, analysis, { engine, applyFacetTransform });
-        if (!live) return;
-        if (outcome.kind === "applied") {
-          commitOverlay({
-            fingerprint: decision.fingerprint,
-            acceptedSiteIds: [...decision.acceptedSiteIds],
-            overlay: outcome.overlay,
-          });
-          markApplied(decision.fingerprint);
-          setNotes(outcome.staleSiteIds.length > 0 ? { staleRuleIds: outcome.staleSiteIds } : null);
-        } else if (outcome.kind === "stale") {
-          setNotes({ staleRuleIds: outcome.staleSiteIds });
-        } else {
-          setNotes({ staleRuleIds: [], refusal: outcome.reason });
-        }
+        const notes = await applyToleranceDecision(decision, analysis, () => live);
+        if (live) setNotes(notes);
       } catch (err: unknown) {
         devLog.warn("[useContextToleranceApply] apply failed:", err);
         if (live) setNotes({ staleRuleIds: [], refusal: err instanceof Error ? err.message : String(err) });

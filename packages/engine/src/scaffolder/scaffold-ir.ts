@@ -17,6 +17,7 @@ import {
   unconditionalScaffoldRenameStores,
   conditionalScaffoldRenameStores,
 } from "../shared/siblingAssetStores.js";
+import { atLeastMinimumFormatVersion } from "../pattern-apply/mark-guards.js";
 import { pruneUnusedDeadkeys } from "../shared/pruneUnusedDeadkeys.js";
 
 export interface ScaffoldIRIdentity {
@@ -168,7 +169,8 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   const displayName = sanitizeDisplayName(identity.displayName);
   // &VERSION is the KMN file-format version — minimum 14.0 for &CasedKeys support.
   // It is NOT the human-visible keyboard release version.
-  const fileFormatVersion = "14.0";
+  // Never lowered below what the base declares: its touch layout may need 15.0+.
+  const fileFormatVersion = atLeastMinimumFormatVersion(getSystemStoreString(ir, "VERSION"));
   // &KEYBOARDVERSION is the human-visible keyboard release version.
   const keyboardVersion = identity.version ?? "1.0";
   // spec 064 SC-001: when no copyright is supplied, PRESERVE whatever the base

@@ -83,7 +83,7 @@ export interface UseDisplacementProposal {
  * the incoming character. The incoming character is part of it so that a
  * different character later displacing the same glyph is proposed afresh.
  */
-function dismissalKey(p: {
+export function displacementDismissalKey(p: {
   displacedChar: string;
   incomingChar: string;
   vkey: string;
@@ -92,26 +92,50 @@ function dismissalKey(p: {
   return `${p.displacedChar}|${p.vkey}|${[...p.modifiers].sort().join(",")}|${p.incomingChar}`;
 }
 
+/**
+ * Decide whether a displacement proposal is raised: pure, reads no store.
+ * The hook's `propose` is exactly this plus `setProposal`. `declined` is the
+ * working copy's `displacedDeclined` list. Null when the caller's
+ * `alreadyDemoted` says the glyph is re-homed already, or the same
+ * displacement was declined before.
+ */
+export function acceptDisplacementProposal(
+  input: DisplacementProposalInput,
+  declined: readonly string[],
+): DisplacementProposal | null {
+  const { alreadyDemoted, ...parts } = input;
+  if (alreadyDemoted?.() === true) return null;
+  if (declined.includes(displacementDismissalKey(parts))) return null;
+  return parts;
+}
+
+/**
+ * "Leave it" / "Keep both": record the dismissal in the working copy's
+ * `displacedDeclined` list. The hook's `dismiss` is exactly this plus
+ * clearing its pending proposal.
+ */
+export function declineDisplacementProposal(proposal: DisplacementProposal): void {
+  useWorkingCopyStore.getState().declineDisplacement(displacementDismissalKey(proposal));
+}
+
 export function useDisplacementProposal(): UseDisplacementProposal {
   const [proposal, setProposal] = useState<DisplacementProposal | null>(null);
   const declined = useWorkingCopyStore((s) => s.displacedDeclined);
-  const declineDisplacement = useWorkingCopyStore((s) => s.declineDisplacement);
 
   const propose = useCallback(
     (input: DisplacementProposalInput): boolean => {
-      const { alreadyDemoted, ...parts } = input;
-      if (alreadyDemoted?.() === true) return false;
-      if (declined.includes(dismissalKey(parts))) return false;
-      setProposal(parts);
+      const next = acceptDisplacementProposal(input, declined);
+      if (next === null) return false;
+      setProposal(next);
       return true;
     },
     [declined],
   );
 
   const dismiss = useCallback(() => {
-    if (proposal !== null) declineDisplacement(dismissalKey(proposal));
+    if (proposal !== null) declineDisplacementProposal(proposal);
     setProposal(null);
-  }, [proposal, declineDisplacement]);
+  }, [proposal]);
 
   const clear = useCallback(() => setProposal(null), []);
   const rebase = useCallback((from: MechanismAssignment, to: MechanismAssignment) => {
