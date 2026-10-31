@@ -8,19 +8,24 @@
 // resolves the target from the index (repo sources) or the params (PRs) and
 // jumps straight to the run.
 //
-// Hard links use path URLs:
-//   /review/<owner>/keyboards/pull/<N>      — PR; auto-runs if 1 keyboard,
-//                                            otherwise shows the picker with
-//                                            the PR preselected.
+// Hard links use path URLs (see reviewLinks.ts); both skip the picker:
+//   /review/<owner>/keyboards/pull/<N>[/<kb-path>] — PR, open or closed,
+//       resolved from the GitHub API; runs the named keyboard, or the only
+//       one the PR touches. Several and none named: the picker, PR preselected.
 //   /review/<owner>/keyboards/<kb-path...>  — published keyboard at the
 //                                            index HEAD; auto-runs.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { ACCENT, BG_CARD, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { ReviewPicker } from "./ReviewPicker.tsx";
 import { ReviewReport } from "./ReviewReport.tsx";
-import { fetchPrAuthorInfo, useReviewIndex, type PrAuthorInfo } from "./useReviewIndex.ts";
+import {
+  fetchPrAuthorInfo,
+  fetchPrKeyboards,
+  useReviewIndex,
+  type PrAuthorInfo,
+} from "./useReviewIndex.ts";
 import { useReviewJudge } from "./useReviewJudge.ts";
 import { useReviewSnapshot } from "./useReviewSnapshot.ts";
 import {
@@ -79,6 +84,45 @@ export function targetFromParams(
   };
 }
 
+/**
+ * Resolve a PR hard link straight to a run target: the PR's head sha and
+ * title, and the keyboard the link names or the only one the PR touches.
+ * Null when the PR touches several keyboards and the link names none.
+ */
+async function resolvePrLink(
+  link: Extract<ReviewPathLink, { kind: "pr" }>,
+  source: ReviewSourceId,
+): Promise<ReviewTarget | null> {
+  const [prRes, keyboards] = await Promise.all([
+    fetch(`https://api.github.com/repos/${link.owner}/keyboards/pulls/${link.prNumber}`, {
+      headers: { Accept: "application/vnd.github+json" },
+    }),
+    fetchPrKeyboards(link.owner, "keyboards", link.prNumber),
+  ]);
+  if (!prRes.ok) throw new Error(`PR API: HTTP ${prRes.status}`);
+  const pr = (await prRes.json()) as { title?: string; head?: { sha?: string } };
+  const sha = pr.head?.sha ?? "";
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error("PR head sha missing");
+  const kb =
+    link.keyboardPath !== undefined
+      ? keyboards.find((k) => k.path === link.keyboardPath)
+      : keyboards.length === 1
+        ? keyboards[0]
+        : undefined;
+  if (kb === undefined) return null;
+  return {
+    source,
+    owner: link.owner,
+    repo: "keyboards",
+    path: kb.path,
+    keyboardId: kb.id,
+    displayName: kb.displayName,
+    sha,
+    prNumber: link.prNumber,
+    ...(pr.title !== undefined ? { prTitle: pr.title } : {}),
+  };
+}
+
 export function ReviewScreen() {
   const { index, error: indexError } = useReviewIndex();
   const [phase, setPhase] = useState<Phase>("pick");
@@ -97,13 +141,27 @@ export function ReviewScreen() {
     prNumber: number;
   } | null>(null);
 
+  // A hard link being resolved shows "Opening…" instead of the picker.
+  const [resolvingLink, setResolvingLink] = useState(false);
+
+  const startRun = useCallback((t: ReviewTarget) => {
+    setTarget(t);
+    setResult(null);
+    setAuthorInfo(null);
+    setPhase("running");
+    setRunNonce((n) => n + 1);
+    // Fetch PR author info for the §17 context banner (PR targets only).
+    if (t.prNumber !== undefined) {
+      fetchPrAuthorInfo(t.owner, t.repo, t.prNumber).then(setAuthorInfo);
+    }
+  }, []);
+
   useEffect(() => {
     if (!index || target) return;
     // Query-param deep link first (exact pinned report link).
     const t = targetFromParams(new URLSearchParams(window.location.search), index);
     if (t) {
-      setTarget(t);
-      setPhase("running");
+      startRun(t);
       return;
     }
     // Path hard link.
@@ -114,26 +172,32 @@ export function ReviewScreen() {
     if (!sources) return;
     if (link.kind === "repo") {
       const repo = index.repos[sources.key];
-      const entry = repo?.keyboards.find((k) => k.path === link.keyboardPath);
-      if (repo && entry) {
-        const keyboardId = link.keyboardPath.split("/").pop() ?? link.keyboardPath;
-        setTarget({
-          source: sources.repo,
-          owner: repo.owner,
-          repo: "keyboards",
-          path: link.keyboardPath,
-          keyboardId,
-          displayName: entry.displayName ?? keyboardId,
-          sha: repo.sha,
-        });
-        setPhase("running");
-      }
+      if (!repo) return;
+      // Not in the index (a new or renamed folder): run anyway at the
+      // index HEAD — a wrong path fails visibly in the snapshot fetch.
+      const entry = repo.keyboards.find((k) => k.path === link.keyboardPath);
+      const keyboardId = link.keyboardPath.split("/").pop() ?? link.keyboardPath;
+      startRun({
+        source: sources.repo,
+        owner: repo.owner,
+        repo: "keyboards",
+        path: link.keyboardPath,
+        keyboardId,
+        displayName: entry?.displayName ?? keyboardId,
+        sha: repo.sha,
+      });
     } else {
-      // PR hard link: preselect the PR in the picker; the picker resolves
-      // the PR's keyboards and auto-runs when there is exactly one.
-      setPathLinkPr({ repo: sources.key, prNumber: link.prNumber });
+      setResolvingLink(true);
+      resolvePrLink(link, sources.prs)
+        .then((resolved) => {
+          if (resolved) startRun(resolved);
+          else setPathLinkPr({ repo: sources.key, prNumber: link.prNumber });
+        })
+        // API failure: fall back to the picker with the PR preselected.
+        .catch(() => setPathLinkPr({ repo: sources.key, prNumber: link.prNumber }))
+        .finally(() => setResolvingLink(false));
     }
-  }, [index, target, pathLink]);
+  }, [index, target, pathLink, startRun]);
 
   const activeTarget = phase === "running" || phase === "report" ? target : null;
   const snapshot = useReviewSnapshot(activeTarget, runNonce);
@@ -161,18 +225,6 @@ export function ReviewScreen() {
       }
     }
   }, [phase, target]);
-
-  const startRun = (t: ReviewTarget) => {
-    setTarget(t);
-    setResult(null);
-    setAuthorInfo(null);
-    setPhase("running");
-    setRunNonce((n) => n + 1);
-    // Fetch PR author info for the §17 context banner (PR targets only).
-    if (t.prNumber !== undefined) {
-      fetchPrAuthorInfo(t.owner, t.repo, t.prNumber).then(setAuthorInfo);
-    }
-  };
 
   const runningDetail = useMemo(() => {
     if (snapshot.kind === "loading") {
@@ -225,7 +277,12 @@ export function ReviewScreen() {
           </p>
         )}
 
-        {phase === "pick" && index && (
+        {phase === "pick" && resolvingLink && (
+          <p style={{ color: TEXT_DIM }}>
+            Opening pull request #{pathLink?.kind === "pr" ? pathLink.prNumber : ""}…
+          </p>
+        )}
+        {phase === "pick" && index && !resolvingLink && (
           <ReviewPicker
             index={index}
             onRun={startRun}
