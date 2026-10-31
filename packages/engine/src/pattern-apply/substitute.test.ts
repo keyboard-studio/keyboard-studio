@@ -132,3 +132,28 @@ describe("substituteSlots", () => {
     expect(text).toBe("a $& b");
   });
 });
+
+describe("substituteSlots - quote characters inside quoted literals", () => {
+  it("leaves a value without the delimiter byte-identical", () => {
+    expect(substituteSlots("store(s) '{{v}}'", { v: "abc" }).text).toBe("store(s) 'abc'");
+    expect(substituteSlots('x "{{v}}"', { v: "a'b" }).text).toBe('x "a\'b"');
+  });
+
+  it("re-quotes a single-quoted literal holding an apostrophe with double quotes", () => {
+    expect(substituteSlots("store(s) '{{v}}'", { v: "'[]x" }).text).toBe(`store(s) "'[]x"`);
+  });
+
+  it("re-quotes a double-quoted literal holding a double quote with single quotes", () => {
+    expect(substituteSlots('a + "{{v}}" > b', { v: 'x"y' }).text).toBe(`a + 'x"y' > b`);
+  });
+
+  it("spells quote characters as U+XXXX when the value holds both", () => {
+    expect(substituteSlots("store(s) '{{v}}'", { v: `a'b"c` }).text).toBe(
+      "store(s) 'a' U+0027 'b' U+0022 'c'",
+    );
+  });
+
+  it("emits a lone apostrophe as a double-quoted literal", () => {
+    expect(substituteSlots("> '{{v}}'", { v: "'" }).text).toBe(`> "'"`);
+  });
+});

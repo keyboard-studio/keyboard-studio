@@ -22,6 +22,39 @@ export interface SubstituteResult {
 // reset before each use since the `g` flag makes exec() stateful.
 const TOKEN_RE = /\{\{(\w+)\}\}/g;
 
+// A token that is the WHOLE content of a quoted KMN literal: '{{id}}' or
+// "{{id}}". The backreference keeps the two delimiters matched.
+const QUOTED_TOKEN_RE = /(['"])\{\{(\w+)\}\}\1/g;
+
+/**
+ * Re-spell a quoted literal whose slot value contains the literal's own
+ * delimiter. Mirrors the codec's store emitter (codec/emit.ts flushBuf): use
+ * the other quote character when the value lacks it, otherwise emit the quote
+ * characters as standalone U+0027 / U+0022 tokens between single-quoted runs.
+ * A value without the delimiter is never routed here, so those inputs keep
+ * their template spelling byte for byte.
+ */
+function quoteLiteral(value: string): string {
+  const other = value.includes("'") ? '"' : "'";
+  if (!value.includes(other)) return `${other}${value}${other}`;
+  const parts: string[] = [];
+  let run = "";
+  const flush = (): void => {
+    if (run !== "") parts.push(`'${run}'`);
+    run = "";
+  };
+  for (const ch of value) {
+    if (ch === "'" || ch === '"') {
+      flush();
+      parts.push(ch === "'" ? "U+0027" : "U+0022");
+    } else {
+      run += ch;
+    }
+  }
+  flush();
+  return parts.join(" ");
+}
+
 /**
  * Replace every `{{slotId}}` token in `fragment` with the corresponding value
  * from `slotValues`.
@@ -65,7 +98,12 @@ export function substituteSlots(
 
   // Second pass: replace all resolved tokens. Unresolved tokens are left
   // verbatim so the caller can inspect the result if needed.
-  let text = fragment;
+  // A quoted literal holding its own delimiter would end early and corrupt the
+  // rest of the line (or store), so those are re-spelled first.
+  let text = fragment.replace(QUOTED_TOKEN_RE, (whole, delim: string, id: string) => {
+    const value = slotValues[id];
+    return value !== undefined && value.includes(delim) ? quoteLiteral(value) : whole;
+  });
   for (const id of seen) {
     const value = slotValues[id];
     if (value === undefined) continue; // unresolved — leave as-is
