@@ -791,7 +791,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         inheritedHolders,
         packageFonts,
         kpsStylesheets,
-        base.name,
+        base.displayName,
       );
 
       // The base's icon came across with the rest of source/ (loader) and was
