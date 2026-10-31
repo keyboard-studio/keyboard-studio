@@ -20,6 +20,7 @@
 
 import { DOC_FORMS } from "@keyboard-studio/contracts";
 import { escapeHtml, phpCommentEscape, phpSingleQuoteEscape } from "./escapeHtml.js";
+import { getLanguageDefaults } from "../langtags/index.js";
 import { renderDocForm } from "./renderDocForm.js";
 
 /**
@@ -93,6 +94,20 @@ export function readmeHtm(displayName: string): string {
 }
 
 /**
+ * Escape Markdown-special characters in an author-supplied value so a name
+ * containing e.g. `[`, `]`, or `#` can't break the README's rendering.
+ *
+ * Underscores are left alone: they are legal in keyboard ids and form no
+ * emphasis intra-word in CommonMark, so escaping them would only corrupt
+ * pinned ids such as `base_keyboard`.
+ *
+ * @internal
+ */
+function escapeMarkdown(s: string): string {
+  return s.replace(/([\\`*{}[\]()<>#+.!-])/g, "\\$1");
+}
+
+/**
  * `README.md` — comprehensive keyboard documentation for users and contributors.
  *
  * Generates a professional, informative README that includes:
@@ -116,20 +131,26 @@ export function readmeMd(
   languages: string[] = [],
   baseKeyboardName?: string,
 ): string {
+  // Escape Markdown-special characters in author-supplied values so a name
+  // containing e.g. `[`, `]`, or `#` can't break the rendered README.
+  const name = escapeMarkdown(displayName);
+  const id = escapeMarkdown(keyboardId);
+  const base = baseKeyboardName ? escapeMarkdown(baseKeyboardName) : undefined;
+
   const languageList =
     languages.length > 0
       ? languages.map((tag) => `- **${languageNameForTag(tag)}** (code: \`${tag}\`)`).join("\n")
       : "- Language support information to be confirmed";
 
-  const baseKeyboardSection = baseKeyboardName
-    ? `- Based on ${baseKeyboardName}`
+  const baseKeyboardSection = base
+    ? `- Based on ${base}`
     : "- Adapted from a standard keyboard layout";
 
   const dateStr = new Date().toISOString().split("T")[0];
 
-  return `# ${displayName}
+  return `# ${name}
 
-Type text in the ${displayName} language with comprehensive character and diacritics support.
+Type text with the ${name} keyboard, with comprehensive character and diacritic support.
 
 ## Languages Supported
 
@@ -190,19 +211,19 @@ Some keyboards use sequences to type accented characters:
 
 1. Open Keyman
 2. Go to the keyboard store or catalog
-3. Search for "${displayName}"
+3. Search for "${name}"
 4. Click "Install" and follow prompts
-5. Select "${displayName}" from your active keyboard list
+5. Select "${name}" from your active keyboard list
 
 ### Getting Help
 
-- **Online Help:** [help.keyman.com/keyboard/${keyboardId}](https://help.keyman.com/keyboard/${keyboardId})
+- **Online Help:** [help.keyman.com/keyboard/${id}](https://help.keyman.com/keyboard/${id})
 - **Keyman Community:** [keyman.com/community](https://keyman.com/community)
 - **Developer Resources:** [Keyman Developer](https://help.keyman.com/developer)
 
 ## Keyboard Layout
 
-This keyboard is based on ${baseKeyboardName || "a standard keyboard layout"} and provides comprehensive support for:
+This keyboard is based on ${base ?? "a standard keyboard layout"} and provides comprehensive support for:
 - Base Latin characters (A-Z, a-z)
 - Diacritical marks (accents, tone marks, and other modifiers)
 - Special punctuation and symbols
@@ -235,52 +256,15 @@ for creating Keyman keyboards with guided workflows.
 }
 
 /**
- * Map ISO 639-3 language codes to human-readable language names.
- *
- * Covers common languages and language codes encountered in keyboard
- * authoring. Can be extended as needed; unknown codes fall back to
- * capitalized form of the code itself.
+ * Human-readable name for a language tag, from the canonical langtags
+ * dataset (the same source the studio's language picker uses), so the
+ * README names languages exactly as the rest of the studio does.
+ * Unknown codes fall back to the capitalized code itself.
  *
  * @internal
  */
 function languageNameForTag(tag: string): string {
-  // Common language code mappings
-  const languageNames: Record<string, string> = {
-    // Major European languages
-    en: "English",
-    fr: "French",
-    de: "German",
-    es: "Spanish",
-    pt: "Portuguese",
-    it: "Italian",
-    nl: "Dutch",
-    pl: "Polish",
-    ru: "Russian",
-
-    // African languages
-    sw: "Swahili",
-    ha: "Hausa",
-    yo: "Yoruba",
-    am: "Amharic",
-    ti: "Tigrinya",
-    om: "Oromo",
-    ewo: "Ewondo",
-    bm: "Bambara",
-
-    // Asian languages
-    hi: "Hindi",
-    bn: "Bengali",
-    ta: "Tamil",
-    te: "Telugu",
-    th: "Thai",
-    vi: "Vietnamese",
-
-    // Other
-    ar: "Arabic",
-    he: "Hebrew",
-  };
-
-  return languageNames[tag] || capitalizeTag(tag);
+  return getLanguageDefaults(tag)?.englishName ?? capitalizeTag(tag);
 }
 
 /**

@@ -40,7 +40,7 @@ describe("readmeMd", () => {
 
     expect(readme).toContain("- **English** (code: `en`)");
     expect(readme).toContain("- **French** (code: `fr`)");
-    expect(readme).toContain("- **German** (code: `de`)");
+    expect(readme).toContain("- **German, Standard** (code: `de`)");
   });
 
   it("handles unknown language codes gracefully", () => {
@@ -59,7 +59,7 @@ describe("readmeMd", () => {
     const readme = readmeMd("Amharic Keyboard", "amharic", ["am"]);
 
     expect(readme).toContain("# Amharic Keyboard");
-    expect(readme).toContain("Type text in the Amharic Keyboard language");
+    expect(readme).toContain("Type text with the Amharic Keyboard keyboard, with comprehensive character and diacritic support.");
     expect(readme).toContain("Search for \"Amharic Keyboard\"");
   });
 
@@ -130,7 +130,7 @@ describe("readmeMd", () => {
     const readme = readmeMd("Français Keyboard", "francais", ["fr"]);
 
     expect(readme).toContain("# Français Keyboard");
-    expect(readme).toContain("Français Keyboard language");
+    expect(readme).toContain("Français Keyboard keyboard");
   });
 
   it("produces valid markdown structure", () => {
@@ -150,13 +150,13 @@ describe("readmeMd", () => {
     const commonLanguages = [
       { code: "en", expected: "English" },
       { code: "fr", expected: "French" },
-      { code: "de", expected: "German" },
+      { code: "de", expected: "German, Standard" },
       { code: "es", expected: "Spanish" },
-      { code: "sw", expected: "Swahili" },
+      { code: "sw", expected: "Swahili (macrolanguage)" },
       { code: "ha", expected: "Hausa" },
       { code: "yo", expected: "Yoruba" },
       { code: "ewo", expected: "Ewondo" },
-      { code: "bm", expected: "Bambara" },
+      { code: "bm", expected: "Bamanankan" },
       { code: "am", expected: "Amharic" },
     ];
 
