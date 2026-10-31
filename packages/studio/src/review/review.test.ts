@@ -12,7 +12,7 @@ import {
   reviewTargetLabel,
   type ReviewTarget,
 } from "./reviewSources.ts";
-import { targetFromParams } from "./ReviewScreen.tsx";
+import { parseReviewPath, targetFromParams } from "./ReviewScreen.tsx";
 import type { ReviewIndex } from "./reviewSources.ts";
 import { rehydrateResult, runJudgeJob } from "./judgeWorkerProtocol.ts";
 import { ALL_CRITERIA } from "@keyboard-studio/contracts";
@@ -289,4 +289,33 @@ describe("runJudgeJob", () => {
     expect(typeof evidence.kind).toBe("string");
     expect(Array.isArray(evidence.lines)).toBe(true);
   }, 120_000);
+});
+
+describe("parseReviewPath", () => {
+  it("parses a PR hard link", () => {
+    expect(parseReviewPath("/review/keymanapp/keyboards/pull/4200")).toEqual({
+      kind: "pr",
+      owner: "keymanapp",
+      prNumber: 4200,
+    });
+  });
+
+  it("parses a published keyboard hard link", () => {
+    expect(
+      parseReviewPath("/review/keymanapp/keyboards/release/gff/gff_amharic"),
+    ).toEqual({
+      kind: "repo",
+      owner: "keymanapp",
+      keyboardPath: "release/gff/gff_amharic",
+    });
+  });
+
+  it("returns null for the bare picker path", () => {
+    expect(parseReviewPath("/review")).toBeNull();
+    expect(parseReviewPath("/review/")).toBeNull();
+  });
+
+  it("rejects path traversal", () => {
+    expect(parseReviewPath("/review/keymanapp/keyboards/../secret")).toBeNull();
+  });
 });

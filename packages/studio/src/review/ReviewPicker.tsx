@@ -10,7 +10,7 @@
 // studio projects. Picking a keyboard pins a ReviewTarget (source + folder +
 // exact sha); the report judges that sha and nothing else.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ACCENT,
   BG_CARD,
@@ -141,12 +141,27 @@ function ChoiceCard({
 export function ReviewPicker({
   index,
   onRun,
+  initialRepo,
+  initialKind,
+  initialPrNumber,
+  autoRunSingle,
 }: {
   index: ReviewIndex;
   onRun: (target: ReviewTarget) => void;
+  /** Preselect a repo for /review hard links. */
+  initialRepo?: "ks" | "km";
+  /** Preselect the pulls/published choice for /review hard links. */
+  initialKind?: "prs" | "repo";
+  /** Preselect a PR number for /review hard links. */
+  initialPrNumber?: number;
+  /**
+   * For /review hard links: when the PR touches exactly one keyboard,
+   * run it immediately instead of showing the list.
+   */
+  autoRunSingle?: boolean;
 }) {
-  const [repo, setRepo] = useState<RepoChoice | null>(null);
-  const [kind, setKind] = useState<KindChoice | null>(null);
+  const [repo, setRepo] = useState<RepoChoice | null>(initialRepo ?? null);
+  const [kind, setKind] = useState<KindChoice | null>(initialKind ?? null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<ReviewKeyboardEntry | null>(null);
   const [selectedPr, setSelectedPr] = useState<ReviewPrEntry | null>(null);
@@ -157,6 +172,38 @@ export function ReviewPicker({
     repo && kind ? sourceId(repo, kind) : null;
   const repoKeyboards = useRepoKeyboards(index, src ?? "ks-repo", query);
   const openPrs = useOpenPrs(index, src ?? "ks-prs", query);
+
+  // Hard link: preselect the PR by number once the list loads.
+  useEffect(() => {
+    if (initialPrNumber === undefined || selectedPr) return;
+    const pr = openPrs.find((p) => p.number === initialPrNumber);
+    if (pr) {
+      setSelectedPr(pr);
+      setSelected(null);
+    }
+  }, [initialPrNumber, openPrs, selectedPr]);
+
+  // Hard link: auto-run when the PR touches exactly one keyboard.
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (!autoRunSingle || autoRanRef.current) return;
+    if (kind !== "prs" || !selectedPr || prKeyboards === null) return;
+    if (prKeyboards.length !== 1) return;
+    autoRanRef.current = true;
+    const kb = prKeyboards[0]!;
+    const owner = repo === "ks" ? "keyboard-studio" : "keymanapp";
+    onRun({
+      source: src!,
+      owner,
+      repo: "keyboards",
+      path: kb.path,
+      keyboardId: kb.id,
+      displayName: kb.displayName,
+      sha: selectedPr.headSha,
+      prNumber: selectedPr.number,
+      prTitle: selectedPr.title,
+    });
+  }, [autoRunSingle, kind, selectedPr, prKeyboards, repo, src, onRun]);
 
   const pickRepo = (r: RepoChoice) => {
     setRepo(r);

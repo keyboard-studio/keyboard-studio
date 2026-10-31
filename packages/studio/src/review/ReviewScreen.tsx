@@ -7,6 +7,13 @@
 // Shareable report links carry ?source=&path=&sha=(&pr=); on load the screen
 // resolves the target from the index (repo sources) or the params (PRs) and
 // jumps straight to the run.
+//
+// Hard links use path URLs:
+//   /review/<owner>/keyboards/pull/<N>      — PR; auto-runs if 1 keyboard,
+//                                            otherwise shows the picker with
+//                                            the PR preselected.
+//   /review/<owner>/keyboards/<kb-path...>  — published keyboard at the
+//                                            index HEAD; auto-runs.
 
 import { useEffect, useMemo, useState } from "react";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
@@ -23,6 +30,39 @@ import {
 } from "./reviewSources.ts";
 
 type Phase = "pick" | "running" | "report";
+
+export type ReviewPathLink =
+  | { kind: "pr"; owner: string; prNumber: number }
+  | { kind: "repo"; owner: string; keyboardPath: string };
+
+/**
+ * Parse a /review hard link path. Returns null for the bare /review
+ * (picker) or unrecognized shapes.
+ */
+export function parseReviewPath(pathname: string): ReviewPathLink | null {
+  const m = /^\/review\/([^/]+)\/keyboards\/(.+)$/.exec(pathname);
+  if (!m) return null;
+  const owner = m[1]!;
+  const rest = m[2]!;
+  const prMatch = /^pull\/(\d+)$/.exec(rest);
+  if (prMatch) {
+    return { kind: "pr", owner, prNumber: Number(prMatch[1]) };
+  }
+  // Anything else is a keyboard path under the repo.
+  if (rest.includes("..")) return null;
+  return { kind: "repo", owner, keyboardPath: rest };
+}
+
+/** Map a repo owner to the review source ids. */
+export function ownerToSources(owner: string): {
+  repo: ReviewSourceId;
+  prs: ReviewSourceId;
+  key: string;
+} | null {
+  if (owner === "keyboard-studio") return { repo: "ks-repo", prs: "ks-prs", key: "ks" };
+  if (owner === "keymanapp") return { repo: "km-repo", prs: "km-prs", key: "km" };
+  return null;
+}
 
 export function targetFromParams(
   params: URLSearchParams,
@@ -74,14 +114,51 @@ export function ReviewScreen() {
   const [runNonce, setRunNonce] = useState(0);
 
   // Deep link: ?source=&path=&sha=(&pr=) jumps straight to the run.
+  // Hard link: /review/<owner>/keyboards/pull/<N> or
+  // /review/<owner>/keyboards/<kb-path> (see parseReviewPath).
+  const [pathLink, setPathLink] = useState<ReviewPathLink | null>(null);
+  const [pathLinkPr, setPathLinkPr] = useState<{
+    repo: string;
+    prNumber: number;
+  } | null>(null);
+
   useEffect(() => {
     if (!index || target) return;
+    // Query-param deep link first (exact pinned report link).
     const t = targetFromParams(new URLSearchParams(window.location.search), index);
     if (t) {
       setTarget(t);
       setPhase("running");
+      return;
     }
-  }, [index, target]);
+    // Path hard link.
+    const link = parseReviewPath(window.location.pathname);
+    if (!link || pathLink) return;
+    setPathLink(link);
+    const sources = ownerToSources(link.owner);
+    if (!sources) return;
+    if (link.kind === "repo") {
+      const repo = index.repos[sources.key];
+      const entry = repo?.keyboards.find((k) => k.path === link.keyboardPath);
+      if (repo && entry) {
+        const keyboardId = link.keyboardPath.split("/").pop() ?? link.keyboardPath;
+        setTarget({
+          source: sources.repo,
+          owner: repo.owner,
+          repo: "keyboards",
+          path: link.keyboardPath,
+          keyboardId,
+          displayName: entry.displayName ?? keyboardId,
+          sha: repo.sha,
+        });
+        setPhase("running");
+      }
+    } else {
+      // PR hard link: preselect the PR in the picker; the picker resolves
+      // the PR's keyboards and auto-runs when there is exactly one.
+      setPathLinkPr({ repo: sources.key, prNumber: link.prNumber });
+    }
+  }, [index, target, pathLink]);
 
   const activeTarget = phase === "running" || phase === "report" ? target : null;
   const snapshot = useReviewSnapshot(activeTarget, runNonce);
@@ -158,7 +235,18 @@ export function ReviewScreen() {
         )}
 
         {phase === "pick" && index && (
-          <ReviewPicker index={index} onRun={startRun} />
+          <ReviewPicker
+            index={index}
+            onRun={startRun}
+            {...(pathLinkPr
+              ? {
+                  initialRepo: pathLinkPr.repo as "ks" | "km",
+                  initialKind: "prs" as const,
+                  initialPrNumber: pathLinkPr.prNumber,
+                  autoRunSingle: true,
+                }
+              : {})}
+          />
         )}
         {phase === "pick" && !index && !indexError && (
           <p style={{ color: TEXT_DIM }}>Loading the keyboard index…</p>
