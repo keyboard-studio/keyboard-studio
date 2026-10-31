@@ -374,7 +374,7 @@ export function ReviewReport({
           mode="foreign"
           keyboardLabel={target.displayName}
           judgedNote={judgedNote}
-          githubLink={{ owner: target.owner, repo: target.repo, sha: target.sha }}
+          githubLink={{ owner: target.owner, repo: target.repo, sha: target.sha, path: target.path }}
           severityMap={severityMap}
         />
       </div>
