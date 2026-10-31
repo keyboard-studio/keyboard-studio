@@ -200,7 +200,7 @@ reporting a missing lift. Stop and lift (FR-040) or list it (FR-042); never writ
 **Independent Test**: G6 reported for `sil_cameroon_qwerty`/`sil_cameroon_azerty`, not applicable for `bj_cree_woods`.
 
 - [X] T068 [US6] Touch-seed driver in `HA/stepDrivers/touchSeed.ts`: `deriveSeedLayout` (`lib/buildTouchLayoutJson.ts:169`) and the seed-source step's default (FR-050) **As built**: landed with Phase 3: the Phase F coverage gate reads the touch layout, so US1 needs a real touch step.
-- [X] T069 [US6] Report G6 as `not-applicable` (not passed) when the copied keyboard has no touch layout, in `HA/runAuthorCase.ts` **As built**: keyed on the copied keyboard's shipped touch file (`copiedKeyboardHasTouch` in stepDrivers/touchSeed.ts); the replay now installs the walk's touch layout, so G6 is evaluated at all.
+- [X] T069 [US6] Report G6 as `not-applicable` (not passed) when the copied keyboard has no touch layout, in `HA/runAuthorCase.ts` **As built**: keyed on whether the copied keyboard ships a usable touch layout (`startShipsUsableTouch` in survey/touchSeedSource/touchSeedSourceContinue.ts, the read the seed-source default makes; reached through stepDrivers/touchSeed.ts); the replay now installs the walk's touch layout, so G6 is evaluated at all.
 - [X] T070 [US6] Tests in `HA/authorCase.corpus.test.ts`: G6 evaluated on a touch-layout keyboard; `not-applicable` on `bj_cree_woods` **As built**: G6 applicable on chechen_latin, not-applicable on bj_cree_woods. Evaluating G6 found it failing on every touch-bearing keyboard (default-layer labels only, no starting-content split): a walk-only KNOWN_GAPS row owned by its issue, which the decision-point replay (no touch step) does not apply.
 
 ---
