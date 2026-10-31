@@ -26,6 +26,8 @@ export interface DocSlotModel {
   year: string;
   docLang: string;
   helpPageUrl: string;
+  /** The keyboard's keyman.com page (criterion 5.5); README form only. */
+  keymanPageUrl: string;
   /** Non-empty when the README has at least one link (homepage or help page), so the Links heading appears once. */
   hasLinks: string;
   /** helpSiteHeader(displayName); help form only. */
@@ -78,6 +80,7 @@ const SLOT_ID_RECORD: Record<DocSlotId, true> = {
   year: true,
   docLang: true,
   helpPageUrl: true,
+  keymanPageUrl: true,
   hasLinks: true,
   helpHeader: true,
   pageStyle: true,

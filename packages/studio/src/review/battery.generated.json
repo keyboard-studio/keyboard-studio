@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-31T19:37:18.139Z",
+ "generatedAt": "2026-10-31T20:20:03.430Z",
  "catalogSize": 188,
  "byBand": {
   "layer-c-enforce": 106,
@@ -19,6 +19,9 @@
  ],
  "precertified": [
   "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_ROOT_SOURCE",
   "KM_LINT_STRAY_SCRATCH_FILES"
  ],
  "criteria": [
@@ -57,7 +60,7 @@
     "id": "KM_LINT_REPO_PLACEMENT_BAD"
    },
    "implemented": true,
-   "precertified": false,
+   "precertified": true,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
    ]
@@ -82,7 +85,7 @@
     "id": "KM_LINT_REPO_NO_ORGANIZING_FOLDER"
    },
    "implemented": true,
-   "precertified": false,
+   "precertified": true,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
    ]
@@ -107,7 +110,7 @@
     "id": "KM_LINT_REPO_ROOT_SOURCE"
    },
    "implemented": true,
-   "precertified": false,
+   "precertified": true,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
    ]

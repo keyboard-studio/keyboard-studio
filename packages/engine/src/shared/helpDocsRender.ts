@@ -25,7 +25,7 @@
 
 import { DOC_FORMS, scriptSubtagOf, type HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { escapeHtml, phpSingleQuoteEscape } from "./escapeHtml.js";
-import { DOC_PAGE_STYLE, helpSiteHeader, helpSitePageName } from "./packageDocs.js";
+import { DOC_PAGE_STYLE, helpSiteHeader, helpSitePageName, pageStyleCss } from "./packageDocs.js";
 import {
   layoutChartLayerFromFilename,
   layoutChartPlatformFromFilename,
@@ -600,14 +600,18 @@ export function renderReadmeMd(
   }
   const helpUrl = helpPageUrl(input);
   const homeUrl = safeUrl(input.answers?.projectHomeUrl) ?? "";
+  // Criterion 5.5: the README links the keyboard's keyman.com page.
+  const keymanId = nonBlank(input.keyboardId);
+  const keymanPageUrl = keymanId !== undefined ? `https://keyman.com/keyboards/${keymanId}` : "";
   const rendered = withOneTrailingNewline(
     renderDocForm(DOC_FORMS.forms.readmeMd, {
       // An empty title slot drops the `# title` line under an inherited README.
       displayName: startReadmeMdText === null ? escapeDocMarkdown(input.displayName) : "",
       description: description !== undefined ? escapeDocMarkdown(description) : "",
       helpPageUrl: helpUrl,
+      keymanPageUrl,
       projectHomeUrl: homeUrl,
-      hasLinks: helpUrl !== "" || homeUrl !== "" ? "1" : "",
+      hasLinks: helpUrl !== "" || homeUrl !== "" || keymanPageUrl !== "" ? "1" : "",
       platforms: input.platforms.map((p) => `- ${p}`).join("\n"),
     }),
   );
@@ -692,7 +696,7 @@ export function renderWelcomeHtm(
  * `header.php` owns it). Relative links to sibling `.htm` pages point at their
  * `.php` twins, the help site's form of the same page.
  */
-function helpFragmentFromWelcome(welcomeHtml: string): string {
+function helpFragmentFromWelcome(welcomeHtml: string): { styles: string; body: string } {
   const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(welcomeHtml)?.[1] ?? "";
   const styles = head.match(/<style\b[^>]*>[\s\S]*?<\/style>/gi) ?? [];
   const bodyMatch = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(welcomeHtml);
@@ -705,7 +709,27 @@ function helpFragmentFromWelcome(welcomeHtml: string): string {
   )
     .replace(/(\bhref\s*=\s*["'])(?![a-z][a-z0-9+.-]*:|\/\/)([^"'#]*?)\.htm(?=["'#])/gi, "$1$2.php")
     .trim();
-  return `${[...styles, body].join("\n")}\n`;
+  return { styles: styles.join("\n"), body: `${body}\n` };
+}
+
+/** A help page for a welcome page: the header carries the styles (criterion 11.3), the fragment the body. */
+function helpPageFromWelcome(header: (styles: string) => string, welcomeHtml: string): string {
+  const { styles, body } = helpFragmentFromWelcome(welcomeHtml);
+  return `${header(styles)}${body}`;
+}
+
+/**
+ * `header` (a leading `<?php ... ?>` block) with `styles` carried in
+ * `$pagestyle` inside it, so no style sits after the closing `?>` (criterion
+ * 11.3). A header that already declares its own `$pagestyle` is left as the
+ * base wrote it.
+ */
+function withStyleInPhpHeader(header: string, styles: string): string {
+  const css = pageStyleCss(styles);
+  if (css === "" || /\$pagestyle\b/.test(header)) return header;
+  const close = header.lastIndexOf("?>");
+  if (close === -1) return header;
+  return `${header.slice(0, close)}  $pagestyle = <<<'END'\n${css}\nEND;\n${header.slice(close)}`;
 }
 
 /**
@@ -735,9 +759,10 @@ export function renderHelpPhp(
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
   if (startHelpPhpText === null && startWelcomeHtmText !== null) {
-    return `${helpSiteHeader(displayName)}${helpFragmentFromWelcome(
+    return helpPageFromWelcome(
+      (styles) => helpSiteHeader(displayName, styles),
       renderWelcomeHtm(input, startWelcomeHtmText),
-    )}`;
+    );
   }
   if (startHelpPhpText !== null) {
     let inherited = stripGeneratedBlocks(startHelpPhpText);
@@ -753,7 +778,10 @@ export function renderHelpPhp(
     // of its own derives one — so the two bodies match (criterion 11.9).
     if (input.inheritedFixes?.bodySync === "welcome" && startWelcomeHtmText !== null) {
       const header = leadingPhpBlock(inherited);
-      return `${header}${helpFragmentFromWelcome(renderWelcomeHtm(input, startWelcomeHtmText))}`;
+      return helpPageFromWelcome(
+        (styles) => withStyleInPhpHeader(header, styles),
+        renderWelcomeHtm(input, startWelcomeHtmText),
+      );
     }
     const generated = renderDocBodyHtml(input, true);
     // FR-006: with nothing generated, the inherited page ships as it is.
@@ -769,8 +797,8 @@ export function renderHelpPhp(
   // so fresh and derived help pages carry the welcome page's CSS alike
   // (criterion 11.10).
   return renderDocForm(DOC_FORMS.forms.help, {
-    helpHeader: helpSiteHeader(displayName),
-    pageStyle: DOC_PAGE_STYLE,
+    helpHeader: helpSiteHeader(displayName, `<style>${DOC_PAGE_STYLE}</style>`),
+    pageStyle: "",
     body: renderDocBodyHtml(input, false),
   });
 }

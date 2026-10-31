@@ -41,3 +41,6 @@ None found in the exports above (types, functions and the D7 retention all prese
 ## Follow-ups and open issues
 - HANDOFF-CONTENT.md (archived) lists Content wording items 1-4 for `il_author_name` / holder questions as never applied; item 5 (correctness guard) was applied.
 - Stale citations for km-programmer: `contracts/src/copyright.ts:13` links `specs/064-.../contracts/copyright.md`; `studio/.../flowStepOptions.tsx:271` links `specs/064-.../spec.md`; both now resolve into `../_archive/`.
+
+## Rulings
+- 2026-10-31: Adapt carries the base LICENSE.md forward (user ruling 2026-10-31). The output projection seeds `LICENSE.md` verbatim from the base's license text (`startLicenseText`, now retained on the adapt branch as well as the copy branch) before `ensurePackageFiles` runs. FR-004 ("no invented holder") still holds for the fallback: the bare MIT body with no copyright line is written only when the base shipped no license at all.

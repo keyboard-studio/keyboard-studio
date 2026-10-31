@@ -59,6 +59,7 @@ import type {
 } from "../criteria/criteriaTypes.ts";
 import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
+import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import {
   getStartBrowserService,
@@ -113,9 +114,14 @@ export interface CriteriaFindings {
 }
 
 interface EngineRun {
-  /** The exact VFS object this run judged — identity, not path list, so a
-   * recompiled artifact with the same file names never inherits a stale run. */
-  forVfs: VirtualFS;
+  /** The exact stage VFS this run was started for — identity, not path list,
+   * so a recompiled artifact with the same file names never inherits a stale run. */
+  forStageVfs: VirtualFS;
+  /** The VFS this run judged: the output projection (what the author
+   * downloads, minus build/), or the stage's own VFS when no working copy
+   * is instantiated. */
+  judgedVfs: VirtualFS;
+  judgedKeyboardId: string;
   findings: LintFinding[];
   verifiedByCode: Map<string, string[]>;
   contextMissing: Record<string, string>;
@@ -181,16 +187,51 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
   }, [catalog, startKeyboard, startIr, identity, instantiationMode]);
 
   const readyStage = stage.kind === "ready" ? stage : null;
-  const vfs = readyStage?.vfs ?? null;
-  const keyboardId = readyStage?.keyboardId ?? null;
+  const stageVfs = readyStage?.vfs ?? null;
+  const stageKeyboardId = readyStage?.keyboardId ?? null;
+
+  // Inputs the output projection reads that the stage's recompile does not
+  // always follow: a changed value re-projects and re-judges.
+  const attribution = useWorkingCopyStore((s) => s.attribution);
+  const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
+  const helpDocs = useWorkingCopyStore((s) => s.helpDocs);
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
+  const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
 
   const [engineRun, setEngineRun] = useState<EngineRun | null>(null);
 
   useEffect(() => {
-    if (vfs === null || keyboardId === null) return;
+    if (stageVfs === null || stageKeyboardId === null) return;
     let cancelled = false;
 
     void (async () => {
+      // Judge the OUTPUT projection — the files the author downloads — not the
+      // preview VFS: the preview of an adapted keyboard is the raw fetched
+      // source (no LICENSE / README / HISTORY / welcome / help), and a copy's
+      // preview carries scaffold stub docs that the projection rewrites. The
+      // projection runs inside this one effect, driven by the stage's single
+      // debounce cycle; no timer of its own. Compiled artifacts are never part
+      // of the community tree, so build/ is dropped from the judged files.
+      // With no instantiated working copy (nothing to project) the stage's own
+      // VFS is judged.
+      let vfs: VirtualFS = stageVfs;
+      let keyboardId: string = stageKeyboardId;
+      try {
+        const projected = await projectWorkingCopyForOutput();
+        if (projected !== null) {
+          for (const path of projected.vfs.list()) {
+            if (path.startsWith("build/")) projected.vfs.delete(path);
+          }
+          vfs = projected.vfs;
+          keyboardId = projected.keyboardId;
+        }
+      } catch {
+        // A failed projection falls back to the stage VFS rather than
+        // wedging the page.
+      }
+      if (cancelled) return;
+
       const baseKpjPath =
         startVfs?.list().find((p) => p.toLowerCase().endsWith(".kpj"));
       const baseKpjText =
@@ -266,7 +307,9 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
         );
         if (!cancelled)
           setEngineRun({
-            forVfs: vfs,
+            forStageVfs: stageVfs,
+            judgedVfs: vfs,
+            judgedKeyboardId: keyboardId,
             findings: engine.findings,
             verifiedByCode: engine.verifiedByCode,
             contextMissing,
@@ -277,7 +320,9 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
         // checks that could not run still resolve Not yet checkable.
         if (!cancelled)
           setEngineRun({
-            forVfs: vfs,
+            forStageVfs: stageVfs,
+            judgedVfs: vfs,
+            judgedKeyboardId: keyboardId,
             findings: [],
             verifiedByCode: new Map(),
             contextMissing,
@@ -289,8 +334,14 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
       cancelled = true;
     };
   }, [
-    vfs,
-    keyboardId,
+    stageVfs,
+    stageKeyboardId,
+    attribution,
+    startLicenseText,
+    helpDocs,
+    phaseResults,
+    touchLayoutJson,
+    historyEntryState,
     session,
     identity,
     decisions,
@@ -298,7 +349,8 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     startVfs,
   ]);
 
-  const runIsCurrent = engineRun !== null && engineRun.forVfs === vfs;
+  const runIsCurrent =
+    engineRun !== null && stageVfs !== null && engineRun.forStageVfs === stageVfs;
 
   const lintFindings = useMemo(
     () =>
@@ -311,8 +363,8 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     verifiedByCode: runIsCurrent ? engineRun.verifiedByCode : new Map(),
     contextMissing: runIsCurrent ? engineRun.contextMissing : {},
     ready: readyStage !== null && runIsCurrent,
-    keyboardId,
-    vfs,
+    keyboardId: runIsCurrent ? engineRun.judgedKeyboardId : null,
+    vfs: runIsCurrent ? engineRun.judgedVfs : null,
     compileResult: readyStage?.compileResult ?? null,
     assemblyVerdicts,
     instantiationMode: startKeyboard !== null ? instantiationMode : null,
