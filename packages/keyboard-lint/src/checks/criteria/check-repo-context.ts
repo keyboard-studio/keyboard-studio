@@ -140,11 +140,17 @@ export function checkPrAttributionBad(
   if (!SHA40.test(body)) missing.push("commit SHA");
   if (!/round-trip/i.test(body)) missing.push("round-trip status");
   if (missing.length === 0) return [];
+  // Capture the adapted-from line that is present, for the evidence.
+  const line = body
+    .split("\n")
+    .find((l) => ADAPTED_FROM.test(l))
+    ?.trim();
   return [
     criteriaFinding({
       code: "KM_LINT_PR_ATTRIBUTION_BAD",
       file: "PR body",
-      message: `The PR attribution block is incomplete — missing: ${missing.join(", ")}.`,
+      message: `The PR attribution block is incomplete — missing: ${missing.join(", ")}.` +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Complete the attribution block: adapted-from path, commit SHA, round-trip status, and the opaque feature inventory.",
     }),
   ];
@@ -163,12 +169,17 @@ export function checkHistoryAttributionBad(
   const history = facts.review.historyMd;
   if (history === undefined) return [];
   if (!/adapted\s+from\s+\S+/i.test(history)) {
+    // Capture the malformed 'Adapted from' line when one exists.
+    const line = ADAPTED_FROM.test(history)
+      ? history.split("\n").find((l) => ADAPTED_FROM.test(l))?.trim()
+      : undefined;
     return [
       criteriaFinding({
         code: "KM_LINT_HISTORY_ATTRIBUTION_BAD",
         file: "HISTORY.md",
         message: ADAPTED_FROM.test(history)
-          ? "The HISTORY.md 'Adapted from' bullet names no source path."
+          ? "The HISTORY.md 'Adapted from' bullet names no source path." +
+            (line ? ` Found: "${line}"` : "")
           : "HISTORY.md has no 'Adapted from <sourcePath>' bullet.",
         hint: "Add an 'Adapted from <sourcePath>' bullet under the 1.0 HISTORY.md entry.",
       }),

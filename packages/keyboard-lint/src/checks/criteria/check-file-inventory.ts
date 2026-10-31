@@ -82,7 +82,7 @@ export function checkBuildFolderPresent(paths: readonly string[]): LintFinding[]
     criteriaFinding({
       code: "KM_LINT_BUILD_FOLDER_PRESENT",
       file: hits[0]!,
-      message: `Committed build output found (${hits.length} file(s) under build/).`,
+      message: `Committed build output found (${hits.length} file(s) under build/): ${hits.slice(0, 3).join(", ")}${hits.length > 3 ? ` (+${hits.length - 3} more)` : ""}.`,
       hint: "Remove the build/ folder contents — compiled artifacts are built by CI, never committed.",
     }),
   ];

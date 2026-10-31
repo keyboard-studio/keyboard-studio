@@ -100,13 +100,19 @@ export function checkCopyrightYearEmbedded(
 ): LintFinding[] {
   if (facts.kmn === undefined && facts.kps === undefined) return [];
   const hits: string[] = [];
+  let offending: string | undefined;
   if (facts.kmn !== undefined && COPYRIGHT_YEAR.test(facts.kmn)) {
     hits.push("the .kmn");
+    offending ??= facts.kmn
+      .split("\n")
+      .find((l) => COPYRIGHT_YEAR.test(l))
+      ?.trim();
   }
   if (facts.kps !== undefined) {
     const copyrightEl = /<Copyright[^>]*>([^<]*)<\/Copyright>/i.exec(facts.kps);
     if (copyrightEl !== null && /\d{4}/.test(copyrightEl[1] ?? "")) {
       hits.push("the .kps");
+      offending ??= copyrightEl[0].trim();
     }
   }
   if (hits.length === 0) return [];
@@ -114,7 +120,9 @@ export function checkCopyrightYearEmbedded(
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_YEAR_EMBEDDED",
       file: facts.kps !== undefined ? "package" : "source",
-      message: `A copyright year is embedded in ${hits.join(" and ")} copyright strings.`,
+      message:
+        `A copyright year is embedded in ${hits.join(" and ")} copyright strings.` +
+        (offending ? ` Found: "${offending}"` : ""),
       hint: "Remove the year from the .kmn/.kps copyright strings — years live in LICENSE.md and HISTORY.md.",
     }),
   ];
@@ -245,11 +253,18 @@ export function checkWelcomeLangMismatch(
 export function checkAuthorInKmn(facts: TextContentFacts): LintFinding[] {
   if (facts.kmn === undefined) return [];
   if (!KMN_AUTHOR_STORE.test(facts.kmn)) return [];
+  // Capture the offending store line for the evidence.
+  const line = facts.kmn
+    .split("\n")
+    .find((l) => KMN_AUTHOR_STORE.test(l))
+    ?.trim();
   return [
     criteriaFinding({
       code: "KM_LINT_AUTHOR_IN_KMN",
       file: `source/${facts.keyboardId}.kmn`,
-      message: "The author name is in a .kmn Author store — it belongs in the .kps.",
+      message:
+        "The author name is in a .kmn Author store — it belongs in the .kps." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Remove the store(&Author) from the .kmn; set the author in the .kps Info tab.",
     }),
   ];
@@ -275,11 +290,15 @@ export function checkPhpHeaderBad(facts: TextContentFacts): LintFinding[] {
   // Strip a BOM before checking the open tag.
   const text = facts.php.replace(/^\ufeff/, "");
   if (PHP_OPEN.test(text) && PHP_HEADER_BLOCK.test(text)) return [];
+  // Capture the offending opening for the evidence.
+  const firstLine = text.split("\n")[0]?.trim();
   return [
     criteriaFinding({
       code: "KM_LINT_PHP_HEADER_BAD",
       file: facts.phpPath ?? "source/help/" + facts.keyboardId + ".php",
-      message: "The help .php does not have the proper PHP header.",
+      message:
+        "The help .php does not have the proper PHP header." +
+        (firstLine ? ` Found: "${firstLine}"` : ""),
       hint: "Start the .php with <?php and the /* Name: ... */ header block.",
     }),
   ];
@@ -292,11 +311,18 @@ export function checkPhpStyleOutside(facts: TextContentFacts): LintFinding[] {
   const closeIdx = facts.php.indexOf("?>");
   const outside = closeIdx >= 0 ? facts.php.slice(closeIdx + 2) : facts.php;
   if (!/<style[\s>]/i.test(outside)) return [];
+  // Capture the offending <style> line for the evidence.
+  const line = outside
+    .split("\n")
+    .find((l) => /<style[\s>]/i.test(l))
+    ?.trim();
   return [
     criteriaFinding({
       code: "KM_LINT_PHP_STYLE_OUTSIDE",
       file: facts.phpPath ?? "source/help/" + facts.keyboardId + ".php",
-      message: "Style information (<style>) is outside the PHP header block.",
+      message:
+        "Style information (<style>) is outside the PHP header block." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Move style information inside the PHP header block (the $pagestyle variable).",
     }),
   ];
@@ -306,11 +332,15 @@ export function checkPhpStyleOutside(facts: TextContentFacts): LintFinding[] {
 export function checkPhpClosingTags(facts: TextContentFacts): LintFinding[] {
   if (facts.php === undefined) return [];
   if (!/<\/(body|html)\s*>/i.test(facts.php)) return [];
+  // Capture the offending closing tag for the evidence.
+  const tag = /<\/(body|html)\s*>/i.exec(facts.php)?.[0];
   return [
     criteriaFinding({
       code: "KM_LINT_PHP_CLOSING_TAGS",
       file: facts.phpPath ?? "source/help/" + facts.keyboardId + ".php",
-      message: "The help .php contains closing </body> or </html> tags.",
+      message:
+        "The help .php contains closing </body> or </html> tags." +
+        (tag ? ` Found: "${tag}"` : ""),
       hint: "Remove the closing </body> / </html> tags — the site template supplies them.",
     }),
   ];

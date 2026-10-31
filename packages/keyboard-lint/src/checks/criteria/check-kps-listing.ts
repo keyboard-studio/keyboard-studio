@@ -61,7 +61,10 @@ export function checkKpsKvkAbsent(facts: KpsListingFacts): LintFinding[] {
     criteriaFinding({
       code: "KM_LINT_KPS_KVK_ABSENT",
       file: facts.kpsPath,
-      message: "The .kps package does not list a compiled .kvk.",
+      message: "The .kps package does not list a compiled .kvk." +
+        (facts.fileNames.length > 0
+          ? ` Listed files: ${facts.fileNames.join(", ")}`
+          : " The package lists no files."),
       hint: "List the built <id>.kvk in the .kps <Files>.",
     }),
   ];
@@ -80,7 +83,10 @@ export function checkKpsJsAbsent(facts: KpsListingFacts): LintFinding[] {
       code: "KM_LINT_KPS_JS_ABSENT",
       file: facts.kpsPath,
       message:
-        "The keyboard has a touch layout but the .kps package does not list a compiled .js.",
+        "The keyboard has a touch layout but the .kps package does not list a compiled .js." +
+        (facts.fileNames.length > 0
+          ? ` Listed files: ${facts.fileNames.join(", ")}`
+          : " The package lists no files."),
       hint: "List the built <id>.js in the .kps <Files> so the mobile package includes it.",
     }),
   ];
@@ -93,7 +99,10 @@ export function checkKpsLicenseAbsent(facts: KpsListingFacts): LintFinding[] {
     criteriaFinding({
       code: "KM_LINT_KPS_LICENSE_ABSENT",
       file: facts.kpsPath,
-      message: "The .kps package does not list LICENSE.md.",
+      message: "The .kps package does not list LICENSE.md." +
+        (facts.fileNames.length > 0
+          ? ` Listed files: ${facts.fileNames.join(", ")}`
+          : " The package lists no files."),
       hint: "List LICENSE.md in the .kps <Files>.",
     }),
   ];
@@ -106,7 +115,10 @@ export function checkKpsReadmeAbsent(facts: KpsListingFacts): LintFinding[] {
     criteriaFinding({
       code: "KM_LINT_KPS_README_ABSENT",
       file: facts.kpsPath,
-      message: "The .kps package does not list readme.htm.",
+      message: "The .kps package does not list readme.htm." +
+        (facts.fileNames.length > 0
+          ? ` Listed files: ${facts.fileNames.join(", ")}`
+          : " The package lists no files."),
       hint: "List readme.htm in the .kps <Files>.",
     }),
   ];
@@ -128,7 +140,10 @@ export function checkKpsWelcomeAbsent(facts: KpsListingFacts): LintFinding[] {
     criteriaFinding({
       code: "KM_LINT_KPS_WELCOME_ABSENT",
       file: facts.kpsPath,
-      message: `The .kps package does not list ${missing.join(" or ")}.`,
+      message: `The .kps package does not list ${missing.join(" or ")}.` +
+        (facts.fileNames.length > 0
+          ? ` Listed files: ${facts.fileNames.join(", ")}`
+          : " The package lists no files."),
       hint: "List welcome.htm and its associated graphics in the .kps <Files>.",
     }),
   ];

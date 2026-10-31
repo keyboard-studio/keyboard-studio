@@ -24,9 +24,9 @@ import {
 } from "./reviewSources.ts";
 import type { SkippedFile } from "./useReviewSnapshot.ts";
 import {
-  severityForReviewRow,
-  type ReviewSeverity,
-} from "./reviewSeverity.ts";
+  severityForRow,
+  type CriteriaSeverity,
+} from "../criteria/criteriaSeverity.ts";
 import {
   ERROR_TEXT,
   SUCCESS_ACCENT,
@@ -125,9 +125,9 @@ export function ReviewReport({
     "all" | "met" | "warning" | "error"
   >("all");
   const { displayResult, severityCounts, severityMap } = useMemo(() => {
-    const severities = new Map<string, ReviewSeverity>();
+    const severities = new Map<string, CriteriaSeverity>();
     const kept = result.rows.filter((r) => {
-      const s = severityForReviewRow(r);
+      const s = severityForRow(r, "foreign");
       severities.set(r.criterion.id, s);
       return s !== "hidden";
     });

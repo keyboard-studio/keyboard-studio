@@ -14,8 +14,10 @@
 // instead — absence as a statement, never false verdicts.
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { useMemo } from "react";
 
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
+import { severityForRow } from "../criteria/criteriaSeverity.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
@@ -83,10 +85,20 @@ export function CriteriaScreen() {
   const keyboardLabel =
     artifact.stage.kind === "ready" ? artifact.stage.keyboardId : undefined;
 
+  // Color-code rows by Met / Warning / Error severity.
+  const severityMap = useMemo(() => {
+    const map: Record<string, "met" | "warning" | "error" | "hidden"> = {};
+    for (const r of result.rows) {
+      map[r.criterion.id] = severityForRow(r, "authored");
+    }
+    return map;
+  }, [result]);
+
   return (
     <CriteriaPage
       result={result}
       mode="authored"
+      severityMap={severityMap}
       {...(keyboardLabel !== undefined ? { keyboardLabel } : {})}
       judgedNote={t({
         id: "criteria.judgedNote.authored",
