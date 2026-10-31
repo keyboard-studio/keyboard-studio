@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "bulletproof navigation",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:36.660Z"
+    }
+  ],
+  "telemetryInstanceId": "460a54fb-9f4c-453e-b944-12c5e49f32b2"
+}

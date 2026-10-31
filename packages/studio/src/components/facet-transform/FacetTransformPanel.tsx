@@ -9,7 +9,7 @@
 //     behind an explicit confirmation.
 //
 // No transform is silent (FR-002): commit fires only from the explicit Confirm
-// button, and the parent wires it to `useFacetTransform().commit`.
+// button, via the parent's `onConfirm` handler (decision recording).
 
 import { useId, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";

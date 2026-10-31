@@ -6,7 +6,7 @@
 //
 //   1. The producer scan: scanning packages/keyboard-lint/src/checks
 //      for the codes emitted as a finding's `code:` literal — the same
-//      source-scan method as decisions/gateCoverage.test.ts's
+//      source-scan method as test/gateCoverage.test.ts's
 //      registeredLintCodes() — keeping the scanned codes that are also
 //      a catalog criterion's lintRuleId.
 //   2. ASSEMBLY_SYNTHESIZED_CODES below: codes no lint check emits,

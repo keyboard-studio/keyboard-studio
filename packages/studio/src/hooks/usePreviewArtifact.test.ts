@@ -19,6 +19,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { i18nHookWrapper } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
@@ -45,7 +46,7 @@ afterEach(() => {
 describe("usePreviewArtifact — mount seeding from the working-copy store", () => {
   it("starts with baseKeyboard === null when the store has no instantiated base", async () => {
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    const { result } = renderHook(() => usePreviewArtifact());
+    const { result } = renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
     expect(result.current.startKeyboard).toBeNull();
   });
 
@@ -62,7 +63,7 @@ describe("usePreviewArtifact — mount seeding from the working-copy store", () 
     });
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    const { result } = renderHook(() => usePreviewArtifact());
+    const { result } = renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     expect(result.current.startKeyboard).not.toBeNull();
     expect(result.current.startKeyboard?.id).toBe(basicKbdus.id);

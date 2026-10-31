@@ -182,7 +182,10 @@ function isCombiningMark(char: string): boolean {
 
 /**
  * Whether `candidate` qualifies to appear in a ranked-suggestions list for
- * `char`, at the given confidence `threshold`.
+ * `char`, at the given confidence `threshold`. Qualification is STRICT:
+ * the candidate's confidence must exceed the threshold — a candidate at
+ * exactly the threshold (a single-source candidate at 0.5) does not
+ * qualify (#2062, spec 085 Part A design intent).
  *
  * An S-02 (deadkey/store-index) candidate additionally requires:
  *   - `char` is not itself a combining mark, and
@@ -198,7 +201,11 @@ function qualifiesForRanking(
   candidate: PlacementCandidate,
   threshold: number,
 ): boolean {
-  if (!(candidate.confidence >= threshold)) return false;
+  // Strict comparison (#2062): a single-source (n=1) candidate sits exactly
+  // at the 0.5 threshold and must NOT qualify — the gate is `>`, not `>=`.
+  // (The seed path in extractSeedEntries keeps `>=` deliberately: seeding a
+  // pre-fill and ranking a suggestion are different bars.)
+  if (!(candidate.confidence > threshold)) return false;
   const strategyId = strategyForCandidate(candidate);
   if (strategyId === "S-02") {
     if (isCombiningMark(char)) return false;

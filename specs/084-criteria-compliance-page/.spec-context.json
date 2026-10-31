@@ -1,7 +1,7 @@
 {
   "approach": "One pure resolver (resolveCriteria) + one presentation, two hosts: authored page at new #criteria route (linked from Output) and inline panel on the Compare tab. Lint assembly reuses useDocumentationFindings for the doc band and KeyboardLintEngine.lintWithContext over the judged VFS for the rest. Attestations/confirmations in a new draft-carried criteriaRecordStore, authored projects only.",
   "branch": "spec/084-criteria-plan",
-  "currentStep": "plan",
+  "currentStep": "implement",
   "history": [
     {
       "date": "2026-10-05",
@@ -14,10 +14,17 @@
       "step": "plan",
       "summary": "Full implementation plan (plan.md + tasks.md) incl. Amendment 2026-10-13: Compare-tab Check criteria button in foreign mode (spec 057 isolation preserved), yellow band resolved by on-page author attestation (no survey questions exist for the 32 surveyQuestionIds), corrected layer-c counts (19 of 67 implemented, 48 not yet checkable).",
       "kind": "start"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:58:03.229Z"
     }
   ],
   "specName": "084-criteria-compliance-page",
-  "status": "planned",
+  "status": "completed",
   "step_summaries": {
     "plan": "plan.md (architecture, decisions D1-D9, verified counts/APIs, isolation constraints, testing gates) and tasks.md (Phases 0-6) written 2026-10-13. No implementation."
   },

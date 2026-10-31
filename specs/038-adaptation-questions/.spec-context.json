@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "adaptation questions",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:17.208Z"
+    }
+  ],
+  "telemetryInstanceId": "380ee21a-92b3-4536-b445-893af052ae4c"
+}

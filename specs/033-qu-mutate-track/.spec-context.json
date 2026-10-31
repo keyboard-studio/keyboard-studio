@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu mutate track",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:10.865Z"
+    }
+  ],
+  "telemetryInstanceId": "81001f45-d12f-41f6-afcd-38b30ccd99e7"
+}

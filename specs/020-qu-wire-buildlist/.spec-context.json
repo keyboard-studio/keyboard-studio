@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu wire buildlist",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:57.394Z"
+    }
+  ],
+  "telemetryInstanceId": "a322a7e2-f753-45eb-bdcf-80155ac8c6f0"
+}

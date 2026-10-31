@@ -24,6 +24,10 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
   const revision = useStepNavStore((s) => (s.revision?.stepId === stepId ? s.revision : null));
   if (revision === null && (spec === undefined || !hasSlots(spec))) return null;
 
+  // #2050: applied AFTER the spread below, so a step's own forward ariaLabel
+  // can never override the "Back to testing" accessible name.
+  const revisionBackLabel = t({ id: "step.revision.backToTesting", message: "Back to testing" });
+
   return (
     <div
       role="group"
@@ -66,12 +70,15 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
         if (stepAction === undefined) return null;
         // spec 094: while revising from Output, the editor's own forward
         // completes the step and StepHost returns to Output, so it is named
-        // for where it goes.
+        // for where it goes. The rename applies only on the targeted step
+        // (#2050): on a step reached via Back the Discard action stays, but
+        // the forward button keeps its own name.
         const action: NavAction =
-          revision !== null && slot === "forward"
+          revision !== null && revision.renameForward && slot === "forward"
             ? {
                 ...stepAction,
-                label: t({ id: "step.revision.backToTesting", message: "Back to testing" }),
+                label: revisionBackLabel,
+                ariaLabel: revisionBackLabel,
                 testId: "step-revision-back-to-testing",
               }
             : stepAction;

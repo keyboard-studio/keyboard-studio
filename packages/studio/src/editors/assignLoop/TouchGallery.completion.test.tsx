@@ -1,4 +1,4 @@
-// Unit tests for TouchGallery — completion: coverage signals, the Done button, mark-for-later-review, the FR-008 gate, and the no-modal rule.
+// Unit tests for TouchGallery — completion: coverage signals, the "Continue" button, mark-for-later-review, the FR-008 gate, and the no-modal rule.
 //
 // Shared module mocks: ../../test/touchGallery/mocks.tsx. Seeders and the
 // lifecycle hooks every suite installs: ../../test/touchGallery/harness.ts.
@@ -113,11 +113,11 @@ function seedShippedPlusSwapped(opts: {
 // key that used to be its only producer — disagreeing with the live
 // completion gate (`handleContinue`'s own
 // `touchCoverage(layoutForLintAndGate, ...)`, which correctly saw the
-// overwrite). Symptom: the badge stayed GREEN and Done stayed FORCE-SHOWN,
-// but a Done click still got refused/nagged by the live gate. The fix
+// overwrite). Symptom: the badge stayed GREEN and Continue stayed FORCE-SHOWN,
+// but a "Continue" click still got refused/nagged by the live gate. The fix
 // sources signal (a) from `touchBaseDirectSet` (LIVE, derived from
 // `directTouchProducedSet` — itself built from `layoutForLintAndGate`, which
-// DOES bake in every `charTouch` edit) so all three (badge, Done visibility,
+// DOES bake in every `charTouch` edit) so all three (badge, "Continue" visibility,
 // live gate) agree.
 //
 // This suite's mocked `buildTouchLayoutJson` (see this file's own module
@@ -127,7 +127,7 @@ function seedShippedPlusSwapped(opts: {
 // not a gap in the property under test: it still proves the intended
 // contract — signal (a) reacting LIVE to a same-session touch edit, vs. the
 // old frozen set which never reacted to one at all — and the two assertions
-// below (the seed-only character's badge, and the Done button's visibility)
+// below (the seed-only character's badge, and the "Continue" button's visibility)
 // both flip against a reverted (frozen) `baseTouchCoveredSet` source, so this
 // is a genuine regression pin, not a tautology.
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
     // walk-excluded SHOW-ALL chip) — "中" being the walk's own last/only
     // entry would otherwise show its own ordinary walk-completion Done
     // regardless of "€", which is not the property under test here (see the
-    // "Done button forced visible" suite below for that ALLCOVERED-forced
+    // "Continue button forced visible" suite below for that ALLCOVERED-forced
     // case specifically).
     fireEvent.click(within(screen.getByTestId("char-scroll-strip")).getByTestId(
       "char-scroll-chip-20AC",
@@ -230,7 +230,7 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
   });
 });
 
-// This suite pins TWO independent, OR-ed reasons the Done button can be
+// This suite pins TWO independent, OR-ed reasons the "Continue" button can be
 // force-shown for a currentChar outside touchLettersToAdd's walk:
 //   (a) `allCovered` — the producer-badge signal, exercised by the two tests
 //       below (a harness-only divergence from `unaccountedTouchChars` here —
@@ -241,8 +241,8 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
 //       in the walk, reached from an unrelated already-covered out-of-walk
 //       character). See TouchGallery.tsx's `touchForwardButton` top-priority
 //       branch doc comment for the full reconciliation between the two.
-describe("TouchGallery — Done button forced visible when the whole inventory is covered", () => {
-  it("shows an ENABLED Done button when every inventory character has count >= 1, even navigated to an already-detected character outside touchLettersToAdd (previously hidden)", async () => {
+describe("TouchGallery — Continue button forced visible when the whole inventory is covered", () => {
+  it("shows an ENABLED Continue button when every inventory character has count >= 1, even navigated to an already-detected character outside touchLettersToAdd (previously hidden)", async () => {
     // "x" carries a desktop swap assignment (mirrored onto the touch seed —
     // badge count via signal (a), and it stays IN touchLettersToAdd as an
     // actionable suggestion target). "€" is detected purely via the SHIPPED
@@ -268,18 +268,18 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
     // The Done button is FORCED visible and enabled — the whole inventory
     // (both "x" and "€") is covered per the producer badge, even though
     // currentChar ("€") is outside touchLettersToAdd's walk. (The completion
-    // round-trip itself — whether clicking Done actually calls onComplete —
+    // round-trip itself — whether clicking Continue actually calls onComplete —
     // is FR-008's own gate, re-deriving coverage from this file's mocked
     // `buildTouchLayoutJson`, which does not reflect shipped/mirrored
     // content; that gate is exercised by its own existing test suite, not
     // this one — the property under test here is button visibility/state.)
     const doneBtn = screen.getByTestId("touch-continue");
-    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect(doneBtn.textContent).toMatch(/Continue/i);
     expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("does NOT force-show the Done button when at least one character is still count === 0, even when navigated to an already-detected character outside touchLettersToAdd", async () => {
+  it('does NOT force-show the "Continue" button when at least one character is still count === 0, even when navigated to an already-detected character outside touchLettersToAdd', async () => {
     // Same "x"/"€" pair as above, PLUS "w" — wholly uncovered (no shipped
     // layout entry, no desktop assignment, no touch config at all) — so the
     // inventory is NOT fully covered.
@@ -300,7 +300,7 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
     expect(screen.queryByTestId("touch-continue")).toBeNull();
   });
 
-  it("force-shows an ENABLED Done button via the mark-aware unaccountedTouchChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
+  it("force-shows an ENABLED Continue button via the mark-aware unaccountedTouchChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
     // "a" is base-covered by the default scaffold fall-through with no
     // unresolved suggestion, so it is excluded from touchLettersToAdd
     // entirely (entry-parity fix) — the SHOW-ALL-only character this test
@@ -340,9 +340,9 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
 
     // Every character is implemented ("a") or marked ("中") —
     // `unaccountedTouchChars` is empty even though `allCovered` (badge) is
-    // false — Done force-shows, ENABLED, from this out-of-walk character.
+    // false — Continue force-shows, ENABLED, from this out-of-walk character.
     const doneBtn = screen.getByTestId("touch-continue");
-    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect(doneBtn.textContent).toMatch(/Continue/i);
     expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
 
     // Unlike the badge-only tests above, clicking here is expected to
@@ -358,7 +358,7 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
 // Mark for later review — replaces the old "Skip this character" escape
 // (mechanism-gallery-progression). A pure per-character TOGGLE: it records
 // nothing in the working copy, but satisfies canGoNext so the existing
-// Next/Done control (not a second navigation control) can advance.
+// Next/Continue control (not a second navigation control) can advance.
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — mark for later review", () => {
@@ -468,14 +468,14 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     });
     expect(alert.textContent).toContain("中");
     expect(
-      (screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled,
+      (screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled,
     ).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("clears the alert and enables Done once a method covering the character is applied", async () => {
+  it("clears the alert and enables Continue once a method covering the character is applied", async () => {
     seedStore({ withInventory: ["中"] });
     const onComplete = vi.fn();
 
@@ -494,7 +494,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     expect(screen.queryByRole("alert")).toBeNull();
 
     await waitFor(() => {
-      const doneBtn = screen.getByRole("button", { name: "Done" });
+      const doneBtn = screen.getByRole("button", { name: "Continue" });
       expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
       fireEvent.click(doneBtn);
     });
@@ -505,7 +505,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("marking the uncovered char also clears the alert and enables Done, without recording a touch assignment", async () => {
+  it("marking the uncovered char also clears the alert and enables Continue, without recording a touch assignment", async () => {
     seedStore({ withInventory: ["中"] });
     const onComplete = vi.fn();
 
@@ -523,7 +523,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     });
     expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries ?? []).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onComplete).toHaveBeenCalledOnce();
   });
 });
@@ -531,7 +531,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 // ---------------------------------------------------------------------------
 // No modal — replaces the old ConfirmDialog leave-warning contract
 // (mechanism-gallery-progression; see MechanismGallery.progression.test.tsx's matching
-// "Done-blocked inline hint (no modal)" suite). TouchGallery renders no
+// "Continue-blocked inline hint (no modal)" suite). TouchGallery renders no
 // <dialog> element at all now; Done is simply disabled while
 // `unaccountedTouchChars` is non-empty, with the FR-008 alert explaining why.
 // ---------------------------------------------------------------------------
@@ -559,7 +559,7 @@ describe("TouchGallery — no modal, ever", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(container.querySelector("dialog")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(container.querySelector("dialog")).toBeNull();
     // Still on "中" — the method chooser is still available to actually cover it.
     expectCurrentChar("中");
@@ -571,7 +571,7 @@ describe("TouchGallery — no modal, ever", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const done = screen.getByRole("button", { name: "Done" }) as HTMLButtonElement;
+    const done = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
     expect(screen.getByRole("group", { name: "Step navigation" }).contains(done)).toBe(true);
     expect(done.disabled).toBe(true);
     const hint = document.getElementById(done.getAttribute("aria-describedby")!);
@@ -610,7 +610,7 @@ describe("TouchGallery — no modal, ever", () => {
 // press states the orphaned edits, a second, explicit press proceeds.
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — footer Done press-twice on orphaned key edits", () => {
+describe("TouchGallery — footer Continue press-twice on orphaned key edits", () => {
   it("the first press shows the orphaned-edit notice instead of completing; the second press proceeds", async () => {
     // A single uncovered char, marked for later review (clears the FR-008
     // coverage gate the same way the "marking the uncovered char" test above

@@ -18,8 +18,13 @@ import { searchWindowsLayouts, windowsLayoutById } from "../lib/windowsLayouts.t
 import type { WindowsLayout } from "../lib/windowsLayouts.ts";
 
 export interface WindowsLayoutPickerProps {
-  /** The currently chosen layout id. */
+  /** The currently chosen layout id (the primary when several are selected). */
   selectedId: string;
+  /**
+   * Every selected layout id — drives each option's `aria-selected`.
+   * Defaults to `[selectedId]` (the pre-#1902 single-select behaviour).
+   */
+  selectedIds?: readonly string[] | undefined;
   /** The studio's suggestion, badged in the list. */
   suggestedId?: string | undefined;
   onSelect: (layoutId: string) => void;
@@ -36,6 +41,7 @@ function optionSummary(layout: WindowsLayout): string {
 
 export function WindowsLayoutPicker({
   selectedId,
+  selectedIds,
   suggestedId,
   onSelect,
   labelledBy,
@@ -47,6 +53,7 @@ export function WindowsLayoutPicker({
   const optionId = (id: string) => `${uid}-opt-${id}`;
 
   const selected = windowsLayoutById(selectedId);
+  const allSelectedIds = selectedIds ?? [selectedId];
   // null = the author is not editing; the input shows the selected name.
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -211,7 +218,7 @@ export function WindowsLayoutPicker({
           >
             {results.map((layout) => {
               const isActive = layout.id === active?.id;
-              const isSelected = layout.id === selectedId;
+              const isSelected = allSelectedIds.includes(layout.id);
               return (
                 // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- APG combobox: keyboard selection happens on the input (Enter on the active option); the option click is the redundant pointer affordance
                 <li

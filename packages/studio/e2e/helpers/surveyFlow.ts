@@ -403,11 +403,11 @@ export async function acceptProjectName(page: Page): Promise<void> {
  * Confirm the prefill summary and advance to Phase B.
  *
  * The prefill confirmation screen shows derived values (target script,
- * base keyboard, language). Confirm by clicking the prefill-confirm button.
+ * base keyboard, language). Confirm by clicking the prefill-continue button.
  */
 export async function confirmPrefill(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 15_000 });
-  await page.click('[data-testid="prefill-confirm"]');
+  await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="prefill-continue"]');
 }
 
 /**
@@ -426,19 +426,19 @@ export async function buildOneCharacterList(
   charToAdd: string = "é",
 ): Promise<void> {
   // IntroChooser — click Continue
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="charlist-continue"]');
 
   // BuildListView — type a character and add it
   await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
   await page.fill('[aria-label="Character to add"]', charToAdd);
-  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByTestId("charlist-add").click();
 
   // Click Done
-  await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', {
+  await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', {
     timeout: 5_000,
   });
-  await page.click('[data-testid="phase-b-done"]');
+  await page.click('[data-testid="charlist-done"]');
 
   // The marks series (spec 071) sits immediately after alphabet confirmation,
   // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.
@@ -621,6 +621,39 @@ export async function carveCharacter(page: Page, ch: string): Promise<void> {
   const count = await cells.count();
   for (let i = 0; i < count; i++) {
     await expect(cells.nth(i)).toHaveAttribute("aria-pressed", "true");
+  }
+}
+
+/**
+ * Deadkeys step (spec 083) — sits on the spine between carve and rules
+ * (steps/manifest.ts derived order: carve → deadkeys → rules →
+ * mechanisms). The walks define no deadkeys, so this is a pass-through:
+ * wait for the step, then click its Continue.
+ *
+ * Race-proof by construction, like driveConvenienceStep / driveMarksSeries
+ * above: races the step's own control against the landmark that follows
+ * it (rules-continue). The step renders unconditionally for every fixture
+ * walked so far (verified live, #2053 — bj_cree_woods, bambara,
+ * pid_piaroa), but if a future gate ever completes it without a screen
+ * for some fixture, the walk must carry on to rules rather than park here
+ * until the test timeout — the exact failure mode #2053 fixed, where
+ * specs that clicked rules-continue directly after carve sat on this
+ * step for the full 240s. Only clicks Continue if the deadkeys screen is
+ * the one that actually showed.
+ */
+export async function driveDeadkeysStep(page: Page): Promise<void> {
+  const deadkeysContinue = page.getByTestId("deadkeys-continue");
+  const rulesContinue = page.getByTestId("rules-continue");
+  await Promise.race([
+    deadkeysContinue.waitFor({ state: "visible", timeout: 30_000 }),
+    rulesContinue.waitFor({ state: "visible", timeout: 30_000 }),
+  ]).catch(() => {
+    // Neither landmark showed within the combined window — fall through
+    // to the direct check below; a genuinely stuck walk still fails
+    // loudly at the caller's own subsequent wait for rules-continue.
+  });
+  if (await deadkeysContinue.isVisible().catch(() => false)) {
+    await deadkeysContinue.click();
   }
 }
 

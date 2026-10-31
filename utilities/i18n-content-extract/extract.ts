@@ -1,6 +1,6 @@
 // Tier B content-i18n extraction (spec 046 T027). Walks a fixed,
 // render-verified allowlist of prose fields — decided in
-// specs/046-i18n-localization/research.md D8 — out of content records into
+// specs/_archive/046-i18n-localization/research.md D8 — out of content records into
 // flat `content.<type>.<id>.<field>` maps. Deliberately does NOT extract
 // every string value (that would leak control fields to translators, the
 // D4-rejected raw-mapping approach); each record type below only reads the

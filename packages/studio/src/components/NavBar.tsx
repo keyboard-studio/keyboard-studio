@@ -97,10 +97,9 @@ export function NavBar({
         activeI18n,
         msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
       )}
-      // Translucent chrome on desktop (.ks-chrome-bar-top, index.css):
-      // a frosted layer with page content scrolling underneath, fading into
-      // the content below through a scroll-edge fade instead of a hairline.
-      // The narrow bar keeps its opaque look.
+      // Solid chrome on desktop (.ks-chrome-bar-top, index.css): an opaque bar
+      // with a hairline divider where it meets the content below. The narrow
+      // bar keeps its own look.
       className={isNarrow ? undefined : "ks-chrome-bar-top"}
       // WRAPS RATHER THAN OVERLAPS. The bar is one row of --topbar-h whenever
       // its three zones fit side by side. When they don't (a ~1280px laptop

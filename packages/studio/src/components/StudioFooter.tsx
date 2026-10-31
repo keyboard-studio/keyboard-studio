@@ -309,17 +309,16 @@ export function StudioFooter() {
         // coarse pointer (spec 081 FR-020a), which an inline style cannot say.
         flexShrink: 0,
         padding: "0 12px",
-        // Translucent chrome: the frosted surface, blur, scroll-edge fade and
-        // the fixed-height logic all live on `.ks-studio-footer` (index.css)
-        // — the blur and the fade need pointer/media queries no inline style
-        // can express, and the bar overlaps the content above it so the page
-        // scrolls underneath the frosted layer.
+        // Solid chrome: the opaque surface, the hairline divider above the bar
+        // and the fixed-height logic all live on `.ks-studio-footer`
+        // (index.css) — the fixed height needs a pointer query no inline
+        // style can express. The bar sits in the shell's normal column flow,
+        // so content ends at its top edge and no scrollbar runs behind it.
         color: CSS_TEXT,
         fontSize: 13,
         // FR-047: no horizontal overflow of the page body — the footer's own
         // box never exceeds its flex parent's width; the SCROLLING happens
-        // inside the dot row below. (The class keeps overflow-y visible so the
-        // scroll-edge fade above the bar can render.)
+        // inside the dot row below.
         overflowX: "clip",
         width: "100%",
         boxSizing: "border-box",

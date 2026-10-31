@@ -57,7 +57,7 @@ A disconnect is any edge where the source's *produces* doesn't satisfy the targe
 (v1.3.0).** The hybrid flow is the implemented authoring path. It is a **hybrid** of
 base-first and survey-first: a light identity prompt first (so a base can be
 suggested), the base back-fills routing, then the heavy character/gallery work,
-then deferred paperwork. [spec.md](../spec.md) §8 is authoritative.
+then deferred paperwork. The §8 data-flow home is [specs/008-data-flow/AS-BUILT.md](../specs/008-data-flow/AS-BUILT.md) (extracted from [spec.md](../spec.md) §8, retired as built).
 
 ### Two authoring tracks, one working-copy spine (v1.3.0)
 
@@ -193,7 +193,8 @@ analog, and KMN has no simultaneous-chord primitive — which is exactly why Sta
 needs its own gallery rather than a mechanical conversion. Note the S-07 cycle is
 *not* a multitap: the desktop cycling rule already fires for touch key events, so it
 works on touch unaided; multitap only adds a discrete second-tap affordance. (This
-table is mirrored, authoritatively, in spec.md §8 "Gallery instantiation".)
+table is mirrored in [spec.md](../spec.md) §8 "Gallery instantiation"; the
+extracted data-flow home is [specs/008-data-flow](../specs/008-data-flow/AS-BUILT.md).)
 
 ### Gallery output is a scoped, multi-valued assignment map (DISCUS-guided)
 

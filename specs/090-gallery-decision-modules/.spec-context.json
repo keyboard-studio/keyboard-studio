@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Gallery and picker decisions become modules",
   "branch": "km/gallery-decision-modules",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "plan",
@@ -18,6 +18,14 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-10-07T00:54:03.330Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:58:09.395Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "0fbcfdc0-2b3b-4d3c-9f28-663620065221"
 }

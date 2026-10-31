@@ -48,7 +48,7 @@
       "title": "il_copyright_holder declares requires: [\"authoring-track\"]"
     }
   },
-  "currentStep": "tasks",
+  "currentStep": "implement",
   "decisions": [
     {
       "decision": "Reuse runDecisionFlow's per-module semantics (order, validate-rejects-are-absent, source naming) in a new live runner that merges into decisionStore, rather than forking semantics",
@@ -114,10 +114,17 @@
       "kind": "complete",
       "step": "tasks",
       "substep": null
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:58:11.836Z"
     }
   ],
   "specName": "live extraction",
-  "status": "ready-to-implement",
+  "status": "completed",
   "step_summaries": {
     "plan": {
       "key_finding": "runDecisionFlow already implements the exact per-module extraction semantics but has no live caller and no store-merge; the StudioShell setup hazard is localised to doCommit's selectedTrack read at baseConfirmed time (track answered after choose_base)",

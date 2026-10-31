@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "langtags identity autocomplete",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:07.193Z"
+    }
+  ],
+  "telemetryInstanceId": "cfa221cd-42db-406e-bdd5-83b9047702a2"
+}

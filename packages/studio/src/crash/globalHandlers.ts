@@ -151,7 +151,3 @@ export function installGlobalCrashHandlers(options: {
   );
 }
 
-/** Test seam: allow a fresh install in the next test. @internal */
-export function _resetGlobalCrashHandlers(): void {
-  installed = false;
-}

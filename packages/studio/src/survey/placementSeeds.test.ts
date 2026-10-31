@@ -594,4 +594,36 @@ describe("getRankedSuggestionsForChar", () => {
   it("returns an empty list for an empty-string char (null-safety)", () => {
     expect(getRankedSuggestionsForChar("", fixture)).toEqual([]);
   });
+
+  it("does not qualify a candidate at exactly the 0.5 threshold (single-source n=1, #2062)", () => {
+    const atThreshold: PlacementCandidate = {
+      vkey: "K_F",
+      modifiers: ["RALT"],
+      mechanism: "direct",
+      priorSource: "corpus",
+      priorCount: 1,
+      confidence: 0.5,
+    };
+    const map: PlacementMap = {
+      entries: [{ codepoint: "U+0192", candidates: [atThreshold] }],
+    };
+    expect(getRankedSuggestionsForChar("ƒ", map)).toEqual([]);
+  });
+
+  it("qualifies a candidate just above the 0.5 threshold (#2062)", () => {
+    const aboveThreshold: PlacementCandidate = {
+      vkey: "K_F",
+      modifiers: ["RALT"],
+      mechanism: "direct",
+      priorSource: "corpus",
+      priorCount: 2,
+      confidence: 0.55,
+    };
+    const map: PlacementMap = {
+      entries: [{ codepoint: "U+0192", candidates: [aboveThreshold] }],
+    };
+    const entries = getRankedSuggestionsForChar("ƒ", map);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.topCandidate.confidence).toBe(0.55);
+  });
 });

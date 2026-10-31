@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "marks treatment question",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:33.190Z"
+    }
+  ],
+  "telemetryInstanceId": "57acf5a6-fada-4c28-ae6a-a7ba79fdbd2e"
+}

@@ -94,7 +94,7 @@ export function runDocChecks(input: DocLintInput): LintFinding[] {
  *                    `toleranceReport` — spec 062 US2. keyboard-lint never
  *                    computes the report itself, see check-19-x's module doc)
  *   Submit        -> all of the above
- *   18.7 (currency) -> DEFERRED; not implemented
+ *   18.7 (currency) -> implemented (KM_LINT_MANDATED_CHAR_MISSING — see checks/criteria/check-currency.ts)
  *   1.10b (adapted .kpj format) -> DEFERRED; not implemented
  */
 export interface LintContext {

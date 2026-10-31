@@ -60,6 +60,13 @@ export const STANDALONE_STEP_ID = "__standalone__";
 export interface RevisionNav {
   stepId: string;
   onDiscard: () => void;
+  /**
+   * #2050: the forward slot is renamed "Back to testing" only on the step the
+   * revision targeted — there, completing really does return to Output. On a
+   * step reached via Back the Discard action stays published but the forward
+   * button keeps its own name.
+   */
+  renameForward: boolean;
 }
 
 const SLOTS = ["back", "secondary", "forward"] as const;
@@ -110,7 +117,11 @@ export const useStepNavStore = create<StepNavState>((set) => ({
 
   publishRevision: (nav) =>
     set((s) =>
-      s.revision?.stepId === nav.stepId && s.revision.onDiscard === nav.onDiscard ? s : { revision: nav },
+      s.revision?.stepId === nav.stepId &&
+      s.revision.onDiscard === nav.onDiscard &&
+      s.revision.renameForward === nav.renameForward
+        ? s
+        : { revision: nav },
     ),
 
   clearRevision: (stepId) => set((s) => (s.revision?.stepId === stepId ? { revision: null } : s)),

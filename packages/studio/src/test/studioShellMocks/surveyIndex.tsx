@@ -20,7 +20,7 @@ export function IdentityLite({ onComplete }: { onComplete: (result: unknown, ide
 export function Prefill({ onConfirm, onBack }: { onConfirm: () => void; onBack?: () => void }) {
   usePublishStepNav({
     ...(onBack !== undefined ? { back: { label: "prefill-back", onClick: onBack, testId: "prefill-back" } } : {}),
-    forward: { label: "prefill-confirm", onClick: onConfirm, testId: "prefill-confirm" },
+    forward: { label: "prefill-continue", onClick: onConfirm, testId: "prefill-continue" },
   });
   return <div data-testid="stage-prefill" />;
 }
@@ -28,7 +28,7 @@ export function Prefill({ onConfirm, onBack }: { onConfirm: () => void; onBack?:
 export function PhaseB({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) {
   usePublishStepNav({
     ...(onBack !== undefined ? { back: { label: "phase-b-back", onClick: onBack, testId: "phase-b-back" } } : {}),
-    forward: { label: "phase-b-done", onClick: () => onComplete(fakePhaseResult), testId: "phase-b-done" },
+    forward: { label: "charlist-done", onClick: () => onComplete(fakePhaseResult), testId: "charlist-done" },
   });
   return <div data-testid="stage-B" />;
 }

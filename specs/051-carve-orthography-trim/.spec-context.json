@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "carve orthography trim",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:32.039Z"
+    }
+  ],
+  "telemetryInstanceId": "e16fe4e0-e357-4b95-bda6-d38afd8084a6"
+}

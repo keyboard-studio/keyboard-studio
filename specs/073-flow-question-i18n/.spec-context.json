@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "flow question i18n",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:55.907Z"
+    }
+  ],
+  "telemetryInstanceId": "9d1ada3c-7b71-42f7-979d-a99a5f0d547e"
+}

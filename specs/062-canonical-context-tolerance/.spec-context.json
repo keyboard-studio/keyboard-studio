@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "canonical context tolerance",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:42.463Z"
+    }
+  ],
+  "telemetryInstanceId": "d97a93df-1e6e-4b2d-81cf-69be2a4018fa"
+}

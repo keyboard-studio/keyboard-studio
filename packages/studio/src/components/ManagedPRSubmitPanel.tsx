@@ -41,6 +41,7 @@ import {
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
 import { recordProjectSubmission } from "../lib/draftPersistence.ts";
+import { useTestingStore } from "../stores/testingStore.ts";
 import { buildDecisionSummaryBlock } from "@keyboard-studio/engine";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
@@ -239,6 +240,16 @@ export function ManagedPRSubmitPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.email]);
 
+  // #2050: the in-flight flag is transient — if this panel unmounts
+  // (navigation away) mid-submit, clear it so a later mount never inherits a
+  // stale flag and skips its confirm step.
+  useEffect(
+    () => () => {
+      useTestingStore.getState().setSubmitInFlight(false);
+    },
+    [],
+  );
+
   const nameValid = isValidDisplayName(authorName);
   const emailValid = isValidEmail(email);
   const formReady = nameValid && emailValid && copyrightChecked;
@@ -257,6 +268,9 @@ export function ManagedPRSubmitPanel({
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
     setSubmitState({ kind: "submitting" });
+    // #2050: PublishHandover keeps this panel mounted while the flag is set,
+    // so a new test build cannot unmount it (and drop this submission) mid-flight.
+    useTestingStore.getState().setSubmitInFlight(true);
 
     try {
       // Project the working copy at submit time — identical to the download path.
@@ -340,6 +354,8 @@ export function ManagedPRSubmitPanel({
               });
       }
       setSubmitState({ kind: "error", message });
+    } finally {
+      useTestingStore.getState().setSubmitInFlight(false);
     }
   }, [submitEnabled, authorName, email, t, i18n, accessToken]);
 
@@ -500,6 +516,29 @@ export function ManagedPRSubmitPanel({
           </Trans>
         </label>
       </div>
+
+      {/* Spec 095 FR-004: the permanence disclosure sits at the confirm
+          step itself, not behind a link — submitting publishes the
+          author's name and email into public git history, and that fact
+          must be in the same view as the button that does it. */}
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: "var(--app-text-subtle)",
+          border: "1px solid var(--app-border)",
+          borderRadius: 6,
+          padding: "8px 10px",
+        }}
+      >
+        <Trans id="output.submit.permanence">
+          Submitting publishes your keyboard as a public pull request. Your name and
+          email address become part of that submission, and once it is merged they
+          are part of the repository&rsquo;s permanent public history — they cannot
+          be removed from it later.
+        </Trans>
+      </p>
 
       {/* Submit button */}
       <button

@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "mvp authoring walk",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:12.131Z"
+    }
+  ],
+  "telemetryInstanceId": "263d86e1-9b31-4a43-834b-8fad9b64045a"
+}

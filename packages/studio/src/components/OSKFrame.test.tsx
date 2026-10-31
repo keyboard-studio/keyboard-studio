@@ -36,15 +36,21 @@ function setViewport(width: number, height: number): void {
 
 const IDLE_STAGE: Stage = { kind: "idle" };
 
-function renderFrame(): void {
+function renderFrame(fullBleed = false): void {
   render(
     <OSKFrame
       startKeyboard={null}
       oskMode="desktop"
       stage={IDLE_STAGE}
       retry={() => {}}
+      fullBleed={fullBleed}
     />,
   );
+}
+
+function frameWrapper(): HTMLElement {
+  return screen.getByTitle("On-screen keyboard preview")
+    .parentElement as HTMLElement;
 }
 
 function iframeHeight(): string {
@@ -98,5 +104,32 @@ describe("OSKFrame — viewport-relative sizing", () => {
     renderFrame();
     // 320 − 120 = 200 < 240 floor — the keyboard stays usable.
     expect(iframeHeight()).toBe("240px");
+  });
+});
+
+describe("OSKFrame — chrome (#1898 full-bleed)", () => {
+  it("keeps the rounded card on desktop by default (card-embedding hosts)", () => {
+    setViewport(1280, 800);
+    renderFrame();
+    expect(frameWrapper().style.borderRadius).toBe("12px");
+    expect(frameWrapper().style.border).toBe("1px solid var(--app-border)");
+  });
+
+  it("is full-bleed on desktop when the host passes fullBleed", () => {
+    setViewport(1280, 800);
+    renderFrame(true);
+    const w = frameWrapper();
+    expect(w.style.borderRadius).toBe("");
+    expect(w.style.border).toBe("");
+    expect(w.style.borderTop).toBe("1px solid var(--app-border)");
+    expect(w.style.borderBottom).toBe("1px solid var(--app-border)");
+  });
+
+  it("is full-bleed at narrow widths with or without the prop", () => {
+    setViewport(390, 844);
+    renderFrame();
+    const w = frameWrapper();
+    expect(w.style.borderRadius).toBe("");
+    expect(w.style.borderTop).toBe("1px solid var(--app-border)");
   });
 });

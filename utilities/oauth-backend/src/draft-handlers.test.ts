@@ -7,10 +7,13 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  deleteAllDrafts,
   deleteDraft,
+  exportDrafts,
   getDraftContent,
   getDraftMeta,
   listDrafts,
+  purgeUserDrafts,
   putDraft,
   type DraftHandlerConfig,
 } from "./draft-handlers.js";
@@ -284,5 +287,78 @@ describe("back-compat: un-upgraded client omits draftId/status/prUrl", () => {
     const list = await listDrafts(AUTH, config);
     expect(list.ok && list.data.drafts).toHaveLength(1);
     expect(list.ok && list.data.drafts[0]?.draftId).toBe(DEFAULT_DRAFT_ID);
+  });
+});
+
+describe("exportDrafts() — spec 097 DSAR self-service export", () => {
+  it("401s when the token does not verify", async () => {
+    const res = await exportDrafts(AUTH, makeConfig(null));
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+
+  it("exports identity plus every draft (payload + metadata), keyed to the caller only", async () => {
+    const config = makeConfig();
+    const creeMeta: DraftMeta = { ...META, draftId: "cree-woods", label: "Cree (Woods)" };
+    await putDraft(AUTH, putBody(META, { a: 1 }), config);
+    await putDraft(AUTH, putBody(creeMeta, { b: 2 }), config);
+    // Another user's drafts must never leak into the caller's export.
+    await config.store.putDraft(999, "someone-else", { ...META, draftId: "theirs" }, { secret: true });
+
+    const res = await exportDrafts(AUTH, config);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.identity).toEqual({ githubUserId: USER.id, login: USER.login });
+    expect(Number.isNaN(Date.parse(res.data.exportedAt))).toBe(false);
+    expect(res.data.drafts).toHaveLength(2);
+    const byId = new Map(res.data.drafts.map((d) => [d.meta.draftId, d.draft]));
+    expect(byId.get(DEFAULT_DRAFT_ID)).toEqual({ a: 1 });
+    expect(byId.get("cree-woods")).toEqual({ b: 2 });
+    expect(byId.has("theirs")).toBe(false);
+  });
+
+  it("exports an empty drafts array for a user with nothing stored", async () => {
+    const res = await exportDrafts(AUTH, makeConfig());
+    expect(res.ok && res.data.drafts).toEqual([]);
+  });
+});
+
+describe("deleteAllDrafts() — spec 098 self-service erasure", () => {
+  it("401s when the token does not verify", async () => {
+    const res = await deleteAllDrafts(AUTH, makeConfig(null));
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+  });
+
+  it("removes every draft including the legacy default slot, returns the count, then verifies empty", async () => {
+    const config = makeConfig();
+    await putDraft(AUTH, putBody(META, { a: 1 }), config);
+    await putDraft(AUTH, putBody({ ...META, draftId: "cree-woods" }, { b: 2 }), config);
+    await config.store.putDraft(999, "someone-else", META, { keep: true });
+
+    const res = await deleteAllDrafts(AUTH, config);
+    expect(res.ok && res.data.deleted).toBe(2);
+
+    const list = await listDrafts(AUTH, config);
+    expect(list.ok && list.data.drafts).toEqual([]);
+    // Idempotent: a second erase reports zero, and the other user is untouched.
+    const again = await deleteAllDrafts(AUTH, config);
+    expect(again.ok && again.data.deleted).toBe(0);
+    expect(await config.store.listMeta(999)).toHaveLength(1);
+  });
+});
+
+describe("purgeUserDrafts() — spec 098 owner purge", () => {
+  it("purges by identity key and emits the completion record", async () => {
+    const config = makeConfig();
+    await putDraft(AUTH, putBody(META, { a: 1 }), config);
+    await putDraft(AUTH, putBody({ ...META, draftId: "ojibwe" }, { b: 2 }), config);
+
+    const record = await purgeUserDrafts(USER.id, config);
+    expect(record.githubUserId).toBe(USER.id);
+    expect(record.deleted).toBe(2);
+    expect(record.outcome).toBe("purged");
+    expect(Number.isNaN(Date.parse(record.purgedAt))).toBe(false);
+    expect(await config.store.listMeta(USER.id)).toEqual([]);
   });
 });

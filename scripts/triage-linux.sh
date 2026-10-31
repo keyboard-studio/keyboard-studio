@@ -286,6 +286,15 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
   TOTAL=$(echo "$PRS_JSON" | jq 'length')
   PR_NUMS=$(echo "$PRS_JSON" | jq -r '[.[].number] | map(tostring) | join(",")')
+
+  # Required status checks for main, fetched live from the branch rulesets
+  # (currently: build, km-triage/review). Gate 6 must NOT rely on
+  # statusCheckRollup[].isRequired - gh returns null for it in some
+  # environments, which silently disabled the CI gate in the muse-triage
+  # sweep and let a build-failing PR dispatch a worker 8 times (PR #2008).
+  REQUIRED_JSON=$(gh api "repos/$REPO/rules/branches/main" 2>/dev/null \
+    | jq -c '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context] | unique | select(length > 0)' 2>/dev/null || echo "")
+  [[ -n "$REQUIRED_JSON" && "$REQUIRED_JSON" != "null" ]] || REQUIRED_JSON='["build","km-triage/review"]'
   echo "[km-triage] $TOTAL open PRs: [$PR_NUMS]" | tee -a "$LOG"
   emit "phase=sweep-start" "total_prs=$TOTAL" "prs=[$PR_NUMS]" || true
 
@@ -357,13 +366,15 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       continue
     fi
 
-    # Gate 6 — CI blocking (any required check not SUCCESS/NEUTRAL/SKIPPED)
-    CI_BLOCKING=$(echo "$PR" | jq '
+    # Gate 6 - CI blocking (checks whose name/context is in the ruleset's
+    # required set and that are present in the rollup: pending or not
+    # SUCCESS/NEUTRAL/SKIPPED blocks; absent required checks do not block)
+    CI_BLOCKING=$(echo "$PR" | jq --argjson req "$REQUIRED_JSON" '
       .statusCheckRollup // [] |
-      map(select(.isRequired == true)) |
+      map(select((.name // .context // "") | IN($req[]))) |
       map(select(
         if .__typename == "CheckRun" then
-          (.conclusion // .status // "") | IN("SUCCESS","NEUTRAL","SKIPPED") | not
+          (.status != "COMPLETED") or ((.conclusion // "") | IN("SUCCESS","NEUTRAL","SKIPPED") | not)
         else
           (.state // "") | IN("SUCCESS") | not
         end

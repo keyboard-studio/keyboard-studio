@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "data flow",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:28.487Z"
+    }
+  ],
+  "telemetryInstanceId": "47ded018-da77-4ef8-b370-0a47239922bc"
+}
