@@ -115,6 +115,7 @@ import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
 import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { ReviewScreen } from "./review/ReviewScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
@@ -1859,6 +1860,17 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
 // ---------------------------------------------------------------------------
 
 export function StudioShell() {
+  // /review — the Keyboard Health Check is a real path route (the hosting
+  // rewrite serves index.html for it; see vercel.json). It renders standalone
+  // here, before any authoring state is touched: no hash routing, no working
+  // copy, no draft stores — structural read-only isolation (spec 057 US2).
+  if (
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/review")
+  ) {
+    return <ReviewScreen />;
+  }
+
   const route = useRoute();
   const isNarrow = useIsNarrow();
   const { t } = useLingui();
