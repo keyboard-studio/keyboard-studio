@@ -43,6 +43,14 @@ Plus one blocked pair inside CHECK-NOW: 1.10b + 2.7 are mechanical
 `.kpj` format as `version="10.0"`, while real keyboards-repo `.kpj`
 files carry `<Options><Version>2.0</Version>`. The pinned constant
 must be settled/corrected before either check can fire honestly.
+**Settled 2026-10-14 by Matthew's ruling:** the constant is 2.0;
+criterion 1.10 was re-pinned to the `<Options><Version>2.0</Version>`
+element form and the pair landed (see the accounting table below).
+Corpus verification behind the ruling: all 12 `.kpj` files in the
+local keyboards checkout — 11 carry `<Version>2.0</Version>`; the
+twelfth (pid_piaroa) predates the element entirely; none carries
+any other value, and the studio never authors the value (it inherits
+the base keyboard's `.kpj` verbatim).
 
 ## Reconciliation with the Ewondo page (44 Not yet checkable)
 
@@ -72,7 +80,7 @@ questions there (EXTERNAL in foreign mode).
 | 1.5 duplicate-keyboard-id | WIRING | Start-keyboard catalog (`getStartBrowserService().listAll()`); caveats: catalog scans `release/` only (extending to `experimental/`+`legacy/` is part of the wiring) and the base's own ID must be self-excluded | M |
 | 1.6 id-contains-"keyboard" | CHECK-NOW | `resolveOutputKeyboardId` + IR header display name; substring test | S |
 | 1.9 duplicate-source-files | CHECK-NOW | VFS `list()`/`entries()`, group by basename + content hash. Not precertifiable: base-carried identical copies on the adapt track must actually be looked at | M |
-| 1.10b kpj-format-outdated | CHECK-NOW (blocked) | `.kpj` `<Options><Version>` at VFS root; reader precedent `parseKpjFlags`. Blocked on the 1.10 constant defect above | S |
+| 1.10b kpj-format-outdated | CHECK-NOW — LANDED (KPJ pair) | `.kpj` `<Options><Version>` at VFS root; reader precedent `parseKpjFlags`. Was blocked on the 1.10 constant defect above; unblocked by the 2026-10-14 ruling (constant = 2.0) | S |
 | 1.13 stray-scratch-files | **PRECERTIFY** | Closed generated manifest (serializeWorkingCopy member set + stubs + docs regen; nothing enters the output except by generator write or as a manifest-enumerated base-carried file). Foreign can CHECK-NOW via scratch-pattern scan | S |
 | 2.1 version-not-bumped | WIRING | Diff package files `startVfs` ↔ output VFS (existing store slices) + adapt bump invariant; N/A on new-from-base | M |
 | 2.2 spurious-version-bump | WIRING | Same diff as 2.1; on adapt output the changed set is never non-package-only (vacuous Met); N/A new-from-base | M (~S incremental) |
@@ -80,7 +88,7 @@ questions there (EXTERNAL in foreign mode).
 | 2.4 leading-zero | CHECK-NOW | Same validator | S |
 | 2.5 v-prefix/labels | CHECK-NOW | Same validator | S |
 | 2.6 version-not-incremented | WIRING | Previous = `startIr.header.version` (adapt only); output > previous by numeric dot-compare; the wiring mostly *proves* the generator invariant. N/A new-from-base | M |
-| 2.7 kpj-version-bumped | CHECK-NOW (blocked) | Same `.kpj` field as 1.10b from the opposite direction — the pair pins equality (one reader, one constant, two findings). Same constant defect | S |
+| 2.7 kpj-version-bumped | CHECK-NOW — LANDED (KPJ pair) | Same `.kpj` field as 1.10b from the opposite direction — the pair pins equality (one reader, one constant, two findings). Same ruling as 1.10b | S |
 
 ## §7/§8/§10 — KMN, KVKS, touch, package (18)
 
@@ -250,9 +258,12 @@ now produces real verdicts in authored mode.
 - **Batch 5 — confirm conversions (2 rows):** 9.1, 9.2 become
   per-font attestations (they leave Not yet checkable for
   Needs human, where they honestly belong).
-- **Constant fix (unblocks 2 rows):** settle the `.kpj` current
-  format constant (1.10's `10.0` vs corpus `2.0`), then 1.10b + 2.7
-  land as one reader, two findings.
+- **Constant fix (unblocks 2 rows): LANDED 2026-10-14** — Matthew
+  ruled the `.kpj` current format constant is 2.0 (1.10's `10.0` was
+  the defect); criterion 1.10 was re-pinned and 1.10b + 2.7 landed
+  as one reader, two findings (check-kpj in keyboard-lint, facts
+  assembled from the judged VFS's root `.kpj`; an absent `.kpj`
+  leaves both rows Not yet checkable with the file named).
 - **Stays Not yet checkable (5 rows):** 9.4, 15.2, 15.4, 15.5, 16.2
   — repo-tree state outside the bundle; in the common authored
   case all but 9.4 already resolve Not applicable.
@@ -320,7 +331,7 @@ the catch-up row that fell between the Batch 1/2 enumerations:
   no check and no synthesis emits them; the exclusion and its
   reason are documented in `implementedChecks.ts`.
 
-## Full 49-row accounting (after Batches 1–5 + catch-up + KPJ pair)
+## Full 49-row accounting (after Batches 1–5 + catch-up)
 
 | Row | Criterion (short) | Disposition |
 |---|---|---|
@@ -328,7 +339,7 @@ the catch-up row that fell between the Batch 1/2 enumerations:
 | 1.5 | Keyboard ID not already used | LANDED — Batch 3 (assembly verdict) |
 | 1.6 | ID does not contain "keyboard" | LANDED — Batch 1 |
 | 1.9 | No duplicate source files | LANDED — Batch 2 |
-| 1.10b | .kpj format when adapted from a base | LANDED — KPJ pair (structural form check, ruling B) |
+| 1.10b | .kpj format when adapted from a base | LANDED — KPJ pair (constant ruled 2.0, 2026-10-14; 1.10 re-pinned) |
 | 1.13 | No stray/scratch files | LANDED — Batch 1 (precertify + foreign scan) |
 | 2.1 | Version bumped if package changed | LANDED — Batch 3 (assembly verdict) |
 | 2.2 | No bump for non-package-only changes | LANDED — Batch 3 (assembly verdict) |
@@ -336,7 +347,7 @@ the catch-up row that fell between the Batch 1/2 enumerations:
 | 2.4 | No leading zero in version | LANDED — Batch 1 |
 | 2.5 | No v-prefix or labels | LANDED — Batch 1 |
 | 2.6 | New version strictly greater | LANDED — Batch 3 (assembly verdict) |
-| 2.7 | .kpj version not bumped | LANDED — KPJ pair (format-marker state compared with the base, ruling B) |
+| 2.7 | .kpj version not bumped | LANDED — KPJ pair (same ruling) |
 | 7.2 | &TARGETS any not alone | LANDED — Batch 1 |
 | 7.3 | No unsupported mobile targets | LANDED — Batch 1 |
 | 7.4 | Modifier names consistent | LANDED — Batch 2 |
@@ -374,71 +385,12 @@ the catch-up row that fell between the Batch 1/2 enumerations:
 | 18.6 | Inventory fully covered | LANDED — Batch 4 (inventory builder) |
 | 18.7 | Mandated currency characters present | LANDED — Batch 3 |
 
-**Remainder: 5 of 49** — the five EXTERNAL rows (9.4, 15.2,
-15.4, 15.5, 16.2), which judge repository-tree state outside the
-judged bundle; of those, only 9.4 is live in the common authored
-case, the other four already resolving Not applicable. With the
-KPJ pair landed below, **44 of 49 rows** have a mechanism; the
-EXTERNAL five remain Not yet checkable by design.
-
-## KPJ pair landed (2026-10-14, PR #2105)
-
-Matthew's ruling B (2026-10-14) settled the format constant by
-dropping it: criterion 1.10 no longer pins a numeric `.kpj`
-version, and the pair checks **structural form** instead. The
-catalog correction and the two checks landed together in one
-follow-on PR off main (PR #2055 having merged).
-
-- **The constant defect, resolved by evidence.** The evidence
-  brief (`keyboard-studio-notes/kpj-constant-evidence-2026-10-14.md`)
-  tallied 1,044 corpus `.kpj` files: 767 carry
-  `<Options><Version>2.0</Version>`, 277 carry no Version element
-  at all, and **zero** carry the `10.0` that 1.10's text pinned —
-  `10.0` is the `.kvks` header version, not a `.kpj` value. The
-  studio's scaffolder stamps no `.kpj` version either; it carries
-  the base keyboard's `.kpj` forward. Criterion 1.10's catalog
-  text (and its `criteria-summary.md` mirror) now states the
-  structural expectation — the current format is recognised by
-  the `<Options><Version>` element's presence — and the false
-  scaffolder-bake claim in it is corrected; a dated correction
-  note in the summary records ruling B.
-- **Reader.** `parseKpjForm` (engine, beside the `parseKpjFlags`
-  precedent) extracts the `<Options><Version>` element's text and
-  the presence of a `<Files>` list, and classifies the file
-  **modern** iff the Version element is present, **legacy**
-  otherwise. Upstream grounds the line: keymanapp/keyman's
-  `common/schemas/kpj/README.md` — the format-2.0 changelog
-  (2023-02-27) makes `Files` optional (ignored by kmc, populated
-  from the folder structure) and `Options.Version` is implicitly
-  `1.0` until declared; kb0114 shows a minimal current `.kpj`
-  carrying `<Version>2.0</Version>`. The corpus agrees exactly:
-  all 767 modern files carry the value `2.0` and none carries
-  `<Files>`; all 277 legacy files carry `<Files>`.
-- **The pair (one reader, two distinct verdicts).** Facts cross
-  into keyboard-lint as `KpjFormFacts` on `CriteriaLintInput`
-  (`kpj` = the judged file, `baseKpj` = the base keyboard's),
-  assembled in `assembleLintContext` from the working copy's
-  `startVfs`. **1.10b** is absolute: it fires iff the judged
-  `.kpj` is in legacy form. **2.7** is relational: it fires iff
-  the format marker's state (absent, or its value) differs
-  between base and output — an adaptation that carries a legacy
-  `.kpj` forward untouched fires 1.10b and passes 2.7; one that
-  changes the marker state fires 2.7. A judged VFS with no `.kpj`
-  names "the .kpj project file" context-missing for both codes;
-  a `.kpj` with no base names the base keyboard's `.kpj`
-  context-missing for 2.7 only (1.10b still judges). Foreign mode
-  never supplies a base, so 2.7 is honestly Not yet checkable
-  there while 1.10b judges the compared keyboard's own `.kpj` —
-  consistent with the sibling base-relative checks.
-  `IMPLEMENTED_LINT_CODES` 57 → 59.
-- **Fixture.** The real `sil_cameroon_qwerty` folder through the
-  real assembly + engine + resolver (authored mode, base = its
-  own `.kpj`): both rows **Met**, no KPJ findings, neither code
-  context-missing. Negative control — the same folder with its
-  `.kpj` replaced by the real legacy `pid_piaroa.kpj`: both
-  findings fire, both rows **Not met**. With no base supplied:
-  1.10b **Met**, 2.7 **Not yet checkable** naming the base
-  keyboard's `.kpj`.
+**Remainder: 5 of 49** — the five EXTERNAL rows (9.4, 15.2, 15.4,
+15.5, 16.2), which judge repository-tree state outside the judged
+bundle; of those, only 9.4 is live in the common authored case, the
+other four already resolving Not applicable. With the KPJ pair
+landed under the 2026-10-14 ruling, the final accounting is
+**44 of 49 landed; only the 5 EXTERNAL rows remain**.
 
 ## Ewondo reconciliation (2026-10-14, real sil_cameroon_qwerty folder, authored mode)
 
@@ -486,7 +438,10 @@ Rows that remain Not yet checkable in this run, and why:
 - **7.6, 7.21** — no compile result exists in this harness (the
   app supplies the stage's compile result; Batch 1's fixture run
   showed both resolving against a real clean compile).
-- **1.10b, 2.7** — the KPJ pair, blocked on the format constant.
+- **1.10b, 2.7** — the KPJ pair (blocked on the format constant
+  at the time of this reconciliation; landed 2026-10-14 under
+  Matthew's ruling — the corpus folder's `.kpj` carries 2.0, so
+  both rows now resolve Met for this keyboard).
 
 §18.6 is unchanged: **Not met — 22 uncovered characters** against
 the Ewondo exemplar inventory, matching Batch 4's first verdict.

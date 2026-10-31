@@ -1,6 +1,7 @@
 // runCriteriaChecks — the spec 084 criteria checks (Batch 1:
 // §§1/2/7/8/9/12/13/15; Batch 2: cross-file reconciliation — 1.9, 7.4,
-// 7.12, 7.14, 7.19, 8.13; KPJ pair: 1.10b, 2.7), run as one gated group.
+// 7.12, 7.14, 7.19, 8.13; Batch 3 wiring; the KPJ pair — 1.10b, 2.7),
+// run as one gated group.
 //
 // Gating shape matches every other optional LintContext input: the
 // checks run only when the caller assembled a CriteriaLintInput (the
@@ -82,15 +83,79 @@ import {
 } from "./checks/criteria/check-version.js";
 import { checkDeprecatedKpsLinkage } from "./checks/criteria/check-deprecated-kps.js";
 import {
-  checkKpjFormatAdapted,
-  checkKpjVersionNotBumped,
+  checkKpjFormatOutdated,
+  checkKpjVersionBumped,
 } from "./checks/criteria/check-kpj.js";
+import { checkFileInventory } from "./checks/criteria/check-file-inventory.js";
+import { checkKpsListing } from "./checks/criteria/check-kps-listing.js";
+import { checkKpsMetadata } from "./checks/criteria/check-kps-metadata.js";
+import {
+  checkTextContent,
+  type TextContentFacts,
+} from "./checks/criteria/check-text-content.js";
+import {
+  checkAttribution,
+  checkRepoContext,
+} from "./checks/criteria/check-repo-context.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
 function readText(fs: VirtualFS, path: string): string | undefined {
   const content = fs.get(path)?.content;
   return typeof content === "string" ? content : undefined;
+}
+
+/** Find a VFS path by case-insensitive exact match, or undefined. */
+function findPath(
+  filePaths: readonly string[],
+  wanted: string,
+): string | undefined {
+  const lower = wanted.toLowerCase();
+  return filePaths.find((p) => p.toLowerCase() === lower);
+}
+
+/**
+ * Resolve the Group A2 text-content twin inputs (Batch 4) from the judged
+ * VFS: the doc texts, the help .php, and the primary BCP47 tag (from the
+ * parsed .kmn IR, falling back to the .kps language list).
+ */
+function resolveTextFacts(
+  fs: VirtualFS,
+  filePaths: readonly string[],
+  keyboardId: string,
+  keyboardIR: KeyboardIR | undefined,
+  input: CriteriaLintInput,
+): TextContentFacts {
+  // Helper: read a text file, returning undefined when absent/unreadable.
+  // The spread below only includes defined values, satisfying
+  // exactOptionalPropertyTypes (a present property must be `string`, not
+  // `string | undefined`).
+  const textAt = (path: string | undefined): string | undefined =>
+    path === undefined ? undefined : readText(fs, path);
+
+  const licenseMd = textAt(findPath(filePaths, "LICENSE.md"));
+  const kmn = textAt(kmnPath(keyboardId));
+  const readmeMd = textAt(findPath(filePaths, "README.md"));
+  const readmeHtm = textAt(findPath(filePaths, "source/readme.htm"));
+  const welcomeHtm = textAt(
+    findPath(filePaths, "source/welcome.htm") ??
+      findPath(filePaths, "source/welcome/welcome.htm"),
+  );
+  const phpPath = filePaths.find((p) => p.toLowerCase().endsWith(".php"));
+  const php = textAt(phpPath);
+  const primaryBcp47 =
+    keyboardIR?.header.bcp47[0] ?? input.kpsLanguages[0] ?? undefined;
+  return {
+    keyboardId,
+    ...(licenseMd !== undefined ? { licenseMd } : {}),
+    ...(kmn !== undefined ? { kmn } : {}),
+    ...(input.kpsText !== undefined ? { kps: input.kpsText } : {}),
+    ...(readmeMd !== undefined ? { readmeMd } : {}),
+    ...(readmeHtm !== undefined ? { readmeHtm } : {}),
+    ...(welcomeHtm !== undefined ? { welcomeHtm } : {}),
+    ...(php !== undefined && phpPath !== undefined ? { php, phpPath } : {}),
+    ...(primaryBcp47 !== undefined ? { primaryBcp47 } : {}),
+  };
 }
 
 /**
@@ -125,15 +190,6 @@ export function runCriteriaChecks(
   // 1.9 — duplicate source files (same basename, identical content)
   // anywhere in the judged folder.
   findings.push(...checkDuplicateSourceFiles(fs));
-
-  // 1.10b / 2.7 — the KPJ pair (ruling B: structural form). The facts
-  // arrive pre-parsed in CriteriaLintInput (the engine's parseKpjForm
-  // ran in the assembly); neither check needs the IR. Absent facts
-  // produce no findings — the assembly names the missing input (no
-  // .kpj in this VFS; no base .kpj, which is every foreign judgment).
-  const kpjPath = filePaths.find((p) => p.toLowerCase().endsWith(".kpj")) ?? "";
-  findings.push(...checkKpjFormatAdapted(input.kpj, kpjPath));
-  findings.push(...checkKpjVersionNotBumped(input.kpj, input.baseKpj, kpjPath));
 
   // 7.10 — raw .kmn text scan; runs even when the IR failed to parse.
   const kmnText = readText(fs, kmnPath(keyboardId));
@@ -184,6 +240,77 @@ export function runCriteriaChecks(
       kpsPath,
     ),
   );
+
+  // 1.10b / 2.7 — the KPJ pair: the root .kpj's <Options><Version>
+  // against criterion 1.10's pinned current format (2.0). Runs only
+  // when a .kpj is present; the absent case is the assembly's
+  // contextMissing, not a finding.
+  if (input.kpjPath !== undefined) {
+    const kpjFacts = {
+      ...(input.kpjText !== undefined ? { kpjText: input.kpjText } : {}),
+      kpjPath: input.kpjPath,
+    };
+    findings.push(...checkKpjFormatOutdated(kpjFacts));
+    findings.push(...checkKpjVersionBumped(kpjFacts));
+  }
+
+  // 1.7b / 1.8b / 1.11b / 1.12b / 3.1b / 6.1b / 6.3b — the file-inventory
+  // twins: pure VFS path-list checks, no parsing. They run in both modes;
+  // for a studio-built keyboard the scaffolder guarantees them, so the
+  // twins double-verify rather than newly constrain.
+  findings.push(...checkFileInventory(filePaths));
+
+  // 8.1b–8.6b / 8.8b–8.11b — the .kps-listing twins: pure functions of the
+  // .kps <File> names. An absent .kps never reaches here — the assembly
+  // names it in contextMissing for all ten codes.
+  // 10.1b / 10.2b / 10.7b / 10.8b / 10.9b — the .kps-metadata twins: pure
+  // functions of the pre-parsed package-tab details. Same absent-.kps
+  // gate via the assembly's contextMissing.
+  if (kpsPath !== "") {
+    findings.push(
+      ...checkKpsListing({
+        fileNames: input.kpsFileNames,
+        hasTouchLayout,
+        kpsPath,
+      }),
+    );
+    const normNames = input.kpsFileNames.map((n) =>
+      n.trim().replace(/\\/g, "/").toLowerCase(),
+    );
+    findings.push(
+      ...checkKpsMetadata({
+        kpsPath,
+        fontSelected: input.kpsFontSelected,
+        fontsInFiles: normNames.some(
+          (n) => n.endsWith(".ttf") || n.endsWith(".otf"),
+        ),
+        languages: input.kpsLanguages,
+        detailsReadme: input.kpsDetailsReadme,
+        detailsWelcome: input.kpsDetailsWelcome,
+        detailsLicense: input.kpsDetailsLicense,
+        followKeyboardVersion: input.kpsFollowKeyboardVersion,
+        description: input.kpsDescription,
+      }),
+    );
+  }
+
+  // 4.1b / 4.5b / 4.6b / 5.2b / 5.3b / 5.5b / 5.6b / 6.6b / 7.11b /
+  // 11.1b / 11.3b / 11.4b — the text-content twins: pure functions of the
+  // judged texts. Missing source files are the assembly's contextMissing
+  // (except 11.1b, where the .php's existence is the criterion).
+  findings.push(
+    ...checkTextContent(resolveTextFacts(fs, filePaths, keyboardId, keyboardIR, input)),
+  );
+
+  // 1.2b / 1.3b / 1.4b / 19.1b / 19.2b + Group C — the /review-only
+  // repo-context checks: pure functions of the ReviewContext. Absent on
+  // the authored and Compare surfaces (those never see the repo); the
+  // assembly names the missing context for the four repo codes.
+  if (input.reviewContext !== undefined) {
+    const repoFacts = { keyboardId, review: input.reviewContext };
+    findings.push(...checkRepoContext(repoFacts));
+    findings.push(...checkAttribution(repoFacts));
+  }
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.
