@@ -181,6 +181,13 @@ function compileSlotGuards(
   // positionally tied to the carved store (coordinated drop targets).
   let analysis: ReturnType<typeof analyzeStores> | undefined;
 
+  // A guard is fully determined by (group, paired rule, any() occurrence,
+  // substituted context). When both sides of a positionally-paired store set
+  // are carved (composed#i and comp-dia#i), each slot would otherwise emit the
+  // same guard under a different nodeId, and the later copy is unreachable.
+  // The first slot to produce a given guard owns it; its nodeId is unchanged.
+  const emittedGuards = new Set<string>();
+
   for (const disposition of slotDispositions) {
     const comboId = disposition.comboId;
     processed.add(comboId);
@@ -237,6 +244,9 @@ function compileSlotGuards(
           const guardContext: ContextElement[] = rule.context.map((el, idx) =>
             idx === contextIdx ? { kind: "char", value: selectorChar } : el,
           );
+          const guardKey = JSON.stringify([group.nodeId, rule.nodeId, occNum, guardContext]);
+          if (emittedGuards.has(guardKey)) return;
+          emittedGuards.add(guardKey);
           const verb = suppressionVerb(guardContext);
           const guard: IRRule = {
             nodeId: guardNodeId,
