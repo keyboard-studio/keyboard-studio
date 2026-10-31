@@ -35,13 +35,16 @@ Expect: 0 unexplained differences across the 4 committed records; stale allow-li
 
 ## 3. PR lane (what CI runs on every PR, SC-002)
 
-The same command the parallel `headless-author` job runs (`timeout-minutes` set by T051, at most 5):
+The same two steps the parallel `headless-author` job runs (`timeout-minutes` set by T051, at most 5):
 
 ```sh
-npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard
+# 1. corpus config: the PR set and parity
+npx vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity
+# 2. default config: the drift guard and the boundary test
+npx vitest run src/test/headlessAuthor/driftGuard src/test/headlessAuthor/boundary
 ```
 
-Expect: 6 PR-set cases report every gate (expected failures named with their owner); wall time (including
+Local figures (T071): step 1 takes 55-60 s; step 2 takes 32-35 s. Expect: 6 PR-set cases report every gate (expected failures named with their owner); wall time (including
 vitest's module load, about 25 s) well inside the job's cap. SC-005 check: revert `sameGroupName` in
 `packages/engine/src/codec/groupName.ts` locally, rebuild the engine, rerun; the `bj_cree_woods`
 case fails with a duplicate-group compile error.
@@ -64,12 +67,21 @@ KS_AUTHOR_SWEEP=latin KS_AUTHOR_SHARD=1/4 npx vitest run --config vitest.corpus.
 ```
 
 Or dispatch the `Headless sweep` workflow with `tier=latin`. Expect a summary grouped by gate and first
-failing step; skips grouped by reason. In CI, new failures are filed as `headless-sweep` issues.
+failing step; skips grouped by reason (a keyboard over 2,000 rules is `too-large`). In CI, new failures
+are filed as `headless-sweep` issues.
+
+Two variables help when a case hangs:
+
+- `KS_AUTHOR_CASE_TIMEOUT_MS`: the per-case timeout (the default is 180 s).
+- `KS_AUTHOR_TRACE=1`: prints `[TRACE] <case> step <id> start|end <ms>` on stderr. A `start` with no
+  `end` names the hung step.
+
+A shard that is killed still reports its case as `hung`.
 
 ## 6. Lifted rules (US5, SC-006)
 
 ```sh
-npx vitest run src/editors/carve src/editors/assignLoop src/survey/marks
+npx vitest run src/editors/carve src/editors/assignLoop src/survey src/lib src/editors/adapters
 npx playwright test e2e/golden-walk.spec.ts   # verify mode; no re-baseline
 ```
 

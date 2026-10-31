@@ -5,14 +5,14 @@ package; consumed by the 107 test files only.
 
 ```ts
 export interface AuthorRunOptions {
-  /** Absolute path of the keyboards corpus root (`.../keyboards/release`). Defaults to the sc004Harness CORPUS. */
-  corpusRoot?: string;
   /** Eligibility slice for sweeps. Default: no slice filter (US1). */
   slice?: "all-eligible" | "latin" | { ids: readonly string[] };
   /** Stop after this decision point (for parity against partial records). Default: run every step. */
   stopAfter?: DecisionPoint;
-  /** Overrides for eligibility's corpus lookups (group, parse status, script); tests inject a keyboard the corpus lacks. */
+  /** Overrides for eligibility's corpus lookups (group, parse status, script, rule count); tests inject a keyboard the corpus lacks. Fields: data-model.md. */
   eligibilityDeps?: EligibilityDeps;
+  /** Called as each step starts. Reporting only: drives the sweep's in-progress report and KS_AUTHOR_TRACE. */
+  onStep?: (step: string) => void;
 }
 
 export function runAuthorCase(c: Case, opts?: AuthorRunOptions): Promise<AuthorRun>;
@@ -40,7 +40,9 @@ Guarantees:
    network fails the case with `network-required`.
 6. **Skips are named**: `outcome: "skipped"` always carries `skipReason`; a case that passed
    eligibility and then fails is `failed`, never `skipped` (research R6).
-7. **Proposal throws fail the case** at that step and decision id; no default is substituted.
+7. **Proposal throws fail the case** at that step and decision id; no default is substituted. A
+   proposal the product itself catches is not a throw: the camazerty tolerance analysis publishes
+   `status: failed`, the author continues, and G2 fails as an expected, owned gap.
 
 ```ts
 export function compareParity(
@@ -51,4 +53,10 @@ export function compareParity(
 ```
 
 `ParityDiff = { decisionId; author: unknown; recorded: unknown; normalisedBy?: string }`. Normalisation
-rules are named (research R8).
+rules are named (research R8). There are four: timestamps dropped; `zzq<hex>` reduced to `zzq`; the
+carve fingerprint recomputed on both sides; and tester-typed, where the author's own `PolicyStep` rule
+for a decision is `placeholder` and the record's value is compared on presence.
+
+Both sides are folded from their records with `recordToDecisionSet`. The live DecisionSet (`run.decisions`)
+is not compared: a decision is recorded when its step completes, and later steps keep seeding the live
+draft. An allow-list entry also explains that decision's agency difference (the 053 agency check).

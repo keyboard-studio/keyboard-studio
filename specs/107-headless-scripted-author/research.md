@@ -35,10 +35,13 @@ cache warm-up.)
 **0.04-0.8 s per case**; the full-decision case is 0.07-0.8 s. The fixed cost dominates, so the PR set
 must run as **one vitest invocation** (one module graph), not one process per case.
 
-**Author half (not yet measurable)**: the author adds proposal calls per case (exemplar lookup,
-`suggestMissingChars`, marks proposals, `analyseContextTolerance` which simulates, placement ranking).
-Budget: **under 5 s per case** until task T051 measures it. With replay at under 1 s, a case is
-budgeted at 6 s.
+**Author half (not yet measurable)**: the author adds proposal calls per case (the sourced exemplar
+lookup and text-sample inventory, marks proposals, `analyseContextTolerance` which simulates,
+placement ranking). Budget: **under 5 s per case** until task T051 measures it on CI. With replay at
+under 1 s, a case is budgeted at 6 s. Local figures from T071 (5 runs of the PR lane, 0 non-gate
+failures): PR set plus parity 55-60 s; drift guard plus boundary 32-35 s. T051 still has to measure
+the job on CI and set the cap, and must update every restatement of the CI timing: spec
+Clarifications, SC-002 and Dependencies; plan Summary and Complexity Tracking; this R1 and R3.
 
 **Sizing the PR set (SC-002)**: 25 s fixed + 6 cases x up to 6 s = about 31-61 s of test time,
 about 30 s if the author is as cheap as replay. The PR lane is the parallel job `headless-author` (R3),
@@ -50,9 +53,11 @@ replaces a weaker one (FR-031).
 
 **32-case suite (SC-008)**: 25 s + 32 x 6 s = about 3.6 min, under the 10-minute bound.
 
-**Wide sweep (FR-034)**: about 608 parseable keyboards (`docs/import-corpus.json`: 496 `clean`, 112
-`clean-with-opaque`; under the amended R6 every keyboard without parse errors is eligible, 921 in all) x 2 profiles x 6 s is
-about 2 h single-runner, about 30 min on a 4-way shard matrix. The Latin slice is smaller.
+**Wide sweep (FR-034)**: the first estimate (608 keyboards x 2 profiles x 6 s, about 2 h) assumed a flat
+6 s a walk. R6's measured timings replace it: the median keyboard (108 rules) takes 3.6 s, a 1,802-rule
+keyboard 9.8 s, and cost is superlinear above about 2,000 rules. The sweep tiers therefore cap at
+`MAX_SWEEP_RULE_COUNT` (R6). Under the amended R6 every keyboard without parse errors is eligible (921
+in `docs/import-corpus.json`); 9 are then `too-large`. The Latin slice is smaller.
 
 **Alternatives considered**: estimating without measuring (rejected: the ruling asks for a measured
 basis); timing through `--reporter=json` assertion durations (rejected: `beforeAll` fixture builds are
@@ -69,9 +74,9 @@ proposal, which the drift guard (FR-011) asserts still calls it.
 | | `deriveScriptPrefill` | studio/src/lib/scriptAxes.ts:110 | survey/IdentityLite.tsx, decisions/identitySelectors.ts |
 | Windows layout | `proposeWindowsLayout` | studio/src/lib/windowsLayouts.ts:134 | survey/layout/LayoutStep.tsx, LayoutStepHost.tsx |
 | Track | `proposeTrack` | studio/src/lib/proposeTrack.ts:78 | editors/adapters/flowStepOptions.tsx |
-| Inventory | `suggestMissingChars` | studio/src/lib/services.ts:308 | (service entry; wraps the engine call) |
-| | `suggestMissingCharacters` | engine/src/character-discovery/suggestMissing.ts:339 | studio/src/lib/services.ts |
-| | `loadExemplars` | engine/src/character-discovery/cldr.ts:531 | engine CharacterDiscoveryServiceImpl.ts |
+| Inventory | characters step rules | studio/src/survey/charactersStepRules.ts | the characters step (build-list path) |
+| | `proposeTextSampleInventory`, `confirmTextSample` | studio/src/survey/marksTextSample.ts | survey/MarksTextSamplePrompt.tsx |
+| | sourced exemplars lookup | studio/src/survey/sourcedExemplarsLookup.ts | the characters step, over the pinned data |
 | Marks | `proposeAttachments` | engine/src/marks/attachment-proposals.ts:43 | survey/marks/MarksSeriesStep.tsx, hooks/useWorkToDo.ts |
 | | `computeMarkTreatmentPrefills` | engine/src/marks/treatment-prefill.ts:116 | MarksSeriesStep.tsx, useWorkToDo.ts |
 | Output form, backspace | `resolveOutputFormProposal` | engine/src/marks/output-form-policy.ts:125 | MarksSeriesStep.tsx |
@@ -94,7 +99,7 @@ proposal, which the drift guard (FR-011) asserts still calls it.
 | | `proposeS02TriggerKey` | studio/src/editors/assignLoop/deadkeyPurpose.ts:135 | MechanismGallery.tsx |
 | | `resolveS02DeadkeyIdentity` | studio/src/editors/assignLoop/MechanismGallery.tsx:530 (exported from the component file) | MechanismGallery.tsx |
 | Case-pair companion | `useCasePairCompanion` | studio/src/editors/assignLoop/casePairCompanion.ts:206 (a hook) | MechanismGallery.tsx, SiblingAccentProposalBanner.tsx, TouchGallery.tsx |
-| Caps handling | the `caps-handling` decision | spec 106 US5 (on `main`); `recordToDecisionSet.ts` seeds the module default for records that predate it | caps step |
+| Caps handling | the `caps-handling` decision | spec 106 US5 (not built: no `caps-handling` step exists in this build, so the module default applies); `recordToDecisionSet.ts` seeds that default | none |
 | Touch seed | `deriveSeedLayout` | studio/src/lib/buildTouchLayoutJson.ts:169 | TouchGallery.tsx, survey/touchSeedSource/TouchSeedSourcePanel.tsx |
 
 **Functions the FR-010 table missed** (the plan adds them to the drift-guard inventory):
@@ -104,7 +109,7 @@ proposal, which the drift guard (FR-011) asserts still calls it.
 | `derivePlacementInventory` | studio/src/lib/placementInventory.ts:79 | which characters the mechanism step walks (via hooks/usePlacementInventory.ts) |
 | `deriveTreatmentFilteredChars` | studio/src/lib/placementInventory.ts:189 | marks-treatment filter on that inventory |
 | `proposeProjectUrl`, `proposeProvenanceBasis` | studio/src/lib/phaseFSeeds.ts:59, :71 | packaging-metadata questions (pf_project_url, pf_provenance_basis) |
-| `proposeTroubleshooting` | studio/src/lib/troubleshootingProposal.ts:115 | troubleshooting question default, via decisions/liveExtraction.ts |
+| `proposeTroubleshooting` | studio/src/lib/troubleshootingProposal.ts:115 | troubleshooting question default, via decisions/liveExtraction.ts. All three phase-F proposals reach the walk through live extraction. |
 | `suggestStarts` | studio/src/lib/suggestStart.ts:121 | not called for decisions (the case names the copied keyboard); recorded for comparison only, like `proposeTrack` |
 
 **Replay and routing entry points** the author reuses unchanged: `advance` (steps/advance.ts:200),
@@ -116,6 +121,11 @@ proposal, which the drift guard (FR-011) asserts still calls it.
 (test/recordToDecisionSet.ts:69), `parseDecisionRecord` (engine/src/decision-audit/record.ts:251).
 The group-name fix the `bj_cree_woods` guard protects is `sameGroupName`
 (engine/src/codec/groupName.ts:6).
+
+`suggestMissingChars` (studio/src/lib/services.ts:308), with `suggestMissingCharacters` and
+`loadExemplars` under it, has no production caller. It is therefore not inventoried: the author calls
+only what the UI calls (FR-014). The pinned exemplars reach the walk through
+`sourcedExemplarsLookup.ts` above.
 
 **Note**: the inventory, marks and output-form proposals have no caller in a `.tsx` other than
 `MarksSeriesStep.tsx` and the `useWorkToDo` hook, so the drift guard asserts on those two files.
@@ -134,8 +144,12 @@ day): a new job **`headless-author`** in `.github/workflows/ci.yml`:
   a required check accepts, so docs-only PRs are not blocked.
 - Its own steps: checkout, the pinned corpus checkout (same step and pin as `build`), pnpm/Node setup,
   install from cache, the cached SLDR/langtags fetches, `pnpm --filter "@keyboard-studio/studio^..."
-  build`, then one vitest invocation:
-  `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity src/test/headlessAuthor/driftGuard`.
+  build` (with `codegen-charnames` among the build steps, as the studio build needs it), then **two**
+  steps, because the corpus config discovers only `*.corpus.test.ts`:
+  1. a corpus-config run (the PR set and parity): `pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/headlessAuthor/prSet src/test/headlessAuthor/parity`;
+  2. a default-config run (the drift guard and boundary test): `pnpm --filter @keyboard-studio/studio exec vitest run src/test/headlessAuthor/driftGuard src/test/headlessAuthor/boundary`.
+
+  Local figures from T071: PR set plus parity 55-60 s; drift guard plus boundary 32-35 s.
 - `timeout-minutes` on the job, set by T051 (below).
 - It gates merges once the owner adds `headless-author` to the required status checks of the
   `main: CI + integrity` ruleset (T077), after it has run green on `main` at least once: a required check
@@ -195,7 +209,11 @@ verdict); filing one issue per run (rejected: duplicates); failing the scheduled
 **Decision**: the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism chip order,
 S-02 identity resolution, displacement banner order, case-pair companion acceptance, marks-series
 assembly, text-sample confirm) are tasks in the US1 phase, labelled US5 for traceability. The US5
-phase keeps the audit, the Playwright-only list (FR-042) and SC-006 evidence.
+phase keeps the audit, the Playwright-only list (FR-042) and SC-006 evidence. The lifts are not a
+fixed list: the audit and the walk found more (the characters, punctuation and invisibles step rules,
+`sourcedExemplarsLookup`, the touch seed, `keyboardCatalog`, `analyseWorkingCopyContextTolerance`,
+`languageResultsFor`, `baseCoverageOf`, `displacementOutcomeFor`, and the mechanism placement
+sequence), each under the same rules.
 
 **Rationale**: the walk policy's "top suggestion" for carve and mechanism is defined by those rules;
 without them US1 would either copy the logic (forbidden by FR-010) or diverge from the UI and fail
@@ -220,7 +238,7 @@ codec cannot parse. "Codec-clean" in this spec therefore means **parses without 
 (`i1ParseComplete`) is not used: it is a token-count heuristic with documented false positives, and it
 flags `chechen_latin` (a PR-set keyboard whose readonly groups the codec keeps as fidelity-only
 groups). On the 2026-10-30 `import-corpus.json` no keyboard has parse errors, so all 921 are eligible
-on this criterion; a keyboard that then fails to scaffold is reported as a failure, never a skip.
+on this criterion; 9 are then `too-large` in the sweep tiers (below). A keyboard that then fails to scaffold is reported as a failure, never a skip.
 
 **Added 2026-10-31 (owner ruling): `too-large`, sweep tiers only.** A walk's cost is superlinear in
 `ruleCount` (docs/import-corpus.json). One walk each (profile 1, backspace whole): 108 rules (the

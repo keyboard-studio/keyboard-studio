@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-30
 
-**Status**: Draft
+**Status**: In implementation
 
 **Input**: User description: "A headless AUTHOR that produces the decisions a walk makes. At each step it calls the product's own proposal and suggestion functions and applies the walk policy (accept the top suggestion, else the default, else a placeholder sequence), writes the decisions into the stores, then hands off to the existing headless replay. It replaces the 32-case Playwright harness for decision coverage."
 
@@ -90,8 +90,10 @@ would let the author diverge MUST fail CI on the PR that makes it.
   run's per-case gate report, not walk zips.
 - Spec 106 **T065** (the T013 corpus test has zero `it.fails` left) **stays in spec 106**. This spec
   neither owns nor relaxes that gate.
-- This spec does not edit any spec 106 file. The dependency is recorded here, and spec 106's tasks are
-  updated in a spec 106 change.
+- This spec does not edit any spec 106 *document*. The dependency is recorded here, and spec 106's tasks are
+  updated in a spec 106 change. It does add rows to spec 106's test-code `KNOWN_GAPS` table (FR-030):
+  G1 on `bj_cree_woods`, and G6 on every touch-bearing keyboard walked. The G6 row is `walkOnly`: it
+  applies to author runs, not to the decision-point replay, which walks no touch step.
 
 ## Clarifications
 
@@ -218,7 +220,7 @@ gate and by first failing step.
 
 **Acceptance Scenarios**:
 
-1. **Given** the eligible slice (FR-031), **When** the sweep runs, **Then** each keyboard x profile yields a gate report or a named skip reason.
+1. **Given** the eligible slice (FR-031), **When** the sweep runs, **Then** each keyboard x profile yields a gate report or a named skip reason. A keyboard over the rule cap (`too-large`, 9 of 921) is skipped in the sweep tiers, never in an explicit run.
 2. **Given** a keyboard whose script routes to the "not yet supported" stub (CJK, Ethiopic), **When** swept, **Then** it is skipped with that reason. The author never forces a path the product does not offer.
 3. **Given** a sweep failure, **When** it is reported, **Then** the failing case can be re-run alone as a US1 case.
 4. **Given** a PR that fixes a keyboard-specific bug, **When** it lands, **Then** that keyboard is in the curated PR set with a reason naming the bug, so the PR set guards the fix from then on.
@@ -261,13 +263,13 @@ layout; no walk zip is committed for this check.
 
 **Acceptance Scenarios**:
 
-1. **Given** a copied keyboard with a touch layout, **When** the author confirms the touch seed source with the product's proposal, **Then** the bundle carries the seeded layout and G6 is evaluated.
+1. **Given** a copied keyboard with a touch layout, **When** the author confirms the touch seed source with the product's proposal, **Then** the bundle carries the seeded layout and G6 is evaluated (today a `walkOnly` known gap).
 2. **Given** a copied keyboard with no touch layout, **When** the case runs, **Then** G6 is reported as not applicable, not as passed.
 
 ### Edge Cases
 
-- **Proposal function throws.** Some cases make a product proposal throw; for example, the tolerance analysis on `sil_cameroon_azerty` hands a touch-only `T_` rule to the desktop simulator. The case reports the throw at that step and decision point and fails. The author never substitutes a default for a thrown proposal.
-- **Step skips itself.** A step the product auto-completes (a caseless alphabet at caps, an empty mechanism diff, no marks) is passed the way the product passes it. The author does not write a decision the product would not write.
+- **Proposal function throws.** If a product proposal throws (an injected throw, in the tests), the case reports the throw at that step and decision point and fails. The author never substitutes a default for a thrown proposal. The tolerance analysis on `sil_cameroon_azerty` is not such a case: the product catches it and publishes `status: failed`, the author continues, and G2 fails as an expected, owned gap.
+- **Step skips itself.** A step the product auto-completes (an empty mechanism diff, no marks) is passed the way the product passes it. There is no `caps-handling` step in this build, so the module default applies. The author does not write a decision the product would not write.
 - **Displacement chains.** An override displaces a character that a later step needs. The author resolves each displacement proposal once, in harness order, and records each action.
 - **Placeholder clash.** The placeholder sequence `zzq<hex>` collides with an existing sequence in the copied keyboard. The case reports the collision; the author does not invent a second placeholder scheme.
 - **Missing decision.** A decision the record cannot carry (`fallbackPolicy`) runs with the store default, and the run report says so.
@@ -309,7 +311,7 @@ layout; no walk zip is committed for this check.
   - the DecisionSet;
   - the output bundle;
   - per-gate results;
-  - a run report listing every placeholder, every displacement action, every skipped step and the `fallbackPolicy` value used.
+  - a run report listing every placeholder, every displacement action, every skipped step, the `fallbackPolicy` value used, and `notCovered`: the ids of the Playwright-only rules the run cannot cover (FR-042).
 - **FR-007**: Runs MUST be deterministic. The same case on the same build MUST yield an identical record (ignoring timestamps), DecisionSet and bundle.
 - **FR-008**: The author MUST need no browser, no dev server, no network and no port. It MUST run under the studio corpus vitest config, as the decision-point suites do.
 
@@ -359,7 +361,7 @@ layout; no walk zip is committed for this check.
   | Identity prefill | `defaultsFor` (`packages/studio/src/lib/langtagsDefaults.ts`), `deriveScriptPrefill` (`lib/scriptAxes.ts`) |
   | Windows layout | `proposeWindowsLayout` (`lib/windowsLayouts.ts`) |
   | Track | `proposeTrack` (`lib/proposeTrack.ts`), recorded for comparison when the case names the track |
-  | Character inventory | `suggestMissingChars` (`lib/services.ts`) over `suggestMissingCharacters` (engine `character-discovery/suggestMissing.ts`), with exemplars from the pinned data (`loadExemplars`, `character-discovery/cldr.ts`) |
+  | Character inventory | the build-list path: `survey/charactersStepRules.ts`, with `proposeTextSampleInventory` and `confirmTextSample` (`survey/marksTextSample.ts`); exemplars from `survey/sourcedExemplarsLookup.ts` over the pinned data. `suggestMissingChars` has no production caller, so it is not inventoried. |
   | Marks attachment and treatment | `proposeAttachments` (engine `marks/attachment-proposals.ts`), `computeMarkTreatmentPrefills` (`marks/treatment-prefill.ts`) |
   | Output form and backspace | `resolveOutputFormProposal`, `resolveBackspaceProposal` (`marks/output-form-policy.ts`) |
   | Context tolerance | `analyseContextTolerance` (`lib/contextToleranceAnalysis.ts`), `applyContextToleranceDecision` (`lib/contextToleranceApply.ts`), `proposeNormalizationStep` (engine `pattern-apply/normalization-step`) |
@@ -369,11 +371,11 @@ layout; no walk zip is committed for this check.
   | Displacement | `displacedFor` and `orthographyTier` (`survey/slotOccupancy.ts`) |
   | S-02 purpose trigger | `proposeS02TriggerKey` and `deadkeyPurposeOf` (`editors/assignLoop/deadkeyPurpose.ts`) |
   | Case-pair companion | the logic behind `useCasePairCompanion` (`editors/assignLoop/casePairCompanion.ts`, lifted per FR-040) |
-  | Caps handling | the `caps-handling` proposal that spec 106 US5 adds, once it lands. Until then the step is absent and the module default applies, as `recordToDecisionSet` already assumes. |
+  | Caps handling | the `caps-handling` proposal of spec 106 US5. Not built: no such step exists in this build, so the module default applies, as `recordToDecisionSet` already assumes. The phase-F metadata proposals (`proposeProjectUrl`, `proposeProvenanceBasis`, `proposeTroubleshooting`) reach the walk through live extraction. |
 
   The plan MUST confirm each entry against the code and name any function this table missed.
 - **FR-011**: A drift-guard test MUST fail when one of the FR-010 functions is renamed, removed, or no longer called by the UI component that renders its suggestion, so a proposal the UI uses cannot silently drop out of the author.
-- **FR-012**: The author MUST NOT change what the product proposes. Any change to a proposal is out of scope (see Out of scope).
+- **FR-012**: The author MUST NOT change what the product proposes. Any change to a proposal is out of scope (see Out of scope). A product defect that parity, the PR set or the sweep exposes is fixed on the product side (FR-017), in its own commit, and listed in the phase commit message.
 
 **Parity (US2)**
 
@@ -387,13 +389,15 @@ layout; no walk zip is committed for this check.
   - the reason;
   - the product change or record age that explains it.
 
+  An entry also explains that decision's agency difference, if any.
+
   An unexplained difference fails the test. Records are never edited to make parity pass.
 - **FR-022**: Allow-list entries whose difference no longer reproduces MUST be reported as stale.
-- **FR-023**: The parity comparison MUST state how it treats values that are inherently run-specific (timestamps, fingerprints, generated ids). Each MUST be either normalised by a named rule or compared exactly.
+- **FR-023**: The parity comparison MUST state how it treats values that are inherently run-specific (timestamps, fingerprints, generated ids, tester-typed text). Each MUST be either normalised by a named rule or compared exactly. The named rules are four: timestamps dropped; `zzq<hex>` reduced to `zzq`; the carve fingerprint recomputed on both sides; and **tester-typed**, where the author's own `PolicyStep` rule for a decision is `placeholder` and the record's value is compared on presence only. Both sides are folded from their records with `recordToDecisionSet`. The author's live DecisionSet is not compared, because a decision is recorded when its step completes and later steps keep seeding the live draft.
 
 **Harness cases (US3)**
 
-- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner). The suite reads the committed canonical case definitions (FR-035) and runs on demand or on the schedule (FR-034). It is not a PR gate.
+- **FR-030**: The 32 cases of `harness/cases.json` MUST run as a headless suite. Each case reports G1-G8, its placeholder count, its displacement actions, and any known gap that spec 106's `KNOWN_GAPS` owns (as expected, with its owner). The author adds two rows to that test-code table: G1 on `bj_cree_woods` (a dead rule after carving a whole `any()` store), and G6 on every touch-bearing keyboard walked. The G6 row is `walkOnly`, so it applies to author runs and not to the decision-point replay. The suite reads the committed canonical case definitions (FR-035) and runs on demand or on the schedule (FR-034). It is not a PR gate.
 - **FR-031**: A corpus sweep mode MUST run the author over any copied keyboard in `../keyboards` crossed with any profile. It runs in two tiers (owner ruling, 2026-10-30):
   - **PR set (required on every PR).** A minimal curated set of keyboards chosen by shape. Each entry is a committed case description (keyboard, profile, sample text, overrides) with a recorded reason. An entry whose keyboard and profile are among the harness cases references that case by id in the canonical copy (FR-035); only keyboards outside the harness set (`bj_cree_woods`, `chechen_latin`) carry their own case description. No walk zip or walk record is needed to run it. The set covers:
     - a few **simple** keyboards (for example `basic_kbdus`);
@@ -409,9 +413,9 @@ layout; no walk zip is committed for this check.
   |---|---|---|
   | `basic_kbdus` | `p1-whole-bafut-kbdus` | Simple: no deadkeys, no stores, one group. Has a committed walk record, so it also anchors parity (US2). |
   | `basic_kbdfr` | `p1-whole-ewondo-kbdfr` | Regression guard: S-02 put three deadkeys on `K_COLON` (fixed in #2358). Also an AZERTY base with a `deadkeys` group. Has a committed walk record. |
-  | `bj_cree_woods` | a whole-alphabet profile (the plan names it) | Regression guard: `applyAssignments` merged `group(main)` into the declared `group(Main)`, a duplicate group that failed `kmcmplib` (fixed in `502fb061`). Also mixed-case group names, heavy `any()`/`index()` store pairs (about 70/58), an opaque `option-store-directive` fragment the codec preserves, a non-Latin script (Canadian syllabics), and no touch layout (G6 not applicable). |
+  | `bj_cree_woods` | a whole-alphabet profile (the plan names it) | Regression guard: `applyAssignments` merged `group(main)` into the declared `group(Main)`, a duplicate group that failed `kmcmplib` (fixed in `502fb061`). Also mixed-case group names, heavy `any()`/`index()` store pairs (about 70/58), an opaque `option-store-directive` fragment the codec preserves, a non-Latin script (Canadian syllabics), and no touch layout (G6 not applicable). Expected: G1 fails, a dead rule after carving a whole `any()` store; a `KNOWN_GAPS` row owns it. |
   | `sil_cameroon_qwerty` | `p4-unwrap-bafut-camqwerty` | Structural: a shipped touch layout with `any()`/`index()` pairs and a `deadkeys` group. Has a committed walk record. |
-  | `sil_cameroon_azerty` | `p4-unwrap-ewondo-camazerty` | Structural: deadkey-heavy (about 37 deadkey references). Carries the open tolerance-analysis throw (#2363) as an expected failure until that lands. Has a committed walk record. |
+  | `sil_cameroon_azerty` | `p4-unwrap-ewondo-camazerty` | Structural: deadkey-heavy (about 37 deadkey references). The tolerance analysis (#2363) does not throw in the product: it publishes `status: failed`, the author continues, and G2 fails as an expected, owned gap. Has a committed walk record. |
   | `chechen_latin` | a whole-alphabet profile (the plan names it) | Structural: three `readonly` groups ahead of `group(main)`, which the codec keeps as fidelity-only groups, plus a shipped touch layout. |
 
   The plan confirms each keyboard is codec-clean and that the set fits SC-002. A keyboard that fails either check is replaced by another of the same shape, and the reason column is updated.
@@ -421,12 +425,15 @@ layout; no walk zip is committed for this check.
     `round-trip-divergence` keyboard that parses is codec-clean for this spec: byte-identical round-trip is out of scope for v1 (owner ruling,
     2026-10-30);
   - routed to the "not yet supported" stub (CJK, Ethiopic);
-  - outside the eligible slice.
+  - outside the eligible slice;
+  - **too large**, in the sweep tiers only (`latin`, `eligible`): `too-large` applies to a keyboard with more than `MAX_SWEEP_RULE_COUNT` (2,000, measured) rules. It excludes 9 of the 921 keyboards (owner ruling, 2026-10-31). It never applies to an explicit harness run, a PR-set run or a `KS_AUTHOR_CASE` run, which name their keyboards on purpose.
 - **FR-033**: Spec 106 T063/T064 MUST be satisfiable from this suite's report, with no Playwright run. Spec 106 T065 (zero `it.fails` in the decision-point corpus test) remains a spec 106 gate.
 - **FR-034**: The wide sweep and the 32-case suite MUST run as a scheduled workflow, separate from the PR workflow. It also runs on manual dispatch. Each run MUST:
   - publish its per-case gate report as a run artifact;
   - file each new failure as a GitHub issue naming the case, gate and decision point, or add to the open issue for that same failure rather than filing a duplicate;
   - never block, fail or gate a PR.
+
+  A shard killed mid-case still reports that case as `hung`: the report is rewritten before each case, and the merge files the entry.
 
   The plan fixes the cadence and the issue-filing rules.
 - **FR-035**: The harness case definitions MUST be committed to this repo at `packages/studio/src/test/headlessAuthor/cases/harness-cases.json`, copied byte for byte from `km/2302-walk-zips` (`tools/testing-profiles-2302/harness/cases.json`), with a `PROVENANCE.md` beside it naming the source branch and commit. That copy is canonical:
@@ -445,6 +452,8 @@ layout; no walk zip is committed for this check.
   - **Case-pair companion acceptance.** The `useCasePairCompanion` hook.
   - **Marks series assembly.** How the marks-series value is assembled from the station answers (`MarksSeriesStep.tsx`, `OutputFormStation.tsx`).
   - **Text-sample proposal and confirm.** `MarksTextSamplePrompt.tsx`.
+
+  As built, the lifts also cover: the characters, punctuation and invisibles step rules; `sourcedExemplarsLookup`; the touch seed (`touchSeedSourceContinue`, `touchStepCompletion`); `keyboardCatalog`; `analyseWorkingCopyContextTolerance`; `languageResultsFor`; `baseCoverageOf`; `displacementOutcomeFor`; and the mechanism placement sequence.
 - **FR-041**: Each lift MUST be behaviour-preserving:
   - the component's existing tests pass unchanged;
   - the golden walk needs no re-baseline;
@@ -475,7 +484,7 @@ layout; no walk zip is committed for this check.
 - **Case**: one row in the shape of `harness/cases.json`. It names the copied keyboard, the language identity, the marks profile, the sample text and the overrides.
 - **Walk policy**: the ordered rule the author applies at each decision. Overrides come first, then the top suggestion, then the default, then the placeholder.
 - **Author run**: one case through the author. It yields the decision record, DecisionSet, bundle, gate results and run report.
-- **Run report**: the placeholders, displacement actions, skipped steps, known gaps and `fallbackPolicy` of one run.
+- **Run report**: the placeholders, displacement actions, skipped steps, known gaps and `fallbackPolicy` of one run, plus `notCovered`: the 15 Playwright-only rules from `HA/playwrightOnly.ts` (FR-042).
 - **Parity allow-list**: reviewed entries that explain each difference between an author run and a recorded walk. Each entry carries a decision id, a reason and the explaining change.
 - **Lifted rule**: a decision rule moved out of a component into a store action or pure function, called by both the UI and the author.
 - **Author boundary**: the line the boundary test enforces between the author (case input, the click, the typing, reporting) and the product (everything below the UI). Only inventoried product functions cross it, and only in one direction.
@@ -485,14 +494,14 @@ layout; no walk zip is committed for this check.
 ### Measurable Outcomes
 
 - **SC-001**: One case runs headlessly, end to end (author, replay, compile, gates), in under 60 seconds on a maintainer's machine from a cold vitest start, and adds under 5 seconds per further case in the same run. That is down from about 25 minutes for a Playwright walk. Baseline measured for the plan on 2026-10-30: the existing replay alone takes about 25 s of one-time module load and 0.06-1.0 s per fixture warm (the full-decision `tolerance` fixture: 0.08 s on `basic_kbdus`, 1.0 s on `sil_cameroon_azerty`).
-- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time. Today it is about 5.1 minutes, set by the longest job chain, `fast` then `build` (#2368's run). This spec's PR lane (the curated PR set of FR-031, parity on the committed records, and the drift guard) is the parallel job `headless-author` (`needs: changes` only; `build` does not need it), so **PR wall time does not grow** as long as the job's total time stays within the `fast` + `build` chain. Its cap is `timeout-minutes` set from T051's measurement of the job plus about 50% headroom, rounded up to a whole minute, hard ceiling 5; the job never runs longer than 5 minutes. All six PR-set keyboards stay unless the job would exceed 5 minutes; only then is the set cut, weakest shape first, both regression guards kept. Basis: replay measured at about 25 s one-time module load plus 0.04-0.8 s per case; the author's proposal calls are budgeted at under 5 s per case until T051 measures them, so the six cases are expected to take about 30-60 s of test time, plus the job's own install and build. The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). The wide sweep and the 32-case suite never run on a PR.
+- **SC-002**: PR CI stays inside the owner's budget (2026-10-30): the **whole** PR run finishes in under 10 minutes of wall time. Today it is about 5.1 minutes, set by the longest job chain, `fast` then `build` (#2368's run). This spec's PR lane (the curated PR set of FR-031, parity on the committed records, and the drift guard) is the parallel job `headless-author` (`needs: changes` only; `build` does not need it), so **PR wall time does not grow** as long as the job's total time stays within the `fast` + `build` chain. Its cap is `timeout-minutes` set from T051's measurement of the job plus about 50% headroom, rounded up to a whole minute, hard ceiling 5; the job never runs longer than 5 minutes. All six PR-set keyboards stay unless the job would exceed 5 minutes; only then is the set cut, weakest shape first, both regression guards kept. Basis: replay measured at about 25 s one-time module load plus 0.04-0.8 s per case; the author's proposal calls are budgeted at under 5 s per case until T051 measures them, so the six cases are expected to take about 30-60 s of test time, plus the job's own install and build. The PR set fails 0 times out of 5 repeated runs for reasons other than a real gate failure (no flakiness). Local figures from T071 (5 runs, 0 non-gate failures): PR set plus parity 55-60 s; drift guard plus boundary 32-35 s. These are local, not CI, so T051 still sets the cap. The wide sweep and the 32-case suite never run on a PR.
 - **SC-003**: Parity holds on 100% of recorded walks: every decision equal, or explained by an allow-list entry. 0 unexplained differences, and 0 records edited.
 - **SC-004**: 100% of the suggestions and defaults the author uses come from product functions covered by the drift guard (FR-011). The author contains 0 copies of proposal logic.
 - **SC-005**: Re-introducing the `group(main)` vs `group(Main)` defect (reverting `502fb061`) makes the PR set fail on its `bj_cree_woods` case, in under 60 seconds.
 - **SC-006**: Every lifted rule (FR-040) leaves its component's existing tests and the golden walk unchanged: 0 re-baselines.
 - **SC-007**: Spec 106 T063/T064 close on this suite's report with 0 Playwright case walks.
 - **SC-008**: The 32 harness cases, run on demand, finish in under 10 minutes in one vitest run, with no browser, dev server or port, and fail 0 times out of 5 repeated runs for reasons other than a real gate failure.
-- **SC-009**: The scheduled wide sweep (FR-034) runs on its cadence without blocking any PR. Every failure it finds is filed or appended to an existing issue within that run, with the case, gate and decision point, and no failure it finds is lost.
+- **SC-009**: The scheduled wide sweep (FR-034) runs on its cadence without blocking any PR. Every failure it finds is filed or appended to an existing issue within that run, with the case, gate and decision point, and no failure it finds is lost. That includes a hung case: a killed shard still reports its case as `hung`, and the merge files it.
 - **SC-010**: Divergence cannot land unnoticed. The boundary test (FR-014) and the depcruise rule
   (FR-016) run on every PR and report 0 violations. A deliberate mutation check, run once and
   recorded, shows each of these fails CI:
@@ -511,7 +520,7 @@ layout; no walk zip is committed for this check.
 - Editing `km/2302-walk-zips` or the harness to read the canonical case file; that is the harness owner's follow-up (FR-035).
 - Running the wide sweep or the 32-case suite on PRs.
 - Retiring or editing the harness in `ks-2302-main`. That is a separate repo, and its retirement follows FR-070.
-- Editing spec 106 files.
+- Editing spec 106 documents. (The two `KNOWN_GAPS` rows in test code are in scope; see FR-030.)
 
 ## Dependencies
 
@@ -519,7 +528,7 @@ layout; no walk zip is committed for this check.
 - **On `main` now.** Everything this spec names from spec 106 is on `main`: the replay code; the Ewondo `kbdfr` re-record after the S-02 fix (one deadkey on `K_COLON`, G1 passing); the group-name fix `502fb061` (`sameGroupName`, `packages/engine/src/codec/groupName.ts`), which the `bj_cree_woods` guard and SC-005 rely on; and the carve "marked until Continue" code (`suggestionFingerprintOf` and `isUntouchedSuggestion` in `survey/carve/carveValue.ts`; `isMarkedRow`, `applySuggestion` and `handleSkip` in `CarveGalleryV2.tsx`), which the FR-040 carve lift moves.
 - **PR CI budget baseline.** After #2368, e2e-desktop on PRs runs only boot-smoke, decision-store reload and spec 104 walk 1 (the full set runs nightly), and the PR critical path is `fast` then `build`, about 5.1 minutes measured on #2368's run. This spec's PR lane is the parallel job `headless-author`, so it adds no wall time while it finishes within that chain, and never runs longer than 5 minutes (SC-002).
 - **Build side effect, closed.** `pnpm build` used to rewrite `baseLayouts.generated.json` and `windowsLayouts.generated.json` with a one-line change. PR #2370 (deterministic codegen) fixes it; it is not an open item here.
-- **Issues.** #2363 (tolerance analysis throws on `sil_cameroon_azerty`), #2361 (`nul`/`beep` in starting stores), and #2366 (`fallbackPolicy` in the record) are owned elsewhere. The author reports them as expected, with their owner, and does not fix them.
+- **Issues.** #2363 (tolerance analysis fails on `sil_cameroon_azerty`: the product publishes `status: failed` and G2 fails), #2361 (`nul`/`beep` in starting stores), and #2366 (`fallbackPolicy` in the record) are owned elsewhere. The author reports them as expected, with their owner, and does not fix them.
 
 ## Assumptions
 

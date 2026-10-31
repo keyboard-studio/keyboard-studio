@@ -66,9 +66,8 @@ lifts of component logic into pure functions in the studio source.
 (FR-008); deterministic (FR-007); no re-implemented proposal logic (FR-010, FR-011); the whole PR CI run under 10 min, preferably under 5
 (owner ruling).
 
-**Scale/Scope**: 6 PR-set cases; 32 harness cases; wide sweep over about 608 codec-parseable keyboards
-(amended R6: every keyboard the codec parses without error, all 921 in `docs/import-corpus.json`), narrowed to the Latin slice by
-default.
+**Scale/Scope**: 6 PR-set cases; 32 harness cases; wide sweep over about 912 keyboards in the eligible tier
+(921 parse; 9 too-large, R6), narrowed to the Latin slice by default.
 
 ## Constitution Check
 
@@ -83,7 +82,7 @@ default.
 | V. VirtualFS only | PASS | The studio code path still writes nothing to host disk; only test runners write report files. |
 | VI. Team boundaries | PASS | Engine team: studio test tooling, studio components (lifts), CI workflow. No content-team artefact changes (pattern library, survey text, gallery ordering). Lifts move code, never wording or order. |
 | VII. Out of scope | PASS | CJK/Ethiopic are skipped with the stub's reason (FR-032); no touch-first authoring; US6 only seeds touch through the existing desktop-to-touch path. |
-| VIII. House conventions | FLAG (minor) | No emoji in runner output. Issue numbers must not appear in shipped code or comments: the author reuses spec 106's `KNOWN_GAPS` table rather than adding its own issue-numbered owners; the spec 106 table already uses `#2361`/`#2363` as owner strings, which is spec 106's call. The scheduled workflow puts issue references only in issue bodies it files. |
+| VIII. House conventions | FLAG (minor) | No emoji in runner output. Issue numbers must not appear in shipped code or comments: the author reuses spec 106's `KNOWN_GAPS` table rather than adding its own table. It does add two rows to it (G1 on `bj_cree_woods`; G6 on every touch-bearing keyboard walked, `walkOnly`), with owner strings in the table's existing style. The spec 106 table already uses `#2361`/`#2363` as owner strings, which is spec 106's call; the new rows are test code, not a spec 106 document. The scheduled workflow puts issue references only in issue bodies it files. |
 | IX. Decision registry | PASS | No new survey surface. Step order comes from the product's routing (`steps/advance.ts`, `steps/reducer.ts`, the journey runner), never a stored list (FR-002). Lifts keep the component as the only renderer. |
 | X. Defaults are proposals | PASS, one justified exception | The author confirms product proposals the way an author would, and records provenance as the UI does. The `zzq` placeholder is not a product proposal: it stands for an author typing a sequence, is recorded as `hand-set`, and is counted in every run report (Complexity Tracking). |
 | XI. Done means integrated | PASS, conditions | Done = PR set wired into required CI (the `headless-author` job added to the `main: CI + integrity` required checks, T077), scheduled workflow live, lifted functions called by their components. A lift with no production caller is unfinished. The carve code the FR-040 lift moves is on `main` since #2369, so no lift is parked. |
@@ -127,7 +126,7 @@ packages/studio/src/test/headlessAuthor/
 ├── stepDrivers/              # one driver per step; each calls product functions only
 │   ├── identity.ts  windowsLayout.ts  track.ts  inventory.ts  marks.ts
 │   ├── outputForm.ts  tolerance.ts  convenience.ts  carve.ts  mechanism.ts
-│   ├── displacement.ts  caps.ts  touchSeed.ts
+│   ├── displacement.ts  caps.ts (Phase F/help driver)  touchSeed.ts
 ├── runAuthorCase.ts          # routing loop -> drivers -> replay hand-off -> result
 ├── runReport.ts              # placeholders, displacements, skips, known gaps, fallbackPolicy
 ├── recordWriter.ts           # 053 record via the UI's recording path
@@ -162,7 +161,7 @@ they come from, as plain exported functions with their own unit tests.
 |---|---|---|---|
 | 1 Setup | folder, types, canonical `cases/harness-cases.json` + `PROVENANCE.md` (FR-035), PR-set manifest skeleton, corpus-config wiring | typecheck + empty suites discovered | none |
 | 2 Foundational | **boundary test + depcruise rule first** (FR-014, FR-016), then case loader, walk policy, placeholder, run report, eligibility, routing loop over the journey runner's routing, replay hand-off | boundary test and depcruise green over every `HA/` file; unit tests for each; the loop walks `basic_kbdus` with every driver taking the default through the step's own store action, and replay compiles | 1 |
-| 3 US1 (P1) | step drivers + the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism order, S-02 identity, displacement order, case-pair companion, marks series assembly, text sample); drift guard (FR-011) | `p1-whole-bafut-kbdus` runs headless, compiles, reports gates; byte-identical rerun; edge cases; drift guard green; lifted components' existing tests unchanged | 2 |
+| 3 US1 (P1) | step drivers + the FR-040 lifts US1 cannot walk without (carve Continue rule, mechanism order, S-02 identity, displacement order, case-pair companion, marks series assembly, text sample), and the later lifts; drift guard (FR-011) | `p1-whole-bafut-kbdus` runs headless, compiles, reports gates; byte-identical rerun; edge cases; drift guard green; lifted components' existing tests unchanged | 2 |
 | 4 US2 (P1) | parity against the 4 committed records + on-demand records; allow-list; stale report | 0 unexplained differences on the 4 records | 3 |
 | 5 US4a PR set + CI | `prSet.json` (6 keyboards), `prSet.corpus.test.ts`, the parallel `headless-author` job, timing check, then the owner's ruleset change (T077) | PR set green locally and in CI within SC-002; SC-005 revert check fails `bj_cree_woods` | 4 |
 | 6 US3 | 32-case suite over the committed canonical case file | 32 cases report gates, placeholders, displacements; under 10 min | 3 |

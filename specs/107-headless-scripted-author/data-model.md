@@ -56,7 +56,7 @@ copied keyboard) → the case fails with `placeholder-clash` (spec Edge Cases).
 | `caseId` | string |
 | `outcome` | `"completed"` \| `"skipped"` \| `"failed"` |
 | `skipReason?` | `"missing"` \| `"not-codec-clean"` \| `"unsupported-script-stub"` \| `"outside-slice"` \| `"too-large"` (sweep tiers only) |
-| `failure?` | `{ step: string; decisionId?: string; kind: "proposal-threw" \| "placeholder-clash" \| "network-required" \| "scaffold-failed" \| "compile-failed"; detail: string }` |
+| `failure?` | `{ step: string; decisionId?: string; kind: "proposal-threw" \| "placeholder-clash" \| "network-required" \| "scaffold-failed" \| "compile-failed" \| "step-blocked"; detail: string }` (`step-blocked`: the routing stayed on a step) |
 | `record` | the 053 decision record (passes `parseDecisionRecord`) |
 | `decisions` | the 088 DecisionSet |
 | `bundle` | the output bundle from `buildOutputBundle` |
@@ -71,7 +71,8 @@ copied keyboard) → the case fails with `placeholder-clash` (spec Edge Cases).
 | `placeholders` | `{ char; sequence; decisionId }[]` |
 | `displacements` | `{ char; key; displaced; action: "confirm-move" \| "keep-both" \| "leave" }[]` |
 | `skippedSteps` | `{ step; reason }[]` (steps the product auto-completed) |
-| `knownGaps` | `{ gate; owner }[]` matched from spec 106's `KNOWN_GAPS` |
+| `knownGaps` | `{ gate: GateId; owner: string }[]` matched from spec 106's test-code `KNOWN_GAPS` table. The author adds two rows to it: G1 on `bj_cree_woods` (a dead rule after carving a whole `any()` store) and G6 on every touch-bearing keyboard walked. The G6 row is `walkOnly`: it applies to author runs, not to the decision-point replay, which walks no touch step. |
+| `notCovered` | `string[]`: the ids of the 15 Playwright-only rules in `HA/playwrightOnly.ts` (FR-042) |
 | `fallbackPolicy` | the store default used (FR-060; removed once #2366 lands) |
 | `timingMs` | `{ author; replay }` (feeds SC-001/SC-002 evidence) |
 
@@ -80,10 +81,44 @@ copied keyboard) → the case fails with `placeholder-clash` (spec Edge Cases).
 `{ caseId; decisionId; reason; explainedBy: string /* commit, PR or "record-age:<build>" */ }`.
 A run reports entries whose difference no longer occurs as `stale` (FR-022). Records are never edited.
 
+## AuthorRunOptions and EligibilityDeps
+
+`AuthorRunOptions` is `{ slice?; stopAfter?; eligibilityDeps?; onStep? }` (contracts/author-api.md).
+`onStep(step)` is for reporting only: it drives the sweep's in-progress report and `KS_AUTHOR_TRACE`,
+and it cannot change what the walk does.
+
+`EligibilityDeps` overrides eligibility's corpus lookups, so a test can inject a keyboard the corpus
+lacks. All fields are optional:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `groupOf` | `(base: string) => string \| undefined` | the directory under the corpus root holding `<base>/`; `undefined` when absent |
+| `parsesCompletely` | `(base: string) => boolean \| undefined` | whether the codec parses `base` without error, per `docs/import-corpus.json`; `undefined` when unlisted |
+| `scriptOf` | `(base: string, group: string) => string \| undefined` | the keyboard's script as the product's `.kps` reader derives it |
+| `ruleCountOf` | `(base: string) => number \| undefined` | the keyboard's rule count per `docs/import-corpus.json`; `undefined` when unlisted |
+
+`eligibility()` also takes `EligibilityOptions { sizeCap?: boolean }`. Only the sweep tiers set it,
+which turns on the `too-large` skip (`MAX_SWEEP_RULE_COUNT` = 2,000).
+
 ## Sweep summary
 
 `{ tier; shard?; cases: { completed; skipped; failed }; byGate: Record<GateId, caseId[]>;
 byFirstFailingStep: Record<string, caseId[]>; skips: Record<SkipReason, caseId[]> }`.
+
+Each shard also writes one `SweepEntry` per case (`runReport.ts`), which is what the issue filer reads:
+
+| Field | Content |
+|---|---|
+| `caseId`, `base`, `profile`, `backspace` | which case |
+| `status` | `"ok"` \| `"failed"` \| `"skipped"` \| `"known-gap"` \| `"in-progress"` |
+| `skipReason?` | a `SkipReason`, when skipped |
+| `gate?` | the failing gate id, or the failure kind when no gate ran; `hung` for an `in-progress` entry |
+| `decisionPoint?` | the decision id or step of a walk failure; `output` for a gate failure after replay |
+| `detail?`, `owner?` | failure detail; the `KNOWN_GAPS` owner of an expected failure |
+| `run?` | the serialised `AuthorRun` minus its bundle |
+
+`in-progress` is written before a case runs and replaced when it finishes. One left in a report
+means the shard was killed on that case, and the merge files it as a `failed` entry with gate `hung`.
 
 ## Provenance mapping (088 ↔ 053)
 
