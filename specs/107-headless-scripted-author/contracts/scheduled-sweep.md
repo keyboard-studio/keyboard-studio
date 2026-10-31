@@ -36,6 +36,8 @@ with no `end` names the hung step). A test that times out (an interruptible hang
 
 ## Issue filing (`scripts/file-sweep-issues.mjs`)
 
+- Before filing, `summarise` creates the `headless-sweep` label (`gh label create --force`,
+  idempotent): `gh issue create --label` rejects a label the repository does not have.
 - Key: `[headless-sweep] <keyboard> <profile> <gate> @ <decision point>`.
 - Search open issues labelled `headless-sweep` for the key. Match → comment with the run URL and the
   date. No match → open an issue titled `bug(<area>): <key-derived summary>` with the reproduce command
