@@ -31,38 +31,12 @@ import {
 
 type Phase = "pick" | "running" | "report";
 
-export type ReviewPathLink =
-  | { kind: "pr"; owner: string; prNumber: number }
-  | { kind: "repo"; owner: string; keyboardPath: string };
-
-/**
- * Parse a /review hard link path. Returns null for the bare /review
- * (picker) or unrecognized shapes.
- */
-export function parseReviewPath(pathname: string): ReviewPathLink | null {
-  const m = /^\/review\/([^/]+)\/keyboards\/(.+)$/.exec(pathname);
-  if (!m) return null;
-  const owner = m[1]!;
-  const rest = m[2]!;
-  const prMatch = /^pull\/(\d+)$/.exec(rest);
-  if (prMatch) {
-    return { kind: "pr", owner, prNumber: Number(prMatch[1]) };
-  }
-  // Anything else is a keyboard path under the repo.
-  if (rest.includes("..")) return null;
-  return { kind: "repo", owner, keyboardPath: rest };
-}
-
-/** Map a repo owner to the review source ids. */
-export function ownerToSources(owner: string): {
-  repo: ReviewSourceId;
-  prs: ReviewSourceId;
-  key: string;
-} | null {
-  if (owner === "keyboard-studio") return { repo: "ks-repo", prs: "ks-prs", key: "ks" };
-  if (owner === "keymanapp") return { repo: "km-repo", prs: "km-prs", key: "km" };
-  return null;
-}
+import {
+  hardLinkForTarget,
+  ownerToSources,
+  parseReviewPath,
+  type ReviewPathLink,
+} from "./reviewLinks.ts";
 
 export function targetFromParams(
   params: URLSearchParams,
@@ -175,6 +149,17 @@ export function ReviewScreen() {
       setPhase("report");
     }
   }, [phase, judge]);
+
+  // When the report lands, jump the address bar to the hard link so the
+  // URL is shareable (and a refresh re-runs the same review).
+  useEffect(() => {
+    if (phase === "report" && target) {
+      const url = hardLinkForTarget(target);
+      if (window.location.pathname !== url) {
+        window.history.pushState(null, "", url);
+      }
+    }
+  }, [phase, target]);
 
   const startRun = (t: ReviewTarget) => {
     setTarget(t);

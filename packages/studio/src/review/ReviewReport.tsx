@@ -22,6 +22,7 @@ import {
   reviewTargetLabel,
   type ReviewTarget,
 } from "./reviewSources.ts";
+import { hardLinkForTarget } from "./reviewLinks.ts";
 import type { SkippedFile } from "./useReviewSnapshot.ts";
 
 function downloadJson(filename: string, data: unknown) {
@@ -61,14 +62,9 @@ export function ReviewReport({
   );
 
   const shareUrl = useMemo(() => {
-    // Hard-link format: /review/<owner>/keyboards/pull/<N> or
-    // /review/<owner>/keyboards/<path>. The report pins the judged sha;
-    // the link resolves to the current head at open time.
-    const base = window.location.origin;
-    if (target.prNumber !== undefined) {
-      return `${base}/review/${target.owner}/keyboards/pull/${target.prNumber}`;
-    }
-    return `${base}/review/${target.owner}/keyboards/${target.path}`;
+    // Hard-link format (see hardLinkForTarget): the report pins the judged
+    // sha; the link resolves to the current head at open time.
+    return window.location.origin + hardLinkForTarget(target);
   }, [target]);
 
   const copyLink = async () => {
