@@ -1797,6 +1797,10 @@ export function StudioShell() {
     return <ReviewScreen />;
   }
 
+  return <StudioShellContent />;
+}
+
+function StudioShellContent() {
   const route = useRoute();
   const isNarrow = useIsNarrow();
   const { t } = useLingui();
@@ -2119,10 +2123,10 @@ export function StudioShell() {
   }
 
   // NOTE: the <I18nProvider> lives in AppRoot, ABOVE this component — never
-  // here. StudioShell calls useLingui() itself (below, for the nav tooltip),
-  // and a component cannot consume a context it renders: that combination
-  // returned a null context and blanked the app in production builds, where
-  // Lingui's dev-only invariant is stripped. See AppRoot.tsx.
+  // here. StudioShellContent calls useLingui() itself (below, for the nav
+  // tooltip), and a component cannot consume a context it renders: that
+  // combination returned a null context and blanked the app in production
+  // builds, where Lingui's dev-only invariant is stripped. See AppRoot.tsx.
   //
   // The blocked-Output explanation is shared by the desktop tab row and the
   // narrow-viewport menu (both inside NavBar), so they can never disagree.
