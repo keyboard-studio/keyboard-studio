@@ -75,9 +75,9 @@ export function CriteriaSummary({ result }: CriteriaSummaryProps) {
           {t({
             id: "criteria.summary.notYetCheckable",
             message: plural(notYetCheckable, {
-              one: "# criterion is not yet checkable: its check is specified but not yet enforced.",
+              one: "# criterion has no verdict yet: its check is not implemented, or an input it needs is not available for this keyboard (each row says which).",
               other:
-                "# criteria are not yet checkable: their checks are specified but not yet enforced.",
+                "# criteria have no verdict yet: their checks are not implemented, or an input they need is not available for this keyboard (each row says which).",
             }),
           })}
         </p>

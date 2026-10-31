@@ -109,7 +109,7 @@
   "criteria.status.notApplicable": "Sans objet",
   "criteria.status.notMet": "Non respecté",
   "criteria.status.notYetCheckable": "Pas encore vérifiable",
-  "criteria.summary.notYetCheckable": "{notYetCheckable, plural, one {# Le critère n'est pas encore vérifiable : sa vérification est spécifiée mais n'est pas encore appliquée.} other {# Les critères ne sont pas encore vérifiables : leurs vérifications sont spécifiées mais ne sont pas encore appliquées.}}",
+  "criteria.summary.notYetCheckable": "{notYetCheckable, plural, one {# Le critère n'a pas encore de verdict : sa vérification n'est pas implémentée, ou une donnée dont il a besoin n'est pas disponible pour ce clavier (chaque ligne précise laquelle).} other {# Les critères n'ont pas encore de verdict : leurs vérifications ne sont pas implémentées, ou une donnée dont ils ont besoin n'est pas disponible pour ce clavier (chaque ligne précise laquelle).}}",
   "criteria.summary.resolved": "{resolved} des critères de l' {total} ont été résolus",
   "criteria.title": "Critères",
   "dashboard.completeness.c1.empty": "Aucune étape obsolète (rien n’a été réouvert)",

@@ -5,8 +5,9 @@
 // existing keyboard loaded for comparison). Mode is an input, not a forked
 // implementation; the modes differ only in what can honestly be claimed —
 // a foreign keyboard had no scaffolder run and has no author record, so
-// its scaffolder-bake rows are Not yet checkable and its yellow/red rows
-// offer no controls.
+// its scaffolder-bake rows resolve Not applicable in favour of their lint
+// twin (which gives the real verdict) and its yellow/red rows offer no
+// controls.
 //
 // Resolution order per row is fixed: applicability first (both modes),
 // then the band rule. A check that did not run — because it is not
@@ -226,6 +227,31 @@ function reviewerContext(
   }
 }
 
+/**
+ * The lint twins of a scaffolder-bake criterion: the criteria whose id
+ * starts `${num}b-` where `num` is the bake row's section number ("1.2"
+ * -> "1.2b-...", "1.10" -> "1.10b-..."). Every bake row has exactly one
+ * (pinned by a test); the foreign-mode resolver points at it.
+ */
+export function bakeTwinsOf(
+  criterion: Criterion,
+  criteria: readonly Criterion[],
+): Criterion[] {
+  const num = /^(\d+\.\d+)-/.exec(criterion.id)?.[1];
+  if (num === undefined) return [];
+  return criteria.filter(
+    (c) => c.band === "layer-c-enforce" && c.id.startsWith(`${num}b-`),
+  );
+}
+
+/** §18.6's code (a literal: the resolver stays free of engine imports). */
+const INVENTORY_UNCOVERED = "KM_LINT_INVENTORY_UNCOVERED";
+
+const FOREIGN_COMPILE_REASON =
+  "/review does not compile keyboards; check the PR's CI build for errors (7.21) and warnings (7.6).";
+const FOREIGN_INVENTORY_REASON =
+  "Needs the studio's confirmed character inventory, which PR keyboards don't have; check by hand that every character the language needs can be typed.";
+
 function resolveRow(
   criterion: Criterion,
   input: CriteriaInput,
@@ -255,6 +281,24 @@ function resolveRow(
           evidence: () => ({
             kind: "scaffolder",
             lines: ["Guaranteed by the scaffolder"],
+          }),
+        };
+      }
+      // Every bake row has a lint twin that judges the same thing on the
+      // files. The row resolves Not applicable and names the twin; it
+      // does not copy the twin's status (that would count a failure twice).
+      const twins = bakeTwinsOf(criterion, input.criteria);
+      if (twins.length === 1) {
+        const twinId = twins[0]!.id;
+        return {
+          criterion,
+          status: "not-applicable",
+          controls: null,
+          evidence: () => ({
+            kind: "foreign-bake",
+            lines: [
+              `For keyboards not built by the studio this is checked by ${twinId}.`,
+            ],
           }),
         };
       }
@@ -297,6 +341,23 @@ function resolveRow(
       // from the host's compile result, not a lint finding — see
       // compileMapping.ts. Runs before the implemented gate because its
       // codes are in the implemented set via that synthesis.
+      if (
+        input.mode === "foreign" &&
+        (lintRuleId === "KM_LINT_COMPILE_ERRORS" ||
+          lintRuleId === "KM_LINT_COMPILE_HAS_WARNINGS") &&
+        (input.compileResult === undefined || input.compileResult === null)
+      ) {
+        return {
+          criterion,
+          status: "not-yet-checkable",
+          controls: null,
+          evidence: () => ({
+            kind: "context-missing",
+            lines: [FOREIGN_COMPILE_REASON],
+            lintRuleId,
+          }),
+        };
+      }
       const compileRow = resolveCompileRow(
         criterion,
         lintRuleId,
@@ -342,7 +403,9 @@ function resolveRow(
           evidence: () => ({
             kind: "context-missing",
             lines: [
-              `Cannot be checked yet: ${missing} is not available for this keyboard.`,
+              input.mode === "foreign" && lintRuleId === INVENTORY_UNCOVERED
+                ? FOREIGN_INVENTORY_REASON
+                : `Cannot be checked yet: ${missing} is not available.`,
             ],
             lintRuleId,
           }),
@@ -438,7 +501,11 @@ function resolveRow(
         controls: input.mode === "authored" ? "attest" : null,
         evidence: () => {
           const context = reviewerContext(criterion.id, input, findingsByCode);
-          const lines = ["No attestation has been recorded for this criterion yet."];
+          const lines = [
+            input.mode === "foreign"
+              ? "Reviewer judgment needed."
+              : "No attestation has been recorded for this criterion yet.",
+          ];
           if (context.length > 0) {
             lines.push("", "Reviewer context:", ...context);
           }

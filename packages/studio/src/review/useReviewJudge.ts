@@ -20,7 +20,11 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
-import { placementFromRepoPath } from "../criteria/judgeForeign.ts";
+import {
+  historyChangedInPr,
+  placementFromRepoPath,
+  type JudgeForeignOptions,
+} from "../criteria/judgeForeign.ts";
 import {
   rehydrateResult,
   type JudgeWorkerInput,
@@ -28,6 +32,7 @@ import {
 } from "./judgeWorkerProtocol.ts";
 import type { ReviewSnapshot } from "./useReviewSnapshot.ts";
 import {
+  fetchBaseHistoryMd,
   fetchBaseKmnVersion,
   fetchIdConflictAtBase,
   fetchPrContext,
@@ -52,7 +57,10 @@ export type JudgeState =
 async function buildReviewContext(
   target: ReviewTarget,
   snapshot: ReviewSnapshot,
-): Promise<ReviewContext> {
+): Promise<{
+  reviewContext: ReviewContext;
+  baseHistory?: JudgeForeignOptions["baseHistory"];
+}> {
   const historyEntry = snapshot.vfs.get("HISTORY.md");
   const historyMd =
     typeof historyEntry?.content === "string"
@@ -78,21 +86,42 @@ async function buildReviewContext(
         `${target.path}/source/${target.keyboardId}.kmn`,
       ),
     ]);
+    // 3.4: the base HISTORY.md is only needed when the PR changes it on
+    // an upgrade (the folder exists at base). Fetch it then; a failed
+    // fetch is reported as such, never as a pass.
+    let baseHistory: JudgeForeignOptions["baseHistory"];
+    if (
+      historyChangedInPr(target.path, pr.filePaths) === true &&
+      idConflict !== null &&
+      idConflict.existingTiers.length > 0
+    ) {
+      baseHistory = await fetchBaseHistoryMd(
+        target.owner,
+        target.repo,
+        target.prNumber,
+        `${target.path}/HISTORY.md`,
+      );
+    }
     return {
-      repoPath: target.path,
-      treePaths: pr.filePaths,
-      prBody: pr.body,
-      isPr: true,
-      ...(historyMd !== undefined ? { historyMd } : {}),
-      ...(idConflict !== null ? { idConflictAtBase: idConflict } : {}),
-      ...(baseKmn !== null ? { baseKmnVersion: baseKmn } : {}),
+      reviewContext: {
+        repoPath: target.path,
+        treePaths: pr.filePaths,
+        prBody: pr.body,
+        isPr: true,
+        ...(historyMd !== undefined ? { historyMd } : {}),
+        ...(idConflict !== null ? { idConflictAtBase: idConflict } : {}),
+        ...(baseKmn !== null ? { baseKmnVersion: baseKmn } : {}),
+      },
+      ...(baseHistory !== undefined ? { baseHistory } : {}),
     };
   }
   return {
-    repoPath: target.path,
-    treePaths: snapshot.treePaths,
-    isPr: false,
-    ...(historyMd !== undefined ? { historyMd } : {}),
+    reviewContext: {
+      repoPath: target.path,
+      treePaths: snapshot.treePaths,
+      isPr: false,
+      ...(historyMd !== undefined ? { historyMd } : {}),
+    },
   };
 }
 
@@ -126,7 +155,7 @@ export function useReviewJudge(
     // The PR context fetch is async; start the worker after it lands so
     // the battery sees the complete reviewContext in one pass.
     buildReviewContext(target, snapshot).then(
-      (reviewContext) => {
+      ({ reviewContext, baseHistory }) => {
         if (runId.current !== id) return;
         try {
           worker = new Worker(
@@ -176,6 +205,7 @@ export function useReviewJudge(
             // §§7.6/7.21 rows resolve not-yet-checkable with that reason.
             compileResult: null,
             reviewContext,
+            ...(baseHistory !== undefined ? { baseHistory } : {}),
           },
         };
         worker.postMessage(input);

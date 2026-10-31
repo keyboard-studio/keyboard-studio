@@ -175,7 +175,7 @@ describe("§18.6 outcome matrix (authored assembly)", () => {
     const row = row186(result);
     expect(row.status).toBe("not-yet-checkable");
     expect(row.evidence().lines.join("\n")).toContain(
-      "no CLDR/SLDR entry for ewo",
+      "CLDR/SLDR exemplar baseline for ewo",
     );
   });
 
@@ -183,6 +183,6 @@ describe("§18.6 outcome matrix (authored assembly)", () => {
     const result = await judgeAuthored(vfsOf(KMN_COVERED), [], new Map());
     const row = row186(result);
     expect(row.status).toBe("not-yet-checkable");
-    expect(row.evidence().lines.join("\n")).toContain("no language target");
+    expect(row.evidence().lines.join("\n")).toContain("recorded language target");
   });
 });

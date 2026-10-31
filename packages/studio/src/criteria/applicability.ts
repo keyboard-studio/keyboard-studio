@@ -11,6 +11,16 @@ import type { Criterion } from "@keyboard-studio/contracts";
 import { VERSION_VERDICT_CODES } from "./assemblyVerdicts.ts";
 import type { CriteriaFacts } from "./criteriaTypes.ts";
 
+/** Lint codes of the criteria that judge the content of the help .php. */
+const HELP_PHP_CONTENT_CODES: ReadonlySet<string> = new Set([
+  "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE", // 11.2
+  "KM_LINT_PHP_STYLE_OUTSIDE", // 11.3b
+  "KM_LINT_PHP_CLOSING_TAGS", // 11.4b
+  "KM_LINT_PHP_DATA_STATES_INCOMPLETE", // 11.6
+  "KM_LINT_PHP_PAGENAME_FORMAT", // 11.7
+  "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED", // 11.8
+]);
+
 /** A named applicability verdict: the criterion does not apply, and why. */
 export interface Applicability {
   reason: string;
@@ -48,7 +58,10 @@ export function applicabilityFor(
   // body / HISTORY.md, set by the /review host) they are Not applicable
   // — a regular contributor PR is not an adaptation. The bake rows
   // (19.1/19.2) are vacuously satisfied for non-adaptations (the
-  // scaffolder's guarantee holds trivially), so they stay applicable.
+  // scaffolder's guarantee holds trivially), so they stay applicable
+  // here. That carve-out is correct for AUTHORED mode only: in foreign
+  // mode the resolver resolves every bake row Not applicable in favour
+  // of its lint twin (see resolveCriteria's scaffolder-bake case).
   if (
     (criterion.id === "19.1b-import-attribution-in-pr-body" ||
       criterion.id === "19.2b-import-attribution-in-history-md") &&
@@ -59,13 +72,35 @@ export function applicabilityFor(
         "This criterion concerns keyboards adapted from a release keyboard, and this keyboard shows no adaptation signal.",
     };
   }
+  // /review: the help-page content rows judge a help .php that is not
+  // there. Its absence is the §11.1b finding, not a pass or fail here.
+  const lintCode = "lintRuleId" in criterion ? criterion.lintRuleId : undefined;
+  if (
+    facts.helpPhpAbsent === true &&
+    lintCode !== undefined &&
+    HELP_PHP_CONTENT_CODES.has(lintCode)
+  ) {
+    return {
+      reason: "No help .php; its absence is reported by 11.1b.",
+    };
+  }
+  // /review: 3.4 compares against the keyboard's earlier HISTORY.md; a
+  // keyboard the PR adds has none.
+  if (
+    facts.newKeyboardAtBase === true &&
+    lintCode === "KM_LINT_HISTORY_TRUNCATED"
+  ) {
+    return {
+      reason:
+        "This PR adds the keyboard, so there is no earlier HISTORY.md whose entries must be preserved.",
+    };
+  }
   // Batch 3: the version-bump rows (2.1/2.2/2.6) presuppose a
   // previously deployed version. A new-from-base keyboard has none —
   // its first version is simply its version.
-  const lintRuleId = "lintRuleId" in criterion ? criterion.lintRuleId : undefined;
   if (
-    lintRuleId !== undefined &&
-    VERSION_VERDICT_CODES.has(lintRuleId) &&
+    lintCode !== undefined &&
+    VERSION_VERDICT_CODES.has(lintCode) &&
     facts.instantiationMode === "new-from-base"
   ) {
     return {

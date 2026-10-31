@@ -97,6 +97,35 @@ function regionSubtagOfTag(tag: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Font files a .kps lists from OUTSIDE the keyboard folder
+ * (`..\..\..\shared\fonts\x.ttf`) that the judged VFS does not hold.
+ * A /review target loads only the keyboard folder, so such a font can
+ * be neither judged nor honestly called missing. Returns the ref paths
+ * as written in the .kps. A ref whose basename IS in the VFS counts as
+ * present (the same basename test the §8.7 family extraction uses).
+ */
+export function sharedFontRefsMissingFromVfs(
+  vfs: VirtualFS,
+  kpsText: string | undefined,
+): string[] {
+  if (kpsText === undefined) return [];
+  let refs: string[];
+  try {
+    refs = parseKpsFontRefs(kpsText).fileFonts;
+  } catch {
+    return [];
+  }
+  const present = new Set(
+    vfs.list().map((p) => (p.split(/[\\/]/).pop() ?? "").toLowerCase()),
+  );
+  return refs.filter((r) => {
+    const segments = r.split(/[\\/]/);
+    if (!segments.includes("..")) return false;
+    return !present.has((segments.pop() ?? "").toLowerCase());
+  });
+}
+
 /** The one criteria-mapped code whose inputs this assembly can fail to supply. */
 export const INVENTORY_UNCOVERED_CODE = "KM_LINT_INVENTORY_UNCOVERED";
 
@@ -109,8 +138,8 @@ export const KPJ_FORMAT_OUTDATED_CODE = "KM_LINT_KPJ_FORMAT_OUTDATED";
 /** §2.7's code: same missing input as 1.10b — the pair shares one reader. */
 export const KPJ_VERSION_BUMPED_CODE = "KM_LINT_KPJ_VERSION_BUMPED";
 
-const MISSING_IR = "the parsed keyboard source for this keyboard";
-const MISSING_INVENTORY = "the linguist inventory for this keyboard";
+const MISSING_IR = "the parsed keyboard source";
+const MISSING_INVENTORY = "the linguist inventory";
 const MISSING_KVKS = "the .kvks visual keyboard file";
 const MISSING_KPJ = "the .kpj project file";
 const MISSING_KPS = "the .kps package file";
@@ -268,14 +297,14 @@ export interface AssembledLintContext {
 
 /** §18.6 named-missing text when the re-parsed IR carries raw fragments. */
 function rawFragmentsMissing(fragmentCount: number): string {
-  return `a fragment-free parse of the keyboard source (${fragmentCount} raw fragment${fragmentCount === 1 ? "" : "s"} present — opaque content the coverage analysis cannot see through)`;
+  return `a fragment-free parse of the keyboard source, which holds ${fragmentCount} raw fragment${fragmentCount === 1 ? "" : "s"} the coverage analysis cannot see through`;
 }
 
 /** §18.6 named-missing text when the exemplar baseline cannot be formed. */
 function exemplarBaselineMissing(missingTag: string | null): string {
   return missingTag === null
-    ? "an exemplar baseline (no language target is recorded, so no CLDR/SLDR entry can be selected)"
-    : `an exemplar baseline (no CLDR/SLDR entry for ${missingTag})`;
+    ? "a recorded language target"
+    : `a CLDR/SLDR exemplar baseline for ${missingTag}`;
 }
 
 /**
@@ -519,6 +548,15 @@ export function assembleLintContext(
     }
   }
 
+  // §8.7: a .kps font listed from outside the keyboard folder (the
+  // shared fonts directory) is not in a /review VFS, so the family
+  // comparison would call a present font missing. Name the shared path.
+  const sharedFonts = sharedFontRefsMissingFromVfs(vfs, kpsText);
+  if (sharedFonts.length > 0) {
+    contextMissing["KM_LINT_KPS_FONT_MISSING"] =
+      `the shared font ${sharedFonts.length === 1 ? "file" : "files"} ${sharedFonts.join(", ")} outside the keyboard folder`;
+  }
+
   // Group A2 text-content twins (Batch 4): name the missing doc inputs.
   // 11.1b is excluded — the help .php's existence is the criterion, so
   // its absence is a finding, never a missing input.
@@ -565,7 +603,7 @@ export function assembleLintContext(
   // (19.1b/19.2b are gated by the adaptation signal instead.)
   if (input.reviewContext === undefined) {
     for (const code of REPO_CONTEXT_CODES) {
-      contextMissing[code] = "the repository context (repo path and file list)";
+      contextMissing[code] = "the repository path and file list";
     }
   }
   // 1.5: a PR target whose base-commit ID lookup failed (API error) —
@@ -594,7 +632,7 @@ export function assembleLintContext(
   ];
   for (const code of VERSION_CODES) {
     if (input.reviewContext === undefined) {
-      contextMissing[code] = "the repository context (repo path and file list)";
+      contextMissing[code] = "the repository path and file list";
     } else if (
       input.reviewContext.isPr &&
       input.reviewContext.baseKmnVersion === undefined

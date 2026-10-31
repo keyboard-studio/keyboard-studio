@@ -18,7 +18,7 @@ import type {
   CriteriaInput,
   CriterionStatus,
 } from "./criteriaTypes.ts";
-import { resolveCriteria } from "./resolveCriteria.ts";
+import { bakeTwinsOf, resolveCriteria } from "./resolveCriteria.ts";
 
 const BASELINE_FACTS: CriteriaFacts = {
   fontBundled: true,
@@ -125,7 +125,7 @@ describe("resolveCriteria — authored baseline", () => {
 });
 
 describe("resolveCriteria — foreign baseline", () => {
-  it("resolves only the 95 implemented layer-c checks and offers no controls", () => {
+  it("resolves the 95 implemented layer-c checks, points bake rows at their twins, and offers no controls", () => {
     const result = resolveCriteria(makeInput({ mode: "foreign" }));
 
     expect(result.rows).toHaveLength(188);
@@ -136,23 +136,95 @@ describe("resolveCriteria — foreign baseline", () => {
       // in foreign mode.
       met: 95,
       "not-met": 0,
-      // The §19 twin rows are Not applicable without an adaptation signal.
-      "not-applicable": 2,
+      // 2 §19 twin rows (no adaptation signal) + 40 scaffolder-bake rows,
+      // which in foreign mode resolve Not applicable and name their lint
+      // twin (previously Not yet checkable: "not verified for this
+      // keyboard"). The twin gives the verdict; the bake row never copies
+      // it, so a failure is not double-counted.
+      "not-applicable": 42,
       "needs-author": 32,
       "needs-human": 10,
-      // 40 foreign scaffolder-bake rows + 9 unimplemented layer-c.
-      "not-yet-checkable": 49,
+      // The 9 unimplemented layer-c rows only (was 49 with the 40 bake rows).
+      "not-yet-checkable": 9,
     });
-    expect(result.resolvedCount).toBe(97); // 95 met + 2 not-applicable
+    expect(result.resolvedCount).toBe(137); // 95 met + 42 not-applicable
     for (const row of result.rows) {
       expect(row.controls).toBeNull();
     }
 
-    const bake = result.rows.find((r) => r.criterion.band === "scaffolder-bake");
-    expect(bake?.status).toBe("not-yet-checkable");
+    const bake = result.rows.find((r) => r.criterion.id.startsWith("1.2-"));
+    expect(bake?.criterion.band).toBe("scaffolder-bake");
+    expect(bake?.status).toBe("not-applicable");
     expect(bake?.evidence().kind).toBe("foreign-bake");
     expect(bake?.evidence().lines).toEqual([
-      "Guaranteed by the scaffolder for studio-created keyboards; not verified for this keyboard.",
+      `For keyboards not built by the studio this is checked by ${ALL_CRITERIA.find((c) => c.id.startsWith("1.2b-"))?.id}.`,
+    ]);
+  });
+
+  it("every scaffolder-bake row has exactly one lint twin (id prefix NUMb-)", () => {
+    const bakes = ALL_CRITERIA.filter((c) => c.band === "scaffolder-bake");
+    expect(bakes.length).toBeGreaterThan(0);
+    for (const bake of bakes) {
+      const twins = bakeTwinsOf(bake, ALL_CRITERIA);
+      expect(twins.map((t) => t.id), bake.id).toHaveLength(1);
+      expect(twins[0]?.band).toBe("layer-c-enforce");
+    }
+    // 1.1 must not capture 1.10's twin, nor 1.10 capture 1.1's.
+    const kpj = ALL_CRITERIA.find((c) => c.id.startsWith("1.10-"));
+    expect(kpj && bakeTwinsOf(kpj, ALL_CRITERIA)[0]?.id).toBe(
+      "1.10b-kpj-format-adapted",
+    );
+  });
+
+  it("does not copy a twin status onto the bake row (a twin failure counts once)", () => {
+    const twin = ALL_CRITERIA.find((c) => c.id.startsWith("1.2b-"));
+    const bake = ALL_CRITERIA.find((c) => c.id.startsWith("1.2-"));
+    if (!twin || twin.band !== "layer-c-enforce" || !bake) throw new Error("no 1.2/1.2b");
+    const finding: LintFinding = {
+      code: twin.lintRuleId,
+      severity: "warning",
+      layer: "C",
+      message: "bad placement",
+    };
+    const input = makeInput({ mode: "foreign", lintFindings: [finding] });
+    expect(rowFor(twin.id, input).status).toBe("not-met");
+    expect(rowFor(bake.id, input).status).toBe("not-applicable");
+  });
+
+  it("authored mode still resolves bake rows Met (the bake carve-out is authored-only)", () => {
+    const bake = ALL_CRITERIA.find((c) => c.id.startsWith("1.2-"))!;
+    expect(rowFor(bake.id, makeInput({ mode: "authored" })).status).toBe("met");
+  });
+
+  it("foreign needs-author rows say reviewer judgment, not an unrecorded attestation", () => {
+    const yellow = ALL_CRITERIA.find((c) => c.band === "yellow-survey")!;
+    const foreign = rowFor(yellow.id, makeInput({ mode: "foreign" })).evidence();
+    expect(foreign.lines[0]).toBe("Reviewer judgment needed.");
+    const authored = rowFor(yellow.id, makeInput({ mode: "authored" })).evidence();
+    expect(authored.lines[0]).toBe(
+      "No attestation has been recorded for this criterion yet.",
+    );
+  });
+
+  it("foreign 18.6 and 7.6 give reviewer-facing reasons instead of the generic one", () => {
+    const inventory = criterionByLintRuleId("KM_LINT_INVENTORY_UNCOVERED");
+    const input = makeInput({
+      mode: "foreign",
+      contextMissing: {
+        KM_LINT_INVENTORY_UNCOVERED: "the linguist inventory",
+      },
+    });
+    const row = rowFor(inventory.id, input);
+    expect(row.status).toBe("not-yet-checkable");
+    expect(row.evidence().lines).toEqual([
+      "Needs the studio's confirmed character inventory, which PR keyboards don't have; check by hand that every character the language needs can be typed.",
+    ]);
+    const warn = rowFor(
+      criterionByLintRuleId("KM_LINT_COMPILE_HAS_WARNINGS").id,
+      makeInput({ mode: "foreign" }),
+    );
+    expect(warn.evidence().lines).toEqual([
+      "/review does not compile keyboards; check the PR's CI build for errors (7.21) and warnings (7.6).",
     ]);
   });
 });
@@ -233,8 +305,7 @@ describe("resolveCriteria — missing lint context", () => {
     const inventory = criterionByLintRuleId("KM_LINT_INVENTORY_UNCOVERED");
     const input = makeInput({
       contextMissing: {
-        KM_LINT_INVENTORY_UNCOVERED:
-          "the linguist inventory for this keyboard",
+        KM_LINT_INVENTORY_UNCOVERED: "the linguist inventory",
       },
     });
     const row = rowFor(inventory.id, input);
@@ -243,9 +314,9 @@ describe("resolveCriteria — missing lint context", () => {
 
     const evidence = row.evidence();
     expect(evidence.kind).toBe("context-missing");
-    expect(evidence.lines.join(" ")).toContain(
-      "the linguist inventory for this keyboard",
-    );
+    expect(evidence.lines).toEqual([
+      "Cannot be checked yet: the linguist inventory is not available.",
+    ]);
 
     const result = resolveCriteria(input);
     expect(result.counts.met).toBe(130); // 131 - 1 (inventory now missing)
@@ -378,7 +449,7 @@ describe("resolveCriteria — compile-result mapping (Batch 1, §§7.6/7.21)", (
         expect(resolved.status).toBe("not-yet-checkable");
         expect(resolved.evidence().kind).toBe("context-missing");
         expect(resolved.evidence().lines.join(" ")).toContain(
-          "no compile result",
+          mode === "foreign" ? "does not compile keyboards" : "no compile result",
         );
       }
     }
@@ -525,8 +596,10 @@ describe("resolveCriteria — applicability", () => {
           expect(row.evidence().lines[0]?.length).toBeGreaterThan(0);
         }
       }
-      // 14 (sections 9/15/16) + 2 (§19 twins, no adaptation signal in baseline).
-      expect(result.counts["not-applicable"]).toBe(16);
+      // 14 (sections 9/15/16) + 2 (§19 twins, no adaptation signal in
+      // baseline); foreign mode adds the 40 scaffolder-bake rows, which
+      // resolve Not applicable in favour of their lint twin.
+      expect(result.counts["not-applicable"]).toBe(mode === "foreign" ? 56 : 16);
 
       // A section-1 row is untouched by the three predicates.
       const section1 = result.rows.find((r) =>

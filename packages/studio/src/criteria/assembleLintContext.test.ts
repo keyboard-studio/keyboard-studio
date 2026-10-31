@@ -353,21 +353,21 @@ describe("assembleLintContext", () => {
       // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
       // input-gated.
       KM_LINT_REPO_PLACEMENT_BAD:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_NO_ORGANIZING_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_ROOT_SOURCE:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_FILES_OUTSIDE_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_DUPLICATE_KEYBOARD_ID:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_VERSION_NOT_INCREMENTED:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_VERSION_NOT_BUMPED:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_SPURIOUS_VERSION_BUMP:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
     });
   });
 
@@ -587,21 +587,21 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
       // input-gated.
       KM_LINT_REPO_PLACEMENT_BAD:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_NO_ORGANIZING_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_ROOT_SOURCE:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_FILES_OUTSIDE_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_DUPLICATE_KEYBOARD_ID:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_VERSION_NOT_INCREMENTED:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_VERSION_NOT_BUMPED:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_SPURIOUS_VERSION_BUMP:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
     });
 
     const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
@@ -730,7 +730,7 @@ describe("applyInventoryOutcome (§18.6 Batch 4)", () => {
     });
     expect(result.ctx.inventory).toBeUndefined();
     expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
-      "no CLDR/SLDR entry for ewo",
+      "CLDR/SLDR exemplar baseline for ewo",
     );
   });
 
@@ -744,7 +744,7 @@ describe("applyInventoryOutcome (§18.6 Batch 4)", () => {
       missingTag: null,
     });
     expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
-      "no language target is recorded",
+      "recorded language target",
     );
   });
 
