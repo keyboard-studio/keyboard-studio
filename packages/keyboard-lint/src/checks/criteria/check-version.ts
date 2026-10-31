@@ -174,17 +174,7 @@ export function checkVersionNotIncremented(
   // Equal versions: an upgrade must bump; a new keyboard has nothing
   // to increment from. Upgrade = the folder exists at base in the
   // PR's tier and the PR touches it (same determination as 1.5).
-  const segments = review.repoPath.split("/").filter((s) => s !== "");
-  const newTier = (segments[0] ?? "").toLowerCase();
-  const org = segments[1] ?? "";
-  const idLower = ir.header.keyboardId.toLowerCase();
-  const changed = (review.treePaths ?? []).map((p) => p.toLowerCase());
-  const folder = `${newTier}/${org}/${idLower}/`;
-  const isUpgrade =
-    (review.idConflictAtBase?.existingTiers ?? []).some(
-      (t) => t.toLowerCase() === newTier,
-    ) && changed.some((p) => p.startsWith(folder));
-  if (isUpgrade) {
+  if (isUpgrade(ir, review)) {
     const bumped = suggestBump(baseVersion);
     return checkFailed(code, [
       criteriaFinding({
@@ -211,99 +201,145 @@ function suggestBump(version: string): string {
   return parts.join(".");
 }
 
-// 2.1 KM_LINT_VERSION_NOT_BUMPED — if any file that ships in the package
-// was modified, the version must be bumped. Compares against the PR's base
-// commit. Non-package files (docs, history, license) don't require a bump.
-//
-// Package files: .kmn, .kvks, .kps, touch layouts, fonts, icons, compiled .js
-// Non-package: .md, .htm/.html docs, .php, .txt, LICENSE
 
-const PACKAGE_EXTENSIONS = new Set([
-  ".kmn",
-  ".kvks",
-  ".kps",
-  ".keyman-touch-layout",
-  ".ttf",
-  ".otf",
-  ".woff",
-  ".woff2",
-  ".ico",
-  ".js",
-]);
-
-const NON_PACKAGE_EXTENSIONS = new Set([
-  ".md",
-  ".htm",
-  ".html",
-  ".php",
-  ".txt",
-]);
-
-function isPackageFile(path: string): boolean {
-  const lower = path.toLowerCase();
-  const dot = lower.lastIndexOf(".");
-  if (dot === -1) return true; // No extension: treat as package file (conservative)
-  const ext = lower.slice(dot);
-  if (NON_PACKAGE_EXTENSIONS.has(ext)) return false;
-  if (PACKAGE_EXTENSIONS.has(ext)) return true;
-  // Unknown extension: conservative — treat as package file
-  return true;
+/** The PR's changed files under the judged keyboard's folder (folder-relative). */
+function changedInFolder(ir: KeyboardIR, review: ReviewContext): string[] {
+  const segments = review.repoPath.split("/").filter((s) => s !== "");
+  const folder =
+    `${segments[0] ?? ""}/${segments[1] ?? ""}/${ir.header.keyboardId}/`.toLowerCase();
+  return (review.treePaths ?? [])
+    .filter((p) => p.toLowerCase().startsWith(folder))
+    .map((p) => p.slice(folder.length));
 }
 
+/**
+ * Upgrade = the folder exists at base in the PR's tier and the PR
+ * touches it (same determination as 1.5). Otherwise the PR is a new
+ * submission (or a tier move) with no previously deployed version.
+ */
+function isUpgrade(ir: KeyboardIR, review: ReviewContext): boolean {
+  const newTier = (review.repoPath.split("/").find((s) => s !== "") ?? "").toLowerCase();
+  return (
+    (review.idConflictAtBase?.existingTiers ?? []).some(
+      (t) => t.toLowerCase() === newTier,
+    ) && changedInFolder(ir, review).length > 0
+  );
+}
+
+// Sources compiled into a shipped file (.kmx/.kvk/.js) and the package
+// definition itself; everything else ships only if the .kps lists it.
+const COMPILED_SOURCES = /\.(kmn|kvks|keyman-touch-layout|kps)$/i;
+
+const baseName = (p: string): string =>
+  (p.split(/[\\/]/).pop() ?? "").toLowerCase();
+
+/** Split the folder's changed files into shipped vs not, by the .kps <Files> list. */
+function classifyChanges(
+  ir: KeyboardIR,
+  review: ReviewContext,
+  kpsFileNames: readonly string[],
+): { pkg: string[]; other: string[] } {
+  const shipped = new Set(kpsFileNames.map(baseName));
+  const pkg: string[] = [];
+  const other: string[] = [];
+  for (const p of changedInFolder(ir, review)) {
+    (COMPILED_SOURCES.test(p) || shipped.has(baseName(p)) ? pkg : other).push(p);
+  }
+  return { pkg, other };
+}
+
+const listed = (files: readonly string[]): string =>
+  files.length === 0 ? "none" : files.join(", ");
+
+/**
+ * The shared PR facts 2.1/2.2 judge from, or a met-moot reason line
+ * when there is nothing to bump from (non-PR, new submission, or a
+ * base with no version).
+ */
+function bumpFacts(
+  ir: KeyboardIR,
+  review: ReviewContext | undefined,
+  kpsFileNames: readonly string[],
+):
+  | { moot: string[] }
+  | { pkg: string[]; other: string[]; baseVersion: string; prVersion: string; sha7: string } {
+  if (review === undefined || !review.isPr)
+    return { moot: ["Already deployed; version history is the repo."] };
+  const base = review.baseKmnVersion;
+  // Unreachable when the assembly is correct: a PR without the base
+  // lookups is named in contextMissing before checks run.
+  if (base === undefined) return { moot: [] };
+  if (versionOf(ir) === "") return { moot: [NO_VERSION] };
+  const sha7 = base.baseSha.slice(0, 7);
+  const { pkg, other } = classifyChanges(ir, review, kpsFileNames);
+  const baseVersion = (base.version ?? "").trim();
+  if (!isUpgrade(ir, review) || baseVersion === "")
+    return {
+      moot: [
+        `New keyboard submission: ${review.repoPath} has no released version at base commit ${sha7}, so there is nothing to bump from.`,
+        `Files added: ${listed([...pkg, ...other])}.`,
+      ],
+    };
+  return { pkg, other, baseVersion, prVersion: versionOf(ir), sha7 };
+}
+
+/**
+ * 2.1 — if any file that ships in the package changed, the version was
+ * bumped past the base commit's. "Ships" = listed in the .kps <Files>,
+ * or a source compiled into a listed file (.kmn/.kvks/touch layout),
+ * or the .kps itself.
+ */
 export function checkVersionBumpRequired(
   ir: KeyboardIR,
   review: ReviewContext | undefined,
+  kpsFileNames: readonly string[],
 ): CheckResult {
   const code = "KM_LINT_VERSION_NOT_BUMPED";
-  const file = kmnPath(ir.header.keyboardId);
-  if (review === undefined || !review.isPr) {
+  const f = bumpFacts(ir, review, kpsFileNames);
+  if ("moot" in f) return checkPassed(code, f.moot);
+  const { pkg, other, baseVersion, prVersion, sha7 } = f;
+  if (pkg.length === 0)
     return checkPassed(code, [
-      "Not a PR; version history is the repo.",
+      `No package file changed (changed: ${listed(other)}); no version bump required.`,
     ]);
-  }
-  const changedFiles = review.treePaths ?? [];
-  if (changedFiles.length === 0) {
+  if (compareDotVersions(prVersion, baseVersion) > 0)
     return checkPassed(code, [
-      "No changed files listed; nothing to judge.",
+      `Package files changed: ${listed(pkg)}.`,
+      `Version bumped "${baseVersion}" → "${prVersion}" (base commit ${sha7}).`,
     ]);
-  }
-  // Filter to this keyboard's folder
-  const segments = review.repoPath.split("/").filter((s) => s !== "");
-  const idLower = ir.header.keyboardId.toLowerCase();
-  const folder = `${segments.join("/")}/`.toLowerCase();
-  const kbFiles = changedFiles.filter((p) =>
-    p.toLowerCase().startsWith(folder),
-  );
-  const packageFiles = kbFiles.filter(isPackageFile);
-  if (packageFiles.length === 0) {
-    return checkPassed(code, [
-      `Only non-package files modified (${kbFiles.length} file(s)); no version bump required.`,
-    ]);
-  }
-  // Package files were modified — version must be bumped
-  const prVersion = versionOf(ir);
-  const base = review.baseKmnVersion;
-  if (base === undefined || (base.version ?? "").trim() === "") {
-    return checkPassed(code, [
-      "Package files modified, but no base version to compare against.",
-    ]);
-  }
-  const baseVersion = base.version!.trim();
-  const cmp = compareDotVersions(prVersion, baseVersion);
-  if (cmp > 0) {
-    return checkPassed(code, [
-      `Package files modified (${packageFiles.length} file(s)); version bumped ${baseVersion} → ${prVersion}.`,
-    ]);
-  }
-  const bumped = suggestBump(baseVersion);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_VERSION_NOT_BUMPED",
-      file,
-      message:
-        `Package files were modified (${packageFiles.map((p) => p.split("/").pop()).join(", ")}), ` +
-        `but the version was not bumped from "${baseVersion}".`,
-      hint: `Bump the version past "${baseVersion}" — e.g. "${bumped}".`,
+      file: kmnPath(ir.header.keyboardId),
+      message: `Package files changed (${listed(pkg)}), but the version was not bumped from "${baseVersion}".`,
+      hint: `Bump the version past "${baseVersion}" — e.g. "${suggestBump(baseVersion)}".`,
     }),
+  ]);
+}
+
+/**
+ * 2.2 — a bump is not required when only non-package files changed.
+ * "Not required" is not "forbidden", so this never fails: the evidence
+ * names the case so the reviewer can confirm the classification.
+ */
+export function checkSpuriousVersionBump(
+  ir: KeyboardIR,
+  review: ReviewContext | undefined,
+  kpsFileNames: readonly string[],
+): CheckResult {
+  const code = "KM_LINT_SPURIOUS_VERSION_BUMP";
+  const f = bumpFacts(ir, review, kpsFileNames);
+  if ("moot" in f) return checkPassed(code, f.moot);
+  const { pkg, other, baseVersion, prVersion } = f;
+  if (pkg.length > 0)
+    return checkPassed(code, [
+      `Package files changed (${listed(pkg)}), so a bump is required — judged by 2.1.`,
+    ]);
+  const moved = compareDotVersions(prVersion, baseVersion) !== 0;
+  return checkPassed(code, [
+    `Only non-package files changed: ${listed(other)}.`,
+    moved
+      ? `Version moved "${baseVersion}" → "${prVersion}" anyway: allowed, but not required.`
+      : `Version stays "${baseVersion}": no bump needed.`,
   ]);
 }

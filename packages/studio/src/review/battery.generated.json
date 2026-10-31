@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-31T18:15:34.193Z",
+ "generatedAt": "2026-10-31T18:54:06.622Z",
  "catalogSize": 188,
  "byBand": {
   "layer-c-enforce": 106,
@@ -139,7 +139,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-identity.ts",
     "packages/keyboard-lint/src/checks/criteria/check-identity.ts"
    ]
   },
@@ -230,7 +229,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-kpj.ts",
     "packages/keyboard-lint/src/checks/criteria/check-kpj.ts"
    ]
   },
@@ -325,7 +323,9 @@
    },
    "implemented": true,
    "precertified": false,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
   },
   {
    "id": "2.3-version-numeric-dot-separated",
@@ -384,7 +384,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-version.ts",
     "packages/keyboard-lint/src/checks/criteria/check-version.ts"
    ]
   },
@@ -1027,7 +1026,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-bitmap.ts",
     "packages/keyboard-lint/src/checks/criteria/check-bitmap.ts"
    ]
   },
@@ -1043,7 +1041,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-store-syntax.ts",
     "packages/keyboard-lint/src/checks/criteria/check-store-syntax.ts"
    ]
   },
@@ -1134,7 +1131,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-kvks.ts",
     "packages/keyboard-lint/src/checks/criteria/check-kvks.ts"
    ]
   },
@@ -1791,7 +1787,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts",
     "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
    ]
   },

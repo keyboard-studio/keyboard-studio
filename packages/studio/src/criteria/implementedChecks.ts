@@ -27,17 +27,15 @@
 /**
  * Codes produced by a named synthesis in the criteria assembly rather
  * than by a keyboard-lint check: §§7.6/7.21 map the host's compile
- * result by diagnostic severity (compileMapping.ts), and §§2.1/2.2/2.6
- * are verdicts computed from the instantiation state
- * (assemblyVerdicts.ts, Batch 3). Precertified codes (precertify.ts)
+ * result by diagnostic severity (compileMapping.ts). Precertified codes (precertify.ts)
  * are NOT here — precertification is a separate resolver mechanism,
  * not an implemented check.
  *
- * §1.5 (KM_LINT_DUPLICATE_KEYBOARD_ID) and §2.6
- * (KM_LINT_VERSION_NOT_INCREMENTED) are NOT here: each has a lint
- * producer (checkKeyboardIdConflict's PR base-commit ID lookup;
- * checkVersionNotIncremented's base-commit version comparison) for
- * foreign mode, alongside its authored-mode assembly verdict —
+ * §1.5 (KM_LINT_DUPLICATE_KEYBOARD_ID) and §§2.1/2.2/2.6 (the
+ * version rows) are NOT here: each has a lint producer
+ * (checkKeyboardIdConflict's PR base-commit ID lookup; check-version's
+ * base-commit comparisons) for foreign mode, alongside its
+ * authored-mode assembly verdict —
  * the scanner finds their `code:` literals, so listing them here would
  * trip the drift guard's "no lint producer" assertion.
  *
@@ -51,8 +49,6 @@
 export const ASSEMBLY_SYNTHESIZED_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
-  "KM_LINT_VERSION_NOT_BUMPED",
-  "KM_LINT_SPURIOUS_VERSION_BUMP",
 ]);
 
 /** Lint codes with a real check behind them, mapped to catalog criteria. */
@@ -189,9 +185,9 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_HISTORY_ATTRIBUTION_BAD",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
-  // instantiation-state verdicts (assemblyVerdicts.ts). §§1.5/2.6 keep
-  // their authored-mode assembly verdicts AND their foreign-mode lint
-  // checks (checkKeyboardIdConflict, checkVersionNotIncremented).
+  // instantiation-state verdicts (assemblyVerdicts.ts). §§1.5/2.1/2.2/2.6
+  // keep their authored-mode assembly verdicts AND their foreign-mode
+  // lint checks (checkKeyboardIdConflict, check-version).
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
   "KM_LINT_DUPLICATE_KEYBOARD_ID",

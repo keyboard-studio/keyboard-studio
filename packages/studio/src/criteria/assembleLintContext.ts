@@ -586,15 +586,28 @@ export function assembleLintContext(
   // lookup. Non-PR targets need no lookup (met-moot in the check).
   // Authored mode never reaches here: its assembly verdict resolves
   // 2.6 before the contextMissing gate.
-  if (input.reviewContext === undefined) {
-    contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"] =
-      "the repository context (repo path and file list)";
-  } else if (
-    input.reviewContext.isPr &&
-    input.reviewContext.baseKmnVersion === undefined
-  ) {
-    contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"] =
-      "the PR base-commit .kmn version";
+  // 2.1/2.2 judge the same comparison, plus whether the folder existed
+  // at base (new submission vs upgrade) — the 1.5 lookup.
+  const VERSION_CODES = [
+    "KM_LINT_VERSION_NOT_INCREMENTED",
+    "KM_LINT_VERSION_NOT_BUMPED",
+    "KM_LINT_SPURIOUS_VERSION_BUMP",
+  ];
+  for (const code of VERSION_CODES) {
+    if (input.reviewContext === undefined) {
+      contextMissing[code] = "the repository context (repo path and file list)";
+    } else if (
+      input.reviewContext.isPr &&
+      input.reviewContext.baseKmnVersion === undefined
+    ) {
+      contextMissing[code] = "the PR base-commit .kmn version";
+    } else if (
+      code !== "KM_LINT_VERSION_NOT_INCREMENTED" &&
+      input.reviewContext.isPr &&
+      input.reviewContext.idConflictAtBase === undefined
+    ) {
+      contextMissing[code] = "the PR base-commit keyboard-folder lookup";
+    }
   }
   // 19.2b needs HISTORY.md text; without the file the row cannot be
   // judged (its absence is not the 19.2 violation — that's 3.1b's).

@@ -32,8 +32,9 @@
 // applicable there (facts.instantiationMode), so this module simply
 // issues no verdicts for that mode. Foreign keyboards get no verdicts
 // either — 1.5 would self-match by construction, and no foreign
-// instantiation context exists — so these rows stay Not yet checkable
-// in the Compare panel, with the reason named in the evidence.
+// instantiation context exists — so the resolver defers all four rows
+// to keyboard-lint's PR base-commit checks (check-keyboard-id-conflict,
+// check-version), and the assembly names any missing base lookup.
 
 import type { Criterion } from "@keyboard-studio/contracts";
 import { bumpKeyboardVersion } from "@keyboard-studio/engine";
@@ -161,13 +162,8 @@ export function computeAssemblyVerdicts(
   return verdicts;
 }
 
-/** Why a verdict-code row has no verdict, per code and mode. */
-function absentReason(lintRuleId: string, mode: "authored" | "foreign"): string {
-  if (mode === "foreign") {
-    return lintRuleId === DUPLICATE_ID_CODE
-      ? "Cannot be checked yet: a keyboard loaded for comparison always matches its own catalog entry; the duplicate-ID verdict needs the authored catalog comparison."
-      : "Cannot be checked yet: version history needs the authored instantiation context (base keyboard and adaptation mode), which a compared keyboard does not have.";
-  }
+/** Why an authored verdict-code row has no verdict. */
+function absentReason(lintRuleId: string): string {
   return lintRuleId === DUPLICATE_ID_CODE
     ? "Cannot be checked yet: no start-keyboard catalog verdict was assembled for this keyboard."
     : "Cannot be checked yet: no instantiation context (base keyboard and adaptation mode) was assembled for this keyboard.";
@@ -185,16 +181,11 @@ export function resolveAssemblyVerdictRow(
   mode: "authored" | "foreign",
 ): ResolvedRow | null {
   if (!ASSEMBLY_VERDICT_CODES.has(lintRuleId)) return null;
-  // 1.5 and 2.6 in foreign (/review, Compare) mode are judged by lint
-  // checks (the base-commit ID lookup and version comparison), not by
-  // assembly verdicts — the authored host alone holds instantiation
-  // state. Defer so the findings path below resolves the rows.
-  if (
-    mode === "foreign" &&
-    (lintRuleId === DUPLICATE_ID_CODE ||
-      lintRuleId === VERSION_NOT_INCREMENTED_CODE)
-  )
-    return null;
+  // In foreign (/review, Compare) mode all four rows are judged by lint
+  // checks against the PR's base commit, not by assembly verdicts — the
+  // authored host alone holds instantiation state. Defer so the
+  // findings path below resolves the rows.
+  if (mode === "foreign") return null;
   const verdict = verdicts?.get(lintRuleId);
   if (verdict === undefined) {
     return {
@@ -203,7 +194,7 @@ export function resolveAssemblyVerdictRow(
       controls: null,
       evidence: () => ({
         kind: "context-missing",
-        lines: [absentReason(lintRuleId, mode)],
+        lines: [absentReason(lintRuleId)],
         lintRuleId,
       }),
     };

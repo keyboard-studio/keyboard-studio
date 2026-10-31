@@ -370,6 +370,10 @@ describe("assembleLintContext", () => {
         "the repository context (repo path and file list)",
       KM_LINT_VERSION_NOT_INCREMENTED:
         "the repository context (repo path and file list)",
+      KM_LINT_VERSION_NOT_BUMPED:
+        "the repository context (repo path and file list)",
+      KM_LINT_SPURIOUS_VERSION_BUMP:
+        "the repository context (repo path and file list)",
     });
   });
 
@@ -443,6 +447,25 @@ describe("assembleLintContext", () => {
         baseKmnVersion: { baseSha: "abc1234", version: "1.0" },
       },
     });
+    expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBeUndefined();
+    expect(contextMissing["KM_LINT_VERSION_NOT_BUMPED"]).toBeUndefined();
+    expect(contextMissing["KM_LINT_SPURIOUS_VERSION_BUMP"]).toBeUndefined();
+  });
+
+  it("2.1/2.2: a PR reviewContext without the base folder lookup names it context-missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        baseKmnVersion: { baseSha: "abc1234", version: "1.0" },
+      },
+    });
+    expect(contextMissing["KM_LINT_VERSION_NOT_BUMPED"]).toBe(
+      "the PR base-commit keyboard-folder lookup",
+    );
     expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBeUndefined();
   });
 
@@ -584,6 +607,10 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       KM_LINT_DUPLICATE_KEYBOARD_ID:
         "the repository context (repo path and file list)",
       KM_LINT_VERSION_NOT_INCREMENTED:
+        "the repository context (repo path and file list)",
+      KM_LINT_VERSION_NOT_BUMPED:
+        "the repository context (repo path and file list)",
+      KM_LINT_SPURIOUS_VERSION_BUMP:
         "the repository context (repo path and file list)",
     });
 

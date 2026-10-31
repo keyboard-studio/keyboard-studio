@@ -132,20 +132,20 @@ describe("resolver integration — assembly verdicts", () => {
     expect(row?.evidence().lines.join(" ")).toContain("catalog");
   });
 
-  it("foreign mode gets no verdicts and names the foreign reason", () => {
-    const result = resolveCriteria(input({ mode: "foreign" }));
-    const row = rowFor(result, VERSION_NOT_BUMPED_CODE);
-    expect(row?.status).toBe("not-yet-checkable");
-    expect(row?.evidence().lines.join(" ")).toContain("instantiation context");
-    // 1.5 and 2.6 defer to their lint checks in foreign mode: with no
-    // reviewContext in this synthetic input they resolve through the
-    // findings path (no findings → met). The assembly names the missing
-    // input when it actually assembles the context (see
+  it("foreign mode defers every verdict code to its lint check", () => {
+    // With no reviewContext in this synthetic input the rows resolve
+    // through the findings path (no findings → met). The assembly names
+    // the missing input when it actually assembles the context (see
     // assembleLintContext.test.ts).
-    const dup = rowFor(result, DUPLICATE_ID_CODE);
-    expect(dup?.status).toBe("met");
-    const vinc = rowFor(result, VERSION_NOT_INCREMENTED_CODE);
-    expect(vinc?.status).toBe("met");
+    const result = resolveCriteria(input({ mode: "foreign" }));
+    for (const code of [
+      DUPLICATE_ID_CODE,
+      VERSION_NOT_BUMPED_CODE,
+      SPURIOUS_VERSION_BUMP_CODE,
+      VERSION_NOT_INCREMENTED_CODE,
+    ]) {
+      expect(rowFor(result, code)?.status).toBe("met");
+    }
   });
 
   it("new-from-base facts resolve the version rows Not applicable, verdicts or not", () => {
