@@ -746,12 +746,14 @@ jobs:
   # e2e-desktop (outputs.e2e). The job id and name are the required-check
   # name once it is added to the `main: CI + integrity` ruleset: do not
   # rename either without updating the ruleset in the same change.
+  # Cap (spec 107 T051): measured job time 84-132 s on CI, warm caches;
+  # 132 s + ~50% headroom, rounded up to a whole minute = 4. Never above 5.
   headless-author:
     name: headless-author
     needs: changes
     if: ${{ needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     permissions:
       contents: read
 

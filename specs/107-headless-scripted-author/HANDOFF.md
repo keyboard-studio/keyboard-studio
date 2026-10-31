@@ -5,9 +5,11 @@ read those before anything else. Everything below is pushed.
 
 ## Where things are
 
-- Worktree `D:/Github/_Projects/_KM/ks-107-resume`, branch `107-headless-scripted-author` (tracks
-  `origin/107-headless-scripted-author`, ahead of `main`).
-- 75 of 80 tasks done. Every phase gate is green locally:
+- **Update (2026-10-31, after merge):** PR #2410 merged and its branch is deleted. T051, T052 and
+  T073 are closed on branch `km/107-ci-cap` (cap `timeout-minutes: 4`; research R3), and so is T062
+  (sweep dispatched; see its As built note). 79 of 80 done; only T077 (owner) is open.
+- Worktree `D:/Github/_Projects/_KM/ks-107-resume`, originally branch `107-headless-scripted-author`.
+- At merge, 75 of 80 tasks done. Every phase gate is green locally:
   - US1 (`authorCase`) 26/26;
   - parity 17/17 on the 4 records;
   - PR set 6/6;
@@ -16,15 +18,11 @@ read those before anything else. Everything below is pushed.
   - default-config suites;
   - `pnpm lint` (0 errors); studio and engine typecheck.
 
-## Open tasks (all need CI, a PR or the owner)
+## Open tasks (owner only)
 
 | Task | What | How |
 |---|---|---|
-| T073 | PR-body note: spec 106 T063/T064 can close on the T057 harness report | Write it when opening the PR |
-| T051 | Measure the `headless-author` CI job; set `timeout-minutes` to measured + ~50% (<= 5) | From the PR's CI runs. T051's text lists every doc that restates the timing |
-| T052 | 3 PR runs: job inside its cap, no later than `fast` -> `build`, run < 10 min | From the PR's CI runs |
-| T062 | Dispatch `headless-sweep.yml` once (`tier=latin, shards=1`) plus a seeded failure | `workflow_dispatch` needs the workflow on the default branch, or `gh workflow run --ref` once it is there |
-| T077 | Make `headless-author` a required check | **Owner/admin only**, after it has run green on `main` |
+| T077 | Make `headless-author` a required check | **Owner/admin only**. Precondition met: green on `main` in run 41220294641 |
 
 ## What this session found and fixed (product defects the author exposed)
 
