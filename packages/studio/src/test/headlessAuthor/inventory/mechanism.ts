@@ -47,6 +47,7 @@ export const mechanismInventory: readonly InventoryEntry[] = [
   { fn: "displacementOutcomeFor", module: PLACEMENT, callers: [GALLERY] },
   { fn: "excludeSequenceMechanisms", module: PLACEMENT, callers: [GALLERY] },
   { fn: "placementOffer", module: PLACEMENT, callers: [GALLERY] },
+  { fn: "placementSequence", module: PLACEMENT, callers: [GALLERY] },
   { fn: "placementWalkList", module: PLACEMENT, callers: [GALLERY] },
   { fn: "planDeadkeyApply", module: PLACEMENT, callers: [GALLERY] },
   { fn: "planSuggestionAccept", module: PLACEMENT, callers: [GALLERY] },

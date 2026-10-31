@@ -164,8 +164,10 @@ import {
   placementWalkList,
   planDeadkeyApply,
   planSuggestionAccept,
+  placementSequence,
   planSwapApply,
   sequenceCompanionInput,
+  type PlacementRecord,
 } from "./mechanismPlacement.ts";
 import {
   TRIGGER_KEY_RESOLVE_OPTIONS,
@@ -2326,6 +2328,22 @@ export function MechanismGallery({
   // Suggestion row handlers
   // ---------------------------------------------------------------------------
 
+  // Runs a recorded placement's steps in the lifted order (placementSequence):
+  // companion, record (+ deadkey escapes), displacement, companion.
+  const runPlacement = useCallback(
+    (plan: PlacementRecord) => {
+      for (const step of placementSequence(plan, sessionAssignments)) {
+        if (step.kind === "propose-companion") proposeCompanion(step.input);
+        else if (step.kind === "propose-displacement") proposeDisplacement(step.input);
+        else {
+          recordAssignments(step.next);
+          raiseDeadkeyEscapes(step.assignment);
+        }
+      }
+    },
+    [sessionAssignments, proposeCompanion, proposeDisplacement, recordAssignments, raiseDeadkeyEscapes],
+  );
+
   // Accept: immediately apply the suggested assignment (same logic as handleApply
   // for swap/ralt/deadkey, but using the candidate's own vkey/baseLetter
   // directly to avoid the async state-update window that would occur if we
@@ -2367,19 +2385,15 @@ export function MechanismGallery({
       markSuggestionEntryDismissed(currentChar, entry.strategyId);
       return;
     }
-    if (plan.companionBefore !== null) proposeCompanion(plan.companionBefore);
-    recordAssignments([...sessionAssignments, plan.assignment]);
-    raiseDeadkeyEscapes(plan.assignment);
+    // A shadowed still-needed glyph raises a demotion proposal inside the
+    // sequence (never blocks the accept — it already happened).
+    runPlacement(plan);
     // The successful accept's own mechanism is now recorded with this
     // strategyId — placementOffer filters this ONE chip out of the visible
     // chips on the next render; a sibling chip with a DIFFERENT strategyId is
     // untouched. Marking it dismissed here too is redundant-but-harmless
     // belt-and-braces (it never needs to reappear).
     markSuggestionEntryDismissed(currentChar, entry.strategyId);
-    // #2300 G3: if this accept shadowed a still-needed glyph, propose its
-    // demotion (never blocks the accept — it already happened).
-    if (plan.displacement !== null) proposeDisplacement(plan.displacement);
-    if (plan.companionAfter !== null) proposeCompanion(plan.companionAfter);
     resetMethodState();
   }, [
     currentChar,
@@ -2387,14 +2401,11 @@ export function MechanismGallery({
     triggerKeyCustomChar,
     workingIr,
     sessionAssignments,
-    recordAssignments,
     resetMethodState,
-    raiseDeadkeyEscapes,
     slotOccupancy,
     needSets,
     markSuggestionEntryDismissed,
-    proposeCompanion,
-    proposeDisplacement,
+    runPlacement,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2576,12 +2587,9 @@ export function MechanismGallery({
     // mutually-exclusive combo the dropdown's own exclusion already
     // prevents) — skip recording rather than crash.
     if (plan === null) return;
-    if (plan.companionBefore !== null) proposeCompanion(plan.companionBefore);
-    recordAssignments([...sessionAssignments, plan.assignment]);
-    raiseDeadkeyEscapes(plan.assignment);
-    // #2300 G3: if this apply shadowed a still-needed glyph, propose its
-    // demotion (never blocks the apply — it already happened).
-    if (plan.displacement !== null) proposeDisplacement(plan.displacement);
+    // A shadowed still-needed glyph raises a demotion proposal inside the
+    // sequence (never blocks the apply — it already happened).
+    runPlacement(plan);
     resetMethodState();
   }, [
     currentChar,
@@ -2594,13 +2602,10 @@ export function MechanismGallery({
     selectedSwapKeyCustomChar,
     raltTokens,
     workingIr,
-    proposeCompanion,
-    recordAssignments,
+    runPlacement,
     sessionAssignments,
     resetMethodState,
     deadkeyBaseLetterResolveOptions,
-    proposeDisplacement,
-    raiseDeadkeyEscapes,
     slotOccupancy,
     needSets,
   ]);

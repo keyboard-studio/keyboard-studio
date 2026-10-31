@@ -11,7 +11,9 @@ import {
   displacementOutcomeFor,
   excludeSequenceMechanisms,
   placementOffer,
+  placementSequence,
   placementWalkList,
+  type PlacementRecord,
 } from "./mechanismPlacement.ts";
 import type { CasePairProposal } from "./casePairCompanion.ts";
 import type { DisplacementProposal } from "./useDisplacementProposal.ts";
@@ -205,5 +207,50 @@ describe("displacementOutcomeFor", () => {
 
   it("a stale proposal records nothing", () => {
     expect(displacementOutcomeFor("confirm-move", proposal, [], null)).toEqual({ kind: "record", next: null });
+  });
+});
+
+describe("placementSequence", () => {
+  const assignment = swap("a", "+ [K_A] > 'a'");
+  const existing = swap("b", "+ [K_B] > 'b'");
+  const companion = (id: string) => ({ originalChar: id }) as never;
+  const displacement = { displacedChar: "x" } as never;
+  const plan = (over: Partial<PlacementRecord>): PlacementRecord => ({
+    kind: "record",
+    assignment,
+    companionBefore: null,
+    displacement: null,
+    companionAfter: null,
+    ...over,
+  });
+
+  it("with no proposals is the record alone, appending to the current assignments", () => {
+    const steps = placementSequence(plan({}), [existing]);
+    expect(steps).toEqual([{ kind: "record", assignment, next: [existing, assignment] }]);
+  });
+
+  it("orders companionBefore, record, displacement, companionAfter", () => {
+    const before = companion("before");
+    const after = companion("after");
+    const steps = placementSequence(
+      plan({ companionBefore: before, displacement, companionAfter: after }),
+      [existing],
+    );
+    expect(steps.map((s) => s.kind)).toEqual([
+      "propose-companion",
+      "record",
+      "propose-displacement",
+      "propose-companion",
+    ]);
+    expect(steps[0]).toEqual({ kind: "propose-companion", input: before });
+    expect(steps[2]).toEqual({ kind: "propose-displacement", input: displacement });
+    expect(steps[3]).toEqual({ kind: "propose-companion", input: after });
+  });
+
+  it("skips absent proposals and does not mutate the current assignments", () => {
+    const current = [existing];
+    const steps = placementSequence(plan({ displacement }), current);
+    expect(steps.map((s) => s.kind)).toEqual(["record", "propose-displacement"]);
+    expect(current).toEqual([existing]);
   });
 });

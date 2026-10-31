@@ -770,6 +770,30 @@ export interface PlacementRecord {
   companionAfter: CasePairProposalInput | null;
 }
 
+/** One step of a placement, in the order it runs. */
+export type PlacementStep =
+  | { kind: "propose-companion"; input: CasePairProposalInput }
+  | { kind: "record"; assignment: MechanismAssignment; next: MechanismAssignment[] }
+  | { kind: "propose-displacement"; input: DisplacementProposalInput };
+
+/**
+ * The ordered steps a recorded placement runs: companionBefore, the record
+ * (the current assignments plus the new one), the displacement proposal, then
+ * companionAfter. Absent proposals are skipped. Both write handlers and the
+ * headless author run exactly this sequence.
+ */
+export function placementSequence(
+  plan: PlacementRecord,
+  sessionAssignments: MechanismAssignment[],
+): PlacementStep[] {
+  const steps: PlacementStep[] = [];
+  if (plan.companionBefore !== null) steps.push({ kind: "propose-companion", input: plan.companionBefore });
+  steps.push({ kind: "record", assignment: plan.assignment, next: [...sessionAssignments, plan.assignment] });
+  if (plan.displacement !== null) steps.push({ kind: "propose-displacement", input: plan.displacement });
+  if (plan.companionAfter !== null) steps.push({ kind: "propose-companion", input: plan.companionAfter });
+  return steps;
+}
+
 export type SuggestionAcceptPlan =
   | PlacementRecord
   /** The chip cannot be recorded; dismiss THIS chip only. */

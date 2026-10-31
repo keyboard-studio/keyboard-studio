@@ -38,19 +38,26 @@ import {
   dismissedSuggestionEntryKey,
   excludeSequenceMechanisms,
   placementOffer,
+  placementSequence,
   placementWalkList,
   planDeadkeyApply,
   planSuggestionAccept,
   planSwapApply,
   sequenceCompanionInput,
   type PlacementRecord,
+  type PlacementStep,
 } from "../../../editors/assignLoop/mechanismPlacement.ts";
 import { sequenceApplyFor } from "../../../editors/assignLoop/sequenceApply.ts";
 import {
   acceptCasePairCompanion,
   type CasePairProposal,
+  type CasePairProposalInput,
 } from "../../../editors/assignLoop/casePairCompanion.ts";
-import { acceptDisplacementProposal } from "../../../editors/assignLoop/useDisplacementProposal.ts";
+import {
+  acceptDisplacementProposal,
+  type DisplacementProposal,
+  type DisplacementProposalInput,
+} from "../../../editors/assignLoop/useDisplacementProposal.ts";
 
 const DECISION_ID = "physical-layout";
 
@@ -88,18 +95,39 @@ function resolveCompanion(ctx: DriverContext, proposal: CasePairProposal): void 
   if (next !== null) store().recordAssignments(next);
 }
 
-/** The gallery's record sequence: companion, record, displacement, companion; then both banners. */
+/**
+ * The proposals left pending once the steps ran, as the hooks' propose leaves
+ * them: each slot holds one proposal, a later accepted one replaces an earlier
+ * one, and a proposal that is not accepted leaves the slot as it was.
+ */
+function pendingProposalsAfter(
+  steps: readonly PlacementStep[],
+  accept: {
+    companion: (input: CasePairProposalInput) => CasePairProposal | null;
+    displacement: (input: DisplacementProposalInput) => DisplacementProposal | null;
+  },
+): { companion: CasePairProposal | null; displacement: DisplacementProposal | null } {
+  let companion: CasePairProposal | null = null;
+  let displacement: DisplacementProposal | null = null;
+  for (const step of steps) {
+    if (step.kind === "propose-companion") companion = accept.companion(step.input) ?? companion;
+    else if (step.kind === "propose-displacement") displacement = accept.displacement(step.input) ?? displacement;
+  }
+  return { companion, displacement };
+}
+
+/** The gallery's lifted placement sequence (placementSequence); then both banners. */
 function applyRecord(ctx: DriverContext, rec: PlacementRecord): void {
   const before = store();
   const bcp47 = before.identity?.bcp47;
-  const assignments = selectDesktopAssignments(before.phaseResults);
-  let companion = rec.companionBefore !== null ? acceptCasePairCompanion(rec.companionBefore, bcp47) : null;
-  before.recordAssignments([...assignments, rec.assignment]);
-  const displacement =
-    rec.displacement !== null ? acceptDisplacementProposal(rec.displacement, before.displacedDeclined) : null;
-  if (rec.companionAfter !== null) {
-    companion = acceptCasePairCompanion(rec.companionAfter, bcp47) ?? companion;
+  const steps = placementSequence(rec, selectDesktopAssignments(before.phaseResults));
+  for (const step of steps) {
+    if (step.kind === "record") before.recordAssignments(step.next);
   }
+  const { companion, displacement } = pendingProposalsAfter(steps, {
+    companion: (input) => acceptCasePairCompanion(input, bcp47),
+    displacement: (input) => acceptDisplacementProposal(input, before.displacedDeclined),
+  });
   if (companion !== null) resolveCompanion(ctx, companion);
   if (displacement !== null) resolveDisplacement(ctx, displacement);
 }
