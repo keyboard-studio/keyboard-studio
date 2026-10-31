@@ -132,6 +132,24 @@ describe("KeyIdentitySection — criterion + provenance (FR-025)", () => {
     expect(section.textContent).toContain("no decision has been recorded for this key yet");
     expect(section.textContent).not.toContain("How this key got its form");
   });
+
+  it("shows the per-mark start-of-line state when the key types a combining mark (#2374)", () => {
+    render(<KeyIdentitySection info={makeInfo({ bareMarkAllowed: true })} />);
+    let section = screen.getByTestId("key-identity-section");
+    expect(section.textContent).toContain("At the start of a line");
+    expect(section.textContent).toContain("The mark appears");
+    cleanup();
+    render(<KeyIdentitySection info={makeInfo({ bareMarkAllowed: false })} />);
+    section = screen.getByTestId("key-identity-section");
+    expect(section.textContent).toContain("At the start of a line");
+    expect(section.textContent).toContain("The mark types nothing");
+  });
+
+  it("shows no start-of-line row when the view model carries none", () => {
+    render(<KeyIdentitySection info={makeInfo()} />);
+    const section = screen.getByTestId("key-identity-section");
+    expect(section.textContent).not.toContain("At the start of a line");
+  });
 });
 
 describe("KeyIdentitySection — FR-029 re-link", () => {

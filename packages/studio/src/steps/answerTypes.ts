@@ -25,7 +25,18 @@ export type SavedValue = string | string[] | boolean;
 export interface SavedAnswer {
   value: SavedValue;
   answerType: AnswerType;
-  origin: "proposed" | "confirmed" | "overturned";
+  /**
+   * Where the recorded value came from. `proposed` / `confirmed` /
+   * `overturned` are the author's own trajectory against the studio's
+   * proposal; the two carried origins are migration attribution (issue
+   * #2374), never invented — `migrated-from-guard` is a tick translated from
+   * a confirmed legacy guard-specification `emit` answer, `imported` a tick
+   * seeded from the imported keyboard's own unguarded marks. Both are
+   * visible in the row, attributed, and changeable: the author confirming
+   * the value keeps the attribution, changing it reverts to
+   * confirmed/overturned.
+   */
+  origin: "proposed" | "confirmed" | "overturned" | "migrated-from-guard" | "imported";
   /**
    * What the studio pre-filled this answer with, when the question opened
    * seeded. `origin` follows from it: "proposed" while the value still equals

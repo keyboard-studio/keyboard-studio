@@ -26,14 +26,13 @@
  *     record is appended BEFORE the transformation is applied
  *     (data-model.md §4: never applied without the outcome recorded first).
  *
- * The FR-009 default reads the per-keyboard guard specification in force:
- * when the author has a swallow-guard spec recorded for the keyboard's
- * marks, a combining mark's default is mint-and-rule (the guard can only
- * live in a rule), never the U_ conversion that would silently drop it.
+ * The FR-009 default reads the mark's per-mark "start of line" box (#2374):
+ * when the box is unticked for the row's evidence mark, a combining mark's
+ * default is mint-and-rule (the guard can only live in a rule), never the
+ * U_ conversion that would silently drop it.
  */
 
 import type {
-  GuardSpecification,
   KeyIdentityDecision,
   KeyboardIR,
   RepairAction,
@@ -67,6 +66,7 @@ import type {
   PendingKeyEditOperation,
   TouchKeyIdentityRecords,
 } from "../stores/workingCopyStore.ts";
+import type { BareMarkAllowedByMark } from "../hooks/useBareMarkAllowedByMark.ts";
 import { EMPTY_TOUCH_KEY_IDENTITY } from "../stores/workingCopyStore.ts";
 
 // ---------------------------------------------------------------------------
@@ -130,18 +130,22 @@ export function latestLive<T extends { recordId: string; supersedes: string | nu
   return undefined;
 }
 
-/** The guard specification currently in force, if any (latest live record). */
-export function guardSpecificationInForce(
-  records: TouchKeyIdentityRecords | null,
-): GuardSpecification | undefined {
-  const all = recordsOrEmpty(records).guardSpecifications;
-  const live = liveRecords(all);
-  return live[live.length - 1];
-}
-
-/** True when a swallow-guard specification is in force (FR-009's rider). */
-export function swallowGuardInForce(records: TouchKeyIdentityRecords | null): boolean {
-  return guardSpecificationInForce(records)?.behaviour === "swallow";
+/**
+ * True when the swallow guard is in force for `mark` (#2374's per-mark
+ * replacement for the keyboard-wide guard specification): the box is
+ * unticked, or the mark has no box at all (a late-added mark with no
+ * survey row takes the unticked default — guarded, blocked).
+ *
+ * The mark may arrive in keycap form (dotted circle + mark, e.g. "◌̀");
+ * the box map is keyed by the bare mark, so the dotted circle is stripped
+ * before the lookup — otherwise a ticked box would silently never apply.
+ */
+export function swallowGuardInForce(
+  mark: string,
+  bareMarkAllowedByMark?: BareMarkAllowedByMark,
+): boolean {
+  const bare = mark.replace(/\u25CC/g, "");
+  return bareMarkAllowedByMark?.[bare] !== true;
 }
 
 /** Append a repair proposal, superseding the live proposal for the same key. */
@@ -314,6 +318,12 @@ export function deriveRepairRows(args: {
   readonly ir: KeyboardIR;
   readonly layout: TouchLayoutIR;
   readonly records: TouchKeyIdentityRecords | null;
+  /**
+   * The per-mark "start of line" box (#2374), when the caller can supply
+   * it. Absent (e.g. a host that never read the survey answers) every
+   * mark takes the unticked default — guarded, blocked.
+   */
+  readonly bareMarkAllowedByMark?: BareMarkAllowedByMark;
 }): DeadKeyRepairRow[] {
   const ruleIndex: TouchKeyRuleIndex = buildTouchKeyRuleIndex(args.ir);
   const findings = findDeadTouchKeys({ ir: args.ir, layout: args.layout, ruleIndex });
@@ -380,7 +390,6 @@ export function deriveRepairRows(args: {
     occurrencesById.set(ctx.key.id, list);
   });
 
-  const guardSwallow = swallowGuardInForce(args.records);
   const rows: DeadKeyRepairRow[] = [];
   for (const finding of findings) {
     const keyId = String(finding.fields.keyId ?? "");
@@ -389,11 +398,22 @@ export function deriveRepairRows(args: {
     const occurrences = occurrencesById.get(keyId) ?? [];
     const keycapText = keycapById.get(keyId) ?? "";
     const keycapChar = keycapText !== "" ? stripDottedCircle(keycapText) : undefined;
+    // FR-009's guard rider, per mark (#2374): the swallow guard is in
+    // force for this row's evidence mark unless its "start of line" box
+    // is ticked. Resolved here (not once per keyboard) because the box is
+    // per-mark; `deadKeyRepairDefault` itself only honours it for
+    // combining-mark evidence. The evidence char is the keycap char, else
+    // the id suffix's char — the same char `deadKeyRepairDefault` judges.
+    const suffixChar =
+      convertToId !== undefined ? decodeUnicodeKeyId(convertToId) : undefined;
     const { defaultAction, options, evidenceChar } = deadKeyRepairDefault({
       keyId,
       keycapChar,
       convertToId,
-      guardSwallowInForce: guardSwallow,
+      guardSwallowInForce: swallowGuardInForce(
+        keycapChar ?? suffixChar ?? "",
+        args.bareMarkAllowedByMark,
+      ),
     });
     rows.push({
       keyRef: finding.address,

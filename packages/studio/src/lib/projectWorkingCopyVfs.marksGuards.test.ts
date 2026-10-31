@@ -58,10 +58,14 @@ describe("projectWorkingCopyVfs — mark guards (spec 106 FR-010)", () => {
     expect(kmn).toContain("nul U+0301 > nul");
   });
 
-  it("drops the buffer-start rule under the emit behaviour", () => {
-    const { kmn } = project({ ...GUARDS, bareMarkBehaviour: "emit" });
+  it("drops the buffer-start rule when the mark's start-of-line box is ticked, and adds U+000A to its allowed store", () => {
+    const { kmn } = project({
+      ...GUARDS,
+      worklist: { ...GUARDS.worklist, bareMarkAllowed: { [ACUTE]: true } },
+    });
     expect(kmn).toContain(`group(${MARKS_GUARD_GROUP})`);
     expect(kmn).not.toContain("nul U+0301 > nul");
+    expect(kmn).toContain("U+000A");
   });
 
   it("generates the backspace rules the recorded answer calls for", () => {
@@ -94,7 +98,6 @@ describe("marksGuardsFromValue", () => {
       outputForm: "ready-made",
       backspace: "peel",
       migrationNeeded: false,
-      guardReevaluation: [],
     },
     ...over,
   });
@@ -104,15 +107,23 @@ describe("marksGuardsFromValue", () => {
     expect(marksGuardsFromValue(value({ completion: null }))).toBeNull();
   });
 
-  it("carries the completion payload and the guard specification's behaviour", () => {
+  it("carries the completion payload; buffer-start behaviour comes from the worklist's per-mark channel, not the legacy guard specification", () => {
     const guards = marksGuardsFromValue(
-      value({ guardSpecification: { behaviour: "emit" } as MarksTreatmentValue["guardSpecification"] }),
+      value({
+        guardSpecification: { behaviour: "emit" } as MarksTreatmentValue["guardSpecification"],
+        completion: {
+          worklist: { ...GUARDS.worklist, bareMarkAllowed: { [ACUTE]: true } },
+          outputForm: "ready-made",
+          backspace: "peel",
+          migrationNeeded: false,
+          guardReevaluation: [],
+        },
+      }),
     );
     expect(guards).toEqual({
-      worklist: GUARDS.worklist,
+      worklist: { ...GUARDS.worklist, bareMarkAllowed: { [ACUTE]: true } },
       outputForm: "ready-made",
       backspace: "peel",
-      bareMarkBehaviour: "emit",
     });
   });
 });

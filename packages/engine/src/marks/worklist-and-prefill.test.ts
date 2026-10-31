@@ -17,7 +17,7 @@ import {
   PRODUCTIVITY_SPREAD_THRESHOLD,
 } from "./treatment-prefill.js";
 import { makeMarkTreatmentAnswer, type MarkTreatmentAnswer } from "./treatment.js";
-import { buildPlacementWorklist, verifyWorklistCoverage } from "./worklist.js";
+import { buildPlacementWorklist, verifyWorklistCoverage, ATTACHMENT_START_OF_LINE } from "./worklist.js";
 
 const ACUTE = "́";
 const CEDILLA = "̧";
@@ -230,6 +230,31 @@ describe("buildPlacementWorklist (spec 052 FR-005/FR-006, SC-009)", () => {
       treatment: answer({ classTreatment: { [acuteClassId]: "own-key", [cedillaClassId]: "composed" } }),
     });
     expect(plain).not.toHaveProperty("allowedContexts");
+  });
+
+  it("maps a ticked start-of-line box to bareMarkAllowed, never into allowedContexts (issue #2374)", () => {
+    const worklist = buildPlacementWorklist({
+      alphabet,
+      classes,
+      attachments: { ...attachments, [ACUTE]: { ...attachments[ACUTE], [ATTACHMENT_START_OF_LINE]: true } },
+      prefills: [],
+      treatment: answer({ classTreatment: { [acuteClassId]: "own-key", [cedillaClassId]: "composed" } }),
+    });
+    expect(worklist.bareMarkAllowed).toEqual({ [ACUTE]: true });
+    // The sentinel is symbolic: it must never leak into the char-only
+    // allowedContexts, units, or blocked pairs.
+    expect(worklist.allowedContexts?.[ACUTE] ?? []).not.toContain(ATTACHMENT_START_OF_LINE);
+    expect(worklist.ownLetterUnits).not.toContain(ATTACHMENT_START_OF_LINE);
+    expect(worklist.blockedCombinations.some((b) => b.base === ATTACHMENT_START_OF_LINE)).toBe(false);
+    // Unticked (or absent): no bareMarkAllowed at all.
+    const plain = buildPlacementWorklist({
+      alphabet,
+      classes,
+      attachments,
+      prefills: [],
+      treatment: answer({ classTreatment: { [acuteClassId]: "own-key", [cedillaClassId]: "composed" } }),
+    });
+    expect(plain).not.toHaveProperty("bareMarkAllowed");
   });
 
   it("classifies mark units (with input order), composed units, and blocked pairs", () => {

@@ -3,12 +3,13 @@
 // Four walks through the real studio, one per spec-104 surface the unit
 // suites cannot reach:
 //
-//   1. Creation + guard (US1, FR-013): a new keyboard whose alphabet
-//      carries a combining mark reaches the marks series' guard station;
-//      answering "swallow" there makes a mark assigned in the touch
-//      editor mint as a guarded T_ key (T_0301, not U_0301), severed
-//      automatically on the Copy track, and the OSK preview proves the
-//      guard: the mark alone types nothing, after a letter it lands.
+//   1. Creation + start-of-line default (US1, FR-013 as amended by #2374):
+//      a new keyboard whose alphabet carries a combining mark passes the
+//      marks series with the "at the start of a line" box unticked; a mark
+//      assigned in the touch editor then mints as a guarded T_ key
+//      (T_0301, not U_0301), severed automatically on the Copy track, and
+//      the OSK preview proves the guard: the mark alone types nothing,
+//      after a letter it lands.
 //   2. Copy parity (US2, FR-014/FR-015): copying sil_cameroon_qwerty
 //      ships every T_ identity and every T_-naming rule the source has
 //      (the artefact-level parity the harness can assert; tap-level
@@ -59,6 +60,7 @@ import {
   drivePunctuationStep,
   driveInvisiblesStep,
   driveConvenienceStep,
+  driveMarksSeries,
   driveDeadkeysStep,
   driveMechanismsGallery,
   navigateToOutput,
@@ -163,42 +165,6 @@ async function driveToBasicKbdusTouchStep(
 }
 
 /**
- * Walk 1's marks series: click through the stations like
- * driveMarksSeries, but STOP at the spec 104 guard station and prove it
- * opens on the "swallow" default with Continue enabled, then pass it.
- * Returns via the punctuation step's
- * landmark, which drivePunctuationStep then clicks through.
- */
-async function driveMarksSeriesExpectingGuard(page: Page): Promise<void> {
-  const continueBtn = page.getByTestId("marks-continue");
-  const punctuationDone = page.getByTestId("punctuation-done");
-  let guardAnswered = false;
-  for (let i = 0; i < 8; i++) {
-    await Promise.race([
-      continueBtn.waitFor({ state: "visible", timeout: 20_000 }),
-      punctuationDone.waitFor({ state: "visible", timeout: 20_000 }),
-    ]).catch(() => {
-      // Neither landmark yet — fall through to the direct checks below.
-    });
-    if (await punctuationDone.isVisible().catch(() => false)) break;
-    if (!(await continueBtn.isVisible().catch(() => false))) break;
-    if (await page.getByTestId("guard-station").isVisible().catch(() => false)) {
-      // FR-013: on this fresh Copy walk there is no seed and no prior, so
-      // the station opens on the "swallow" default with Continue enabled;
-      // passing the station records the default as the author's answer.
-      await expect(page.getByTestId("guard-option-swallow")).toBeChecked();
-      await expect(page.getByTestId("guard-option-emit")).not.toBeChecked();
-      await expect(continueBtn).toBeEnabled();
-      guardAnswered = true;
-    }
-    await continueBtn.click();
-  }
-  expect(guardAnswered, "the marks series must present the spec 104 guard station").toBe(
-    true,
-  );
-}
-
-/**
  * Walk 4's rename-back gesture: select the key (by its cell testid
  * suffix), open the key-grid command menu from the cell's context menu,
  * and rename it via RenameDialog. Renaming is the one editor gesture
@@ -257,11 +223,11 @@ async function assignCharToSelectedKey(page: Page, notation: string): Promise<vo
 }
 
 // ---------------------------------------------------------------------------
-// Walk 1 — creation: the guard answer mints guarded T_ marks (FR-013)
+// Walk 1 — creation: the start-of-line default mints guarded T_ marks (#2374)
 // ---------------------------------------------------------------------------
 
-test.describe("spec 104 walk 1: creation with the guard station", () => {
-  test("guard answered 'swallow' → a mark assigned in the editor mints T_0301, severs with the line shown, and the OSK guard swallows a lone mark", async ({
+test.describe("spec 104 walk 1: creation with the start-of-line default", () => {
+  test("start-of-line box unticked → a mark assigned in the editor mints T_0301, severs with the line shown, and the OSK guard swallows a lone mark", async ({
     page,
   }) => {
     test.setTimeout(480_000);
@@ -280,7 +246,8 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
     await confirmPrefill(page);
 
     // Phase B with a decomposable letter ("é" = e + U+0301): the marks
-    // series renders, and its last station is the guard question.
+    // series renders. The attachment station's "at the start of a line"
+    // box stays unticked (the #2374 default), so no guard station appears.
     await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
     await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
@@ -290,7 +257,7 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
       timeout: 5_000,
     });
     await page.click('[data-testid="charlist-done"]');
-    await driveMarksSeriesExpectingGuard(page);
+    await driveMarksSeries(page);
     await drivePunctuationStep(page);
     await driveInvisiblesStep(page);
     await driveConvenienceStep(page);
@@ -308,8 +275,9 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
     const charField = page.getByLabel("Character or code point");
     await expect(charField).toBeFocused();
     await page.keyboard.type("U+0301");
-    // The guard specification is in force, so the proposal is the
-    // guarded T_ mint — NOT the U_0301 an unguarded mark would get.
+    // The start-of-line box was left unticked (the #2374 default), so the
+    // proposal is the guarded T_ mint — NOT the U_0301 an allowed-at-line-
+    // start mark would get.
     await expect(page.getByTestId("assign-panel-proposal")).toBeVisible({
       timeout: 15_000,
     });
@@ -325,7 +293,8 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
     await expect(charField).toHaveValue("");
 
     // The live preview: the redefined key exists under its T_ id, and
-    // the recorded guard is real KMW behaviour — a mark at the start of
+    // the unticked start-of-line default is real KMW behaviour — a mark at
+    // the start of
     // a word (after a space) is swallowed; after a letter, it lands.
     await page.getByTestId("touch-mode-tab-character").click();
     const oskFrame = page.frameLocator(OSK_FRAME_SELECTOR);
@@ -344,8 +313,8 @@ test.describe("spec 104 walk 1: creation with the guard station", () => {
     // context is not swallowed by any keyboard built on the idiom,
     // including the shipped sil_cameroon_qwerty. That is why SC-002's
     // context probes are letter/space/deadkey and omit empty. The space
-    // tap below is the canonical start-of-word case the guard question
-    // names; the mark tap after it must leave the field at just " ".
+    // tap below is the canonical start-of-word case the old guard question
+    // named; the mark tap after it must leave the field at just " ".
     await clickOskKeyById(oskFrame, "K_SPACE");
     await clickOskKeyById(oskFrame, "T_0301");
     await expect(oskTarget).toHaveValue(" ");

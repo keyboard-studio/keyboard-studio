@@ -53,17 +53,43 @@ function withSpaceTicked(set: DecisionSet): DecisionSet {
   };
 }
 
+/** The same decisions with the start-of-line box ticked on the grave's row (issue #2374). */
+function withStartOfLineTicked(set: DecisionSet): DecisionSet {
+  const entry = set["marks-treatment"]!;
+  const value = entry.value as MarksTreatmentValue;
+  const completion = value.completion!;
+  return {
+    ...set,
+    "marks-treatment": {
+      ...entry,
+      value: {
+        ...value,
+        completion: {
+          ...completion,
+          worklist: { ...completion.worklist, bareMarkAllowed: { [GRAVE]: true } },
+        },
+      },
+    },
+  };
+}
+
 const keys = (...vkeys: string[]): SimKeyInput[] => vkeys.map((vkey) => ({ vkey, modifiers: [], caps: false }));
 
 describe.skipIf(!sc004GatesEnabled)("mark guards, typed (Bafut kbdus at assignments)", () => {
   let fx: DecisionPointFixture;
   let spaced: DecisionPointFixture;
+  let lined: DecisionPointFixture;
   beforeAll(async () => {
     fx = await buildDecisionPointFixture({ ...bafut, point: "assignments", decisions: decisions() });
     spaced = await buildDecisionPointFixture({
       ...bafut,
       point: "assignments",
       decisions: withSpaceTicked(decisions()),
+    });
+    lined = await buildDecisionPointFixture({
+      ...bafut,
+      point: "assignments",
+      decisions: withStartOfLineTicked(decisions()),
     });
   }, 240_000);
 
@@ -88,6 +114,10 @@ describe.skipIf(!sc004GatesEnabled)("mark guards, typed (Bafut kbdus at assignme
 
   it("swallows the grave at buffer start under swallow", () => {
     expect(type(fx, "K_5")).toBe("");
+  });
+
+  it("passes the grave at buffer start when the start-of-line box is ticked (issue #2374)", () => {
+    expect(type(lined, "K_5")).toBe(GRAVE);
   });
 
   // The fixtures do not reproduce the touch step (see consistency gate G6), so

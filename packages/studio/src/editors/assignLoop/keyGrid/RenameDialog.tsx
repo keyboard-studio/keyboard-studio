@@ -117,7 +117,6 @@ import {
   createKeyOccurrenceCounter,
   bindingsForKeyId,
   normalizeTouchKeyId,
-  type GuardSpecification,
   type KeyboardIR,
   type TouchKeyIR,
   type TouchKeyRuleIndex,
@@ -157,7 +156,7 @@ import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
  */
 export function computeProposedRenameId(
   cell: KeyGridCellViewModel,
-  guardSpecification?: GuardSpecification,
+  bareMarkAllowed?: boolean,
 ): string {
   if (cell.producedChars.length === 1) {
     const [ch] = cell.producedChars;
@@ -165,7 +164,7 @@ export function computeProposedRenameId(
       const proposal = proposeKeyId({
         chars: ch,
         capsHandled: false,
-        ...(guardSpecification !== undefined ? { guardSpecification } : {}),
+        ...(bareMarkAllowed !== undefined ? { bareMarkAllowed } : {}),
       });
       if (proposal.path === "unicode-default") return proposal.id;
     }
@@ -571,13 +570,13 @@ export interface RenameDialogProps {
   /** From `buildTouchKeyRuleIndex(ir)`, built once by the caller. */
   ruleIndex: TouchKeyRuleIndex;
   /**
-   * The keyboard's confirmed guard specification (spec 104 FR-013),
-   * forwarded to the rename pre-fill's `proposeKeyId` — under `"swallow"`
-   * a mark key's proposed form is its guarded `T_` id, which is not the
-   * `unicode-default` path, so the pre-fill keeps the current id and the
-   * dialog's own machinery handles the rest.
+   * The per-mark "start of line" box as `mark -> ticked` (#2374),
+   * forwarded to the rename pre-fill's `proposeKeyId` — with the box
+   * unticked a mark key's proposed form is its guarded `T_` id, which is
+   * not the `unicode-default` path, so the pre-fill keeps the current id
+   * and the dialog's own machinery handles the rest.
    */
-  guardSpecification?: GuardSpecification;
+  bareMarkAllowedByMark?: Readonly<Record<string, boolean>>;
   /** Escape, the Cancel button, or the backdrop. Does not itself move focus back — the caller owns the invoker and restores focus to it (mirrors AssignPanel.tsx's cross-component wiring convention). */
   onCancel: () => void;
   /** Fired exactly once per confirmed rename — see {@link RenameDialogConfirmResult}. */
@@ -592,7 +591,7 @@ export function RenameDialog({
   layout,
   ir,
   ruleIndex,
-  guardSpecification,
+  bareMarkAllowedByMark,
   onCancel,
   onConfirm,
   label,
@@ -611,9 +610,17 @@ export function RenameDialog({
   // dialog pattern) — the id field is the dialog's first focusable element.
   useEffect(() => {
     if (!open || selectedCell === null) return;
-    setIdInput(computeProposedRenameId(selectedCell, guardSpecification));
+    // The pre-fill's mark is the cell's single produced char, resolved
+    // against the per-mark box (#2374).
+    const mark = selectedCell.producedChars.length === 1 ? selectedCell.producedChars[0] : undefined;
+    setIdInput(
+      computeProposedRenameId(
+        selectedCell,
+        mark !== undefined ? bareMarkAllowedByMark?.[mark] === true : undefined,
+      ),
+    );
     setRemoveGeneratedChecked(true);
-  }, [open, selectedCell, guardSpecification]);
+  }, [open, selectedCell, bareMarkAllowedByMark]);
 
   const candidateLayerOverride = useMemo(() => {
     if (selectedCell === null) return undefined;

@@ -30,7 +30,6 @@
 import {
   decideKeyIdForm,
   toUPlusNotation,
-  type GuardSpecification,
 } from "@keyboard-studio/contracts";
 import { unicodeCharHex } from "../shared/touch-ids.js";
 import { caseCounterpart } from "../character-discovery/casePair.js";
@@ -367,14 +366,15 @@ export interface KeyIdMintingRequest {
    */
   readonly sharedCandidateCount?: number;
   /**
-   * The keyboard's combining-mark guard specification (spec 104 FR-013).
-   * A combining mark is minted to guarded `T_` ONLY when this is present
-   * with `behaviour: "swallow"` (contracts §2 arm d′); absent or `"emit"`
-   * the mark mints `U_` (arm d). This SUPERSEDES the spec 063 default —
-   * under 063 every mark minted guarded `T_`; FR-013 rules that a mark
-   * must not be minted guarded in the absence of the specification.
+   * The mark's per-mark "start of line" box (#2374, replacing spec 104
+   * FR-013's keyboard-wide guard specification). A combining mark is minted
+   * to guarded `T_` ONLY when the box is unticked (contracts §2 arm d′);
+   * ticked (or absent — a late-added mark with no survey row) the mark mints
+   * `U_` (arm d). This SUPERSEDES the spec 063 default — under 063 every
+   * mark minted guarded `T_`; #2374 rules that a mark must not be minted
+   * guarded when its box is ticked.
    */
-  readonly guardSpecification?: GuardSpecification;
+  readonly bareMarkAllowed?: boolean;
   /**
    * The keyboard's `&VERSION`, e.g. `"15.0"` (spec 104 FR-005 arm c/c′).
    * A fixed multi-codepoint string mints a multi-segment `U_` id only at
@@ -479,11 +479,12 @@ function buildUnicodeDefaultProposal(
  *     alternative is always offered alongside it per section 2.1). The
  *     arm (c′) fall-through (a C0/C1 char the runtime decoder skips)
  *     mints `T_<HEX>` + rule instead, in the rule-minted proposal shape.
- *   - combining mark -> the guard specification decides (FR-013): with a
- *     `"swallow"` specification in force, arm (d′): `T_<UPPERHEX>`, guard
- *     AND producing rule required. Without one (or `"emit"`), arm (d):
- *     `U_<HEX>`, no rule — the mark decodes directly. This supersedes the
- *     spec 063 row, under which every mark minted guarded `T_`.
+ *   - combining mark -> the mark's "start of line" box decides (#2374): with
+ *     the box unticked, arm (d′): `T_<UPPERHEX>`, guard AND producing rule
+ *     required. With the box ticked (or no box — a late-added mark with no
+ *     survey row), arm (d): `U_<HEX>`, no rule — the mark decodes directly.
+ *     This supersedes the spec 063 row, under which every mark minted
+ *     guarded `T_`.
  *   - multi-codepoint / string output (a digraph, a grapheme cluster - no
  *     distinction) -> arm (c) at `&VERSION` 15.0+: a multi-segment `U_`
  *     id, no rule; arm (c′) below the floor: `T_<MNEMONIC>`, producing
@@ -514,12 +515,12 @@ export function proposeKeyId(request: KeyIdMintingRequest): KeyIdMintingProposal
         roles: ["producer"],
         isCombiningMark: true,
         plainOutput: ch,
-        ...(request.guardSpecification !== undefined
-          ? { guardSpecification: request.guardSpecification }
+        ...(request.bareMarkAllowed !== undefined
+          ? { bareMarkAllowed: request.bareMarkAllowed }
           : {}),
       });
       if (decision.destination.form === "T_") {
-        // Arm (d′) — a guard is specified for this keyboard's marks.
+        // Arm (d′) — the mark's "start of line" box is unticked.
         const id = `T_${unicodeCharHex(ch)}`;
         const proposal: KeyIdMintingProposal = {
           path: "combining-mark-guard",
@@ -532,7 +533,8 @@ export function proposeKeyId(request: KeyIdMintingRequest): KeyIdMintingProposal
           ? { ...proposal, noCaseTripleReason: "combining-mark" }
           : proposal;
       }
-      // Arm (d) — no guard specified: the U_ id decodes the mark directly.
+      // Arm (d) — the mark's "start of line" box is ticked (or there is no
+      // box): the U_ id decodes the mark directly.
       const proposal: KeyIdMintingProposal = {
         path: "unicode-default",
         id: `U_${unicodeCharHex(ch)}`,

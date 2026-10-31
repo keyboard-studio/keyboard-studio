@@ -243,12 +243,7 @@ import { FindPanel, type FindPanelResult } from "./keyGrid/FindPanel.tsx";
 import { useModeContextCarry } from "./keyGrid/useModeContextCarry.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
-import {
-  effectiveGuardSpecification,
-  recordGuardAnswer,
-  type GuardBehaviour,
-} from "../../survey/marks/guardSpecification.ts";
-import type { MarksTreatmentValue } from "../../survey/marks/marksValue.ts";
+import { useBareMarkAllowedByMark } from "../../hooks/useBareMarkAllowedByMark.ts";
 import { collateInventory, loanwordsLast } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import {
@@ -1695,9 +1690,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // built in this component and passed down as a prop.
   const keyIdentityDecisions = useWorkingCopyStore((s) => s.keyIdentityDecisions);
   const keyTransplants = useWorkingCopyStore((s) => s.keyTransplants);
-  // The guard specification itself is read from the decision store below
-  // (spec 104 FR-013: the marks-treatment registry entry is the one source;
-  // only a CONFIRMED record reaches consumers).
+  // The per-mark "start of line" box is read via useBareMarkAllowedByMark
+  // below (#2374: the survey layer's reconciled attachment checked-map is
+  // the one source; an unticked/absent box mints guarded T_).
 
   // Undo affordance (T076, FR-036g) — ONE chronological stack across both
   // modes. `undoDelete` already dispatches correctly per entry kind
@@ -1736,20 +1731,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Spec 088 FR-005: the recorded seed choice is a decision-store record.
   const touchSeedSourceStored = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
 
-  // Spec 104 FR-013: the keyboard's guard specification (recorded at the
-  // marks step, or by the assign panel's routed question below). Only a
-  // CONFIRMED record reaches the proposers — a provisional Track 2 seed
-  // mints nothing guarded until the author confirms it.
-  const guardSpecificationRecord = useDecisionStore(
-    (s) => (s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined)?.guardSpecification ?? undefined,
-  );
-  const guardSpecification = effectiveGuardSpecification(guardSpecificationRecord);
-  const handleGuardAnswer = useCallback(
-    (behaviour: GuardBehaviour) => {
-      recordGuardAnswer(behaviour);
-    },
-    [],
-  );
+  // #2374: the per-mark "start of line" box (mark -> ticked), read from
+  // the survey layer's reconciled attachment checked-map. Unticked —
+  // including marks with no survey row at all — mints guarded T_.
+  const bareMarkAllowedByMark = useBareMarkAllowedByMark();
 
   // "Mark for later review" — authoring metadata only (surveySessionStore),
   // never the working copy. Touch-gallery counterpart of MechanismGallery's
@@ -1823,7 +1808,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // copy itself produces. The survey inventory alone holds letters, marks,
   // punctuation and invisibles but never the space or the digits, so a guard
   // minted from it alone could not swallow a mark after a space — the
-  // start-of-word case the guard question names. The keyboard's own outputs
+  // start-of-word case. The keyboard's own outputs
   // are still "the keyboard's own repertoire" (no hardcoded ASCII set);
   // planGuardSynthesis drops the letters.
   const guardRepertoire = useMemo(
@@ -2508,7 +2493,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       key: selectedKeyNode,
       decisions: keyIdentityDecisions,
       transplants: keyTransplants,
-      ...(guardSpecification !== undefined ? { guardSpecification } : {}),
+      bareMarkAllowedByMark,
     });
   }, [
     ir,
@@ -2518,7 +2503,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     selectedKeyNode,
     keyIdentityDecisions,
     keyTransplants,
-    guardSpecification,
+    bareMarkAllowedByMark,
   ]);
 
   // FR-034's honest provenance statement — the same resolvedSeedSource this
@@ -5556,9 +5541,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       expectedOutputs,
       capsHandled,
       ...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {}),
-      ...(guardSpecification !== undefined ? { guardSpecification } : {}),
+      // Per-mark #2374: the selected char's "start of line" box; unticked
+      // (or no box) mints guarded T_.
+      bareMarkAllowed: bareMarkAllowedByMark[chars] === true,
     });
-  }, [selectedKeyCell, keyModeRuleIndex, capsHandled, identityBcp47, guardSpecification]);
+  }, [selectedKeyCell, keyModeRuleIndex, capsHandled, identityBcp47, bareMarkAllowedByMark]);
 
 
   // ---------------------------------------------------------------------------
@@ -7655,8 +7642,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                         inventoryChars={inventory}
                         capsHandled={capsHandled}
                         {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
-                        {...(guardSpecification !== undefined ? { guardSpecification } : {})}
-                        onGuardAnswer={handleGuardAnswer}
+                        bareMarkAllowedByMark={bareMarkAllowedByMark}
                         repertoire={guardRepertoire}
                         onCommit={handleAssignPanelCommit}
                       />
@@ -7690,7 +7676,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
             ir={ir}
             ruleIndex={keyModeRuleIndex}
-            {...(guardSpecification !== undefined ? { guardSpecification } : {})}
+            bareMarkAllowedByMark={bareMarkAllowedByMark}
             onCancel={handleRenameCancel}
             onConfirm={handleRenameConfirm}
           />
