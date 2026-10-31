@@ -595,11 +595,22 @@ function emitGroupBodyFaithful(
     });
   }
 
-  // Typed rules.
-  for (const rule of group.rules) {
+  // Typed rules. A rule without a sourceLine (synthesized: carve guards, rule
+  // additions) takes the position of the NEXT sourced rule in group.rules, so it
+  // stays immediately ahead of it (first-match semantics); the stable sort keeps
+  // consecutive unsourced rules in group order. Trailing unsourced rules have no
+  // following sourced rule and stay at the back.
+  const ruleLines: number[] = new Array<number>(group.rules.length);
+  let nextLine = Number.MAX_SAFE_INTEGER;
+  for (let i = group.rules.length - 1; i >= 0; i--) {
+    const own = group.rules[i]!.sourceLine;
+    if (own !== undefined) nextLine = own;
+    ruleLines[i] = nextLine;
+  }
+  for (const [i, rule] of group.rules.entries()) {
     items.push({
       kind: "rule",
-      sourceLine: rule.sourceLine ?? Number.MAX_SAFE_INTEGER,
+      sourceLine: ruleLines[i]!,
       text: emitRule(rule, group.usingKeys),
       nodeId: rule.nodeId,
     });

@@ -15,10 +15,9 @@
 
 import { useState, useRef, type ChangeEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { StartKeyboard, InventoryChar } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
 import { useInventoryDraft } from "./useInventoryDraft.ts";
-import { getCharacterDiscoveryService } from "../lib/services.ts";
+import { confirmTextSample, proposeTextSampleInventory } from "./marksTextSample.ts";
 import { codepointLabel } from "./codepointLabel.ts";
 import { collateInventory } from "./collation.ts";
 import { displayChar } from "../lib/irToCarveNodes.ts";
@@ -53,44 +52,8 @@ import {
 // used: a second paste/upload is a legitimate re-run, not a one-shot offer.
 // ---------------------------------------------------------------------------
 
-// harvestFromText's `base` parameter is unused by its implementation today
-// (see CharacterDiscoveryServiceImpl.ts's TODO(#141-followup) — an ASCII
-// proxy stands in for the real base-keyboard output-set lookup), so a
-// minimal fixture stands in, mirroring the "exact values do not matter"
-// fixture already used by the engine's own harvestFromText tests.
-const TEXT_SAMPLE_BASE: StartKeyboard = {
-  id: "basic_kbdus",
-  path: "release/b/basic_kbdus",
-  // ISO-15924 script code, not user-facing text; falls outside the rule's
-  // ALL-CAPS/lowercase ignore patterns because it's Title-case.
-  // eslint-disable-next-line lingui/no-unlocalized-strings
-  script: "Latn",
-  targets: ["windows"],
-  displayName: "US English",
-  version: "1.0",
-};
-
-/**
- * Build a `SourcedInventory` from a text harvest (#2063, spec 050
- * FR-005/FR-006): the author's own corpus as a first-class proposal source,
- * wired through `seedFromProposal` — the same path as the exemplar offer.
- * Confidence is "approved": the author demonstrably uses these characters,
- * which is the strongest attestation available.
- */
-function buildTextInventory(harvested: InventoryChar[]): SourcedInventory {
-  return {
-    resolvedTag: "text-sample",
-    source: "text",
-    confidence: "approved",
-    characters: harvested.map(({ char }) => ({
-      char,
-      tier: "main" as const,
-      source: "text" as const,
-      confidence: "approved" as const,
-    })),
-    digraphs: [],
-  };
-}
+// The harvest, the proposal it builds and the confirm live in
+// marksTextSample.ts (spec 107 FR-040), shared with the headless author.
 
 export function TextSampleAffordance() {
   const { t } = useLingui();
@@ -119,23 +82,19 @@ export function TextSampleAffordance() {
     setEmptyMessage(false);
     setIsExtracting(true);
     try {
-      const service = await getCharacterDiscoveryService();
-      const harvested = await service.harvestFromText(sample, TEXT_SAMPLE_BASE);
-      if (harvested.length === 0) {
-        setEmptyMessage(true);
-        return;
-      }
-      setProposal(buildTextInventory(harvested));
-    } catch {
+      const outcome = await proposeTextSampleInventory(sample);
+      if (outcome.status === "proposal") setProposal(outcome.proposal);
+      else if (outcome.status === "empty") setEmptyMessage(true);
       // getCharacterDiscoveryService() does a real dynamic import() in
       // production — a chunk-load/network failure must surface to the user,
       // not vanish as an unhandled rejection behind handleSubmit's `void`.
-      setUploadError(
-        t({
-          id: "survey.phaseB.buildList.textSampleExtractError",
-          message: "Something went wrong reading that text — try again.",
-        }),
-      );
+      else
+        setUploadError(
+          t({
+            id: "survey.phaseB.buildList.textSampleExtractError",
+            message: "Something went wrong reading that text — try again.",
+          }),
+        );
     } finally {
       setIsExtracting(false);
     }
@@ -149,7 +108,7 @@ export function TextSampleAffordance() {
     if (proposal === null) return;
     // 044's contract: union into the draft with per-character "text"
     // attribution, respecting sticky rejection (FR-005/FR-006/FR-007).
-    seedFromProposal(proposal);
+    confirmTextSample(proposal, seedFromProposal);
     setProposal(null);
     setRawInput("");
   }

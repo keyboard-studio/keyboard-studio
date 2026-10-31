@@ -16,10 +16,8 @@
 // onChange on completion instead of recording directly.
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
-import { currentPhysicalLayoutValue } from "../../survey/assignLoop/physicalLayoutValue.ts";
-import { applyPhysicalCompletionEffects } from "../../lib/assignLoopCompletion.ts";
+import { completePhysicalLayoutStep } from "../../lib/mechanismStepCompletion.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
 import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
@@ -37,12 +35,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   const placementMap = usePlacementPriors();
 
   function handleComplete() {
-    useDecisionStore.getState().record({
-      id: "physical-layout",
-      value: currentPhysicalLayoutValue(),
-      provenance: "asked",
-    });
-    applyPhysicalCompletionEffects();
+    completePhysicalLayoutStep();
     onComplete(undefined);
   }
 

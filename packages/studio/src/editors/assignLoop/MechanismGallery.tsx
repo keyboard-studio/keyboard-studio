@@ -72,14 +72,13 @@ import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { useShallow } from "zustand/react/shallow";
 import type {
   StartKeyboard,
-  KeyboardIR,
   Pattern,
   MechanismAssignment,
   MechanismRef,
   PlacementMap,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import { toUPlusNotation, toUPlusSequence, buildProducedSet } from "@keyboard-studio/contracts";
+import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -100,11 +99,6 @@ import { capabilityHint } from "./parts/capabilityHint.ts";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
-  isMnemonicLayout,
-  planShiftAssignment,
-  buildShiftRuleLines,
-  buildStartRuleLines,
-  buildCasePairRuleLines,
   MODIFIER_EXCLUSIONS,
   canonicalizeCombo,
   comboToKeySpec,
@@ -130,8 +124,6 @@ import {
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
-  getRankedSuggestionsForChar,
-  PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
 } from "../../survey/placementSeeds.ts";
 import {
   KEY_OPTIONS,
@@ -146,33 +138,40 @@ import {
   resolvedVkeyOf,
   isLoneCombiningMark,
   reflectCharInput,
-  type ResolveCharInputOptions,
-  type KeyPickerResolveOptions,
-  type KeyPickerResolution,
 } from "../../lib/charInput.ts";
-import {
-  useCasePairCompanion,
-  type CasePairProposal,
-} from "./casePairCompanion.ts";
+import { useCasePairCompanion } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { useDisplacementProposal } from "./useDisplacementProposal.ts";
 import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
 import {
-  assignmentSlotKeys,
   buildSlotOccupancy,
-  displacedFor,
-  isProducedOnOtherSlot,
-  isStillNeeded,
-  mechanismSlotEntries,
-  orthographyTier,
+  displacementActions,
   slotKeyFor,
+  type DisplacementAction,
 } from "../../survey/slotOccupancy.ts";
+import { buildRationaleLine } from "../../survey/placementRationale.ts";
+import { preselectMethod } from "./suggestionOrder.ts";
 import {
-  buildRationaleLine,
-  scoreCandidate,
-  type ScoredCandidate,
-} from "../../survey/placementRationale.ts";
-import { isGatedAccentCompositionCandidate } from "./siblingAccents.ts";
+  baseOnlyProducedSetFor,
+  buildDeadkeyBaseLetterResolveOptions,
+  buildNeedSets,
+  canGoNextFor,
+  companionConfirmAssignments,
+  displacementOutcomeFor,
+  dismissedSuggestionEntryKey,
+  excludeSequenceMechanisms,
+  placementOffer,
+  placementWalkList,
+  planDeadkeyApply,
+  planSuggestionAccept,
+  placementSequence,
+  planSwapApply,
+  sequenceCompanionInput,
+  type PlacementRecord,
+} from "./mechanismPlacement.ts";
+import {
+  TRIGGER_KEY_RESOLVE_OPTIONS,
+} from "./assignmentFromSuggestion.ts";
 import {
   appendNotDeletableSuffix,
   composeContributorLabel,
@@ -189,7 +188,7 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { Dialog } from "../../ui/Dialog.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
-import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
+import { allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
@@ -214,7 +213,6 @@ import { subtractMarked } from "../../lib/accountedForGate.ts";
 import {
   SequenceBuilderPanel,
   hasSequenceForChar,
-  partitionSequenceAssignment,
   type SequenceApplied,
 } from "./SequenceBuilderPanel.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
@@ -243,21 +241,17 @@ import {
 // allocateDeadkeyId is the single numeric-id source for S-02 mints.
 import {
   DEADKEY_OPTIONS,
-  TRIGGER_KEY_CHARS,
 } from "../deadkey/deadkeyTriggerOptions.ts";
-import { allocateDeadkeyId } from "@keyboard-studio/contracts";
-import { hex4 } from "../deadkey/deadkeyWrite.ts";
 // One deadkey per purpose: trigger proposal, id reuse, and base-clash guard.
 import {
   formatDeadkeyEscapes,
-  proposeS02TriggerKey,
   recordedDeadkeyEscapes,
-  rememberedDeadkeyEscapes,
   s02BaseClash,
-  sessionDeadkeys,
   type DeadkeyEscape,
 } from "./deadkeyPurpose.ts";
 import { DeadkeyEscapesBanner } from "./DeadkeyEscapesBanner.tsx";
+
+export { resolveS02DeadkeyIdentity, type S02DeadkeyIdentity } from "./deadkeyPurpose.ts";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
@@ -268,50 +262,6 @@ const selectStyle: CSSProperties = gallerySelectMenuStyle(140);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-// deadkeyBaseLetter is substituted directly into a single-quoted KMN string
-// literal with no escaping (substituteSlots in
-// @keyboard-studio/engine/pattern-apply), so it blocks the ASCII
-// straight-quote delimiters and accepts multi-token compose (e.g.
-// "U+006E U+0303" -> a single composed character) — see charInput.ts.
-// deadkeyBaseLetter stays single-grapheme — a multi-base deadkey needs a
-// paired accented-output list, which is a separate future change (relaxing
-// this alone is a hard compile error via Layer-A Check #9).
-//
-// singleGraphemeReason is user-facing chrome (an error string), but this
-// object is constructed at module scope where no useLingui() is available —
-// buildDeadkeyBaseLetterResolveOptions(i18n) below builds the localized
-// version per-render; each component that needs it calls that with its own
-// i18n instance. Takes an optional i18n + resolves via
-// msg()/resolveMessage() rather than a bare `t` parameter — Lingui's macro
-// tracks the specific binding introduced by useLingui(), so a re-bound `t`
-// parameter is a distinct binding the extractor does not follow (see
-// resolveMessage in lib/i18nResolve.ts).
-function buildDeadkeyBaseLetterResolveOptions(
-  i18n?: I18n,
-): ResolveCharInputOptions {
-  return {
-    multiToken: true,
-    singleGrapheme: true,
-    blockDelimiters: true,
-    singleGraphemeReason: resolveMessage(
-      i18n,
-      msg({
-        id: "editor.assignLoop.deadkeySingleGraphemeReason",
-        message:
-          "Enter one base character. (Covering several base letters with one dead key is coming later.)",
-      }),
-    ),
-  };
-}
-
-// The S-02 deadkey trigger's resolved custom character is reused as
-// `accentChar` — the deadkey's own literal output — so it needs the same
-// delimiter guard as the character boxes above, unlike the SWAP/RALT/touch
-// host-key pickers (which resolve solely to a K_ vkey id).
-const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
-  blockDelimiters: true,
-};
 
 // Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
 // bare `t` parameter — Lingui's macro tracks the specific binding introduced
@@ -390,164 +340,16 @@ function methodLabel(
 }
 
 // ---------------------------------------------------------------------------
-// excludeSequenceMechanisms — multi_char_sequence (PATTERN_SEQUENCE / S-03)
-// mechanisms are tracked as a separate dimension (see the "Sequences" chip
-// row and SequenceBuilderPanel below), even though they are recorded into the
-// SAME Phase C assignments array (scope: "individual") this gallery reads via
-// sessionAssignments. Without this filter, a char whose ONLY recorded
-// mechanism is a sequence would show as "Added" in
-// coveredChars/appliedForCurrentChar/the "Applied methods" badge row, and its
-// covered-char chip's Remove control would silently delete the sequence work
-// (the P1 this function fixes).
-//
-// An assignment made up ENTIRELY of PATTERN_SEQUENCE mechanisms is dropped
-// outright — it never surfaces in this gallery's covered/applied view. An
-// assignment that mixes a non-sequence mechanism with PATTERN_SEQUENCE
-// mechanism(s) on the same target (permitted by the MechanismAssignment
-// contract, though no current write path actually produces one — this
-// gallery always appends a NEW assignment object per apply, and
-// SequenceBuilderPanel's own partitionSequenceAssignment only ever touches
-// the sequence-only assignment for a char) keeps just its non-sequence
-// mechanisms, so a genuinely mechanism-covered char is never hidden merely
-// because it also carries a sequence.
-function excludeSequenceMechanisms(
-  assignments: MechanismAssignment[],
-): MechanismAssignment[] {
-  const result: MechanismAssignment[] = [];
-  for (const a of assignments) {
-    if (a.scope !== "individual") {
-      result.push(a);
-      continue;
-    }
-    const nonSequence = a.mechanisms.filter(
-      (m) => m.patternId !== PATTERN_SEQUENCE,
-    );
-    if (nonSequence.length === 0) continue;
-    result.push(
-      nonSequence.length === a.mechanisms.length
-        ? a
-        : { ...a, mechanisms: nonSequence },
-    );
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------------------
 // S-02 deadkey id/allocation seam (spec 083).
 //
 // `buildDeadkeyAssignment` (below) is the shared assignment-shape builder for
 // the manual deadkey card, the S-02 suggestion accept, and the case-pair
 // companion — the three write paths cannot drift on the slotValues shape.
 //
-// The id + accentChar derivation is the second half of the seam:
-// `resolveS02DeadkeyIdentity` is the ONLY place an S-02 mint derives its
-// deadkeyName/accentChar. The manual deadkey Apply and the S-02 suggestion
-// accept both call it; the case-pair companion reuses the identity the
-// proposal captured (it must share the id, never mint a new one).
-//
-// Ids are numeric-only (hex4 for the deadkeyName slot): the "dead0" forced
-// derivation is gone — every mint goes through allocateDeadkeyId.
-//
-// One deadkey per trigger: a placement on a trigger the session already gave
-// a deadkey reuses that id rather than minting a second, unreachable one
-// (deadkeyPurpose.ts proposes the trigger by the mark the character adds).
-//
-// Honest seam note: allocateDeadkeyId(workingIr) alone is NOT enough. The
-// working IR does not carry this session's phase-C assignments
-// (recordAssignments stores them in phaseResults; the working IR only sees
-// setWorkingIR mutations), so a second S-02 mint in the same gallery visit
-// would re-mint the first one's id. allocateS02DeadkeyId additionally
-// reserves every numeric deadkeyName already minted in this session's
-// assignments and skips past them. The reservation is session-local; ids
-// minted by the Deadkeys step (committed through setWorkingIR) are visible
-// via the IR itself.
+// The id + accentChar derivation (`resolveS02DeadkeyIdentity`) lives in
+// deadkeyPurpose.ts so a headless caller reaches the same seam; it is imported
+// and re-exported here for existing importers.
 // ---------------------------------------------------------------------------
-
-/**
- * Numeric ids already minted as S-02 deadkeyName slots in this session's
- * assignments. 1–8 hex chars count — the pipeline imposes no 0xffff cap,
- * so a 5-digit session-minted id must still be reserved.
- */
-function sessionMintedDeadkeyIds(
-  sessionAssignments: readonly MechanismAssignment[],
-): Set<number> {
-  const ids = new Set<number>();
-  for (const a of sessionAssignments) {
-    for (const m of a.mechanisms) {
-      if (!isDeadkeyPatternId(m.patternId)) continue;
-      const name = m.slotValues?.["deadkeyName"];
-      // 1–8 hex digits — matches the deadkey editors' parseIdText: the
-      // pipeline imposes no 0xffff cap, so a 5-digit session-minted id
-      // must still be reserved.
-      if (typeof name !== "string" || !/^[0-9a-fA-F]{1,8}$/.test(name)) continue;
-      const id = parseInt(name, 16);
-      if (!Number.isNaN(id)) ids.add(id);
-    }
-  }
-  return ids;
-}
-
-/**
- * Allocate the numeric id for a NEW S-02 deadkey assignment: the engine's
- * allocateDeadkeyId over the working IR, skipping past any ids already
- * minted in this session's assignments (see the seam note above).
- */
-function allocateS02DeadkeyId(
-  workingIr: KeyboardIR | null,
-  sessionAssignments: readonly MechanismAssignment[],
-): number {
-  // Mirrors the engine's LEGACY_ID_CEILING floor (0x2FFF) for the
-  // no-working-IR case — allocateDeadkeyId itself applies the same floor.
-  let id = workingIr !== null ? allocateDeadkeyId(workingIr) : 0x3000;
-  const reserved = sessionMintedDeadkeyIds(sessionAssignments);
-  while (reserved.has(id)) id += 1;
-  return id;
-}
-
-/** The identity half of an S-02 mint: numeric id + trigger literal. */
-export interface S02DeadkeyIdentity {
-  /** hex4 numeric id for the deadkeyName slot — never "dead0". */
-  deadkeyName: string;
-  /**
-   * The trigger key's literal character (double-tap escape output). For the
-   * 4 built-in trigger keys this is the key's character (e.g. ';' for
-   * K_COLON); for a custom trigger character, the resolved character itself.
-   */
-  accentChar: string;
-}
-
-/**
- * Resolve the identity for a new S-02 deadkey assignment — the single seam
- * the manual deadkey card and the S-02 suggestion accept derive
- * deadkeyName/accentChar through. accentChar keeps the old convention (the
- * trigger key's literal character).
- *
- * A trigger key carries ONE deadkey: when a session placement already put a
- * deadkey on the resolved trigger, its id and accentChar are reused, so
- * applyAssignments merges the two into one bases/output store pair (see
- * deadkeyPurpose.ts). Only a trigger with no session deadkey mints a fresh id.
- */
-export function resolveS02DeadkeyIdentity(params: {
-  /** Raw key-picker value (one of DEADKEY_OPTIONS or ""). */
-  triggerKey: string;
-  /** resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, …). */
-  triggerResolution: KeyPickerResolution;
-  workingIr: KeyboardIR | null;
-  sessionAssignments: readonly MechanismAssignment[];
-}): S02DeadkeyIdentity {
-  const { triggerKey, triggerResolution, workingIr, sessionAssignments } = params;
-  const vkey = resolvedVkeyOf(triggerResolution);
-  const existing = vkey !== null ? sessionDeadkeys(sessionAssignments).get(vkey) : undefined;
-  if (existing !== undefined) {
-    return { deadkeyName: existing.deadkeyName, accentChar: existing.accentChar };
-  }
-  const id = allocateS02DeadkeyId(workingIr, sessionAssignments);
-  const accentChar =
-    triggerResolution.kind === "customOk"
-      ? triggerResolution.char
-      : (TRIGGER_KEY_CHARS[triggerKey] ?? "");
-  return { deadkeyName: hex4(id), accentChar };
-}
 
 /**
  * Canonicalized modifier combo for an S-08 suggestion entry's display text +
@@ -574,49 +376,6 @@ function suggestionComboTokensFor(entry: PlacementSeedEntry): ModifierToken[] {
   } catch {
     return tokens;
   }
-}
-
-/**
- * Build the S-02 (deadkey) {@link MechanismAssignment} shape — shared by
- * `handleApply`'s manual deadkey method, `handleSuggestionAccept`'s S-02
- * branch, and the case-pair companion confirm, so the three write paths
- * cannot drift on this mechanism's slotValues shape (see
- * docs/design-notes/mechanism-gallery-flow.md's "Method → assignment" seam).
- *
- * The deadkeyName/accentChar values come from `resolveS02DeadkeyIdentity`
- * (the S-02 id/allocation seam above) for new mints; the companion reuses
- * the proposal's preserved identity. This builder never derives an id.
- */
-function buildDeadkeyAssignment(params: {
-  currentChar: string;
-  baseLetter: string;
-  triggerVkey: string;
-  deadkeyName: string;
-  accentChar: string;
-  /** Set only on a deadkey's FIRST placement (see deadkeyPurpose.ts's trigger escapes). */
-  escapes?: string | undefined;
-}): MechanismAssignment {
-  const { currentChar, baseLetter, triggerVkey, deadkeyName, accentChar, escapes } = params;
-  return {
-    scope: "individual",
-    target: currentChar,
-    modality: "physical",
-    mechanisms: [
-      {
-        patternId: PATTERN_DEADKEY,
-        strategyId: "S-02",
-        slotValues: {
-          triggerKey: triggerVkey,
-          deadkeyName,
-          baseLetters: baseLetter,
-          accentedForms: currentChar,
-          accentChar,
-          ...(escapes !== undefined ? { escapes } : {}),
-        },
-      },
-    ],
-    source: "user",
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1724,13 +1483,7 @@ export function MechanismGallery({
   // char reachable only via a backspace-correction rule is not wrongly
   // counted as directly produced here either. Memoized on `startIr` alone —
   // this never reacts to session assignments, same as `lettersToAdd`.
-  const baseOnlyProducedSet = useMemo(
-    () =>
-      startIr !== null
-        ? buildProducedSet(startIr, { excludeBackspaceCorrections: true })
-        : new Set<string>(),
-    [startIr],
-  );
+  const baseOnlyProducedSet = useMemo(() => baseOnlyProducedSetFor(startIr), [startIr]);
 
   // The BASE (pre-augmentWithComposable) SESSION-AWARE produced set — this
   // session's physical assignments folded into the base, but never itself run
@@ -1795,10 +1548,7 @@ export function MechanismGallery({
   // hook — keeps it consistent with `inventory` and with TouchGallery's
   // matching `touchLettersToAdd`.
   const lettersToAdd = useMemo(() => {
-    const deduped = nfcDedup([], inventoryLettersToAdd);
-    const placementSet = new Set(placementInventory.map((c) => c.normalize("NFC")));
-    const filtered = deduped.filter((c) => placementSet.has(c.normalize("NFC")));
-    return collateInventory(filtered, loanwordSet);
+    return placementWalkList(inventoryLettersToAdd, placementInventory, loanwordSet);
   }, [inventoryLettersToAdd, placementInventory, loanwordSet]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
@@ -2182,14 +1932,6 @@ export function MechanismGallery({
   // longer plumbs a bcp47 tag, which is what keeps `caseCounterpart` down to
   // exactly one caller.
 
-  // Shift-layer targeting is disallowed for mnemonic keyboards (planShiftAssignment /
-  // isMnemonicLayout in @keyboard-studio/engine) — in mnemonic mode K_X already
-  // resolves to the base-layout character, so a SHIFT-flagged rule would
-  // double-apply shift. Also suppresses the case-pair companion prompt.
-  const shiftLayerAllowed = useMemo(
-    () => workingIr !== null && !isMnemonicLayout(workingIr),
-    [workingIr],
-  );
 
   // -- #2300 occupancy ledger ---------------------------------------------
   // Per-key slot → incumbent ledger over the working IR + this session's
@@ -2203,108 +1945,10 @@ export function MechanismGallery({
     [workingIr, sessionAssignments],
   );
   const needSets = useMemo(
-    () => ({
-      confirmedInventory: new Set(rawInventory.map((c) => c.normalize("NFC"))),
-      baseProducedSet,
-    }),
+    () => buildNeedSets(rawInventory, baseProducedSet),
     [rawInventory, baseProducedSet],
   );
 
-  /**
-   * Raise the demotion proposal when the assignment just recorded took a
-   * slot whose incumbent glyph is a DIFFERENT character that is still
-   * needed and not otherwise produced after this assignment (#2300 G3).
-   * The slot(s) checked are derived from the RECORDED assignment itself
-   * (`assignmentSlotKeys` — the same parsers the occupancy overlay uses),
-   * never from the candidate or picker tokens that produced it: the two
-   * can differ (Cycle 4 P1-2 — a case-pair-inherited S-01 candidate
-   * carries ["SHIFT"], while the S-01 accept writes a bare `[vkey]`
-   * rule, so the displaced incumbent lives on the BARE slot).
-   * Reads the PRE-apply ledger: at handler time `slotOccupancy` /
-   * `sessionAssignments` are still the render-time values the assignment
-   * was appended to, so the incumbent named here is the glyph the new
-   * assignment shadows. Never blocks the apply itself — the author chose
-   * the key; this only proposes the incumbent's new home.
-   */
-  const maybeRaiseDisplacement = useCallback(
-    (assignment: MechanismAssignment) => {
-      if (currentChar === null) return;
-      // A deadkey's trigger slot is not handled here: its own character's
-      // escapes (double-tap / space / AltGr) are the escape banner's job.
-      for (const slot of assignmentSlotKeys(assignment)) {
-      const displaced = displacedFor(
-        slotOccupancy,
-        slot.vkey,
-        slot.modifiers,
-        currentChar,
-      );
-      if (displaced === null) continue;
-      if (!isStillNeeded(displaced.char, needSets)) continue;
-      const takenSlotKey = slot.key;
-      // Still reachable elsewhere → nothing is lost, so no proposal.
-      // "Elsewhere" means another SLOT (the ledger check), or a recorded
-      // assignment for the displaced glyph that does not live on the slot
-      // just taken — an assignment ON this slot is the very occupancy
-      // being displaced, not another production. Non-slot mechanisms
-      // (deadkey / sequence) always count as another production.
-      if (isProducedOnOtherSlot(slotOccupancy, displaced.char, takenSlotKey)) continue;
-      const producedElsewhereByAssignment = sessionAssignments.some((a) => {
-        if (a.target !== displaced.char.normalize("NFC")) return false;
-        return a.mechanisms.some((m) => {
-          if (m.patternId === PATTERN_RALT || m.patternId === PATTERN_SWAP) {
-            // Parsed through the same helper as the overlay. A parse
-            // failure yields NO slot entries and so counts as NOT
-            // produced elsewhere (Cycle 4 P2-c): a spurious proposal is
-            // author-dismissable; a suppressed one is a silent loss.
-            return mechanismSlotEntries(m).some((e) => e.key !== takenSlotKey);
-          }
-          return true;
-        });
-      });
-      if (producedElsewhereByAssignment) continue;
-      // Demotion rank: RAlt on the SAME key first; deadkey only when the
-      // RAlt slot is taken or IS the slot just taken.
-      const raltSlotKey = slotKeyFor(slot.vkey, ["RALT"]);
-      const demotionMethod: "ralt" | "deadkey" =
-        raltSlotKey !== takenSlotKey && !slotOccupancy.has(raltSlotKey)
-          ? "ralt"
-          : "deadkey";
-      // WHO gets demoted follows the orthography tier (steer 2 — no
-      // frequency data exists, so tier decides): both core → neither by
-      // default; core incumbent + non-core incoming → the INCOMING char
-      // loses the primary slot; otherwise the incumbent is demoted.
-      // "demote-incoming" fires when a punctuation, digit or symbol
-      // currentChar (convenience even in the inventory: punctuation is
-      // never core, spec 106 FR-043) lands on a core letter's slot.
-      const displacedTier = orthographyTier(displaced.char, needSets);
-      const incomingTier = orthographyTier(currentChar, needSets);
-      const direction =
-        displacedTier === "core" && incomingTier === "core"
-          ? ("both-core" as const)
-          : displacedTier === "core"
-            ? ("demote-incoming" as const)
-            : ("demote-incumbent" as const);
-      proposeDisplacement({
-        displacedChar: displaced.char,
-        incomingChar: currentChar,
-        vkey: slot.vkey,
-        modifiers: [...slot.modifiers],
-        demotionMethod,
-        direction,
-        baseAssignment: assignment,
-        alreadyDemoted: () =>
-          sessionAssignments.some(
-            (a) =>
-              a.target === displaced.char.normalize("NFC") &&
-              a.mechanisms.some((m) => m.patternId === PATTERN_RALT),
-          ),
-      });
-      // One proposal per apply: the hook holds a single pending proposal.
-      return;
-      }
-    },
-    [currentChar, slotOccupancy, needSets, sessionAssignments, proposeDisplacement],
-  );
 
   // ---------------------------------------------------------------------------
   // Deadkey trigger escapes (DeadkeyEscapesBanner). A deadkey's FIRST
@@ -2318,20 +1962,6 @@ export function MechanismGallery({
     deadkeyName: string;
     accentChar: string;
   } | null>(null);
-
-  /** The `escapes` value for a deadkey about to be placed on `triggerVkey`:
-   *  the remembered choice when the trigger has no session deadkey yet, else
-   *  undefined (that deadkey already chose). AltGr drops out when AltGr + the
-   *  trigger already types something. */
-  const newTriggerEscapes = useCallback(
-    (triggerVkey: string): string | undefined => {
-      if (sessionDeadkeys(sessionAssignments).has(triggerVkey)) return undefined;
-      const escapes = rememberedDeadkeyEscapes(sessionAssignments);
-      if (slotOccupancy.has(slotKeyFor(triggerVkey, ["RALT"]))) escapes.delete("altgr");
-      return formatDeadkeyEscapes(escapes);
-    },
-    [sessionAssignments, slotOccupancy],
-  );
 
   /** Raise the escape banner when `assignment` is a deadkey's first
    *  placement (it carries an `escapes` slot). */
@@ -2401,54 +2031,13 @@ export function MechanismGallery({
     return altFamily ?? "RALT";
   }, [modifierPool]);
 
-  // The current character's 3-signal producer badge (charMechanisms.ts's
-  // getProducerBadge) — the SAME computation CharScrollStrip's own badge and
-  // the SHOW-ALL floor-row check (existingMethodContributors below) use,
-  // with the SAME 4 trailing args this gallery already passes to
-  // CharScrollStrip (baseOnlyProducedSet, baseProducedSet). Hoisted here so
-  // the suggestion gate below (currentCharBadge?.count ?? 0) === 0 and the
-  // floor-row check share one computation rather than each re-deriving it.
-  const currentCharBadge = useMemo(
-    () =>
-      currentChar !== null
-        ? getProducerBadge(currentChar, sessionAssignments, "physical", baseOnlyProducedSet, baseProducedSet)
-        : null,
-    [currentChar, sessionAssignments, baseOnlyProducedSet, baseProducedSet],
-  );
-
-  // kbgen/corpus placement suggestions for the current character (empty
-  // array when no map or no qualifying candidate). Memoized against
-  // currentChar + placementMap so it only recomputes on actual input
-  // changes, not on unrelated re-renders.
-  //
-  // getRankedSuggestionsForChar returns up to 2 entries with DISTINCT
-  // strategyIds (e.g. "S-02 deadkey" + "S-08 RAlt", both attested by the
-  // corpus for the same codepoint) — see placementSeeds.ts. It additionally
-  // falls back to the LOWERCASE case-pair sibling's ranked entries, shifted,
-  // for an UPPERCASE letter with no qualifying entries of its own (never a
-  // second, independently-derived uppercase ranking). Same "" -> undefined
-  // bcp47 normalization useCasePairCompanion applies (an identity with an
-  // empty tag is "no locale", not "the empty locale").
-  const suggestionBcp47 =
-    identity?.bcp47 !== undefined && identity.bcp47 !== ""
-      ? identity.bcp47
-      : undefined;
-  const suggestions = useMemo((): PlacementSeedEntry[] => {
-    if (placementMap === undefined || currentChar === null) return [];
-    const ranked = getRankedSuggestionsForChar(
-      currentChar,
-      placementMap,
-      PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
-      suggestionBcp47,
-    );
-    // Never surface a CAPS-based placement as a *suggestion*: CAPS is a
-    // case/state modifier, not a layer an author reaches for, so a "Caps + key"
-    // recommendation surprises more than it helps. This suppresses only the
-    // suggestion chip (and its accept button) for a CAPS-carrying candidate —
-    // CAPS stays fully available as a manual layer pick (computeModifierPool
-    // still offers it in every dropdown) and everywhere else is untouched.
-    return ranked.filter((entry) => !entry.topCandidate.modifiers.includes("CAPS"));
-  }, [currentChar, placementMap, suggestionBcp47]);
+  // The current character's producer badge, the kbgen/corpus placement
+  // suggestions, which chips are visible and in what order, and whether the row
+  // is shown at all come from one lifted derivation (`placementOffer`, see
+  // mechanismPlacement.ts), computed below once the whole-row Deny state is
+  // known. Same "" -> undefined bcp47 normalization useCasePairCompanion
+  // applies (an identity with an empty tag is "no locale").
+  const suggestionBcp47 = identity?.bcp47;
 
   // ---------------------------------------------------------------------------
   // Per-chip suggestion resolution — accepts are INDEPENDENT (bug fix).
@@ -2474,8 +2063,6 @@ export function MechanismGallery({
   //     path inside handleSuggestionAccept (e.g. an unresolvable modifier
   //     combo) that must stop offering THAT entry without touching a sibling
   //     chip that might still be perfectly acceptable.
-  const dismissedSuggestionEntryKey = (char: string, strategyId: string): string =>
-    `${char}::${strategyId}`;
   const [dismissedSuggestionEntries, setDismissedSuggestionEntries] = useState<
     Set<string>
   >(() => new Set());
@@ -2491,105 +2078,6 @@ export function MechanismGallery({
     },
     [],
   );
-
-  // Every strategyId already recorded as a NON-sequence mechanism for
-  // currentChar (mechanismAssignments — see excludeSequenceMechanisms above).
-  // Built from the SAME list `coveredChars`/`appliedForCurrentChar` read, so
-  // this can never disagree with what the "Applied methods" chip row shows.
-  const recordedSuggestionStrategyIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (currentChar === null) return ids;
-    for (const a of mechanismAssignments) {
-      if (a.scope !== "individual" || a.target !== currentChar) continue;
-      for (const m of a.mechanisms) {
-        if (m.strategyId !== undefined) ids.add(m.strategyId);
-      }
-    }
-    return ids;
-  }, [mechanismAssignments, currentChar]);
-
-  // The chips actually eligible to render right now — `suggestions` minus
-  // whichever entries are already recorded or were explicitly dismissed. Row
-  // visibility (below) is driven off THIS list's length, not `suggestions`
-  // itself, so accepting one chip only ever removes that one chip.
-  const visibleSuggestions = useMemo(
-    () =>
-      currentChar === null
-        ? []
-        : suggestions.filter(
-            (entry) =>
-              !recordedSuggestionStrategyIds.has(entry.strategyId) &&
-              !dismissedSuggestionEntries.has(
-                dismissedSuggestionEntryKey(currentChar, entry.strategyId),
-              ),
-          ),
-    [suggestions, currentChar, recordedSuggestionStrategyIds, dismissedSuggestionEntries],
-  );
-
-  // -- #2300 weighted rationale -------------------------------------------
-  // Score every ranked suggestion against the occupancy ledger and order
-  // the VISIBLE chips by score. This is the studio consumption layer the
-  // lead ruling scopes the weights to: `getRankedSuggestionsForChar` and
-  // the contracts producer order are untouched — only the chips' display
-  // order and their rationale lines derive from the score.
-  const suggestionScores = useMemo(() => {
-    const scores = new Map<PlacementSeedEntry, ScoredCandidate>();
-    if (currentChar !== null) {
-      for (const entry of suggestions) {
-        scores.set(
-          entry,
-          scoreCandidate(entry.topCandidate, currentChar, {
-            occupancy: slotOccupancy,
-            ...needSets,
-            occupancyVerified: workingIr !== null,
-          }),
-        );
-      }
-    }
-    return scores;
-  }, [suggestions, currentChar, slotOccupancy, needSets, workingIr]);
-
-  const orderedVisibleSuggestions = useMemo(
-    () =>
-      [...visibleSuggestions].sort(
-        (a, b) =>
-          (suggestionScores.get(b)?.total ?? 0) -
-          (suggestionScores.get(a)?.total ?? 0),
-      ),
-    [visibleSuggestions, suggestionScores],
-  );
-
-  // Whether currentChar already has at least one recorded (non-sequence)
-  // mechanism whose strategyId is NOT among the strategyIds `suggestions`
-  // is currently offering for this char — i.e. the char is covered by
-  // UNRELATED means: a manually-applied method that has nothing to do with
-  // this row's chips (including one with no strategyId attribution at
-  // all). Built from the SAME `mechanismAssignments`/`suggestions` memos
-  // used above rather than re-collecting. Deliberately does NOT fire for a
-  // recorded mechanism whose strategyId DOES match one of the offered
-  // chips — that case is already handled per-chip by
-  // recordedSuggestionStrategyIds (it hides just that one chip), and must
-  // NOT suppress the whole row while a sibling chip is still on offer —
-  // that's the accept-independence contract (accept S-02 -> S-08 chip
-  // stays visible).
-  const hasUnrelatedRecordedMechanism = useMemo(() => {
-    if (currentChar === null) return false;
-    const offeredSuggestionStrategyIds = new Set(
-      suggestions.map((entry) => entry.strategyId),
-    );
-    for (const a of mechanismAssignments) {
-      if (a.scope !== "individual" || a.target !== currentChar) continue;
-      for (const m of a.mechanisms) {
-        if (
-          m.strategyId === undefined ||
-          !offeredSuggestionStrategyIds.has(m.strategyId)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }, [mechanismAssignments, currentChar, suggestions]);
 
   // Whole-inventory leave-warning (soft gate) — computed from the SAME
   // MechanismAssignment map + lettersToAdd scope this gallery already uses
@@ -2749,6 +2237,43 @@ export function MechanismGallery({
   const suggestionDismissed =
     currentChar !== null && suggestionResolved.has(currentChar);
 
+  const {
+    suggestionScores,
+    orderedVisibleSuggestions,
+    currentCharBadge,
+    rowOffered: suggestionRowOffered,
+  } = useMemo(
+    () =>
+      placementOffer({
+        currentChar,
+        placementMap,
+        bcp47: suggestionBcp47,
+        sessionAssignments,
+        mechanismAssignments,
+        dismissedEntries: dismissedSuggestionEntries,
+        rowDismissed: suggestionDismissed,
+        slotOccupancy,
+        needSets,
+        workingIr,
+        baseOnlyProducedSet,
+        baseProducedSet,
+      }),
+    [
+      currentChar,
+      placementMap,
+      suggestionBcp47,
+      sessionAssignments,
+      mechanismAssignments,
+      dismissedSuggestionEntries,
+      suggestionDismissed,
+      slotOccupancy,
+      needSets,
+      workingIr,
+      baseOnlyProducedSet,
+      baseProducedSet,
+    ],
+  );
+
   // ---------------------------------------------------------------------------
   // Method-input reset — called after apply or suggestion accept
   // ---------------------------------------------------------------------------
@@ -2782,32 +2307,43 @@ export function MechanismGallery({
     resetMethodState();
     if (currentChar !== null) {
       // One deadkey per purpose: propose the trigger of the session deadkey
-      // that already adds this character's mark, else a free trigger.
-      const proposed = proposeS02TriggerKey({
+      // that already adds this character's mark, else a free trigger. For a
+      // decomposable accented letter outside an abugida the natural method is
+      // deadkey (S-02, §3c defaults-first) — propose-then-confirm.
+      // resetMethodState sets "swap" unconditionally, so override after it.
+      const pre = preselectMethod({
         currentChar,
-        baseLetter: [...currentChar.normalize("NFD")][0] ?? "",
+        scriptClass: axes.scriptClass,
         ...triggerProposalInputsRef.current,
       });
-      proposedTriggerKeyRef.current = proposed;
-      setTriggerKey(proposed);
-    }
-    // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
-    // reasoning (also used by TouchGallery's longpress suggestion memo).
-    if (
-      currentChar !== null &&
-      isGatedAccentCompositionCandidate(currentChar, axes.scriptClass)
-    ) {
-      // §3c defaults-first: for a decomposable accented letter the natural method
-      // is deadkey (S-02) — propose-then-confirm. resetMethodState sets "swap"
-      // unconditionally, so override here after the reset.
-      setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
-      setMethod("deadkey");
+      proposedTriggerKeyRef.current = pre.proposedTriggerKey;
+      setTriggerKey(pre.proposedTriggerKey);
+      if (pre.method === "deadkey") {
+        setDeadkeyBaseLetter(pre.deadkeyBaseLetter);
+        setMethod("deadkey");
+      }
     }
   }, [currentChar, resetMethodState, clearCompanion, clearDisplacement, axes.scriptClass]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
   // ---------------------------------------------------------------------------
+
+  // Runs a recorded placement's steps in the lifted order (placementSequence):
+  // companion, record (+ deadkey escapes), displacement, companion.
+  const runPlacement = useCallback(
+    (plan: PlacementRecord) => {
+      for (const step of placementSequence(plan, sessionAssignments)) {
+        if (step.kind === "propose-companion") proposeCompanion(step.input);
+        else if (step.kind === "propose-displacement") proposeDisplacement(step.input);
+        else {
+          recordAssignments(step.next);
+          raiseDeadkeyEscapes(step.assignment);
+        }
+      }
+    },
+    [sessionAssignments, proposeCompanion, proposeDisplacement, recordAssignments, raiseDeadkeyEscapes],
+  );
 
   // Accept: immediately apply the suggested assignment (same logic as handleApply
   // for swap/ralt/deadkey, but using the candidate's own vkey/baseLetter
@@ -2818,244 +2354,47 @@ export function MechanismGallery({
   // below), so this can no longer close over a single `suggestion`.
   const handleSuggestionAccept = useCallback((entry: PlacementSeedEntry) => {
     if (currentChar === null) return;
-    const { vkey } = entry.topCandidate;
-    let assignment: MechanismAssignment;
-    // Set only by the S-08 branch below, to the LOWERCASE placement's own
-    // modifiers (never including SHIFT — see the guard there) — carries the
-    // ralt-layer companion's propose() call outside the branch so it fires
-    // AFTER recordAssignments below, once `assignment` is the exact object
-    // the proposal must reference (FR-008 identity guard).
-    let raltCompanionModifiers: ModifierToken[] | null = null;
-    // The #2300 displacement check derives the taken slot(s) from the
-    // recorded assignment itself (see maybeRaiseDisplacement) — S-02
-    // takes no slot (a deadkey composes on top of a base keystroke and
-    // shadows nothing) and yields no slot entries there.
-    if (entry.strategyId === "S-01") {
-      assignment = {
-        scope: "individual",
-        target: currentChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_SWAP,
-            strategyId: "S-01",
-            // Every code point: a character with no single ready-made form
-            // (ɛ̌) is a base plus its mark, and both must reach the rule.
-            slotValues: { kmnRules: `+ [${vkey}] > ${toUPlusSequence(currentChar)}` },
-          },
-        ],
-        source: "user",
-      };
-    } else if (entry.strategyId === "S-08") {
-      // Build from the candidate's OWN modifiers — never hardcode RALT.
-      // Mirrors the manual S-08 write path below (comboToKeySpec /
-      // canonicalizeCombo), so an uppercase case-pair fallback candidate
-      // (placementSeeds.ts's getRankedSuggestionsForChar, which supplies
-      // ["SHIFT","RALT"]) emits "[SHIFT RALT vkey]" rather than colliding with
-      // the lowercase's "[RALT vkey]". Falls back to bare RALT when the
-      // candidate carries no modifiers — today's kbgen seeder emits a direct
-      // S-08 candidate with modifiers: ["RALT"], but an empty list is guarded
-      // defensively rather than assumed.
-      const candidateModifiers = entry.topCandidate.modifiers;
-      // PlacementCandidate.modifiers are documented Keyman modifier tokens
-      // (placementMap.ts) — asserted rather than re-typed here, same as the
-      // manual S-08 badge label's `parts as ModifierToken[]` above.
-      const tokens = (
-        candidateModifiers.length > 0 ? candidateModifiers : ["RALT"]
-      ) as ModifierToken[];
-      let altgrKeyList: string;
-      try {
-        altgrKeyList = comboToKeySpec(canonicalizeCombo(tokens), vkey);
-      } catch {
-        // canonicalizeCombo only throws for a mutually-exclusive combo — a
-        // malformed kbgen/case-pair candidate should not crash the gallery;
-        // dismiss THIS chip only (not the whole row — a sibling S-02 chip may
-        // still be perfectly acceptable) rather than record a broken
-        // assignment.
-        markSuggestionEntryDismissed(currentChar, entry.strategyId);
-        devLog.warn(
-          `[MechanismGallery] handleSuggestionAccept: invalid modifier combo ${JSON.stringify(candidateModifiers)} for S-08 suggestion — dismissing`,
-        );
-        return;
-      }
-      assignment = {
-        scope: "individual",
-        target: currentChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_RALT,
-            strategyId: "S-08",
-            slotValues: {
-              altgrKeyList,
-              altgrOutputList: currentChar,
-            },
-          },
-        ],
-        source: "user",
-      };
-      // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm)
-      // for the RAlt-layer counterpart, raised right after the author accepts
-      // THIS suggestion — the flow the user actually takes, rather than
-      // waiting for them to separately navigate to the uppercase character
-      // (which today only gets its OWN ranked suggestions via
-      // getRankedSuggestionsForChar, not this propose-then-confirm banner).
-      // Only when `tokens` has no SHIFT of its own: a candidate that already
-      // carries SHIFT is itself the uppercase case-pair fallback
-      // (placementSeeds.ts), so IT is the companion — proposing a further
-      // companion for it would double up. `useCasePairCompanion`'s own
-      // `caseCounterpart` direction check (toUpper only) independently
-      // suppresses this for an already-uppercase `currentChar`.
-      if (!tokens.includes("SHIFT")) {
-        raltCompanionModifiers = tokens;
-      }
-    } else if (entry.strategyId === "S-02") {
-      // Prefills-via-direct-apply: the corpus attests a base LETTER
-      // (entry.topCandidate.baseLetter — the sole thing getRankedSuggestionsForChar
-      // gates an S-02 entry on) but never a TRIGGER key — the corpus has no
-      // signal for which physical key an author wants as the deadkey
-      // trigger, and imposing one would be exactly the kind of synthesized
-      // guess the ranking rule forbids for the base letter itself. Accept
-      // therefore builds the SAME shape handleApply's manual deadkey method
-      // would (via buildDeadkeyAssignment), using the studio's own
-      // currently-held trigger-key state (defaults to K_COLON — see
-      // resetMethodState) exactly as if the author had typed this base
-      // letter into the deadkey card themselves and clicked its own Apply.
-      const baseLetter = entry.topCandidate.baseLetter;
-      if (baseLetter === undefined || baseLetter.length === 0) {
-        // Structurally unreachable — getRankedSuggestionsForChar never
-        // returns an S-02 entry without a baseLetter — guarded defensively
-        // rather than assumed, same posture as the S-08 combo-canon catch
-        // above. Dismisses THIS chip only, same rationale as that catch.
-        markSuggestionEntryDismissed(currentChar, entry.strategyId);
-        devLog.warn(
-          `[MechanismGallery] handleSuggestionAccept: S-02 suggestion for "${currentChar}" carries no baseLetter — dismissing`,
-        );
-        return;
-      }
-      // While the author has left the proposed trigger untouched, re-propose
-      // with the suggestion's own base letter (ɛ is typed as trigger + e, not
-      // trigger + ɛ) so a base clash on the shared deadkey is avoided.
-      const acceptTriggerKey =
-        triggerKey === proposedTriggerKeyRef.current
-          ? proposeS02TriggerKey({ currentChar, baseLetter, sessionAssignments, workingIr })
-          : triggerKey;
-      const triggerResolution = resolveKeyPickerSelection(
-        acceptTriggerKey,
-        triggerKeyCustomChar,
-        TRIGGER_KEY_RESOLVE_OPTIONS,
-      );
-      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
-      if (
-        resolvedTriggerVkey === null ||
-        s02BaseClash({
-          triggerKey: resolvedTriggerVkey,
-          baseLetter,
-          currentChar,
-          sessionAssignments,
-        }) !== null
-      ) {
-        // The trigger doesn't resolve (e.g. a custom trigger character left
-        // blank), or its deadkey already maps this base letter to another
-        // character — fall back to prefilling the deadkey method card
-        // (defaults-first, §3c) rather than dismissing outright, so the
-        // author can pick a trigger and Apply manually. Dismisses THIS chip
-        // only — a sibling chip (e.g. S-08) stays offered.
-        setMethod("deadkey");
-        setTriggerKey(acceptTriggerKey);
-        setDeadkeyBaseLetter(baseLetter);
-        markSuggestionEntryDismissed(currentChar, entry.strategyId);
-        return;
-      }
-      // The id + accent char come from the shared S-02 seam
-      // (resolveS02DeadkeyIdentity) — the same call handleApply's manual
-      // deadkey method makes, so the two write paths cannot drift. The id is
-      // the trigger's existing session deadkey, else freshly allocated.
-      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
-        triggerKey: acceptTriggerKey,
-        triggerResolution,
-        workingIr,
-        sessionAssignments,
-      });
-      assignment = buildDeadkeyAssignment({
-        currentChar,
-        baseLetter,
-        triggerVkey: resolvedTriggerVkey,
-        deadkeyName,
-        accentChar,
-        escapes: newTriggerEscapes(resolvedTriggerVkey),
-      });
-      // S-02 case-pair proposal — same companion the manual deadkey Apply
-      // raises (see handleApply's method === "deadkey" branch): the base
-      // letter and output case-shift; the trigger key/deadkey name/accent
-      // char are untouched.
-      proposeCompanion({
-        mechanism: "combo",
-        originalChar: currentChar,
-        combo: {
-          kind: "deadkey",
-          triggerKey: resolvedTriggerVkey,
-          deadkeyName,
-          accentChar,
-          baseLetter,
-        },
-        baseAssignment: assignment,
-        alreadyProduced: (counterpart) =>
-          sessionAssignments.some(
-            (a) =>
-              a.target === counterpart &&
-              a.mechanisms.some(
-                (m) =>
-                  isDeadkeyPatternId(m.patternId) &&
-                  m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
-              ),
-          ),
-      });
-    } else {
+    const plan = planSuggestionAccept({
+      entry,
+      currentChar,
+      sessionAssignments,
+      workingIr,
+      slotOccupancy,
+      needSets,
+      triggerKey,
+      triggerKeyCustomChar,
+      proposedTriggerKey: proposedTriggerKeyRef.current,
+    });
+    if (plan.kind === "dismiss") {
+      // Dismisses THIS chip only — a sibling chip stays offered.
       markSuggestionEntryDismissed(currentChar, entry.strategyId);
       devLog.warn(
-        `[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${entry.strategyId}" — dismissing suggestion`,
+        `[MechanismGallery] handleSuggestionAccept: ${plan.reason} for ${entry.strategyId} suggestion on "${currentChar}" — dismissing`,
       );
       return;
     }
-    recordAssignments([...sessionAssignments, assignment]);
-    raiseDeadkeyEscapes(assignment);
-    // The successful accept's own mechanism is now recorded with this
-    // strategyId — recordedSuggestionStrategyIds (above) filters this ONE
-    // chip out of visibleSuggestions on the next render; a sibling chip with
-    // a DIFFERENT strategyId is untouched. Marking it dismissed here too is
-    // redundant-but-harmless belt-and-braces (it never needs to reappear).
-    markSuggestionEntryDismissed(currentChar, entry.strategyId);
-    // #2300 G3: if this accept shadowed a still-needed glyph, propose its
-    // demotion (never blocks the accept — it already happened).
-    maybeRaiseDisplacement(assignment);
-    if (raltCompanionModifiers !== null) {
-      proposeCompanion({
-        mechanism: "ralt-layer",
-        originalChar: currentChar,
-        vkey,
-        baseModifiers: raltCompanionModifiers,
-        baseAssignment: assignment,
-        // "Counterpart already placed" (spec §Edge Cases): redundant if the
-        // counterpart already has a PATTERN_RALT mechanism whose altgrKeyList
-        // names this same vkey — mirrors the manual S-08 write path's
-        // word-boundary match on kmnRules (see the "Assign to a key" card's
-        // alreadyProduced above), applied to altgrKeyList instead.
-        alreadyProduced: (counterpart) =>
-          sessionAssignments.some(
-            (a) =>
-              a.target === counterpart &&
-              a.mechanisms.some((m) => {
-                const keyList = m.slotValues?.["altgrKeyList"];
-                return (
-                  m.patternId === PATTERN_RALT &&
-                  typeof keyList === "string" &&
-                  new RegExp(`\\b${vkey}\\b`).test(keyList)
-                );
-              }),
-          ),
-      });
+    if (plan.kind === "prefill-deadkey") {
+      // The trigger doesn't resolve (e.g. a custom trigger character left
+      // blank), or its deadkey already maps this base letter to another
+      // character — fall back to prefilling the deadkey method card
+      // (defaults-first, §3c) rather than dismissing outright, so the
+      // author can pick a trigger and Apply manually. Dismisses THIS chip
+      // only — a sibling chip (e.g. S-08) stays offered.
+      setMethod("deadkey");
+      setTriggerKey(plan.triggerKey);
+      setDeadkeyBaseLetter(plan.baseLetter);
+      markSuggestionEntryDismissed(currentChar, entry.strategyId);
+      return;
     }
+    // A shadowed still-needed glyph raises a demotion proposal inside the
+    // sequence (never blocks the accept — it already happened).
+    runPlacement(plan);
+    // The successful accept's own mechanism is now recorded with this
+    // strategyId — placementOffer filters this ONE chip out of the visible
+    // chips on the next render; a sibling chip with a DIFFERENT strategyId is
+    // untouched. Marking it dismissed here too is redundant-but-harmless
+    // belt-and-braces (it never needs to reappear).
+    markSuggestionEntryDismissed(currentChar, entry.strategyId);
     resetMethodState();
   }, [
     currentChar,
@@ -3063,13 +2402,11 @@ export function MechanismGallery({
     triggerKeyCustomChar,
     workingIr,
     sessionAssignments,
-    recordAssignments,
     resetMethodState,
-    raiseDeadkeyEscapes,
-    newTriggerEscapes,
+    slotOccupancy,
+    needSets,
     markSuggestionEntryDismissed,
-    proposeCompanion,
-    maybeRaiseDisplacement,
+    runPlacement,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -3217,276 +2554,43 @@ export function MechanismGallery({
     // method === "sequence" is unreachable here: canApply returns false for
     // it (the sequence builder in the right pane owns its own Apply — see
     // SequenceBuilderPanel), so the guard above already returned.
-
-    let assignment: MechanismAssignment;
-    // The #2300 displacement check derives the taken slot(s) from the
-    // recorded assignment itself (see maybeRaiseDisplacement) — the
-    // deadkey branch takes no slot (a deadkey composes on top of a base
-    // keystroke and shadows nothing) and yields no slot entries there.
-
-    if (method === "deadkey") {
-      const base = resolveCharInput(
-        deadkeyBaseLetter,
-        deadkeyBaseLetterResolveOptions,
-      );
-      const triggerResolution = resolveKeyPickerSelection(
-        triggerKey,
-        triggerKeyCustomChar,
-        TRIGGER_KEY_RESOLVE_OPTIONS,
-      );
-      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
-      if (!base.ok || resolvedTriggerVkey === null) return;
-      // The id + accent char come from the shared S-02 seam
-      // (resolveS02DeadkeyIdentity) — the same call the S-02 suggestion
-      // accept makes, so the two write paths cannot drift. accentChar keeps
-      // the old convention (the trigger key's literal character, so
-      // trigger+trigger escapes back to the bare character); the id is the
-      // trigger's existing session deadkey, else freshly allocated via
-      // allocateDeadkeyId — the "dead0" forced derivation is gone.
-      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
-        triggerKey,
-        triggerResolution,
-        workingIr,
-        sessionAssignments,
-      });
-      assignment = buildDeadkeyAssignment({
-        currentChar,
-        baseLetter: base.value,
-        triggerVkey: resolvedTriggerVkey,
-        deadkeyName,
-        accentChar,
-        escapes: newTriggerEscapes(resolvedTriggerVkey),
-      });
-
-      // S-02 case-pair proposal: the parallel combo case-shifts the BASE
-      // LETTER and the OUTPUT only. The trigger key, its deadkey name, and the
-      // accent character are untouched — a dead key is an accent selector, not
-      // a letter, and a SHIFT-flagged accent key would be a broken rule.
-      // Suppressed by the hook when either side has no confident capital.
-      proposeCompanion({
-        mechanism: "combo",
-        originalChar: currentChar,
-        combo: {
-          kind: "deadkey",
-          triggerKey: resolvedTriggerVkey,
-          deadkeyName,
-          accentChar,
-          baseLetter: base.value,
-        },
-        baseAssignment: assignment,
-        // "Counterpart already placed" (spec §Edge Cases): the parallel combo
-        // is redundant if the counterpart already has a PATTERN_DEADKEY
-        // mechanism on this same trigger key.
-        alreadyProduced: (counterpart) =>
-          sessionAssignments.some(
-            (a) =>
-              a.target === counterpart &&
-              a.mechanisms.some(
-                (m) =>
-                  isDeadkeyPatternId(m.patternId) &&
-                  m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
-              ),
-          ),
-      });
-    } else {
-      // method === "swap" — combined "Assign to a key" card. Zero filled
-      // layers (raltTokens has none) plans a plain S-01 simple_swap base-key
-      // assignment; one or more filled layers plans an S-08
-      // modifier_as_layer_switch combo instead. Both write paths below are
-      // unchanged from the pre-merge "Assign to a key"/"Layer + key" cards —
-      // only the branching condition (chosenTokens.length) is new.
-      const resolvedSwapVkey = resolvedVkeyOf(
-        resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
-      );
-      if (resolvedSwapVkey === null) return;
-      const chosenTokens = raltTokens.filter(
-        (tok): tok is ModifierToken => tok !== "",
-      );
-
-      if (chosenTokens.length === 0) {
-        // ---- S-01: simple_swap — kmnFragment uses {{kmnRules}}. ----
-        // capsHandling is a property of the KEY — a key that already carries
-        // explicit CAPS/NCAPS rules needs a CAPS-aware pair (Layer-A Check
-        // #10).
-        const capsHandling =
-          workingIr !== null
-            ? planShiftAssignment(workingIr, "main", resolvedSwapVkey)
-                .capsHandling
-            : false;
-        // Base layer only now that the Base/Shift toggle is gone: bare
-        // `+ [K_X] > U+XXXX` when the key has no CAPS handling; the
-        // CAPS-aware NCAPS+CAPS pair otherwise — a bare rule on a
-        // CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
-        // pair, since applyAssignments splices new lines before existing
-        // ones (first-match-wins).
-        const kmnRules = buildStartRuleLines(resolvedSwapVkey, currentChar, {
-          capsHandling,
-        }).join("\n");
-        assignment = {
-          scope: "individual",
-          target: currentChar,
-          modality: "physical",
-          mechanisms: [
-            {
-              patternId: PATTERN_SWAP,
-              strategyId: "S-01",
-              slotValues: {
-                kmnRules,
-              },
-            },
-          ],
-          source: "user",
-        };
-
-        // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm,
-        // never apply silently). The counterpart's natural home is the shift
-        // layer of the SAME key. Suppressed for mnemonic keyboards (shift
-        // targeting is unavailable) and for the toLower direction — assigning
-        // an uppercase char to base proposes nothing; only the base->uppercase
-        // (toUpper) direction is offered a companion. Scope cut, not a defect:
-        // the reverse direction is left for a future pass.
-        if (shiftLayerAllowed && workingIr !== null) {
-          proposeCompanion({
-            mechanism: "physical",
-            originalChar: currentChar,
-            vkey: resolvedSwapVkey,
-            capsHandling,
-            // Object identity, not target/index: the gallery allows several
-            // mechanisms per character, so confirm must locate exactly the
-            // assignment this proposal was raised for (FR-008).
-            baseAssignment: assignment,
-            // "Counterpart already placed" (spec §Edge Cases). `simple_swap`
-            // records its rule text as already-emitted .kmn lines in
-            // `slotValues.kmnRules` (buildStartRuleLines / buildShiftRuleLines /
-            // buildCasePairRuleLines all interpolate the vkey literally), so we
-            // don't have exactly one line shape to string-match against — a
-            // combined CAPS quad, a bare shift line, and a CAPS/NCAPS shift pair
-            // all look different. Matching `target === counterpart` (this IS an
-            // assignment for the capital) together with the vkey appearing
-            // (word-boundary) anywhere in that assignment's `kmnRules` is
-            // reliable regardless of which of the three emitters produced it,
-            // without re-deriving or comparing exact rule text.
-            alreadyProduced: (counterpart) =>
-              sessionAssignments.some(
-                (a) =>
-                  a.target === counterpart &&
-                  a.mechanisms.some((m) => {
-                    const rules = m.slotValues?.["kmnRules"];
-                    return (
-                      typeof rules === "string" &&
-                      new RegExp(`\\b${resolvedSwapVkey}\\b`).test(rules)
-                    );
-                  }),
-              ),
+    //
+    // The write, its case-pair companion and its displacement check come
+    // from the lifted plans (mechanismPlacement.ts). A deadkey takes no slot
+    // (it composes on top of a base keystroke and shadows nothing), so its
+    // displacement check yields nothing.
+    const plan =
+      method === "deadkey"
+        ? planDeadkeyApply({
+            currentChar,
+            baseLetterInput: deadkeyBaseLetter,
+            baseLetterOptions: deadkeyBaseLetterResolveOptions,
+            triggerKey,
+            triggerKeyCustomChar,
+            workingIr,
+            sessionAssignments,
+            slotOccupancy,
+            needSets,
+          })
+        : planSwapApply({
+            currentChar,
+            selectedKey: selectedSwapKey,
+            selectedKeyCustomChar: selectedSwapKeyCustomChar,
+            // Zero layers is S-01 on the base key, a lone SHIFT the shift
+            // plane (S-01, CAPS-aware), anything else S-08.
+            chosenTokens: raltTokens.filter((tok): tok is ModifierToken => tok !== ""),
+            workingIr,
+            sessionAssignments,
+            slotOccupancy,
+            needSets,
           });
-        }
-      } else if (chosenTokens.length === 1 && chosenTokens[0] === "SHIFT") {
-        // ---- Shift-plane assignment (S-01 via the shift layer) — spec §10
-        // Check #10 / shiftRules.ts. ----
-        // A combo whose ONLY modifier is SHIFT targets the SAME shift plane
-        // the pre-merge Base/Shift radio's "Shift" option wrote, via the
-        // SAME CAPS-aware builder (planShiftAssignment + buildShiftRuleLines)
-        // — not the store-based S-08 write path below, which never consults
-        // keyHasCapsHandling and would silently skip the NCAPS/CAPS pair a
-        // CAPS-handling key requires. Multi-modifier combos that also
-        // include SHIFT (e.g. [SHIFT ALT K_X]) are NOT rerouted here: they
-        // fall through to the S-08 branch below unchanged, which has never
-        // been CAPS-aware (shiftRules.ts is scoped to bare base/shift
-        // assignments only) — that is pre-existing S-08 behavior, not a
-        // regression introduced by the merged card.
-        //
-        // Not gated on shiftLayerAllowed/mnemonic: unlike the old radio, the
-        // layer-combo SHIFT option is intentionally selectable regardless of
-        // &MNEMONICLAYOUT (see the "is not gated by mnemonic layout" test) —
-        // capsHandling is the only per-key concern this plane needs.
-        const capsHandling =
-          workingIr !== null
-            ? planShiftAssignment(workingIr, "main", resolvedSwapVkey)
-                .capsHandling
-            : false;
-        const kmnRules = buildShiftRuleLines(resolvedSwapVkey, currentChar, {
-          capsHandling,
-        }).join("\n");
-        assignment = {
-          scope: "individual",
-          target: currentChar,
-          modality: "physical",
-          mechanisms: [
-            {
-              patternId: PATTERN_SWAP,
-              strategyId: "S-01",
-              slotValues: {
-                kmnRules,
-              },
-            },
-          ],
-          source: "user",
-        };
-        // No case-pair companion proposal here — mirrors the old Shift radio,
-        // which only proposed a companion from the BASE-layer apply (see the
-        // chosenTokens.length === 0 branch above); the counterpart of a
-        // shift-plane assignment isn't a further shift-plane target.
-      } else {
-        // ---- S-08: modifier_as_layer_switch — kmnFragment uses
-        // {{altgrKeyList}} and {{altgrOutputList}}. ----
-        // Build a single-entry held-layer rule for this character, keyed on
-        // whichever combo of ModifierTokens the author picked (generalized S-08).
-        let altgrKeyList: string;
-        try {
-          // Use the RESOLVED vkey (custom-char aware), never the raw
-          // selectedSwapKey — the latter may be the "__custom__" sentinel
-          // when the author typed a custom base character.
-          altgrKeyList = comboToKeySpec(
-            canonicalizeCombo(chosenTokens),
-            resolvedSwapVkey,
-          );
-        } catch {
-          // canonicalizeCombo only throws for a mutually-exclusive combo, which
-          // the dropdown's own exclusion logic (handleRaltTokenChange) already
-          // prevents from being selected — structurally unreachable today.
-          // Guarded anyway: skip recording rather than crashing the gallery.
-          return;
-        }
-        // No ralt-layer case-pair companion proposal here (unlike the
-        // suggestion-accept path's handleSuggestionAccept, which does raise
-        // one). This "Assign to a key" card lets the author pick ANY combo of
-        // up to four ModifierTokens — chosenTokens may already include SHIFT
-        // (e.g. the author manually building the SHIFT+RALT companion
-        // itself), or be an unrelated combo (e.g. CTRL+ALT) that carries no
-        // case-pair meaning at all. Unlike the suggestion-accept path — whose
-        // candidate is always a kbgen-seeded, RALT-only lowercase placement,
-        // so "this base placement's own modifiers, plus SHIFT" is always a
-        // sound companion to propose — there is no reliable signal here that
-        // chosenTokens IS a lowercase case-pair's RALT layer rather than an
-        // arbitrary combo. Proposing unconditionally would misfire (double
-        // SHIFT, or a nonsensical companion for CTRL+ALT). Scope cut, not a
-        // defect: a future pass could special-case chosenTokens === ["RALT"]
-        // specifically, but that is a narrower rule than exists today for any
-        // other manual-apply companion.
-        assignment = {
-          scope: "individual",
-          target: currentChar,
-          modality: "physical",
-          mechanisms: [
-            {
-              patternId: PATTERN_RALT,
-              strategyId: "S-08",
-              slotValues: {
-                altgrKeyList,
-                altgrOutputList: currentChar,
-              },
-            },
-          ],
-          source: "user",
-        };
-      }
-    }
-
-    recordAssignments([...sessionAssignments, assignment]);
-    raiseDeadkeyEscapes(assignment);
-    // #2300 G3: if this apply shadowed a still-needed glyph, propose its
-    // demotion (never blocks the apply — it already happened).
-    maybeRaiseDisplacement(assignment);
+    // Null when a pick does not resolve (or, for the swap card, a
+    // mutually-exclusive combo the dropdown's own exclusion already
+    // prevents) — skip recording rather than crash.
+    if (plan === null) return;
+    // A shadowed still-needed glyph raises a demotion proposal inside the
+    // sequence (never blocks the apply — it already happened).
+    runPlacement(plan);
     resetMethodState();
   }, [
     currentChar,
@@ -3498,16 +2602,13 @@ export function MechanismGallery({
     selectedSwapKey,
     selectedSwapKeyCustomChar,
     raltTokens,
-    shiftLayerAllowed,
     workingIr,
-    proposeCompanion,
-    recordAssignments,
+    runPlacement,
     sessionAssignments,
     resetMethodState,
     deadkeyBaseLetterResolveOptions,
-    maybeRaiseDisplacement,
-    raiseDeadkeyEscapes,
-    newTriggerEscapes,
+    slotOccupancy,
+    needSets,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -3523,331 +2624,27 @@ export function MechanismGallery({
     (applied?: SequenceApplied) => {
       resetMethodState();
       if (applied === undefined || currentChar === null) return;
-      proposeCompanion({
-        mechanism: "combo",
-        originalChar: currentChar,
-        combo: {
-          kind: "sequence",
-          content: applied.content,
-          indicator: applied.indicator,
-        },
-        baseAssignment: applied.assignment,
-        // "Counterpart already placed" (spec §Edge Cases). The confirm path's
-        // own (firstLetterOut, secondLetter) dedup already makes a re-confirm
-        // a no-op — this predicate suppresses the BANNER in that same case, so
-        // the author isn't prompted to confirm something that would do
-        // nothing. Matches the S-02 predicate's style: it checks the
-        // UNCHANGED physical component (there, `triggerKey`; here,
-        // `secondLetter`, the indicator key, which the combo shift never
-        // touches — see DeadkeyCombo/SequenceCombo in casePairCompanion.ts)
-        // rather than re-deriving the case-shifted `firstLetterOut`, which
-        // would need a second `caseCounterpart` call outside the hook
-        // (`caseCounterpart` is deliberately kept to exactly one caller,
-        // FR-002 — see the comment above `useCasePairCompanion()`).
-        alreadyProduced: (counterpart) =>
-          partitionSequenceAssignment(sessionAssignments, counterpart).mechs.some(
-            (m) => m.slotValues?.["secondLetter"] === applied.indicator,
-          ),
-      });
+      proposeCompanion(sequenceCompanionInput({ currentChar, applied, sessionAssignments }));
     },
     [resetMethodState, currentChar, proposeCompanion, sessionAssignments],
-  );
-
-  /**
-   * S-02 / S-03 confirm: record the parallel combo. The trigger (dead key) or
-   * indicator (sequence) is carried across unchanged — only the base/content
-   * letter and the output are case-shifted, and both were shifted by the hook
-   * at propose time (`parallelCombo`), never re-derived here.
-   */
-  const confirmComboCompanion = useCallback(
-    (proposal: Extract<CasePairProposal, { mechanism: "combo" }>) => {
-      // Stale-proposal guard — same rule as the physical path (FR-008): the
-      // assignment this was raised for must still be present, by reference.
-      if (!sessionAssignments.includes(proposal.baseAssignment)) {
-        clearCompanion();
-        return;
-      }
-
-      const { parallelCombo, counterpart } = proposal;
-
-      if (parallelCombo.kind === "deadkey") {
-        // Unchanged: the accent key is a selector, not a letter. Case-shifted:
-        // the base letter in, the accented form out. Same shape as
-        // handleApply's manual deadkey Apply and handleSuggestionAccept's
-        // S-02 branch — see buildDeadkeyAssignment.
-        const companionAssignment = buildDeadkeyAssignment({
-          currentChar: counterpart,
-          baseLetter: parallelCombo.baseLetter,
-          triggerVkey: parallelCombo.triggerKey,
-          deadkeyName: parallelCombo.deadkeyName,
-          accentChar: parallelCombo.accentChar,
-        });
-        recordAssignments([...sessionAssignments, companionAssignment]);
-      } else {
-        // The parallel sequence produces the counterpart, so it belongs in the
-        // counterpart's own sequence bucket. The existing
-        // (firstLetterOut, secondLetter) dedup makes a re-confirm a no-op
-        // rather than a duplicate ref.
-        const { mechs: existingMechs, rest } = partitionSequenceAssignment(
-          sessionAssignments,
-          counterpart,
-        );
-        const alreadyRecorded = existingMechs.some(
-          (m) =>
-            m.slotValues?.["firstLetterOut"] === parallelCombo.content &&
-            m.slotValues?.["secondLetter"] === parallelCombo.indicator,
-        );
-        if (!alreadyRecorded) {
-          const newRef: MechanismRef = {
-            patternId: PATTERN_SEQUENCE,
-            strategyId: "S-03",
-            slotValues: {
-              firstLetterOut: parallelCombo.content,
-              // Unchanged: the indicator is a physical key by construction.
-              secondLetter: parallelCombo.indicator,
-              collapsedChar: counterpart,
-            },
-          };
-          recordAssignments([
-            ...rest,
-            {
-              scope: "individual",
-              target: counterpart,
-              modality: "physical",
-              mechanisms: [...existingMechs, newRef],
-              source: "user",
-            },
-          ]);
-        }
-      }
-
-      clearCompanion();
-    },
-    [sessionAssignments, recordAssignments, clearCompanion],
   );
 
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
     // The touch mechanism confirms in its own gallery.
     if (pendingCompanion.mechanism === "touch") return;
-
-    if (pendingCompanion.mechanism === "combo") {
-      confirmComboCompanion(pendingCompanion);
-      return;
-    }
-
-    if (pendingCompanion.mechanism === "ralt-layer") {
-      // Stale-proposal guard — same rule as the physical branch below (FR-008):
-      // the assignment this was raised for must still be present, by reference.
-      if (!sessionAssignments.includes(pendingCompanion.baseAssignment)) {
-        clearCompanion();
-        return;
-      }
-      // The companion's modifiers are the lowercase placement's own modifiers
-      // with SHIFT added — the SAME comboToKeySpec/canonicalizeCombo builder
-      // the manual S-08 write path and the suggestion-accept fix use, so the
-      // emitted altgrKeyList shape can never drift between the three call
-      // sites. canonicalizeCombo only throws for a mutually-exclusive combo —
-      // structurally unreachable here since baseModifiers was itself already
-      // a valid, applied combo — but guarded the same defensive way as the
-      // other write paths rather than assumed.
-      let altgrKeyList: string;
-      try {
-        altgrKeyList = comboToKeySpec(
-          canonicalizeCombo([...pendingCompanion.baseModifiers, "SHIFT"]),
-          pendingCompanion.vkey,
-        );
-      } catch {
-        clearCompanion();
-        return;
-      }
-      const companionAssignment: MechanismAssignment = {
-        scope: "individual",
-        target: pendingCompanion.counterpart,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_RALT,
-            strategyId: "S-08",
-            slotValues: {
-              altgrKeyList,
-              altgrOutputList: pendingCompanion.counterpart,
-            },
-          },
-        ],
-        source: "user",
-      };
-      recordAssignments([...sessionAssignments, companionAssignment]);
-      clearCompanion();
-      return;
-    }
-
-    // Stale-proposal guard: locate the exact assignment object this proposal
-    // was raised for, by reference — not by re-matching target/scope, which
-    // would happily grab a different, unrelated assignment for the same
-    // character (P1: multiple mechanisms per character). If it is no longer
-    // present in sessionAssignments (removed, or somehow replaced by another
-    // path), the proposal is stale: dismiss the banner and record nothing.
-    const baseAssignmentIdx = sessionAssignments.indexOf(
-      pendingCompanion.baseAssignment,
-    );
-    if (baseAssignmentIdx === -1) {
-      clearCompanion();
-      return;
-    }
-
-    if (pendingCompanion.capsHandling) {
-      // CAPS-handling key: the base assignment just recorded (for
-      // originalChar) already carries an explicit NCAPS/CAPS pair
-      // (buildStartRuleLines). Appending a SEPARATE companion assignment with
-      // its own [CAPS K_X] line would conflict with that pair's [CAPS K_X]
-      // line — two rules targeting the identical context, first-inserted
-      // silently wins (Layer-A Check #10). Instead, REPLACE the base
-      // assignment with a single combined assignment carrying the full
-      // CAPS-as-case-inverter quad (buildCasePairRuleLines).
-      const kmnRules = buildCasePairRuleLines(
-        pendingCompanion.vkey,
-        pendingCompanion.originalChar,
-        pendingCompanion.counterpart,
-        { capsHandling: true },
-      ).join("\n");
-      const combinedAssignment: MechanismAssignment = {
-        scope: "individual",
-        target: pendingCompanion.originalChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_SWAP,
-            strategyId: "S-01",
-            slotValues: { kmnRules },
-          },
-        ],
-        source: "user",
-      };
-      const next = sessionAssignments.map((a, i) =>
-        i === baseAssignmentIdx ? combinedAssignment : a,
-      );
-      recordAssignments(next);
-    } else {
-      // No CAPS handling on the key: base (`[K_X]`) and shift (`[SHIFT K_X]`)
-      // target disjoint contexts — appending a separate companion assignment
-      // cannot conflict with the base assignment.
-      const kmnRules = buildShiftRuleLines(
-        pendingCompanion.vkey,
-        pendingCompanion.counterpart,
-        {
-          capsHandling: false,
-        },
-      ).join("\n");
-      const companionAssignment: MechanismAssignment = {
-        scope: "individual",
-        target: pendingCompanion.counterpart,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_SWAP,
-            strategyId: "S-01",
-            slotValues: { kmnRules },
-          },
-        ],
-        source: "user",
-      };
-      recordAssignments([...sessionAssignments, companionAssignment]);
-    }
-
+    // What confirming records — the parallel combo, the RAlt / shift
+    // companion, or the CAPS-handling replacement — comes from the lifted
+    // confirm (mechanismPlacement.ts); null when the proposal is stale (its
+    // assignment is gone) or confirming would record nothing.
+    const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
+    if (next !== null) recordAssignments(next);
     clearCompanion();
-  }, [
-    pendingCompanion,
-    sessionAssignments,
-    recordAssignments,
-    clearCompanion,
-    confirmComboCompanion,
-  ]);
+  }, [pendingCompanion, sessionAssignments, recordAssignments, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // Displacement (demotion) — confirm handler (#2300, gate G3)
   // ---------------------------------------------------------------------------
-
-  /**
-   * Build the demotion assignment for `targetChar` under the pending
-   * proposal: an S-08 RAlt assignment on the SAME key (rank 1), or — only
-   * when the RAlt slot was taken/unavailable at propose time — an S-02
-   * deadkey assignment built through the shared buildDeadkeyAssignment /
-   * resolveS02DeadkeyIdentity seam (the demoted glyph is its own base
-   * letter: trigger + its old key's letter produces it again). Returns
-   * null when the shape cannot be built (unresolvable trigger / combo).
-   */
-  const buildDemotionAssignment = useCallback(
-    (targetChar: string): MechanismAssignment | null => {
-      if (pendingDisplacement === null) return null;
-      if (pendingDisplacement.demotionMethod === "ralt") {
-        let altgrKeyList: string;
-        try {
-          altgrKeyList = comboToKeySpec(
-            canonicalizeCombo(["RALT"]),
-            pendingDisplacement.vkey,
-          );
-        } catch {
-          return null;
-        }
-        return {
-          scope: "individual",
-          target: targetChar,
-          modality: "physical",
-          mechanisms: [
-            {
-              patternId: PATTERN_RALT,
-              strategyId: "S-08",
-              slotValues: {
-                altgrKeyList,
-                altgrOutputList: targetChar,
-              },
-            },
-          ],
-          source: "user",
-        };
-      }
-      // The demoted glyph is typed as trigger + itself — propose its trigger
-      // on its own (one deadkey per purpose), not the current character's.
-      const demotionTriggerKey = proposeS02TriggerKey({
-        currentChar: targetChar,
-        baseLetter: targetChar,
-        sessionAssignments,
-        workingIr,
-      });
-      const triggerResolution = resolveKeyPickerSelection(
-        demotionTriggerKey,
-        "",
-        TRIGGER_KEY_RESOLVE_OPTIONS,
-      );
-      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
-      if (resolvedTriggerVkey === null) return null;
-      if (
-        s02BaseClash({
-          triggerKey: resolvedTriggerVkey,
-          baseLetter: targetChar,
-          currentChar: targetChar,
-          sessionAssignments,
-        }) !== null
-      ) {
-        return null;
-      }
-      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
-        triggerKey: demotionTriggerKey,
-        triggerResolution,
-        workingIr,
-        sessionAssignments,
-      });
-      return buildDeadkeyAssignment({
-        currentChar: targetChar,
-        baseLetter: targetChar,
-        triggerVkey: resolvedTriggerVkey,
-        deadkeyName,
-        accentChar,
-      });
-    },
-    [pendingDisplacement, workingIr, sessionAssignments],
-  );
 
   /**
    * Confirm the demotion proposal. Direction (orthography tier, steer 2):
@@ -3860,73 +2657,28 @@ export function MechanismGallery({
    * assignment must still be present by reference, or the proposal is
    * dismissed and nothing is recorded. (The both-core proposal never
    * reaches this handler — its confirm is "Keep both", a dismissal; its
-   * demotion override is handleBothCoreDemoteOverride below.)
+   * demotion override is the second banner action, below.) What is
+   * recorded comes from the lifted confirm (mechanismPlacement.ts).
    */
-  const handleDisplacementConfirm = useCallback(() => {
-    if (pendingDisplacement === null) return;
-    if (!sessionAssignments.includes(pendingDisplacement.baseAssignment)) {
-      clearDisplacement();
-      return;
-    }
-    if (pendingDisplacement.direction === "demote-incoming") {
-      const demotionAssignment = buildDemotionAssignment(
-        pendingDisplacement.incomingChar,
-      );
-      if (demotionAssignment === null) {
-        clearDisplacement();
+  // The banner's two buttons take the first and second action of
+  // displacementActions. What each action records (or that it is the recorded
+  // dismissal) is the lifted displacementOutcomeFor (mechanismPlacement.ts);
+  // confirm-move and the both-core demotion override (never the default
+  // button, which keeps both primaries) clear the proposal, keep-both and
+  // leave dismiss it.
+  const resolveDisplacementAction = useCallback(
+    (action: DisplacementAction) => {
+      if (pendingDisplacement === null) return;
+      const outcome = displacementOutcomeFor(action, pendingDisplacement, sessionAssignments, workingIr);
+      if (outcome.kind === "dismiss") {
+        dismissDisplacement();
         return;
       }
-      const withoutPrimary = sessionAssignments.filter(
-        (a) => a !== pendingDisplacement.baseAssignment,
-      );
-      recordAssignments([...withoutPrimary, demotionAssignment]);
+      if (outcome.next !== null) recordAssignments(outcome.next);
       clearDisplacement();
-      return;
-    }
-    const demotionAssignment = buildDemotionAssignment(
-      pendingDisplacement.displacedChar,
-    );
-    if (demotionAssignment === null) {
-      clearDisplacement();
-      return;
-    }
-    recordAssignments([...sessionAssignments, demotionAssignment]);
-    clearDisplacement();
-  }, [
-    pendingDisplacement,
-    sessionAssignments,
-    recordAssignments,
-    clearDisplacement,
-    buildDemotionAssignment,
-  ]);
-
-  /**
-   * Both-core explicit author override: the author chose to demote the
-   * displaced core glyph anyway (the banner's non-default choice). This
-   * is never the default button — the default keeps both primaries.
-   */
-  const handleBothCoreDemoteOverride = useCallback(() => {
-    if (pendingDisplacement === null) return;
-    if (!sessionAssignments.includes(pendingDisplacement.baseAssignment)) {
-      clearDisplacement();
-      return;
-    }
-    const demotionAssignment = buildDemotionAssignment(
-      pendingDisplacement.displacedChar,
-    );
-    if (demotionAssignment === null) {
-      clearDisplacement();
-      return;
-    }
-    recordAssignments([...sessionAssignments, demotionAssignment]);
-    clearDisplacement();
-  }, [
-    pendingDisplacement,
-    sessionAssignments,
-    recordAssignments,
-    clearDisplacement,
-    buildDemotionAssignment,
-  ]);
+    },
+    [pendingDisplacement, sessionAssignments, workingIr, recordAssignments, clearDisplacement, dismissDisplacement],
+  );
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -3950,12 +2702,7 @@ export function MechanismGallery({
   // completion (mechanism-gallery-progression; replaces the old
   // "Skip this character" escape, which recorded nothing and let an author
   // leave a character neither implemented nor accounted for).
-  const canGoNext =
-    currentChar !== null &&
-    (appliedForCurrentChar > 0 ||
-      coveredChars.has(currentChar) ||
-      hasSequenceForChar(sessionAssignments, currentChar) ||
-      markedDesktopSet.has(currentChar));
+  const canGoNext = canGoNextFor(currentChar, mechanismAssignments, sessionAssignments, markedDesktopSet);
 
   const handleRemoveCovered = useCallback(
     (char: string) => {
@@ -4887,13 +3634,8 @@ export function MechanismGallery({
                   contract). hasUnrelatedRecordedMechanism is defined to
                   agree with this: a recorded mechanism whose strategyId DOES
                   match an offered chip does not count as "unrelated". */}
-            {visibleSuggestions.length > 0 &&
-              !suggestionDismissed &&
-              currentChar !== null &&
-              !baseOnlyProducedSet.has(currentChar) &&
-              !(currentCharBadge?.isComposable ?? false) &&
-              !hasSequenceForChar(sessionAssignments, currentChar) &&
-              !hasUnrelatedRecordedMechanism && (
+            {suggestionRowOffered &&
+              currentChar !== null && (
               <div
                 role="note"
                 aria-label={t({
@@ -5234,15 +3976,11 @@ export function MechanismGallery({
                 // frequency data); demoting the displaced glyph is the
                 // explicit override on the other button. Every other
                 // direction confirms the demotion / dismisses as usual.
-                onConfirm={
-                  pendingDisplacement.direction === "both-core"
-                    ? dismissDisplacement
-                    : handleDisplacementConfirm
+                onConfirm={() =>
+                  resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[0])
                 }
-                onDismiss={
-                  pendingDisplacement.direction === "both-core"
-                    ? handleBothCoreDemoteOverride
-                    : dismissDisplacement
+                onDismiss={() =>
+                  resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[1])
                 }
               />
             )}

@@ -17,7 +17,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { MechanismAssignment, OutputForm, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import { applyAssignments } from "@keyboard-studio/engine";
-import { useCasePairCompanion } from "./casePairCompanion.ts";
+import { acceptCasePairCompanion, useCasePairCompanion } from "./casePairCompanion.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
 /** A throwaway base assignment — identity is all the hook needs. */
@@ -426,5 +426,70 @@ describe("case-pair companion output form (spec 106 FR-023)", () => {
     const kmn = emit("ready-made");
     expect(kmn).toContain("store(dk_3000_output) 'ǎǍ'");
     expect(kmn).not.toContain("̌");
+  });
+});
+
+describe("acceptCasePairCompanion (pure derivation)", () => {
+  it("builds a physical proposal with the uppercase counterpart", () => {
+    const base = baseAssignment("a");
+    const p = acceptCasePairCompanion(
+      { mechanism: "physical", originalChar: "a", vkey: "K_A", capsHandling: false, baseAssignment: base },
+      undefined,
+    );
+    expect(p).not.toBeNull();
+    expect(p?.counterpart).toBe("A");
+    expect(p?.mechanism).toBe("physical");
+  });
+
+  it("returns null for caseless, Georgian, and already-produced counterparts", () => {
+    const base = baseAssignment("x");
+    const physical = (originalChar: string, alreadyProduced?: (c: string) => boolean) =>
+      acceptCasePairCompanion(
+        {
+          mechanism: "physical",
+          originalChar,
+          vkey: "K_Q",
+          capsHandling: false,
+          baseAssignment: base,
+          ...(alreadyProduced ? { alreadyProduced } : {}),
+        },
+        undefined,
+      );
+    expect(physical("ا")).toBeNull();
+    expect(physical("ა")).toBeNull();
+    expect(physical("a", (c) => c === "A")).toBeNull();
+  });
+
+  it("case-shifts a combo's input side and leaves the trigger alone", () => {
+    const p = acceptCasePairCompanion(
+      {
+        mechanism: "combo",
+        originalChar: "é",
+        combo: { kind: "deadkey", triggerKey: "K_QUOTE", deadkeyName: "acute", accentChar: "\u00B4", baseLetter: "e" },
+        baseAssignment: baseAssignment("é"),
+      },
+      undefined,
+    );
+    expect(p?.mechanism).toBe("combo");
+    if (p?.mechanism === "combo") {
+      expect(p.parallelCombo).toEqual({
+        kind: "deadkey",
+        triggerKey: "K_QUOTE",
+        deadkeyName: "acute",
+        accentChar: "\u00B4",
+        baseLetter: "E",
+      });
+    }
+  });
+
+  it("treats an empty locale as no locale", () => {
+    const input = {
+      mechanism: "physical" as const,
+      originalChar: "i",
+      vkey: "K_I",
+      capsHandling: false,
+      baseAssignment: baseAssignment("i"),
+    };
+    expect(acceptCasePairCompanion(input, "")).toEqual(acceptCasePairCompanion(input, undefined));
   });
 });

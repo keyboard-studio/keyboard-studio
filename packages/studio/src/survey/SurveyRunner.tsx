@@ -11,7 +11,6 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
-import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useId, useMemo, useRef, useEffect } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type {
@@ -25,13 +24,11 @@ import type {
 } from "./types.ts";
 import type {
   DecisionProposalSource,
-  SurveyAnswer,
   SurveyPhaseResult,
   LintFinding,
   LanguageSummary,
 } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
-import { evalConditionGrammar } from "./conditionGrammar.ts";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import {
@@ -40,11 +37,24 @@ import {
   peekAnswerDraft,
   peekAnswerProposals,
 } from "../stores/stepWalkStore.ts";
-import { useSurveyAnswerStore, type SavedAnswer } from "../stores/surveyAnswerStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
-import { runLiveExtractionFromStores } from "../decisions/liveExtraction.ts";
-import { questionRegistry } from "./questions/registry.ts";
+import {
+  answersDiffer,
+  assembleFlowResult,
+  buildSavedAnswers,
+  advanceThrough,
+  canAdvanceFrom,
+  evalCondition,
+  hasValue,
+  indexFlow,
+  publishSavedAnswers,
+  recordForQuestion,
+  resolveNext,
+  seedProposal,
+  toSurveyAnswer,
+} from "./flowWalk.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import {
   surveyCard,
@@ -61,177 +71,10 @@ import { handleEnterToAdvance } from "./enterToAdvance.ts";
 import { WARNING } from "../ui/theme.ts";
 import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 
-// ---------------------------------------------------------------------------
-// Condition evaluator
-// ---------------------------------------------------------------------------
-
-/**
- * Evaluate a YAML condition string against the current answer value and context.
- *
- * Supported patterns (drawn from actual YAML content):
- *   value == 'x'
- *   value != 'x'
- *   ctx.field == 'x'
- *   ctx.field != 'x'
- *   <expr> or <expr>
- *   <expr> and <expr>
- */
-export function evalCondition(
-  condition: string,
-  value: string | string[] | undefined,
-  ctx: SurveyContext,
-): boolean {
-  const strVal = typeof value === "string" ? value : Array.isArray(value) ? value.join(",") : "";
-  return (
-    evalConditionGrammar(
-      condition,
-      (lhs) => (lhs === "value" ? strVal : ctx[lhs.slice(4)] ?? ""),
-      false,
-    ) === true
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Next-question resolver
-// ---------------------------------------------------------------------------
-
-export function resolveNext(
-  question: FlowQuestion,
-  value: string | string[] | undefined,
-  ctx: SurveyContext,
-): string | null {
-  const { next } = question;
-  if (next === undefined || next === null) return null;
-  if (typeof next === "string") return next;
-
-  for (const rule of next as FlowGotoRule[]) {
-    if (rule.condition !== undefined) {
-      if (evalCondition(rule.condition, value, ctx)) return rule.goto;
-    } else {
-      // default branch
-      return rule.goto;
-    }
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Question index
-// ---------------------------------------------------------------------------
-
-function buildIndex(questions: FlowQuestion[]): Map<string, FlowQuestion> {
-  const map = new Map<string, FlowQuestion>();
-  for (const q of questions) map.set(q.id, q);
-  return map;
-}
-
-// ---------------------------------------------------------------------------
-// Answer -> SurveyAnswer
-// ---------------------------------------------------------------------------
-
-/**
- * The recorded `AnswerType` for a question — the same mapping `toSurveyAnswer`
- * applies, so a saved answer and its recorded entry agree on type.
- */
-function answerTypeFor(question: FlowQuestion): SurveyAnswer["answerType"] {
-  if (question.type === "multi_select") return "char-list";
-  if (question.type === "bool") return "boolean";
-  if (question.type === "select" || question.type === "radio") return "select";
-  return "text";
-}
-
-function toSurveyAnswer(
-  questionId: string,
-  question: FlowQuestion,
-  value: string | string[] | undefined,
-): SurveyAnswer | null {
-  if (value === undefined) return null;
-  if (question.type === "multi_select") {
-    return {
-      questionId,
-      answerType: "char-list",
-      value: Array.isArray(value) ? value : [value],
-    };
-  }
-  if (question.type === "bool") {
-    const strVal = typeof value === "string" ? value : "";
-    return {
-      questionId,
-      answerType: "boolean",
-      value: strVal === "true",
-    };
-  }
-  if (question.type === "select" || question.type === "radio") {
-    const strVal = typeof value === "string" ? value : "";
-    if (strVal === "") return null;
-    return { questionId, answerType: "select", value: strVal };
-  }
-  if (question.type === "notice") return null;
-  // text, short_text, autocomplete
-  const strVal = typeof value === "string" ? value : "";
-  return { questionId, answerType: "text", value: strVal };
-}
-
-// ---------------------------------------------------------------------------
-// Template interpolation
-// ---------------------------------------------------------------------------
-// `{{token}}` interpolation of a question's prompt/label/help_text/body and
-// option labels happens in QuestionField (see its `resolveFlowText`), AFTER
-// Tier-B content-i18n catalog resolution — a translated catalog value carries
-// its own tokens, so only the resolved string may be interpolated. SurveyRunner
-// therefore hands QuestionField the RAW question (plus any dynamic options) and
-// does NOT pre-interpolate it here: doing so would redundantly process the
-// English fallback and cannot see the translated string's tokens at all.
-
-// ---------------------------------------------------------------------------
-// advanceThrough — moved before SurveyRunner so it is in scope for render-time
-// isLastQuestion computation (Fix 2). Function declarations are hoisted in JS
-// but TypeScript strict mode may flag use-before-declaration, so we keep the
-// definition here.
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve the next question id starting from `currentQ`, skipping over any
- * `engine_resolved` nodes by following their routing rules with the given context.
- * Returns null when the flow has ended.
- *
- * A Set<string> visited guard prevents an infinite loop if a YAML author
- * creates a cycle (A→B→A, both engine_resolved).
- */
-export function advanceThrough(
-  currentQ: FlowQuestion,
-  value: string | string[] | undefined,
-  ctx: SurveyContext,
-  index: Map<string, FlowQuestion>,
-  getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined,
-): string | null {
-  const visited = new Set<string>();
-  // Dynamic-next override (spec 030 US3): lets the caller route based on
-  // resolved-entry state that no static `next`/condition can express — e.g. send
-  // il_language_code to il_language_region only when the picked language is
-  // region-ambiguous. Evaluated at render from the current value, so it does not
-  // depend on onAnswerCommit ordering. Returns undefined ⇒ use the static next.
-  const overridden = getNextOverride?.(currentQ.id, value);
-  let nextId =
-    overridden !== undefined && overridden !== ""
-      ? overridden
-      : resolveNext(currentQ, value, ctx);
-  while (nextId !== null) {
-    const next = index.get(nextId);
-    if (next === undefined) {
-      devLog.error("SurveyRunner: unresolved goto target", nextId);
-      return null;
-    }
-    if (next.engine_resolved !== true) return nextId;
-    if (visited.has(nextId)) {
-      devLog.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
-      return null;
-    }
-    visited.add(nextId);
-    nextId = resolveNext(next, undefined, ctx);
-  }
-  return null;
-}
+// The routing (evalCondition, resolveNext, advanceThrough) lives in flowWalk.ts so
+// the headless author walks flows with the same code; re-exported here for the
+// callers that import it from the runner.
+export { evalCondition, resolveNext, advanceThrough };
 
 // ---------------------------------------------------------------------------
 // SurveyRunner component
@@ -382,19 +225,6 @@ export interface SurveyRunnerProps {
   resumeAnswers?: Readonly<Record<string, string | string[]>>;
 }
 
-/** The contracts proposal-source union, for pass-through of lookup sources. */
-const PROPOSAL_SOURCES: ReadonlySet<string> = new Set([
-  "langtags",
-  "cldr",
-  "corpus",
-  "axis-fill",
-  "base",
-  "identity",
-  "region",
-  "derived-from-axis",
-  "analysis",
-]);
-
 export function SurveyRunner({
   flow,
   context = {},
@@ -431,60 +261,6 @@ export function SurveyRunner({
   const getSeedSourceRef = useRef(getSeedSource);
   getSeedSourceRef.current = getSeedSource;
 
-  // Spec 092 (T031, FR-003): decision records are the runner's first seed
-  // source. A record the extraction pass seeded (provenance extracted /
-  // default) IS the question's seed — value from the record, the source
-  // label rendered from the record (see recordProvenanceCaption below) —
-  // so a converted step needs no per-step seed callbacks at all. Bases
-  // whose seeders are not yet converted keep working through the prop
-  // fallback in callerProposal.
-  function recordForQuestion(questionId: string) {
-    const mod = questionRegistry[questionId];
-    const decisionId = mod?.provides?.[0];
-    if (decisionId === undefined) return undefined;
-    return useDecisionStore.getState().decisions[decisionId];
-  }
-
-  function recordProposal(questionId: string): SeedProposal | undefined {
-    let record = recordForQuestion(questionId);
-    if (record === undefined) {
-      // Spec 092 (G-9): a gate that opens only after setup — e.g.
-      // pf_more_detail_gate answered "Yes" during the Phase F step itself —
-      // can make a module's extract/lookup default applicable only now.
-      // The setup pass skipped it (gated off against the pre-pass set, the
-      // demo runner's semantics); re-running the idempotent pass here,
-      // at question-push time, materialises its record so the seed and
-      // its caption arrive exactly as if the gate had been open at setup.
-      const mod = questionRegistry[questionId];
-      if (mod !== undefined && (mod.extract !== undefined || mod.lookupDefault !== undefined)) {
-        try {
-          runLiveExtractionFromStores();
-        } catch (err) {
-          devLog.error(
-            "[live-extraction] question-push pass re-run failed:",
-            err instanceof Error ? err.message : String(err),
-          );
-        }
-        record = recordForQuestion(questionId);
-      }
-    }
-    if (record === undefined) return undefined;
-    if (record.provenance !== "extracted" && record.provenance !== "default") {
-      return undefined;
-    }
-    const value = record.value;
-    if (typeof value !== "string" && !Array.isArray(value)) return undefined;
-    // The record's free-form source names a keyboard id for extractions,
-    // which the contracts proposal-source union does not carry; the label
-    // rides the caption channel instead. Lookup sources that ARE in the
-    // union ("langtags", "identity", "base", "analysis", …) pass through
-    // so the committed answer's record keeps naming them.
-    const source = record.source;
-    return source !== undefined && PROPOSAL_SOURCES.has(source)
-      ? { value, source: source as DecisionProposalSource }
-      : { value };
-  }
-
   // Spec 092 (T031): the record-driven provenance caption. An extracted
   // seed names its source ("from <keyboard id>", the demo's rendering);
   // an answered record with an `offered` value shows the offer beside the
@@ -518,16 +294,10 @@ export function SurveyRunner({
     return undefined;
   }
 
-  // The caller's seed for a question, as the proposal its entry carries. Only a
-  // caller seed is a proposal: a debug pin is a test convenience, not something
-  // the studio suggested.
+  // The seed for a question, as the proposal its entry carries (survey/flowWalk.ts:
+  // the decision record first, then the caller's seed callbacks).
   function callerProposal(questionId: string): SeedProposal | undefined {
-    const fromRecord = recordProposal(questionId);
-    if (fromRecord !== undefined) return fromRecord;
-    const value = getSeedValueRef.current?.(questionId);
-    if (value === undefined) return undefined;
-    const source = getSeedSourceRef.current?.(questionId);
-    return source !== undefined ? { value, source } : { value };
+    return seedProposal(questionId, getSeedValueRef.current, getSeedSourceRef.current);
   }
   const getSeedProvenanceRef = useRef(getSeedProvenance);
   getSeedProvenanceRef.current = getSeedProvenance;
@@ -543,14 +313,13 @@ export function SurveyRunner({
   onEntryResolvedRef.current = onEntryResolved;
 
   // Derive flow-level constants once per flow identity change.
-  // context is intentionally excluded from the deps array: findFirstRenderable
-  // ignores it (underscore-prefixed params), so keying on [flow] alone is correct.
+  // context is intentionally excluded from the deps array: indexFlow ignores it,
+  // so keying on [flow] alone is correct.
   const { index, firstId, approxTotal } = useMemo(() => {
-    const all = [...flow.questions, ...(flow.provenance_questions ?? [])];
-    const idx = buildIndex(all);
+    const { all, index: idx, firstId: first } = indexFlow(flow);
     return {
       index: idx,
-      firstId: findFirstRenderable(all, idx, context),
+      firstId: first,
       approxTotal: all.filter((q) => q.engine_resolved !== true).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -575,8 +344,6 @@ export function SurveyRunner({
   // way to say the same thing that could disagree.
   const walkStepId = useSurveySessionStore((s) => s.activeStepId);
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
-  const setPosition = useSurveyAnswerStore((s) => s.setPosition);
-  const setStepAnswers = useSurveyAnswerStore((s) => s.setStepAnswers);
   const recordQuestionAnswers = useRecordQuestionAnswers();
   const externalCursor = useSurveyAnswerStore((s) => s.steps[walkStepId]?.position ?? undefined);
 
@@ -749,53 +516,19 @@ export function SurveyRunner({
   // raw value — the shape `buildResumeStack` replays — with the type it will be
   // recorded as. Each question is its own screen (screenId = question id), and
   // no SurveyRunner answer depends on an earlier step's evidence.
-  const savedAnswers = useMemo(() => {
-    const saved: Record<string, Omit<SavedAnswer, "savedAt">> = {};
-    stack.forEach((entry, i) => {
-      const value = liveValues[i];
-      // Only answered entries: an undefined value carries no information a
-      // replay could use, and storing it would make `buildResumeStack` treat an
-      // untouched question as deliberately blank.
-      if (value === undefined) return;
-      const q = index.get(entry.questionId);
-      // A pre-filled answer is the studio's proposal until the author changes
-      // it; only an answer that was never pre-filled is the author's outright.
-      const proposal = entry.proposal;
-      saved[entry.questionId] = {
-        value,
-        answerType: q !== undefined ? answerTypeFor(q) : "text",
-        origin:
-          proposal === undefined
-            ? "confirmed"
-            : answersDiffer(proposal.value, value)
-              ? "overturned"
-              : "proposed",
-        ...(proposal !== undefined ? { proposal } : {}),
-        stage: "draft",
-        evidenceKey: null,
-        screenId: entry.questionId,
-      };
-    });
-    return saved;
-  }, [stack, liveValues, index]);
+  const savedAnswers = useMemo(
+    () => buildSavedAnswers(stack, liveValues, index),
+    [stack, liveValues, index],
+  );
 
   useEffect(() => {
     publishStepWalk(walkStepId, positions);
     // The walk defines this step's answer set: replacing it drops the answers of
     // a tail a changed answer invalidated, so they are never replayed.
-    setStepAnswers(walkStepId, savedAnswers);
     // "" is the completed-flow sentinel (no entry to be at) — never publish it
     // as a position, or the footer would mark a stop that does not exist.
-    if (currentQId !== "") setPosition(walkStepId, currentQId);
-  }, [
-    walkStepId,
-    positions,
-    savedAnswers,
-    currentQId,
-    publishStepWalk,
-    setStepAnswers,
-    setPosition,
-  ]);
+    publishSavedAnswers(walkStepId, savedAnswers, currentQId !== "" ? currentQId : null);
+  }, [walkStepId, positions, savedAnswers, currentQId, publishStepWalk]);
 
   // Honour a cursor written while this runner is already mounted — a footer dot
   // for another question in the step the author is CURRENTLY on. That jump
@@ -856,10 +589,9 @@ export function SurveyRunner({
   const canGoBack = cursor > 0 || onBack !== undefined;
 
   const value = currentValue ?? currentEntry?.value;
-  const isNotice = displayQ?.type === "notice";
   const canAdvance =
     displayQ !== undefined &&
-    (isNotice || ((!displayQ.required || hasValue(value)) && hasValidFormat(value, displayQ.format)));
+    canAdvanceFrom(displayQ, value);
   // Derive the next question id once so that both the button label and handleNext
   // share the same result — avoids a second advanceThrough call that would cause
   // a brief button-label flicker when value changes mid-render.
@@ -940,21 +672,15 @@ export function SurveyRunner({
       // walk the author has since backed out of. If a revised answer routes the
       // flow to an earlier ending, those stale entries must not contribute
       // answers to a result they are no longer part of.
-      const answers: SurveyAnswer[] = [];
-      for (const entry of stack.slice(0, cursor)) {
-        if (entry.value === undefined) continue;
-        const q = index.get(entry.questionId);
-        if (q === undefined) continue;
-        const answer = toSurveyAnswer(entry.questionId, q, entry.value);
-        if (answer !== null) answers.push(answer);
-      }
-      // Include the current answer too
-      if (committedValue !== undefined) {
-        const answer = toSurveyAnswer(currentQId, currentQ, committedValue);
-        if (answer !== null) answers.push(answer);
-      }
-      const phase = flow.phase as SurveyPhaseResult["phase"];
-      onComplete({ phase, answers });
+      onComplete(
+        assembleFlowResult(
+          flow,
+          stack.slice(0, cursor),
+          index,
+          { questionId: currentQId, question: currentQ },
+          committedValue,
+        ),
+      );
       return;
     }
 
@@ -1282,66 +1008,6 @@ export function SurveyRunner({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function hasValue(v: string | string[] | undefined): boolean {
-  if (v === undefined) return false;
-  if (Array.isArray(v)) return v.length > 0;
-  return v.trim() !== "";
-}
-
-// Basic structural check (local@domain.tld), not RFC 5322 — good enough to
-// catch "forgot the @" / pasted-the-wrong-thing without rejecting anything a
-// real address could look like.
-const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * Does `v` satisfy `format`? Blank always passes here — required/hasValue
- * already gates blank separately, so an optional format-checked field stays
- * skippable rather than becoming implicitly required.
- */
-function hasValidFormat(v: string | string[] | undefined, format: FlowQuestion["format"]): boolean {
-  if (format === undefined) return true;
-  const s = typeof v === "string" ? v.trim() : Array.isArray(v) ? v.join("").trim() : "";
-  if (s === "") return true;
-  if (format === "email") return EMAIL_FORMAT_RE.test(s);
-  return true;
-}
-
-/**
- * Did the author actually CHANGE this answer? The one question `advance` asks to
- * decide whether the committed answers ahead of it survive (see its `keepAhead`).
- *
- * By value, element-wise for a multi-select, because an answer value is either a
- * string or a string array and a fresh array with identical contents is the same
- * answer — reference comparison would report every re-confirmation as a change
- * and discard the downstream walk on a Back/Next that changed nothing, which is
- * exactly the blanking bug this guard exists to prevent.
- *
- * Element ORDER counts: a multi-select's order is author-visible (the character
- * lists these flows collect are rendered in the order they were built), so a
- * reorder is a change.
- */
-function answersDiffer(
-  a: string | string[] | undefined,
-  b: string | string[] | undefined,
-): boolean {
-  if (a === b) return false;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length !== b.length || a.some((v, i) => v !== b[i]);
-  }
-  return true;
-}
-
-function findFirstRenderable(
-  questions: FlowQuestion[],
-  _index: Map<string, FlowQuestion>,
-  _ctx: SurveyContext,
-): string | null {
-  for (const q of questions) {
-    if (q.engine_resolved !== true) return q.id;
-  }
-  return null;
-}
 
 /**
  * Resume-time dynamic-branch resolver. buildResumeStack runs synchronously in

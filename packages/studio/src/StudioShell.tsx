@@ -39,17 +39,12 @@ import type {
   KeyboardIR,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import { applyMutatePatch } from "./steps/mutateApply.ts";
 import {
   useWorkingCopyStore,
   bindManifest,
 } from "./stores/workingCopyStore.ts";
 import { useTestingStore } from "./stores/testingStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
-import {
-  instantiateFromStartIfConfirmed,
-  instantiateFromExistingWithIdentitySeed,
-} from "./lib/confirmRebase.ts";
 import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
@@ -79,7 +74,7 @@ import {
 } from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useStepNavStore } from "./stores/stepNavStore.ts";
-import { useSurveyAnswerStore, peekStepAnswers } from "./stores/surveyAnswerStore.ts";
+import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
 import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
 import { useCriteriaRecordStore } from "./stores/criteriaRecordStore.ts";
 import { deriveScaffoldSpec, deriveSurveyContext } from "./decisions/identitySelectors.ts";
@@ -123,13 +118,14 @@ import { manifest, screenTrails, validateManifestShape } from "./steps/manifest.
 import { resolveRightPane, shouldShowPreviewPane } from "./steps/types.ts";
 import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
-import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
 import { runLiveExtractionFromStores } from "./decisions/liveExtraction.ts";
+import { recalculateForStartingPointChangeFromStores } from "./decisions/rebuildWorkingCopy.ts";
 import {
-  rebuildWorkingCopyFromStores,
-  recalculateForStartingPointChangeFromStores,
-} from "./decisions/rebuildWorkingCopy.ts";
-import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
+  clearTouchSeedChoice,
+  createStudioRecordDecision,
+  createStudioReducerDeps,
+  createStudioSnapshotter,
+} from "./lib/studioReducerDeps.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
 import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
@@ -384,16 +380,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalStart = useSurveySessionStore((s) => s.setLocalStart);
-  // Injected into reducerDeps (spec 035 R12, re-homed by spec 088 T026) so
-  // reducer.ts can clear the touch_seed_source fork choice on a genuine base
-  // re-instantiation without steps/ importing stores/ directly. The choice
-  // is the `touch-seed-source` DECISION now: clearing removes the record AND
-  // clears the working copy's touch draft (research D-06 — the side effect
-  // the deleted session setter used to perform).
-  const clearTouchSeedChoice = useCallback(() => {
-    useDecisionStore.getState().forget("touch-seed-source");
-    useWorkingCopyStore.getState().setTouchDraft(null);
-  }, []);
 
   // githubTokenRef lets the cloud-draft-sync loop (draftPersistence.ts's
   // startCloudSync) read the current token lazily (from the single
@@ -809,122 +795,26 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // carries the previous boundary's text. A re-memo mid-session would drop that
   // baseline and make the next diff span two boundaries.
   // ---------------------------------------------------------------------------
-  const snapshotterRef = useRef(
-    createSourceSnapshotter({
-      readProjectedFiles: async () => {
-        const projected = await projectWorkingCopyForOutput();
-        return projected === null ? null : { entries: projected.vfs.entries() };
-      },
-    }),
-  );
+  const snapshotterRef = useRef(createStudioSnapshotter());
 
   // The store-derived dep block itself lives in createStudioDecisionRecorder.ts,
   // shared verbatim with reducer.decisionRecording.test.ts's `realRecorder()` —
   // see that module's header for why this used to be inlined here and why that
   // was a defect (specs/055 post-implement review, P1).
-  const recordDecision = useMemo(
-    () =>
-      createStudioDecisionRecorder({
-        getWorkingCopyState: () => useWorkingCopyStore.getState(),
-        snapshotter: snapshotterRef.current,
-        // spec 080 R-04: the answer store learns which screen each entry was
-        // recorded on (journey-strip grouping) and each screen's last hash
-        // (FR-040 "a Next with no change records nothing").
-        onScreenRecorded: (stepId, screenId, entryIds, hash) => {
-          const answers = useSurveyAnswerStore.getState();
-          answers.markScreenRecorded(stepId, screenId, hash);
-          for (const entryId of entryIds)
-            answers.setRecordedScreen(entryId, screenId);
-        },
-        getLastRecordedHash: (stepId, screenId) =>
-          useSurveyAnswerStore.getState().steps[stepId]?.lastRecorded[screenId],
-        resolveCompletionScreen: (stepId) =>
-          useSurveyAnswerStore.getState().steps[stepId]?.position ?? stepId,
-        getSavedAnswer: (stepId, questionId) =>
-          useSurveyAnswerStore.getState().steps[stepId]?.answers[questionId],
-        // spec 090 US5: the recorder resolves each completing step's
-        // settled gallery decisions against the live decision set.
-        getDecisions: () => getDecisionSnapshot(),
-      }),
-    [],
-  );
+  const recordDecision = useMemo(() => createStudioRecordDecision(snapshotterRef.current), []);
 
   // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
   // All store actions and lib helpers are injected here; the reducer itself has
   // no static imports from stores/ or lib/ (boundary compliance).
   //
-  // The wrapper lambdas delegate to stable module-level imports
-  // (instantiateFromStartIfConfirmed) that are not React state,
-  // so they are intentionally omitted from the dependency array.
+  // Built by lib/studioReducerDeps.ts (lifted for spec 107, FR-040); its
+  // wrapper lambdas delegate to stable module-level imports, so only the
+  // React-held inputs are dependencies.
   // ---------------------------------------------------------------------------
   const reducerDeps: ReducerDeps = useMemo(
-    () => ({
-      instantiateFromStart,
-      // Track 2 (adapt): the seeded wrapper, not the raw store action — the
-      // adapt instantiation must carry the author's identity-language seed
-      // (composed tag + English name) or the emitted descriptor falls back
-      // to the base's raw tag as the <Language> display text. Module-level
-      // import, like instantiateFromStartIfConfirmed below.
-      instantiateFromExisting: (base, opts) =>
-        instantiateFromExistingWithIdentitySeed(base, opts),
-      clearTouchSeedChoice,
-      // Spec 035 R11: the emission-matrix wrapper that used to live here
-      // (as the buildTouchLayoutJson dep) moved verbatim into
-      // lib/assignLoopCompletion.ts at spec 090 T042 with the R2 build.
-      instantiateFromStartIfConfirmed: (base, opts, options) =>
-        instantiateFromStartIfConfirmed(base, opts, options),
-      // spec-014 mutate seam (T014): read/write the working-copy carve IR for
-      // the reducer's path-scoped mutate() apply. Read via getState() (stable,
-      // no re-render churn); write via the OVERLAY-PRESERVING setWorkingIR action.
-      // These are INCREMENTAL patches to the working IR (mutate-apply US1 +
-      // touch re-propagation US2), not base replacements, so they must NOT clear
-      // the carve-deletion overlay (setIR would). See workingCopyStore.setWorkingIR.
-      getWorkingIR: () => useWorkingCopyStore.getState().ir,
-      setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
-      // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
-      // everything else here; the reducer knows only that it has a callback.
-      recordDecision,
-      recordQuestionAnswers: recordDecision.recordQuestionAnswers,
-      // Spec 088 FR-003 (contract C-2): the completion writer's decision
-      // store access, injected so steps/reducer.ts never imports stores/.
-      writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
-      readDecisionSet: () => getDecisionSnapshot(),
-      // Spec 093 T009: after a completion records decisions, recalculate
-      // the downstream closure and rebuild the working copy by replay
-      // (decisions are the only stored state; the keyboard is derived).
-      rebuildFromDecisions: (changed) => {
-        rebuildWorkingCopyFromStores(changed);
-      },
-      // Spec 089 FR-001/FR-002 (apply-contract A4): the checked patch sink.
-      // The `ir` channel's containment-checked merge runs FIRST — a
-      // MutatePatchContainmentError throws before any overlay setter runs,
-      // so a patch is never partially applied. Channels then land in the
-      // contract's order (identity → attribution → helpDocs →
-      // historyEntryState), each a whole-value replace. A null working IR
-      // (not yet instantiated) skips only the `ir` channel; the overlay
-      // channels still apply.
-      applyWorkingCopyPatch: (patch, writes) => {
-        const wc = useWorkingCopyStore.getState();
-        if (patch.ir !== undefined && wc.ir !== null) {
-          wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
-        }
-        if (patch.identity !== undefined) wc.setIdentity(patch.identity);
-        if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
-        if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
-        if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
-      },
-      getDecisions: () => getDecisionSnapshot(),
-      getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
-      getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
-      getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
-    }),
-    // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [
-      instantiateFromStart,
-      clearTouchSeedChoice,
-      recordDecision,
-    ],
+    () => createStudioReducerDeps({ instantiateFromStart, clearTouchSeedChoice, recordDecision }),
+    [instantiateFromStart, recordDecision],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always

@@ -14,14 +14,8 @@
 // through onChange on completion instead of recording directly.
 
 import type { EditorStepProps } from "../../steps/types.ts";
-import type { DeadkeysDefinedValue } from "../../lib/deadkeyOps.ts";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { completeDeadkeysStep } from "../../lib/mechanismStepCompletion.ts";
 import { DeadkeySurface } from "../deadkey/DeadkeySurface.tsx";
-
-function currentDeadkeyValue(): DeadkeysDefinedValue {
-  return { ops: [...useWorkingCopyStore.getState().deadkeyOverlay.ops] };
-}
 
 /**
  * EditorStep adapter for the deadkey lifecycle surface (spec 083 —
@@ -32,11 +26,7 @@ export function DeadkeyAdapter({ onComplete, onBack }: EditorStepProps) {
   return (
     <DeadkeySurface
       onComplete={() => {
-        useDecisionStore.getState().record({
-          id: "deadkeys-defined",
-          value: currentDeadkeyValue(),
-          provenance: "asked",
-        });
+        completeDeadkeysStep();
         onComplete(undefined);
       }}
       {...(onBack !== undefined ? { onBack } : {})}

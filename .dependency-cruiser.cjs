@@ -186,6 +186,22 @@ module.exports = {
       from: { path: '^packages/studio/src/(StudioShell\\.tsx|components/StepHost\\.tsx)$' },
       to:   { path: '^packages/studio/src/editors/' },
     },
+    {
+      name: 'product-not-to-headless-author',
+      comment:
+        'Spec 107 FR-016: product code must not know the headless scripted author ' +
+        'exists. No file under packages/*/src outside src/test/ may import from ' +
+        'packages/studio/src/test/headlessAuthor/. The author is the product minus ' +
+        'React rendering; if product code reached back into it, the two could ' +
+        'diverge silently. The boundary test (headlessAuthor/boundary.test.ts) ' +
+        'covers the non-import half of FR-016 (no KS_AUTHOR branch).',
+      severity: 'error',
+      from: {
+        path: '^packages/[^/]+/src/',
+        pathNot: '^packages/[^/]+/src/test/',
+      },
+      to:   { path: '^packages/studio/src/test/headlessAuthor/' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

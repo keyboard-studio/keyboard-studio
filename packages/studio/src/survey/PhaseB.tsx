@@ -40,7 +40,7 @@ import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import { useFlaggedNextGate } from "../hooks/useFlaggedNextGate.ts";
-import { deriveCharacterFlags, ADDITION_ANSWER_PREFIX, CHARACTERS_BUILD_LIST_SCREEN_ID } from "./characterFlags.ts";
+import { deriveCharacterFlags, CHARACTERS_BUILD_LIST_SCREEN_ID } from "./characterFlags.ts";
 import { reproposalCueMessage } from "./reproposalReason.ts";
 import { FlaggedAnswersList } from "../components/FlaggedAnswersList.tsx";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
@@ -55,7 +55,16 @@ import {
 import { codepointLabel } from "./codepointLabel.ts";
 import { matchesQuery } from "./characterSearch.ts";
 import { collate, codePointCompare, collateInventory } from "./collation.ts";
-import { glyphCategory, isCombiningMarkChar, caseCounterpart, getEffectiveFacet, CASING_FACET_ID } from "@keyboard-studio/engine";
+import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
+import {
+  buildListDoneDisabled,
+  buildListDoneResult,
+  continueFromIntro,
+  isCasedBaseOf,
+  resolveIntroSelection,
+  restampFlaggedAdditions,
+  type IntroChoice,
+} from "./charactersStepRules.ts";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { charactersInTier } from "../lib/services.ts";
 import type {
@@ -214,8 +223,7 @@ function isLinguisticChar(c: string): boolean {
 
 function useIsCasedBase(): boolean {
   const startIr = useWorkingCopyStore((s) => s.startIr);
-  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
-  return casingValue === "cased" || casingValue === "mixed";
+  return isCasedBaseOf(startIr);
 }
 
 /**
@@ -1036,7 +1044,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   // check) so there is exactly one gate implementation across every step
   // that surfaces flags (T080).
   const nextGate = useFlaggedNextGate(flaggedWorkItems, [CHARACTERS_BUILD_LIST_SCREEN_ID], CHARACTERS_BUILD_LIST_SCREEN_ID);
-  const doneDisabled = chars.length === 0 || nextGate.blocked;
+  const doneDisabled = buildListDoneDisabled(chars.length) || nextGate.blocked;
   const isCasedBase = useIsCasedBase();
 
   // Chip removal goes through the store's per-character remove(), not setAll,
@@ -1051,47 +1059,26 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const hasProposedChars = Object.values(provenance).some((p) => p !== "author");
 
   function handleDone(): void {
-    // spec 079 US3 T080/FR-041: re-stamp every flagged addition with
-    // the CURRENT evidence key on Done — the author has seen the
-    // alphabet (and this cue) in full, so this is the confirm/keep
-    // action that clears the flag, mirroring marks' station Next.
-    for (const f of flaggedAnswers) {
-      const grapheme = f.answerId.slice(ADDITION_ANSWER_PREFIX.length);
-      saveCharacterAnswer("characters", f.answerId, {
-        value: grapheme,
-        answerType: "char-list",
-        origin: "confirmed",
-        stage: "confirmed",
-        evidenceKey: alphabetEvidenceKey ?? null,
-        screenId: CHARACTERS_BUILD_LIST_SCREEN_ID,
-      });
-    }
-    // Record both cases (spec 047 FR-009): augment the captured
-    // inventory with each cased letter's locale-correct counterpart via
-    // the engine's caseCounterpart, deduped. A null counterpart
-    // (caseless script, or a multi-character expansion like ß→SS)
-    // contributes nothing (FR-010). The augmentation sits behind the
-    // casing-facet gate (useIsCasedBase): on a caseless base nothing is
-    // derived — the recorded inventory is exactly what the author chose.
-    const derivedUppercases = isCasedBase
-      ? chars
-          .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
-          .filter((u): u is string => u != null)
-      : [];
-    onComplete({
-      phase: "B",
-      answers: [],
-      // Loanword letters are needed, so they are in the inventory, but
-      // they stay out of the alphabet (the stores behind `chars`).
-      confirmedInventory: nfcDedup(nfcDedup(chars, derivedUppercases), loanwordChars),
-      // Always emitted, `[]` included: recordPhase merges per field,
-      // so an omitted field would keep a previous run's letters.
-      loanwordChars,
-      // Alongside the inventory, never inside it: the cluster's own
-      // letters are already in `chars`, so a keyboard needs no extra
-      // key for "dz" — this is the record that d+z also form a unit.
-      ...(exemplarDigraphs.length > 0 ? { attestedDigraphs: exemplarDigraphs } : {}),
+    // spec 079 US3 T080/FR-041: re-stamp every flagged addition with the
+    // CURRENT evidence key on Done -- the author has seen the alphabet (and this
+    // cue) in full, so this is the confirm/keep action that clears the flag,
+    // mirroring marks' station Next.
+    restampFlaggedAdditions({
+      answers: charactersAnswers,
+      evidenceKey: alphabetEvidenceKey,
+      saveAnswer: saveCharacterAnswer,
     });
+    // Record both cases (spec 047 FR-009) behind the casing-facet gate
+    // (useIsCasedBase); see buildListDoneResult.
+    onComplete(
+      buildListDoneResult({
+        chars,
+        loanwordChars,
+        exemplarDigraphs,
+        bcp47: context.bcp47_tag,
+        isCasedBase,
+      }),
+    );
   }
 
   // Back / Continue render in the footer (spec 081); this screen is the step's
@@ -1482,15 +1469,6 @@ interface IntroChooserProps {
   onBack?: () => void;
 }
 
-/**
- * The chooser's own option vocabulary. `"exemplars"` is NOT a
- * `DiscoveryMethod`: accepting the exemplar set lands on the same page 2 as
- * `"build-list"`, just prefilled, so it resolves to `"build-list"` on Continue.
- * Keeping it local means the persisted traversal, draft persistence and
- * StudioShell's right-pane gating all stay unchanged.
- */
-type IntroChoice = DiscoveryMethod | "exemplars";
-
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   const { t } = useLingui();
   const { inventory, loading } = useSourcedExemplars(context.bcp47_tag);
@@ -1513,12 +1491,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   // once on the first settled lookup) means a late-arriving or re-resolved
   // offer still becomes the default. An explicit author choice always wins.
   const [authorChoice, setAuthorChoice] = useState<IntroChoice | null>(null);
-  const defaultChoice: IntroChoice =
-    !loading && offerExemplars && !declinedBefore ? "exemplars" : "build-list";
-  const selected: IntroChoice =
-    authorChoice === "exemplars" && !offerExemplars
-      ? "build-list"
-      : (authorChoice ?? defaultChoice);
+  const selected: IntroChoice = resolveIntroSelection({ authorChoice, loading, offerExemplars, declinedBefore });
   const setSelected = setAuthorChoice;
 
   const languageName =
@@ -1556,25 +1529,12 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   ];
 
   function handleContinue(): void {
-    // Record the choice on this screen's own Next, before dispatching it —
-    // "exemplars" resolves to the "build-list" DiscoveryMethod either way,
-    // so the recorded value matches what onChoose below actually sets.
-    const resolvedMethod: DiscoveryMethod = selected === "exemplars" ? "build-list" : selected;
-    recordQuestionAnswers("intro", [
-      { questionId: "phaseB.discoveryMethod", answerType: "select", value: resolvedMethod },
-    ]);
-
-    if (selected === "exemplars" && inventory !== null) {
-      // Exactly once, here — never on the prefill -> B transition (P1a).
-      // seedFromProposal is idempotent, so a Back-and-Continue is safe.
-      seedFromProposal(inventory, context.bcp47_tag);
-      onChoose("build-list");
-      return;
-    }
-    // Any other choice, when an offer was actually available, is a decline —
-    // remembered so it is never re-asserted as the default (FR-016a).
-    if (offerExemplars) declineExemplarMethod();
-    onChoose(selected as DiscoveryMethod);
+    continueFromIntro(selected, inventory, context.bcp47_tag, {
+      record: recordQuestionAnswers,
+      seedFromProposal,
+      declineExemplarMethod,
+      onChoose,
+    });
   }
 
   // Back / Continue render in the footer (spec 081); this screen is the

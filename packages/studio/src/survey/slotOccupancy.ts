@@ -501,3 +501,36 @@ export function isProducedOnOtherSlot(
   }
   return false;
 }
+
+/** Who a displacement proposal demotes (see useDisplacementProposal). */
+export type DisplacementDirection =
+  | "demote-incumbent"
+  | "demote-incoming"
+  | "both-core";
+
+/**
+ * What an author can do about a pending displacement proposal:
+ *   - "confirm-move"      — record the proposed demotion (the banner's "Move it")
+ *   - "keep-both"         — both are core: keep both primary, a recorded dismissal
+ *   - "demote-displaced"  — both-core only: demote the displaced glyph anyway
+ *   - "leave"             — a recorded dismissal; the glyph stays shadowed
+ */
+export type DisplacementAction =
+  | "confirm-move"
+  | "keep-both"
+  | "demote-displaced"
+  | "leave";
+
+/**
+ * The available actions for a proposal, in banner order: the first is the
+ * default (confirm) button, the second the other button. Both-core is
+ * inverted from the rest: the default keeps both primaries, and demoting is
+ * the explicit override.
+ */
+export function displacementActions(
+  direction: DisplacementDirection,
+): readonly [DisplacementAction, DisplacementAction] {
+  return direction === "both-core"
+    ? ["keep-both", "demote-displaced"]
+    : ["confirm-move", "leave"];
+}

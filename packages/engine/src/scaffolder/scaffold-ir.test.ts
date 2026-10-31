@@ -60,6 +60,24 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     expect(kbVersion?.items.map((i) => (i.kind === "char" ? i.value : "")).join("")).toBe("1.0");
   });
 
+  it.each([
+    ["10.0", "14.0"],
+    ["14.0", "14.0"],
+    ["15.0", "15.0"],
+    ["17.0", "17.0"],
+    ["banana", "14.0"],
+    [null, "14.0"],
+  ])("resetIdentity keeps &VERSION at max(base %s, 14.0) -> %s, never lowering it", (declared, expected) => {
+    const kmn = US_BASE_KMN.replace(
+      /store\(&VERSION\) '5\.0'\r?\n/,
+      declared === null ? "" : `store(&VERSION) '${declared}'\n`,
+    );
+    const { ir } = parse(kmn, "us_english");
+    resetIdentity(ir, { keyboardId: "my_new_kbd", displayName: "My New Keyboard" });
+    const version = ir.stores.find((s) => s.isSystem && s.name === "VERSION");
+    expect(version?.items.map((i) => (i.kind === "char" ? i.value : "")).join("")).toBe(expected);
+  });
+
   it("resetIdentity rewrites &VISUALKEYBOARD / &LAYOUTFILE / &KMW_EMBEDCSS to match the new keyboardId", () => {
     const SOURCE_WITH_PATH_STORES = `store(&NAME) 'Old'
 store(&COPYRIGHT) 'C'

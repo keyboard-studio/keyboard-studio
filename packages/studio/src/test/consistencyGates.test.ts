@@ -145,6 +145,25 @@ describe("G4: one output form", () => {
   });
 });
 
+describe("G4: per-item attribution in a carved starting store", () => {
+  const plusMark = setOf(marksDecision({ blocked: false, marks: false, outputForm: "base-plus-mark" }));
+  const startBody = "store(out) U+00E1 U+00E9 U+00ED\ngroup(main) using keys\n+ [K_A] > 'a'\n";
+  it("keeps starting items out of the failure and fails only the generated one", async () => {
+    // Carved: U+00ED dropped; U+00F3 added by the session.
+    const body = "store(out) U+00E1 U+00E9 U+00F3\ngroup(main) using keys\n+ [K_A] > 'a'\n";
+    const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark, startIr: irOf(startBody) });
+    expect(r.pass).toBe(false);
+    const problems = r.detail.filter((d) => d.startsWith("store out"));
+    expect(problems).toEqual(["store out: U+00F3 is not NFD"]);
+    expect(r.detail.join(" ")).toContain("2 starting item(s) kept by carve");
+  });
+  it("passes a carved store holding only starting items", async () => {
+    const body = "store(out) U+00E1 U+00E9\ngroup(main) using keys\n+ [K_A] > 'a'\n";
+    const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark, startIr: irOf(startBody) });
+    expect(r.pass).toBe(true);
+  });
+});
+
 describe("G5: &CasedKeys iff cased", () => {
   const cased = setOf(decision("character-inventory", { chars: ["a", "A"] }));
   const caseless = setOf(decision("character-inventory", { chars: ["a", "b"] }));
@@ -225,5 +244,23 @@ describe("G8: no nul/beep in stores", () => {
     const input = { vfs: vfsOf(bad), startIr: irOf(bad) };
     expect((await gate("G8", input)).pass).toBe(true);
     expect((await gate("G8-start", input)).pass).toBe(false);
+  });
+});
+
+describe("G8: per-item attribution in a carved starting store", () => {
+  const startBody = "store(s) 'a' nul 'b' 'c'\ngroup(main) using keys\n+ [K_A] > 'a'\n";
+  it("puts the starting nul on G8-start when the carve trimmed the store", async () => {
+    const body = "store(s) 'a' nul 'b'\ngroup(main) using keys\n+ [K_A] > 'a'\n";
+    const input = { vfs: vfsOf(body), startIr: irOf(startBody) };
+    expect((await gate("G8", input)).pass).toBe(true);
+    expect((await gate("G8-start", input)).pass).toBe(false);
+  });
+  it("fails G8 only for the nul/beep beyond what the starting store held", async () => {
+    const body = "store(s) 'a' nul 'b' beep\ngroup(main) using keys\n+ [K_A] > 'a'\n";
+    const input = { vfs: vfsOf(body), startIr: irOf(startBody) };
+    const g8 = await gate("G8", input);
+    expect(g8.pass).toBe(false);
+    expect(g8.detail).toEqual(["store s: 1 nul/beep item(s)"]);
+    expect((await gate("G8-start", input)).detail).toEqual(["store s: 1 nul/beep item(s)"]);
   });
 });
