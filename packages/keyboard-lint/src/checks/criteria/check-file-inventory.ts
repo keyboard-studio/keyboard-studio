@@ -127,7 +127,7 @@ export function checkHistoryMdAbsent(paths: readonly string[]): CheckResult {
     );
   });
   if (hit !== undefined)
-    return checkPassed("KM_LINT_HISTORY_MD_ABSENT", [`Found: ${hit}`]);
+    return checkPassed("KM_LINT_HISTORY_MD_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
   return checkFailed("KM_LINT_HISTORY_MD_ABSENT", [
     criteriaFinding({
       code: "KM_LINT_HISTORY_MD_ABSENT",
@@ -142,7 +142,7 @@ export function checkHistoryMdAbsent(paths: readonly string[]): CheckResult {
 export function checkReadmeHtmAbsent(paths: readonly string[]): CheckResult {
   const hit = paths.find((p) => p.toLowerCase() === "source/readme.htm");
   if (hit !== undefined)
-    return checkPassed("KM_LINT_README_HTM_ABSENT", [`Found: ${hit}`]);
+    return checkPassed("KM_LINT_README_HTM_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
   return checkFailed("KM_LINT_README_HTM_ABSENT", [
     criteriaFinding({
       code: "KM_LINT_README_HTM_ABSENT",
@@ -164,7 +164,7 @@ export function checkWelcomeHtmAbsent(paths: readonly string[]): CheckResult {
     lowered.get("source/welcome.htm") ??
     lowered.get("source/welcome/welcome.htm");
   if (hit !== undefined)
-    return checkPassed("KM_LINT_WELCOME_HTM_ABSENT", [`Found: ${hit}`]);
+    return checkPassed("KM_LINT_WELCOME_HTM_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
   return checkFailed("KM_LINT_WELCOME_HTM_ABSENT", [
     criteriaFinding({
       code: "KM_LINT_WELCOME_HTM_ABSENT",

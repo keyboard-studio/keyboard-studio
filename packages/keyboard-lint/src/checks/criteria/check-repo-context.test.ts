@@ -6,6 +6,7 @@ import {
   checkAttribution,
   checkFilesOutsideFolder,
   checkHistoryAttributionBad,
+  checkKeyboardIdConflict,
   checkPrAttributionBad,
   checkRepoContext,
   checkRepoNoOrganizingFolder,
@@ -205,5 +206,131 @@ describe("repo-context twins", () => {
     expect(f).toEqual(
       ["KM_LINT_PR_ATTRIBUTION_BAD", "KM_LINT_HISTORY_ATTRIBUTION_BAD"].sort(),
     );
+  });
+});
+
+describe("1.5 keyboard-ID conflict (KM_LINT_DUPLICATE_KEYBOARD_ID)", () => {
+  const prFacts = (
+    overrides: Partial<ReviewContext> = {},
+  ): RepoContextFacts =>
+    facts({
+      isPr: true,
+      repoPath: "experimental/gff/gff_amharic",
+      treePaths: ["experimental/gff/gff_amharic/source/gff_amharic.kmn"],
+      idConflictAtBase: { baseSha: "abc1234" + "0".repeat(33), existingTiers: [] },
+      ...overrides,
+    });
+
+  it("non-PR target is met-moot", () => {
+    const r = checkKeyboardIdConflict(facts());
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(/uniqueness was established at submission/);
+  });
+
+  it("PR with no existing tiers passes with a not-found note", () => {
+    const r = checkKeyboardIdConflict(prFacts());
+    expect(r.code).toBe("KM_LINT_DUPLICATE_KEYBOARD_ID");
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(/not found in experimental/);
+  });
+
+  it("PR modifying the existing folder is an upgrade, not a conflict", () => {
+    const r = checkKeyboardIdConflict(
+      prFacts({
+        idConflictAtBase: {
+          baseSha: "abc1234" + "0".repeat(33),
+          existingTiers: ["experimental"],
+        },
+      }),
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(/Upgrade to existing experimental\/gff\/gff_amharic/);
+  });
+
+  it("PR adding a new folder while the ID exists elsewhere is a conflict", () => {
+    const r = checkKeyboardIdConflict(
+      prFacts({
+        idConflictAtBase: {
+          baseSha: "abc1234" + "0".repeat(33),
+          existingTiers: ["release"],
+        },
+      }),
+    );
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]!.code).toBe("KM_LINT_DUPLICATE_KEYBOARD_ID");
+    expect(r.findings[0]!.message).toMatch(/already used by a different keyboard in release/);
+  });
+
+  it("cross-tier move with the old folder touched is a deprecation, not a conflict", () => {
+    const r = checkKeyboardIdConflict(
+      prFacts({
+        repoPath: "legacy/gff/gff_amharic",
+        treePaths: [
+          "legacy/gff/gff_amharic/source/gff_amharic.kmn",
+          "release/gff/gff_amharic/source/gff_amharic.kmn",
+        ],
+        idConflictAtBase: {
+          baseSha: "abc1234" + "0".repeat(33),
+          existingTiers: ["release"],
+        },
+      }),
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(
+      /Deprecation: gff_amharic moving from release\/ to legacy\//,
+    );
+  });
+
+  it("PR body mentioning deprecation marks a cross-tier presence as a move", () => {
+    const r = checkKeyboardIdConflict(
+      prFacts({
+        prBody: "Deprecating the old release in favor of this rewrite.",
+        idConflictAtBase: {
+          baseSha: "abc1234" + "0".repeat(33),
+          existingTiers: ["release"],
+        },
+      }),
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(/Deprecation/);
+  });
+
+  it("mixed: one tier conflicts while another is an upgrade", () => {
+    const r = checkKeyboardIdConflict(
+      prFacts({
+        treePaths: [
+          "experimental/gff/gff_amharic/source/gff_amharic.kmn",
+          "release/gff/gff_amharic/source/gff_amharic.kmn",
+        ],
+        idConflictAtBase: {
+          baseSha: "abc1234" + "0".repeat(33),
+          existingTiers: ["experimental", "legacy"],
+        },
+      }),
+    );
+    // experimental is touched (upgrade); legacy is untouched (conflict).
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]!.message).toMatch(/in legacy/);
+    expect(r.findings[0]!.message).toMatch(/Also an upgrade to experimental/);
+  });
+
+  it("missing base lookup never manufactures a verdict", () => {
+    const r = checkKeyboardIdConflict(prFacts({ idConflictAtBase: undefined }));
+    expect(r.findings).toEqual([]);
+  });
+
+  it("runs through the checkRepoContext aggregate", () => {
+    const out = checkRepoContext(
+      prFacts({
+        idConflictAtBase: {
+          baseSha: "abc1234" + "0".repeat(33),
+          existingTiers: ["release"],
+        },
+      }),
+    );
+    expect(out.findings.map((x) => x.code)).toContain(
+      "KM_LINT_DUPLICATE_KEYBOARD_ID",
+    );
+    expect(out.verifiedByCode.has("KM_LINT_DUPLICATE_KEYBOARD_ID")).toBe(false);
   });
 });

@@ -148,16 +148,17 @@ const KPS_METADATA_TWIN_CODES = [
 
 /**
  * Group A2 Batch 5 repo-context codes (1.2b/1.3b/1.4b) + the Group C
- * extraneous-files code (1.1). All four need the reviewContext (repo
- * path + tree/PR file list); without it each is a named missing input.
- * (19.1b/19.2b are gated by the adaptation signal instead — see
- * applicability.ts.)
+ * extraneous-files code (1.1) + 1.5 (the base-commit ID lookup). All
+ * five need the reviewContext (repo path + tree/PR file list); without
+ * it each is a named missing input. (19.1b/19.2b are gated by the
+ * adaptation signal instead — see applicability.ts.)
  */
 const REPO_CONTEXT_CODES = [
   "KM_LINT_REPO_PLACEMENT_BAD",
   "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
   "KM_LINT_REPO_ROOT_SOURCE",
   "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_DUPLICATE_KEYBOARD_ID",
 ];
 
 /**
@@ -561,12 +562,39 @@ export function assembleLintContext(
   }
 
   // Group A2 Batch 5 + Group C: without a reviewContext the repo-context
-  // checks cannot run — name the missing context for the four repo codes.
+  // checks cannot run — name the missing context for the five repo codes.
   // (19.1b/19.2b are gated by the adaptation signal instead.)
   if (input.reviewContext === undefined) {
     for (const code of REPO_CONTEXT_CODES) {
       contextMissing[code] = "the repository context (repo path and file list)";
     }
+  }
+  // 1.5: a PR target whose base-commit ID lookup failed (API error) —
+  // name the missing lookup rather than letting the row pass or fail
+  // undecided. Non-PR targets need no lookup (met-moot in the check).
+  if (
+    input.reviewContext !== undefined &&
+    input.reviewContext.isPr &&
+    input.reviewContext.idConflictAtBase === undefined
+  ) {
+    contextMissing["KM_LINT_DUPLICATE_KEYBOARD_ID"] =
+      "the PR base-commit keyboard-ID lookup";
+  }
+  // 2.6: the PR base .kmn version for the "strictly greater"
+  // comparison. Without a reviewContext (Compare) the lookup cannot
+  // run; a PR target whose lookup failed (API error) names the missing
+  // lookup. Non-PR targets need no lookup (met-moot in the check).
+  // Authored mode never reaches here: its assembly verdict resolves
+  // 2.6 before the contextMissing gate.
+  if (input.reviewContext === undefined) {
+    contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"] =
+      "the repository context (repo path and file list)";
+  } else if (
+    input.reviewContext.isPr &&
+    input.reviewContext.baseKmnVersion === undefined
+  ) {
+    contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"] =
+      "the PR base-commit .kmn version";
   }
   // 19.2b needs HISTORY.md text; without the file the row cannot be
   // judged (its absence is not the 19.2 violation — that's 3.1b's).

@@ -47,6 +47,7 @@ export function checkIso6395Collective(
   ];
   if (offenders.length === 0)
     return checkPassed("KM_LINT_ISO_639_5_LANG_CODE", [
+      `File: ${kmnPath(keyboardId)}`,
       `Checked ${tags.length} tag(s): no ISO 639-5 collective codes.`,
     ]);
   return checkFailed("KM_LINT_ISO_639_5_LANG_CODE", [

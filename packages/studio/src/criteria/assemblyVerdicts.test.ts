@@ -137,8 +137,15 @@ describe("resolver integration — assembly verdicts", () => {
     const row = rowFor(result, VERSION_NOT_BUMPED_CODE);
     expect(row?.status).toBe("not-yet-checkable");
     expect(row?.evidence().lines.join(" ")).toContain("instantiation context");
+    // 1.5 and 2.6 defer to their lint checks in foreign mode: with no
+    // reviewContext in this synthetic input they resolve through the
+    // findings path (no findings → met). The assembly names the missing
+    // input when it actually assembles the context (see
+    // assembleLintContext.test.ts).
     const dup = rowFor(result, DUPLICATE_ID_CODE);
-    expect(dup?.evidence().lines.join(" ")).toContain("own catalog entry");
+    expect(dup?.status).toBe("met");
+    const vinc = rowFor(result, VERSION_NOT_INCREMENTED_CODE);
+    expect(vinc?.status).toBe("met");
   });
 
   it("new-from-base facts resolve the version rows Not applicable, verdicts or not", () => {
