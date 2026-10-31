@@ -6,7 +6,7 @@ read those before anything else. Everything below is pushed.
 ## Where things are
 
 - Worktree `D:/Github/_Projects/_KM/ks-107-resume`, branch `107-headless-scripted-author` (tracks
-  `origin/107-headless-scripted-author`, 34 commits ahead of `main`). No PR is open yet.
+  `origin/107-headless-scripted-author`, ahead of `main`).
 - 75 of 80 tasks done. Every phase gate is green locally:
   - US1 (`authorCase`) 26/26;
   - parity 17/17 on the 4 records;
@@ -45,7 +45,8 @@ Issues filed for what was not fixed here:
 - #2392 spec 106 US6 (owns camqwerty G2);
 - #2395 accepted tolerance normalization dropped after later steps;
 - #2396 exemplar seeding ignores the target script;
-- #2397 dead rule after carving a whole `any()` store (owns bj_cree_woods G1);
+- #2397 dead rule after carving a whole `any()` store. Fixed on main by `089eb37a` (merged here):
+  G1 holds on bj_cree_woods and its KNOWN_GAPS row is removed. The issue can close;
 - #2400 G6 vs touch reachability (owns the walkOnly G6 row);
 - #2403 synthesized kvks breaks the schema;
 - #2404 eo_plus `outs()` order;
@@ -60,12 +61,26 @@ Issues filed for what was not fixed here:
   the punctuation step keeps seeding the draft after `character-inventory` is recorded.
 - **camazerty tolerance.** The product publishes `failed` and continues (no throw); the author
   mirrors it, and G2 is owned by `#2363`.
-- **KNOWN_GAPS rows added by the author.** G1 bj_cree_woods (#2397); G6 on touch-bearing keyboards
+- **KNOWN_GAPS rows added by the author.** G1 bj_cree_woods (#2397, since removed); G6 on touch-bearing keyboards
   (#2400). The G6 row is `walkOnly` (`ownerOf(..., { walked: false })` in the decision-point replay).
 - **Sweep `too-large` skip.** `MAX_SWEEP_RULE_COUNT = 2000` (measured; excludes 9 of 921), only in
   the `latin`/`eligible` tiers.
 - **Sweep hangs.** The report is rewritten before and after each case, and a killed shard reports
   its case as `hung`.
+
+## Merge of main (2026-10-31)
+
+main moved under the author; two merges (`45b9aee6`, `1fd359d6`) bring the branch up to date.
+
+- **Marks.** The guard question is gone (main `874b44b1`, start-of-line box). The guard lifts
+  had no production caller left and are deleted; `startOfLineImportSeeded` / `startOfLineSeed`
+  are the new lifts. The four records still carry the walker's guard answer: allow-listed as
+  `record-age:origin/main 874b44b1`. T044 now treats an allow-listed decision as covering the
+  agency of every survey answer its recorded value carries.
+- **Carve.** main's LHS dedupe, key-side-only guards and whole-store removal supersede this
+  branch's `3e56aefc` / `9a73eb46`; `carveSuppression.ts` is main's.
+- **Inherited from main, not this branch:** `gateCoverage.test.ts` fails on main's own CI
+  (`build`), and `battery.drift.test.ts` fails on Windows only (path separators).
 
 ## Residuals worth knowing
 

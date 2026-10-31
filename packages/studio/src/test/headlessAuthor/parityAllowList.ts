@@ -34,7 +34,32 @@ export const PARITY_ALLOW_LIST: readonly ParityAllowEntry[] = [
     decisionId: "marks-treatment",
     reason:
       "contextTolerance only: the author accepts the station's pre-accepted normalization; the record has null because " +
-      "the walker pressed Continue before the analysis arrived. The accepted overlay goes stale by output (the dropped-decision bug).",
+      "the walker pressed Continue before the analysis arrived. The accepted overlay goes stale by output (the dropped-decision bug). " +
+      "Also the retired guard question: see the p1-whole-bafut-kbdus entry.",
     explainedBy: "record-age:origin/main 2698f774 (round 3)",
+  },
+  {
+    caseId: "p1-whole-bafut-kbdus",
+    decisionId: "marks-treatment",
+    reason:
+      "The guard question was retired for the per-mark start-of-line box (main 874b44b1), so the author records no " +
+      "marks.marks_guard.behaviour answer; the record still carries the walker's hand-set guard answer.",
+    explainedBy: "record-age:origin/main 874b44b1 (start-of-line box)",
+  },
+  {
+    caseId: "p1-whole-ewondo-kbdfr",
+    decisionId: "marks-treatment",
+    reason:
+      "The guard question was retired for the per-mark start-of-line box (main 874b44b1), so the author records no " +
+      "marks.marks_guard.behaviour answer; the record still carries the walker's hand-set guard answer.",
+    explainedBy: "record-age:origin/main 874b44b1 (start-of-line box)",
+  },
+  {
+    caseId: "p4-unwrap-ewondo-camazerty",
+    decisionId: "marks-treatment",
+    reason:
+      "The guard question was retired for the per-mark start-of-line box (main 874b44b1), so the author records no " +
+      "marks.marks_guard.behaviour answer; the record still carries the walker's hand-set guard answer.",
+    explainedBy: "record-age:origin/main 874b44b1 (start-of-line box)",
   },
 ];

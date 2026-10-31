@@ -16,6 +16,7 @@ import type { DecisionRecord } from "@keyboard-studio/contracts";
 import { parseDecisionRecord } from "@keyboard-studio/engine";
 import { announceSc004Skip, sc004GatesEnabled } from "../sc004Harness.ts";
 import { DECISION_POINT_BASES } from "../decisionPointBases.ts";
+import { recordToDecisionSet } from "../recordToDecisionSet.ts";
 import type { AuthorRun, ParityAllowEntry } from "./caseTypes.ts";
 import { loadCases } from "./loadCases.ts";
 import { runAuthorCase } from "./runAuthorCase.ts";
@@ -150,8 +151,15 @@ describe.skipIf(!sc004GatesEnabled)("headless author parity with recorded walks 
     it("the 053 agency matches the record per decision (T044)", () => {
       const run = runs.get(caseId);
       if (run === undefined) throw new Error(`no run for ${caseId}`);
-      // An allow-list entry explains the decision, its agency included.
-      const allowed = new Set(PARITY_ALLOW_LIST.filter((e) => e.caseId === caseId).map((e) => e.decisionId));
+      // An allow-list entry explains the decision, its agency included: the
+      // decision's own key and every survey answer its recorded value carries.
+      const allowed = new Set<string>();
+      const recorded = recordToDecisionSet(record, "tolerance") as Record<string, { value: unknown } | undefined>;
+      for (const e of PARITY_ALLOW_LIST.filter((x) => x.caseId === caseId)) {
+        allowed.add(e.decisionId);
+        const answers = (recorded[e.decisionId]?.value as { answers?: Record<string, unknown> } | undefined)?.answers;
+        for (const questionId of Object.keys(answers ?? {})) allowed.add(questionId);
+      }
       const diffs = compareAgency(run, record).filter((d) => !allowed.has(d.key));
       expect(diffs, formatAgency(label, diffs)).toEqual([]);
     });
