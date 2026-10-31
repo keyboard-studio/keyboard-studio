@@ -71,6 +71,11 @@ import {
 import { checkRedundantTouchLayouts } from "./checks/criteria/check-touch-layouts.js";
 import { checkStrayScratchFiles } from "./checks/criteria/check-scratch-files.js";
 import { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
+import { checkDeprecatedNumericFormats } from "./checks/criteria/check-numeric-formats.js";
+import { checkCapsNcapsConsistent } from "./checks/criteria/check-caps-ncaps.js";
+import { checkDeprecatedHeaders } from "./checks/criteria/check-deprecated-headers.js";
+import { checkTouchRequiredKeys } from "./checks/criteria/check-touch-required-keys.js";
+import { checkFilenameConvention } from "./checks/criteria/check-filename-convention.js";
 import {
   checkTargetsAnyAlone,
   checkTargetsMobileWithoutTouch,
@@ -236,10 +241,20 @@ export function runCriteriaChecks(
   // anywhere in the judged folder.
   collect(checkDuplicateSourceFiles(fs));
 
+  // 1.15 — filename conventions over the VFS basenames (kmc KM0400F):
+  // lowercase extensions, safe characters only.
+  collect(checkFilenameConvention(filePaths));
+
   // 7.10 — raw .kmn text scan; runs even when the IR failed to parse.
   const kmnText = readText(fs, kmnPath(keyboardId));
   if (kmnText !== undefined) {
     collect(checkStoreSyntax(kmnText, kmnPath(keyboardId)));
+    // 7.25 — deprecated d###/x### character codes (text scan; the IR
+    // normalises notations away).
+    collect(checkDeprecatedNumericFormats(kmnText, kmnPath(keyboardId)));
+    // 7.27 — deprecated header statements (text half) + unused stores
+    // (IR half; skipped without a parsed IR).
+    collect(checkDeprecatedHeaders(kmnText, keyboardIR, keyboardId));
   }
 
   // 7.16 — a present .kvks that parses to nothing (the absent case is
@@ -253,6 +268,9 @@ export function runCriteriaChecks(
   if (touchLayout !== undefined) {
     collect(checkTouchLayoutFontMismatch(touchLayout, touchLayoutPath(keyboardId)));
     collect(checkRedundantTouchLayouts(touchLayout, touchLayoutPath(keyboardId)));
+    // 18.14 — every layer carries the required control keys (K_LOPT,
+    // K_BKSP, K_ENTER) with canonical K_ IDs.
+    collect(checkTouchRequiredKeys(touchLayout, touchLayoutPath(keyboardId)));
   }
 
   // 8.12 / 9.6 — package font scans over .kps facts + the VFS inventory.
@@ -446,6 +464,9 @@ export function runCriteriaChecks(
         ...(touchLayout !== undefined ? { touchLayout } : {}),
       }),
     );
+
+    // 7.26 — CAPS/NCAPS handling consistent per referenced key.
+    collect(checkCapsNcapsConsistent(keyboardIR, keyboardId));
 
     // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
     // Runs whenever the .kmn IR exists. An undeclared <Targets> list

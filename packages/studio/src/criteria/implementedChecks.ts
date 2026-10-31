@@ -205,4 +205,12 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_VERSION_NOT_BUMPED",
   "KM_LINT_SPURIOUS_VERSION_BUMP",
   "KM_LINT_VERSION_NOT_INCREMENTED",
+  // Consistency batch (keyboards#4146 mining, 2026-10-31): the five new
+  // deterministic criteria checks in packages/keyboard-lint/src/checks/
+  // criteria/ — §§7.25/7.26/7.27/18.14/1.15.
+  "KM_LINT_DEPRECATED_NUMERIC_FORMAT",
+  "KM_LINT_CAPS_NCAPS_INCONSISTENT",
+  "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE",
+  "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS",
+  "KM_LINT_FILENAME_CONVENTION",
 ]);
