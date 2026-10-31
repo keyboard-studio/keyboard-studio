@@ -69,7 +69,8 @@ export function checkCopyrightAbsent(facts: TextContentFacts): CheckResult {
   if (facts.licenseMd === undefined)
     return checkPassed(code, ["No LICENSE.md to check."]);
   const line = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
-  if (line !== undefined) return checkPassed(code, [`Found: "${line}"`]);
+  if (line !== undefined)
+    return checkPassed(code, ["File: LICENSE.md", `Found: "${line}"`]);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_ABSENT",
@@ -95,7 +96,7 @@ export function checkCopyrightSyntax(facts: TextContentFacts): CheckResult {
     ]);
   const line = firstMatchingLine(facts.licenseMd, COPYRIGHT_YEAR);
   if (COPYRIGHT_SYNTAX.test(facts.licenseMd))
-    return checkPassed(code, line ? [`Found: "${line}"`] : []);
+    return checkPassed(code, line ? ["File: LICENSE.md", `Found: "${line}"`] : []);
   return checkFailed(code, [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_SYNTAX",
