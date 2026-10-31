@@ -4,7 +4,7 @@
 // keys sorted recursively so two reports diff cleanly.
 
 import { createHash } from "node:crypto";
-import type { AuthorRun, PolicyStep, RunReport } from "./caseTypes.ts";
+import type { AuthorRun, PolicyStep, RunReport, SkipReason, SweepSummary } from "./caseTypes.ts";
 import { NOT_COVERED } from "./playwrightOnly.ts";
 
 export interface RunReportAccumulator {
@@ -84,4 +84,53 @@ export function serializeRunReport(run: AuthorRun): string {
   const sha = hashArtifacts(run);
   if (sha !== undefined) body["bundleSha256"] = sha;
   return JSON.stringify(sortKeys(body), null, 2);
+}
+
+/** One swept case, normalised so the issue filer needs no knowledge of AuthorRun. */
+export interface SweepEntry {
+  caseId: string;
+  base: string;
+  profile: number;
+  backspace: string;
+  /**
+   * `in-progress` is written before a case runs and replaced when it finishes; one left in a
+   * report means the shard was killed on it, and the merge counts it as a `hung` failure.
+   */
+  status: "ok" | "failed" | "skipped" | "known-gap" | "in-progress";
+  skipReason?: SkipReason;
+  /** The failing gate id, or the failure kind when no gate ran. */
+  gate?: string;
+  /** The decision id or step of a walk failure; `output` for a gate failure after replay. */
+  decisionPoint?: string;
+  detail?: string;
+  /** The owner of a KNOWN_GAPS-owned failure. */
+  owner?: string;
+  /** Serialised AuthorRun minus its bundle. */
+  run?: unknown;
+}
+
+export function summarise(tier: string, shard: string, entries: readonly SweepEntry[]): SweepSummary {
+  const summary: SweepSummary = {
+    tier,
+    shard,
+    cases: { completed: 0, skipped: 0, failed: 0 },
+    byGate: {},
+    byFirstFailingStep: {},
+    skips: {},
+  };
+  for (const e of entries) {
+    if (e.status === "skipped") {
+      summary.cases.skipped++;
+      const reason = e.skipReason ?? "missing";
+      (summary.skips[reason] ??= []).push(e.caseId);
+    } else if (e.status === "failed" || e.status === "in-progress") {
+      summary.cases.failed++;
+      const gate = (e.gate ?? "unknown") as keyof SweepSummary["byGate"];
+      (summary.byGate[gate] ??= []).push(e.caseId);
+      (summary.byFirstFailingStep[e.decisionPoint ?? "unknown"] ??= []).push(e.caseId);
+    } else {
+      summary.cases.completed++;
+    }
+  }
+  return summary;
 }

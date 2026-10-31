@@ -50,6 +50,17 @@ test("known-gap and skipped cases are never filed", () => {
   assert.equal(calls.length, 0);
 });
 
+test("too-large skips are merged under skips and never filed", () => {
+  const big = (caseId) => ({ caseId, status: "skipped", skipReason: "too-large" });
+  const m = mergeReports([report([big("sweep-huge-p1-whole"), big("sweep-huge-p1-unwrap")], "1of2"), report([big("sweep-huge2-p1-whole")], "2of2")]);
+  assert.deepEqual(m.summary.cases, { completed: 0, skipped: 3, failed: 0 });
+  assert.equal(m.summary.skips["too-large"].length, 3);
+  assert.equal(failuresByKey(m).size, 0);
+  const { gh, calls } = stubGh([]);
+  assert.deepEqual(fileIssues(m, { gh }), []);
+  assert.equal(calls.length, 0);
+});
+
 test("same key across profiles collapses to one filing", () => {
   const m = mergeReports([report([fail(), fail({ caseId: "sweep-kb1-p1-whole-dup" })])]);
   assert.equal(failuresByKey(m).size, 1);

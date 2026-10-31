@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthorRun } from "./caseTypes.ts";
-import { createRunReport, formatCaseLine, serializeRunReport } from "./runReport.ts";
+import { createRunReport, formatCaseLine, serializeRunReport, summarise, type SweepEntry } from "./runReport.ts";
 
 const gate = (g: "G1" | "G2", applicable: boolean, pass: boolean) => ({ gate: g, applicable, pass, detail: [] });
 
@@ -54,5 +54,29 @@ describe("runReport", () => {
     const keys = Object.keys(parsed);
     expect(keys).toEqual([...keys].sort());
     expect(serializeRunReport(run)).toBe(text);
+  });
+});
+
+describe("summarise", () => {
+  const head = { base: "b", profile: 1, backspace: "whole" };
+  it("groups skipped cases by reason, too-large included, and counts them as skipped", () => {
+    const entries: SweepEntry[] = [
+      { ...head, caseId: "a", status: "ok" },
+      { ...head, caseId: "b", status: "skipped", skipReason: "too-large" },
+      { ...head, caseId: "c", status: "skipped", skipReason: "too-large" },
+      { ...head, caseId: "d", status: "skipped", skipReason: "outside-slice" },
+      { ...head, caseId: "e", status: "failed", gate: "G1", decisionPoint: "assignments" },
+    ];
+    const s = summarise("latin", "1/1", entries);
+    expect(s.cases).toEqual({ completed: 1, skipped: 3, failed: 1 });
+    expect(s.skips).toEqual({ "too-large": ["b", "c"], "outside-slice": ["d"] });
+    expect(s.byGate).toEqual({ G1: ["e"] });
+  });
+
+  it("formats a too-large skip as an ASCII console line", () => {
+    const report = createRunReport("p").report;
+    expect(formatCaseLine({ caseId: "k", outcome: "skipped", skipReason: "too-large", gates: [], report })).toBe(
+      "[SKIP] k too-large",
+    );
   });
 });

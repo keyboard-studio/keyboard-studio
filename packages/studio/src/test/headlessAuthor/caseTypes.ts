@@ -89,7 +89,13 @@ export interface PolicyStep {
   proposalSource?: string;
 }
 
-export type SkipReason = "missing" | "not-codec-clean" | "unsupported-script-stub" | "outside-slice";
+export type SkipReason =
+  | "missing"
+  | "not-codec-clean"
+  | "unsupported-script-stub"
+  | "outside-slice"
+  // Sweep tiers only: the keyboard has more rules than a walk can finish inside the case timeout.
+  | "too-large";
 
 export type FailureKind =
   | "proposal-threw"

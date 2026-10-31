@@ -55,7 +55,7 @@ copied keyboard) → the case fails with `placeholder-clash` (spec Edge Cases).
 |---|---|
 | `caseId` | string |
 | `outcome` | `"completed"` \| `"skipped"` \| `"failed"` |
-| `skipReason?` | `"missing"` \| `"not-codec-clean"` \| `"unsupported-script-stub"` \| `"outside-slice"` |
+| `skipReason?` | `"missing"` \| `"not-codec-clean"` \| `"unsupported-script-stub"` \| `"outside-slice"` \| `"too-large"` (sweep tiers only) |
 | `failure?` | `{ step: string; decisionId?: string; kind: "proposal-threw" \| "placeholder-clash" \| "network-required" \| "scaffold-failed" \| "compile-failed"; detail: string }` |
 | `record` | the 053 decision record (passes `parseDecisionRecord`) |
 | `decisions` | the 088 DecisionSet |

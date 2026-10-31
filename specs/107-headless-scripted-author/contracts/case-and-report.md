@@ -52,6 +52,14 @@ sorted, so two reports diff cleanly.
 See [data-model.md](../data-model.md#sweep-summary). File name
 `headless-report-<tier>-<shard>.json`; the merge job writes `headless-report-<tier>.json`.
 
+## Skip reasons
+
+`SkipReason` is `missing`, `not-codec-clean`, `unsupported-script-stub`, `outside-slice` or
+`too-large`. `too-large` means the keyboard's `ruleCount` exceeds `MAX_SWEEP_RULE_COUNT` (2,000;
+research R6) and is decided only for the `latin` and `eligible` sweep tiers. Explicit harness,
+PR-set and `KS_AUTHOR_CASE` runs are never size-capped. Every skip, `too-large` included, appears
+in the summary's `skips` by reason and is never filed as an issue.
+
 ## Console output
 
 Plain ASCII, one line per case: `[OK] <caseId> gates=8/8 placeholders=N`,

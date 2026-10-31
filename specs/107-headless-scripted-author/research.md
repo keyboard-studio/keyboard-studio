@@ -222,6 +222,19 @@ flags `chechen_latin` (a PR-set keyboard whose readonly groups the codec keeps a
 groups). On the 2026-10-30 `import-corpus.json` no keyboard has parse errors, so all 921 are eligible
 on this criterion; a keyboard that then fails to scaffold is reported as a failure, never a skip.
 
+**Added 2026-10-31 (owner ruling): `too-large`, sweep tiers only.** A walk's cost is superlinear in
+`ruleCount` (docs/import-corpus.json). One walk each (profile 1, backspace whole): 108 rules (the
+corpus median) 3.6 s, 351 (p95) 5.2 s, 1,802 9.8 s, 2,285 37 s, 3,790 32 s, 4,144 49 s, 25,474 over
+440 s (killed), and `vietnamese_telex_legacy` (58,026 rules in one group; issue #2406) about 900 s,
+against the 180 s default case timeout. The `latin` and `eligible` tiers therefore skip a keyboard
+with more than `MAX_SWEEP_RULE_COUNT` (2,000) rules as `too-large`: 9 of the 921 keyboards
+(`vietnamese_telex`, `hakka`, `vietnamese_telex_legacy`, `vietnamese_vni`, `taigi_viet_telex`,
+`foochow`, `tibetan_ewts`, `hieroglyphic`, `taigi_telex`). The cap sits just above the largest
+keyboard measured under 10 s, leaving margin for a slower CI runner. It is reported like any other
+skip and never filed as an issue. The explicit harness, the PR set and `KS_AUTHOR_CASE` runs name
+their keyboards on purpose and are not capped. Lowering the cost of a large walk is a separate
+product question tracked in that issue; the cap only keeps the sweep honest in the meantime.
+
 **Rationale**: Art. II forbids try/catch around `parse()` in the scaffold; deciding up front keeps the
 product path honest and makes "skipped" mean only "not eligible".
 

@@ -32,6 +32,17 @@ import { lookupGroup } from "./loadCases.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const IMPORT_CORPUS_PATH = resolve(here, "../../../../../docs/import-corpus.json");
 
+/**
+ * Most rules (`ruleCount` in docs/import-corpus.json) a sweep walk is attempted on. Measured
+ * 2026-10-31, one walk each (profile 1, backspace whole, KS_AUTHOR_TRACE=1): 108 rules 3.6 s,
+ * 351 rules 5.2 s, 1,802 rules 9.8 s, 2,285 rules 37 s, 3,790 rules 32 s, 4,144 rules 49 s,
+ * 25,474 rules over 440 s (killed), 58,026 rules about 900 s. The corpus median is 108 rules, p95
+ * 351, max 72,222. Cost is superlinear above about 2,000 rules, so the cap sits just above the
+ * largest keyboard measured at under 10 s, leaving a wide margin under the 180 s case timeout on
+ * a slower CI runner. It excludes 9 of the 921 keyboards (those with more than 2,000 rules).
+ */
+export const MAX_SWEEP_RULE_COUNT = 2000;
+
 export type Slice = "all-eligible" | "latin" | { ids: readonly string[] };
 
 export interface EligibilityDeps {
@@ -44,18 +55,43 @@ export interface EligibilityDeps {
   parsesCompletely?: (base: string) => boolean | undefined;
   /** The keyboard's script as the product's .kps reader derives it. */
   scriptOf?: (base: string, group: string) => string | undefined;
+  /** The keyboard's rule count per `docs/import-corpus.json`; undefined when unlisted. */
+  ruleCountOf?: (base: string) => number | undefined;
 }
 
-let parseCache: Map<string, boolean> | undefined;
+export interface EligibilityOptions {
+  /**
+   * Skip keyboards over MAX_SWEEP_RULE_COUNT as `too-large`. Only the sweep tiers set this: the
+   * explicit harness, PR-set and single-case runs name their keyboards on purpose.
+   */
+  sizeCap?: boolean;
+}
+
+interface CorpusRow {
+  parses: boolean;
+  ruleCount: number;
+}
+
+let corpusCache: Map<string, CorpusRow> | undefined;
+
+function corpusRow(base: string): CorpusRow | undefined {
+  if (corpusCache === undefined) {
+    const doc = JSON.parse(readFileSync(IMPORT_CORPUS_PATH, "utf8")) as {
+      keyboards: { keyboardId: string; parseErrors: unknown[]; ruleCount: number }[];
+    };
+    corpusCache = new Map(
+      doc.keyboards.map((k) => [k.keyboardId, { parses: k.parseErrors.length === 0, ruleCount: k.ruleCount }]),
+    );
+  }
+  return corpusCache.get(base);
+}
 
 function defaultParsesCompletely(base: string): boolean | undefined {
-  if (parseCache === undefined) {
-    const doc = JSON.parse(readFileSync(IMPORT_CORPUS_PATH, "utf8")) as {
-      keyboards: { keyboardId: string; parseErrors: unknown[] }[];
-    };
-    parseCache = new Map(doc.keyboards.map((k) => [k.keyboardId, k.parseErrors.length === 0]));
-  }
-  return parseCache.get(base);
+  return corpusRow(base)?.parses;
+}
+
+function defaultRuleCountOf(base: string): number | undefined {
+  return corpusRow(base)?.ruleCount;
 }
 
 function defaultScriptOf(base: string, group: string): string | undefined {
@@ -68,6 +104,7 @@ export function eligibility(
   base: string,
   slice: Slice = "all-eligible",
   deps: EligibilityDeps = {},
+  options: EligibilityOptions = {},
 ): { eligible: true; group: string } | { eligible: false; reason: SkipReason } {
   const no = (reason: SkipReason): { eligible: false; reason: SkipReason } => ({ eligible: false, reason });
 
@@ -81,6 +118,11 @@ export function eligibility(
 
   if (slice === "latin" && script !== "Latn") return no("outside-slice");
   if (typeof slice === "object" && !slice.ids.includes(base)) return no("outside-slice");
+
+  if (options.sizeCap === true) {
+    const rules = (deps.ruleCountOf ?? defaultRuleCountOf)(base);
+    if (rules !== undefined && rules > MAX_SWEEP_RULE_COUNT) return no("too-large");
+  }
 
   return { eligible: true, group };
 }
