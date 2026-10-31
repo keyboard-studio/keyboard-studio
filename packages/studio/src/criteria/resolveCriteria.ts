@@ -232,11 +232,15 @@ function resolveRow(
           controls: null,
           evidence: (): EvidenceModel => ({
             kind: "lint-finding",
-            lines: findings.flatMap((finding) =>
-              finding.hint
-                ? [finding.message, finding.hint]
-                : [finding.message],
-            ),
+            lines: findings.flatMap((finding) => {
+              const loc =
+                finding.location?.file != null
+                  ? [`File: ${finding.location.file}`]
+                  : [];
+              return finding.hint
+                ? [...loc, finding.message, finding.hint]
+                : [...loc, finding.message];
+            }),
             lintRuleId,
             findings,
           }),

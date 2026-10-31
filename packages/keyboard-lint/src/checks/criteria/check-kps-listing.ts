@@ -45,7 +45,10 @@ export function checkKpsKmxAbsent(facts: KpsListingFacts): LintFinding[] {
     criteriaFinding({
       code: "KM_LINT_KPS_KMX_ABSENT",
       file: facts.kpsPath,
-      message: "The .kps package does not list a compiled .kmx.",
+      message: "The .kps package does not list a compiled .kmx." +
+        (facts.fileNames.length > 0
+          ? ` Listed files: ${facts.fileNames.join(", ")}`
+          : " The package lists no files."),
       hint: "List the built <id>.kmx in the .kps <Files>.",
     }),
   ];

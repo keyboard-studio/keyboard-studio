@@ -73,12 +73,18 @@ export function checkCopyrightSyntax(facts: TextContentFacts): LintFinding[] {
   if (facts.licenseMd === undefined) return [];
   if (!COPYRIGHT_YEAR.test(facts.licenseMd)) return [];
   if (COPYRIGHT_SYNTAX.test(facts.licenseMd)) return [];
+  // Capture the offending copyright line for the evidence.
+  const line = facts.licenseMd
+    .split("\n")
+    .find((l) => COPYRIGHT_YEAR.test(l))
+    ?.trim();
   return [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_SYNTAX",
       file: "LICENSE.md",
       message:
-        "The LICENSE.md copyright line does not follow the `Copyright (C) <year> <holder>` syntax.",
+        "The LICENSE.md copyright line does not follow the `Copyright (C) <year> <holder>` syntax." +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Rewrite the copyright line as `Copyright (C) <year> <holder>`.",
     }),
   ];
@@ -128,11 +134,15 @@ export function checkVersionInDocs(facts: TextContentFacts): LintFinding[] {
   ];
   const hits = docs.filter(([, text]) => text !== undefined && VERSION_LIKE.test(text));
   if (hits.length === 0) return [];
+  // Capture the offending version string for the evidence.
+  const versionMatch = hits[0]![1]!.match(VERSION_LIKE);
+  const version = versionMatch ? versionMatch[0] : "";
   return [
     criteriaFinding({
       code: "KM_LINT_VERSION_IN_DOCS",
       file: hits[0]![0],
-      message: `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.`,
+      message: `A version number is embedded in ${hits.map(([n]) => n).join(", ")} — versions go stale in docs.` +
+        (version ? ` Found: "${version}"` : ""),
       hint: "Remove the hardcoded version from the documentation; the package version is the single source of truth.",
     }),
   ];
@@ -149,11 +159,17 @@ export function checkCopyrightInDocs(facts: TextContentFacts): LintFinding[] {
     ([, text]) => text !== undefined && COPYRIGHT_YEAR.test(text),
   );
   if (hits.length === 0) return [];
+  // Capture the offending copyright line for the evidence.
+  const line = hits[0]![1]!
+    .split("\n")
+    .find((l) => COPYRIGHT_YEAR.test(l))
+    ?.trim();
   return [
     criteriaFinding({
       code: "KM_LINT_COPYRIGHT_IN_DOCS",
       file: hits[0]![0],
-      message: `A copyright statement is embedded in ${hits.map(([n]) => n).join(", ")}.`,
+      message: `A copyright statement is embedded in ${hits.map(([n]) => n).join(", ")}.` +
+        (line ? ` Found: "${line}"` : ""),
       hint: "Remove the copyright statement from the documentation — it belongs in LICENSE.md.",
     }),
   ];
