@@ -192,6 +192,18 @@ jobs:
           path: shards
           merge-multiple: true
 
+      # `gh issue create --label` fails when the label does not exist, which
+      # would fail the filing step on the first new failure. --force makes this
+      # idempotent (it updates the label if it is already there).
+      - name: Ensure the headless-sweep label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh label create headless-sweep --force
+          --repo "${{ github.repository }}"
+          --color d93f0b
+          --description "Failure filed by the scheduled headless author sweep (spec 107)"
+
       - name: Merge, summarise and file issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
