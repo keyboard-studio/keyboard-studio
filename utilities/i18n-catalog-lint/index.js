@@ -37,6 +37,8 @@
 //     ratio-based and need a large fraction of the catalog to fire — neither
 //     can see a HANDFUL of keys reverting in an otherwise-translated catalog,
 //     which is exactly what a real Crowdin sync did once (3 keys of 1214).
+//   • target locales, additionally: no value may be empty. A new string lands
+//     with its translation; a "" left for Crowdin comes back as English.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 //
@@ -78,6 +80,9 @@ const notes = [];
 // is not stale, and `messages:extract` is the wrong instruction to print at it
 // (it would work, but it rewrites the whole catalog to fix a pure reordering).
 const orderProblems = [];
+// Empty target values get their own channel too: the fix is writing the
+// translation, and `messages:extract` is what put the "" there in the first place.
+const untranslatedProblems = [];
 
 function readCatalog(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
@@ -205,6 +210,20 @@ try {
             (missing.length ? ` — missing: ${missing.join(", ")}` : "") +
             (extra.length ? ` — stale/extra: ${extra.join(", ")}` : ""),
         );
+      }
+
+      // `messages:extract` adds every new id to a target catalog as "". A
+      // Crowdin download never produces "" for Tier A (skip_untranslated_strings
+      // is false, so untranslated ids arrive as English source text) — which is
+      // exactly what happens to a "" that reaches main: the next sync PR turns it
+      // into English inside the French catalog. So a new UI string lands with its
+      // translation in the same change; merging uploads it to Crowdin
+      // (crowdin-upload-sources.yml) and the download round-trips it. Tier B
+      // content catalogs use "" as "not yet translated" by design — this check
+      // is Tier A only.
+      const empty = keySet(committed).filter((k) => committed[k] === "");
+      if (empty.length) {
+        untranslatedProblems.push(`[${locale}] ${empty.length} empty value(s): ${empty.join(", ")}`);
       }
 
       // Key-set parity above cannot see a catalog whose keys all survived but
@@ -349,6 +368,15 @@ if (orderProblems.length > 0) {
   );
 }
 
-if (problems.length > 0 || orderProblems.length > 0) process.exit(1);
+if (untranslatedProblems.length > 0) {
+  console.error("[ERROR] i18n-catalog-lint: target catalogs have untranslated (empty) values.");
+  for (const p of untranslatedProblems) console.error("  - " + p);
+  console.error(
+    "\nFix: write the translation into packages/studio/src/locales/<locale>/messages.json in this change. " +
+      "An empty value reaching main comes back from the next Crowdin sync as English.",
+  );
+}
+
+if (problems.length > 0 || orderProblems.length > 0 || untranslatedProblems.length > 0) process.exit(1);
 
 console.log("[OK] i18n-catalog-lint: message catalogs are in sync and in message-id order.");
