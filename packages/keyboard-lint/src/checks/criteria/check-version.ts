@@ -210,3 +210,100 @@ function suggestBump(version: string): string {
   parts[parts.length - 1] = String(patch + 1);
   return parts.join(".");
 }
+
+// 2.1 KM_LINT_VERSION_NOT_BUMPED — if any file that ships in the package
+// was modified, the version must be bumped. Compares against the PR's base
+// commit. Non-package files (docs, history, license) don't require a bump.
+//
+// Package files: .kmn, .kvks, .kps, touch layouts, fonts, icons, compiled .js
+// Non-package: .md, .htm/.html docs, .php, .txt, LICENSE
+
+const PACKAGE_EXTENSIONS = new Set([
+  ".kmn",
+  ".kvks",
+  ".kps",
+  ".keyman-touch-layout",
+  ".ttf",
+  ".otf",
+  ".woff",
+  ".woff2",
+  ".ico",
+  ".js",
+]);
+
+const NON_PACKAGE_EXTENSIONS = new Set([
+  ".md",
+  ".htm",
+  ".html",
+  ".php",
+  ".txt",
+]);
+
+function isPackageFile(path: string): boolean {
+  const lower = path.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  if (dot === -1) return true; // No extension: treat as package file (conservative)
+  const ext = lower.slice(dot);
+  if (NON_PACKAGE_EXTENSIONS.has(ext)) return false;
+  if (PACKAGE_EXTENSIONS.has(ext)) return true;
+  // Unknown extension: conservative — treat as package file
+  return true;
+}
+
+export function checkVersionBumpRequired(
+  ir: KeyboardIR,
+  review: ReviewContext | undefined,
+): CheckResult {
+  const code = "KM_LINT_VERSION_NOT_BUMPED";
+  const file = kmnPath(ir.header.keyboardId);
+  if (review === undefined || !review.isPr) {
+    return checkPassed(code, [
+      "Not a PR; version history is the repo.",
+    ]);
+  }
+  const changedFiles = review.treePaths ?? [];
+  if (changedFiles.length === 0) {
+    return checkPassed(code, [
+      "No changed files listed; nothing to judge.",
+    ]);
+  }
+  // Filter to this keyboard's folder
+  const segments = review.repoPath.split("/").filter((s) => s !== "");
+  const idLower = ir.header.keyboardId.toLowerCase();
+  const folder = `${segments.join("/")}/`.toLowerCase();
+  const kbFiles = changedFiles.filter((p) =>
+    p.toLowerCase().startsWith(folder),
+  );
+  const packageFiles = kbFiles.filter(isPackageFile);
+  if (packageFiles.length === 0) {
+    return checkPassed(code, [
+      `Only non-package files modified (${kbFiles.length} file(s)); no version bump required.`,
+    ]);
+  }
+  // Package files were modified — version must be bumped
+  const prVersion = versionOf(ir);
+  const base = review.baseKmnVersion;
+  if (base === undefined || (base.version ?? "").trim() === "") {
+    return checkPassed(code, [
+      "Package files modified, but no base version to compare against.",
+    ]);
+  }
+  const baseVersion = base.version!.trim();
+  const cmp = compareDotVersions(prVersion, baseVersion);
+  if (cmp > 0) {
+    return checkPassed(code, [
+      `Package files modified (${packageFiles.length} file(s)); version bumped ${baseVersion} → ${prVersion}.`,
+    ]);
+  }
+  const bumped = suggestBump(baseVersion);
+  return checkFailed(code, [
+    criteriaFinding({
+      code: "KM_LINT_VERSION_NOT_BUMPED",
+      file,
+      message:
+        `Package files were modified (${packageFiles.map((p) => p.split("/").pop()).join(", ")}), ` +
+        `but the version was not bumped from "${baseVersion}".`,
+      hint: `Bump the version past "${baseVersion}" — e.g. "${bumped}".`,
+    }),
+  ]);
+}

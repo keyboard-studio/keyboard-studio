@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-31T06:43:19.421Z",
+ "generatedAt": "2026-10-31T18:15:34.193Z",
  "catalogSize": 188,
  "byBand": {
   "layer-c-enforce": 106,
@@ -310,7 +310,9 @@
    },
    "implemented": true,
    "precertified": false,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
   },
   {
    "id": "2.2-version-not-required-if-only-nonpackage",
