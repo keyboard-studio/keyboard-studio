@@ -224,5 +224,5 @@ export function computeBaselineDocFindings(args: BaselineDocFindingsArgs): LintF
       members,
       ...(args.cssTexts !== undefined ? { cssTexts: args.cssTexts } : {}),
     }),
-  );
+  ).findings;
 }
