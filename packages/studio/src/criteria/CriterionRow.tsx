@@ -201,7 +201,7 @@ export function CriterionRow({
    * sha (opens in a new tab). Only in hosts that pass githubLink (/review).
    * Values (quoted strings, paths) render in monospace code style.
    */
-  const renderEvidenceLine = (line: string, index: number): React.ReactNode => {
+  const renderEvidenceLine = (line: string, _index: number): React.ReactNode => {
     // Helper: wrap quoted strings in <code>
     const withCode = (text: string): React.ReactNode[] => {
       const parts = text.split(/("[^"]*")/g);
