@@ -98,12 +98,12 @@ function indexFindings(
  * Data sources:
  * - input.verifiedByCode: verified lines from related implemented checks
  * - input.facts: keyboard facts (fonts, etc.)
- * - findingsByCode: findings from related checks
+ * - _findingsByCode: findings from related checks (currently unused)
  */
 function reviewerContext(
   criterionId: string,
   input: CriteriaInput,
-  findingsByCode: Map<string, readonly LintFinding[]>,
+  _findingsByCode: Map<string, readonly LintFinding[]>,
 ): string[] {
   const verified = input.verifiedByCode;
   const getVerified = (code: string): string[] =>
