@@ -126,31 +126,34 @@ function resolveTextFacts(
   keyboardIR: KeyboardIR | undefined,
   input: CriteriaLintInput,
 ): TextContentFacts {
-  const licensePath = findPath(filePaths, "LICENSE.md");
-  const readmeMdPath = findPath(filePaths, "README.md");
-  const readmeHtmPath = findPath(filePaths, "source/readme.htm");
-  const welcomeHtmPath =
+  // Helper: read a text file, returning undefined when absent/unreadable.
+  // The spread below only includes defined values, satisfying
+  // exactOptionalPropertyTypes (a present property must be `string`, not
+  // `string | undefined`).
+  const textAt = (path: string | undefined): string | undefined =>
+    path === undefined ? undefined : readText(fs, path);
+
+  const licenseMd = textAt(findPath(filePaths, "LICENSE.md"));
+  const kmn = textAt(kmnPath(keyboardId));
+  const readmeMd = textAt(findPath(filePaths, "README.md"));
+  const readmeHtm = textAt(findPath(filePaths, "source/readme.htm"));
+  const welcomeHtm = textAt(
     findPath(filePaths, "source/welcome.htm") ??
-    findPath(filePaths, "source/welcome/welcome.htm");
+      findPath(filePaths, "source/welcome/welcome.htm"),
+  );
   const phpPath = filePaths.find((p) => p.toLowerCase().endsWith(".php"));
-  const kmnFilePath = kmnPath(keyboardId);
+  const php = textAt(phpPath);
   const primaryBcp47 =
     keyboardIR?.header.bcp47[0] ?? input.kpsLanguages[0] ?? undefined;
   return {
     keyboardId,
-    ...(licensePath !== undefined
-      ? { licenseMd: readText(fs, licensePath) } : {}),
-    ...(readText(fs, kmnFilePath) !== undefined
-      ? { kmn: readText(fs, kmnFilePath) } : {}),
+    ...(licenseMd !== undefined ? { licenseMd } : {}),
+    ...(kmn !== undefined ? { kmn } : {}),
     ...(input.kpsText !== undefined ? { kps: input.kpsText } : {}),
-    ...(readmeMdPath !== undefined
-      ? { readmeMd: readText(fs, readmeMdPath) } : {}),
-    ...(readmeHtmPath !== undefined
-      ? { readmeHtm: readText(fs, readmeHtmPath) } : {}),
-    ...(welcomeHtmPath !== undefined
-      ? { welcomeHtm: readText(fs, welcomeHtmPath) } : {}),
-    ...(phpPath !== undefined
-      ? { php: readText(fs, phpPath), phpPath } : {}),
+    ...(readmeMd !== undefined ? { readmeMd } : {}),
+    ...(readmeHtm !== undefined ? { readmeHtm } : {}),
+    ...(welcomeHtm !== undefined ? { welcomeHtm } : {}),
+    ...(php !== undefined && phpPath !== undefined ? { php, phpPath } : {}),
     ...(primaryBcp47 !== undefined ? { primaryBcp47 } : {}),
   };
 }
