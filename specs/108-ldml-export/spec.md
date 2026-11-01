@@ -21,6 +21,8 @@ without key input."
   and the finding-code table. **Normative** for this spec.
 - [research.md](research.md) — sources, authority order, verified facts, open items R8/R9.
 - [amendment.md](amendment.md) — the adopted Art VII amendments (G0, Constitution 2.1.0; G1, 2.2.0).
+- [spec 109](../109-base-keyboard-fallback/spec.md) — base-keyboard fallback. Owns the
+  enumerator of positions the keyboard does not handle, which FR-021 and FR-028 reuse.
 
 ## Governance gate G0 (cleared)
 
@@ -312,7 +314,12 @@ not been done yet.
   otherwise. Only one hardware form is written.
 - **FR-021**: Every main-block position in every exported hardware layer MUST have an explicit
   key. Positions without a rule get the base keyboard's character for that layer, because
-  LDML does not fall through to the base keyboard.
+  LDML does not fall through to the base keyboard. The set of positions without a rule comes
+  from spec 109's shared enumerator (its FR-040). Under the "Do nothing" fallback policy, spec
+  109's `swallowUndefined` store gives those positions `nul` rules, so they export as
+  suppressed gap keys (rows 2.25, 3.15a) and the export no longer depends on the base keyboard.
+  Spec 109 lists leaks for every picked base keyboard; this export fills from the primary one
+  only (FR-027).
 - **FR-022**: Within each transform group, transforms MUST be written in KMN's effective
   precedence (longest context first, then source order), not in source order (research R5).
 - **FR-023**: Every transform MUST meet Keyman 19's set-mapping limit: at most one mapping, as
