@@ -109,12 +109,18 @@ async function clickOskKeyById(oskFrame: FrameLocator, keyId: string): Promise<v
 
 /**
  * Carve (nothing carved) → deadkeys → rules → mechanisms, the gallery
- * tail every full walk here shares (mirrors copy-edit.spec.ts's
- * finishGalleryWork without its carve/placement options).
+ * tail every full walk here shares.
+ *
+ * "Nothing carved" is Skip, not Continue: spec 106 FR-042 made Continue
+ * the approval of carve's suggested discards. These walks build a
+ * one-character alphabet, so carve suggests nearly everything the starting
+ * keyboard produces — on sil_cameroon_qwerty that includes every combining
+ * mark, and approving it takes the T_ mark keys off the touch layout. FR-014
+ * parity is measured against the copy, not against a carve decision.
  */
 async function finishGalleryWork(page: Page): Promise<void> {
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId("carve-continue").click();
+  await page.getByTestId("carve-skip").click();
   await driveDeadkeysStep(page);
   await page.getByTestId("rules-continue").click();
   await driveMechanismsGallery(page);
