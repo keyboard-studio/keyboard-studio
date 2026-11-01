@@ -128,6 +128,32 @@ export interface CriteriaFacts {
   noPuaInOutput?: boolean;
   /** 13.4 ran and found no mathematical Latin look-alikes in the output. */
   noMathLatinLookalikes?: boolean;
+  /**
+   * Foreign host, from languageTags.ts: every .kps language tag is one
+   * langtags records, so none is new or unusual (10.4).
+   */
+  kpsTagsAllInLangtags?: boolean;
+  /** Every .kps tag's language is in Glottolog and none is constructed (10.5). */
+  kpsTagsNoConstructed?: boolean;
+  /**
+   * The output is confidently in one script, and langtags records that
+   * script for every .kps tag's language: no mismatch to flag (12.5/12.6).
+   */
+  outputScriptRecordedByLangtags?: boolean;
+  /**
+   * 4.1b ran and its LICENSE copyright line states exactly one year, so
+   * no year range is used (4.8).
+   */
+  copyrightSingleYear?: boolean;
+  /**
+   * The LICENSE year and every HISTORY.md entry year are the same single
+   * year: the keyboard was not updated across multiple years (4.2).
+   */
+  copyrightAndHistoryOneYear?: boolean;
+  /** /review host: the PR has no review or conversation comments (17.1). */
+  noPrComments?: boolean;
+  /** /review host: the target is a published keyboard, not a PR (17.1). */
+  notAPullRequest?: boolean;
 }
 
 /**
@@ -205,6 +231,13 @@ export interface CriteriaInput {
    * evidence only; it never decides a status.
    */
   reviewerSource?: ReviewerSource;
+  /**
+   * Foreign mode only: yellow-row verdicts the source data settles
+   * (languageTags.ts: 10.3, 12.1), keyed by criterion id. A row with no
+   * entry stays with the reviewer; the resolver ignores this in authored
+   * mode, where the author's attestation decides.
+   */
+  reviewerVerdicts?: ReadonlyMap<string, CriteriaAssemblyVerdict>;
 }
 
 /**
@@ -219,6 +252,7 @@ export interface EvidenceModel {
     | "precertified"
     | "compile"
     | "assembly"
+    | "reviewer-verdict"
     | "lint-pass"
     | "lint-finding"
     | "not-implemented"

@@ -199,6 +199,11 @@ export interface PrContext {
   body: string;
   /** The PR's base commit sha (the commit before the PR's changes). */
   baseSha: string;
+  /**
+   * The PR's diff (review) and conversation comment counts (17.1), when
+   * the API returned them.
+   */
+  commentCounts?: { review: number; conversation: number };
 }
 
 const prContextCache = new Map<string, Promise<PrContext>>();
@@ -230,6 +235,8 @@ export function fetchPrContext(
     const pr = (await prRes.json()) as {
       body?: string | null;
       base?: { sha?: string } | null;
+      comments?: number;
+      review_comments?: number;
     };
     const files = (await filesRes.json()) as Array<{ filename?: string }>;
     return {
@@ -238,6 +245,14 @@ export function fetchPrContext(
         .filter((n) => n !== ""),
       body: pr.body ?? "",
       baseSha: pr.base?.sha ?? "",
+      ...(typeof pr.review_comments === "number" && typeof pr.comments === "number"
+        ? {
+            commentCounts: {
+              review: pr.review_comments,
+              conversation: pr.comments,
+            },
+          }
+        : {}),
     };
   })();
   prContextCache.set(key, p);

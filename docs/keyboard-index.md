@@ -55,6 +55,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Övdalsk | `elfdalian` | `ovd` | Craig Cornelius | `../keyboards/experimental/e/elfdalian` |
 | தமிழ்99 \| Tamil99 | `ekwtamil99uni` | `ta` | Mugunth, Umar, K. Sethu | `../keyboards/release/e/ekwtamil99uni` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
+| Esperanto Plus | `eo_plus` | `eo` | Andrea Vaccari | `../keyboards/release/e/eo_plus` |
 | Dane-Z̲aa Z̲áágéʔ | `fv_dane_zaa_zaage` | `bea` | Clarissa Forbes | `../keyboards/release/fv/fv_dane_zaa_zaage` |
 | X̱aayda-X̱aad Kil | `fv_hlgaagilda_xaayda_kil` | `hax` | (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_hlgaagilda_xaayda_kil` |
 | Northern Tutchone | `fv_northern_tutchone` | `ttm-Latn` | (c) 2008-2019 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_northern_tutchone` |
@@ -80,6 +81,11 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Odia/Oriya Phonetic (ITRANS) | `itrans_odia` | `or`, `bdv`, `bfw`, `dso`, `gbj`, `gdb`, `hoc-Orya`, `jun`, `kff-Orya`, `kxv-Orya`, `kyw-Orya`, `pci-Orya`, `peg`, `sat-Orya`, `spv`, `srb-Orya` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_odia` |
 | Ibọnọ Chwerty | `ibono_chwerty` | `ibn` | Rogers Katelem Edeh | `../keyboards/release/i/ibono_chwerty` |
 | Korean RR | `korean_rr` | `ko` | © 2010-2023 SIL International | `../keyboards/release/k/korean_rr` |
+| Arabic Phonetic (SIL) | `sil_arabic_phonetic` | `ar`, `arq-Arab`, `abv-Arab`, `shu-Arab`, `acy-Arab`, `avl-Arab`, `arz-Arab`, `afb-Arab`, `acw-Arab`, `ayl-Arab`, `acm-Arab`, `ary-Arab`, `ars-Arab`, `apc-Arab`, `ayp-Arab` … (+8 more) | Marc Durdin and Tamara Duff | `../keyboards/release/sil/sil_arabic_phonetic` |
+| Indígenas Bolivianos | `sil_bolivia` | `ay`, `aro`, `cav`, `cao`, `cap`, `cax`, `ese`, `gnw`, `gn`, `gui`, `gyr`, `ign`, `qu-BO`, `qul`, `srq` … (+2 more) | (c) 2022 SIL International | `../keyboards/release/sil/sil_bolivia` |
+| Cherokee Nation (SIL) | `sil_cherokee_nation` | `chr-Cher` | © 2012-2020 SIL International | `../keyboards/release/sil/sil_cherokee_nation` |
+| Dzongkha (SIL) | `sil_dzongkha` | `dz-BT` | © SIL Global | `../keyboards/release/sil/sil_dzongkha` |
+| Polytonic Greek (SIL) | `sil_greek_polytonic` | `grc-Grek`, `el` | D I Bevan | `../keyboards/release/sil/sil_greek_polytonic` |
 | Kayah [Myanmar] (SIL) | `sil_kayah_mymr` | `kyu-Mymr` | © SIL Global | `../keyboards/release/sil/sil_kayah_mymr` |
 | Kcho (SIL) | `sil_kcho` | `mwq`, `dao` | SIL Global | `../keyboards/release/sil/sil_kcho` |
 | Khmer Angkor | `khmer_angkor` | `km` | Makara Sok | `../keyboards/release/k/khmer_angkor` |

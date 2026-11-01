@@ -311,3 +311,49 @@ if (existing === content) {
   const bytes = Buffer.byteLength(content, 'utf8');
   console.log(`[OK] Generated ${OUT_FILE} (${bytes} bytes)`);
 }
+
+// ------------------------------------------------------------ tagsets -------
+//
+// Every tagset (bare and script/region-specific), for the /review language-tag
+// rows (10.3 minimal, 10.4 known, 10.5 macrolanguage members, 12.5 recorded
+// scripts): the canonical minimal `tag`, its `full` form, its equivalent
+// `tags`, the extra `regions` the orthography is also used in, and the
+// `macrolang` the language belongs to. One row per tagset, sorted by tag;
+// lists are space-joined to keep the file small.
+
+const tagsetRows = raw
+  .filter((e) => e.tag && !e.tag.startsWith('_') && typeof e.full === 'string')
+  .map((e) => [
+    e.tag,
+    e.full,
+    (Array.isArray(e.tags) ? [...e.tags].sort() : []).join(' '),
+    (Array.isArray(e.regions) ? [...e.regions].sort() : []).join(' '),
+    typeof e.macrolang === 'string' ? e.macrolang : '',
+  ])
+  .sort((a, b) => a[0].localeCompare(b[0]));
+
+const tagsetsContent = `\
+// generated — do not edit
+// source:  scripts/codegen-langtags.mjs
+// data:    packages/engine/data/langtags/langtags.json
+// commit:  ${cfg.commit}
+// fetched: ${cfg.source}
+// rows:    ${tagsetRows.length}
+//
+// [tag, full, equivalent tags (space-joined), extra regions (space-joined),
+//  macrolanguage ('' for none)].
+
+export const tagsets: readonly (readonly [string, string, string, string, string])[] = [
+${tagsetRows.map((r) => `  ${JSON.stringify(r)},`).join('\n')}
+];
+`;
+
+const TAGSETS_FILE = join(OUT_DIR, 'tagsets.ts');
+let existingTagsets = '';
+try { existingTagsets = readFileSync(TAGSETS_FILE, 'utf8'); } catch { /* new */ }
+if (existingTagsets === tagsetsContent) {
+  console.log(`[OK] Unchanged ${TAGSETS_FILE}`);
+} else {
+  writeFileSync(TAGSETS_FILE, tagsetsContent, 'utf8');
+  console.log(`[OK] Generated ${TAGSETS_FILE} (${Buffer.byteLength(tagsetsContent, 'utf8')} bytes, ${tagsetRows.length} rows)`);
+}

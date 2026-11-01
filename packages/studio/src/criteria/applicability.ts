@@ -130,6 +130,64 @@ export function applicabilityFor(
         "The produced output contains no mathematical Latin look-alikes (check 13.4), so there is nothing to compare for spoofing.",
     };
   }
+  // /review language tags (languageTags.ts): langtags and Glottolog say
+  // there is nothing to flag.
+  if (
+    facts.kpsTagsAllInLangtags === true &&
+    criterion.id === "10.4-kps-unusual-tag-flagged"
+  ) {
+    return {
+      reason:
+        "Every .kps language tag is one langtags records, so none is new or unusual.",
+    };
+  }
+  if (
+    facts.kpsTagsNoConstructed === true &&
+    criterion.id === "10.5-kps-conlang-flagged"
+  ) {
+    return {
+      reason:
+        "Glottolog classifies every .kps language as a natural language, none as constructed.",
+    };
+  }
+  if (
+    facts.outputScriptRecordedByLangtags === true &&
+    (criterion.id === "12.5-script-mismatch-flagged" ||
+      criterion.id === "12.6-script-mismatch-submitted-to-langtags")
+  ) {
+    return {
+      reason:
+        "langtags records the keyboard's output script for every .kps language, so there is no script mismatch to flag.",
+    };
+  }
+  if (
+    facts.copyrightSingleYear === true &&
+    criterion.id === "4.8-year-range-starts-at-original"
+  ) {
+    return {
+      reason: "The LICENSE.md copyright states a single year, not a range.",
+    };
+  }
+  if (
+    facts.copyrightAndHistoryOneYear === true &&
+    criterion.id === "4.2-copyright-year-range-if-multiyear"
+  ) {
+    return {
+      reason:
+        "The LICENSE.md year and every HISTORY.md entry fall in the same year, so the keyboard was not updated across multiple years.",
+    };
+  }
+  if (
+    criterion.id === "17.1-build-trigger-pr-comments-resolved" &&
+    (facts.noPrComments === true || facts.notAPullRequest === true)
+  ) {
+    return {
+      reason:
+        facts.notAPullRequest === true
+          ? "This is a published keyboard, not a pull request, so there are no PR comments to resolve."
+          : "This PR has no review or conversation comments, so there is nothing to resolve.",
+    };
+  }
   if (
     facts.newKeyboardAtBase === true &&
     criterion.id === "14.1-third-party-patch-author-consulted"

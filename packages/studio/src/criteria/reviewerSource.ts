@@ -5,8 +5,9 @@
 // title, the declared language tags against langtags, the welcome text
 // against its purpose). This module reads those few facts once from the
 // judged VFS into plain data (`ReviewerSource`), and formats them into the
-// short "Reviewer context" lines the resolver shows. Text only: it never
-// decides a status.
+// short "Reviewer context" lines the resolver shows. It never decides a
+// status itself; the resolver reads two positive facts from it (the
+// LICENSE and HISTORY.md years, for 4.2/4.8's Not applicable).
 //
 // Pure apart from the optional langtags lookup, which the caller supplies
 // (the studio loads it lazily) so this module imports no engine data.
@@ -18,6 +19,7 @@ import type {
 } from "@keyboard-studio/contracts";
 
 import { readVfsText } from "../lib/vfsText.ts";
+import type { LanguageTagAnalysis } from "./languageTags.ts";
 
 /** One .kps `<Info>` child: its text and its URL attribute. */
 export interface KpsInfoField {
@@ -55,6 +57,10 @@ export interface ReviewerSource {
    * the keyboard-folder-relative paths the PR changed, lower-cased.
    */
   upgradePr?: { changedFiles: readonly string[] };
+  /** The .kps tags against langtags, Glottolog and the output script. */
+  languageTags?: LanguageTagAnalysis;
+  /** PR targets: the PR's review and conversation comment counts. */
+  prCommentCounts?: { review: number; conversation: number };
 }
 
 const EXCERPT_CHARS = 300;
@@ -136,9 +142,14 @@ export function buildReviewerSource(args: {
   /** The PR changes a keyboard that already exists at the base commit. */
   isUpgradePr: boolean;
   langtags?: LangtagsLookup;
+  languageTags?: LanguageTagAnalysis;
 }): ReviewerSource {
   const { vfs, kpsText, reviewContext } = args;
   const src: ReviewerSource = {};
+  if (args.languageTags !== undefined) src.languageTags = args.languageTags;
+  if (reviewContext?.prCommentCounts !== undefined) {
+    src.prCommentCounts = reviewContext.prCommentCounts;
+  }
 
   if (kpsText !== undefined) {
     src.kps = {
@@ -347,6 +358,21 @@ export function licenseCopyrightLine(
     if (m) return m[1];
   }
   return undefined;
+}
+
+/** Every four-digit year in a copyright line, in order ([] for none). */
+export function copyrightYears(line: string | undefined): number[] {
+  return [...(line ?? "").matchAll(/\b(\d{4})\b/g)].map((m) => Number(m[1]));
+}
+
+/** 17.1: the PR's comment counts, and why resolution is not shown. */
+export function prCommentLines(src: ReviewerSource | undefined): string[] {
+  const c = src?.prCommentCounts;
+  if (c === undefined) return [];
+  return [
+    `This PR has ${c.review} review comment(s) on the diff and ${c.conversation} conversation comment(s).`,
+    "Whether review threads are resolved is only in GitHub's GraphQL API, which needs a signed-in request; check the PR's Files tab.",
+  ];
 }
 
 /** First year or year range ("2015-2024") in a copyright line. */

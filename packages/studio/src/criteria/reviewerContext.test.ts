@@ -328,9 +328,19 @@ describe("judgeForeignKeyboard end to end", () => {
     expect(syntax.evidence().lines).toContain(
       "Already present before this PR (file unchanged by this PR)",
     );
-    const r104 = result.rows.find((r) => r.criterion.id.startsWith("10.4-"))!;
-    const lines = r104.evidence().lines.join("\n");
-    expect(lines).toMatch(/\.kps language ibb/);
-    expect(lines).toContain("Source file unchanged by this PR.");
+    const row = (prefix: string) =>
+      result.rows.find((r) => r.criterion.id.startsWith(prefix))!;
+    // ibb is a natural language langtags records, and already minimal.
+    expect(row("10.3-").status).toBe("met");
+    expect(row("10.3-").evidence().lines).toContain("ibb (ibb-Latn-NG)");
+    expect(row("10.4-").status).toBe("not-applicable");
+    expect(row("10.5-").status).toBe("not-applicable");
+    // One produced character is too little to judge the script from.
+    expect(row("12.1-").status).toBe("needs-author");
+    expect(row("12.1-").evidence().lines.join("\n")).toMatch(/\.kps language ibb/);
+    expect(row("12.5-").status).toBe("needs-author");
+    expect(row("10.10-").evidence().lines).toContain(
+      "Source file unchanged by this PR.",
+    );
   });
 });

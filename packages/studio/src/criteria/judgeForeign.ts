@@ -36,6 +36,7 @@ import type {
   ReviewContext,
   VirtualFS,
 } from "@keyboard-studio/contracts";
+import { outputScriptProfile } from "@keyboard-studio/engine";
 import {
   KeyboardLintEngine,
   deprecatedRelatedPackageIds,
@@ -60,6 +61,13 @@ import {
   buildReviewerSource,
   type LangtagsLookup,
 } from "./reviewerSource.ts";
+import {
+  analyzeLanguageTags,
+  languageTagFacts,
+  languageTagVerdicts,
+  type ConlangLookup,
+  type LangtagsTagLookup,
+} from "./languageTags.ts";
 
 /** Options the host supplies (Compare artifact, /review target). */
 export interface JudgeForeignOptions {
@@ -145,18 +153,50 @@ export function stampPrDelta(
   });
 }
 
-/** The langtags name/script/region lookup, or undefined when unavailable. */
-async function loadLangtagsLookup(): Promise<LangtagsLookup | undefined> {
+/**
+ * The langtags lookups — bare-subtag name/script/region and the full-tag
+ * resolution — or undefined when unavailable.
+ */
+async function loadLangtagsLookup(): Promise<
+  { defaults: LangtagsLookup; tags: LangtagsTagLookup } | undefined
+> {
   try {
     const mod = await import("@keyboard-studio/engine/langtags");
-    return (subtag) => {
-      const d = mod.getLanguageDefaults(subtag);
-      if (d === null) return null;
-      return {
-        ...(d.englishName !== undefined ? { name: d.englishName } : {}),
-        ...(d.defaultScript !== undefined ? { script: d.defaultScript } : {}),
-        ...(d.defaultRegion !== undefined ? { region: d.defaultRegion } : {}),
-      };
+    return {
+      defaults: (subtag) => {
+        const d = mod.getLanguageDefaults(subtag);
+        if (d === null) return null;
+        return {
+          ...(d.englishName !== undefined ? { name: d.englishName } : {}),
+          ...(d.defaultScript !== undefined ? { script: d.defaultScript } : {}),
+          ...(d.defaultRegion !== undefined ? { region: d.defaultRegion } : {}),
+        };
+      },
+      tags: {
+        resolve: mod.resolveLangtag,
+        scripts: mod.langtagsScripts,
+        iso639_3: (lang) => mod.getLanguageDefaults(lang)?.iso639_3,
+        members: mod.macrolanguageMembers,
+      },
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Glottolog's "Artificial Language" pseudo-family. */
+export const ARTIFICIAL_LANGUAGE_FAMILY = "arti1236";
+
+/** Glottolog's constructed/natural answer per ISO 639-3, or undefined. */
+async function loadConlangLookup(): Promise<ConlangLookup | undefined> {
+  try {
+    const mod = await import("@keyboard-studio/glottolog");
+    return (iso) => {
+      const hits = mod.byIso639p3(iso);
+      if (hits.length === 0) return null;
+      return hits.some((l) => l.familyId === ARTIFICIAL_LANGUAGE_FAMILY)
+        ? "constructed"
+        : "natural";
     };
   } catch {
     return undefined;
@@ -356,16 +396,36 @@ export async function judgeForeignKeyboard(
     // adaptation. Without it the §19 rows resolve Not applicable.
     isAdaptation: isAdaptationSignal(options.reviewContext),
   };
-  const langtags = await loadLangtagsLookup();
+  const kpsLanguages = ctx.criteriaInput?.kpsLanguages ?? [];
+  const [langtags, conlang] = await Promise.all([
+    loadLangtagsLookup(),
+    kpsLanguages.length > 0 ? loadConlangLookup() : Promise.resolve(undefined),
+  ]);
+  // 10.3/10.4/10.5/12.1/12.5/12.6: the tags against langtags, Glottolog
+  // and the output script. No langtags, no analysis — the rows stay with
+  // the reviewer.
+  const languageTags =
+    langtags !== undefined && kpsLanguages.length > 0
+      ? analyzeLanguageTags(
+          kpsLanguages,
+          langtags.tags,
+          conlang,
+          ctx.keyboardIR !== undefined
+            ? outputScriptProfile(ctx.keyboardIR)
+            : undefined,
+        )
+      : undefined;
   const reviewerSource = buildReviewerSource({
     vfs,
     kpsText: ctx.criteriaInput?.kpsText,
-    kpsLanguages: ctx.criteriaInput?.kpsLanguages ?? [],
+    kpsLanguages,
     keyboardIR: ctx.keyboardIR,
     reviewContext: options.reviewContext,
     isUpgradePr: (rc?.idConflictAtBase?.existingTiers.length ?? 0) > 0,
-    ...(langtags !== undefined ? { langtags } : {}),
+    ...(langtags !== undefined ? { langtags: langtags.defaults } : {}),
+    ...(languageTags !== undefined ? { languageTags } : {}),
   });
+  const prComments = rc?.prCommentCounts;
   return resolveCriteria({
     criteria: ALL_CRITERIA,
     mode: "foreign",
@@ -376,7 +436,18 @@ export async function judgeForeignKeyboard(
     ),
     verifiedByCode,
     record: EMPTY_CRITERIA_RECORD,
-    facts,
+    facts: {
+      ...facts,
+      ...languageTagFacts(languageTags),
+      // 17.1: nothing to resolve on a PR with no comments, or off a PR.
+      noPrComments:
+        rc?.isPr === true &&
+        prComments !== undefined &&
+        prComments.review === 0 &&
+        prComments.conversation === 0,
+      notAPullRequest: rc !== undefined && !rc.isPr,
+    },
+    reviewerVerdicts: languageTagVerdicts(languageTags),
     contextMissing,
     compileResult: options.compileResult ?? null,
     // §9.2 supporting evidence only (never decides the row).

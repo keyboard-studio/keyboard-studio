@@ -1112,7 +1112,10 @@ export {
   clearFacetOverride,
   scriptOf,
   scriptExtensionsOf,
+  outputScriptProfile,
+  CONFIDENT_SCRIPT_SHARE,
 } from "./facets/index.js";
+export type { OutputScriptProfile } from "./facets/index.js";
 export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";
 
 // Deadkey lifecycle mutations (spec 083, issue #1849 — Phase 2): IR-to-IR

@@ -183,4 +183,15 @@ export interface ReviewContext {
     baseSha: string;
     version?: string;
   };
+  /**
+   * Criterion 17.1 (PR targets only): the PR's comment counts from the
+   * pull-request API — `review` are line comments on the diff (threads a
+   * reviewer can resolve), `conversation` the comments on the PR's
+   * conversation tab. Absent when the target is not a PR or the API
+   * omitted them.
+   */
+  prCommentCounts?: {
+    review: number;
+    conversation: number;
+  };
 }

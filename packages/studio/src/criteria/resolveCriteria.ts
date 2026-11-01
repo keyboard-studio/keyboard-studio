@@ -34,9 +34,12 @@ import { resolveCompileRow } from "./compileMapping.ts";
 import { resolveFontLicenseRow } from "./fontLicense.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
 import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
+import { languageTagContextLines } from "./languageTags.ts";
 import {
   copyrightContextLines,
+  copyrightYears,
   licenseCopyrightLine,
+  prCommentLines,
   scopeNote,
   sourceContextLines,
 } from "./reviewerSource.ts";
@@ -172,16 +175,19 @@ function reviewerContextBody(
       return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Tags/BCP47-related ---
-    // Tag values not available in resolver input; would need kps parsing
-    // plumbed through. Noted for future work.
+    // Each tag's langtags name and defaults, then what the language-tag
+    // analysis found for this row (languageTags.ts).
     case "10.3-kps-tags-minimal":
     case "10.4-kps-unusual-tag-flagged":
     case "12.1-bcp47-tag-correct":
     case "12.5-script-mismatch-flagged":
-      return sourceContextLines(criterionId, input.reviewerSource);
+      return [
+        ...sourceContextLines(criterionId, input.reviewerSource),
+        ...languageTagContextLines(criterionId, input.reviewerSource?.languageTags),
+      ];
     case "10.5-kps-conlang-flagged":
     case "12.6-script-mismatch-submitted-to-langtags":
-      return [];
+      return languageTagContextLines(criterionId, input.reviewerSource?.languageTags);
 
     // --- Font-related ---
     case "9.3-font-license-genuinely-open": {
@@ -227,10 +233,11 @@ function reviewerContextBody(
       return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Red checklist ---
+    case "17.1-build-trigger-pr-comments-resolved":
+      return prCommentLines(input.reviewerSource);
     case "14.1-third-party-patch-author-consulted":
     case "15.1-relicense-permission-granted":
     case "16.1-partner-notes-followed":
-    case "17.1-build-trigger-pr-comments-resolved":
     case "17.3-build-issues-fed-back":
     case "18.11-tested-with-real-users":
     case "18.12-meets-legal-accessibility-requirements": {
@@ -500,8 +507,20 @@ function resolveRow(
     }
 
     case "yellow-survey": {
+      // Foreign mode: a verdict the source data settles (languageTags.ts).
+      if (input.mode === "foreign") {
+        const verdict = input.reviewerVerdicts?.get(criterion.id);
+        if (verdict !== undefined) {
+          return {
+            criterion,
+            status: verdict.status,
+            controls: null,
+            evidence: () => ({ kind: "reviewer-verdict", lines: verdict.lines }),
+          };
+        }
+      }
       // d. Authored mode only: the author's recorded attestation resolves
-      // the row. Foreign mode has no author to ask, so it always stays
+      // the row. Foreign mode has no author to ask, so it otherwise stays
       // Needs author and offers no control.
       if (input.mode === "authored") {
         const attestation = input.record.attestations[criterion.id];
@@ -591,10 +610,20 @@ export function resolveCriteria(rawInput: CriteriaInput): CriteriaResult {
   // the check ran and its verified line says it found nothing. Both modes
   // run the same engine pass, so both get these facts.
   const verified = rawInput.verifiedByCode;
+  const licenseYears = copyrightYears(
+    licenseCopyrightLine(verified?.get("KM_LINT_COPYRIGHT_ABSENT") ?? []),
+  );
+  const history = rawInput.reviewerSource?.historyYears;
   const input: CriteriaInput = {
     ...rawInput,
     facts: {
       ...rawInput.facts,
+      copyrightSingleYear: licenseYears.length === 1,
+      copyrightAndHistoryOneYear:
+        licenseYears.length === 1 &&
+        history !== undefined &&
+        history.earliest === licenseYears[0] &&
+        history.latest === licenseYears[0],
       noPuaInOutput:
         verified?.get("KM_LINT_PUA_KEYBOARD_PLACEMENT")?.includes(NO_PUA_LINE) ===
         true,
