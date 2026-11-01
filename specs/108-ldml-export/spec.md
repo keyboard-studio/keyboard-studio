@@ -20,15 +20,14 @@ without key input."
 - [contracts/ldml-mapping.md](contracts/ldml-mapping.md) — the construct-by-construct mapping
   and the finding-code table. **Normative** for this spec.
 - [research.md](research.md) — sources, authority order, verified facts, open items R8/R9.
-- [amendment.md](amendment.md) — the proposed Constitution Art VII amendment (gate G0).
+- [amendment.md](amendment.md) — the adopted Art VII amendments (G0, Constitution 2.1.0; G1, 2.2.0).
 
-## Governance gate G0 (prerequisite)
+## Governance gate G0 (cleared)
 
-Constitution Art VII, spec.md §16, CLAUDE.md and README.md all list "LDML output" as out of
-scope. This feature MUST NOT be planned or implemented until the product owner records a
-ruling that adopts the amendment in [amendment.md](amendment.md), or a variant of it. The
-ruling makes LDML export a **secondary, source-only** artifact; KMN stays the primary emission
-format. Under the constitution's precedence table, a recorded product ruling beats spec text.
+Cleared 2026-11-01 by product-owner ruling. Constitution Art VII, root spec.md §16, CLAUDE.md
+and README.md now admit a secondary LDML export. KMN stays the primary emission format and the
+only format on the KMN `.kmp` and pull-request paths. A compiled desktop `.kmp` is covered by
+G1, below.
 
 ## Governance gate G1 (Story 5 only)
 
@@ -54,6 +53,17 @@ Where Keyman accepts less than the standard:
 
 Either way the difference is reported as a Keyman gap, never as an LDML incompatibility
 (FR-053; research, "Authority order").
+
+### Product ruling: reuse Keyman's libraries (2026-11-01)
+
+The product owner ruled: "As much as possible we should use Keyman libraries."
+
+Where a published Keyman library (the `@keymanapp/*` packages, e.g. kmc-ldml, kmc-package,
+kmc-generate templates, developer-utils, common-types) provides a function the exporter needs,
+the studio uses it rather than re-implementing it. That covers LDML types, XML reading and
+writing, schema validation, compilation, packaging, project templates, and normalization. A
+re-implementation needs a recorded reason: the library lacks the function, is not browser-safe,
+or fails the bundle-safety tests. See FR-080.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -262,8 +272,8 @@ not been done yet.
 
 **Governance**
 
-- **FR-001**: Work MUST NOT start until gate G0 is recorded, i.e. the Art VII amendment, or a
-  variant the product owner chooses, is applied to the four governing files in one change.
+- **FR-001**: *(Satisfied 2026-11-01.)* Gates G0 and G1 are recorded (Constitution 2.2.0). Any
+  later narrowing of the scope ruling re-gates this feature.
 
 **Export**
 
@@ -389,7 +399,7 @@ not been done yet.
   schema pinned in CI, unless the profile is marked "TR35-only (awaiting Keyman)". This keeps
   the default-profile rule honest.
 
-**Compile and package (User Story 5 — gated on G1)**
+**Compile and package (User Story 5 — G1 cleared; FR-070 trial can still withdraw it)**
 
 - **FR-070**: Before FR-071–FR-076 are planned, a trial MUST confirm that Keyman's LDML compiler
   runs in the studio's browser bundle. It must:
@@ -478,6 +488,11 @@ not been done yet.
     hint.
 
   Keyman-only conventions MUST NOT be baked into the touch output.
+
+**Upstream reuse**
+
+- **FR-080**: The exporter MUST use Keyman's published libraries for any function they provide
+  (see Product ruling). Each place it does not MUST be listed in the plan with its reason.
 
 ### Key Entities
 

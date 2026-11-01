@@ -31,12 +31,12 @@
 
 ## Notes
 
-- **Blocking gate, not a clarification**: governance gate G0 (Constitution Art VII amendment,
-  [amendment.md](../amendment.md)) must be ruled on before `/speckit-plan`. Its Constitution
-  Check fails mechanically on Art VII until then.
+- **Governance gates G0 and G1**: both cleared 2026-11-01 (Constitution 2.2.0); see
+  [amendment.md](../amendment.md). No governance blocker remains for `/speckit-plan`.
 - **Deliberate deviation from "no implementation details"**: the spec names finding-code
   prefixes (`KM_LINT_LDML_*`), the Keyman `conformsTo` value, and the studio surfaces that
-  findings must reach. These are contract-level constraints that the house conventions require
+  findings must reach. It also names Keyman's LDML compiler (kmc-ldml), `kmc generate
+  ldml-keyboard`, `$[N:set]`, CI schema validation, and the Keyman-library ruling. These are contract-level constraints that the house conventions require
   (Output-panel code filtering, Constitution Art IV), not design choices. All per-construct
   mapping detail lives in [contracts/ldml-mapping.md](../contracts/ldml-mapping.md).
 - **Open research items** R8 (touch backspace/enter/tab) and R9 (normalization default) are

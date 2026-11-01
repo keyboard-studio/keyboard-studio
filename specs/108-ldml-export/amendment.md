@@ -1,4 +1,4 @@
-# Amendment: allow LDML export (Constitution 2.0.0 → 2.1.0)
+# Amendments: allow LDML export (G0: 2.0.0 → 2.1.0) and a compiled desktop package (G1: 2.1.0 → 2.2.0)
 
 **Status**: ADOPTED 2026-11-01 by product-owner ruling ("LDML output is now in-scope.
 Approved."). Applied to the constitution (2.1.0), spec.md §16, CLAUDE.md and README.md in the
@@ -13,7 +13,7 @@ not deliver them to web, Android, or iOS (`&TARGETS` is hard-coded to `desktop`;
 rejects `.kmx`) — research R11.
 
 The deferral assumed LDML would replace KMN as an emission format. This feature does not do
-that. The ruling proposed here is narrower:
+that. The ruling adopted here is narrower:
 
 > **LDML export is a secondary, source-only artifact.** KMN + `.keyman-touch-layout` remains
 > the primary emission format and the only format on the `.kmp` and pull-request paths. The
@@ -28,7 +28,11 @@ On that reading the original reason for deferral — authors shipping a keyboard
 loses its touch layout — does not arise: the KMN keyboard ships as before, and the LDML file is
 an additional, clearly labelled portability artifact.
 
-## Proposed diffs
+## Diffs as proposed (G0)
+
+> The "source-only" wording quoted in these diffs was superseded by G1 below. The current text
+> lives in the constitution and spec.md §16. Where a diff shows `<ruling date>`, the actual date
+> is 2026-11-01.
 
 ### `.specify/memory/constitution.md` — Article VII
 
@@ -42,14 +46,14 @@ an additional, clearly labelled portability artifact.
  mobile-app integration, hosting, multi-language `welcome.htm` variants,
 ```
 
-Footer: `**Version**: 2.1.0 | **Ratified**: 2026-10-14 | **Last amended**: <ruling date> (Art VII: LDML export, spec 108)`.
+Footer: `**Version**: 2.1.0 | **Ratified**: 2026-10-14 | **Last amended**: <ruling date, 2026-11-01> (Art VII: LDML export, spec 108)`.
 Minor version: it widens scope without changing any gate.
 
 ### `spec.md` §16
 
 ```diff
 -- **LDML output** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`.
-+- **LDML as an emission format** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`. *Amended <ruling date>:* a secondary, source-only LDML **export** is in scope — see [specs/108-ldml-export](specs/108-ldml-export/spec.md).
++- **LDML as an emission format** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`. *Amended <ruling date, 2026-11-01>:* a secondary, source-only LDML **export** is in scope — see [specs/108-ldml-export](specs/108-ldml-export/spec.md).
 ```
 
 ### `CLAUDE.md` — "Out of scope for v1"
@@ -107,7 +111,7 @@ What stays the same is everything the original deferral protected:
 - The pull-request path carries neither LDML nor compiled output (criteria SS1).
 - The studio never writes KMX+ bytes itself; Keyman's compiler is the only producer.
 
-## Proposed diffs
+## Diffs as proposed (G1)
 
 ### `.specify/memory/constitution.md` — Article VII
 
@@ -122,7 +126,7 @@ What stays the same is everything the original deferral protected:
 +— is in scope per spec 108), mobile-app integration,
 ```
 
-Footer: `**Version**: 2.2.0 | … | **Last amended**: <ruling date> (Art VII: compiled LDML package, spec 108 Story 5)`.
+Footer: `**Version**: 2.2.0 | … | **Last amended**: <ruling date, 2026-11-01> (Art VII: compiled LDML package, spec 108 Story 5)`.
 
 ### `spec.md` §16
 
@@ -134,8 +138,8 @@ Footer: `**Version**: 2.2.0 | … | **Last amended**: <ruling date> (Art VII: co
 `CLAUDE.md` and `README.md` need no change: their wording ("the secondary LDML export of
 spec 108", "an LDML export is available as a secondary download") already covers it.
 
-### On adoption
+### Applied
 
-- Flip spec 108's gate G1 to cleared.
-- Acknowledge spec-trace for §16.
-- Land the constitution, §16 and spec 108 changes in one commit.
+- Spec 108's gate G1 is flipped to cleared (done).
+- Constitution, §16 and spec 108 changes landed together (done).
+- spec-trace acknowledged for §16 and specs/108-ldml-export (done, same commit).
