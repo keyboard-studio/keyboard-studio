@@ -5,6 +5,8 @@ export type { CasingValue } from "./casing.js";
 // engine package (the characters step's script-fit check for a carried-over
 // author addition) never reach past the barrel into ./generated/scriptLookup.js.
 export { scriptOf, scriptExtensionsOf } from "./generated/scriptLookup.js";
+export { outputScriptProfile, CONFIDENT_SCRIPT_SHARE } from "./scriptProfile.js";
+export type { OutputScriptProfile } from "./scriptProfile.js";
 export {
   CASING_FACET_ID,
   deriveFacets,

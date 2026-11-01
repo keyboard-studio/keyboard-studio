@@ -328,9 +328,43 @@ describe("judgeForeignKeyboard end to end", () => {
     expect(syntax.evidence().lines).toContain(
       "Already present before this PR (file unchanged by this PR)",
     );
-    const r104 = result.rows.find((r) => r.criterion.id.startsWith("10.4-"))!;
-    const lines = r104.evidence().lines.join("\n");
-    expect(lines).toMatch(/\.kps language ibb/);
-    expect(lines).toContain("Source file unchanged by this PR.");
+    const row = (prefix: string) =>
+      result.rows.find((r) => r.criterion.id.startsWith(prefix))!;
+    // ibb is a natural language langtags records, and already minimal.
+    expect(row("10.3-").status).toBe("met");
+    expect(row("10.3-").evidence().lines).toContain("ibb (ibb-Latn-NG)");
+    expect(row("10.4-").status).toBe("not-applicable");
+    expect(row("10.5-").status).toBe("not-applicable");
+    // One produced character is too little to judge the script from.
+    expect(row("12.1-").status).toBe("needs-author");
+    expect(row("12.1-").evidence().lines.join("\n")).toMatch(/\.kps language ibb/);
+    expect(row("12.5-").status).toBe("needs-author");
+    expect(row("10.10-").evidence().lines).toContain(
+      "Source file unchanged by this PR.",
+    );
+    // No comment counts were read: 17.1 stays with a human.
+    expect(row("17.1-").status).toBe("needs-human");
+  });
+
+  it("17.1 follows the review context: off a PR, and a PR's comment counts", async () => {
+    const vfs = createVirtualFS([
+      entry(`source/${ID}.kmn`, "store(&NAME) 'X'\nbegin Unicode > use(main)\ngroup(main) using keys\n"),
+    ]);
+    const status171 = async (rc: ReviewContext) =>
+      (await judgeForeignKeyboard(vfs, ID, ID, { reviewContext: rc })).rows.find(
+        (r) => r.criterion.id === "17.1-build-trigger-pr-comments-resolved",
+      )!.status;
+    const pr = (diff: number, conversation: number, reviews: number): ReviewContext => ({
+      repoPath: `release/i/${ID}`,
+      isPr: true,
+      prCommentCounts: { diff, conversation, reviews },
+    });
+    expect(await status171({ repoPath: `release/i/${ID}`, isPr: false })).toBe(
+      "not-applicable",
+    );
+    expect(await status171(pr(0, 0, 0))).toBe("not-applicable");
+    // A summary-only "Request changes" review leaves both comment counts at 0.
+    expect(await status171(pr(0, 0, 1))).toBe("needs-human");
+    expect(await status171(pr(2, 0, 1))).toBe("needs-human");
   });
 });

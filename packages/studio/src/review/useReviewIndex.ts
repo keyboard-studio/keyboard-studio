@@ -199,6 +199,11 @@ export interface PrContext {
   body: string;
   /** The PR's base commit sha (the commit before the PR's changes). */
   baseSha: string;
+  /**
+   * The PR's diff-comment, conversation-comment and review counts (17.1),
+   * when every one of them could be read.
+   */
+  commentCounts?: { diff: number; conversation: number; reviews: number };
 }
 
 const prContextCache = new Map<string, Promise<PrContext>>();
@@ -216,7 +221,7 @@ export function fetchPrContext(
   const cached = prContextCache.get(key);
   if (cached) return cached;
   const p = (async () => {
-    const [prRes, filesRes] = await Promise.all([
+    const [prRes, filesRes, reviewsRes] = await Promise.all([
       fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`, {
         headers: { Accept: "application/vnd.github+json" },
       }),
@@ -224,20 +229,45 @@ export function fetchPrContext(
         `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`,
         { headers: { Accept: "application/vnd.github+json" } },
       ),
+      // 17.1: a "Request changes" review can have no line comment at all.
+      fetch(
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews?per_page=100`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      ).catch(() => null),
     ]);
     if (!prRes.ok) throw new Error(`PR API: HTTP ${prRes.status}`);
     if (!filesRes.ok) throw new Error(`PR files API: HTTP ${filesRes.status}`);
     const pr = (await prRes.json()) as {
       body?: string | null;
       base?: { sha?: string } | null;
+      comments?: number;
+      review_comments?: number;
     };
     const files = (await filesRes.json()) as Array<{ filename?: string }>;
+    // A failed reviews call leaves the counts unread, never zero.
+    const reviews =
+      reviewsRes?.ok === true
+        ? ((await reviewsRes.json()) as Array<{ state?: string }>)
+        : null;
     return {
       filePaths: (Array.isArray(files) ? files : [])
         .map((f) => f.filename ?? "")
         .filter((n) => n !== ""),
       body: pr.body ?? "",
       baseSha: pr.base?.sha ?? "",
+      ...(typeof pr.review_comments === "number" &&
+      typeof pr.comments === "number" &&
+      Array.isArray(reviews)
+        ? {
+            commentCounts: {
+              diff: pr.review_comments,
+              conversation: pr.comments,
+              reviews: reviews.filter(
+                (r) => r.state === "CHANGES_REQUESTED" || r.state === "COMMENTED",
+              ).length,
+            },
+          }
+        : {}),
     };
   })();
   prContextCache.set(key, p);

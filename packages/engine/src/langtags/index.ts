@@ -122,3 +122,12 @@ export function lookupByName(query: string): readonly LanguageSummary[] {
     ...substring.sort(byEnglish),
   ];
 }
+
+export {
+  resolveLangtag,
+  langtagsScripts,
+  macrolanguageMembers,
+  isScriptSubtag,
+  isRegionSubtag,
+} from "./tagsets.js";
+export type { LangtagResolution } from "./tagsets.js";

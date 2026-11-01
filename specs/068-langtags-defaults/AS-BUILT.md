@@ -12,6 +12,7 @@
 
 ## Public contracts (as the code has them)
 - `@keyboard-studio/engine/langtags` (`packages/engine/package.json` subpath `./langtags`; `packages/engine/src/langtags/index.ts`): `getLanguageDefaults(subtag): LanguageDefaults | null` (2- or 3-letter, case-insensitive, never throws), `listLanguages(): readonly LanguageSummary[]`, `lookupByName(query): readonly LanguageSummary[]` (exact-code, englishName-prefix, autonym-prefix, substring; empty query gives `[]`).
+- Later addition (the /review language-tag rows, `packages/engine/src/langtags/tagsets.ts`), over every tagset rather than the bare-subtag defaults: `resolveLangtag(tag): LangtagResolution | null` (the full tag langtags reads a tag as, including a tagset's listed extra regions), `langtagsScripts(lang)`, `macrolanguageMembers(lang)`. Data: `generated/tagsets.ts`, emitted by the same codegen; lookup maps built on first use.
 - Types in `packages/contracts/src/langtags.ts`: `LanguageDefaults`, `RegionVariant`, `LanguageSummary`, `LangtagsProvenance`.
 - Generated index: `packages/engine/src/langtags/generated/index.ts` (never hand-edit).
 - Build: root `pnpm run fetch-langtags` (`scripts/fetch-langtags.mjs`, pin in `scripts/langtags-version.json`: commit `99b856bb`, SHA-256 recorded) and `pnpm run codegen-langtags`; both in `prebuild`. Codegen is deterministic (`codegen-determinism.test.ts`).

@@ -111,6 +111,9 @@ async function buildReviewContext(
         ...(historyMd !== undefined ? { historyMd } : {}),
         ...(idConflict !== null ? { idConflictAtBase: idConflict } : {}),
         ...(baseKmn !== null ? { baseKmnVersion: baseKmn } : {}),
+        ...(pr.commentCounts !== undefined
+          ? { prCommentCounts: pr.commentCounts }
+          : {}),
       },
       ...(baseHistory !== undefined ? { baseHistory } : {}),
     };

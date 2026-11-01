@@ -326,6 +326,8 @@ export function CriterionRow({
             {evidenceCheckLine(model)}
           </>
         );
+      case "reviewer-verdict":
+        return <>{evidenceLines(model)}</>;
       default: {
         const _exhaustive: never = model.kind;
         return String(_exhaustive);

@@ -610,3 +610,70 @@ describe("resolveCriteria — applicability", () => {
     }
   });
 });
+
+describe("resolveCriteria — copyright-year and PR-comment facts", () => {
+  const licenseLine = (line: string) =>
+    new Map([["KM_LINT_COPYRIGHT_ABSENT", [`Found: "${line}"`]]]);
+  const status = (id: string, input: CriteriaInput) => rowFor(id, input).status;
+
+  it("a single LICENSE year makes 4.8 Not applicable; a range does not", () => {
+    const single = makeInput({
+      mode: "foreign",
+      verifiedByCode: licenseLine("Copyright © 2026 GemaGemia"),
+    });
+    expect(status("4.8-year-range-starts-at-original", single)).toBe("not-applicable");
+    const range = makeInput({
+      mode: "foreign",
+      verifiedByCode: licenseLine("Copyright (C) 2015-2026 SIL"),
+    });
+    expect(status("4.8-year-range-starts-at-original", range)).toBe("needs-author");
+    for (const open of ["Copyright (C) 2024-present SIL", "Copyright (C) 2024– SIL"]) {
+      const input = makeInput({ mode: "foreign", verifiedByCode: licenseLine(open) });
+      expect(status("4.8-year-range-starts-at-original", input)).toBe("needs-author");
+    }
+  });
+
+  it("4.2 is Not applicable only when LICENSE and every HISTORY entry share one year", () => {
+    const withHistory = (earliest: number, latest: number) =>
+      makeInput({
+        mode: "foreign",
+        verifiedByCode: licenseLine("Copyright © 2026 GemaGemia"),
+        reviewerSource: { historyYears: { earliest, latest } },
+      });
+    expect(status("4.2-copyright-year-range-if-multiyear", withHistory(2026, 2026))).toBe(
+      "not-applicable",
+    );
+    expect(status("4.2-copyright-year-range-if-multiyear", withHistory(2015, 2026))).toBe(
+      "needs-author",
+    );
+    // No HISTORY years: nothing shows the keyboard stayed in one year.
+    expect(
+      status(
+        "4.2-copyright-year-range-if-multiyear",
+        makeInput({ mode: "foreign", verifiedByCode: licenseLine("Copyright © 2026 X") }),
+      ),
+    ).toBe("needs-author");
+  });
+
+  it("17.1 is Not applicable off a PR or on a PR with no comments, else shows the counts", () => {
+    const id = "17.1-build-trigger-pr-comments-resolved";
+    const facts = { ...BASELINE_FACTS };
+    expect(
+      status(id, makeInput({ mode: "foreign", facts: { ...facts, notAPullRequest: true } })),
+    ).toBe("not-applicable");
+    expect(
+      status(id, makeInput({ mode: "foreign", facts: { ...facts, noPrComments: true } })),
+    ).toBe("not-applicable");
+    const row = rowFor(
+      id,
+      makeInput({
+        mode: "foreign",
+        reviewerSource: { prCommentCounts: { diff: 3, conversation: 1, reviews: 2 } },
+      }),
+    );
+    expect(row.status).toBe("needs-human");
+    expect(row.evidence().lines).toContain(
+      "This PR has 3 comment(s) on the diff, 1 conversation comment(s) and 2 review(s) requesting changes or commenting.",
+    );
+  });
+});

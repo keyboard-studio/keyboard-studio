@@ -183,4 +183,16 @@ export interface ReviewContext {
     baseSha: string;
     version?: string;
   };
+  /**
+   * Criterion 17.1 (PR targets only): what reviewers have said on the PR —
+   * `diff` line comments (threads a reviewer can resolve), `conversation`
+   * comments, and `reviews` submitted as "Request changes" or "Comment"
+   * (a review can carry only a summary, with no line comment). Absent when
+   * the target is not a PR or any count could not be read.
+   */
+  prCommentCounts?: {
+    diff: number;
+    conversation: number;
+    reviews: number;
+  };
 }
