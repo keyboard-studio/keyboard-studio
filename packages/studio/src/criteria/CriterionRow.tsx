@@ -28,12 +28,14 @@ import { resolveMessage } from "../lib/i18nResolve.ts";
 import { githubBlobUrl, type GithubLink } from "./githubLink.ts";
 import {
   ACCENT,
+  BG_INSET,
   BORDER,
   ERROR_TEXT,
   FONT,
   FONT_MONO,
   SUCCESS_ACCENT,
   TEXT_DIM,
+  TEXT_MAIN,
   WARNING,
 } from "../ui/theme.ts";
 import type {
@@ -145,13 +147,33 @@ const controlButtonStyle: React.CSSProperties = {
 
 const evidenceLineStyle: React.CSSProperties = { margin: "0 0 4px", color: TEXT_DIM };
 
-const evidenceCodeStyle: React.CSSProperties = {
+const evidenceCodeBlockStyle: React.CSSProperties = {
   fontFamily: FONT_MONO,
   fontSize: 12,
-  background: "var(--app-bg-inset)",
-  padding: "1px 4px",
-  borderRadius: 3,
+  color: TEXT_MAIN,
+  background: BG_INSET,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 4,
+  padding: "6px 8px",
+  margin: "2px 0 6px",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
 };
+
+/**
+ * Cited text — a value quoted verbatim from the keyboard's files — is an
+ * evidence line of the form `<label>: "<text>"`, optionally followed by a
+ * ` (<url>)`. Lint findings emit it (`Found: "..."`, `Line: "..."`, possibly
+ * after prose) and reviewerSource.ts quotes its excerpts and field values
+ * the same way. Returns null for every other line.
+ */
+export function splitCitation(
+  line: string,
+): { label: string; text: string; suffix: string } | null {
+  const m = /^(.*?): "([\s\S]*)"(\s+\([^()]*\))?$/.exec(line);
+  if (m === null) return null;
+  return { label: m[1]!, text: m[2]!, suffix: m[3]?.trim() ?? "" };
+}
 
 export function CriterionRow({
   row,
@@ -189,34 +211,35 @@ export function CriterionRow({
 
   const evidenceLines = (model: EvidenceModel): React.ReactNode => (
     <>
-      {model.lines.map((line, index) => (
-        <p key={index} style={evidenceLineStyle}>
-          {renderEvidenceLine(line, index)}
-        </p>
-      ))}
+      {model.lines.map((line, index) => {
+        // Cited text renders as a code block under its label.
+        const cited = splitCitation(line);
+        if (cited !== null) {
+          return (
+            <div key={index} data-testid="criteria-evidence-citation">
+              <p style={evidenceLineStyle}>
+                {cited.suffix !== "" ? `${cited.label}: ${cited.suffix}` : `${cited.label}:`}
+              </p>
+              <pre style={evidenceCodeBlockStyle}>
+                <code>{cited.text}</code>
+              </pre>
+            </div>
+          );
+        }
+        return (
+          <p key={index} style={evidenceLineStyle}>
+            {renderEvidenceLine(line)}
+          </p>
+        );
+      })}
     </>
   );
 
   /**
    * Linkify "File: <path>" evidence lines to the GitHub blob at the pinned
    * sha (opens in a new tab). Only in hosts that pass githubLink (/review).
-   * Values (quoted strings, paths) render in monospace code style.
    */
-  const renderEvidenceLine = (line: string, _index: number): React.ReactNode => {
-    // Helper: wrap quoted strings in <code>
-    const withCode = (text: string): React.ReactNode[] => {
-      const parts = text.split(/("[^"]*")/g);
-      return parts.map((part, i) =>
-        part.startsWith('"') && part.endsWith('"') && part.length > 1 ? (
-          <code key={i} style={evidenceCodeStyle}>
-            {part}
-          </code>
-        ) : (
-          <span key={i}>{part}</span>
-        ),
-      );
-    };
-
+  const renderEvidenceLine = (line: string): React.ReactNode => {
     if (githubLink) {
       // File: <path> or File: <path>#L<line>
       const m = /^File: ([^#]+)(#L(\d+))?$/.exec(line);
@@ -239,10 +262,6 @@ export function CriterionRow({
           </>
         );
       }
-    }
-    // Wrap quoted values in code style
-    if (line.includes('"')) {
-      return <>{withCode(line)}</>;
     }
     return line;
   };
