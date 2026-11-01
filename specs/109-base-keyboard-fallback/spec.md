@@ -136,7 +136,18 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
 - **Minimal overlay keyboards (the headline risk).** A keyboard that overrides a few keys and
   relies on the base keyboard for the rest becomes nearly dead under "Do nothing" once US2 ships.
   Today's default is "Do nothing", and every existing draft received it by migration without the
-  author seeing the question. See FR-020 and FR-021.
+  author seeing the question. FR-020 proposes "Use the computer's layout" for such a keyboard when
+  its base keyboard shares its script, and FR-021 keeps unconfirmed drafts from changing.
+- **Same script, different language.** A Latin-script keyboard on a Latin base keyboard
+  (French on US English) proposes "Use the computer's layout", even though some leaked letters
+  are not in the language's alphabet. The leak list shows them; the author can still choose
+  "Do nothing".
+- **Mixed picks.** A Latin-script keyboard with US English and Russian base keyboards proposes
+  "Do nothing", because the Russian base keyboard leaks Cyrillic letters. The evidence names the
+  Russian base keyboard.
+- **Multi-script targets.** When the language tag carries one script but the keyboard
+  deliberately types two (for example a transliteration keyboard), the target script is the tag's;
+  the author can override the proposal.
 - **Plural base keyboards.** Positions do not depend on the base keyboard; characters do. One
   policy covers every base keyboard: the swallow store is positional. The leak list is per base
   keyboard.
@@ -164,7 +175,8 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
 - **FR-002**: For each picked base keyboard (the `windows-layout` decision's picks, primary
   first), the surface MUST list every unhandled position with the character that base keyboard
   types there, "starts a deadkey", or "unknown". The primary base keyboard's list is shown; the
-  others can be expanded.
+  others can be expanded. Each list groups its leaks into letters, digits, and punctuation and
+  symbols, so the author can judge them separately (see FR-020).
 - **FR-003**: With no picked base keyboard, the surface MUST use the likely base keyboards (spec
   076 FR-023 order) and label them as the studio's guess (A3 honesty caption).
 - **FR-004**: The copy MUST follow the binding A2 rules (spec 076): each option states its own
@@ -196,12 +208,31 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
 
 **Defaults and existing drafts**
 
-- **FR-020**: The default policy is a proposal the author confirms (Art X). [NEEDS CLARIFICATION:
-  how the proposal is derived. Options: (a) derived per keyboard — "Use the computer's layout"
-  when the keyboard relies on the base keyboard for printable keys (a sparseness test the plan
-  states), otherwise "Do nothing"; (b) always "Do nothing", today's default; (c) always "Use the
-  computer's layout". Spec 076 FR-005 originally proposed (a) — declined for sparse Latin
-  overlays, accepted for non-Latin scripts.]
+- **FR-020**: The default policy is a proposal the author confirms (Art X). It is derived from
+  the **script of what leaks**, compared with the **target script** (product-owner ruling,
+  2026-11-01: "A random 'Q' would be less disconcerting in a Latin-script keyboard than, say,
+  Korean script."):
+  - **Target script**: the script subtag of the keyboard's language tag, filled by likely
+    subtags when absent.
+  - **Leak script**: the scripts of the letters the picked base keyboards type at unhandled
+    positions (FR-002).
+  - **Digits and punctuation** may need separate handling. [NEEDS CLARIFICATION: whether leaked
+    digits and punctuation count toward the proposal. They are mostly Common script, but a target
+    script can have its own digits (Arabic-Indic, Devanagari, Thai) or punctuation (Arabic comma,
+    danda, full-width CJK forms), so an ASCII `4` or `,` can be as foreign to it as a stray
+    letter. Options: (a) neutral, ignored; (b) counted when the target script has its own digits
+    or punctuation; (c) a separate fallback choice for digits and punctuation. Until resolved,
+    the proposal uses letters only.]
+  - If every leaked letter is in the target script, or no letter leaks, the proposal is "Use the
+    computer's layout". A stray letter is mildly surprising but legible.
+  - If any picked base keyboard leaks a letter in another script, the proposal is "Do nothing".
+    A foreign-script letter is disconcerting, as with Latin leaking into a Hangul keyboard.
+  - Where a base keyboard has no character data, its script is taken from its catalog language
+    tags.
+  - The proposal shows its evidence: which base keyboard and which script triggered it, with
+    the leak count.
+  This replaces spec 076 FR-005's "declined for sparse Latin overlays, accepted for non-Latin
+  scripts" with a test that also covers non-Latin targets on non-Latin base keyboards.
 - **FR-021**: A policy the author never confirmed MUST NOT start suppressing never-defined keys
   when US2 ships. Such drafts are re-proposed the choice, with the leak list, before their
   compiled output changes (Art X: no silent automation).
@@ -260,6 +291,9 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
   "suppressed" positions.
 - **SC-006**: No existing draft's compiled output changes on upgrade without an author
   confirmation.
+- **SC-007**: A Korean (Hangul) keyboard on a US English base keyboard proposes "Do nothing"; a
+  French Latin-script overlay on a US English base keyboard proposes "Use the computer's layout";
+  each proposal names its triggering base keyboard and script.
 
 ## Assumptions
 

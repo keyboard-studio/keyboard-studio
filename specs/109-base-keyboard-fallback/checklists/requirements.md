@@ -31,9 +31,11 @@
 
 ## Notes
 
-- **Open clarification**: FR-020, how the default fallback policy is derived. Resolve with
-  `/speckit-clarify` before `/speckit-plan`. FR-021 (no silent change for unconfirmed drafts)
-  does not depend on the answer; it follows from Constitution Art X.
+- **FR-020 mostly resolved 2026-11-01** by product-owner ruling: the default policy is proposed
+  from the script of the leaked letters versus the target script. Still open: whether digits and
+  punctuation count (the marker inside FR-020); resolve with `/speckit-clarify` before
+  `/speckit-plan`. FR-021 (no silent change for unconfirmed drafts) follows from Constitution
+  Art X.
 - **Deliberate deviation from "no implementation details"**: the spec names `swallowUndefined`,
   `nul`, `nomatch > nul`, the `windows-layout` decision, `isInSwallowSet`, the `mutate()` seam,
   the `basic_kbd*` corpus keyboards and the codegen test. These are the existing contracts and
