@@ -25,7 +25,8 @@ function registeredLintCodes(): string[] {
       }
       if (!name.endsWith(".ts") || name.endsWith(".test.ts") || name.startsWith("_shared")) continue;
       const text = readFileSync(abs, "utf-8");
-      for (const m of text.matchAll(/code:\s*"(KM_(?:LINT|WARN|HINT|ERROR)_[A-Z0-9_]+)"/g)) out.add(m[1]!);
+      // A check that never fails declares its code only as `const code =`.
+      for (const m of text.matchAll(/code(?::|\s*=)\s*"(KM_(?:LINT|WARN|HINT|ERROR)_[A-Z0-9_]+)"/g)) out.add(m[1]!);
     }
   };
   walk(LINT_CHECKS);

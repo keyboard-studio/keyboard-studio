@@ -118,10 +118,6 @@ const GAP_SPECS: readonly GapSpec[] = [
   // Spec 084 Batch 3 (checks in keyboard-lint's checks/criteria/):
   // same status as the Batch 1/2 entries — the criteria resolver is
   // their consumer, and no DecisionId captures what they validate.
-  // The four assembly-verdict codes (1.5, 2.1, 2.2, 2.6) are NOT lint
-  // codes and do not belong in this registry: no check emits them;
-  // they are synthesized in the criteria assembly (assemblyVerdicts.ts)
-  // and pinned by criteriaCatalog.test.ts's synthesized-set guard.
   { id: "8.7-kps-font-missing", code: "KM_LINT_KPS_FONT_MISSING", criteria: "All fonts used in the keyboard are listed in the .kps <Files>.", why: "font packaging; no DecisionId" },
   { id: "12.2-iso-639-5-lang-code", code: "KM_LINT_ISO_639_5_LANG_CODE", criteria: "BCP47 tags do not use ISO 639-5 language codes.", why: "language-tag hygiene; no DecisionId" },
   { id: "12.3-numeric-region-non-contrastive", code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", criteria: "A language tag does not include a numerical region code, unless it is explicitly contrastive.", why: "language-tag hygiene; no DecisionId" },
@@ -133,6 +129,55 @@ const GAP_SPECS: readonly GapSpec[] = [
   // criterion 1.10's current .kpj format constant to 2.0.
   { id: "1.10b-kpj-format-outdated", code: "KM_LINT_KPJ_FORMAT_OUTDATED", criteria: "Adapted keyboard's .kpj uses the current project-file format version (2.0), not an older one.", why: "project-file format hygiene; no DecisionId" },
   { id: "2.7-kpj-version-bumped", code: "KM_LINT_KPJ_VERSION_BUMPED", criteria: "The .kpj file's <Version> (the file-format version) has not been bumped.", why: "project-file format hygiene; no DecisionId" },
+  // /review twins and PR checks (the text-content, .kps-listing, .kps-
+  // metadata and repo-context twins, plus the PR base-commit checks for
+  // 1.5/2.1/2.2/2.6, whose authored verdicts come from assemblyVerdicts.ts):
+  // same status as the Batch 1-3 entries -- the criteria resolver is their
+  // consumer, and no DecisionId captures what they validate.
+{ id: "7.11b-author-in-kps-not-kmn", code: "KM_LINT_AUTHOR_IN_KMN", criteria: "The author name is in the .kps, not in a .kmn Author store.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.12b-no-build-folder-committed", code: "KM_LINT_BUILD_FOLDER_PRESENT", criteria: "No `build/` folder contents are committed.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "4.1b-copyright-present-with-year", code: "KM_LINT_COPYRIGHT_ABSENT", criteria: "A copyright statement with year(s) is present in LICENSE.md.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "5.3b-no-copyright-in-readme-or-docs", code: "KM_LINT_COPYRIGHT_IN_DOCS", criteria: "No copyright year/statement is in README.md, readme.htm, or welcome.htm.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "4.5b-copyright-syntax-exact", code: "KM_LINT_COPYRIGHT_SYNTAX", criteria: "The LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax (the `©` symbol is accepted in place of `(C)`).", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "4.6b-copyright-year-not-in-kmn-or-kps", code: "KM_LINT_COPYRIGHT_YEAR_EMBEDDED", criteria: "No copyright year is embedded in the .kmn or .kps copyright strings.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.8b-no-duplicate-docs-subfolder", code: "KM_LINT_DOCS_SUBFOLDER_DUPLICATES", criteria: "No `docs/` (or similar) subfolder holds duplicate HISTORY / README / INSTALL files.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.5-keyboard-id-not-already-used", code: "KM_LINT_DUPLICATE_KEYBOARD_ID", criteria: "The keyboard ID (folder name) is not already used in `experimental/`, `legacy/`, or `release/`", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.1-no-files-outside-keyboard-folder", code: "KM_LINT_FILES_OUTSIDE_FOLDER", criteria: "No files modified outside the keyboard's own folder", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "19.2b-import-attribution-in-history-md", code: "KM_LINT_HISTORY_ATTRIBUTION_BAD", criteria: "HISTORY.md contains the 'Adapted from' entry.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "3.1b-history-file-exists", code: "KM_LINT_HISTORY_MD_ABSENT", criteria: "A `HISTORY.md` exists at the keyboard root.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.7b-no-keyboard-info-file", code: "KM_LINT_KEYBOARD_INFO_PRESENT", criteria: "No `keyboard.info` file is present in the keyboard folder.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.11b-no-kpj-user-committed", code: "KM_LINT_KPJ_USER_PRESENT", criteria: "No `.kpj.user` file is committed.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "10.9b-kps-description-nonempty", code: "KM_LINT_KPS_DESCRIPTION_EMPTY", criteria: "The .kps description is present and non-empty.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "10.7b-kps-details-files-selected", code: "KM_LINT_KPS_DETAILS_UNSELECTED", criteria: "Readme.htm, welcome.htm, and LICENSE.md are selected in the .kps Details tab.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "10.8b-kps-follow-keyboard-version", code: "KM_LINT_KPS_FOLLOW_VERSION_UNSET", criteria: "\"Follow keyboard version\" is selected in the .kps Details tab.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "10.1b-kps-font-selected", code: "KM_LINT_KPS_FONT_UNSELECTED", criteria: "A font is selected in the .kps Keyboards tab when a font is included in the package files.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.9b-kps-no-help-folder-files", code: "KM_LINT_KPS_HELP_LISTED", criteria: "No files from the `help/` folder are listed in the `.kps` package.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.11b-kps-no-displaymap-json", code: "KM_LINT_KPS_JSON_LISTED", criteria: "No font display-map `.json` files are listed in the `.kps`.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.3b-kps-includes-js-if-mobile", code: "KM_LINT_KPS_JS_ABSENT", criteria: "A compiled `.js` is listed in the `.kps` package when the keyboard has a touch layout.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.1b-kps-includes-kmx", code: "KM_LINT_KPS_KMX_ABSENT", criteria: "A compiled `.kmx` is listed in the `.kps` package.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.2b-kps-includes-kvk", code: "KM_LINT_KPS_KVK_ABSENT", criteria: "A compiled `.kvk` is listed in the `.kps` package.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "10.2b-kps-language-tags-selected", code: "KM_LINT_KPS_LANGUAGES_UNSELECTED", criteria: "Language tag(s) are selected in the .kps Keyboards tab.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.4b-kps-includes-license-md", code: "KM_LINT_KPS_LICENSE_ABSENT", criteria: "`LICENSE.md` is listed in the `.kps` package.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.8b-kps-no-php-file", code: "KM_LINT_KPS_PHP_LISTED", criteria: "No `.php` help file is listed in the `.kps` package.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.5b-kps-includes-readme-htm", code: "KM_LINT_KPS_README_ABSENT", criteria: "`readme.htm` is listed in the `.kps` package.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.10b-kps-no-uncompiled-sources", code: "KM_LINT_KPS_SOURCE_LISTED", criteria: "No uncompiled sources (.kmn, .ico, .kvks, .keyman-touch-layout, .kps) are listed in the `.kps`.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.6b-kps-includes-welcome-and-graphics", code: "KM_LINT_KPS_WELCOME_ABSENT", criteria: "`welcome.htm` is listed in the `.kps` package, and its associated graphics when the welcome page references images.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "11.4b-php-no-closing-body-html", code: "KM_LINT_PHP_CLOSING_TAGS", criteria: "The .php has no closing </body> or </html> tags.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "11.1b-php-exists-with-header", code: "KM_LINT_PHP_HEADER_BAD", criteria: "The <name>.php help file exists and has the proper PHP header (<?php + `$pagename = '...'` and `require_once('header.php')`).", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "11.3b-php-style-inside-header", code: "KM_LINT_PHP_STYLE_OUTSIDE", criteria: "All style information (<style> tags) is inside the PHP header block, not outside it.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "19.1b-import-attribution-in-pr-body", code: "KM_LINT_PR_ATTRIBUTION_BAD", criteria: "The PR body includes the import attribution block.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "5.6b-readme-help-link", code: "KM_LINT_README_HELP_LINK_ABSENT", criteria: "README.md links to http(s)://help.keyman.com/keyboard/<id>.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "6.1b-readme-htm-exists", code: "KM_LINT_README_HTM_ABSENT", criteria: "`readme.htm` exists in `source/`.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "5.5b-readme-keyman-home-link", code: "KM_LINT_README_KEYMAN_LINK_ABSENT", criteria: "README.md links to https://keyman.com/keyboards/<id>.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.3b-keyboard-under-organizing-folder", code: "KM_LINT_REPO_NO_ORGANIZING_FOLDER", criteria: "The keyboard sits under an organizing subfolder (`release/<org>/<id>`).", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.2b-keyboard-under-release-or-experimental", code: "KM_LINT_REPO_PLACEMENT_BAD", criteria: "The keyboard folder lives under `release/` or `experimental/`.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.4b-no-source-files-at-repo-root", code: "KM_LINT_REPO_ROOT_SOURCE", criteria: "No source files are placed at the repository root.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "2.2-version-not-required-if-only-nonpackage", code: "KM_LINT_SPURIOUS_VERSION_BUMP", criteria: "If only non-package files were modified, a version bump is not required", why: "keyboard version is not a DecisionId" },
+  { id: "5.2b-no-version-in-readme-or-docs", code: "KM_LINT_VERSION_IN_DOCS", criteria: "No version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: an X.Y[.Z] pattern in the visible text; CSS, scripts, URLs and DOIs are ignored).", why: "keyboard version is not a DecisionId" },
+  { id: "2.1-version-bumped-if-package-changed", code: "KM_LINT_VERSION_NOT_BUMPED", criteria: "If any file that ships in the package was modified, the keyboard version was bumped", why: "keyboard version is not a DecisionId" },
+  { id: "2.6-new-version-strictly-greater", code: "KM_LINT_VERSION_NOT_INCREMENTED", criteria: "New version is strictly greater than the previously deployed version", why: "keyboard version is not a DecisionId" },
+  { id: "6.3b-welcome-htm-exists", code: "KM_LINT_WELCOME_HTM_ABSENT", criteria: "`welcome.htm` exists in `source/` (flat or the `source/welcome/` folder convention).", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "6.6b-welcome-htm-lang-attribute", code: "KM_LINT_WELCOME_LANG_MISMATCH", criteria: "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag (an English page may declare lang=\"en\").", why: "submission hygiene the criteria page judges; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {
