@@ -5,13 +5,17 @@ model routing.
 
 This is the GOAT variant of scripts/speckit_rounds.py. That file is left
 untouched; this driver reuses its helpers (status, round_label,
-fingerprint, feature_root, run_claude) and adds only the routing layer:
+fingerprint, feature_root, run_claude) and adds two routing layers:
 
-  tasks step      -> haiku   (mechanical decomposition of an approved plan)
-  plan step       -> sonnet  (high-leverage reasoning; escalates if stuck)
-  implement phase -> haiku for mechanical phases (i18n, copy, rename, docs,
-                     golden, lint), opus for deep phases (engine, compiler,
-                     IR, derivation, migration), sonnet otherwise.
+1. Pre-model agent router (implement rounds only): the phase heading picks
+   which .claude/agents crew member owns the phase -- km-testing for e2e /
+   Playwright phases, km-doc for i18n / docs phases, km-frontend for UI,
+   km-keyman for .kmn work, km-programmer for engine / compiler code, and
+   so on; unclassified phases default to km-programmer. The routed agent's
+   name goes into the round prompt as a dispatch directive.
+2. Model router: the routed agent's declared frontmatter model is the base
+   (else the round-kind tier table: tasks -> haiku, plan -> sonnet,
+   implement mechanical -> haiku / deep -> opus / default sonnet).
 
 Routing is deterministic -- no extra model calls, so routing itself is
 free. A round that stalls or errors escalates one tier (haiku -> sonnet ->
@@ -31,6 +35,7 @@ Needs the `claude` CLI on PATH.
 """
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -53,6 +58,52 @@ GOAT_TIERS = ["haiku", "sonnet", "opus"]
 GOAT_DEEP_RE = re.compile(r"engine|compil|\bIR\b|deriv|migrat|\bguards?\b|kernel|parser|typecheck", re.IGNORECASE)
 GOAT_LIGHT_RE = re.compile(r"i18n|catalog|\bcop(y|ies)\b|rename|\bdocs?\b|golden|\blint\b|\bcomments?\b|readme|changelog|deprecat|\bwarnings?\b|a11y", re.IGNORECASE)
 
+# Pre-model agent router: which .claude/agents crew member owns an implement
+# phase, by phase-heading keywords. Checked in order; first match wins.
+# Unclassified implement phases go to km-programmer, the generalist code
+# implementer. plan/tasks rounds are not agent-routed.
+GOAT_AGENT_MAP = [
+    ("km-testing", re.compile(r"e2e|playwright|smoke|fixture|vitest", re.IGNORECASE)),
+    ("km-verification", re.compile(r"\bverif", re.IGNORECASE)),
+    ("km-doc", re.compile(r"i18n|\bdocs?\b|readme|changelog|\bcop(y|ies)\b|\bcomments?\b|catalog|message|architect", re.IGNORECASE)),
+    ("km-frontend", re.compile(r"frontend|\bUI\b|gallery|component|a11y|accessib|\bstudio\b", re.IGNORECASE)),
+    ("km-keyman", re.compile(r"keyman|\bkmn\b|\bkmw\b|kmcmplib|touch layout|\bosk\b", re.IGNORECASE)),
+    ("km-output", re.compile(r"output|scaffolder|virtualfs|\bzip\b|artifact", re.IGNORECASE)),
+    ("km-validator", re.compile(r"validat", re.IGNORECASE)),
+    ("km-qc", re.compile(r"\bqc\b|review|audit", re.IGNORECASE)),
+    ("km-simplify", re.compile(r"simplif|refactor|dead code|dedup", re.IGNORECASE)),
+    ("km-domain", re.compile(r"linguist|orthograph|\bscript\b", re.IGNORECASE)),
+    ("km-programmer", re.compile(r"engine|compil|\bIR\b|deriv|migrat|\bguards?\b|kernel|parser|typecheck|codec|\blint\b", re.IGNORECASE)),
+]
+
+
+def goat_agent(step, phase):
+    """Crew agent for this round.
+
+    Implement phases route by phase-heading keywords (first match wins);
+    anything unclassified goes to km-programmer, the generalist code
+    implementer. plan/tasks rounds get None -- no agent routing there.
+    """
+    if step != "implement":
+        return None
+    if phase:
+        for agent, rx in GOAT_AGENT_MAP:
+            if rx.search(phase):
+                return agent
+    return "km-programmer"
+
+
+@functools.lru_cache(maxsize=None)
+def goat_agent_model(agent):
+    """The model declared in the agent's frontmatter, or None."""
+    path = REPO / ".claude" / "agents" / f"{agent}.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.search(r"^model:\s*(\S+)\s*$", text, re.MULTILINE)
+    return m.group(1) if m else None
+
 
 def goat_base_tier(step, phase):
     """Tier index for a round kind, before any escalation bump."""
@@ -71,6 +122,21 @@ def goat_base_tier(step, phase):
 def goat_model(step, phase, bump=0):
     """Model for this round: base tier for the round kind, plus escalation."""
     return GOAT_TIERS[min(goat_base_tier(step, phase) + bump, len(GOAT_TIERS) - 1)]
+
+
+def goat_round_model(step, phase, bump, agent):
+    """Base model for the round, then the GOAT escalation bump.
+
+    A routed agent's declared frontmatter model is the base; otherwise the
+    round-kind tier table. --model (handled by the caller) still wins over
+    both.
+    """
+    if agent:
+        declared = goat_agent_model(agent)
+        base_idx = GOAT_TIERS.index(declared) if declared in GOAT_TIERS else goat_base_tier(step, phase)
+    else:
+        base_idx = goat_base_tier(step, phase)
+    return GOAT_TIERS[min(base_idx + bump, len(GOAT_TIERS) - 1)]
 
 
 def run_routed(claude, prompt, args, root, model):
@@ -121,7 +187,8 @@ def main():
         if res.get("empty") or step in (None, "specify", "clarify"):
             print(f"[STOP] next step is '{step}': run specify/clarify interactively first")
             return 1
-        model = args.model or goat_model(step, phase, bump)
+        agent = goat_agent(step, phase)
+        model = args.model or goat_round_model(step, phase, bump, agent)
         if args.model and n == 1:
             print("[INFO] --model overrides GOAT routing")
 
@@ -132,19 +199,23 @@ def main():
                 print(f"[STOP] no recorded progress in two rounds (still at {res.get('nextActionLabel')})")
                 return 1
             bump = min(bump + 1, len(GOAT_TIERS) - 1)
-            print(f"[GOAT] no recorded progress; next round escalates to {goat_model(step, phase, bump)}")
+            print(f"[GOAT] no recorded progress; next round escalates to {goat_round_model(step, phase, bump, agent)}")
         else:
             stalls = 0
             bump = 0
         prev_fp = fp
 
         prompt = f"Invoke the speckit-round skill with argument: {feature_dir.as_posix()}"
+        if agent:
+            prompt += (f" Route this phase through the {agent} agent (.claude/agents/{agent}.md): "
+                       f"dispatch the phase's work per that agent definition.")
         label = f"{step}" + (f" / {phase}" if phase else "")
+        agent_tag = f"agent: {agent}, " if agent else ""
         if args.dry_run:
-            print(f"[INFO] next round: {label}\n[INFO] model: {model}\n[INFO] prompt: {prompt}")
+            print(f"[INFO] next round: {label}\n[INFO] {agent_tag}model: {model}\n[INFO] prompt: {prompt}")
             return 0
 
-        print(f"[INFO] round {n}: {label} (model: {model}) ...", flush=True)
+        print(f"[INFO] round {n}: {label} ({agent_tag}model: {model}) ...", flush=True)
         started = time.time()
         proc = run_routed(claude, prompt, args, base.feature_root(feature_dir), model)
         log_dir.mkdir(exist_ok=True)
@@ -171,7 +242,7 @@ def main():
         if out.get("is_error"):
             if bump < len(GOAT_TIERS) - 1:
                 bump += 1
-                print(f"[GOAT] round {n} errored on {model}; escalating to {goat_model(step, phase, bump)} and retrying")
+                print(f"[GOAT] round {n} errored on {model}; escalating to {goat_round_model(step, phase, bump, agent)} and retrying")
                 continue
             print(f"[FAIL] round {n} ended in error ({out.get('subtype')}); see {log_dir}")
             return 1
