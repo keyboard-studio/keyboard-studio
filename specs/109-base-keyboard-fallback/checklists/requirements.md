@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,11 +31,13 @@
 
 ## Notes
 
-- **FR-020 mostly resolved 2026-11-01** by product-owner ruling: the default policy is proposed
-  from the script of the leaked letters versus the target script. Still open: whether digits and
-  punctuation count (the marker inside FR-020); resolve with `/speckit-clarify` before
-  `/speckit-plan`. FR-021 (no silent change for unconfirmed drafts) follows from Constitution
-  Art X.
+- **FR-020 resolved 2026-11-01** by product-owner rulings: the policy is decided per class
+  (letters, digits, punctuation and symbols) using Unicode General Category and Script. Letters
+  follow script divergence; digits and punctuation follow whether the keyboard defines its own.
+  FR-021 (no silent change for unconfirmed drafts) follows from Constitution Art X.
+- **Contracts change**: the `FallbackPolicy` type becomes one value per class (Key Entities).
+  It is not the locked Pattern schema, but its zod schema, drift guard and draft migration move
+  in the same change.
 - **Deliberate deviation from "no implementation details"**: the spec names `swallowUndefined`,
   `nul`, `nomatch > nul`, the `windows-layout` decision, `isInSwallowSet`, the `mutate()` seam,
   the `basic_kbd*` corpus keyboards and the codegen test. These are the existing contracts and

@@ -315,9 +315,10 @@ not been done yet.
 - **FR-021**: Every main-block position in every exported hardware layer MUST have an explicit
   key. Positions without a rule get the base keyboard's character for that layer, because
   LDML does not fall through to the base keyboard. The set of positions without a rule comes
-  from spec 109's shared enumerator (its FR-040). Under the "Do nothing" fallback policy, spec
-  109's `swallowUndefined` store gives those positions `nul` rules, so they export as
-  suppressed gap keys (rows 2.25, 3.15a) and the export no longer depends on the base keyboard.
+  from spec 109's shared enumerator (its FR-040). Spec 109 decides fallback per class (letters,
+  digits, punctuation and symbols). Positions in a "Do nothing" class get `nul` rules from its
+  `swallowUndefined` store, so they export as suppressed gap keys (rows 2.25, 3.15a) that do not
+  depend on the base keyboard. Only positions in classes left to the base keyboard are filled.
   Spec 109 lists leaks for every picked base keyboard; this export fills from the primary one
   only (FR-027).
 - **FR-022**: Within each transform group, transforms MUST be written in KMN's effective

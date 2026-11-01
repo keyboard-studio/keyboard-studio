@@ -1135,7 +1135,7 @@
     },
     "specs/108-ldml-export": {
       "title": "Feature Specification: LDML keyboard export",
-      "hash": "sha256:84c39f039dba819c",
+      "hash": "sha256:b44abe641950c199",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1143,7 +1143,7 @@
     },
     "specs/109-base-keyboard-fallback": {
       "title": "Feature Specification: Base-keyboard fallback — show the leaks, and make \"Do nothing\" true",
-      "hash": "sha256:7d41256a1566131f",
+      "hash": "sha256:b8d4d60c8d4d1dc0",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

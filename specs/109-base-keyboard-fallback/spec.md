@@ -81,9 +81,10 @@ defined.
 
 ### User Story 2 — "Do nothing" covers every key the keyboard does not handle (Priority: P1)
 
-The author chooses "Do nothing". The compiled keyboard suppresses every printable position the
-keyboard does not handle, on the modifier layers it uses, while Backspace, Enter and the other
-frame keys keep working.
+The author chooses "Do nothing" for one or more classes (letters, digits, punctuation and
+symbols; FR-020). The compiled keyboard suppresses every unhandled printable position in those
+classes, on the modifier layers it uses, while Backspace, Enter and the other frame keys keep
+working.
 
 **Why this priority**: Without it the most common choice does not do what it says.
 
@@ -136,21 +137,30 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
 - **Minimal overlay keyboards (the headline risk).** A keyboard that overrides a few keys and
   relies on the base keyboard for the rest becomes nearly dead under "Do nothing" once US2 ships.
   Today's default is "Do nothing", and every existing draft received it by migration without the
-  author seeing the question. FR-020 proposes "Use the computer's layout" for such a keyboard when
-  its base keyboard shares its script, and FR-021 keeps unconfirmed drafts from changing.
+  author seeing the question. FR-020 proposes "Use the computer's layout" for each class such a
+  keyboard does not define for itself, and FR-021 keeps unconfirmed drafts from changing.
 - **Same script, different language.** A Latin-script keyboard on a Latin base keyboard
-  (French on US English) proposes "Use the computer's layout", even though some leaked letters
-  are not in the language's alphabet. The leak list shows them; the author can still choose
-  "Do nothing".
+  (French on US English) proposes "Use the computer's layout" for letters, even though some
+  leaked letters are not in the language's alphabet. The leak list shows them; the author can
+  still choose "Do nothing".
 - **Mixed picks.** A Latin-script keyboard with US English and Russian base keyboards proposes
-  "Do nothing", because the Russian base keyboard leaks Cyrillic letters. The evidence names the
-  Russian base keyboard.
+  "Do nothing" for letters, because the Russian base keyboard leaks Cyrillic letters. The
+  evidence names the Russian base keyboard.
+- **Classes split across a script.** An Arabic keyboard that defines its letters and the Arabic
+  comma but not its own digits proposes "Do nothing" for letters and punctuation and "Use the
+  computer's layout" for digits, so ASCII digits stay available.
+- **Shared punctuation.** A keyboard that defines its own comma (،) but not a full stop gets
+  "Do nothing" for punctuation, which also swallows a leaked `.`. The leak list shows the `.`
+  under punctuation, so the author sees it before confirming.
+- **A position's class differs between base keyboards.** Unshifted `1` types `1` on US English
+  (a digit) and `&` on French AZERTY (punctuation). The position is swallowed if its leak falls
+  in a "Do nothing" class on any picked base keyboard (FR-010).
 - **Multi-script targets.** When the language tag carries one script but the keyboard
   deliberately types two (for example a transliteration keyboard), the target script is the tag's;
   the author can override the proposal.
-- **Plural base keyboards.** Positions do not depend on the base keyboard; characters do. One
-  policy covers every base keyboard: the swallow store is positional. The leak list is per base
-  keyboard.
+- **Plural base keyboards.** Positions do not depend on the base keyboard; characters and their
+  classes do. The leak list is per base keyboard, and the swallow store is recomputed when the
+  picks change.
 - **A layer the keyboard never uses.** The swallow store covers only modifier layers the IR binds
   at least one key on (spec 076 FR-005). The leak list still shows the other layers' leaks and
   marks them "not covered by Do nothing".
@@ -183,8 +193,9 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
   risk, neither is recommended, and the retired one-sided slogan appears nowhere.
 - **FR-005**: The copy MUST match what the compiled keyboard does. Until US2 ships, "Do nothing"
   states that it covers removed keys only and that the listed characters still come through.
-- **FR-006**: The collapsed summary MUST show how many unhandled positions type something on the
-  primary base keyboard, so the decision is visible before the section is opened (Art X).
+- **FR-006**: The collapsed summary MUST show, per class, how many unhandled positions type
+  something on the primary base keyboard, so the decision is visible before the section is opened
+  (Art X).
 - **FR-007**: The list is derived from the working copy and recomputed when it changes. It adds no
   timer.
 - **FR-008**: The setting stays an editor-authored working-copy setting at its interim host (the
@@ -193,9 +204,12 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
 
 **`swallowUndefined` (US2) — spec 076 FR-005, carried forward**
 
-- **FR-010**: When the policy is "Do nothing", the compiled keyboard MUST suppress every printable
-  virtual-key position, on each modifier layer the IR binds at least one key on, that the IR does
-  not match. The positions go into one store, emitted as one rule with `nul` output.
+- **FR-010**: The compiled keyboard MUST suppress every printable virtual-key position, on each
+  modifier layer the IR binds at least one key on, that the IR does not match **and** whose leak
+  falls in a class set to "Do nothing" (FR-020) on any picked base keyboard. The positions go into
+  one store, emitted as one rule with `nul` output. Because a position's class depends on the
+  base keyboard (unshifted `1` types `1` on US English but `&` on French AZERTY), the store is
+  recomputed when the base-keyboard picks change.
 - **FR-011**: The store MUST never include frame keys (Backspace, Enter, Tab, Escape, Delete,
   navigation). The keyboard MUST NOT use `nomatch > nul`.
 - **FR-012**: The store MUST be recomputed whenever a binding is added or removed. It MUST respect
@@ -203,36 +217,43 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
   another behaviour's rule are not emitted again, and deadkey carves always suppress.
 - **FR-013**: The rule and store are behaviour-owned IR written through the `mutate()` seam, use
   corpus naming idiom, and compile cleanly through Layer A/B and `kmcmplib`.
-- **FR-014**: When the policy is "Use the computer's layout", nothing is emitted beyond today's
-  carve behaviour.
+- **FR-014**: When all three classes are "Use the computer's layout", nothing is emitted beyond
+  today's carve behaviour.
+- **FR-015**: Carve suppression (spec 076 FR-020–FR-022) keeps reading one swallow-or-pass value
+  per carved combination; the per-class policy supplies it from the carved key's leak class on
+  the picked base keyboards, by the same "any picked base keyboard" rule as FR-010.
 
 **Defaults and existing drafts**
 
-- **FR-020**: The default policy is a proposal the author confirms (Art X). It is derived from
-  the **script of what leaks**, compared with the **target script** (product-owner ruling,
-  2026-11-01: "A random 'Q' would be less disconcerting in a Latin-script keyboard than, say,
-  Korean script."):
+- **FR-020**: The fallback policy MUST be decided separately for three character classes:
+  **letters**, **digits**, and **punctuation and symbols**. Each class has its own "Do nothing" /
+  "Use the computer's layout" choice, and each default is a proposal the author confirms
+  (Art X). Product-owner rulings, 2026-11-01: "A random 'Q' would be less disconcerting in a
+  Latin-script keyboard than, say, Korean script", and "treat digits and punctuation separately.
+  If a keyboard defines its own diverging script, we know what to do; if it defines its own
+  digits, we know what to do; and if it defines its own punctuation, we know what to do."
+  - **Classification** uses Unicode General Category: letters are L* (with any M* marks a base
+    keyboard types), digits are Nd, punctuation and symbols are P* and S*. A leak takes the class
+    of the character the base keyboard types there.
   - **Target script**: the script subtag of the keyboard's language tag, filled by likely
     subtags when absent.
-  - **Leak script**: the scripts of the letters the picked base keyboards type at unhandled
-    positions (FR-002).
-  - **Digits and punctuation** may need separate handling. [NEEDS CLARIFICATION: whether leaked
-    digits and punctuation count toward the proposal. They are mostly Common script, but a target
-    script can have its own digits (Arabic-Indic, Devanagari, Thai) or punctuation (Arabic comma,
-    danda, full-width CJK forms), so an ASCII `4` or `,` can be as foreign to it as a stray
-    letter. Options: (a) neutral, ignored; (b) counted when the target script has its own digits
-    or punctuation; (c) a separate fallback choice for digits and punctuation. Until resolved,
-    the proposal uses letters only.]
-  - If every leaked letter is in the target script, or no letter leaks, the proposal is "Use the
-    computer's layout". A stray letter is mildly surprising but legible.
-  - If any picked base keyboard leaks a letter in another script, the proposal is "Do nothing".
-    A foreign-script letter is disconcerting, as with Latin leaking into a Hangul keyboard.
-  - Where a base keyboard has no character data, its script is taken from its catalog language
-    tags.
-  - The proposal shows its evidence: which base keyboard and which script triggered it, with
-    the leak count.
+  - **Letters**: propose "Do nothing" when any picked base keyboard leaks a letter whose Script
+    differs from the target script (Latin leaking into a Hangul keyboard). Otherwise propose "Use
+    the computer's layout": a stray same-script letter is surprising but legible.
+  - **Digits**: propose "Do nothing" when the keyboard defines its own digits, i.e. it emits Nd
+    characters of a different digit set from the leaked ones (an Arabic-Indic or Devanagari
+    keyboard on a US English base keyboard). Otherwise propose "Use the computer's layout": the
+    leaked digits are the only digits the typist has.
+  - **Punctuation and symbols**: propose "Do nothing" when the keyboard defines its own
+    punctuation, i.e. it emits P* characters whose Script_Extensions include the target script
+    (Arabic comma, danda, full-width CJK forms). Otherwise propose "Use the computer's layout".
+  - Where a base keyboard has no character data, the letters proposal takes its script from the
+    base keyboard's catalog language tags; the digits and punctuation proposals stand on what the
+    keyboard itself emits.
+  - Each proposal shows its evidence: the class, the base keyboard and character that triggered
+    it, and the leak count.
   This replaces spec 076 FR-005's "declined for sparse Latin overlays, accepted for non-Latin
-  scripts" with a test that also covers non-Latin targets on non-Latin base keyboards.
+  scripts" with a per-class test that also covers non-Latin targets on non-Latin base keyboards.
 - **FR-021**: A policy the author never confirmed MUST NOT start suppressing never-defined keys
   when US2 ships. Such drafts are re-proposed the choice, with the leak list, before their
   compiled output changes (Art X: no silent automation).
@@ -252,17 +273,16 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
 
 - **FR-040**: One engine function MUST return the key-and-modifier positions the keyboard does not
   handle, from the IR alone. It is positional and does not depend on the base keyboard. The leak
-  list (FR-002), the swallow store (FR-010, restricted to covered layers) and spec 108's fill
-  (FR-021) and "filled" provenance (FR-028) all use it.
+  list (FR-002), the swallow store (FR-010, restricted to covered layers and swallowed classes)
+  and spec 108's fill (FR-021) and "filled" provenance (FR-028) all use it.
 - **FR-041**: Characters are joined in by the caller from base-keyboard data passed as input. The
   engine never imports the studio (spec 108 Assumptions, "Base keyboard").
 - **FR-042**: Spec 108 uses only the **primary** base keyboard (its FR-027), because an LDML file
   must fill each position with one concrete key. This spec lists **every** picked base keyboard,
-  because the typists may use any of them. The two are consistent: under "Do nothing" the swallow
-  store's `nul` outputs reach the LDML export as suppressed positions (spec 108 rows 2.25 and
-  3.15a: gap keys), so a swallowing keyboard's LDML export does not depend on the base keyboard.
-  Under "Use the computer's layout", spec 108 fills from the primary base keyboard and reports
-  it.
+  because the typists may use any of them. The two are consistent: swallowed positions' `nul`
+  outputs reach the LDML export as suppressed positions (spec 108 rows 2.25 and 3.15a: gap keys),
+  which do not depend on the base keyboard. Positions in classes left to "Use the computer's
+  layout" are filled from the primary base keyboard, and the report says so.
 
 ### Key Entities
 
@@ -272,8 +292,13 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
   "starts a deadkey", or "unknown").
 - **Base keyboard**: a physical OS layout the typists use (project vocabulary; never the copied
   keyboard). The `windows-layout` decision holds one or more, primary first.
-- **Fallback policy**: the existing keyboard-wide `"swallow" | "pass-through"` setting (spec 076).
-  This spec does not change its type.
+- **Fallback policy**: today a single keyboard-wide `"swallow" | "pass-through"` value (spec 076,
+  `packages/contracts`, zod schema with drift guard, persisted in drafts). This spec changes it to
+  one value per class (letters, digits, punctuation and symbols). A contracts change, not a
+  Pattern-schema change. Migration: an existing single value applies to all three classes and
+  keeps its "author never confirmed" state for FR-021.
+- **Leak class**: letters, digits, or punctuation and symbols, by the Unicode General Category of
+  the character a base keyboard types at a position.
 
 ## Success Criteria *(mandatory)*
 
@@ -291,9 +316,10 @@ which key-and-modifier positions does this keyboard not handle? One engine funct
   "suppressed" positions.
 - **SC-006**: No existing draft's compiled output changes on upgrade without an author
   confirmation.
-- **SC-007**: A Korean (Hangul) keyboard on a US English base keyboard proposes "Do nothing"; a
-  French Latin-script overlay on a US English base keyboard proposes "Use the computer's layout";
-  each proposal names its triggering base keyboard and script.
+- **SC-007**: On a US English base keyboard: a Korean (Hangul) keyboard proposes "Do nothing" for
+  letters; a French Latin-script overlay proposes "Use the computer's layout" for all three
+  classes; an Arabic keyboard with Arabic-Indic digits and the Arabic comma proposes "Do nothing"
+  for all three. Each proposal names its class, triggering base keyboard and character.
 
 ## Assumptions
 
