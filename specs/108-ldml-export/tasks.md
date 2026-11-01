@@ -388,7 +388,7 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
 - [ ] T050 [US1] Write the Playwright journey `packages/studio/e2e/ldml-export.spec.ts`: open a fixture keyboard and reach the Output page, choose profile 46, download the LDML zip, and assert the zip's entry list and that the report names the profile.
 
 **Checkpoint**: Story 1 works on its own. The H1–H3, H5, H9 and H10 corpus suites are green for
-the hardware form. Commit `spec 108 T020-T050`.
+the hardware form. Commit `spec 108 T020-T050, T090`.
 
 ---
 
@@ -408,12 +408,12 @@ findings with source lines, and the `.kmp` and `.zip` downloads stay enabled.
   - `location` is set exactly when `line` is non-null;
   - message ids follow the `lint.ldml.<codeSlug>.*` pattern;
   - no finding is ever `error`;
-  - M items produce nothing.
+  - M items without a code produce nothing; an M item with a hint (row 3.16) produces a hint.
 - [ ] T052 [P] [US2] Write `ST/lint/lintToQuestion.ldml.test.ts`:
   - every code routes per the table in [contracts/findings-routing.md](contracts/findings-routing.md);
   - a code whose step is not in the route falls back to unmapped (Output);
   - `buildStepWarningCounts` counts distinct LDML codes per step, hints included, while other codes are still counted per finding (a step with 300 `OPTION_STATE` and 2 `CALL` badges 2).
-- [ ] T053 [P] [US2] Write `ST/test/ldmlParity/ldmlParity.corpus.test.ts` (H6, SC-005). For each corpus working copy, built with the spec 106 replay helpers in `ST/test/`, build both projections headlessly, with no React hook mounted. The **preview** projection calls `projectWorkingCopyVfs` (`ST/lib/projectWorkingCopyVfs.ts:432`) with the same input `ST/hooks/useWorkingCopyTransform.ts:501` passes (display-name identity only), then parses its `.kmn`, touch layout and `.kvks`. The **download** projection uses `projectWorkingCopyForOutput`. Assert that the A/N/K `siteKey` set from the preview projection equals that from `projectWorkingCopyForOutput`, and that the studio findings' site keys equal the report's A/N/K rows, excluding the row-5.15 delivery note (FR-012, SC-005).
+- [ ] T053 [P] [US2] Write `ST/test/ldmlParity/ldmlParity.corpus.test.ts` (H6, SC-005). For each corpus working copy, built with the spec 106 replay helpers in `ST/test/`, build both projections headlessly, with no React hook mounted. The **preview** projection calls `projectWorkingCopyVfs` (`ST/lib/projectWorkingCopyVfs.ts:432`) with the same input `ST/hooks/useWorkingCopyTransform.ts:501` passes (display-name identity only), then parses its `.kmn`, touch layout and `.kvks`. The **download** projection uses `projectWorkingCopyForOutput`. Both paths use the same `resolveLdmlBaseLayout` result; a working copy whose FR-027 default is unavailable gets the override `us`, never a skip. Assert that the coded-item `siteKey` set (A, N, K, and M with a hint) from the preview projection equals that from `projectWorkingCopyForOutput`, and that the studio findings' site keys equal the report's coded-item rows, excluding the row-5.15 delivery note (FR-012, SC-005).
 
 ### Implementation for User Story 2
 
@@ -423,7 +423,7 @@ findings with source lines, and the `.kmp` and `.zip` downloads stay enabled.
   - Register it as EPHEMERAL in `ST/decisions/derivedSurfaceRegistry.ts`.
   - Add a hook test.
 - [ ] T055 [US2] Implement `ST/lint/ldmlFindings.ts`: `buildLdmlFindings(classification, i18n) → LintFinding[]` per [contracts/findings-routing.md](contracts/findings-routing.md) (layer `"C"`, `msg({ id: "lint.ldml.<codeSlug>.message", values: item.params })`). Make T051 pass.
-- [ ] T056 [US2] Implement `ST/hooks/useLdmlFindings.ts`: a `useMemo` over `previewProjection`, `ldmlProfile`, `ldmlBaseLayout`, the base-layout inputs and `i18n`. When `chosen` is `null`, it returns only a single unmapped Output-page notice that no base keyboard is selected, and no LDML classification. Inside it, run `parseTouchLayoutOrNull` and `parseKvks`, then `resolveLdmlBaseLayout`, then `classifyForLdml(input, resolveLdmlProfile(ldmlProfile ?? default))`, then `buildLdmlFindings`. Do not add a timer or an effect that schedules work (Art IV, FR-014). Test that it recomputes only when an input changes.
+- [ ] T056 [US2] Implement `ST/hooks/useLdmlFindings.ts`: a `useMemo` over `previewProjection`, `ldmlProfile`, `ldmlBaseLayout`, the base-layout inputs and `i18n`. When `chosen` is `null` (unavailable default, no override), it returns `[]`: the LDML panel (T047) already shows the unavailable state, and FR-011 admits no finding without a contract code. Inside it, run `parseTouchLayoutOrNull` and `parseKvks`, then `resolveLdmlBaseLayout`, then `classifyForLdml(input, resolveLdmlProfile(ldmlProfile ?? default))`, then `buildLdmlFindings`. Do not add a timer or an effect that schedules work (Art IV, FR-014). Test that it recomputes only when an input changes.
 - [ ] T057 [US2] In `ST/StudioShell.tsx`, merge `useLdmlFindings()` into the `findings` memo beside `documentationFindings` and `oe2Findings`, so it publishes through the existing `setValidatorFindings`.
 - [ ] T058 [US2] In `ST/lint/lintToQuestion.ts`:
   - add the LDML question routes;

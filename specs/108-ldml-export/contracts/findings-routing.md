@@ -4,8 +4,8 @@
 
 ## Finding shape
 
-`lint/ldmlFindings.ts` maps each A, N and K item of the classification to one `LintFinding`. M
-items produce no finding.
+`lint/ldmlFindings.ts` maps each item that carries a code (A, N and K items, and M items with a
+hint such as row 3.16) to one `LintFinding`. M items without a code produce no finding.
 
 | Field | Value |
 |---|---|

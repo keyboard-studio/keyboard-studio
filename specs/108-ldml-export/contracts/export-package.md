@@ -84,7 +84,7 @@ The report is always English and contains no timestamp. Sections, in order:
 4. **Delivery note**: Keyman 19 delivers LDML keyboards to desktop only. When touch forms are
    present, a single statement for row 5.15: written to TR35, ready for Keyman's touch pipeline,
    not yet run by any Keyman.
-5. **What did not carry over: physical keyboard**: one table row per A, N and K item on the
+5. **What did not carry over: physical keyboard**: one table row per coded item (A, N, K, and M with a hint) on the
    hardware side. Columns: Location, Construct, Code, Status, What LDML does instead.
 6. **What did not carry over: touch**: the same columns, for touch items.
 7. **Other items**: header, metadata and package-only hints.
@@ -101,6 +101,8 @@ report has no cap (Edge Cases).
 
 - `toZip(vfs, { nextSteps: false, fixedMtime: new Date(1980, 0, 1) })`. Text entries use deflate
   level 6, binary entries level 0, as today.
+- `LdmlExportInput` includes the export's base keyboard (FR-027): a different base keyboard is a
+  different input, so FR-030 compares exports under the same profile **and** base keyboard.
 - No input other than `LdmlExportInput` affects any byte: no clock, no locale, no random source,
   no environment.
 - The SC-009 test exports the same working copy twice, once with the interface locale `en` and

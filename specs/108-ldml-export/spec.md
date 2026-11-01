@@ -91,7 +91,8 @@ or fails the bundle-safety tests. See FR-080.
   touch half without erroring until it implements it. The FR-070 trial confirms this.
 - Q: Is `LDML-EXPORT-REPORT.md` localized to the interface language? → A: No. The report,
   like the `.xml` comments, is always English. Studio-side findings and controls are
-  translated (FR-019). The determinism inputs are the working copy and the selected profile.
+  translated (FR-019). The determinism inputs are the working copy, the selected profile and the export's base
+  keyboard (FR-027).
 - Q: Which OS base layout does the export assume for fall-through keys, mnemonic resolution,
   `baselayout()` and the hardware form? (This is the OS layout under Keyman, not the copied
   keyboard, which is what the `base-keyboard` decision stores.) → A: One base keyboard per
@@ -416,7 +417,8 @@ not been done yet.
   page filters out.
 - **FR-012**: The authoring-time findings and the export report MUST come from one
   classification of the same working copy. For any working copy, the set of finding sites
-  MUST equal the set of report rows for A, N and K items. The single row-5.15 statement is
+  MUST equal the set of report rows for every item that carries a finding code: A, N and K
+  items, and M items with a hint (row 3.16). The single row-5.15 statement is
   the one exception: it is a report note, not a finding.
 - **FR-013**: Every `RawKmnFragment` and every `raw` IR element MUST produce exactly one
   finding and one report row, naming its opaque reason.
@@ -523,13 +525,14 @@ not been done yet.
 
 **Report**
 
-- **FR-030**: The same working copy exported under the same profile MUST yield a
+- **FR-030**: The same working copy exported under the same profile and base keyboard MUST yield a
   byte-identical package, whatever the interface language. The export uses no timestamps and
   no ids that depend on traversal order. `LDML-EXPORT-REPORT.md` and the `.xml` comments are
   always English. Only the studio-side strings are translated (FR-019).
 - **FR-031**: `LDML-EXPORT-REPORT.md` MUST contain:
   - counts per status;
-  - one row per Approximated, Not-transferable and Keyman-gap item, with location, construct,
+  - one row per Approximated, Not-transferable and Keyman-gap item, and per Mapped item that
+    carries a hint (row 3.16), with location, construct,
     code and consequence;
   - a separate "physical keyboard" list and "touch" list of items that did not transfer;
   - the Keyman 19 desktop-only delivery note;
@@ -634,7 +637,7 @@ not been done yet.
   an item in its report. Zero unexplained mismatches.
 - **SC-004**: Every opaque fragment and `raw` element in the corpus yields exactly one finding
   and one report row.
-- **SC-005**: For any working copy, the finding sites and the report's A/N/K rows are the same
+- **SC-005**: For any working copy, the finding sites and the report's rows for coded items (A, N, K, and M with a hint) are the same
   set (excluding the row-5.15 delivery note).
 - **SC-006**: For `ibono_chwerty`, the exported key map and outputs match the hand-written
   `ibono_chwerty.xml` in the keyboards corpus for every hardware position both define.
@@ -642,7 +645,7 @@ not been done yet.
   Producing it for a corpus-sized keyboard (≤ 2 000 rules) takes under 2 seconds.
 - **SC-008**: Adding or removing an incompatible rule changes the visible LDML warnings within
   the same validation cycle as other findings. No extra delay is introduced.
-- **SC-009**: Two exports of an unchanged working copy under the same profile are
+- **SC-009**: Two exports of an unchanged working copy under the same profile and base keyboard are
   byte-identical, including when the interface language differs between them.
 - **SC-010**: 100 % of touch forms exported from the corpus pass the TR35 touch conformance
   check (FR-052). Zero touch constructs are degraded to fit today's Keyman compiler.

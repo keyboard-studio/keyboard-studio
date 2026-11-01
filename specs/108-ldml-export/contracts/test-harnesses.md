@@ -89,8 +89,10 @@ For each corpus working copy, the harness:
 2. builds the preview-path classification from the preview projection;
 3. builds the download-path classification from `projectWorkingCopyForOutput`.
 
-It asserts that the site-key sets for A, N and K items are equal (research R25). It also asserts
-that the studio findings built from (2) have exactly the A/N/K site keys of the report built from
+Both paths use the same base keyboard. A corpus working copy whose FR-027 default is unavailable
+is given an explicit override (`us`), never skipped. It asserts that the site-key sets for coded
+items (A, N, K, and M with a hint) are equal (research R25). It also asserts
+that the studio findings built from (2) have exactly the coded-item site keys of the report built from
 (3), excluding the row-5.15 delivery note (FR-012, SC-005).
 
 ## H7 — Profiles (FR-061, FR-065, SC-011)

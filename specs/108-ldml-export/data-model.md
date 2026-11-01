@@ -19,7 +19,7 @@ engine-side types live in `packages/engine/src/ldml-export/types.ts` and
 | `deltas` | `RowDelta[]` | empty for 46 |
 | `writeAttribution` | `boolean` | the profile-level switch the lowering reads, derived from row 4.10. Set mappings are the same in every profile (spec FR-023). The lowering never compares profile ids |
 
-**ProfileRow**: `{ id: RowId ("3.17"), status: "M"|"A"|"N"|"K"|"M/A"|"M/N", code?: LdmlCode,
+**ProfileRow**: `{ id: RowId ("3.17"), status: "M"|"A"|"N"|"K"|"M/A"|"M/N"|"A/N", code?: LdmlCode,
 severity: "warning"|"hint"|null, form: string, lift?: string, keymanCodes?: string[] }`.
 
 - `keymanCodes` lists the Keyman message codes a K row is expected to raise (H1).
@@ -77,7 +77,7 @@ minus the suppressed positions (spec 109 SC-005).
 | `siteKey` | string | `${code}\|${rowId}\|${nodeKey}`. This is the identity used for FR-012/SC-005 (R25) |
 | `rowId` | `RowId` | the mapping-contract row |
 | `status` | `"M" \| "A" \| "N" \| "K"` | an `M/A` row resolves to one status per item |
-| `code` | `LdmlCode \| null` | `null` only for M |
+| `code` | `LdmlCode \| null` | `null` for an M item without a hint; an M item with a hint (row 3.16) carries its code |
 | `severity` | `"warning" \| "hint" \| null` | FR-010; the rule-vs-non-rule split is computed per item |
 | `nodeKey` | string | `group:<name>#<ordinal>`, `fragment#<ordinal>`, `store:<NAME>`, `touch:<platform>/<layer>/<key>`, `header:<field>`, `base:<layer>/<vkey>` for row 2.26, or `behaviour:<name>` for FR-026's per-behaviour items |
 | `line` | number \| null | `sourceLine` from the IR that was classified |
@@ -90,8 +90,8 @@ minus the suppressed positions (spec 109 SC-005).
 **Rules**:
 
 - one item per classified site;
-- an M item is kept only when the report counts need it, and is never shown as a finding;
-- an `M/A` row (1.8) resolves to M or A per item, and an `M/N` row (3.23) to M or N.
+- an M item without a code is kept only for the report counts and is never shown as a finding; an M item with a hint (row 3.16) is both a finding and a report row (spec FR-012, FR-031);
+- an `M/A` row (1.8) resolves to M or A per item, an `M/N` row (3.26) to M or N, and an `A/N` row (2.23) to A or N.
 
 ## LdmlClassification (engine)
 
