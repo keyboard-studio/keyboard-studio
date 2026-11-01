@@ -304,6 +304,53 @@ the `us` hardware form.
 - `kmxToXml` (`kmc-ldml/src/util/serialize.ts`, #12874) round-trips the in-memory KMX+ model
   back to XML. It loses transforms that lack source hints, and all comments.
 
+## R15 — Is "context rules without key input" a real gap?
+
+**For text, no.** KMN cannot rewrite text without a keystroke either:
+
+- A context-only KMN group runs only when a keystroke rule hands off to it with `use()`. LDML
+  covers that with chained `transformGroup`s (mapping row 1.5).
+- The two entry points that do fire without a character keystroke, `begin NewContext` and
+  `begin PostKeystroke`, require `readonly` groups, which cannot emit text
+  (help.keyman.com `developer/language/reference/begin.md:39-57`, Keyman 15.0).
+
+**Corpus check** (`../keyboards`, release and experimental, 2026-11-01): 50 of 1,036 `.kmn`
+files use either entry point. All 97 entry groups are `readonly`, and every file uses them
+for touch layer switching. The dominant rules are:
+
+- `any(sentencePunctuation) ' ' > layer('shift')`
+- `nomatch > layer('default')`
+- `if(&newLayer = "") > use(detectStartOfSentence)`
+- `if(&layer = 'numeric') any(digit) > context`
+
+None rewrites text.
+
+**The real gap: automatic touch layer state.** That means start-of-sentence shift, return to
+the default layer, numeric-layer stickiness, and caps emulation (casing support, #3621, Keyman
+15).
+
+- LDML's only layer control is `key/@layerId` on the pressed key. A key may output and then
+  switch.
+- TR35 discards the input context when the insertion point moves, and has no hook for that
+  event or for a post-keystroke layer choice.
+- The loss is touch-only: these groups run only on web, iOS and Android, never on Windows,
+  macOS or Linux (`begin.md:103-107`).
+
+**Upstream status.**
+
+- **Known only in passing.** On #15286 (open, 20.0, web-core `processPostKeystroke`), Marc
+  Durdin wrote on 2026-04-14 that PostKeystroke is "conceptually supported by the
+  KmxKeyboardProcessor … but not LdmlKeyboardProcessor". #15291 covers NewContext for KMN.
+  Keyman Core does not run either group even for KMX today; only the KeymanWeb JS compiler
+  does (`kmw-compiler.ts:114-118,280-284`).
+- **No issue asks for an LDML or CLDR equivalent.** #8093 (LDML touch umbrella) does not
+  mention it. #12620, which converts KMN touch layouts to LDML/KMX+, would drop this behaviour
+  for those 50 keyboards unless KMX+ or TR35 gains a mechanism. Ten `gh` searches found no
+  CLDR GitHub issue; CLDR Jira was not searched.
+- **Follow-up candidate:** raise it with the Keyman team (on #12620/#8093) and as a CLDR
+  ticket. It is out of scope for spec 108, which reports it as `KM_LINT_LDML_NO_KEY_TRIGGER`
+  with a touch-specific consequence message.
+
 ## Reference pairs in the corpus
 
 - `ibono_chwerty` — a `.kmn` and a hand-written `source/extras/ibono_chwerty.xml` in the same
