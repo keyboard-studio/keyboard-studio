@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-01
 
-**Status**: Draft — gate G0 cleared 2026-11-01 (Constitution 2.1.0)
+**Status**: Draft — gates G0 and G1 cleared 2026-11-01 (Constitution 2.2.0)
 
 **Owner**: Engine team (Constitution Art VI) — exporter, classifier, output path, SPA surfaces.
 No Content-team surfaces change.
@@ -32,10 +32,10 @@ format. Under the constitution's precedence table, a recorded product ruling bea
 
 ## Governance gate G1 (Story 5 only)
 
-User Story 5 compiles the export and offers an installable LDML `.kmp`. That produces a
-compiled binary, which G0's "source-only" wording does not allow. Story 5 and FR-070–FR-076
-MUST NOT be planned until the product owner adopts **Proposed amendment G1** in
-[amendment.md](amendment.md). Stories 1–4 do not depend on G1.
+User Story 5 compiles the export and offers an installable LDML `.kmp`, which is a compiled
+binary rather than source. **Cleared 2026-11-01**: the product owner adopted amendment G1
+(Constitution 2.2.0, [amendment.md](amendment.md)). Story 5 still starts with the FR-070
+trial, which can withdraw it.
 
 ## Authority order
 
@@ -190,8 +190,8 @@ produce for that key.
 
 ### User Story 5 — Compile and package the LDML export (Priority: P3)
 
-**Gated on G1** (see [amendment.md](amendment.md), "Proposed amendment G1"). Not planned
-until the product owner adopts it.
+Gate G1 cleared 2026-11-01 (Constitution 2.2.0). The FR-070 in-browser compiler trial comes
+first.
 
 An author who downloads the LDML export can also get it **compiled**:
 - The studio runs Keyman's own LDML compiler on the exported `.xml` in the browser.

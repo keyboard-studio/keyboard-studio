@@ -84,10 +84,11 @@ Minor version: it widens scope without changing any gate.
 
 ---
 
-# Proposed amendment G1: allow a compiled LDML package (Constitution 2.1.0 → 2.2.0)
+# Amendment G1: allow a compiled LDML package (Constitution 2.1.0 → 2.2.0)
 
-**Status**: PROPOSED 2026-11-01, awaiting the product owner's ruling. **Not applied.** It
-gates only spec 108 User Story 5 (FR-070–FR-076). Stories 1–4 proceed under 2.1.0.
+**Status**: ADOPTED 2026-11-01 by product-owner ruling ("Yep", in reply to "adopt G1 as
+drafted?"). Applied to the constitution (2.2.0) and spec.md §16 in the same commit. Gate G1 is
+cleared.
 
 ## Why
 

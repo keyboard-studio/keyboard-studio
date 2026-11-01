@@ -211,7 +211,7 @@
     },
     "§16": {
       "title": "16. Out of scope",
-      "hash": "sha256:41eab6f9297abc8b",
+      "hash": "sha256:d7796828d415441c",
       "status": "reference",
       "implements": [],
       "decisions": [
@@ -1135,7 +1135,7 @@
     },
     "specs/108-ldml-export": {
       "title": "Feature Specification: LDML keyboard export",
-      "hash": "sha256:32100a7b9626db93",
+      "hash": "sha256:9307a85be0729b7d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

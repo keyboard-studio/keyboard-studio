@@ -87,9 +87,10 @@ change and stay within that boundary.
 
 ### VII. Out of scope for v1 (spec §16)
 Plans MUST NOT implement: CJK/Ethiopic reorder patterns, LDML as an
-emission format (LDML *export* — a secondary, source-only download that
-never replaces KMN on the `.kmp` or pull-request paths — is in scope per
-spec 108), mobile-app integration, hosting, multi-language `welcome.htm` variants,
+emission format (LDML *export* — a secondary download of the LDML source,
+optionally with a desktop package compiled by Keyman's own LDML compiler,
+that never replaces the KMN `.kmp` and never enters the pull-request path
+— is in scope per spec 108), mobile-app integration, hosting, multi-language `welcome.htm` variants,
 `.kpj.user` management, touch-first authoring, multi-source merge,
 survey-editing of opaque `RawKmnFragment`, or byte-identical round-trip.
 Three-group routing renders the "not yet supported" stub for CJK/Ethiopic —
@@ -204,4 +205,4 @@ existing text MUST edit that text. Append-only amendments — a new paragraph
 that silently reverses an old one while both stand — are the failure this
 version exists to end, and a reviewer MUST reject one on sight.
 
-**Version**: 2.1.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-01 (Art VII: LDML export in scope, spec 108) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)
+**Version**: 2.2.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-01 (Art VII: LDML export in scope, spec 108; compiled LDML desktop package, spec 108 Story 5) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)
