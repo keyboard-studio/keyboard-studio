@@ -59,8 +59,8 @@ export interface ReviewerSource {
   upgradePr?: { changedFiles: readonly string[] };
   /** The .kps tags against langtags, Glottolog and the output script. */
   languageTags?: LanguageTagAnalysis;
-  /** PR targets: the PR's review and conversation comment counts. */
-  prCommentCounts?: { review: number; conversation: number };
+  /** PR targets: the PR's diff-comment, conversation-comment and review counts. */
+  prCommentCounts?: { diff: number; conversation: number; reviews: number };
 }
 
 const EXCERPT_CHARS = 300;
@@ -365,12 +365,22 @@ export function copyrightYears(line: string | undefined): number[] {
   return [...(line ?? "").matchAll(/\b(\d{4})\b/g)].map((m) => Number(m[1]));
 }
 
+/**
+ * The one year a copyright line states, or undefined when it states none,
+ * several, or an open range ("2024-present", "2024–").
+ */
+export function copyrightSingleYear(line: string | undefined): number | undefined {
+  const years = copyrightYears(line);
+  if (years.length !== 1 || /\d{4}\s*[-\u2013\u2014]/.test(line ?? "")) return undefined;
+  return years[0];
+}
+
 /** 17.1: the PR's comment counts, and why resolution is not shown. */
 export function prCommentLines(src: ReviewerSource | undefined): string[] {
   const c = src?.prCommentCounts;
   if (c === undefined) return [];
   return [
-    `This PR has ${c.review} review comment(s) on the diff and ${c.conversation} conversation comment(s).`,
+    `This PR has ${c.diff} comment(s) on the diff, ${c.conversation} conversation comment(s) and ${c.reviews} review(s) requesting changes or commenting.`,
     "Whether review threads are resolved is only in GitHub's GraphQL API, which needs a signed-in request; check the PR's Files tab.",
   ];
 }

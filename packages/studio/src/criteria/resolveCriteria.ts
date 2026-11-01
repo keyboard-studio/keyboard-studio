@@ -37,7 +37,7 @@ import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
 import { languageTagContextLines } from "./languageTags.ts";
 import {
   copyrightContextLines,
-  copyrightYears,
+  copyrightSingleYear,
   licenseCopyrightLine,
   prCommentLines,
   scopeNote,
@@ -610,7 +610,7 @@ export function resolveCriteria(rawInput: CriteriaInput): CriteriaResult {
   // the check ran and its verified line says it found nothing. Both modes
   // run the same engine pass, so both get these facts.
   const verified = rawInput.verifiedByCode;
-  const licenseYears = copyrightYears(
+  const licenseYear = copyrightSingleYear(
     licenseCopyrightLine(verified?.get("KM_LINT_COPYRIGHT_ABSENT") ?? []),
   );
   const history = rawInput.reviewerSource?.historyYears;
@@ -618,12 +618,12 @@ export function resolveCriteria(rawInput: CriteriaInput): CriteriaResult {
     ...rawInput,
     facts: {
       ...rawInput.facts,
-      copyrightSingleYear: licenseYears.length === 1,
+      copyrightSingleYear: licenseYear !== undefined,
       copyrightAndHistoryOneYear:
-        licenseYears.length === 1 &&
+        licenseYear !== undefined &&
         history !== undefined &&
-        history.earliest === licenseYears[0] &&
-        history.latest === licenseYears[0],
+        history.earliest === licenseYear &&
+        history.latest === licenseYear,
       noPuaInOutput:
         verified?.get("KM_LINT_PUA_KEYBOARD_PLACEMENT")?.includes(NO_PUA_LINE) ===
         true,

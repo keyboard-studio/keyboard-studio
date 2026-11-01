@@ -150,7 +150,7 @@ export interface CriteriaFacts {
    * year: the keyboard was not updated across multiple years (4.2).
    */
   copyrightAndHistoryOneYear?: boolean;
-  /** /review host: the PR has no review or conversation comments (17.1). */
+  /** /review host: the PR has no diff or conversation comments and no reviews (17.1). */
   noPrComments?: boolean;
   /** /review host: the target is a published keyboard, not a PR (17.1). */
   notAPullRequest?: boolean;

@@ -439,12 +439,14 @@ export async function judgeForeignKeyboard(
     facts: {
       ...facts,
       ...languageTagFacts(languageTags),
-      // 17.1: nothing to resolve on a PR with no comments, or off a PR.
+      // 17.1: nothing to resolve on a PR no reviewer has said anything
+      // on, or off a PR.
       noPrComments:
         rc?.isPr === true &&
         prComments !== undefined &&
-        prComments.review === 0 &&
-        prComments.conversation === 0,
+        prComments.diff === 0 &&
+        prComments.conversation === 0 &&
+        prComments.reviews === 0,
       notAPullRequest: rc !== undefined && !rc.isPr,
     },
     reviewerVerdicts: languageTagVerdicts(languageTags),

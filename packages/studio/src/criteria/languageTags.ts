@@ -258,9 +258,16 @@ export function languageTagVerdicts(
       lines: capped(
         notMinimal.map((t) => {
           const eq = t.shorterEquivalents!;
-          return eq.length === 1
-            ? `${t.tag} is not minimal: langtags reads ${eq[0]} as the same tag (${t.full}).`
-            : `${t.tag} is not minimal: langtags reads each of ${eq.join(", ")} as the same tag (${t.full}).`;
+          const line =
+            eq.length === 1
+              ? `${t.tag} is not minimal: langtags reads ${eq[0]} as the same tag (${t.full}).`
+              : `${t.tag} is not minimal: langtags reads each of ${eq.join(", ")} as the same tag (${t.full}).`;
+          // A deprecated code: the shorter tag still uses it.
+          const tagLang = (t.tag.split("-")[0] ?? "").toLowerCase();
+          const fullLang = (t.full!.split("-")[0] ?? "").toLowerCase();
+          return tagLang !== fullLang
+            ? `${line} langtags folds ${tagLang} into ${fullLang}.`
+            : line;
         }),
         MAX_NOT_MET_LINES,
         "non-minimal tags",

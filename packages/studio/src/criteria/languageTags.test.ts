@@ -180,6 +180,9 @@ describe("12.1 / 12.5 script", () => {
     const a = analyze(["ajp-Arab"], profile("Arab"));
     expect(a.tags[0]!.recordedScripts).toContain("Arab");
     expect(languageTagFacts(a).outputScriptRecordedByLangtags).toBe(true);
+    expect(languageTagVerdicts(a).get("10.3-kps-tags-minimal")?.lines).toEqual([
+      "ajp-Arab is not minimal: langtags reads ajp as the same tag (apc-Arab-JO). langtags folds ajp into apc.",
+    ]);
   });
 
   it("12.5's fact when langtags records the output script for every language", () => {

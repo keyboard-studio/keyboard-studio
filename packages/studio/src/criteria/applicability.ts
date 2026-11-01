@@ -185,7 +185,7 @@ export function applicabilityFor(
       reason:
         facts.notAPullRequest === true
           ? "This is a published keyboard, not a pull request, so there are no PR comments to resolve."
-          : "This PR has no review or conversation comments, so there is nothing to resolve.",
+          : "This PR has no diff comments, conversation comments or reviews requesting changes, so there is nothing to resolve.",
     };
   }
   if (

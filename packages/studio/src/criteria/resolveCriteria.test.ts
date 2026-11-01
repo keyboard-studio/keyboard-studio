@@ -627,6 +627,10 @@ describe("resolveCriteria — copyright-year and PR-comment facts", () => {
       verifiedByCode: licenseLine("Copyright (C) 2015-2026 SIL"),
     });
     expect(status("4.8-year-range-starts-at-original", range)).toBe("needs-author");
+    for (const open of ["Copyright (C) 2024-present SIL", "Copyright (C) 2024– SIL"]) {
+      const input = makeInput({ mode: "foreign", verifiedByCode: licenseLine(open) });
+      expect(status("4.8-year-range-starts-at-original", input)).toBe("needs-author");
+    }
   });
 
   it("4.2 is Not applicable only when LICENSE and every HISTORY entry share one year", () => {
@@ -664,12 +668,12 @@ describe("resolveCriteria — copyright-year and PR-comment facts", () => {
       id,
       makeInput({
         mode: "foreign",
-        reviewerSource: { prCommentCounts: { review: 3, conversation: 1 } },
+        reviewerSource: { prCommentCounts: { diff: 3, conversation: 1, reviews: 2 } },
       }),
     );
     expect(row.status).toBe("needs-human");
     expect(row.evidence().lines).toContain(
-      "This PR has 3 review comment(s) on the diff and 1 conversation comment(s).",
+      "This PR has 3 comment(s) on the diff, 1 conversation comment(s) and 2 review(s) requesting changes or commenting.",
     );
   });
 });
