@@ -80,6 +80,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Gurmukhi Phonetic (ITRANS) | `itrans_gurmukhi` | `pa`, `sd-Guru` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_gurmukhi` |
 | Odia/Oriya Phonetic (ITRANS) | `itrans_odia` | `or`, `bdv`, `bfw`, `dso`, `gbj`, `gdb`, `hoc-Orya`, `jun`, `kff-Orya`, `kxv-Orya`, `kyw-Orya`, `pci-Orya`, `peg`, `sat-Orya`, `spv`, `srb-Orya` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_odia` |
 | Ibọnọ Chwerty | `ibono_chwerty` | `ibn` | Rogers Katelem Edeh | `../keyboards/release/i/ibono_chwerty` |
+| Imperial Aramaic | `imperial_aramaic` | `arc`, `amw-Armi` | Lorna Evans | `../keyboards/release/i/imperial_aramaic` |
 | Korean RR | `korean_rr` | `ko` | © 2010-2023 SIL International | `../keyboards/release/k/korean_rr` |
 | Arabic Phonetic (SIL) | `sil_arabic_phonetic` | `ar`, `arq-Arab`, `abv-Arab`, `shu-Arab`, `acy-Arab`, `avl-Arab`, `arz-Arab`, `afb-Arab`, `acw-Arab`, `ayl-Arab`, `acm-Arab`, `ary-Arab`, `ars-Arab`, `apc-Arab`, `ayp-Arab` … (+8 more) | Marc Durdin and Tamara Duff | `../keyboards/release/sil/sil_arabic_phonetic` |
 | Indígenas Bolivianos | `sil_bolivia` | `ay`, `aro`, `cav`, `cao`, `cap`, `cax`, `ese`, `gnw`, `gn`, `gui`, `gyr`, `ign`, `qu-BO`, `qul`, `srq` … (+2 more) | (c) 2022 SIL International | `../keyboards/release/sil/sil_bolivia` |
@@ -89,6 +90,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Kayah [Myanmar] (SIL) | `sil_kayah_mymr` | `kyu-Mymr` | © SIL Global | `../keyboards/release/sil/sil_kayah_mymr` |
 | Kcho (SIL) | `sil_kcho` | `mwq`, `dao` | SIL Global | `../keyboards/release/sil/sil_kcho` |
 | Khmer Angkor | `khmer_angkor` | `km` | Makara Sok | `../keyboards/release/k/khmer_angkor` |
+| khmer_ldml | `khmer_ldml` | `km` | Nguonnyny Tan | `../keyboards/experimental/k/khmer_ldml` |
 | Komono (Côte d'Ivoire) | `komono_ci` | `kqg` | Kirk Rogers | `../keyboards/release/k/komono_ci` |
 | Lao 2008 Basic | `lao_2008_basic` | `lo` | © John Durdin | `../keyboards/release/l/lao_2008_basic` |
 | Malayalam Mozhi | `mozhi_malayalam` | `ml` | Cibu C. J. | `../keyboards/release/m/mozhi_malayalam` |
