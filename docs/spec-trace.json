@@ -1135,7 +1135,7 @@
     },
     "specs/108-ldml-export": {
       "title": "Feature Specification: LDML keyboard export",
-      "hash": "sha256:8c25d1b7f53cd763",
+      "hash": "sha256:60b6a00e3adca48d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

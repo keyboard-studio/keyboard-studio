@@ -253,7 +253,18 @@ produce for that key.
   Every such marker MUST have a final catch-all transform.
 - **FR-025**: Context-only groups reached by `use()` MUST be exported as later transform
   groups. Groups that run without key input (`NewContext`, `PostKeystroke`, `readonly`) MUST
-  be reported as Not transferable.
+  be reported as Not transferable. Rows 1.4a and FR-026 are the exception.
+- **FR-026**: For touch forms, the exporter MUST evaluate `NewContext` and `PostKeystroke` layer
+  rules statically for every (layer, output key) pair.
+  - Where the resulting layer depends only on the current layer and that key's own output,
+    the exporter MUST emit it as `key/@layerId`. This covers one-shot shift, caps staying
+    caps, and numeric staying numeric after digits.
+  - Where it depends on earlier text, the rule MUST be reported once per behaviour, not once
+    per key, with code `KM_LINT_LDML_NO_KEY_TRIGGER`. This covers start-of-sentence shift,
+    start-of-field shift, and re-evaluation after backspace (mapping rows 1.4a/1.4b).
+  - The exporter MUST NOT emulate context-dependent auto-shift with text transforms. Such
+    transforms would also fire on physical keyboards, which share the transforms, and the
+    user could not opt out of a capital letter.
 
 **Compatibility findings (authoring-time warnings)**
 
