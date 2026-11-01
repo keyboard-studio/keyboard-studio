@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-23",
+  "lastUpdated": "2026-11-01",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -211,7 +211,7 @@
     },
     "§16": {
       "title": "16. Out of scope",
-      "hash": "sha256:bdb006c9f3d7383b",
+      "hash": "sha256:d7796828d415441c",
       "status": "reference",
       "implements": [],
       "decisions": [
@@ -1131,7 +1131,15 @@
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
-      "notes":"Seeded 2026-10-23 (Path C, issue #2318): spec was never seeded, so it flagged as new-section after the spec/plan/Phase 0 merge (PR #2292). Programme is planned only; Phase 0 inventory complete, no implementation landed yet, so no implementing files diverge. Re-review when the first implementation phase merges."
+      "notes": "Seeded 2026-10-23 (Path C, issue #2318): spec was never seeded, so it flagged as new-section after the spec/plan/Phase 0 merge (PR #2292). Programme is planned only; Phase 0 inventory complete, no implementation landed yet, so no implementing files diverge. Re-review when the first implementation phase merges."
+    },
+    "specs/108-ldml-export": {
+      "title": "Feature Specification: LDML keyboard export",
+      "hash": "sha256:9307a85be0729b7d",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }

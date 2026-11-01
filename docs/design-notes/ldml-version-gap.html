@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LDML 46 vs TR35 49</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../../assets/favicon-32.png">
+<!-- Source: spec 108 (specs/108-ldml-export) research R13-R15 -- the CLDR 46 vs 49 keyboard3 DTD diff,
+     Keyman origin/master cbc752f (20.0.10-alpha) behaviour per product, and the KMX+ format.
+     Text twin for spec-search: ldml-version-gap.md. Colours mirror packages/studio/src/styles/colors.css. -->
+<script>
+  try { var t = localStorage.getItem("ks.theme"); if (t === "light" || t === "navy") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a single reading column of four numbered findings (the order is the argument),
+   with one full-width product matrix and one pipeline strip as the two visual anchors.
+   Palette is keyboard-studio's own: SIL blue on cool grey, navy in dark. */
+:root {
+  --bg: #F3F5F7;
+  --surface: #FFFFFF;
+  --surface-2: #F8FAFB;
+  --border: #E3E7EB;
+  --border-strong: #CFD6DC;
+  --fg: #18242E;
+  --muted: #5B6976;
+  --accent: #005CB9;
+  --accent-bg: #E5EEF8;
+  --ok: #38751C;      --ok-bg: #EDF5EA;   --ok-bd: #DCECD5;
+  --warn: #A84400;    --warn-bg: #FFF4E5; --warn-bd: #FFE1CC;
+  --bad: #A6121F;     --bad-bg: #FBE8E9;  --bad-bd: #F7D3D4;
+  --na: #5B6976;      --na-bg: #EFF1F3;   --na-bd: #E0E4E8;
+  --code-bg: #EEF2F6;
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-body: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #18243F; --surface: #1F2C49; --surface-2: #27365A;
+    --border: #33436A; --border-strong: #44588A;
+    --fg: #EAF1FB; --muted: #AEBCD6;
+    --accent: #8FC4F6; --accent-bg: rgba(90,167,240,.16);
+    --ok: #96C582; --ok-bg: rgba(63,185,80,.12); --ok-bd: rgba(63,185,80,.40);
+    --warn: #ECC26A; --warn-bg: rgba(217,164,65,.12); --warn-bd: rgba(217,164,65,.42);
+    --bad: #F2A0A3; --bad-bg: rgba(242,78,60,.13); --bad-bd: rgba(242,78,60,.42);
+    --na: #AEBCD6; --na-bg: rgba(174,188,214,.08); --na-bd: rgba(174,188,214,.22);
+    --code-bg: #162138;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"], :root[data-theme="navy"] {
+  --bg: #18243F; --surface: #1F2C49; --surface-2: #27365A;
+  --border: #33436A; --border-strong: #44588A;
+  --fg: #EAF1FB; --muted: #AEBCD6;
+  --accent: #8FC4F6; --accent-bg: rgba(90,167,240,.16);
+  --ok: #96C582; --ok-bg: rgba(63,185,80,.12); --ok-bd: rgba(63,185,80,.40);
+  --warn: #ECC26A; --warn-bg: rgba(217,164,65,.12); --warn-bd: rgba(217,164,65,.42);
+  --bad: #F2A0A3; --bad-bg: rgba(242,78,60,.13); --bad-bd: rgba(242,78,60,.42);
+  --na: #AEBCD6; --na-bg: rgba(174,188,214,.08); --na-bd: rgba(174,188,214,.22);
+  --code-bg: #162138;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 400 16px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+}
+.page { max-width: 1040px; margin: 0 auto; display: grid; gap: 56px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.08; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: clamp(22px, 3vw, 28px); line-height: 1.2; font-weight: 700; }
+h3 { margin: 0; font-size: 16px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 4px; }
+.eyebrow {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--accent);
+}
+.muted { color: var(--muted); }
+
+/* Hero */
+header { display: grid; gap: 18px; }
+.lede { font-size: 19px; line-height: 1.5; color: var(--fg); }
+.verdicts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+.verdict {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0;
+}
+.verdict .big { font: 800 34px/1 var(--font-body); font-variant-numeric: tabular-nums; }
+.verdict .big.ok { color: var(--ok); } .verdict .big.bad { color: var(--bad); } .verdict .big.warn { color: var(--warn); }
+.verdict .what { font-weight: 600; }
+.verdict .why { color: var(--muted); font-size: 14px; }
+
+section { display: grid; gap: 20px; }
+.sec-head { display: grid; gap: 8px; }
+.num {
+  font: 700 13px/1 var(--font-mono); color: var(--accent);
+}
+
+/* Timeline */
+.timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; }
+.tl-col { display: grid; gap: 10px; align-content: start; padding: 0 14px 0 0; min-width: 0; }
+.tl-ver { display: flex; align-items: center; gap: 10px; }
+.tl-dot {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--surface);
+  border: 3px solid var(--accent); flex: none;
+}
+.tl-col.base .tl-dot { background: var(--accent); }
+.tl-line { flex: 1; height: 2px; background: var(--border-strong); }
+.tl-col:last-child .tl-line { background: transparent; }
+.tl-label { font: 700 18px/1 var(--font-body); }
+.tl-label small { display: block; font: 600 12px/1.4 var(--font-body); color: var(--muted); margin-top: 4px; }
+.change {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font-size: 14px; display: grid; gap: 4px;
+}
+.change .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.tag.add { color: var(--ok); } .tag.doc { color: var(--muted); } .tag.grammar { color: var(--accent); }
+.change.breaks { border-color: var(--bad-bd); background: var(--bad-bg); }
+.change .km { font-size: 12.5px; color: var(--bad); font-weight: 600; }
+.unchanged {
+  background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: 10px;
+  padding: 14px 16px; font-size: 15px; display: grid; gap: 6px;
+}
+.unchanged strong { color: var(--ok); }
+
+/* Matrix */
+.matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+table.matrix { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+.matrix th, .matrix td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.matrix thead th { background: var(--surface-2); font-size: 13px; font-weight: 700; }
+.matrix thead th .sub { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.matrix tbody th { font-weight: 600; width: 26%; }
+.matrix tbody th .sub { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.matrix tr.group td, .matrix tr.group th {
+  background: var(--surface-2); font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted); padding-block: 7px;
+}
+.matrix tr:last-child th, .matrix tr:last-child td { border-bottom: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap; border: 1px solid;
+}
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.w  { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok-bd); }
+.chip.cu { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-bd); }
+.chip.r  { color: var(--bad);  background: var(--bad-bg);  border-color: var(--bad-bd); }
+.chip.na { color: var(--na);   background: var(--na-bg);   border-color: var(--na-bd); }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 13.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.note { font-size: 12.5px; color: var(--muted); display: block; margin-top: 3px; white-space: normal; }
+
+/* Pipeline */
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.stage {
+  border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start;
+  border: 1px solid; position: relative; min-width: 0;
+}
+.stage.ok   { border-color: var(--ok-bd);   background: var(--ok-bg); }
+.stage.warn { border-color: var(--warn-bd); background: var(--warn-bg); }
+.stage.bad  { border-color: var(--bad-bd);  background: var(--bad-bg); }
+.stage .who { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.stage .state { font-weight: 700; font-size: 15px; }
+.stage.ok .state { color: var(--ok); } .stage.warn .state { color: var(--warn); } .stage.bad .state { color: var(--bad); }
+.stage p { font-size: 13.5px; }
+.stage:not(:last-child)::after {
+  content: "→"; position: absolute; right: -10px; top: 50%; transform: translate(50%, -50%);
+  color: var(--muted); font-weight: 700; background: var(--bg); padding: 0 1px; z-index: 1;
+}
+.roadmap {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+}
+.roadmap .k { font-family: var(--font-mono); font-size: 13px; color: var(--accent); white-space: nowrap; }
+
+/* Profiles */
+.profiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.profile {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; display: grid; gap: 12px; align-content: start; min-width: 0;
+}
+.profile.default { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.profile .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.profile .ver { font: 700 22px/1 var(--font-display); }
+.badge { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.badge.km { color: var(--ok); background: var(--ok-bg); }
+.badge.tr { color: var(--warn); background: var(--warn-bg); }
+pre {
+  margin: 0; background: var(--code-bg); border-radius: 8px; padding: 12px 14px;
+  font: 400 12.5px/1.6 var(--font-mono); overflow-x: auto; white-space: pre;
+}
+pre .hl { color: var(--accent); font-weight: 600; }
+pre .add { color: var(--warn); font-weight: 600; }
+.profile ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14.5px; }
+.callout {
+  border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 0 10px 10px 0;
+  padding: 14px 18px; display: grid; gap: 6px;
+}
+.aside {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; display: grid; gap: 8px; font-size: 14.5px;
+}
+.aside ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+
+.stage.neutral { border-color: var(--border-strong); background: var(--surface); }
+.stage.neutral .state { color: var(--accent); }
+.pipe.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+table.matrix.compact { min-width: 560px; }
+.matrix td.from { font-size: 13px; color: var(--muted); }
+.kmx-box {
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 10px 12px; display: grid; gap: 6px; font-size: 13px;
+}
+.kmx-box .layer { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 6px; background: var(--surface-2); }
+.kmx-box .layer.plus { background: var(--accent-bg); color: var(--accent); font-weight: 700; }
+.axes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 820px) {
+  .pipe.four { grid-template-columns: minmax(0, 1fr); }
+  .axes { grid-template-columns: minmax(0, 1fr); }
+}
+
+footer { border-top: 1px solid var(--border); padding-top: 18px; display: grid; gap: 8px; font-size: 13px; color: var(--muted); }
+footer a { color: var(--accent); }
+
+@media (max-width: 820px) {
+  .verdicts { grid-template-columns: minmax(0, 1fr); }
+  .timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 22px; }
+  .tl-col:nth-child(2) .tl-line { background: transparent; }
+  .pipe { grid-template-columns: minmax(0, 1fr); }
+  .stage:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -10px; transform: translate(50%, 50%); }
+  .profiles { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .timeline { grid-template-columns: minmax(0, 1fr); }
+  .tl-line { display: none; }
+}
+</style>
+
+</head>
+<body>
+<div class="page">
+
+<header>
+  <div class="eyebrow">LDML keyboard3 · keyboard-studio spec 108</div>
+  <h1>LDML 46 vs the current TR35 (CLDR 49), and what Keyman does with each</h1>
+  <p class="lede">The format barely moved between 46 and 49, and nothing about touch changed. Keyman does not ignore what it doesn't know: any 47+ feature fails the build. Keyman compiles LDML into KMX+, a binary block inside a <code>.kmx</code>, and its runtimes read only part of that block. Touch is the big gap, as you expected, but the gap is in Keyman, not in the LDML version. KMX+ is also where Keyman plans to close it.</p>
+  <div class="verdicts">
+    <div class="verdict">
+      <div class="big ok">0</div>
+      <div class="what">touch changes in the schema</div>
+      <div class="why">Every touch element and attribute is identical in the 46 and 49 DTDs.</div>
+    </div>
+    <div class="verdict">
+      <div class="big bad">Fails</div>
+      <div class="what">Keyman with any 47+ feature</div>
+      <div class="why">Schema error, build stops, no <code>.kmx</code>. Nothing is skipped or ignored.</div>
+    </div>
+    <div class="verdict">
+      <div class="big warn">Unused</div>
+      <div class="what">LDML touch half in Keyman</div>
+      <div class="why">Compiled into the keyboard file, then nothing runs it. Mobile can't load LDML at all yet.</div>
+    </div>
+  </div>
+</header>
+
+<section aria-labelledby="s1">
+  <div class="sec-head">
+    <span class="num">1 / 5</span>
+    <h2 id="s1">What changed between 46 and 49</h2>
+    <p class="muted">Confirmed by diffing the CLDR <code>ldmlKeyboard3.dtd</code> at <code>release-46</code> against <code>main</code> (49), plus the CLDR 47–49 release notes and TR35 modification lists.</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-col base">
+      <div class="tl-ver"><span class="tl-dot"></span><span class="tl-line"></span></div>
+      <div class="tl-label">CLDR 46<small>Keyman's ceiling · <code>conformsTo</code> 45 or 46</small></div>
+      <div class="change"><span class="tag doc">Baseline</span>The keyboard3 format as Keyman 19 and 20-alpha validate it.</div>
+    </div>
+    <div class="tl-col">
+      <div class="tl-ver"><span class="tl-dot"></span><span class="tl-line"></span></div>
+      <div class="tl-label">CLDR 47<small>additive</small></div>
+      <div class="change breaks"><span class="tag add">New attribute</span><code>info/@attribution</code>, who designed the layout <span class="km">Keyman: build fails</span></div>
+      <div class="change breaks"><span class="tag add">New attribute</span><code>keyboard3/@draft</code>: approved, contributed, provisional, unconfirmed <span class="km">Keyman: build fails</span></div>
+      <div class="change"><span class="tag grammar">Grammar</span>Formal ABNF for transform <code>from</code> / <code>to</code>. Defines the syntax; adds nothing new.</div>
+    </div>
+    <div class="tl-col">
+      <div class="tl-ver"><span class="tl-dot"></span><span class="tl-line"></span></div>
+      <div class="tl-label">CLDR 48<small>clarifications</small></div>
+      <div class="change"><span class="tag doc">Clarified</span>A key with no output can still get a keycap via <code>display/@keyId</code>.</div>
+      <div class="change"><span class="tag doc">Clarified</span><code>layer/@modifiers</code> applies when a hardware layout is used as a touch layout.</div>
+      <div class="change"><span class="tag doc">Clarified</span>Normalization of the default backspace transform.</div>
+    </div>
+    <div class="tl-col">
+      <div class="tl-ver"><span class="tl-dot"></span><span class="tl-line"></span></div>
+      <div class="tl-label">CLDR 49<small>current · tr35-79, 2026-10-21</small></div>
+      <div class="change breaks"><span class="tag add">Allowed value</span><code>conformsTo</code> 47, 48 or 49 <span class="km">Keyman: build fails</span></div>
+      <div class="change"><span class="tag doc">Clarified</span><code>display</code>, <code>layer</code>, backspace <code>transform</code>; test-data links removed.</div>
+      <div class="change"><span class="tag doc">Known issue</span><code>minDeviceWidth</code> is under-specified (CLDR-19754).</div>
+    </div>
+  </div>
+
+  <div class="unchanged">
+    <div><strong>Unchanged from 46 to 49:</strong> every other element and attribute. That covers <code>keys</code>/<code>key</code> (width, gap, longPress, multiTap, flickId, layerId, stretch), <code>flicks</code>, <code>forms</code>/<code>scanCodes</code>, <code>layers</code>/<code>layer</code>/<code>row</code>, <code>variables</code>, <code>transforms</code>/<code>transformGroup</code>/<code>transform</code>/<code>reorder</code>, <code>displays</code>, <code>import</code>, <code>settings</code>, <code>locales</code>.</div>
+    <div class="muted">The one fixed value that moves is <code>version/@cldrVersion</code> ("46" → "49"). It is optional, so the export leaves it out.</div>
+  </div>
+</section>
+
+<section aria-labelledby="s2">
+  <div class="sec-head">
+    <span class="num">2 / 5</span>
+    <h2 id="s2">Does Keyman fail, or use what it understands?</h2>
+    <p>It fails. Keyman validates the whole file against its CLDR-46 JSON schema before compiling. The schema allows <code>conformsTo</code> 45 or 46 only and rejects unknown attributes on 30 elements, including <code>info</code> and <code>keyboard3</code>. One violation stops the build, and no <code>.kmx</code> or <code>.kvk</code> is written. Only the first violation is reported.</p>
+  </div>
+
+  <div class="legend" aria-label="Legend">
+    <span><span class="chip w">Works</span></span>
+    <span><span class="chip cu">Compiled, unused</span></span>
+    <span><span class="chip r">Build fails</span></span>
+    <span><span class="chip na">Can't load LDML</span></span>
+  </div>
+
+  <div class="matrix-wrap" role="region" aria-label="LDML feature support by Keyman product" tabindex="0">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th scope="col">Part of an LDML keyboard</th>
+          <th scope="col">Keyman mobile<span class="sub">Android, iOS</span></th>
+          <th scope="col">Keyman desktop<span class="sub">Windows, macOS, Linux (Core)</span></th>
+          <th scope="col">Keyman compiler<span class="sub">kmc / kmc-ldml</span></th>
+          <th scope="col">Keyman Developer<span class="sub">IDE (TIKE)</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="group"><th scope="rowgroup" colspan="5">Hardware half, CLDR 46 syntax</th></tr>
+        <tr><th scope="row">Keys and hardware layers</th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr><th scope="row">Transforms and reorders</th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr><th scope="row">Backspace transforms</th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr><th scope="row">Markers <span class="sub">KMN deadkeys</span></th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr><th scope="row">Variables and set mapping</th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr><th scope="row">Displays <span class="sub">keycap labels</span></th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span><span class="note">On-screen keyboard only, via .kvk</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr><th scope="row">info, version, locales</th><td><span class="chip na">Can't load</span></td><td><span class="chip w">Works</span><span class="note">Locales compiled, unused</span></td><td><span class="chip w">Works</span></td><td><span class="chip w">Works</span></td></tr>
+        <tr class="group"><th scope="rowgroup" colspan="5">Touch half, CLDR 46 syntax</th></tr>
+        <tr><th scope="row">Touch layers <span class="sub"><code>formId="touch"</code></span></th><td><span class="chip na">Can't load</span></td><td><span class="chip cu">Compiled, unused</span></td><td><span class="chip cu">Compiled, unused</span></td><td><span class="chip cu">Compiled, unused</span><span class="note">No touch view or editor</span></td></tr>
+        <tr><th scope="row">Flicks, long-press, multitap, layer switch, width, gap</th><td><span class="chip na">Can't load</span></td><td><span class="chip cu">Compiled, unused</span></td><td><span class="chip cu">Compiled, unused</span></td><td><span class="chip cu">Compiled, unused</span></td></tr>
+        <tr class="group"><th scope="rowgroup" colspan="5">Anything from CLDR 47–49</th></tr>
+        <tr><th scope="row"><code>info/@attribution</code>, <code>keyboard3/@draft</code></th><td><span class="chip r">Build fails</span></td><td><span class="chip r">Build fails</span></td><td><span class="chip r">Build fails</span></td><td><span class="chip r">Build fails</span></td></tr>
+        <tr><th scope="row"><code>conformsTo</code> 47, 48 or 49</th><td><span class="chip r">Build fails</span></td><td><span class="chip r">Build fails</span></td><td><span class="chip r">Build fails</span></td><td><span class="chip r">Build fails</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="aside">
+    <h3>Keyman is also stricter than TR35 within 46</h3>
+    <ul>
+      <li>A set mapping must be capture group 1 and fill the whole <code>to</code> (<code>$[1:set]</code>). TR35 allows <code>$[2:set]</code> through <code>$[9:set]</code>; Keyman fails the build. Upstream fix is draft PR #16870, unmerged.</li>
+      <li>Only one set mapping per transform. Lifting this needs binary-format, core and compiler changes, pencilled in for v20.</li>
+      <li>One loose end: <code>&lt;import path="47/…"&gt;</code> is accepted and treated as 46, while <code>conformsTo="47"</code> is rejected.</li>
+    </ul>
+  </div>
+</section>
+
+<section aria-labelledby="sk">
+  <div class="sec-head">
+    <span class="num">3 / 5</span>
+    <h2 id="sk">Where KMX+ fits</h2>
+    <p>KMX+ is the binary form Keyman compiles an LDML keyboard into. It is not a separate file type: it is a block inside an ordinary <code>.kmx</code>, marked by a header flag. The studio exports LDML source, and Keyman's LDML compiler turns that into KMX+. Nothing else in Keyman writes KMX+; KMN keyboards still compile to classic <code>.kmx</code>.</p>
+  </div>
+
+  <div class="pipe four">
+    <div class="stage neutral">
+      <div class="who">Studio export</div>
+      <div class="state">LDML <code>.xml</code></div>
+      <p>The keyboard3 source: the file the version picker controls.</p>
+    </div>
+    <div class="stage neutral">
+      <div class="who">Keyman compiler</div>
+      <div class="state">kmc-ldml</div>
+      <p>The only producer of KMX+. Also writes a <code>.kvk</code> for the desktop on-screen keyboard, from the <code>us</code> hardware form.</p>
+    </div>
+    <div class="stage neutral">
+      <div class="who">Output</div>
+      <div class="kmx-box" aria-label="Structure of the compiled .kmx file">
+        <div class="layer"><span>Classic .kmx header</span><span class="mono">KXTS</span></div>
+        <div class="layer"><span>Flag</span><span class="mono">KF_KMXPLUS</span></div>
+        <div class="layer plus"><span>KMX+ block</span><span class="mono">v17 · 0x1100</span></div>
+      </div>
+    </div>
+    <div class="stage warn">
+      <div class="who">Keyman Core (desktop)</div>
+      <div class="state">Reads part of it</div>
+      <p>Files with the KMX+ flag go to the LDML processor; KMN <code>.kmx</code> files go to the classic processor.</p>
+    </div>
+  </div>
+
+  <div class="matrix-wrap" role="region" aria-label="KMX+ sections and whether Keyman Core reads them" tabindex="0">
+    <table class="matrix compact">
+      <thead>
+        <tr><th scope="col">KMX+ section</th><th scope="col">Comes from (LDML)</th><th scope="col">Keyman Core at runtime</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row"><code>keys</code>: key map</th><td class="from"><code>&lt;keys&gt;</code> placed by hardware <code>&lt;layers&gt;</code></td><td><span class="chip w">Read</span></td></tr>
+        <tr><th scope="row"><code>tran</code></th><td class="from"><code>&lt;transforms type="simple"&gt;</code>, reorders</td><td><span class="chip w">Read</span></td></tr>
+        <tr><th scope="row"><code>bksp</code></th><td class="from"><code>&lt;transforms type="backspace"&gt;</code></td><td><span class="chip w">Read</span></td></tr>
+        <tr><th scope="row"><code>vars</code>, <code>elem</code>, <code>uset</code></th><td class="from"><code>&lt;variables&gt;</code>, sets in transforms, markers</td><td><span class="chip w">Read</span></td></tr>
+        <tr><th scope="row"><code>meta</code></th><td class="from"><code>&lt;info&gt;</code>, <code>&lt;version&gt;</code>, <code>conformsTo</code>, <code>&lt;settings&gt;</code></td><td><span class="chip w">Normalization only</span></td></tr>
+        <tr><th scope="row"><code>keys</code>: gestures</th><td class="from">flicks, long-press, multitap on <code>&lt;key&gt;</code>, <code>&lt;flicks&gt;</code></td><td><span class="chip cu">Validated, unused</span></td></tr>
+        <tr><th scope="row"><code>layr</code></th><td class="from"><code>&lt;layers&gt;</code>, hardware <em>and</em> touch</td><td><span class="chip cu">Validated, unused</span></td></tr>
+        <tr><th scope="row"><code>list</code></th><td class="from">long-press and multitap key lists</td><td><span class="chip cu">Validated, unused</span></td></tr>
+        <tr><th scope="row"><code>disp</code></th><td class="from"><code>&lt;displays&gt;</code> keycaps</td><td><span class="chip cu">Validated, unused</span><span class="note">Keycaps reach the desktop on-screen keyboard through the .kvk instead</span></td></tr>
+        <tr><th scope="row"><code>loca</code></th><td class="from"><code>locale</code>, <code>&lt;locales&gt;</code></td><td><span class="chip cu">Validated, unused</span></td></tr>
+        <tr><th scope="row"><code>sect</code>, <code>strs</code></th><td class="from">table of contents, string pool</td><td><span class="chip na">Structural</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="axes">
+    <div class="profile">
+      <div class="hd"><span class="ver">CLDR <code>conformsTo</code></span><span class="badge km">The studio's axis</span></div>
+      <ul>
+        <li>Lives in the LDML source: 45 or 46 for Keyman today.</li>
+        <li>The compiler checks it against its schema and uses it to pick the CLDR import files.</li>
+        <li>Copied into KMX+ <code>meta</code>; Core only logs it.</li>
+        <li>This is what the studio's version picker sets.</li>
+      </ul>
+    </div>
+    <div class="profile">
+      <div class="hd"><span class="ver">KMX+ file version</span><span class="badge tr">Keyman's axis</span></div>
+      <ul>
+        <li>v17 (<code>0x1100</code>) is what every Keyman compiler writes today.</li>
+        <li>The unmerged web-core branch adds KMX+ v19, with a version on every section, behind a compiler option.</li>
+        <li>Core refuses a file newer than it supports; there is no fallback.</li>
+        <li>Independent of <code>conformsTo</code>: nothing maps one to the other. The studio never writes KMX+, so it doesn't choose this.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>KMX+ is where Keyman's touch plans converge</strong>
+    <span><strong>web-core (Keyman 20):</strong> the browser engine, and so Android and iOS, will load <code>.kmx</code> files through Core compiled to WASM. That brings the hardware half of LDML keyboards to mobile. Reading the touch tables (<code>layr</code>, <code>disp</code>, key gestures) is still a TODO there (#15290, #13429, #8093).</span>
+    <span><strong>#12620 (open, Keyman 20):</strong> Keyman plans to convert a KMN keyboard's <code>.kvks</code> and <code>.keyman-touch-layout</code> into LDML and compile them into KMX+ tables inside the <code>.kmx</code>, giving one file for every platform. That is the same touch-to-LDML conversion the studio's export performs, so spec-perfect touch LDML is on Keyman's own roadmap.</span>
+  </div>
+</section>
+
+<section aria-labelledby="s3">
+  <div class="sec-head">
+    <span class="num">4 / 5</span>
+    <h2 id="s3">Touch is the big gap, but it is Keyman's gap</h2>
+    <p>The same touch markup is valid in 46 and 49. What is missing is Keyman's ability to run it, at every stage after compilation:</p>
+  </div>
+
+  <div class="pipe">
+    <div class="stage ok">
+      <div class="who">LDML file</div>
+      <div class="state">Valid in 46 and 49</div>
+      <p>Touch forms, flicks, long-press and multitap are fully specified.</p>
+    </div>
+    <div class="stage ok">
+      <div class="who">Keyman compiler</div>
+      <div class="state">Compiles it</div>
+      <p>Stored in the KMX+ <code>layr</code>, <code>keys</code> and <code>list</code> sections of the <code>.kmx</code>.</p>
+    </div>
+    <div class="stage warn">
+      <div class="who">Keyman desktop (Core)</div>
+      <div class="state">Ignores it</div>
+      <p>Core reads only the KMX+ key map, transforms and variables. <code>layr</code> and the gesture data are validated, then never used.</p>
+    </div>
+    <div class="stage bad">
+      <div class="who">KeymanWeb → mobile</div>
+      <div class="state">Rejects the file</div>
+      <p>The loader throws "<span class="mono">.kmx files are not currently supported</span>". Android and iOS run on KeymanWeb, so neither half loads.</p>
+    </div>
+    <div class="stage bad">
+      <div class="who">Keyman Developer</div>
+      <div class="state">No touch view</div>
+      <p>The LDML editor is text plus a debugger. "Test in browser" is a stub, and the <code>.kvk</code> is built from the <code>us</code> hardware form only.</p>
+    </div>
+  </div>
+
+  <div class="roadmap" aria-label="Upstream roadmap">
+    <span class="k">epic/web-core</span><span>Core (WASM) inside KeymanWeb, the route that brings LDML to web and mobile. 237 commits, not merged.</span>
+    <span class="k">#11293</span><span>Core integration for Web, milestone 20.0</span>
+    <span class="k">#8093</span><span>LDML processor touch support, milestone 20.0</span>
+    <span class="k">#13429</span><span>Touch keys in .kmx for web/touch, milestone 20.0</span>
+    <span class="k">#13424</span><span>On-screen keyboard for mobile/desktop, milestone 20.0</span>
+  </div>
+</section>
+
+<section aria-labelledby="s4">
+  <div class="sec-head">
+    <span class="num">5 / 5</span>
+    <h2 id="s4">What this means for the studio's version picker</h2>
+    <p>The two export profiles differ in three tokens of output. The touch half is spec-perfect and identical in both, so a 46 export loses nothing on touch.</p>
+  </div>
+
+  <div class="profiles">
+    <div class="profile default">
+      <div class="hd"><span class="ver">Profile 46</span><span class="badge km">Default · Keyman compiles it</span></div>
+<pre>&lt;keyboard3 xmlns="https://schemas.unicode.org/cldr/<span class="hl">46</span>/keyboard3"
+           locale="ibn" conformsTo="<span class="hl">46</span>"&gt;
+  &lt;info name="Ibọnọ Chwerty" author="…"/&gt;
+  &lt;!-- attribution: carried in this comment
+       and in the .kps --&gt;</pre>
+      <ul>
+        <li>Builds in Keyman 19 and 20-alpha today.</li>
+        <li>Desktop runs the hardware half. The touch half compiles and waits for Keyman 20.</li>
+        <li>Attribution travels in the header comment and the package.</li>
+      </ul>
+    </div>
+    <div class="profile">
+      <div class="hd"><span class="ver">Profile 49</span><span class="badge tr">TR35-only · awaiting Keyman</span></div>
+<pre>&lt;keyboard3 xmlns="…/cldr/<span class="add">49</span>/keyboard3"
+           locale="ibn" conformsTo="<span class="add">49</span>"&gt;
+  &lt;info name="Ibọnọ Chwerty" author="…"
+        <span class="add">attribution="…"</span>/&gt;</pre>
+      <ul>
+        <li>The newest valid CLDR output, for other LDML implementations and for the future.</li>
+        <li>Every Keyman tool fails to build it until Keyman ships a 47+ schema.</li>
+        <li>May also use <code>$[N:set]</code> mappings, which make transforms smaller.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Recommendation:</strong>
+    <span>Keep 46 as the default. Because the touch half is identical, "spec-perfect touch, ready for Keyman's pipeline" is already met by profile 46. Profile 49 only adds attribution metadata and smaller transforms, at the cost of Keyman refusing the file. The version profiles stay useful because the next CLDR version may change more than this one did.</span>
+    <span>The studio exports LDML, not KMX+, so the KMX+ version stays Keyman's concern. For a build check, the studio could probably run Keyman's LDML compiler in the browser, which has no file-system dependencies, if it bundles the compiler's WASM and the CLDR import files. That is untested.</span>
+  </div>
+</section>
+
+<footer>
+  <div><strong>Sources.</strong> TR35 Part 7 Keyboards, CLDR 49 (tr35-79, 2026-10-21) and the TR35 modification lists; CLDR <code>keyboards/dtd/ldmlKeyboard3.dtd</code> at <code>release-46</code> and <code>main</code>; CLDR 47, 48 and 49 release notes. Keyman evidence: <code>keymanapp/keyman</code> <code>origin/master</code> <code>cbc752f</code> (2026-10-29, 20.0.10-alpha): the CLDR-46 JSON schema, <code>kmc-ldml</code>, <code>core/src/ldml</code>, the KeymanWeb loader and TIKE sources. KMX+: <code>docs/file-formats/kmx-plus-file-format.md</code>, <code>core/src/kmx/kmx_plus.cpp</code>, <code>ldml_processor.cpp</code>, and the unmerged <code>epic/web-core</code> branch (<code>236a6e6</code>) for KMX+ v19 and the Core-in-browser loader.</div>
+  <div><strong>Caveats.</strong> The Keyman 19 beta branch was not diffed separately; master still carries the "for version 19" loader guard. The CLDR 47 TR35 modification page was unavailable, so 47 items come from the release note and the DTD diff. The Keyman error text is reconstructed from its message template, not observed in a run.</div>
+</footer>
+
+</div>
+
+</body>
+</html>

@@ -206,7 +206,8 @@ don't change the schema silently.**
 
 ## Out of scope for v1 (do not implement)
 
-Spec §16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting,
+Spec §16. CJK and Ethiopic reorder patterns, LDML as an emission format (the secondary LDML
+export of spec 108 is in scope), mobile-app integration, hosting,
 multi-language `welcome.htm` variants, `.kpj.user` management, touch-first authoring (Decision
 6). The v1.1.0 amendment removed "editing existing keyboards" — single-source adaptation is now
 in scope. Still out of scope: multi-source merge, survey-editing opaque IR fragments

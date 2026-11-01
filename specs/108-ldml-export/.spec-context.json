@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "LDML keyboard export",
+  "branch": "108-ldml-export",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-01T15:09:19.879Z"
+    }
+  ],
+  "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051"
+}
