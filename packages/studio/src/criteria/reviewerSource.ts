@@ -230,13 +230,17 @@ export function buildReviewerSource(args: {
 // ---------------------------------------------------------------------------
 
 const none = "(none)";
-const show = (s: string | undefined): string =>
-  s !== undefined && s !== "" ? s : none;
+
+/**
+ * `<label>: "<text>"` — text quoted verbatim from the keyboard's files.
+ * CriterionRow renders this shape as a code block (`splitCitation`).
+ * Empty text is `(none)`, unquoted: there is nothing to cite.
+ */
+const cite = (label: string, text: string | undefined): string =>
+  text !== undefined && text !== "" ? `${label}: "${text}"` : `${label}: ${none}`;
 
 function fieldLine(label: string, f: KpsInfoField): string {
-  return f.url !== ""
-    ? `${label}: ${show(f.text)} (${f.url})`
-    : `${label}: ${show(f.text)}`;
+  return f.url !== "" ? `${cite(label, f.text)} (${f.url})` : cite(label, f.text);
 }
 
 /** Section number prefix -> the files whose change makes the row current. */
@@ -307,9 +311,9 @@ export function sourceContextLines(
         lines.push(fieldLine(".kps <Info><WebSite>", src.kps.website));
       }
     }
-    if (src.kmnName !== undefined) lines.push(`.kmn &NAME: ${src.kmnName}`);
+    if (src.kmnName !== undefined) lines.push(cite(".kmn &NAME", src.kmnName));
     if (src.readmeTitle !== undefined)
-      lines.push(`README title: ${src.readmeTitle}`);
+      lines.push(cite("README title", src.readmeTitle));
     return lines;
   }
   if (LANG_ROWS.has(criterionId)) {
@@ -327,23 +331,23 @@ export function sourceContextLines(
   switch (criterionId) {
     case "6.2-readme-htm-short":
       return ex?.readmeHtm
-        ? [`readme.htm: ${ex.readmeHtm.words} words`, `Excerpt: ${ex.readmeHtm.text}`]
+        ? [`readme.htm: ${ex.readmeHtm.words} words`, cite("Excerpt", ex.readmeHtm.text)]
         : [];
     case "6.4-welcome-htm-describes-usage":
     case "6.7-welcome-htm-not-political":
-      return ex?.welcomeHtm ? [`welcome.htm excerpt: ${ex.welcomeHtm.text}`] : [];
+      return ex?.welcomeHtm ? [cite("welcome.htm excerpt", ex.welcomeHtm.text)] : [];
     case "6.5-welcome-htm-no-install-instructions": {
       const w = ex?.welcomeHtm;
       if (w === undefined) return [];
       return [
         w.sentences.length > 0
-          ? `Install/download sentences in welcome.htm: ${w.sentences.join(" | ")}`
+          ? cite("Install/download sentences in welcome.htm", w.sentences.join("\n"))
           : "No sentence in welcome.htm mentions install or download.",
-        `welcome.htm excerpt: ${w.text}`,
+        cite("welcome.htm excerpt", w.text),
       ];
     }
     case "3.2-history-header-sensible":
-      return ex?.history ? [`HISTORY.md excerpt: ${ex.history}`] : [];
+      return ex?.history ? [cite("HISTORY.md excerpt", ex.history)] : [];
     default:
       return [];
   }
@@ -401,14 +405,14 @@ export function copyrightContextLines(
 ): string[] {
   const lines: string[] = [
     licenseLine !== undefined
-      ? `LICENSE.md copyright: ${licenseLine}`
+      ? cite("LICENSE.md copyright", licenseLine)
       : "LICENSE.md: no copyright line found.",
   ];
   if (criterionId.startsWith("4.3")) {
     if (src?.kps !== undefined)
       lines.push(fieldLine(".kps <Info><Author>", src.kps.author));
     if (src?.kmnCopyright !== undefined)
-      lines.push(`.kmn &COPYRIGHT: ${src.kmnCopyright}`);
+      lines.push(cite(".kmn &COPYRIGHT", src.kmnCopyright));
   }
   if (criterionId.startsWith("4.2") || criterionId.startsWith("4.8")) {
     const y = licenseLine !== undefined ? yearsIn(licenseLine) : undefined;

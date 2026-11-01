@@ -559,3 +559,40 @@ describe("CriteriaPage — identifiers guard", () => {
     expect(evidenceText).toContain("KM_LINT_HISTORY_ORDER");
   });
 });
+
+describe("CriteriaPage — cited text renders as a code block", () => {
+  it("a finding's Found:/Line: values sit in pre > code, their labels outside", () => {
+    const finding: LintFinding = {
+      ...HISTORY_FINDING,
+      message:
+        'HISTORY.md entries are not newest-first. Found: "1.0 (2019)"\nLine: "## 1.0 (2019) first release"',
+    };
+    const result = resolveCriteria(fixtureInput({ lintFindings: [finding] }));
+    render(<CriteriaPage result={result} mode="authored" />);
+
+    const row = rowByDescription("Fixture history order criterion");
+    expandRow(row);
+    const citations = within(row).getAllByTestId("criteria-evidence-citation");
+    expect(citations).toHaveLength(2);
+
+    const [found, line] = citations as [HTMLElement, HTMLElement];
+    expect(found.querySelector("pre > code")?.textContent).toBe("1.0 (2019)");
+    expect(found.querySelector("p")?.textContent).toBe(
+      "HISTORY.md entries are not newest-first. Found:",
+    );
+    expect(line.querySelector("pre > code")?.textContent).toBe(
+      "## 1.0 (2019) first release",
+    );
+    expect(line.querySelector("p")?.textContent).toBe("Line:");
+  });
+
+  it("a plain evidence line renders no code block", () => {
+    const result = resolveCriteria(fixtureInput());
+    render(<CriteriaPage result={result} mode="authored" />);
+
+    const row = rowByDescription("Fixture history order criterion");
+    expandRow(row);
+    expect(within(row).queryAllByTestId("criteria-evidence-citation")).toHaveLength(0);
+    expect(within(row).getByTestId("criteria-row-evidence").querySelector("pre")).toBeNull();
+  });
+});

@@ -15,8 +15,10 @@ import { EMPTY_CRITERIA_RECORD } from "./criteriaTypes.ts";
 import type { CriteriaInput } from "./criteriaTypes.ts";
 import { judgeForeignKeyboard, stampPrDelta } from "./judgeForeign.ts";
 import { resolveCriteria } from "./resolveCriteria.ts";
+import { splitCitation } from "./CriterionRow.tsx";
 import {
   buildReviewerSource,
+  copyrightContextLines,
   kpsInfoField,
   scopeNote,
   sourceContextLines,
@@ -180,9 +182,9 @@ describe("copyright context", () => {
       .lines.join("\n");
   it("4.3 shows LICENSE holder, .kps Author with URL, &COPYRIGHT; no store(&Author) line", () => {
     const t = ctx("4.3-");
-    expect(t).toContain("LICENSE.md copyright: Copyright (C) 2015-2020 Fixture Holder");
-    expect(t).toContain(".kps <Info><Author>: Jo Author (https://example.org)");
-    expect(t).toContain(".kmn &COPYRIGHT: (c) 2015 SIL");
+    expect(t).toContain('LICENSE.md copyright: "Copyright (C) 2015-2020 Fixture Holder"');
+    expect(t).toContain('.kps <Info><Author>: "Jo Author" (https://example.org)');
+    expect(t).toContain('.kmn &COPYRIGHT: "(c) 2015 SIL"');
     expect(t).not.toMatch(/store\(&Author\)/i);
   });
   it("4.2 and 4.8 show LICENSE years beside HISTORY years", () => {
@@ -236,9 +238,9 @@ describe("source context lines", () => {
   });
   it("name rows show .kps Name, README title", () => {
     const t = sourceContextLines("7.7-display-name-no-underscores", src);
-    expect(t).toEqual([".kps <Info><Name>: Ibibio Tonal", "README title: Ibibio Tonal"]);
+    expect(t).toEqual(['.kps <Info><Name>: "Ibibio Tonal"', 'README title: "Ibibio Tonal"']);
     const five = sourceContextLines("5.1-readme-good-header", src);
-    expect(five).toContain("README title: Ibibio Tonal");
+    expect(five).toContain('README title: "Ibibio Tonal"');
     expect(five.length).toBeLessThanOrEqual(6);
   });
   it("language rows show each tag with langtags name/script/region", () => {
@@ -256,9 +258,24 @@ describe("source context lines", () => {
   });
   it("3.2 excerpt and history years", () => {
     expect(sourceContextLines("3.2-history-header-sensible", src)[0]).toMatch(
-      /^HISTORY.md excerpt: Title/,
+      /^HISTORY.md excerpt: "Title/,
     );
     expect(src.historyYears).toEqual({ earliest: 2015, latest: 2026 });
+  });
+  it("every cited context line has CriterionRow's code-block shape", () => {
+    const cited = [
+      ...sourceContextLines("5.1-readme-good-header", src),
+      ...sourceContextLines("6.2-readme-htm-short", src),
+      ...sourceContextLines("6.5-welcome-htm-no-install-instructions", src),
+      ...sourceContextLines("3.2-history-header-sensible", src),
+      ...copyrightContextLines("4.3-", "Copyright (C) 2015 Holder", src),
+    ].filter((l) => l.includes(': "'));
+    expect(cited.length).toBeGreaterThanOrEqual(6);
+    for (const l of cited) expect(splitCitation(l), l).not.toBeNull();
+    expect(
+      splitCitation('.kps <Info><Author>: "Jo Author" (https://example.org)'),
+    ).toEqual({ label: ".kps <Info><Author>", text: "Jo Author", suffix: "(https://example.org)" });
+    expect(splitCitation(".kps <Info><WebSite>: (none)")).toBeNull();
   });
 });
 
