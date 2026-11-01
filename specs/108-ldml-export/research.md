@@ -192,20 +192,56 @@ target desktop only: `&TARGETS` is hard-coded to `desktop` and the web engine re
 - The reference base-keyboard data (`referenceBaseLayouts.ts`) lives in the **studio**; the
   engine exporter must receive it as input.
 
-## R13 — OPEN: the TR35-only "current version" profile
+## R13 — RESOLVED: 46 vs current TR35 (CLDR 49), and Keyman's reaction
 
-The spec requires a second, TR35-only profile at launch (FR-066), so the author's version
-choice is real. Settle these in planning:
+Infographic: <https://claude.ai/artifact/JxmUQ2Xs8rFgrPmaJLAHEh>.
 
-- **Version**: its `conformsTo` value. TR35 revision `tr35-79` is CLDR 49, and its header lists
-  DTDs at `https://www.unicode.org/cldr/dtd/49/`.
-- **Namespace and DTD**: TR35's File Structure example still shows the `…/cldr/45/keyboard3`
-  namespace. The page does not reconcile this with the CLDR 49 DTD location.
-- **Deltas from 46**: from the CLDR 47–49 release notes and the DTD diffs. Known so far:
-  `info/@attribution`; set mapping on any capture group (`$[N:var]`), which TR35 already
-  allows.
-- **Validation in CI**: the CLDR keyboard3 DTD of that version, plus the FR-052 conformance
-  rules. It is exempt from the Keyman compile check under FR-065's "TR35-only" marker.
+**Format delta 46 → 49.** Confirmed by diffing CLDR `keyboards/dtd/ldmlKeyboard3.dtd` at
+`release-46` against `main` (49), plus the CLDR 47–49 release notes and
+`tr35-modifications.html`:
+
+| Introduced | Change | Kind |
+|---|---|---|
+| 47 | `info/@attribution` (CLDR-17971) | additive, optional |
+| 47 | `keyboard3/@draft` = approved, contributed, provisional or unconfirmed (CLDR-18324) | additive, optional |
+| 47 | formal ABNF for transform `from`/`to` (CLDR-16836/18318/18319) | grammar formalised; nothing added |
+| 47–49 | `conformsTo` enum `45 \| 46` → `45 \| 46 \| 47 \| 48 \| 49` | allowed values |
+| per release | `version/@cldrVersion` #FIXED "46" → "49" | optional; omitted by the exporter |
+| 48 | clarifications: `display/@keyId` for keys with no output; `layer/@modifiers` when a hardware layout is used as touch; default backspace normalization | spec text only |
+| 49 | clarifications to display, layer and backspace transform; test-data links removed; known issue CLDR-19754 (`minDeviceWidth` under-specified) | spec text only |
+
+Every other element and attribute is unchanged. In particular there are **no touch schema
+changes** between 46 and 49.
+
+**Keyman's reaction** (`origin/master` `cbc752f`, 20.0.10-alpha): it **fails rather than
+ignores**. The CLDR-46 JSON schema allows `conformsTo` 45 or 46 only, and sets
+`additionalProperties:false` on 30 elements, including `keyboard3` and `info`. A single
+violation stops the build with `Error_SchemaValidationError`, and no `.kmx` or `.kvk` is
+written. Only the first violation is reported. `$[N:set]` with N > 1 also fails
+(`Error_IllegalTransformToUset`). The only content Keyman deliberately ignores is
+`<special>`.
+
+**Touch in Keyman.** `kmc-ldml` compiles touch forms, flicks, long-press, multitap, layer
+switches, widths and gaps into `layr`/`key2`. After that nothing consumes them:
+
+- Core on desktop reads only the hardware key map, transforms and variables.
+- KeymanWeb throws on `.kmx`, so Android and iOS cannot load any LDML keyboard, hardware half
+  included.
+- Keyman Developer has no LDML touch view, and "Test in browser" is a stub.
+
+Roadmap: `epic/web-core` (not merged), plus #11293, #8093, #13429 and #13424, all milestone
+20.0.
+
+**Consequences for the profiles:**
+
+- **Profile `49`** (TR35-only) = profile 46 plus `conformsTo="49"`, the `…/cldr/49/keyboard3`
+  namespace (to confirm against the CLDR 49 XSD/DTD headers in planning), `info/@attribution`,
+  and `$[N:set]` mappings. `keyboard3/@draft` is not emitted: it is a CLDR-repository review
+  status, not author data.
+- **Profile 46** already meets the product goal of spec-perfect touch, because the touch
+  markup is identical in both.
+- CI validates profile 49 against the CLDR 49 DTD plus the FR-052 rules. Under FR-065 it is
+  exempt from the Keyman compile check.
 
 ## Reference pairs in the corpus
 

@@ -169,7 +169,7 @@ section 3 — never from its label (prior art used labels as outputs).
 | 5.12 | `sp` special keys: shift / layer switch | `layerId` keys | M | — |
 | 5.13 | `sp` special keys: backspace, enter, tab | to be confirmed (research R8) | A until R8 | `KM_LINT_LDML_TOUCH_SPECIAL_KEY` |
 | 5.14 | `T_*` / `U_*` touch key ids | resolved through rules (`+ [T_x]`) or `U_xxxx` → codepoint | M | — |
-| 5.15 | any touch form | exported **spec-perfect to TR35** (spec FR-052/FR-053); Keyman's pipeline does not yet support the touch half of LDML (it does not reach web/Android/iOS) | K | stated once in the report, not a per-key finding. The touch half follows TR35, never Keyman's current behaviour: the export is preparation for Keyman's touch pipeline |
+| 5.15 | any touch form | exported **spec-perfect to TR35** (spec FR-052/FR-053). Keyman compiles it into `layr`/`key2` but nothing runs it: Core ignores it, and KeymanWeb (hence Android/iOS) rejects LDML keyboards entirely (research R13) | K | stated once in the report, not a per-key finding. The touch half follows TR35, never Keyman's current behaviour: the export is preparation for Keyman's touch pipeline |
 
 ## 6. Opaque and unparsed content
 
@@ -248,8 +248,13 @@ condition. These are the known candidates for the next profile:
 A new profile file states its id, namespace, TR35 revision and Keyman release, followed by
 only the rows that differ from this profile.
 
-**At launch** (spec FR-066) a second profile ships beside this one: the current TR35 version,
-marked "TR35-only (awaiting Keyman)". It applies the deltas above that the standard already
-allows (`attribution`, `$[N:var]` set mapping). The author picks between the two on the Output
-page (FR-062). Its file is `contracts/ldml-mapping-<version>.md`, written in planning once
-research R13 fixes the version, namespace and remaining deltas.
+**At launch** (spec FR-066), profile `49` ships beside this one, marked "TR35-only (awaiting
+Keyman)". Its deltas are:
+
+- `conformsTo="49"` and the 49 namespace;
+- row 4.10 → M (`info/@attribution`);
+- rows 3.7/3.8 → M without expansion (`$[N:set]`).
+
+The 46 → 49 format delta has no touch changes (research R13), so section 5 is identical in both
+profiles. The author picks between the two on the Output page (FR-062). The profile's file is
+`contracts/ldml-mapping-49.md`, written in planning.

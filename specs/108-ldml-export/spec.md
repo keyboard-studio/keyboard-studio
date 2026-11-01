@@ -315,8 +315,9 @@ produce for that key.
   - the **current TR35 version**: TR35-only, spec-perfect, using the newest features the
     standard allows, such as `info/@attribution` and set mappings on any capture group.
 
-  The exact version number, namespace and DTD of the second profile, and its deltas from 46,
-  are settled in planning against the CLDR release notes (research R13).
+  The second profile is `49`. Its deltas from 46 are `conformsTo`, namespace,
+  `info/@attribution` and `$[N:set]` mappings (research R13). The touch half is identical in
+  both profiles.
 - **FR-063**: Every Keyman-gap (K) row MUST record the condition that would lift it, for
   example "CLDR 47 `info/@attribution`" or "Keyman accepts `$[N:var]` (upstream #16868)". A
   new profile can then promote those rows without re-research.
