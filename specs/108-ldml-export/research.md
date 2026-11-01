@@ -243,6 +243,67 @@ Roadmap: `epic/web-core` (not merged), plus #11293, #8093, #13429 and #13424, al
 - CI validates profile 49 against the CLDR 49 DTD plus the FR-052 rules. Under FR-065 it is
   exempt from the Keyman compile check.
 
+## R14 — KMX+ and where it fits
+
+**What it is.** KMX+ is the binary that Keyman compiles an LDML keyboard into
+(`docs/file-formats/kmx-plus-file-format.md`, #7043). It is a block inside an ordinary `.kmx`:
+a classic `KXTS` header with flag `KF_KMXPLUS`, plus `COMP_KEYBOARD_KMXPLUSINFO` pointing at
+the block. `kmc-ldml` is its **only** producer, and always writes file version 17 (`0x1100`).
+KMN keyboards still compile to classic `.kmx`.
+
+**Sections and runtime use** (Keyman Core `ldml_processor.cpp`):
+
+| Section | Holds | Core at runtime |
+|---|---|---|
+| `keys` (key map) | `<keys>` placed by hardware `<layers>` | read |
+| `tran` | simple transforms, reorders | read |
+| `bksp` | backspace transforms | read |
+| `vars`, `elem`, `uset` | variables, transform sets, markers | read |
+| `meta` | `info`, `version`, `conformsTo`, `settings` | the normalization flag only |
+| `keys` (gestures) | flicks, long-press, multitap | validated, unused |
+| `layr` | hardware **and touch** layers | validated, unused |
+| `list` | long-press and multitap key lists | validated, unused |
+| `disp` | `<displays>` | validated, unused |
+| `loca` | `locale`, `<locales>` | validated, unused |
+
+Desktop keycaps reach the on-screen keyboard through the `.kvk` that `kmc-ldml` builds from
+the `us` hardware form.
+
+**Two separate version axes.**
+
+- CLDR `conformsTo` (45/46) lives in the source. It selects the schema and the CLDR imports,
+  and Core only logs it. This is what the studio's profiles (FR-060–066) control.
+- The KMX+ file version is v17 today. The unmerged `epic/web-core` adds v19, with a `sec2`
+  table of contents and a version on every section, behind a `targetVersion` compiler option.
+- Nothing maps one axis to the other. Core refuses a file newer than its `VERSION_MAX`, with no
+  fallback.
+- The studio never writes KMX+, so the KMX+ version is Keyman's axis. A profile's "Keyman
+  compiles it" label depends only on the schema accepting its `conformsTo`.
+
+**Roadmap that makes the touch export directly useful** (all open, milestone 20.0):
+
+- **web-core** (#11293): KeymanWeb, and with it Android and iOS, loads `.kmx`/KMX+ through
+  Core WASM. That brings the hardware half of LDML keyboards to mobile.
+- **Touch tables still to do:** reading `layr`, `disp` and key gestures (#15290, #13429,
+  #13424, #8093).
+- **#12620** "embed .kvk, .keyman-touch-layout in .kmx": Keyman plans to *convert a KMN
+  keyboard's `.kvks` and touch layout into LDML source and compile them into KMX+ tables*.
+  That is the same touch-to-LDML conversion as mapping contract section 5. The studio's
+  converter is therefore prior art for an upstream need, and a candidate for contribution
+  alongside the `kmc-convert` follow-up in R10.
+
+**In-browser compile (plan option, untested).**
+
+- `kmc-ldml/src` has no `fs`, `path` or `node:` imports; all I/O goes through callbacks. It
+  needs the kmcmplib WASM (its UnicodeSet parser) and the CLDR implied-import XMLs, served
+  through `loadFile`.
+- The studio could therefore compile its export to KMX+ in the browser, as a build check
+  against the K-row set (FR-050) without waiting for CI. The `/speckit-plan` decision is
+  whether to do it, weighed against bundle size and Art IV: it would be a download-time
+  check, not a diagnostic cycle.
+- `kmxToXml` (`kmc-ldml/src/util/serialize.ts`, #12874) round-trips the in-memory KMX+ model
+  back to XML. It loses transforms that lack source hints, and all comments.
+
 ## Reference pairs in the corpus
 
 - `ibono_chwerty` — a `.kmn` and a hand-written `source/extras/ibono_chwerty.xml` in the same
