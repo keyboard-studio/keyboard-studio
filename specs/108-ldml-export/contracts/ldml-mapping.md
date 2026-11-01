@@ -247,3 +247,9 @@ condition. These are the known candidates for the next profile:
 
 A new profile file states its id, namespace, TR35 revision and Keyman release, followed by
 only the rows that differ from this profile.
+
+**At launch** (spec FR-066) a second profile ships beside this one: the current TR35 version,
+marked "TR35-only (awaiting Keyman)". It applies the deltas above that the standard already
+allows (`attribution`, `$[N:var]` set mapping). The author picks between the two on the Output
+page (FR-062). Its file is `contracts/ldml-mapping-<version>.md`, written in planning once
+research R13 fixes the version, namespace and remaining deltas.

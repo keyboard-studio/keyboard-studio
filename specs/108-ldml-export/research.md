@@ -12,9 +12,12 @@ When sources disagree, this order decides (set by the product owner for this fea
    what *valid* LDML is.
 2. **The Keyman team's upstream work** — `keymanapp/keyman` `origin/master` (`cbc752f67b`,
    2026-10-29), the `epic/ng-compiler` branch, and draft PR #16870. It defines what Keyman can
-   *compile today*. Where Keyman accepts less than the standard, the export conforms to the
-   standard **and** stays inside Keyman's subset; the difference is a status-K row, never an
-   "LDML incompatibility".
+   *compile today*. Where Keyman accepts less than the standard:
+   - **hardware**: the export conforms to the standard *and* stays inside Keyman's subset;
+   - **touch**: the export follows the standard alone. The product goal is spec-perfect touch
+     LDML, ready for Keyman's touch pipeline, which does not yet support the touch half.
+
+   Either way the difference is a status-K row, never an "LDML incompatibility".
 3. **The product owner's prior work** — the `kmc-kmn-to-ldml` converter on the
    `MattGyverLee/keyman` fork branches, `KMJStoLDML`, `ParseKB`. Prior art for mapping ideas
    and known losses; not an authority.
@@ -188,6 +191,21 @@ target desktop only: `&TARGETS` is hard-coded to `desktop` and the web engine re
   unverified; load it lazily, as `output/kmp.ts` loads `kmc-package`.
 - The reference base-keyboard data (`referenceBaseLayouts.ts`) lives in the **studio**; the
   engine exporter must receive it as input.
+
+## R13 — OPEN: the TR35-only "current version" profile
+
+The spec requires a second, TR35-only profile at launch (FR-066), so the author's version
+choice is real. Settle these in planning:
+
+- **Version**: its `conformsTo` value. TR35 revision `tr35-79` is CLDR 49, and its header lists
+  DTDs at `https://www.unicode.org/cldr/dtd/49/`.
+- **Namespace and DTD**: TR35's File Structure example still shows the `…/cldr/45/keyboard3`
+  namespace. The page does not reconcile this with the CLDR 49 DTD location.
+- **Deltas from 46**: from the CLDR 47–49 release notes and the DTD diffs. Known so far:
+  `info/@attribution`; set mapping on any capture group (`$[N:var]`), which TR35 already
+  allows.
+- **Validation in CI**: the CLDR keyboard3 DTD of that version, plus the FR-052 conformance
+  rules. It is exempt from the Keyman compile check under FR-065's "TR35-only" marker.
 
 ## Reference pairs in the corpus
 

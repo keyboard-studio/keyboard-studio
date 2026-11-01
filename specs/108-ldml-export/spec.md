@@ -66,6 +66,9 @@ the same text. The report says "nothing was lost".
 
 **Acceptance Scenarios**:
 
+0. **Given** the Output page, **When** the author opens the LDML download, **Then** they can
+   pick the LDML version. Version 46 is preselected and marked as compilable by Keyman, and
+   the current TR35 version is offered and marked "TR35-only (awaiting Keyman)".
 1. **Given** a keyboard whose rules are all transferable, **When** the author downloads the
    LDML export, **Then** the `.xml` is valid keyboard3, compiles with Keyman's LDML compiler
    without errors, and the report lists zero approximated or non-transferable items.
@@ -222,8 +225,8 @@ produce for that key.
 - **FR-004**: The export MUST be a zip package containing `source/<id>.xml` (keyboard3), the
   Keyman LDML project files listed in FR-040, and `LDML-EXPORT-REPORT.md`.
 - **FR-005**: The `.xml` MUST declare `conformsTo="46"` and the matching keyboard3 namespace,
-  and MUST use only constructs that both TR35 and Keyman 19's LDML compiler accept (research
-  R1–R3, R6).
+  and MUST be valid TR35 throughout. Its **hardware** half MUST also stay inside what Keyman
+  19's LDML compiler accepts (research R1–R3, R6). The touch half follows FR-053.
 - **FR-006**: Writing the download MUST NOT start a validation pass of its own. It reuses the
   classification already computed (Art IV, D3).
 - **FR-007**: The export MUST NOT write to host disk except through the browser download (Art V).
@@ -272,8 +275,8 @@ produce for that key.
 - **FR-015**: Each finding code MUST be routed to the step or question where its construct is
   authored. Codes with no owning step appear in the Output page's findings summary. All LDML
   findings MUST also be listed on the Output page next to the LDML download.
-- **FR-016**: LDML findings MUST NOT block, gate or disable any download or the pull-request
-  path, and MUST NOT count against criteria.
+- **FR-016**: LDML findings MUST NOT block, gate or disable any non-LDML download or the
+  pull-request path, and MUST NOT count against criteria.
 - **FR-017**: Each finding MUST carry the rule's `source/<id>.kmn` line when the rule has one,
   and a plain-language message saying what LDML will do instead. Synthesised rules without a
   line MUST name their group and owning pattern or behaviour.
@@ -296,11 +299,24 @@ produce for that key.
 - **FR-061**: A later profile MUST be expressible as **deltas** from the profile before it:
   rows whose status, LDML form or finding code changes. Supporting a new LDML version means
   adding a profile and its deltas. It MUST NOT require changing how the IR is walked.
-- **FR-062**: The exporter, the authoring-time findings and the report MUST all use the
-  **selected** profile, and the report and the `.xml` header comment MUST name it.
-  - The default profile is the newest one whose hardware subset Keyman compiles.
-  - When more than one profile exists, the author MAY choose another. That choice is an
-    export option, not a survey decision (Art IX).
+- **FR-062**: The LDML download MUST let the author **choose the LDML version** to export. It
+  MUST offer every available profile, each labelled with:
+  - its LDML/CLDR version;
+  - whether Keyman can compile it today, or whether it is "TR35-only (awaiting Keyman)".
+
+  The default is the newest profile whose hardware subset Keyman compiles.
+  - The exporter, the authoring-time findings and the report MUST all use the selected
+    profile. The report and the `.xml` header comment MUST name it.
+  - Choosing a version is an export option on the Output page, not a survey decision (Art IX).
+    It is saved with the project's output settings in the draft envelope (Art III), so the
+    authoring-time findings use the same version the author will export.
+- **FR-066**: At launch, at least two profiles MUST exist, so the choice is real:
+  - `46`: the default, compilable by Keyman 19;
+  - the **current TR35 version**: TR35-only, spec-perfect, using the newest features the
+    standard allows, such as `info/@attribution` and set mappings on any capture group.
+
+  The exact version number, namespace and DTD of the second profile, and its deltas from 46,
+  are settled in planning against the CLDR release notes (research R13).
 - **FR-063**: Every Keyman-gap (K) row MUST record the condition that would lift it, for
   example "CLDR 47 `info/@attribution`" or "Keyman accepts `$[N:var]` (upstream #16868)". A
   new profile can then promote those rows without re-research.
@@ -344,7 +360,10 @@ produce for that key.
 **Quality**
 
 - **FR-050**: Every exported `.xml` in the test corpus MUST pass Keyman's keyboard3 schema
-  validation and compile with Keyman's LDML compiler in CI.
+  validation and compile with Keyman's LDML compiler in CI. The only errors allowed are those
+  attributable to a Keyman-gap (K) row, and the CI test MUST assert that the compiler's error
+  set equals exactly the export's K-row set. A file with no K rows compiles cleanly. A new
+  Keyman release that lifts a gap then shows up as a test change, not a silent pass.
 - **FR-051**: A keystroke-equivalence harness MUST compare KMN behaviour (the engine's
   simulator) with LDML behaviour on generated keystroke sequences for the test corpus.
   Mismatches are allowed only on sequences that exercise an item the report lists.
@@ -388,7 +407,8 @@ produce for that key.
 ### Measurable Outcomes
 
 - **SC-001**: 100 % of exports in the test corpus pass Keyman's keyboard3 schema validation and
-  compile with Keyman's LDML compiler.
+  compile with Keyman's LDML compiler with no errors other than those their report attributes
+  to a Keyman-gap row. 100 % of hardware-only exports compile with zero errors.
 - **SC-002**: For every corpus keyboard whose report lists no A or N items, 100 % of generated
   keystroke sequences produce identical text under KMN and under the LDML export.
 - **SC-003**: For every corpus keyboard, every keystroke-sequence mismatch is attributable to
@@ -408,6 +428,9 @@ produce for that key.
   check (FR-052). Zero touch constructs are degraded to fit today's Keyman compiler.
 - **SC-011**: Adding a second profile that only changes the status of existing rows touches
   only that profile's definition and its tests. No exporter or finding code changes.
+- **SC-012**: An author can switch the export's LDML version and download again in two
+  interactions. The warnings shown while authoring always match the selected version's
+  report.
 
 ## Assumptions
 
