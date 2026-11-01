@@ -91,3 +91,18 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   K_RBRKT starting rules, shadowed by dk(3000) and dk(3001)). HISTORY
   gains a "Removed 15 keys." bullet and carries the 2026-10-30 capture
   date, which verify normalises. Verify mode passes against it locally.
+- **Re-capture: 2026-10-31 (America/Chicago), from PR #2415
+  (`km/review-version-bump-verdict`) at `0745fe90`.** Taken locally
+  (Playwright desktop, pinned corpus `435f82d6`, vite dev server).
+  The criteria-audit batches changed what the walk emits; the old
+  baseline (2026-10-30, `502fb061`) differed in exactly five entries,
+  each mapped to its criterion: `README.md` gains the keyman.com
+  keyboards link (5.5b, batch 3); `source/test.kmn` and
+  `source/test.kps` lose their copyright years (4.6b, batch 3), and the
+  `.kps` additionally emits `<LicenseFile>` (10.7b, batch 1);
+  `source/help/test.php` carries its styles in the PHP header's
+  `$pagestyle` (11.3b, batch 3); `build/test.kmx` is recompiled from
+  the changed `.kmn`. `HISTORY.md` carries the 2026-10-31 capture date
+  (verify normalises it) and `.studio/decision-record.json` its
+  wall-clock timestamps (presence-checked only). Every other entry is
+  byte-identical. Verify mode passes against it locally.
