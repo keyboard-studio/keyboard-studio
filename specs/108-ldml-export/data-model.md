@@ -48,7 +48,7 @@ tables directly.
 |---|---|
 | `name` | identity `displayName`, else `startIr.header.name` |
 | `version` | `resolvePublishVersion(…)`. The original string goes to the header comment, and the normalised semver to `<version number>` (row 4.3) |
-| `languages` | identity `bcp47`, else `startKeyboard.languages`. The first goes to `@locale`, the rest to `<locales>`. When none exists: `und`, plus a report item |
+| `languages` | identity `bcp47`, else `startKeyboard.languages`. The first goes to `@locale`, the rest to `<locales>`. When none exists: `und`, plus the row 4.16 `NO_LOCALE` hint |
 | `author`, `authorEmail` | `attribution.authorName`, `authorEmail` |
 | `copyright` | `effectiveHolder(attribution)`, rendered as the `.kps` does |
 | `licenceName` | from the licence the package carries |

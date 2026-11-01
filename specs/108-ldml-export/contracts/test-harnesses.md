@@ -72,6 +72,15 @@ document.
 
   The report prints each unexplained mismatch as `[FAIL] <keyboard> <keys> kmn=<…> ldml=<…>`.
 
+- **Touch pass** (Story 4): for each touch form and each touch key, compare:
+  - the KMN side: a tap through the engine simulator's `TouchTapSession`
+    (`packages/engine/src/simulator/tapSimulation.ts`);
+  - the LDML side: `ldmlInterpreter.tapTouch(formWidth, layerId, keyId, context?)`, which
+    applies the key's output, then the transforms.
+
+  The outputs must satisfy NFC(KMN) === LDML. A mismatch is allowed only on a key with an A/N
+  item.
+
 ## H6 — Two-path parity (FR-012, SC-005)
 
 For each corpus working copy, the harness:
@@ -80,8 +89,9 @@ For each corpus working copy, the harness:
 2. builds the preview-path classification from the preview projection;
 3. builds the download-path classification from `projectWorkingCopyForOutput`.
 
-It asserts that the site-key sets for A and N items are equal (research R23). It also asserts that
-the studio findings built from (2) have exactly the A/N site keys of the report built from (3).
+It asserts that the site-key sets for A, N and K items are equal (research R23). It also asserts
+that the studio findings built from (2) have exactly the A/N/K site keys of the report built from
+(3), excluding the row-5.15 delivery note (FR-012, SC-005).
 
 ## H7 — Profiles (FR-061, FR-065, SC-011)
 

@@ -291,8 +291,8 @@ not been done yet.
 - **Mnemonic keyboard**: exported by resolving character keystrokes through the export's one
   base keyboard (FR-027). The report says the layout is right only for that base keyboard.
   Prior art refused these.
-- **No language tag**: `locale="und"`, plus a report item. `und` is BCP47 and Keyman practice;
-  TR35 does not prescribe it.
+- **No language tag**: `locale="und"`, plus a report item (mapping row 4.16). `und` is BCP47
+  and Keyman practice; TR35 does not prescribe it.
 - **Platforms disagree on unmatched modifier combinations and transform failures** (TR35
   (CLDR 49) §Platform Behaviors in Edge Cases). The export never relies on fall-through: it
   emits every key and modifier combination it supports (FR-021).
@@ -416,11 +416,13 @@ not been done yet.
   page filters out.
 - **FR-012**: The authoring-time findings and the export report MUST come from one
   classification of the same working copy. For any working copy, the set of finding sites
-  MUST equal the set of report rows for A and N items.
+  MUST equal the set of report rows for A, N and K items. The single row-5.15 statement is
+  the one exception: it is a report note, not a finding.
 - **FR-013**: Every `RawKmnFragment` and every `raw` IR element MUST produce exactly one
   finding and one report row, naming its opaque reason.
 - **FR-014**: The findings MUST be computed inside the existing validation cycle. The model is
-  a memoised scan over the working IR, joined into the one published findings array, in the
+  a memoised scan over the IR the live preview parses from the projected `.kmn` (the working
+  copy as it will be output), joined into the one published findings array, in the
   same way as the existing sole-source `oe2` finding. They MUST NOT add a timer or a parallel
   validation path (Art IV).
 - **FR-015**: Each finding code, `warning` and `hint` alike, MUST be routed to the step or
@@ -632,8 +634,8 @@ not been done yet.
   an item in its report. Zero unexplained mismatches.
 - **SC-004**: Every opaque fragment and `raw` element in the corpus yields exactly one finding
   and one report row.
-- **SC-005**: For any working copy, the finding sites and the report's A/N rows are the same
-  set.
+- **SC-005**: For any working copy, the finding sites and the report's A/N/K rows are the same
+  set (excluding the row-5.15 delivery note).
 - **SC-006**: For `ibono_chwerty`, the exported key map and outputs match the hand-written
   `ibono_chwerty.xml` in the keyboards corpus for every hardware position both define.
 - **SC-007**: An author can download the LDML package in one click from the Output page.
@@ -672,12 +674,12 @@ not been done yet.
   offers no installable package for keyboards with touch forms (FR-074).
 - **Expansion cap**: 1 000 transforms per KMN rule is enough for real keyboards. It is a
   tunable constant, not a contract.
-- **Open items carried into planning**:
-  - research R8: how Keyman expects touch backspace, enter and tab keys. It does not change
-    the user-visible scope.
-  - Research R9 (normalization) is resolved: normalization stays on, and the export warns
-    wherever an output differs from its NFC form (mapping rows 3.22 and 3.23). The application
-    receives NFC under the LDML export, so this is user-visible.
+- **Open items R8 and R9 are resolved.**
+  - R8 (touch backspace, enter and tab) was resolved in planning: same-width gap keys with a
+    hint (mapping row 5.13). It does not change the user-visible scope.
+  - R9 (normalization) was resolved by product ruling: normalization stays on, and the export
+    warns wherever an output differs from its NFC form (mapping rows 3.22 and 3.23). The
+    application receives NFC under the LDML export, so this is user-visible.
 - **Out of scope**:
   - LDML **import**;
   - LDML as a primary emission format;

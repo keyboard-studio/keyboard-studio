@@ -9,7 +9,7 @@
 | TR35 revision written against | CLDR 49, `tr35-79` (2026-10-21) |
 | Keyman release defining the hardware subset | Keyman 19, as pinned in CI: `@keymanapp/kmc-ldml@19.0.240-alpha` and `@keymanapp/common-types@19.0.240-alpha` (research R16). `origin/master` `cbc752f67b` (20.0.10-alpha) is evidence only |
 | Status | Default profile |
-| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 3.22, 5.1, 5.2, 5.13, 6.1; new rows 2.26 and 4.15; gap-key rule (research R17–R21, R24) |
+| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 5.1, 5.2, 5.13, 6.1; new rows 2.26, 4.15 and 4.16; severity column clarified; gap-key rule (research R17–R21, R24) |
 
 This file is the **first target profile** (spec FR-060). A later LDML version gets its own
 profile, written as deltas from this one (FR-061). See "Version deltas" at the end. Research
@@ -159,6 +159,7 @@ exporter bridges the two this way:
 | 4.13 | `&CASEDKEYS` | drives row 2.14 | M | — |
 | 4.14 | `&MNEMONICLAYOUT` | drives row 2.7 | A | `KM_LINT_LDML_MNEMONIC` |
 | 4.15 | CLDR imports | none written. Every key the export uses is defined in the file, except implied keys (`a`–`z`, `A`–`Z`, `0`–`9`, `space`, `gap`), which Keyman imports itself. This keeps both profiles' files free of version-specific import paths | M | — |
+| 4.16 | no language tag in the identity overlay or package metadata | `keyboard3/@locale="und"`, no `<locales>` | A | hint `KM_LINT_LDML_NO_LOCALE` |
 
 ## 5. Touch layout (`TouchLayoutIR`)
 
@@ -219,7 +220,7 @@ documentation travels in two places:
 
 ## Code table
 
-| Code | Default severity | Rows |
+| Code | Severity for a rule-level item (non-rule items are always hints, FR-010) | Rows |
 |---|---|---|
 | `KM_LINT_LDML_NO_KEY_TRIGGER` | warning | 1.3, 1.4, 1.10 |
 | `KM_LINT_LDML_GROUP_CHAIN_PARTIAL` | warning | 1.6, 1.7, 1.8 |
@@ -247,7 +248,8 @@ documentation travels in two places:
 | `KM_LINT_LDML_LAYER_STATE` | warning | 3.21 |
 | `KM_LINT_LDML_NORMALIZATION` | warning | 3.22, 3.23 |
 | `KM_LINT_LDML_OPAQUE` | warning | 3.26, 6.1, 6.2 |
-| `KM_LINT_LDML_ANSI_ONLY` | warning | 1.2 |
+| `KM_LINT_LDML_ANSI_ONLY` | hint | 1.2 (a header construct; the download is disabled with an explanation) |
+| `KM_LINT_LDML_NO_LOCALE` | hint | 4.16 |
 | `KM_LINT_LDML_UNREACHABLE` | hint | 1.11, 3.4 |
 | `KM_LINT_LDML_HEADER_UNSUPPORTED` | hint | 4.12 |
 | `KM_LINT_LDML_METADATA_PACKAGE_ONLY` | hint | 4.9, 4.11 |

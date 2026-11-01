@@ -92,7 +92,7 @@ CI for the Keyman compile, CLDR XSD validation and the equivalence harness.
 
 **Scale/Scope**:
 
-- 27 finding codes, including `KM_LINT_LDML_BASE_DEADKEY` (row 2.26, added in planning). The R9 widening reuses `KM_LINT_LDML_NORMALIZATION`, and the
+- 34 finding codes: the 26 of the specify phase, six from the TR35 reread (`MODIFIER`, `MODIFIER_SIDES`, `BKSP_NO_CONTEXT`, `KEY_STORE`, `NEGATED_CLASS`, `CONTEXT_START`), and `BASE_DEADKEY` (row 2.26) and `NO_LOCALE` (row 4.16) from planning review. The R9 widening reuses `KM_LINT_LDML_NORMALIZATION`, and the
   set/save/reset reclassification reuses `KM_LINT_LDML_OPTION_STATE`.
 - Corpus: the studio's existing fixtures, plus `ibono_chwerty`, `khmer_angkor`/`khmer_ldml` and
   one mnemonic keyboard.
@@ -182,11 +182,14 @@ packages/engine/src/ldml-export/
 │   ├── touchForms.ts          # touch layers, gestures, widths, layerId (FR-026)
 │   └── document.ts            # assembles the LdmlDocument model
 ├── xml/
+│   ├── model.ts               # LdmlDocument, the lowered model the serializer writes
 │   └── writeKeyboard3.ts      # deterministic serializer with header/group/transform comments
 ├── project/
 │   ├── kps.ts  kpj.ts  docs.ts  # Keyman LDML project files (FR-040)
 ├── report.ts                  # LDML-EXPORT-REPORT.md (FR-031)
 ├── package.ts                 # buildLdmlExport(input) -> { files, zip, classification }
+├── compile/
+│   └── loadLdmlCompiler.ts    # Story 5 only, if the FR-070 trial passes: lazy kmc-ldml loader
 └── __testing__/               # test-only, excluded from the barrel
     ├── ldmlInterpreter.ts     # minimal LDML runtime for FR-051 (research R22)
     ├── keymanCompile.ts       # kmc-ldml + in-memory callbacks (research R19)

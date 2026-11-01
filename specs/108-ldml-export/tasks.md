@@ -58,7 +58,7 @@ corpus suites where named.
   - `fr-t-k0-test.xml`, which has touch forms and the `enter` gap key.
 - [ ] T004 Create the module skeleton in `packages/engine/src/ldml-export/` (`LX/index.ts`, `LX/types.ts`) and wire `packages/engine/src/index.ts`:
   - `LX/index.ts` (barrel; never exports `__testing__`);
-  - `LX/types.ts` with every engine type in [data-model.md](data-model.md): `CompatibilityItem`, `LdmlClassification`, `LdmlClassifyInput`, `LdmlExportInput`, `LdmlExportResult`, `LdmlBaseLayout`, `LdmlExportMetadata`, `LdmlPackageFiles`, `LdmlProfileId`, `LdmlCode` (the union of the 27 codes in the mapping contract's code table), `RowId`;
+  - `LX/types.ts` with every engine type in [data-model.md](data-model.md): `CompatibilityItem`, `LdmlClassification`, `LdmlClassifyInput`, `LdmlExportInput`, `LdmlExportResult`, `LdmlBaseLayout`, `LdmlExportMetadata`, `LdmlPackageFiles`, `LdmlProfileId`, `LdmlCode` (the union of the 28 codes in the mapping contract's code table), `RowId`;
   - in `packages/engine/src/index.ts`, re-export the ldml-export public API, with a comment stating that the barrel exposes no test tooling.
 - [ ] T005 [P] Confirm test discovery in `packages/engine/vitest.config.ts`, `packages/engine/vitest.corpus.config.ts` and `packages/studio/vitest.corpus.config.ts`:
   - the default `packages/engine/vitest.config.ts` runs `LX/**/*.test.ts` and excludes `*.corpus.test.ts`;
@@ -84,7 +84,7 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
   - `TargetProfile`;
   - `ProfileRow` (`id`, `status`, `code`, `severity`, `form`, `lift`, `keymanCodes`);
   - `RowDelta`.
-- [ ] T008 Implement `LX/profiles/profile46.ts`. It holds **every** row of [contracts/ldml-mapping.md](contracts/ldml-mapping.md) sections 1–6, including 1.4a, 1.4b, 2.22 and 4.15, with:
+- [ ] T008 Implement `LX/profiles/profile46.ts`. It holds **every** row of [contracts/ldml-mapping.md](contracts/ldml-mapping.md) sections 1–6, including 1.4a, 1.4b, 2.22, 4.15 and 4.16, with:
   - status, code and severity as the tables state;
   - a short `form` summary;
   - `lift` from the "Version deltas" table for every K row and every A/N row it lists (FR-063);
@@ -94,7 +94,7 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
 - [ ] T009 Implement `LX/profiles/profile49.ts` (the deltas of [contracts/ldml-mapping-49.md](contracts/ldml-mapping-49.md): rows 4.10, 3.7, 3.8, 3.9; `keymanRelease: null`, `keymanCompilable: false`, `writeAttribution: true`, `setMapping: "any-group"`) and `LX/profiles/resolve.ts`:
   - `resolveLdmlProfile(id)` applies the deltas to profile 46, deep-freezes the result, and throws on an unknown id or on a delta naming a missing row;
   - `listLdmlProfiles()` lists the profiles newest first.
-- [ ] T010 [P] Write `LX/profiles/profiles.test.ts` (H7):
+- [ ] T010 Write `LX/profiles/profiles.test.ts` (H7), after T007–T009. It can run in parallel with T011–T018:
   - (a) parse the first column and the code table of both contract markdown files, and assert that the set of row ids and codes equals the profile tables, both ways;
   - (b) for FR-065, both ways: read the `conformsTo` enum from `@keymanapp/common-types` `Schemas.ldmlKeyboard3`, and assert `enum.includes(id) === profile.keymanCompilable` for every profile;
   - (c) exactly one default, and it is the newest compilable profile;
@@ -145,7 +145,8 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
   - `backspace` transforms on `K_BKSP`;
   - markers;
   - `${str}`, `$[set]`, `[...]`/`[^...]`, `(...)` captures, `$1`–`$9`, and `$[N:set]` mapping;
-  - NFD matching and NFC output.
+  - NFD matching and NFC output;
+  - `tapTouch(formWidth, layerId, keyId, context?)`: select the touch form by `minDeviceWidth`, apply the key's output, then run the transforms (used by the H5 touch pass in T078).
 
   Unit-test each feature with hand-written mini documents in `LX/__testing__/ldmlInterpreter.test.ts`.
 - [ ] T019 Implement `LX/__testing__/corpus.ts`. It resolves the corpus in [contracts/test-harnesses.md](contracts/test-harnesses.md) from `../keyboards/release` and `../keyboards/experimental` (path pattern of `packages/engine/src/pattern-apply/touchProductionEquivalence.corpus.test.ts:128`) and loads each keyboard's `.kmn`, `.keyman-touch-layout` and `.kvks` from disk for tests. It also needs three keyboards, picked using [docs/keyboard-index.md](../../docs/keyboard-index.md) and the `../keyboards` tree:
@@ -163,7 +164,9 @@ profiles, parity, FR-065 and the four harness self-tests pass on CLDR's samples.
 ## Phase 3: User Story 1 — Download an LDML version of my keyboard (Priority: P1) MVP
 
 **Goal**: "Download LDML" on the Output page produces a deterministic Keyman LDML project with a
-valid keyboard3 hardware form and `LDML-EXPORT-REPORT.md`, under either profile.
+valid keyboard3 hardware form and `LDML-EXPORT-REPORT.md`, under either profile. The package
+here is the minimal Keyman project (`.kpj`, `.kps`, `.xml`, report). FR-004/FR-040's documents,
+icon and fonts complete in Phase 5 (US3).
 
 **Independent Test**: load a keyboard with only plain key assignments, deadkeys and stores, and
 download under profile 46. The `.xml` passes H1–H3, the keystrokes match (H5), and the report
@@ -177,6 +180,7 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   - `ansi-only.kmn`;
   - `unruled.kmn`: keys with no rule;
   - `shared-output.kmn`: two keys produce the same character but have different context rules (trigger markers);
+  - `all-opaque.kmn`: a keyboard whose every rule is an opaque fragment (spec Edge Cases);
   - `us-base.ts`: an `LdmlBaseLayout` built from contracts' `US_BASE_LAYOUT`;
   - `azerty-base.ts`: built at test time by reading `packages/studio/src/lib/generated/baseLayouts.generated.json` with `fs`, so there is one source and no captured copy. Tests are depcruise-excluded, so reading studio data from an engine test is allowed. The fixture includes AZERTY's dead-key cells (row 2.26).
 - [ ] T021 [P] [US1] Write `LX/classify/classify.test.ts`:
@@ -195,7 +199,8 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   - scenario 5: two builds are byte-identical, also under `process.env.TZ = "Pacific/Auckland"` (H8);
   - the filename is `<id>-<semver>-ldml.zip`;
   - there is no `NEXT_STEPS.md`;
-  - for `shared-output.kmn`, no trigger marker survives in any interpreter output (FR-024).
+  - for `shared-output.kmn`, no trigger marker survives in any interpreter output (FR-024);
+  - for `all-opaque.kmn`, the export succeeds, the key map comes from the base layout only, and every fragment has exactly one report row (spec Edge Cases, FR-013).
 
 ### Classifier (FR-008–FR-010, FR-013, FR-017, FR-025)
 
@@ -203,14 +208,14 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   - split each rule at `isPlusSeparator` (`packages/contracts/src/rule-shape.ts:32`) into context and keystroke;
   - classify the keystroke: vkey (rows 2.1–2.5, 2.19–2.21), char (2.6/2.7), any;
   - classify the modifiers: rows 2.9–2.13, including `RSHIFT` → 2.12, and `LALT`/`RALT`/`ALT` kept distinct.
-- [ ] T024 [US1] Implement `LX/classify/callGraph.ts`:
+- [ ] T024 [US1] Implement `LX/classify/callGraph.ts`. It depends on T025 (`rawText.ts`), so implement T025 first:
   - entry points from `IRHeader.entryPoints`;
   - `use()` edges from typed `useGroup` outputs, and from `match`/`nomatch` `raw` right-hand sides through `rawText.ts`;
   - every-path vs some-path reachability (rows 1.5/1.6, with `nomatch` and the implicit default counted as paths);
   - keystroke groups called from keystroke groups (1.7);
   - unreachable groups (1.11);
   - `readonly`, `NewContext` and `PostKeystroke` groups (1.3, 1.4, 1.10). The 1.4a/1.4b split is US4 (T071): here every such group is a single N item.
-- [ ] T025 [P] [US1] Implement `LX/classify/rawText.ts` (research R17). Only these patterns are recognised: `use(g)`, `layer('x')`, `platform('…')`, `set(&layer='x')`, plus `RawKmnFragment.reason` routing (`option-store-directive`/`if-option-store` → 3.18, `call-return` → 1.12, everything else → 6.1 `OPAQUE` with the reason in `params.reason`). Never parse `sourceText` beyond these patterns (Art II).
+- [ ] T025 [P] [US1] Implement `LX/classify/rawText.ts` (research R17) before T024; it is parallel with T023 and T027 only. Only these patterns are recognised: `use(g)`, `layer('x')`, `platform('…')`, `set(&layer='x')`, plus `RawKmnFragment.reason` routing (`option-store-directive`/`if-option-store` → 3.18, `call-return` → 1.12, everything else → 6.1 `OPAQUE` with the reason in `params.reason`). Never parse `sourceText` beyond these patterns (Art II).
 - [ ] T026 [US1] Implement `LX/classify/ruleElements.ts`, covering rows 3.1–3.23:
   - `index()` pairing and the capture-group count, against the profile's `setMapping` and the cap `MAX_TRANSFORMS_PER_RULE = 1000` exported from `LX/lower/transforms.ts`;
   - `notany` with multi-code-point items;
@@ -225,7 +230,8 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   - 2.15 caps modes;
   - 4.9 and 4.11 → `METADATA_PACKAGE_ONLY` hints;
   - 4.12 → `HEADER_UNSUPPORTED` hints;
-  - 4.10 → its status from the resolved profile row (K in 46, M in 49).
+  - 4.10 → its status from the resolved profile row (K in 46, M in 49);
+  - 4.16 → `NO_LOCALE` hint when `metadata.languages` is empty.
 - [ ] T028 [US1] Implement `LX/classify/classify.ts` (`classifyForLdml`). It composes T023–T027, and adds the row 2.26 items: one `BASE_DEADKEY` hint per (exported layer, main-block position) where `input.baseLayout` has a `"deadkey"` cell and no rule covers the position, with `nodeKey` `base:<layer>/<vkey>` and `side` `hardware`. It builds each item's `siteKey`, `nodeKey`, `line` (`sourceLine`), `owner` (FR-017), `side`, `params`, and English `construct` and `consequence` constants from the row. It sorts by `siteKey`, computes `counts`, `baseLayout`, `ansiOnly` and `touchPresent`, and deep-freezes the result. It reads statuses and codes only from the resolved profile and never compares profile ids (FR-061). Export it from `LX/index.ts`.
 
 ### Lowering (FR-020–FR-024)
@@ -256,7 +262,11 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   - `index()` → `$[1:set]` when the profile's `setMapping` is `group1-whole` and the rule meets 3.7, `$[N:set]` when it is `any-group`, otherwise cartesian expansion capped at `MAX_TRANSFORMS_PER_RULE` (3.8/3.9);
   - backspace rules → `<transforms type="backspace">` (2.18).
 
-  Every transform carries a `source/<id>.kmn:<line>` comment, and every group a `KMN group: <name>` comment (FR-042). Test it in `LX/lower/transforms.test.ts`, including a `to` that must not be emitted as `\uXXXX`.
+  Comments (FR-042, FR-017):
+  - every group carries `KMN group: <name>`;
+  - every transform carries `source/<id>.kmn:<line>` of its rule, including transforms from cartesian expansion;
+  - a trigger-marker catch-all carries `exporter: trigger catch-all for <key id>`;
+  - the first transform that uses a deadkey's marker carries `marker <id> = deadkey <original name>`, so the original names survive (spec Edge Cases). Test it in `LX/lower/transforms.test.ts`, including a `to` that must not be emitted as `\uXXXX`.
 - [ ] T034 [US1] Implement `LX/lower/document.ts`. It assembles the `LdmlDocument`:
   - the hardware form choice (FR-020): `iso` when any ISO-only key is used or `baseLayout.isoFamily`, `abnt2`/`jis` for their keys, otherwise `us`; keys of another form give 2.4 items;
   - layers with `modifiers` (`none` for the base, no `id`);
@@ -264,7 +274,8 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   - variables;
   - transform groups in call order (FR-025);
   - `info name` and `version number` (normalised to `major.minor.patch`, row 4.3);
-  - `@locale` (first tag, or `und` plus a report item) and `<locales>`.
+  - `@locale` (first tag, or `und` with the row 4.16 item) and `<locales>`;
+  - the first lines of the header comment: the profile id with its TR35 revision, the base keyboard resolved against, and the report pointer (FR-062). T067 adds the rest of FR-042's header.
 
   N items are never lowered, and M/A items are always lowered (FR-009).
 - [ ] T035 [US1] Implement `LX/report.ts`: `renderReport(classification, profile, context) → string`, with sections 1–8 exactly as [contracts/export-package.md](contracts/export-package.md):
@@ -329,7 +340,9 @@ says "Nothing was lost.". Downloading twice gives identical bytes.
   An `ok: false` result throws an `OutputBundleError` carrying the ANSI-only reason. Add to `ST/lib/buildOutputBundle.test.ts`:
   - the projected VFS is unchanged afterwards (FR-007);
   - `buildKmpForDownload` and `buildSourceZipForDownload` outputs never contain a `.xml` keyboard file or `LDML-EXPORT-REPORT.md` (Art VII);
-  - the LDML path calls no validator (FR-006).
+  - the LDML path calls no validator (FR-006);
+  - the pull-request projection (the managed-PR path's file list) never contains an LDML file (FR-002, Art VII);
+  - `buildLdmlExportForDownload` returns byte-identical zips with the Lingui locale activated as `en` and then as `fr` (FR-030, SC-009).
 - [ ] T046 [US1] In `ST/hooks/usePreviewArtifact.ts`, add `handleDownloadLdml()`, `downloadingLdml` and `ldmlError`. It uses the same `canDownload` and `emissionBlockReason` gates as `handleDownload`, calls `buildLdmlExportForDownload(ldmlProfile ?? default)`, then `triggerDownload(bytes, filename, "application/zip")`. Include `downloadingLdml` in the busy state that disables the `.kmp` and `.zip` buttons, and disable the LDML button while those run (FR-002).
 - [ ] T047 [US1] Create `ST/components/output/LdmlDownloadPanel.tsx`:
   - a native `<select>` with a visible `<label>`. Each option's text is the profile's LDML version plus "Keyman compiles it" or "TR35-only (awaiting Keyman)". `46` is preselected when `ldmlProfile` is `null`. A change calls `setLdmlProfile`;
@@ -372,7 +385,7 @@ findings with source lines, and the `.kmp` and `.zip` downloads stay enabled.
   - every code routes per the table in [contracts/findings-routing.md](contracts/findings-routing.md);
   - a code whose step is not in the route falls back to unmapped (Output);
   - `buildStepWarningCounts` counts distinct LDML codes per step, hints included, while other codes are still counted per finding (a step with 300 `OPTION_STATE` and 2 `CALL` badges 2).
-- [ ] T053 [P] [US2] Write `ST/test/ldmlParity/ldmlParity.corpus.test.ts` (H6, SC-005). For each corpus working copy, built with the spec 106 replay helpers in `ST/test/`, build both projections headlessly, with no React hook mounted. The **preview** projection calls `projectWorkingCopyVfs` (`ST/lib/projectWorkingCopyVfs.ts:432`) with the same input `ST/hooks/useWorkingCopyTransform.ts:501` passes (display-name identity only), then parses its `.kmn`, touch layout and `.kvks`. The **download** projection uses `projectWorkingCopyForOutput`. Assert that the A/N `siteKey` set from the preview projection equals that from `projectWorkingCopyForOutput`, and that the studio findings' site keys equal the report's A/N rows.
+- [ ] T053 [P] [US2] Write `ST/test/ldmlParity/ldmlParity.corpus.test.ts` (H6, SC-005). For each corpus working copy, built with the spec 106 replay helpers in `ST/test/`, build both projections headlessly, with no React hook mounted. The **preview** projection calls `projectWorkingCopyVfs` (`ST/lib/projectWorkingCopyVfs.ts:432`) with the same input `ST/hooks/useWorkingCopyTransform.ts:501` passes (display-name identity only), then parses its `.kmn`, touch layout and `.kvks`. The **download** projection uses `projectWorkingCopyForOutput`. Assert that the A/N/K `siteKey` set from the preview projection equals that from `projectWorkingCopyForOutput`, and that the studio findings' site keys equal the report's A/N/K rows, excluding the row-5.15 delivery note (FR-012, SC-005).
 
 ### Implementation for User Story 2
 
@@ -394,7 +407,7 @@ findings with source lines, and the `.kmp` and `.zip` downloads stay enabled.
 - [ ] T059 [P] [US2] In `ST/lint/LintSummary.tsx`, add `groupByCode?: boolean`: one row per code with its translated title, count and severity, expanding to the individual `LintChip`s, each with its line (FR-018). Write `ST/lint/LintSummary.groupByCode.test.tsx`.
 - [ ] T060 [US2] In `ST/survey/rules/RulesStep.tsx`, render the step-owned findings (`LINT_CODE_TO_STEP_IDS` → `rules`) as a grouped `LintSummary`. Check that the touch-layout and physical-layout question surfaces render their LDML chips through the existing `findingsByQuestionId` path, and add the chip there if a surface does not render one (findings-routing table).
 - [ ] T061 [US2] In `ST/components/OutputScreen.tsx`, exclude `KM_LINT_LDML_*` from the "Other findings" list, and have `LdmlDownloadPanel` list every LDML finding with `groupByCode` (FR-015).
-- [ ] T062 [US2] Add `lint.ldml.<codeSlug>.{title,message,hint}` for all 27 codes to `ST/locales/en/messages.json` and `ST/locales/fr/messages.json`, with French translations and the interpolated `params` names matching what `classify.ts` emits.
+- [ ] T062 [US2] Add `lint.ldml.<codeSlug>.{title,message,hint}` for all 28 codes to `ST/locales/en/messages.json` and `ST/locales/fr/messages.json`, with French translations and the interpolated `params` names matching what `classify.ts` emits.
 - [ ] T063 [US2] Write `ST/lint/ldmlNoGating.test.ts` (FR-016):
   - with only LDML findings present, `outputBlockers` is not blocked;
   - the criteria resolution (`ST/criteria/resolveCriteria.ts`) ignores `KM_LINT_LDML_*`;
@@ -423,7 +436,7 @@ complete Keyman LDML project that builds.
   - `layout` = `baseLayout.family`;
   - `attribution` only when the profile's `writeAttribution` is set (row 4.10; FR-041);
   - `<locales>` holds the remaining language tags, all minimal.
-- [ ] T067 [US3] In `LX/xml/writeKeyboard3.ts` (via the document `comment`), write the FR-042 header documentation comment exactly as in [contracts/export-package.md](contracts/export-package.md): name, id, original version, description, copyright, licence, author, attribution, home page, studio version, profile and TR35 revision, the base keyboard resolved against, and the report pointer. There is no timestamp.
+- [ ] T067 [US3] In `LX/xml/writeKeyboard3.ts` (via the document `comment`), complete the FR-042 header documentation comment that T034 started, exactly as in [contracts/export-package.md](contracts/export-package.md): name, id, original version, description, copyright, licence, author, attribution, home page, studio version, profile and TR35 revision, the base keyboard resolved against, and the report pointer. There is no timestamp.
 - [ ] T068 [US3] Complete `LX/project/kps.ts` (`<Info>`: name, copyright, author, description, website; `<Keyboards>` with languages; `<Files>`: build outputs, readme, welcome, icon, fonts). Implement `LX/project/docs.ts`, which places `source/readme.htm`, `source/welcome.htm`, `LICENSE.md`, `README.md`, `HISTORY.md`, the icon and the fonts at the paths in [contracts/export-package.md](contracts/export-package.md) (FR-040).
 - [ ] T069 [US3] Write `LX/metadata.test.ts`:
   - Story 3 scenario 1: name, author, version `1.2` → `1.2.0`, `locale="ibn"`, `<locales>` holding `en`;
@@ -484,7 +497,9 @@ equals the KMN rule output for that key.
   - `tr35Conformance` returns `[]`;
   - under 46, the Keyman compile with the touch forms included returns exactly the K-row codes.
 
-  The last check is the FR-070 premise, checked in CI first. If it fails, record the failing codes in [research.md](research.md) R29 and stop before Phase 7.
+  Also run the H5 touch pass ([contracts/test-harnesses.md](contracts/test-harnesses.md)): for every touch key, NFC(KMN via `TouchTapSession`) === LDML via `ldmlInterpreter.tapTouch`. A mismatch is allowed only on a key with an A/N item (Story 4 Independent Test).
+
+  The Keyman compile is the FR-070 premise, checked in CI first. If it fails, record the failing codes in [research.md](research.md) R29 and stop before Phase 7.
 
 **Checkpoint**: Story 4 is green, and SC-010 holds. Commit `spec 108 T071-T078`.
 
