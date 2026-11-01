@@ -7,8 +7,9 @@
 | Profile id / `conformsTo` | `46` |
 | Namespace | `https://schemas.unicode.org/cldr/46/keyboard3` |
 | TR35 revision written against | CLDR 49, `tr35-79` (2026-10-21) |
-| Keyman release defining the hardware subset | Keyman 19 (`keymanapp/keyman` `origin/master` `cbc752f67b`) |
+| Keyman release defining the hardware subset | Keyman 19, as pinned in CI: `@keymanapp/kmc-ldml@19.0.240-alpha` and `@keymanapp/common-types@19.0.240-alpha` (research R16). `origin/master` `cbc752f67b` (20.0.10-alpha) is evidence only |
 | Status | Default profile |
+| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 3.22, 5.1, 5.2, 5.13, 6.1; new row 4.15; gap-key rule (research R17–R21) |
 
 This file is the **first target profile** (spec FR-060). A later LDML version gets its own
 profile, written as deltas from this one (FR-061). See "Version deltas" at the end. Research
@@ -47,7 +48,7 @@ Every A/N/K row names its finding code. Codes are the `KM_LINT_LDML_*` family (F
 | 1.5 | context-only group reached by `use()` on **every** keystroke path of the calling group (rules, `nomatch`, implicit default) | a later `<transformGroup>` | M | — | LDML runs every group, in order, after each key that outputs. A group reached on every path is equivalent. |
 | 1.6 | context-only group reached by `use()` on **some** paths only | a later `<transformGroup>` | A | `KM_LINT_LDML_GROUP_CHAIN_PARTIAL` | LDML runs it after every key that outputs, including the keys that never reached it in KMN. |
 | 1.7 | a keystroke group (`using keys`) reached by `use()` from another keystroke group | merged into the key map, in call order | A | `KM_LINT_LDML_GROUP_CHAIN_PARTIAL` | LDML has one key map; layered keystroke dispatch flattens. |
-| 1.8 | `match` rule whose output is only `use(g)` | a call-graph edge (rows 1.5/1.6) | M/A | as 1.5/1.6 | |
+| 1.8 | `match` rule whose output is only `use(g)` | a call-graph edge (rows 1.5/1.6) | M/A | as 1.5/1.6 | The IR keeps a `match`/`nomatch` right-hand side as one `raw` element. The classifier recognises `use(g)` from that element's text; anything else is row 1.9. |
 | 1.9 | `match` / `nomatch` rule with literal output | — | N | `KM_LINT_LDML_MATCH_NOMATCH_OUTPUT` | No "after any match" or "no rule matched" hook. |
 | 1.10 | `readonly` group | — | N | `KM_LINT_LDML_NO_KEY_TRIGGER` | Readonly groups exist to inspect context without a keystroke. |
 | 1.11 | group unreachable from the entry group | — | — | hint `KM_LINT_LDML_UNREACHABLE` | Dead in KMN too; listed, not exported. |
@@ -127,8 +128,8 @@ exporter bridges the two this way:
 | 3.15a | `+ [K_X] > nul` with no context | `<key gap="true"/>` for that position, instead of the base keyboard's character | M | — | TR35 `key` requires at least one of `layerId`, `gap` or `output`; a gap produces nothing. kmc-ldml accepts gap keys. The suppressed position overrides the fill (row 2.8). Spec FR-029: never dropped. Prior art threw these rules away. |
 | 3.15b | `nul` output with a context | transform with an empty `to`, ordered ahead of the more general rule (FR-022) | M | — | Spec FR-029: never dropped. |
 | 3.16 | `beep` (both forms, as 3.15a and 3.15b) | as rows 3.15a and 3.15b | M | hint `KM_LINT_LDML_BEEP` | Only the audible feedback is lost. A key or transform with an empty output is not used: kmc-ldml rejects it (`Error_KeyMissingToGapOrSwitch`). Spec FR-029. |
-| 3.17 | `if(option = 'v')` (typed in the IR, spec 103) | evaluated against the option store's **default** value; true → condition dropped, false → rule dropped | A | `KM_LINT_LDML_OPTION_STATE` | LDML has no runtime state. The export behaves as the keyboard does with every option at its default. |
-| 3.18 | `if(option <> 'v')`, `set()`, `save()`, `reset()` | as 3.17; `set/save/reset` outputs dropped | A | `KM_LINT_LDML_OPTION_STATE` | `<>` is opaque in the IR (row 6.1) until spec 103 types it. |
+| 3.17 | `if(option = 'v')` in the rule's head position (typed in the IR, spec 103) | evaluated against the option store's **default** value; true → condition dropped, false → rule dropped | A | `KM_LINT_LDML_OPTION_STATE` | LDML has no runtime state. The export behaves as the keyboard does with every option at its default. |
+| 3.18 | `if(option <> 'v')`, an `if()` after other context, and any rule using `set()`, `save()` or `reset()` | — | N | `KM_LINT_LDML_OPTION_STATE` | The codec keeps these rules whole as `RawKmnFragment`s (reasons `if-option-store`, `option-store-directive`). There is no typed rule to evaluate or export, and Art II forbids re-parsing `sourceText`. The fragment's reason selects this code instead of `KM_LINT_LDML_OPAQUE` (row 6.1), and the finding still names the reason. FR-026 reads a `set(&layer=…)` inside a `PostKeystroke`/`NewContext` group (row 1.4a), so it is not reported here. |
 | 3.19 | `platform()` / `if(&platform …)` | evaluated statically: hardware view for the hardware form, touch view for touch forms | A | `KM_LINT_LDML_PLATFORM_CONDITION` | Only when the two views produce **different** transforms; LDML transforms cannot be scoped to a form. Identical views are M. |
 | 3.20 | `baselayout()` / `if(&baselayout …)` | evaluated against the export's one base keyboard (spec FR-027), the same one used for row 2.8 | A | `KM_LINT_LDML_BASELAYOUT_CONDITION` | |
 | 3.21 | `layer()` / `if(&layer …)` / `&newLayer` / `&oldLayer` in a rule | — (touch layer switching maps through keys, row 5.4) | N | `KM_LINT_LDML_LAYER_STATE` | |
@@ -156,6 +157,7 @@ exporter bridges the two this way:
 | 4.12 | `&HOTKEY`, `&WINDOWSLANGUAGES`, `&LANGUAGE`, `&ETHNOLOGUECODE` (locale source only), `&DISPLAYMAP`, `&KMW_RTL`, `&KMW_EMBEDJS`, `&KMW_EMBEDCSS`, `&KMW_HELPFILE`, `&KMW_HELPTEXT`, `&INCLUDECODES`, `&VERSION` | — | N | hint `KM_LINT_LDML_HEADER_UNSUPPORTED` |
 | 4.13 | `&CASEDKEYS` | drives row 2.14 | M | — |
 | 4.14 | `&MNEMONICLAYOUT` | drives row 2.7 | A | `KM_LINT_LDML_MNEMONIC` |
+| 4.15 | CLDR imports | none written. Every key the export uses is defined in the file, except implied keys (`a`–`z`, `A`–`Z`, `0`–`9`, `space`, `gap`), which Keyman imports itself. This keeps both profiles' files free of version-specific import paths | M | — |
 
 ## 5. Touch layout (`TouchLayoutIR`)
 
@@ -173,8 +175,8 @@ of the value (a fixed phone/tablet pair, or derived from the KMN platform) is a 
 
 | # | IR construct | LDML | Status | Code |
 |---|---|---|---|---|
-| 5.1 | `platforms[phone]` | `<layers formId="touch" minDeviceWidth="…">` | M | — |
-| 5.2 | `platforms[tablet]` | a second `<layers formId="touch" minDeviceWidth="…">` | M | — (prior art discarded tablet whenever phone existed) |
+| 5.1 | `platforms[phone]` | `<layers formId="touch" minDeviceWidth="1">` (constant `PHONE_MIN_DEVICE_WIDTH`) | M | — (TR35: "the `layers` entry with the greatest matching width will be selected", so 1 is the fallback for every device. The pinned Keyman compiler also requires the attribute on every touch form; research R20) |
+| 5.2 | `platforms[tablet]` | a second `<layers formId="touch" minDeviceWidth="150">` (constant `TABLET_MIN_DEVICE_WIDTH`, millimetres) | M | — (Prior art discarded the tablet form whenever a phone form existed. 150 keeps landscape phones on the phone form, as KeymanWeb does; research R20) |
 | 5.3 | `platforms[desktop]` | — (the hardware form covers desktop) | N | hint `KM_LINT_LDML_TOUCH_PRESENTATION` |
 | 5.4 | layer `id` (`default` → `base`), `nextlayer` | `<layer id>`; `key/@layerId` | M | — |
 | 5.5 | `sk` (long-press) incl. default | `longPressKeyIds`, `longPressDefaultKeyId` | M | — |
@@ -185,7 +187,7 @@ of the value (a fixed phone/tablet pair, or derived from the KMN platform) is a 
 | 5.10 | `text` label differing from output | `<display keyId>`. A label that is a bare nonspacing mark is an error: prepend U+25CC (TR35 (CLDR 49) §display). `display` must not equal the key's `output`. Gap keys cannot carry a display. | M | — |
 | 5.11 | `font`, `fontsize`, `hint`, `defaultHint`, `displayUnderlying`, touch `dk` | — | N | hint `KM_LINT_LDML_TOUCH_PRESENTATION` |
 | 5.12 | `sp` special keys: shift / layer switch | `layerId` keys | M | — |
-| 5.13 | `sp` special keys: backspace, enter, tab | to be confirmed (research R8) | A until R8 | `KM_LINT_LDML_TOUCH_SPECIAL_KEY` |
+| 5.13 | `sp` special keys: backspace (`K_BKSP`), enter (`K_ENTER`), tab (`K_TAB`) | a gap key of the same width: `<key id="bksp" gap="true" width="…"/>`, and likewise `enter` and `tab`. Never an `output` of U+0008, U+0009, U+000A or U+000D, which would insert a control character | A | hint `KM_LINT_LDML_TOUCH_SPECIAL_KEY`. TR35 has "no way to indicate that a key has a standardized identity", and CLDR's own sample writes `enter` as a gap. The touch form keeps the row's shape but has no working backspace, enter or tab key, and their labels are lost. Backspace **transforms** (row 2.18) still apply to the platform's backspace. Research R8 (resolved) |
 | 5.14 | `T_*` / `U_*` touch key ids | resolved through rules (`+ [T_x]`) or `U_xxxx` → codepoint | M | — |
 | 5.15 | any touch form | exported **spec-perfect to TR35** (spec FR-052/FR-053). Keyman compiles it into `layr`/`key2` but nothing runs it: Core ignores it, and KeymanWeb (hence Android/iOS) rejects LDML keyboards entirely (research R13) | K | stated once in the report, not a per-key finding. The touch half follows TR35, never Keyman's current behaviour: the export is preparation for Keyman's touch pipeline |
 
@@ -193,7 +195,7 @@ of the value (a fixed phone/tablet pair, or derived from the KMN platform) is a 
 
 | # | IR construct | LDML | Status | Code |
 |---|---|---|---|---|
-| 6.1 | `RawKmnFragment`, any reason in `codec/opaque-reasons.ts` | — | N | `KM_LINT_LDML_OPAQUE` (the message names the reason) |
+| 6.1 | `RawKmnFragment`, any reason in `codec/opaque-reasons.ts` | — | N | `KM_LINT_LDML_OPAQUE` (the message names the reason). The exception is a reason that selects a more specific row: `option-store-directive` and `if-option-store` go to row 3.18, `call-return` to row 1.12. Either way there is exactly one item per fragment |
 | 6.2 | `raw` context/output element (incl. `platform()` text, `<>` comparisons, `layer()` output) | classified by its text where a row above covers it, else — | N | `KM_LINT_LDML_OPAQUE` |
 
 Article II: nothing opaque is dropped silently — every fragment produces exactly one finding
@@ -221,7 +223,7 @@ documentation travels in two places:
 | `KM_LINT_LDML_NO_KEY_TRIGGER` | warning | 1.3, 1.4, 1.10 |
 | `KM_LINT_LDML_GROUP_CHAIN_PARTIAL` | warning | 1.6, 1.7, 1.8 |
 | `KM_LINT_LDML_MATCH_NOMATCH_OUTPUT` | warning | 1.9 |
-| `KM_LINT_LDML_CALL` | warning | 1.12 |
+| `KM_LINT_LDML_CALL` | warning | 1.12, 6.1 (`call-return`) |
 | `KM_LINT_LDML_PLATFORM_CONDITION` | warning | 1.13, 3.19 |
 | `KM_LINT_LDML_FORM_KEY_MISSING` | warning | 2.4 |
 | `KM_LINT_LDML_FRAME_KEY` | warning | 2.5, 2.19, 2.21 |
@@ -238,7 +240,7 @@ documentation travels in two places:
 | `KM_LINT_LDML_BKSP_NO_CONTEXT` | warning | 2.24 |
 | `KM_LINT_LDML_KEY_STORE` | warning | 2.25 |
 | `KM_LINT_LDML_NEGATED_CLASS` | warning | 3.10 |
-| `KM_LINT_LDML_OPTION_STATE` | warning | 3.17, 3.18 |
+| `KM_LINT_LDML_OPTION_STATE` | warning | 3.17, 3.18, 6.1 (`option-store-directive`, `if-option-store`) |
 | `KM_LINT_LDML_BASELAYOUT_CONDITION` | warning | 3.20 |
 | `KM_LINT_LDML_LAYER_STATE` | warning | 3.21 |
 | `KM_LINT_LDML_NORMALIZATION` | warning | 3.22, 3.23 |
@@ -250,6 +252,10 @@ documentation travels in two places:
 | `KM_LINT_LDML_KEYMAN_GAP` | hint | 4.10 |
 | `KM_LINT_LDML_TOUCH_PRESENTATION` | hint | 5.3, 5.8, 5.11 |
 | `KM_LINT_LDML_TOUCH_SPECIAL_KEY` | hint | 5.13 |
+
+**Gap keys.** TR35 forbids `output`, `layerId`, `flickId`, `longPressKeyIds`, `longPressDefaultKeyId`,
+`multiTapKeyIds` and any `<display>` on a gap key. Keyman's compiler does not check this, so the
+exporter's own conformance check does (FR-052; [test-harnesses.md](test-harnesses.md)).
 
 Codes are `KM_LINT_*`, never `KM_WARN_*`: the Output page's "Other findings" panel filters out
 `KM_WARN*` codes (`OutputScreen.tsx:147-151`), so a `KM_WARN_LDML_*` family would never reach
@@ -265,7 +271,8 @@ condition. These are the known candidates for the next profile:
 | 4.10 `info/@attribution` | K, omitted | a profile whose `conformsTo` is ≥ 47 **and** a Keyman schema that accepts `attribution` | M |
 | 3.7/3.8 set mapping not in group 1 | M by expansion, in both profiles (CLDR 49 grammar allows only `$[1:var]`) | Keyman accepts `$[N:var]` (upstream #16868 / PR #16870) **and** TR35 grammar admits N > 1 | M without expansion (smaller output) |
 | 3.8 several mappings in one `to` | M by expansion; N past the cap (3.9) | Keyman supports several maps per transform (#16868, "v20?") | M without expansion; 3.9 shrinks |
-| 5.13 touch backspace/enter/tab | A pending research R8 | R8 resolved against TR35 | M or N |
+| 5.13 touch backspace/enter/tab | A (gap placeholders) | TR35 gains a standardized key identity | M |
+| 3.18 `if(option <> 'v')`, non-head `if()` | N (opaque in the IR) | spec 103 types these conditions | A, as row 3.17 |
 | 5.15 touch forms in Keyman | K (pipeline not ready) | Keyman ships the LDML touch pipeline | M, and the report's delivery note is removed |
 | `conformsTo` enum | 45, 46 | Keyman ships a 47+ standards-data set | a new default profile |
 
