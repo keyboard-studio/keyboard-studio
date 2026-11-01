@@ -50,8 +50,10 @@ pipeline when it is implemented. Keyman's pipeline does not yet support the touc
 
 Where Keyman accepts less than the standard:
 
-- **hardware**: the export stays inside Keyman's subset, because Keyman compiles it today;
-- **touch**: the export follows TR35, because nothing in Keyman consumes it yet.
+- **hardware**: under a Keyman-compilable profile (46), the export stays inside Keyman's
+  subset, because Keyman compiles it today. Under a TR35-only profile (49), it follows TR35;
+- **touch**: the export follows TR35 under every profile, because nothing in Keyman consumes
+  it yet.
 
 Either way the difference is reported as a Keyman gap, never as an LDML incompatibility
 (FR-053; research, "Authority order").
@@ -69,6 +71,39 @@ the studio uses it rather than re-implementing it. That covers LDML types, XML r
 writing, schema validation, compilation, packaging, project templates, and normalization. A
 re-implementation needs a recorded reason: the library lacks the function, is not browser-safe,
 or fails the bundle-safety tests. See FR-080.
+
+## Clarifications
+
+### Session 2026-11-01
+
+- Q: Profile 49 is TR35-only (FR-066), but FR-005/FR-023/FR-041/FR-050/SC-001 were written
+  as if every export targets Keyman 19. Which rules apply under 49? → A: Each profile sets
+  its own rules. The Keyman-subset constraints (FR-005 hardware clause, FR-023, FR-041's
+  `attribution` exclusion) and the Keyman compile requirement (FR-050, SC-001) apply only to
+  Keyman-compilable profiles. Under a TR35-only profile, the hardware half follows TR35 in
+  full, and the export must pass the keyboard3 DTD/schema for its `conformsTo` plus the TR35
+  conformance checks instead.
+- Q: When the Story 5 compile reports only expected (Keyman-gap) errors, for example from the
+  touch half, is an installable LDML `.kmp` offered? → A: No. The package is compiled from
+  the complete, spec-perfect export, touch and hardware together, and is offered only when
+  that compile has zero errors. The exporter never strips or degrades the touch forms to get a
+  clean compile. The expectation is that Keyman, the only known LDML consumer, ignores the
+  touch half without erroring until it implements it. The FR-070 trial confirms this.
+- Q: Is `LDML-EXPORT-REPORT.md` localized to the interface language? → A: No. The report,
+  like the `.xml` comments, is always English. Studio-side findings and controls are
+  translated (FR-019). The determinism inputs are the working copy and the selected profile.
+- Q: Which OS base layout does the export assume for fall-through keys, mnemonic resolution,
+  `baselayout()` and the hardware form? (This is the OS layout under Keyman, not the copied
+  keyboard, which is what the `base-keyboard` decision stores.) → A: One base keyboard per
+  export (FR-027), chosen with a **per-export picker** on the Output page. Its default is the
+  primary hardware base: the primary `windows-layout` pick. Without a primary pick, the
+  studio's likely-base resolution (layout-family answer, then language tag) supplies it, then
+  `en-US`. The report and the `.xml` header comment name the layout used and where it came
+  from. (Reconciled 2026-11-01 with the FR-027 product ruling, which the session's first
+  answer, "no new export control", predated.)
+- Q: Do `hint` findings (non-rule losses, Keyman gaps) go to authoring steps like warnings, or
+  only to the Output page? → A: To authoring steps. Every code, warning or hint, is routed to
+  its owning step under FR-015, and FR-018's grouping keeps the volume readable.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -92,7 +127,7 @@ the same text. The report says "nothing was lost".
    pick the LDML version. Version 46 is preselected and marked as compilable by Keyman, and
    the current TR35 version is offered and marked "TR35-only (awaiting Keyman)".
 1. **Given** a keyboard whose rules are all transferable, **When** the author downloads the
-   LDML export, **Then** the `.xml` is valid keyboard3, compiles with Keyman's LDML compiler
+   LDML export under the default profile, **Then** the `.xml` is valid keyboard3, compiles with Keyman's LDML compiler
    without errors, and the report lists zero approximated or non-transferable items.
 2. **Given** a keyboard with an option-guarded rule (`if(opt = '1')`) and a `begin
    PostKeystroke` group, **When** the author downloads, **Then** the export still succeeds, the
@@ -238,10 +273,12 @@ not been done yet.
 2. **Given** a profile-46 export with Keyman-gap rows, **When** the compile check runs,
    **Then** the reported errors are exactly those rows. Any other error is shown as an
    exporter defect, not as an author problem.
-3. **Given** a successful compile, **When** the author downloads the LDML package, **Then** it
-   contains the compiled `<kmnid>_ldml.kmx` (with KMX+) and `<kmnid>_ldml.kvk` alongside the
-   source, under package id `<kmnid>_ldml`, and the package says it is desktop-only until
-   Keyman's web-core work ships.
+3. **Given** a zero-error compile of the complete export (touch forms included), **When** the
+   author downloads the LDML package, **Then** it contains the compiled `<kmnid>_ldml.kmx`
+   (with KMX+) and `<kmnid>_ldml.kvk` alongside the source, under package id `<kmnid>_ldml`,
+   and the package says it is desktop-only until Keyman's web-core work ships.
+3a. **Given** a compile that reports any error, expected or not, **Then** no LDML `.kmp` is
+   offered, the errors are shown as in scenario 2, and the source export still works.
 4. **Given** profile 49, **Then** compile and package are disabled with an explanation, and the
    source export still works.
 
@@ -294,9 +331,11 @@ not been done yet.
   downloads serialise. It operates on the KeyboardIR, never on raw `.kmn` text (Art II).
 - **FR-004**: The export MUST be a zip package containing `source/<kmnid>_ldml.xml` (keyboard3), the
   Keyman LDML project files listed in FR-040, and `LDML-EXPORT-REPORT.md`.
-- **FR-005**: The `.xml` MUST declare `conformsTo="46"` and the matching keyboard3 namespace,
-  and MUST be valid TR35 throughout. Its **hardware** half MUST also stay inside what Keyman
-  19's LDML compiler accepts (research R1–R3, R6). The touch half follows FR-053.
+- **FR-005**: The `.xml` MUST declare the selected profile's `conformsTo` and matching
+  keyboard3 namespace (FR-060), and MUST be valid TR35 throughout. Under a Keyman-compilable
+  profile (46), its **hardware** half MUST also stay inside what Keyman 19's LDML compiler
+  accepts (research R1–R3, R6). Under a TR35-only profile (49), the hardware half follows TR35
+  in full. The touch half follows FR-053 under every profile.
 - **FR-006**: Writing the download MUST NOT start a validation pass of its own. It reuses the
   classification already computed (Art IV, D3).
 - **FR-007**: The export MUST NOT write to host disk except through the browser download (Art V).
@@ -323,8 +362,10 @@ not been done yet.
   only (FR-027).
 - **FR-022**: Within each transform group, transforms MUST be written in KMN's effective
   precedence (longest context first, then source order), not in source order (research R5).
-- **FR-023**: Every transform MUST meet Keyman 19's set-mapping limit: at most one mapping, as
-  capture group 1, filling the whole replacement. Anything else MUST be expanded or reported.
+- **FR-023**: Under a Keyman-compilable profile, every transform MUST meet Keyman 19's
+  set-mapping limit: at most one mapping, as capture group 1, filling the whole replacement.
+  Anything else MUST be expanded or reported. Under a TR35-only profile, set mappings follow
+  TR35 (`$[N:set]` on any capture group, FR-066).
 - **FR-024**: No trigger marker introduced by the exporter may survive into the output text.
   Every such marker MUST have a final catch-all transform.
 - **FR-025**: Context-only groups reached by `use()` MUST be exported as later transform
@@ -382,8 +423,9 @@ not been done yet.
   a memoised scan over the working IR, joined into the one published findings array, in the
   same way as the existing sole-source `oe2` finding. They MUST NOT add a timer or a parallel
   validation path (Art IV).
-- **FR-015**: Each finding code MUST be routed to the step or question where its construct is
-  authored. Codes with no owning step appear in the Output page's findings summary. All LDML
+- **FR-015**: Each finding code, `warning` and `hint` alike, MUST be routed to the step or
+  question where its construct is authored, grouped per FR-018. Codes with no owning step
+  appear in the Output page's findings summary. All LDML
   findings MUST also be listed on the Output page next to the LDML download.
 - **FR-016**: LDML findings MUST NOT block, gate or disable any non-LDML download or the
   pull-request path, and MUST NOT count against criteria.
@@ -392,7 +434,8 @@ not been done yet.
   line MUST name their group and owning pattern or behaviour.
 - **FR-018**: Presentation MUST group findings by code with a count, while keeping every
   finding individually locatable.
-- **FR-019**: All new author-facing strings MUST ship with their French translation and use
+- **FR-019**: All new author-facing strings in the studio MUST ship with their French
+  translation and use
   the `output.download.*` and `lint.ldml.*` id namespaces. The new controls MUST meet the
   studio accessibility rules, including the aria-label matching the filename id.
 
@@ -445,7 +488,9 @@ not been done yet.
   - load lazily, like the existing `kmc-package` and `kmc-kmn` loads;
   - reuse the kmcmplib WASM the studio already ships;
   - read the CLDR import files through the compiler's file callbacks;
-  - pass the bundle-safety tests.
+  - pass the bundle-safety tests;
+  - show that the pinned compiler accepts a complete export, touch forms included, ignoring
+    the touch half without errors.
 
   The trial records the bundle-size cost. If it fails, Story 5 is withdrawn, and FR-050 stays
   a CI-only check.
@@ -461,6 +506,9 @@ not been done yet.
 - **FR-074**: The LDML package MAY include the compiled `<kmnid>_ldml.kmx` and
   `<kmnid>_ldml.kvk` and be offered as an installable `<kmnid>_ldml.kmp` (package id
   `<kmnid>_ldml`). That `.kmp` MUST:
+  - be offered only when Keyman's compiler builds the complete export, touch and hardware
+    together, with zero errors. The exporter MUST NOT strip or degrade the touch forms to get
+    a clean compile; any error means no package, and the source export stays available;
   - be a separate download from the KMN `.kmp`, with an id that does not collide with it;
   - never replace the KMN `.kmp`, and never enter the pull-request path (SS1);
   - state that it is desktop-only until Keyman can load LDML keyboards on web and mobile.
@@ -473,15 +521,18 @@ not been done yet.
 
 **Report**
 
-- **FR-030**: Identical working copies MUST yield byte-identical packages. The export uses no
-  timestamps and no ids that depend on traversal order.
+- **FR-030**: The same working copy exported under the same profile MUST yield a
+  byte-identical package, whatever the interface language. The export uses no timestamps and
+  no ids that depend on traversal order. `LDML-EXPORT-REPORT.md` and the `.xml` comments are
+  always English. Only the studio-side strings are translated (FR-019).
 - **FR-031**: `LDML-EXPORT-REPORT.md` MUST contain:
   - counts per status;
   - one row per Approximated, Not-transferable and Keyman-gap item, with location, construct,
     code and consequence;
   - a separate "physical keyboard" list and "touch" list of items that did not transfer;
   - the Keyman 19 desktop-only delivery note;
-  - the authority statement (TR35 version and Keyman version targeted).
+  - the authority statement (TR35 version and Keyman version targeted);
+  - the base keyboard the export resolved against (see "Base-keyboard resolution").
 
 **Documentation and metadata**
 
@@ -494,8 +545,9 @@ not been done yet.
   `/^[a-z_][a-z0-9_]*$/` (`common/web/types` `valid-ids.ts:25`). Its `.kps` MUST reference
   `build/<kmnid>_ldml.kmx` and `build/<kmnid>_ldml.kvk`.
 - **FR-041**: The `.xml` MUST carry the metadata of mapping-contract section 4:
-  - `info` holds only `name`, `author`, `layout` and `indicator`. `attribution` is not
-    accepted by Keyman's v46 schema.
+  - Under profile 46, `info` holds only `name`, `author`, `layout` and `indicator`, because
+    Keyman's v46 schema does not accept `attribution`. Profile 49 adds `info/@attribution`
+    (FR-066).
   - `version` and locales come from the identity overlay and package metadata, not from
     `IRHeader.bcp47`.
   - `keyboard3/@locale` comes from the keyboard's BCP47 tag reduced to minimal likely-subtags
@@ -503,17 +555,20 @@ not been done yet.
     `-k0-`.
 - **FR-042**: The `.xml` MUST open with a documentation comment carrying:
   - name, id, version, description, copyright, licence name, author, attribution, home page
-    and studio version;
+    and studio version, plus the selected profile and the base keyboard resolved against;
   - one comment per transform group naming its KMN group;
   - one comment per transform naming its source line.
 
 **Quality**
 
-- **FR-050**: Every exported `.xml` in the test corpus MUST pass Keyman's keyboard3 schema
-  validation and compile with Keyman's LDML compiler in CI. The only errors allowed are those
-  attributable to a Keyman-gap (K) row, and the CI test MUST assert that the compiler's error
-  set equals exactly the export's K-row set. A file with no K rows compiles cleanly. A new
-  Keyman release that lifts a gap then shows up as a test change, not a silent pass.
+- **FR-050**: Under every Keyman-compilable profile, every exported `.xml` in the test corpus
+  MUST pass Keyman's keyboard3 schema validation and compile with Keyman's LDML compiler in
+  CI. The only errors allowed are those attributable to a Keyman-gap (K) row, and the CI test
+  MUST assert that the compiler's error set equals exactly the export's K-row set. A file with
+  no K rows compiles cleanly. A new Keyman release that lifts a gap then shows up as a test
+  change, not a silent pass. Under a TR35-only profile, every exported `.xml` MUST instead pass
+  the CLDR keyboard3 DTD/schema for its `conformsTo` and the TR35 conformance checks (FR-052
+  for the touch half); it is not compiled with Keyman.
 - **FR-051**: A keystroke-equivalence harness MUST compare KMN behaviour (the engine's
   simulator) with LDML behaviour on generated keystroke sequences for the test corpus.
   Mismatches are allowed only on sequences that exercise an item the report lists.
@@ -528,8 +583,8 @@ not been done yet.
   This conformance check is the touch half's source of truth. Keyman's compiler is a second
   check, and a construct Keyman rejects is resolved by FR-053.
 - **FR-053**: Where TR35 and Keyman 19 disagree:
-  - on the **hardware** half, the export uses the subset both accept, because Keyman compiles
-    it today;
+  - on the **hardware** half under a Keyman-compilable profile, the export uses the subset both
+    accept, because Keyman compiles it today. Under a TR35-only profile, TR35 decides;
   - on the **touch** half, the export follows TR35, and each Keyman difference is a Keyman-gap
     hint.
 
@@ -548,9 +603,13 @@ not been done yet.
 - **Export package**: the zip of the LDML project plus the report. It is derived from the
   projected working copy and has no state of its own.
 - **Base-keyboard resolution**: the one OS layout the export uses for fill (FR-021), mnemonic
-  resolution and `baselayout()` evaluation (FR-027). It comes from the studio's reference base
-  keyboards. The default is the primary `windows-layout` pick, then the likely-base resolution,
-  then `en-US`. Distinct from the copied keyboard and the starting point.
+  resolution, `baselayout()` evaluation (FR-027) and the hardware-form choice (FR-020). It
+  comes from the studio's reference base keyboards and is chosen per export with the Output
+  page's base-keyboard picker. The default is the primary `windows-layout` pick, then the
+  likely-base resolution, then `en-US`; a default with no character data is shown as
+  unavailable and the author picks another, never a silent substitute. The report and the
+  `.xml` header comment name it and its source. Distinct from the copied keyboard (the
+  `base-keyboard` decision) and the starting point.
 - **Target profile**: one LDML keyboard version the exporter can write. It holds `conformsTo`,
   namespace, TR35 revision, the Keyman release it is compiled against, and its classification
   rows (or deltas from the previous profile). It is selected per export and named in the
@@ -562,9 +621,11 @@ not been done yet.
 
 ### Measurable Outcomes
 
-- **SC-001**: 100 % of exports in the test corpus pass Keyman's keyboard3 schema validation and
-  compile with Keyman's LDML compiler with no errors other than those their report attributes
-  to a Keyman-gap row. 100 % of hardware-only exports compile with zero errors.
+- **SC-001**: Under every Keyman-compilable profile, 100 % of exports in the test corpus pass
+  Keyman's keyboard3 schema validation and compile with Keyman's LDML compiler with no errors
+  other than those their report attributes to a Keyman-gap row, and 100 % of hardware-only
+  exports compile with zero errors. Under every TR35-only profile, 100 % of corpus exports
+  pass the CLDR keyboard3 DTD/schema for their `conformsTo` and the TR35 conformance checks.
 - **SC-002**: For every corpus keyboard whose report lists no A or N items, 100 % of generated
   keystroke sequences produce identical text under KMN and under the LDML export.
 - **SC-003**: For every corpus keyboard, every keystroke-sequence mismatch is attributable to
@@ -579,7 +640,8 @@ not been done yet.
   Producing it for a corpus-sized keyboard (≤ 2 000 rules) takes under 2 seconds.
 - **SC-008**: Adding or removing an incompatible rule changes the visible LDML warnings within
   the same validation cycle as other findings. No extra delay is introduced.
-- **SC-009**: Two exports of an unchanged working copy are byte-identical.
+- **SC-009**: Two exports of an unchanged working copy under the same profile are
+  byte-identical, including when the interface language differs between them.
 - **SC-010**: 100 % of touch forms exported from the corpus pass the TR35 touch conformance
   check (FR-052). Zero touch constructs are degraded to fit today's Keyman compiler.
 - **SC-011**: Adding a second profile that only changes the status of existing rows touches
@@ -605,6 +667,9 @@ not been done yet.
   input. The reference data lives in the studio package, and the engine may not import the
   studio.
 - **Option defaults**: an option store's default is its initial store value in the IR.
+- **Keyman and the touch half**: Keyman's LDML compiler ignores touch forms it does not yet
+  implement, without erroring. The FR-070 trial checks this. If it does not hold, Story 5
+  offers no installable package for keyboards with touch forms (FR-074).
 - **Expansion cap**: 1 000 transforms per KMN rule is enough for real keyboards. It is a
   tunable constant, not a contract.
 - **Open items carried into planning**:
