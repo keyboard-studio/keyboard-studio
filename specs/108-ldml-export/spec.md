@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-01
 
-**Status**: Draft — blocked on governance gate G0 (see below)
+**Status**: Draft — gate G0 cleared 2026-11-01 (Constitution 2.1.0)
 
 **Owner**: Engine team (Constitution Art VI) — exporter, classifier, output path, SPA surfaces.
 No Content-team surfaces change.

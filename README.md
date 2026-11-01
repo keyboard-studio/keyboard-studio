@@ -56,7 +56,8 @@ keyboard.
 
 - Experimental. Reviewers may still ask for changes, and passing the studio's checks does not
   guarantee acceptance.
-- Not yet supported: CJK, Ethiopic, and Hangul jamo-composition input methods, LDML output,
+- Not yet supported: CJK, Ethiopic, and Hangul jamo-composition input methods, LDML as the
+  primary output (an LDML export is available as a secondary download),
   predictive-text wordlists, and merging several keyboards into one. Full list in
   [spec.md §16](spec.md#16-out-of-scope).
 - Some review criteria can't be checked by software (for example, the right to name a given

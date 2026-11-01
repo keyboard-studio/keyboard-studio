@@ -1,8 +1,8 @@
-# Proposed amendment: allow LDML export (Constitution 2.0.0 → 2.1.0)
+# Amendment: allow LDML export (Constitution 2.0.0 → 2.1.0)
 
-**Status**: PROPOSED. Awaiting the product owner's ruling. **Not applied.** No governing file
-changes until the ruling is recorded; `/speckit-plan`'s Constitution Check fails on Article VII
-until it lands.
+**Status**: ADOPTED 2026-11-01 by product-owner ruling ("LDML output is now in-scope.
+Approved."). Applied to the constitution (2.1.0), spec.md §16, CLAUDE.md and README.md in the
+same commit. Gate G0 is cleared.
 **Spec**: [spec.md](spec.md)
 
 ## Why this is a ruling, not a met condition

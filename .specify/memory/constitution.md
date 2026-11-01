@@ -86,8 +86,10 @@ prompts, and criteria triage. Every plan MUST declare which team owns the
 change and stay within that boundary.
 
 ### VII. Out of scope for v1 (spec §16)
-Plans MUST NOT implement: CJK/Ethiopic reorder patterns, LDML output,
-mobile-app integration, hosting, multi-language `welcome.htm` variants,
+Plans MUST NOT implement: CJK/Ethiopic reorder patterns, LDML as an
+emission format (LDML *export* — a secondary, source-only download that
+never replaces KMN on the `.kmp` or pull-request paths — is in scope per
+spec 108), mobile-app integration, hosting, multi-language `welcome.htm` variants,
 `.kpj.user` management, touch-first authoring, multi-source merge,
 survey-editing of opaque `RawKmnFragment`, or byte-identical round-trip.
 Three-group routing renders the "not yet supported" stub for CJK/Ethiopic —
@@ -202,4 +204,4 @@ existing text MUST edit that text. Append-only amendments — a new paragraph
 that silently reverses an old one while both stand — are the failure this
 version exists to end, and a reviewer MUST reject one on sight.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-14 | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)
+**Version**: 2.1.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-01 (Art VII: LDML export in scope, spec 108) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)
