@@ -39,7 +39,9 @@
   ldml-keyboard`, `$[N:set]`, CI schema validation, and the Keyman-library ruling. These are contract-level constraints that the house conventions require
   (Output-panel code filtering, Constitution Art IV), not design choices. All per-construct
   mapping detail lives in [contracts/ldml-mapping.md](../contracts/ldml-mapping.md).
-- **Open research items** R8 (touch backspace/enter/tab) and R9 (normalization default) are
-  carried into planning. Neither changes user-visible scope.
+- **Open research item** R8 (touch backspace/enter/tab) is carried into planning. It does not
+  change user-visible scope. R9 (normalization) was resolved by product-owner ruling on
+  2026-11-01. It does change user-visible behaviour: under the LDML export the application
+  receives NFC text, so rows 3.22 and 3.23 warn wherever an output differs from its NFC form.
 - **Success criteria**: SC-007 (≤ 2 s) and SC-008 (same validation cycle) are user-facing
   timing. The others are corpus-measurable outcomes.

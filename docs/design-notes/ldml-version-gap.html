@@ -250,7 +250,7 @@ footer a { color: var(--accent); }
 <header>
   <div class="eyebrow">LDML keyboard3 · keyboard-studio spec 108</div>
   <h1>LDML 46 vs the current TR35 (CLDR 49), and what Keyman does with each</h1>
-  <p class="lede">The format barely moved between 46 and 49, and nothing about touch changed. Keyman does not ignore what it doesn't know: any 47+ feature fails the build. Keyman compiles LDML into KMX+, a binary block inside a <code>.kmx</code>, and its runtimes read only part of that block. Touch is the big gap, as you expected, but the gap is in Keyman, not in the LDML version. KMX+ is also where Keyman plans to close it.</p>
+  <p class="lede">The format barely moved between 46 and 49, and no touch schema changed. Keyman does not ignore what it doesn't know: any 47+ feature fails the build. Keyman compiles LDML into KMX+, a binary block inside a <code>.kmx</code>, and its runtimes read only part of that block. Touch is the big gap, as you expected, but the gap is in Keyman, not in the LDML version. KMX+ is also where Keyman plans to close it.</p>
   <div class="verdicts">
     <div class="verdict">
       <div class="big ok">0</div>
@@ -303,12 +303,17 @@ footer a { color: var(--accent); }
       <div class="change breaks"><span class="tag add">Allowed value</span><code>conformsTo</code> 47, 48 or 49 <span class="km">Keyman: build fails</span></div>
       <div class="change"><span class="tag doc">Clarified</span><code>display</code>, <code>layer</code>, backspace <code>transform</code>; test-data links removed.</div>
       <div class="change"><span class="tag doc">Known issue</span><code>minDeviceWidth</code> is under-specified (CLDR-19754).</div>
+      <div class="change"><span class="tag doc">Spec text</span>The transform escape list is explicit, and no longer allows the <code>\0</code> escape that 46.1 listed.</div>
+      <div class="change"><span class="tag doc">Spec text</span>"For hardware layouts, the layer with <code>modifiers="none"</code> becomes the base layer when the keyboard is used as a touch layout". A behavioural clarification; no schema change.</div>
+      <div class="change"><span class="tag doc">Spec text</span>The display note about keys with no output is rewritten; 46.1 said there was no way to give a custom display to an output-less key.</div>
     </div>
   </div>
 
   <div class="unchanged">
     <div><strong>Unchanged from 46 to 49:</strong> every other element and attribute. That covers <code>keys</code>/<code>key</code> (width, gap, longPress, multiTap, flickId, layerId, stretch), <code>flicks</code>, <code>forms</code>/<code>scanCodes</code>, <code>layers</code>/<code>layer</code>/<code>row</code>, <code>variables</code>, <code>transforms</code>/<code>transformGroup</code>/<code>transform</code>/<code>reorder</code>, <code>displays</code>, <code>import</code>, <code>settings</code>, <code>locales</code>.</div>
     <div class="muted">The one fixed value that moves is <code>version/@cldrVersion</code> ("46" → "49"). It is optional, so the export leaves it out.</div>
+    <div class="muted"><strong>Not a 46 to 49 change: <code>$[N:set]</code>.</strong> TR35 prose says <code>$[1:variable]</code> is "(Where '1' is any numbered capture group from 1 to 9)" in both CLDR 46.1 and CLDR 49. The CLDR 49 transform-to grammar allows only <code>mapped-set ::= '$[1:' var-id ']'</code>, and the <code>$[1:…]</code> set format may only be used where there is exactly one capture group with a set variable on the <code>from=</code> match string. A profile-49 export must not emit <code>$[N:set]</code> with N &gt; 1; set mappings outside group 1 are expanded in both profiles.</div>
+    <div class="muted">The 47, 48 and 49 attributions above come from the release notes and the DTD diff. They were not re-verified against tr35-modifications.html; the 2026-11-01 TR35 reread checked only presence in 46.1 versus 49.</div>
   </div>
 </section>
 
@@ -359,7 +364,7 @@ footer a { color: var(--accent); }
   <div class="aside">
     <h3>Keyman is also stricter than TR35 within 46</h3>
     <ul>
-      <li>A set mapping must be capture group 1 and fill the whole <code>to</code> (<code>$[1:set]</code>). TR35 allows <code>$[2:set]</code> through <code>$[9:set]</code>; Keyman fails the build. Upstream fix is draft PR #16870, unmerged.</li>
+      <li>A set mapping must be capture group 1 and fill the whole <code>to</code> (<code>$[1:set]</code>). TR35 prose mentions groups 1 to 9 in both 46.1 and 49, but the CLDR 49 grammar allows only <code>$[1:set]</code>. On <code>$[N:set]</code> with N &gt; 1, Keyman fails the build (Error_IllegalTransformToUset); the upstream fix, draft PR #16870, is unmerged. This is a Keyman-side fact, not a difference between profiles.</li>
       <li>Only one set mapping per transform. Lifting this needs binary-format, core and compiler changes, pencilled in for v20.</li>
       <li>One loose end: <code>&lt;import path="47/…"&gt;</code> is accepted and treated as 46, while <code>conformsTo="47"</code> is rejected.</li>
     </ul>
@@ -490,6 +495,34 @@ footer a { color: var(--accent); }
     <span class="k">#13429</span><span>Touch keys in .kmx for web/touch, milestone 20.0</span>
     <span class="k">#13424</span><span>On-screen keyboard for mobile/desktop, milestone 20.0</span>
   </div>
+
+  <div class="aside">
+    <h3>The "no key input" gap is touch layer state, not text</h3>
+    <p>KMN cannot rewrite text without a keystroke either:</p>
+    <ul>
+      <li>Context-only groups run only when a keystroke rule hands off to them with <code>use()</code>. LDML covers that with chained <code>transformGroup</code>s.</li>
+      <li><code>begin NewContext</code> and <code>begin PostKeystroke</code> must use <code>readonly</code> groups, which cannot emit text.</li>
+    </ul>
+    <p>In the corpus, 50 of 1,036 keyboards use them. All 97 of those groups are <code>readonly</code>, and all of them are used for touch auto-layer switching.</p>
+  </div>
+
+  <div class="matrix-wrap" role="region" aria-label="Keyman casing-template behaviours and whether the LDML export keeps them" tabindex="0">
+    <table class="matrix compact">
+      <thead>
+        <tr><th scope="col">Behaviour <span class="sub">Keyman casing template</span></th><th scope="col">KMN rule</th><th scope="col">In the LDML export</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Back to default after one shifted letter</th><td class="from"><code>nomatch &gt; layer('default')</code></td><td><span class="chip w">Carries over</span><span class="note"><code>layerId="base"</code> on Shift-layer output keys</span></td></tr>
+        <tr><th scope="row">Caps lock stays on</th><td class="from"><code>if(&amp;layer = 'caps') &gt; context</code></td><td><span class="chip w">Carries over</span><span class="note">No layer switch on caps-layer keys</span></td></tr>
+        <tr><th scope="row">Stay numeric while typing digits</th><td class="from"><code>if(&amp;layer = 'numeric') any(digit) &gt; context</code></td><td><span class="chip w">Carries over</span><span class="note">Digit keys stay, others return to base</span></td></tr>
+        <tr><th scope="row">Shift after <code>. </code> <code>? </code> <code>! </code></th><td class="from"><code>any(sentencePunctuation) ' ' &gt; layer('shift')</code></td><td><span class="chip r">Lost</span><span class="note">An LDML layer switch cannot depend on earlier text</span></td></tr>
+        <tr><th scope="row">Start a new field on Shift</th><td class="from"><code>NewContext</code> → <code>nul &gt; layer('shift')</code></td><td><span class="chip r">Lost</span><span class="note">An LDML touch form always starts on <code>base</code></span></td></tr>
+        <tr><th scope="row">Re-check after backspace or a predictive-text pick</th><td class="from"><code>PostKeystroke</code> re-runs</td><td><span class="chip r">Lost</span><span class="note">LDML has no hook for these events</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted">Keyman acknowledges the gap only in passing: on #15286, PostKeystroke is "conceptually supported by the KmxKeyboardProcessor … but not LdmlKeyboardProcessor". No Keyman or CLDR GitHub issue asks for an LDML equivalent; CLDR's Jira was not searched.</p>
 </section>
 
 <section aria-labelledby="s4">
@@ -522,20 +555,20 @@ footer a { color: var(--accent); }
       <ul>
         <li>The newest valid CLDR output, for other LDML implementations and for the future.</li>
         <li>Every Keyman tool fails to build it until Keyman ships a 47+ schema.</li>
-        <li>May also use <code>$[N:set]</code> mappings, which make transforms smaller.</li>
+        <li>Must not emit <code>$[N:set]</code> with N &gt; 1: the CLDR 49 grammar allows only <code>$[1:set]</code>, so set mappings outside group 1 are expanded, as in profile 46.</li>
       </ul>
     </div>
   </div>
 
   <div class="callout">
     <strong>Recommendation:</strong>
-    <span>Keep 46 as the default. Because the touch half is identical, "spec-perfect touch, ready for Keyman's pipeline" is already met by profile 46. Profile 49 only adds attribution metadata and smaller transforms, at the cost of Keyman refusing the file. The version profiles stay useful because the next CLDR version may change more than this one did.</span>
+    <span>Keep 46 as the default. Because the touch half is identical, "spec-perfect touch, ready for Keyman's pipeline" is already met by profile 46. Profile 49 only adds attribution metadata, at the cost of Keyman refusing the file. The version profiles stay useful because the next CLDR version may change more than this one did.</span>
     <span>The studio exports LDML, not KMX+, so the KMX+ version stays Keyman's concern. For a build check, the studio could probably run Keyman's LDML compiler in the browser, which has no file-system dependencies, if it bundles the compiler's WASM and the CLDR import files. That is untested.</span>
   </div>
 </section>
 
 <footer>
-  <div><strong>Sources.</strong> TR35 Part 7 Keyboards, CLDR 49 (tr35-79, 2026-10-21) and the TR35 modification lists; CLDR <code>keyboards/dtd/ldmlKeyboard3.dtd</code> at <code>release-46</code> and <code>main</code>; CLDR 47, 48 and 49 release notes. Keyman evidence: <code>keymanapp/keyman</code> <code>origin/master</code> <code>cbc752f</code> (2026-10-29, 20.0.10-alpha): the CLDR-46 JSON schema, <code>kmc-ldml</code>, <code>core/src/ldml</code>, the KeymanWeb loader and TIKE sources. KMX+: <code>docs/file-formats/kmx-plus-file-format.md</code>, <code>core/src/kmx/kmx_plus.cpp</code>, <code>ldml_processor.cpp</code>, and the unmerged <code>epic/web-core</code> branch (<code>236a6e6</code>) for KMX+ v19 and the Core-in-browser loader.</div>
+  <div><strong>Sources.</strong> TR35 Part 7 Keyboards, CLDR 49 (tr35-79, 2026-10-21), reread in full on 2026-11-01 against CLDR 46.1 (tr35-74), and the TR35 modification lists; CLDR <code>keyboards/dtd/ldmlKeyboard3.dtd</code> at <code>release-46</code> and <code>main</code>; CLDR 47, 48 and 49 release notes. Keyman evidence: <code>keymanapp/keyman</code> <code>origin/master</code> <code>cbc752f</code> (2026-10-29, 20.0.10-alpha): the CLDR-46 JSON schema, <code>kmc-ldml</code>, <code>core/src/ldml</code>, the KeymanWeb loader and TIKE sources. KMX+: <code>docs/file-formats/kmx-plus-file-format.md</code>, <code>core/src/kmx/kmx_plus.cpp</code>, <code>ldml_processor.cpp</code>, and the unmerged <code>epic/web-core</code> branch (<code>236a6e6</code>) for KMX+ v19 and the Core-in-browser loader.</div>
   <div><strong>Caveats.</strong> The Keyman 19 beta branch was not diffed separately; master still carries the "for version 19" loader guard. The CLDR 47 TR35 modification page was unavailable, so 47 items come from the release note and the DTD diff. The Keyman error text is reconstructed from its message template, not observed in a run.</div>
 </footer>
 
