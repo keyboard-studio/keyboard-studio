@@ -66,7 +66,7 @@ tables directly.
 | `status` | `"M" \| "A" \| "N" \| "K"` | an `M/A` row resolves to one status per item |
 | `code` | `LdmlCode \| null` | `null` only for M |
 | `severity` | `"warning" \| "hint" \| null` | FR-010; the rule-vs-non-rule split is computed per item |
-| `nodeKey` | string | `group:<name>#<ordinal>`, `fragment#<ordinal>`, `store:<NAME>`, `touch:<platform>/<layer>/<key>`, `header:<field>`, or `behaviour:<name>` for FR-026's per-behaviour items |
+| `nodeKey` | string | `group:<name>#<ordinal>`, `fragment#<ordinal>`, `store:<NAME>`, `touch:<platform>/<layer>/<key>`, `header:<field>`, `base:<layer>/<vkey>` for row 2.26, or `behaviour:<name>` for FR-026's per-behaviour items |
 | `line` | number \| null | `sourceLine` from the IR that was classified |
 | `owner` | string \| null | the group and its owning pattern or behaviour, for items with no line (FR-017) |
 | `construct` | string | a short English construct label, e.g. "`set()` in rule" |

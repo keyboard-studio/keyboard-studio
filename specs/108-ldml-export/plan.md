@@ -92,7 +92,7 @@ CI for the Keyman compile, CLDR XSD validation and the equivalence harness.
 
 **Scale/Scope**:
 
-- 26 finding codes. The R9 widening reuses `KM_LINT_LDML_NORMALIZATION`, and the
+- 27 finding codes, including `KM_LINT_LDML_BASE_DEADKEY` (row 2.26, added in planning). The R9 widening reuses `KM_LINT_LDML_NORMALIZATION`, and the
   set/save/reset reclassification reuses `KM_LINT_LDML_OPTION_STATE`.
 - Corpus: the studio's existing fixtures, plus `ibono_chwerty`, `khmer_angkor`/`khmer_ldml` and
   one mnemonic keyboard.

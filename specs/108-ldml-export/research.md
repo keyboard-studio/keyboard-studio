@@ -616,7 +616,7 @@ reason, and the alternatives rejected. The sources are:
   - The download parses the output projection's `.kmn` and classifies again.
   - A **site** is identified by its IR node, not its line: `(code, rowId, nodeKey)`.
     - `nodeKey` is one of `group:<name>#<rule ordinal>`, `fragment#<ordinal>`, `store:<NAME>`,
-      `touch:<platform>/<layer>/<key>` or `header:<field>`.
+      `touch:<platform>/<layer>/<key>`, `header:<field>` or `base:<layer>/<vkey>` (row 2.26).
     - The line is a display attribute. Findings show the preview projection's line; the report
       shows the output projection's line, which is the line in the downloaded KMN package's
       `.kmn`.
@@ -645,6 +645,7 @@ reason, and the alternatives rejected. The sources are:
   - **ISO family**: the host table has a `K_OE2` cell (FR-020).
   - **`info/@layout`**: the family label comes from the host id. `us`, `us-intl` and `uk` give
     QWERTY, `azerty` gives AZERTY, and `qwertz` gives QWERTZ.
+- **Base dead keys**: the tables mark 12 dead-key cells (AZERTY, US-International) with a sentinel only. A position no rule covers is omitted, and row 2.26 reports it (`KM_LINT_LDML_BASE_DEADKEY`, hint; added in tasks review, 2026-11-01).
 - **Limitation, reported**: only five reference hosts exist. A picked Windows layout outside them
   contributes only its family, because `WindowsLayout.host` is unset. The report names the host
   actually used.

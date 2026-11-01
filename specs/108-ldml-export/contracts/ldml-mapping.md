@@ -9,7 +9,7 @@
 | TR35 revision written against | CLDR 49, `tr35-79` (2026-10-21) |
 | Keyman release defining the hardware subset | Keyman 19, as pinned in CI: `@keymanapp/kmc-ldml@19.0.240-alpha` and `@keymanapp/common-types@19.0.240-alpha` (research R16). `origin/master` `cbc752f67b` (20.0.10-alpha) is evidence only |
 | Status | Default profile |
-| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 3.22, 5.1, 5.2, 5.13, 6.1; new row 4.15; gap-key rule (research R17–R21) |
+| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 3.22, 5.1, 5.2, 5.13, 6.1; new rows 2.26 and 4.15; gap-key rule (research R17–R21, R24) |
 
 This file is the **first target profile** (spec FR-060). A later LDML version gets its own
 profile, written as deltas from this one (FR-061). See "Version deltas" at the end. Research
@@ -84,6 +84,7 @@ Every A/N/K row names its finding code. Codes are the `KM_LINT_LDML_*` family (F
 | 2.23 | left and right modifiers mixed in one rule (e.g. `LCTRL RALT`, `LALT RCTRL`) | the side-neutral form (`ctrl alt`) when no other rule in the keyboard distinguishes those sides; otherwise not exported | A, else N | `KM_LINT_LDML_MODIFIER_SIDES` | TR35 forbids mixing sides in one modifier value, errors on overlapping layers, and requires implementations to warn when a keyboard mixes `alt` with `altL`/`altR` (TR35 (CLDR 49) §layer). See rows 2.10 and 2.11. |
 | 2.24 | `+ [K_BKSP]` rule with an empty context | — | N | `KM_LINT_LDML_BKSP_NO_CONTEXT` | A backspace transform requires `from` (TR35 (CLDR 49) §transform). |
 | 2.25 | `any(store)` where the store holds virtual keys, in keystroke position (`+ any(keys) > index(out, n)`) | one `<key>` per store item, with its indexed output | M | — | Transforms have no key-identity construct, so the keystroke side is expanded into keys. Unequal store lengths or unresolvable items are N with code `KM_LINT_LDML_KEY_STORE` (warning). |
+| 2.26 | a position no rule covers where the **base keyboard** has a dead key (e.g. `^` and `¨` on AZERTY, `'` `"` `^` `` ` `` `~` on US-International) | position omitted from that layer | N | hint `KM_LINT_LDML_BASE_DEADKEY` | The studio's reference tables hold only a dead-key sentinel, not the dead key's spacing character or its compositions, so the exporter cannot reproduce the OS dead key. In KMN the keystroke falls through to the OS dead key; in the LDML export the key types nothing. One item per (layer, position). Added in planning (2026-11-01). |
 
 **Key ids.** LDML key ids are author-chosen; position comes from rows. The exporter generates
 ids deterministically from content, never from time or counters that depend on traversal order:
@@ -229,6 +230,7 @@ documentation travels in two places:
 | `KM_LINT_LDML_FRAME_KEY` | warning | 2.5, 2.19, 2.21 |
 | `KM_LINT_LDML_MNEMONIC` | warning | 2.7, 4.14 |
 | `KM_LINT_LDML_SHIFT_SIDE` | warning | 2.12 |
+| `KM_LINT_LDML_BASE_DEADKEY` | hint | 2.26 (base keyboard, not a rule) |
 | `KM_LINT_LDML_CAPS_MODE` | hint | 2.15 (header stores) |
 | `KM_LINT_LDML_EXPANSION_LIMIT` | warning | 3.9 |
 | `KM_LINT_LDML_NOTANY_MULTI` | warning | 3.11 |
@@ -273,6 +275,7 @@ condition. These are the known candidates for the next profile:
 | 3.8 several mappings in one `to` | M by expansion; N past the cap (3.9) | Keyman supports several maps per transform (#16868, "v20?") | M without expansion; 3.9 shrinks |
 | 5.13 touch backspace/enter/tab | A (gap placeholders) | TR35 gains a standardized key identity | M |
 | 3.18 `if(option <> 'v')`, non-head `if()` | N (opaque in the IR) | spec 103 types these conditions | A, as row 3.17 |
+| 2.26 base-keyboard dead key | N (position omitted) | the reference base tables carry each dead key's spacing character and compositions | A: an LDML marker plus transforms emulating the OS dead key |
 | 5.15 touch forms in Keyman | K (pipeline not ready) | Keyman ships the LDML touch pipeline | M, and the report's delivery note is removed |
 | `conformsTo` enum | 45, 46 | Keyman ships a 47+ standards-data set | a new default profile |
 

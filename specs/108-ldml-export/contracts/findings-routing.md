@@ -38,7 +38,7 @@ to the Output page.
 | `KM_LINT_LDML_TOUCH_PRESENTATION`, `KM_LINT_LDML_TOUCH_SPECIAL_KEY` | `touch` | question `touch-layout` |
 | `KM_LINT_LDML_NO_KEY_TRIGGER` | `touch`. The parser sets `readonly` only on `NewContext`/`PostKeystroke` groups (`parse.ts:1218`), so rows 1.3, 1.4, 1.4b and 1.10 are all touch layer behaviour | question `touch-layout` |
 | `KM_LINT_LDML_GROUP_CHAIN_PARTIAL`, `KM_LINT_LDML_MATCH_NOMATCH_OUTPUT`, `KM_LINT_LDML_CALL`, `KM_LINT_LDML_PLATFORM_CONDITION`, `KM_LINT_LDML_OPTION_STATE`, `KM_LINT_LDML_BASELAYOUT_CONDITION`, `KM_LINT_LDML_LAYER_STATE`, `KM_LINT_LDML_NORMALIZATION`, `KM_LINT_LDML_OPAQUE`, `KM_LINT_LDML_BEEP`, `KM_LINT_LDML_EXPANSION_LIMIT`, `KM_LINT_LDML_NOTANY_MULTI`, `KM_LINT_LDML_CAPTURE_LIMIT`, `KM_LINT_LDML_UNREACHABLE` | `rules` | step `rules` |
-| `KM_LINT_LDML_HEADER_UNSUPPORTED`, `KM_LINT_LDML_METADATA_PACKAGE_ONLY`, `KM_LINT_LDML_KEYMAN_GAP`, `KM_LINT_LDML_ANSI_ONLY` | Output page | none |
+| `KM_LINT_LDML_HEADER_UNSUPPORTED`, `KM_LINT_LDML_METADATA_PACKAGE_ONLY`, `KM_LINT_LDML_KEYMAN_GAP`, `KM_LINT_LDML_ANSI_ONLY`, `KM_LINT_LDML_BASE_DEADKEY` | Output page (`BASE_DEADKEY` comes from the OS base keyboard, which the author changes through the layout survey answers, not through a key) | none |
 
 - Routing is **by code alone**. `LintFinding` (contracts) gains no field.
 - **Route fallback**: if the owning step is not in the author's current route (for example,
@@ -70,7 +70,7 @@ to the Output page.
     (`aria.ready`, plus the shared blocker descriptors), the profile picker (`profile.label`,
     `profile.option`, `profile.compilable`, `profile.tr35Only`), help text, the error alert, and
     the findings section heading;
-  - `lint.ldml.<codeSlug>.{title,message,hint}`, one set per code (26 codes).
+  - `lint.ldml.<codeSlug>.{title,message,hint}`, one set per code (27 codes).
 - The aria-label carries the keyboard id from `resolveOutputKeyboardId`, the same function the
   filename uses (WCAG 2.5.3). A test asserts that the aria-label's id equals the downloaded
   filename's id. This is the first such test, and it is added for the `.zip` and `.kmp` buttons too.
