@@ -81,3 +81,60 @@ Minor version: it widens scope without changing any gate.
 - The validator layering and single D3 cycle (Article IV): the compatibility findings are a
   memoised scan joined into the existing findings array (spec FR-014).
 - Team boundaries (Article VI): Engine owns the whole feature.
+
+---
+
+# Proposed amendment G1: allow a compiled LDML package (Constitution 2.1.0 → 2.2.0)
+
+**Status**: PROPOSED 2026-11-01, awaiting the product owner's ruling. **Not applied.** It
+gates only spec 108 User Story 5 (FR-070–FR-076). Stories 1–4 proceed under 2.1.0.
+
+## Why
+
+2.1.0 admits LDML export as a "secondary, **source-only** download". Story 5 adds a compiled
+build of that export, which is not source-only:
+
+- a `.kmx` carrying KMX+, and a `.kvk`, both produced by Keyman's own LDML compiler;
+- packaged as an installable LDML `.kmp`.
+
+It exists so authors can run the LDML version of their keyboard in Keyman desktop today, and
+so the compile check gives them feedback instead of waiting for CI.
+
+What stays the same is everything the original deferral protected:
+
+- The KMN `.kmp` remains the primary, all-platform package.
+- The pull-request path carries neither LDML nor compiled output (criteria SS1).
+- The studio never writes KMX+ bytes itself; Keyman's compiler is the only producer.
+
+## Proposed diffs
+
+### `.specify/memory/constitution.md` — Article VII
+
+```diff
+ Plans MUST NOT implement: CJK/Ethiopic reorder patterns, LDML as an
+-emission format (LDML *export* — a secondary, source-only download that
+-never replaces KMN on the `.kmp` or pull-request paths — is in scope per
+-spec 108), mobile-app integration,
++emission format (LDML *export* — a secondary download of the LDML source,
++optionally with a desktop package compiled by Keyman's own LDML compiler,
++that never replaces the KMN `.kmp` and never enters the pull-request path
++— is in scope per spec 108), mobile-app integration,
+```
+
+Footer: `**Version**: 2.2.0 | … | **Last amended**: <ruling date> (Art VII: compiled LDML package, spec 108 Story 5)`.
+
+### `spec.md` §16
+
+```diff
+-… *Amended 2026-11-01:* a secondary, source-only LDML **export** is in scope — see [specs/108-ldml-export](specs/108-ldml-export/spec.md).
++… *Amended 2026-11-01:* a secondary LDML **export** is in scope, optionally with a desktop package compiled by Keyman's LDML compiler — see [specs/108-ldml-export](specs/108-ldml-export/spec.md).
+```
+
+`CLAUDE.md` and `README.md` need no change: their wording ("the secondary LDML export of
+spec 108", "an LDML export is available as a secondary download") already covers it.
+
+### On adoption
+
+- Flip spec 108's gate G1 to cleared.
+- Acknowledge spec-trace for §16.
+- Land the constitution, §16 and spec 108 changes in one commit.

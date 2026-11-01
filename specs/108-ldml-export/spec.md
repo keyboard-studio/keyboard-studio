@@ -30,6 +30,13 @@ ruling that adopts the amendment in [amendment.md](amendment.md), or a variant o
 ruling makes LDML export a **secondary, source-only** artifact; KMN stays the primary emission
 format. Under the constitution's precedence table, a recorded product ruling beats spec text.
 
+## Governance gate G1 (Story 5 only)
+
+User Story 5 compiles the export and offers an installable LDML `.kmp`. That produces a
+compiled binary, which G0's "source-only" wording does not allow. Story 5 and FR-070–FR-076
+MUST NOT be planned until the product owner adopts **Proposed amendment G1** in
+[amendment.md](amendment.md). Stories 1–4 do not depend on G1.
+
 ## Authority order
 
 1. CLDR TR35 Part 7 (Keyboards) — what valid LDML is.
@@ -181,6 +188,49 @@ produce for that key.
 
 ---
 
+### User Story 5 — Compile and package the LDML export (Priority: P3)
+
+**Gated on G1** (see [amendment.md](amendment.md), "Proposed amendment G1"). Not planned
+until the product owner adopts it.
+
+An author who downloads the LDML export can also get it **compiled**:
+- The studio runs Keyman's own LDML compiler on the exported `.xml` in the browser.
+- It shows whether the file builds, and why not if it doesn't.
+- It offers an installable LDML `.kmp` (desktop) so the author can try the LDML version of
+  their keyboard in Keyman for Windows, macOS or Linux today.
+
+The studio never writes KMX+ itself. Keyman's compiler is the only producer, and Keyman owns
+that format and its version.
+
+**Why this priority**:
+- It is the only way to experience the LDML version before Keyman 20.
+- It turns FR-050's CI check into feedback for the author.
+
+It depends on Stories 1, 3 and 4, and on an in-browser trial of Keyman's compiler that has
+not been done yet.
+
+**Independent Test**: Export a hardware-only keyboard under profile 46.
+- The compile check reports success.
+- The LDML `.kmp` installs in Keyman for Windows, and typing matches the KMN keyboard for the
+  mapped rules.
+- Under profile 49 the compile and package actions are disabled, with a "TR35-only (awaiting
+  Keyman)" explanation.
+
+**Acceptance Scenarios**:
+
+1. **Given** a profile-46 export with no Keyman-gap rows, **When** the compile check runs,
+   **Then** it reports zero errors.
+2. **Given** a profile-46 export with Keyman-gap rows, **When** the compile check runs,
+   **Then** the reported errors are exactly those rows. Any other error is shown as an
+   exporter defect, not as an author problem.
+3. **Given** a successful compile, **When** the author downloads the LDML package, **Then** it
+   contains the compiled `.kmx` (with KMX+) and `.kvk` alongside the source, and the package
+   says it is desktop-only until Keyman's web-core work ships.
+4. **Given** profile 49, **Then** compile and package are disabled with an explanation, and the
+   source export still works.
+
+---
+
 ### Edge Cases
 
 - **ANSI-only keyboard** (`begin ANSI`, no `begin Unicode`): the download is disabled with an
@@ -218,8 +268,8 @@ produce for that key.
 **Export**
 
 - **FR-002**: The Output page MUST offer an LDML download alongside the existing downloads. It
-  MUST share their gate and busy state, and MUST NOT appear on the `.kmp` or pull-request
-  paths.
+  MUST share their gate and busy state, and MUST NOT appear on the KMN `.kmp` or
+  pull-request paths. The separate LDML `.kmp` is Story 5, FR-074.
 - **FR-003**: The export MUST be computed from the same projected working copy that the other
   downloads serialise. It operates on the KeyboardIR, never on raw `.kmn` text (Art II).
 - **FR-004**: The export MUST be a zip package containing `source/<id>.xml` (keyboard3), the
@@ -339,6 +389,38 @@ produce for that key.
   schema pinned in CI, unless the profile is marked "TR35-only (awaiting Keyman)". This keeps
   the default-profile rule honest.
 
+**Compile and package (User Story 5 — gated on G1)**
+
+- **FR-070**: Before FR-071–FR-076 are planned, a trial MUST confirm that Keyman's LDML compiler
+  runs in the studio's browser bundle. It must:
+  - load lazily, like the existing `kmc-package` and `kmc-kmn` loads;
+  - reuse the kmcmplib WASM the studio already ships;
+  - read the CLDR import files through the compiler's file callbacks;
+  - pass the bundle-safety tests.
+
+  The trial records the bundle-size cost. If it fails, Story 5 is withdrawn, and FR-050 stays
+  a CI-only check.
+- **FR-071**: The studio MUST NOT write KMX+ or `.kmx` bytes itself. Compilation MUST go
+  through Keyman's LDML compiler at the version the studio pins.
+- **FR-072**: The compile check MUST run only when the author asks (download time), never in
+  the validation cycle (Art IV). It MUST compare the compiler's errors with the export's
+  Keyman-gap rows:
+  - an expected error is shown as a known Keyman limitation;
+  - an unexpected error is shown as an exporter defect, with the compiler message.
+- **FR-073**: Compile and package MUST be offered only for profiles that Keyman's pinned schema
+  accepts (FR-065). For other profiles they are disabled, with the reason.
+- **FR-074**: The LDML package MAY include the compiled `.kmx` and `.kvk` and be offered as an
+  installable `.kmp`. That `.kmp` MUST:
+  - be a separate download from the KMN `.kmp`;
+  - never replace the KMN `.kmp`, and never enter the pull-request path (SS1);
+  - state that it is desktop-only until Keyman can load LDML keyboards on web and mobile.
+- **FR-075**: The KMX+ file version is Keyman's choice: whatever the pinned compiler writes by
+  default. The studio MUST NOT expose it as an author option. The report MUST name the
+  compiler version and the KMX+ file version it produced.
+- **FR-076**: Compiled artifacts MUST be staged into a clone at download time, never into the
+  shared output projection. This follows the existing `buildKmp` rule (Art V; root CLAUDE.md
+  "Virtual FS").
+
 **Report**
 
 - **FR-030**: Identical working copies MUST yield byte-identical packages. The export uses no
@@ -443,6 +525,11 @@ produce for that key.
 - **SC-012**: An author can switch the export's LDML version and download again in two
   interactions. The warnings shown while authoring always match the selected version's
   report.
+- **SC-013** (Story 5): For 100 % of profile-46 corpus exports, the in-browser compile result
+  matches the CI compile result exactly, both the error set and the success or failure.
+- **SC-014** (Story 5): An LDML `.kmp` built from a hardware-only corpus keyboard installs in
+  Keyman for Windows and passes SC-002's keystroke-equivalence sequences when typed through
+  Keyman Core.
 
 ## Assumptions
 
@@ -464,7 +551,10 @@ produce for that key.
 - **Out of scope**:
   - LDML **import**;
   - LDML as a primary emission format;
-  - putting the LDML file in the `.kmp` or pull request;
+  - putting the LDML file in the KMN `.kmp` or the pull request. The separate LDML `.kmp` of
+    Story 5 is the only package that carries it;
+  - the studio writing KMX+ itself, and converting KMN keyboards to KMX+. That is Keyman's
+    #12620 plan; the studio's part is offering its touch → LDML converter upstream;
   - authoring directly in LDML;
   - LDML regex features KMN cannot express, which are irrelevant to a KMN→LDML direction;
   - upstreaming the exporter to `kmc-convert`, which is a possible follow-up (research R10).
