@@ -20,7 +20,11 @@ fingerprint, feature_root, run_claude) and adds two routing layers:
 Routing is deterministic -- no extra model calls, so routing itself is
 free. A round that stalls or errors escalates one tier (haiku -> sonnet ->
 opus) and the work is retried; any round that makes progress resets to the
-base tier. --model still overrides routing when given.
+base tier. On the second consecutive stall, one read-only top-tier advisor
+round gives a verdict from disk state: ADVISOR: UNBLOCK retries the work at
+the top tier, anything else stops. The advisor never implements -- at most
+one verdict round per stall episode. --model still overrides routing when
+given.
 
 Subscription-safe: routing only sets the already-supported `claude
 --model` flag, so rounds bill against the Claude subscription, never API
@@ -139,6 +143,53 @@ def goat_round_model(step, phase, bump, agent):
     return GOAT_TIERS[min(base_idx + bump, len(GOAT_TIERS) - 1)]
 
 
+ADVISOR_RE = re.compile(r"^ADVISOR:\s*(UNBLOCK|BLOCKED)\b\s*(.*)$", re.MULTILINE)
+
+
+def run_advisor(claude, args, root, feature_dir, res):
+    """One top-tier verdict round after two consecutive stalls.
+
+    Read-only: the advisor diagnoses from disk and returns a verdict, it
+    never implements. Returns (verdict, detail) where verdict is "UNBLOCK",
+    "BLOCKED", or "?" when the round itself failed.
+    """
+    label = res.get("nextActionLabel") or "unknown"
+    prompt = (
+        "You are a technical advisor, not an implementer. Do not write code, "
+        "edit files, or commit anything.\n"
+        f"The speckit pipeline for feature '{feature_dir.as_posix()}' has stalled: "
+        "two consecutive rounds made no recorded progress. "
+        f"Current next action: {label}.\n"
+        "1. Run (note PYTHONIOENCODING on Windows):\n"
+        f"   PYTHONIOENCODING=utf-8 python3 .specify/extensions/companion/scripts/status-context.py --feature-dir {feature_dir.as_posix()}\n"
+        "   and parse the final RESOLUTION line.\n"
+        f"2. Read tasks.md and the two most recent logs in {feature_dir.as_posix()}/rounds/.\n"
+        "3. Diagnose why no progress was recorded.\n"
+        "End your last message with exactly one line:\n"
+        "ADVISOR: UNBLOCK <one concrete next action a fresh implement round should take>\n"
+        "or\n"
+        "ADVISOR: BLOCKED <reason this needs the user>"
+    )
+    routed = types.SimpleNamespace(
+        permission_mode=args.permission_mode,
+        model=GOAT_TIERS[-1],
+        max_budget_usd=args.max_budget_usd,
+    )
+    proc = base.run_claude(claude, prompt, routed, root)
+    try:
+        out = json.loads(proc.stdout)
+    except ValueError:
+        return "?", f"advisor round: claude exited {proc.returncode} without JSON"
+    if out.get("is_error"):
+        return "?", f"advisor round ended in error ({out.get('subtype')})"
+    text = out.get("result") or ""
+    m = ADVISOR_RE.findall(text)
+    if not m:
+        return "?", "advisor round gave no ADVISOR verdict"
+    verdict, detail = m[-1]
+    return verdict, detail.strip()
+
+
 def run_routed(claude, prompt, args, root, model):
     """Run one round via the classic driver, with the routed model forced in."""
     routed = types.SimpleNamespace(
@@ -176,6 +227,7 @@ def main():
     log_dir = base.feature_root(feature_dir) / feature_dir / "rounds"
     stalls, prev_fp = 0, None
     bump = 0  # GOAT escalation level: added to the round's base tier
+    advisor_used = False  # one top-tier verdict round per stall episode
     total_cost = 0.0
 
     for n in range(1, args.max_rounds + 1):
@@ -196,6 +248,19 @@ def main():
         if fp == prev_fp:
             stalls += 1
             if stalls >= 2:
+                if not advisor_used:
+                    advisor_used = True
+                    print(f"[GOAT] stalled twice; consulting {GOAT_TIERS[-1]} advisor before giving up ...", flush=True)
+                    averdict, adetail = run_advisor(claude, args, base.feature_root(feature_dir), feature_dir, res)
+                    log_dir.mkdir(exist_ok=True)
+                    (log_dir / f"round-{n:02d}-advisor.json").write_text(
+                        json.dumps({"verdict": averdict, "detail": adetail}), encoding="utf-8")
+                    if averdict == "UNBLOCK":
+                        print(f"[GOAT] advisor verdict: UNBLOCK -- {adetail}")
+                        stalls = 0
+                        bump = len(GOAT_TIERS) - 1
+                        continue
+                    print(f"[GOAT] advisor verdict: {averdict} -- {adetail}")
                 print(f"[STOP] no recorded progress in two rounds (still at {res.get('nextActionLabel')})")
                 return 1
             bump = min(bump + 1, len(GOAT_TIERS) - 1)
@@ -203,6 +268,7 @@ def main():
         else:
             stalls = 0
             bump = 0
+            advisor_used = False
         prev_fp = fp
 
         prompt = f"Invoke the speckit-round skill with argument: {feature_dir.as_posix()}"
