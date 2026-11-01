@@ -194,7 +194,7 @@ target desktop only: `&TARGETS` is hard-coded to `desktop` and the web engine re
 
 ## R13 — RESOLVED: 46 vs current TR35 (CLDR 49), and Keyman's reaction
 
-Infographic: <https://claude.ai/artifact/JxmUQ2Xs8rFgrPmaJLAHEh>.
+Infographic: [docs/design-notes/ldml-version-gap.html](../../docs/design-notes/ldml-version-gap.html) (text twin: [ldml-version-gap.md](../../docs/design-notes/ldml-version-gap.md)).
 
 **Format delta 46 → 49.** Confirmed by diffing CLDR `keyboards/dtd/ldmlKeyboard3.dtd` at
 `release-46` against `main` (49), plus the CLDR 47–49 release notes and
