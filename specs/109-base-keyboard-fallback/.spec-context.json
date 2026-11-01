@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Base-keyboard fallback",
+  "branch": "109-base-keyboard-fallback",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "km-lead",
+      "at": "2026-11-01T18:00:00.000Z"
+    }
+  ],
+  "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801"
+}

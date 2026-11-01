@@ -111,7 +111,7 @@ Defects this spec designs out (each is a mapping-contract row or a functional re
 | All Alt variants collapsed to `altR` | Row 2.10 |
 | Last rule wins on a key's output; context rules corrupted the base output | Section 3 trigger model |
 | Combining-key markers left behind | Section 3, step 3 catch-all |
-| Rules with empty `to` (`nul`, deletions) silently dropped | Row 3.15 |
+| Rules with empty `to` (`nul`, deletions) silently dropped | Rows 3.15a, 3.15b, FR-029 |
 | `if()` conditions silently removed, rule kept | Row 3.17 (default-value evaluation, warned) |
 | `index()` silently dropped when pairing failed | Rows 3.7–3.9 |
 | `notany`, `outs`, `context(n)` dropped | Rows 3.10–3.14 |
@@ -138,15 +138,31 @@ keyboards data, and `resources/standards-data/ldml-keyboards/46/3.0/*.xml`. Cons
 
 Until then mapping row 5.13 is status A.
 
-## R9 — OPEN: normalization default
+## R9 — RESOLVED (product ruling 2026-11-01): normalization stays on
 
-LDML matches in NFD; KMN matches exact codepoints. Keeping normalization on is the standard's
-default and conflates only rules that distinguish composed from decomposed text (row 3.22).
-`normalization="disabled"` is closer to KMN semantics but draws `HINT_NormalizationDisabled`
-and changes matching for every rule. Before planning, confirm which normalization form Keyman
-core emits to the application when normalization is on, because a KMN keyboard that
-deliberately outputs decomposed text would change its output under NFC. Default until then:
-normalization on, conflated pairs warned.
+**Decision.** Keep normalization on, which is the TR35 default (TR35 (CLDR 49) §Normalization).
+The export warns per keyboard wherever an output string differs from its NFC form.
+
+**Evidence** (`keymanapp/keyman` `origin/master` `cbc752f`):
+
+- The LDML processor normalizes context to NFD
+  (`core/src/ldml/ldml_processor.cpp:308-341`).
+- It reports `supports_normalization() = !normalization_disabled`
+  (`ldml_processor.hpp:80`).
+- `state.cpp:136` then runs `actions_normalize`, which converts output to NFC for the
+  application.
+- The KMX processor does not normalize (`kmx_processor.hpp:84`).
+
+**Consequence.** Under KMN the application receives the exact codepoints the rule wrote. Under
+the LDML export it receives NFC. Two cases change visible output:
+
+- deliberately decomposed output, and composition-excluded characters such as the Devanagari
+  nukta forms U+0958–U+095F;
+- canonical reordering of combining marks (Arabic harakat, Hebrew points, Vietnamese).
+
+Mapping row 3.22 keeps the context-conflation case. Row 3.23 covers the output-form case. Both
+use `KM_LINT_LDML_NORMALIZATION` (warning). `normalization="disabled"` is not used: it draws
+`HINT_NormalizationDisabled` and changes matching for every rule.
 
 ## R10 — Upstream KMN↔LDML plans
 
@@ -235,9 +251,26 @@ Roadmap: `epic/web-core` (not merged), plus #11293, #8093, #13429 and #13424, al
 **Consequences for the profiles:**
 
 - **Profile `49`** (TR35-only) = profile 46 plus `conformsTo="49"`, the `…/cldr/49/keyboard3`
-  namespace (to confirm against the CLDR 49 XSD/DTD headers in planning), `info/@attribution`,
-  and `$[N:set]` mappings. `keyboard3/@draft` is not emitted: it is a CLDR-repository review
-  status, not author data.
+  namespace (to confirm against the CLDR 49 XSD/DTD headers in planning), and
+  `info/@attribution`. It adds no set-mapping capability. `keyboard3/@draft` is not emitted: it
+  is a CLDR-repository review status, not author data.
+- **Set mapping is the same in both profiles.** Three facts:
+  - The TR35 prose says `$[1:variable]` "Where '1' is any numbered capture group from 1 to 9",
+    in both CLDR 46.1 and CLDR 49.
+  - The CLDR 49 grammar allows only `mapped-set ::= '$[1:' var-id ']'`.
+  - The CLDR 49 validity constraint requires exactly one capture group with a set variable in
+    `from`.
+
+  So `$[N:set]` with N > 1 is not a 46 to 49 addition and is grammar-invalid under 49. Both
+  profiles expand such mappings (rows 3.7/3.8).
+- **Further 46.1 to 49 deltas missed above.**
+  - CLDR 49 forbids the `\0` escape that 46.1 allowed; the escape list is now explicit.
+  - CLDR 49 adds a sentence that a hardware `modifiers="none"` layer becomes the base layer
+    when the keyboard is used as touch (TR35 (CLDR 49) §layers).
+  - The display note about output-less keys was rewritten.
+
+  The "introduced in 47/48" attributions in the table above were not re-verified against
+  `tr35-modifications.html`. Only presence in 46.1 versus 49 was checked on 2026-11-01.
 - **Profile 46** already meets the product goal of spec-perfect touch, because the touch
   markup is identical in both.
 - CI validates profile 49 against the CLDR 49 DTD plus the FR-052 rules. Under FR-065 it is
@@ -351,10 +384,40 @@ the default layer, numeric-layer stickiness, and caps emulation (casing support,
   ticket. It is out of scope for spec 108, which reports it as `KM_LINT_LDML_NO_KEY_TRIGGER`
   with a touch-specific consequence message.
 
+## R16 — Keyman libraries the exporter reuses (product ruling 2026-11-01, FR-080)
+
+| Need | Library and entry points |
+|---|---|
+| LDML types, XML read and write, schema validation | `@keymanapp/developer-utils`: `LDMLKeyboardXMLSourceFile`, `KeymanXMLWriter`, `LDMLKeyboardXMLSourceFileReader` (including the AJV schema validate) |
+| Normalization helpers | `@keymanapp/common-types`: `NFDAnalyzer`, `MarkerParser.nfd_markers`, `util.isNormalized` |
+| Compile to KMX+ and `.kvk`, semantic validation | `@keymanapp/kmc-ldml`: `LdmlKeyboardCompiler`. It reuses `kmc-kmn`'s kmcmplib WASM as its UnicodeSet parser |
+| Package | `@keymanapp/kmc-package` (already a dependency) |
+| Project scaffold | `@keymanapp/kmc-generate`, `ldml-keyboard` template |
+
+Not dependencies today: `kmc-ldml`, `kmc-generate`.
+
+No library provides:
+
+- KMN to LDML conversion (`kmc-convert` has only keylayout to kmn);
+- a `\u{…}` escaper (Keyman only unescapes);
+- touch layout to LDML;
+- deterministic XML formatting.
+
+These were read on a 19.x working tree. Confirm each against the pinned version in planning.
+
+## R17 — TR35 Part 7 full reread (2026-11-01)
+
+CLDR 49 (`tr35-79`) and CLDR 46.1 (`tr35-74`) were read in full. The findings are folded into
+the mapping contract rows (2.7, 2.8, 2.17–2.19, 3.1–3.10, 3.15–3.16, 3.22–3.23, 4.8, 5.1, 5.2,
+5.10 and the new modifier, backspace, key-store, context-start and reorder rows). There are no
+meaning-changing 46.1 to 49 differences outside those listed in R13.
+
 ## Reference pairs in the corpus
 
 - `ibono_chwerty` — a `.kmn` and a hand-written `source/extras/ibono_chwerty.xml` in the same
   project; shows CLDR punctuation key ids via `import base="cldr"`.
-- `khmer_angkor` (`.kmn`) and `khmer_ldml` (experimental; a hand port of it) — exercises
-  variables, `uset`, reorder, backspace transforms.
+- `khmer_angkor` (`.kmn`) and `khmer_ldml` (experimental; a hand port of it) — the port
+  exercises variables, `uset`, `<reorder>` and backspace transforms. KMN has no reorder
+  element, so `khmer_angkor` expresses reordering as ordinary context rules; only the hand port
+  uses `<reorder>`.
 - `imperial_aramaic` — an LDML-only keyboard in `release/`.

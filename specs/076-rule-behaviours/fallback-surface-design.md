@@ -1,6 +1,6 @@
 # Fallback-character surface for `swallowUndefined` — design (#1912)
 
-**Status**: Implemented (interim host: the Assign Mechanisms step, pending the Behaviours step). See the amendment in [AS-BUILT.md](AS-BUILT.md).  
+**Status**: Implemented (interim host: the Assign Mechanisms step, pending the Behaviours step). See the amendment in [AS-BUILT.md](AS-BUILT.md). The surface's copy overstates what "Do nothing" covers until `swallowUndefined` is built; that work, a full leak list and per-key data for every base keyboard are [spec 109](../109-base-keyboard-fallback/spec.md).  
 **Replaces**: The archived carve-gallery Allow/Block disposition UI (spec 076
 amendments A1–A4, archived 2026-09-29 to `docs/archive/carve-disposition-ui/`).  
 **Decides**: FR-019 per-carve override — re-enable or retire.

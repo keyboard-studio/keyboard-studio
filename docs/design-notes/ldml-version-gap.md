@@ -4,7 +4,8 @@
 **Spec**: [specs/108-ldml-export](../../specs/108-ldml-export/spec.md) — research R13, R14, R15.
 **Evidence as of 2026-11-01**:
 
-- TR35 Part 7 Keyboards, CLDR 49 (`tr35-79`, 2026-10-21).
+- TR35 Part 7 Keyboards, CLDR 49 (`tr35-79`, 2026-10-21), reread in full on 2026-11-01 against
+  CLDR 46.1 (`tr35-74`).
 - CLDR `keyboards/dtd/ldmlKeyboard3.dtd` at `release-46` and at `main`.
 - CLDR 47/48/49 release notes.
 - `keymanapp/keyman` `origin/master` `cbc752f` (2026-10-29, 20.0.10-alpha), and the unmerged
@@ -18,7 +19,7 @@
 | **Keyman fails** on any 47+ feature | A schema error stops the build and no `.kmx` is written. Nothing is skipped or ignored. |
 | **The touch half is unused** in Keyman | It is compiled into the keyboard file and then nothing runs it. Mobile cannot load LDML at all yet. |
 
-The format barely moved between 46 and 49, and nothing about touch changed. Keyman compiles
+The format barely moved between 46 and 49, and no touch schema changed. Keyman compiles
 LDML into KMX+, a binary block inside a `.kmx`, and its runtimes read only part of that block.
 Touch is the big gap, but the gap is in Keyman, not in the LDML version. KMX+ is also where
 Keyman plans to close it.
@@ -39,6 +40,20 @@ the TR35 modification lists.
 | 48 | Normalization of the default backspace transform | clarification | — |
 | 49 | `conformsTo` may be 47, 48 or 49 | allowed value | **build fails** |
 | 49 | `display`, `layer` and backspace `transform` clarified; test-data links removed. Known issue: `minDeviceWidth` under-specified (CLDR-19754) | clarification | — |
+| 49 | The transform escape list is explicit, and no longer allows the `\0` escape that 46.1 listed | spec-text change | — |
+| 49 | "For hardware layouts, the layer with `modifiers="none"` becomes the base layer when the keyboard is used as a touch layout" | spec-text change (behavioural clarification; no schema change) | — |
+| 49 | The display note about keys with no output is rewritten; 46.1 said there was no way to give a custom display to an output-less key | spec-text change | — |
+
+The CLDR column attributes each item to 47, 48 or 49 from the release notes and the DTD diff. Those
+attributions were not re-verified against tr35-modifications.html; the 2026-11-01 reread checked only
+presence in 46.1 versus 49.
+
+**Not a 46 to 49 change: `$[N:set]`.** TR35 prose says `$[1:variable]` is "(Where '1' is any numbered
+capture group from 1 to 9)" in both CLDR 46.1 and CLDR 49. The CLDR 49 transform-to grammar allows only
+`mapped-set ::= '$[1:' var-id ']'`, with the constraint that the `$[1:…]` set format may only be used
+where there is exactly one capture group with a set variable on the `from=` match string. A profile-49
+export must therefore not emit `$[N:set]` with N > 1; set mappings outside group 1 are expanded in
+both profiles.
 
 **Unchanged from 46 to 49**:
 
@@ -82,9 +97,10 @@ It fails. Keyman validates the whole file against its CLDR-46 JSON schema before
 
 **Keyman is also stricter than TR35 within 46:**
 
-- A set mapping must be capture group 1 and fill the whole `to` (`$[1:set]`). TR35 allows
-  `$[2:set]` to `$[9:set]`. Keyman fails the build; the upstream fix, draft PR #16870, is
-  unmerged.
+- A set mapping must be capture group 1 and fill the whole `to` (`$[1:set]`). TR35 prose
+  mentions groups 1 to 9 in both 46.1 and 49, but the CLDR 49 grammar allows only `$[1:set]`. On
+  `$[N:set]` with N > 1, Keyman fails the build (Error_IllegalTransformToUset); the upstream fix,
+  draft PR #16870, is unmerged. This is a Keyman-side fact, not a difference between profiles.
 - Only one set mapping is allowed per transform. Lifting this needs binary-format, core and
   compiler changes, pencilled in for v20.
 - One loose end: `<import path="47/…">` is accepted and treated as 46, while `conformsTo="47"`
@@ -220,14 +236,15 @@ identical in both, so a 46 export loses nothing on touch.
 
 - The newest valid CLDR output, for other LDML implementations and for the future.
 - Every Keyman tool fails to build it until Keyman ships a 47+ schema.
-- May also use `$[N:set]` mappings, which make transforms smaller.
+- Must not emit `$[N:set]` with N > 1: the CLDR 49 grammar allows only `$[1:set]`, so set
+  mappings outside group 1 are expanded, as in profile 46.
 
 **Recommendation**:
 
 - **Keep 46 as the default.** Because the touch half is identical, the goal of spec-perfect
   touch, ready for Keyman's pipeline, is already met by profile 46.
-- **Profile 49 trades Keyman support for little.** It only adds attribution metadata and
-  smaller transforms, and Keyman refuses the file.
+- **Profile 49 trades Keyman support for little.** It only adds attribution metadata, and
+  Keyman refuses the file.
 - **The version profiles stay useful.** The next CLDR version may change more than this one
   did.
 - **KMX+ stays Keyman's concern.** The studio exports LDML, not KMX+. For a build check, the
