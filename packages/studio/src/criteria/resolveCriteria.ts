@@ -5,8 +5,9 @@
 // existing keyboard loaded for comparison). Mode is an input, not a forked
 // implementation; the modes differ only in what can honestly be claimed —
 // a foreign keyboard had no scaffolder run and has no author record, so
-// its scaffolder-bake rows are Not yet checkable and its yellow/red rows
-// offer no controls.
+// its scaffolder-bake rows resolve Not applicable in favour of their lint
+// twin (which gives the real verdict) and its yellow/red rows offer no
+// controls.
 //
 // Resolution order per row is fixed: applicability first (both modes),
 // then the band rule. A check that did not run — because it is not
@@ -33,6 +34,17 @@ import { resolveCompileRow } from "./compileMapping.ts";
 import { resolveFontLicenseRow } from "./fontLicense.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
 import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
+import {
+  copyrightContextLines,
+  licenseCopyrightLine,
+  scopeNote,
+  sourceContextLines,
+} from "./reviewerSource.ts";
+
+/** 13.1's / 13.4's verified lines when they found nothing (lint wording). */
+const NO_PUA_LINE = "No PUA codepoints in the produced output.";
+const NO_MATH_LATIN_LINE =
+  "No mathematical Latin look-alikes in the produced output.";
 
 const ALL_STATUSES: readonly CriterionStatus[] = [
   "met",
@@ -101,9 +113,21 @@ function indexFindings(
  * - _findingsByCode: findings from related checks (currently unused)
  */
 function reviewerContext(
-  criterionId: string,
+  criterion: Criterion,
   input: CriteriaInput,
   _findingsByCode: Map<string, readonly LintFinding[]>,
+): string[] {
+  const criterionId = criterion.id;
+  const lines = reviewerContextBody(criterionId, input);
+  const side = input.reviewerSource;
+  if (side === undefined) return lines;
+  const note = scopeNote(criterion.section, side);
+  return note === null ? lines : [...lines, note];
+}
+
+function reviewerContextBody(
+  criterionId: string,
+  input: CriteriaInput,
 ): string[] {
   const verified = input.verifiedByCode;
   const getVerified = (code: string): string[] =>
@@ -126,18 +150,17 @@ function reviewerContext(
     }
 
     // --- Copyright-related ---
+    // The LICENSE line comes from 4.1b's verified line, which exists
+    // whenever a copyright line does (4.5b's only when the syntax passes).
     case "4.2-copyright-year-range-if-multiyear":
     case "4.4-org-legal-name-current":
-    case "4.8-year-range-starts-at-original": {
-      const copy = getVerified("KM_LINT_COPYRIGHT_SYNTAX");
-      if (copy.length > 0) return ["Copyright line:", ...copy];
-      return [];
-    }
-    case "4.3-copyright-holder-is-authorized": {
-      const copy = getVerified("KM_LINT_COPYRIGHT_SYNTAX");
-      const author = getVerified("KM_LINT_AUTHOR_IN_KMN");
-      return [...copy, ...author];
-    }
+    case "4.8-year-range-starts-at-original":
+    case "4.3-copyright-holder-is-authorized":
+      return copyrightContextLines(
+        criterionId,
+        licenseCopyrightLine(getVerified("KM_LINT_COPYRIGHT_ABSENT")),
+        input.reviewerSource,
+      );
 
     // --- Description/readme-related ---
     // README.md / .kps description text not available in resolver input;
@@ -146,16 +169,17 @@ function reviewerContext(
     case "5.4-readme-description-sensible":
     case "10.10-kps-description-meaningful":
     case "10.11-kps-no-spelling-errors":
-      return [];
+      return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Tags/BCP47-related ---
     // Tag values not available in resolver input; would need kps parsing
     // plumbed through. Noted for future work.
     case "10.3-kps-tags-minimal":
     case "10.4-kps-unusual-tag-flagged":
-    case "10.5-kps-conlang-flagged":
     case "12.1-bcp47-tag-correct":
     case "12.5-script-mismatch-flagged":
+      return sourceContextLines(criterionId, input.reviewerSource);
+    case "10.5-kps-conlang-flagged":
     case "12.6-script-mismatch-submitted-to-langtags":
       return [];
 
@@ -175,6 +199,7 @@ function reviewerContext(
     // Display name value not in verified; RTL flag needs .kmn/.kps parsing.
     // Noted for future work.
     case "7.7-display-name-no-underscores":
+      return sourceContextLines(criterionId, input.reviewerSource);
     case "7.8-rtl-flag-matches-script":
       return [];
 
@@ -191,17 +216,15 @@ function reviewerContext(
     }
 
     // --- History ---
-    case "3.2-history-header-sensible": {
-      return [];
-    }
+    case "3.2-history-header-sensible":
+      return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Welcome/readme.htm ---
     case "6.2-readme-htm-short":
     case "6.4-welcome-htm-describes-usage":
     case "6.5-welcome-htm-no-install-instructions":
-    case "6.7-welcome-htm-not-political": {
-      return [];
-    }
+    case "6.7-welcome-htm-not-political":
+      return sourceContextLines(criterionId, input.reviewerSource);
 
     // --- Red checklist ---
     case "14.1-third-party-patch-author-consulted":
@@ -225,6 +248,31 @@ function reviewerContext(
       return [];
   }
 }
+
+/**
+ * The lint twins of a scaffolder-bake criterion: the criteria whose id
+ * starts `${num}b-` where `num` is the bake row's section number ("1.2"
+ * -> "1.2b-...", "1.10" -> "1.10b-..."). Every bake row has exactly one
+ * (pinned by a test); the foreign-mode resolver points at it.
+ */
+export function bakeTwinsOf(
+  criterion: Criterion,
+  criteria: readonly Criterion[],
+): Criterion[] {
+  const num = /^(\d+\.\d+)-/.exec(criterion.id)?.[1];
+  if (num === undefined) return [];
+  return criteria.filter(
+    (c) => c.band === "layer-c-enforce" && c.id.startsWith(`${num}b-`),
+  );
+}
+
+/** §18.6's code (a literal: the resolver stays free of engine imports). */
+const INVENTORY_UNCOVERED = "KM_LINT_INVENTORY_UNCOVERED";
+
+const FOREIGN_COMPILE_REASON =
+  "/review does not compile keyboards; check the PR's CI build for errors (7.21) and warnings (7.6).";
+const FOREIGN_INVENTORY_REASON =
+  "Needs the studio's confirmed character inventory, which PR keyboards don't have; check by hand that every character the language needs can be typed.";
 
 function resolveRow(
   criterion: Criterion,
@@ -255,6 +303,24 @@ function resolveRow(
           evidence: () => ({
             kind: "scaffolder",
             lines: ["Guaranteed by the scaffolder"],
+          }),
+        };
+      }
+      // Every bake row has a lint twin that judges the same thing on the
+      // files. The row resolves Not applicable and names the twin; it
+      // does not copy the twin's status (that would count a failure twice).
+      const twins = bakeTwinsOf(criterion, input.criteria);
+      if (twins.length === 1) {
+        const twinId = twins[0]!.id;
+        return {
+          criterion,
+          status: "not-applicable",
+          controls: null,
+          evidence: () => ({
+            kind: "foreign-bake",
+            lines: [
+              `For keyboards not built by the studio this is checked by ${twinId}.`,
+            ],
           }),
         };
       }
@@ -297,6 +363,23 @@ function resolveRow(
       // from the host's compile result, not a lint finding — see
       // compileMapping.ts. Runs before the implemented gate because its
       // codes are in the implemented set via that synthesis.
+      if (
+        input.mode === "foreign" &&
+        (lintRuleId === "KM_LINT_COMPILE_ERRORS" ||
+          lintRuleId === "KM_LINT_COMPILE_HAS_WARNINGS") &&
+        (input.compileResult === undefined || input.compileResult === null)
+      ) {
+        return {
+          criterion,
+          status: "not-yet-checkable",
+          controls: null,
+          evidence: () => ({
+            kind: "context-missing",
+            lines: [FOREIGN_COMPILE_REASON],
+            lintRuleId,
+          }),
+        };
+      }
       const compileRow = resolveCompileRow(
         criterion,
         lintRuleId,
@@ -342,7 +425,9 @@ function resolveRow(
           evidence: () => ({
             kind: "context-missing",
             lines: [
-              `Cannot be checked yet: ${missing} is not available for this keyboard.`,
+              input.mode === "foreign" && lintRuleId === INVENTORY_UNCOVERED
+                ? FOREIGN_INVENTORY_REASON
+                : `Cannot be checked yet: ${missing} is not available.`,
             ],
             lintRuleId,
           }),
@@ -371,15 +456,25 @@ function resolveRow(
             kind: "lint-finding",
             lines: findings.flatMap((finding) => {
               const fileLine = finding.location
-                ? `File: ${finding.location.file}#L${finding.location.line}`
+                ? finding.location.line >= 1
+                  ? `File: ${finding.location.file}#L${finding.location.line}`
+                  : `File: ${finding.location.file}`
                 : null;
+              const deltaLine =
+                finding.prDelta === "changed"
+                  ? "Changed in this PR"
+                  : finding.prDelta === "unchanged"
+                    ? "Already present before this PR (file unchanged by this PR)"
+                    : null;
               // Split message on newlines so multi-line messages (e.g. with
               // a full source line) render as separate paragraphs.
               const msgLines = finding.message.split("\n");
               const parts = finding.hint
                 ? [...msgLines, finding.hint]
                 : msgLines;
-              return fileLine ? [fileLine, ...parts] : parts;
+              return fileLine
+                ? [fileLine, ...(deltaLine ? [deltaLine] : []), ...parts]
+                : parts;
             }),
             lintRuleId,
             findings,
@@ -435,8 +530,12 @@ function resolveRow(
         status: "needs-author",
         controls: input.mode === "authored" ? "attest" : null,
         evidence: () => {
-          const context = reviewerContext(criterion.id, input, findingsByCode);
-          const lines = ["No attestation has been recorded for this criterion yet."];
+          const context = reviewerContext(criterion, input, findingsByCode);
+          const lines = [
+            input.mode === "foreign"
+              ? "Reviewer judgment needed."
+              : "No attestation has been recorded for this criterion yet.",
+          ];
           if (context.length > 0) {
             lines.push("", "Reviewer context:", ...context);
           }
@@ -471,7 +570,7 @@ function resolveRow(
         status: "needs-human",
         controls: input.mode === "authored" ? "confirm" : null,
         evidence: () => {
-          const context = reviewerContext(criterion.id, input, findingsByCode);
+          const context = reviewerContext(criterion, input, findingsByCode);
           const lines = [checklistText];
           if (context.length > 0) {
             lines.push("", "Reviewer context:", ...context);
@@ -487,7 +586,24 @@ function resolveRow(
 }
 
 /** Judge every criterion in `input.criteria`, preserving catalog order. */
-export function resolveCriteria(input: CriteriaInput): CriteriaResult {
+export function resolveCriteria(rawInput: CriteriaInput): CriteriaResult {
+  // Positive lint facts for the named Not applicable predicates: only when
+  // the check ran and its verified line says it found nothing. Both modes
+  // run the same engine pass, so both get these facts.
+  const verified = rawInput.verifiedByCode;
+  const input: CriteriaInput = {
+    ...rawInput,
+    facts: {
+      ...rawInput.facts,
+      noPuaInOutput:
+        verified?.get("KM_LINT_PUA_KEYBOARD_PLACEMENT")?.includes(NO_PUA_LINE) ===
+        true,
+      noMathLatinLookalikes:
+        verified
+          ?.get("KM_LINT_MATH_LATIN_LOOKALIKE")
+          ?.includes(NO_MATH_LATIN_LINE) === true,
+    },
+  };
   const findingsByCode = indexFindings(input.lintFindings);
   const counts = emptyStatusCounts();
   const bandCounts = emptyBandCounts();

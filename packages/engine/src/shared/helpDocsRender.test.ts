@@ -20,6 +20,11 @@ import { DOC_GENERATED_END, DOC_GENERATED_START } from "./docSlots.js";
 const HAUSA_HEADER =
   "<?php\n  $pagename = 'Hausa Basic Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n";
 
+/** The fresh help page's header: criterion 11.3 puts the shared style inside it, in `$pagestyle`. */
+function styledHeader(displayName: string): string {
+  return helpSiteHeader(displayName, `<style>${DOC_PAGE_STYLE}</style>`);
+}
+
 function baseInput(overrides: Partial<HelpDocsRenderInput> = {}): HelpDocsRenderInput {
   return {
     answers: null,
@@ -85,7 +90,7 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
   it("renderHelpPhp renders the shared body form when answers is null, not the scaffolder stub", () => {
     const rendered = renderHelpPhp(baseInput(), null);
     expect(rendered).toBe(
-      `${helpSiteHeader("Piaroa")}<style>${DOC_PAGE_STYLE}</style>\n<h1>Piaroa</h1>\n<p>Welcome to Piaroa</p>`,
+      `${styledHeader("Piaroa")}<h1>Piaroa</h1>\n<p>Welcome to Piaroa</p>`,
     );
     expect(rendered).not.toBe(helpPhpStub("Piaroa"));
   });
@@ -93,7 +98,7 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
   it("renderHelpPhp HTML-escapes the display name in the no-answer body", () => {
     const input = baseInput({ displayName: "A<&>B" });
     expect(renderHelpPhp(input, null)).toBe(
-      `${helpSiteHeader("A<&>B")}<style>${DOC_PAGE_STYLE}</style>\n<h1>A&lt;&amp;&gt;B</h1>\n<p>Welcome to A&lt;&amp;&gt;B</p>`,
+      `${styledHeader("A<&>B")}<h1>A&lt;&amp;&gt;B</h1>\n<p>Welcome to A&lt;&amp;&gt;B</p>`,
     );
   });
 });
@@ -119,13 +124,15 @@ describe("helpDocsRender — spec 080 FR-003 standard help-site header (US1)", (
   it("a fresh help page begins with the header, then the shared body without nested html/body (US1-1 / criterion 11.4)", () => {
     const input = baseInput({ displayName: "Hausa Basic", answers: answersWith(), primaryBcp47: "ha" });
     const help = renderHelpPhp(input, null);
-    expect(help.startsWith(HAUSA_HEADER)).toBe(true);
-    // After the header: the shared inline style, then welcome.htm's inner
+    expect(help.startsWith(styledHeader("Hausa Basic"))).toBe(true);
+    // After the header (which carries the shared style): welcome.htm's inner
     // body — not a nested <html><body> document (criteria.md §11.4: help.php
     // must not close </body></html>).
     const welcome = renderWelcomeHtm(input, null);
     const welcomeBody = welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, "");
-    expect(help.slice(HAUSA_HEADER.length)).toBe(`<style>${DOC_PAGE_STYLE}</style>\n${welcomeBody}`);
+    expect(help.slice(styledHeader("Hausa Basic").length)).toBe(welcomeBody);
+    // Criterion 11.3: no <style> after the header's closing ?>.
+    expect(help.slice(help.indexOf("?>") + 2)).not.toMatch(/<style/i);
     expect(help).not.toMatch(/<\/body>/i);
     expect(help).not.toMatch(/<\/html>/i);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
@@ -133,7 +140,7 @@ describe("helpDocsRender — spec 080 FR-003 standard help-site header (US1)", (
 
   it("a no-answer production still carries the header above the body (US1-3)", () => {
     const help = renderHelpPhp(baseInput({ displayName: "Hausa Basic" }), null);
-    expect(help.startsWith(HAUSA_HEADER)).toBe(true);
+    expect(help.startsWith(styledHeader("Hausa Basic"))).toBe(true);
     expect(help.endsWith("<p>Welcome to Hausa Basic</p>")).toBe(true);
   });
 
@@ -321,10 +328,10 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     const input = baseInput({ answers: answersWith({ usageTips: ["Tip one."] }), primaryBcp47: "pid" });
     const help = renderHelpPhp(input, null);
     const welcome = renderWelcomeHtm(input, null);
-    const header = helpSiteHeader("Piaroa");
+    const header = styledHeader("Piaroa");
     expect(help.startsWith(header)).toBe(true);
     const welcomeBody = welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, "");
-    expect(help.slice(header.length)).toBe(`<style>${DOC_PAGE_STYLE}</style>\n${welcomeBody}`);
+    expect(help.slice(header.length)).toBe(welcomeBody);
   });
 });
 
@@ -339,11 +346,13 @@ describe("helpDocsRender — element spec §1 shell and §2 intro", () => {
     expect(welcome.endsWith("</body>\n</html>")).toBe(true);
   });
 
-  it("the fresh help page carries the same style block as the welcome page (criterion 11.10 by construction)", () => {
+  it("the fresh help page carries the welcome page's CSS, raw in $pagestyle (criterion 11.10 by construction)", () => {
     const input = baseInput({ answers: answersWith() });
-    const styleOf = (page: string) => /<style>([\s\S]*?)<\/style>/.exec(page)?.[1];
-    expect(styleOf(renderWelcomeHtm(input, null))).toBe(DOC_PAGE_STYLE);
-    expect(styleOf(renderHelpPhp(input, null))).toBe(DOC_PAGE_STYLE);
+    expect(/<style>([\s\S]*?)<\/style>/.exec(renderWelcomeHtm(input, null))?.[1]).toBe(DOC_PAGE_STYLE);
+    // The site's header.php wraps $pagestyle in <style>, so it holds raw CSS.
+    const php = renderHelpPhp(input, null);
+    expect(/\$pagestyle = <<<'END'\n([\s\S]*?)\nEND;/.exec(php)?.[1]).toBe(DOC_PAGE_STYLE.trim());
+    expect(php).not.toContain("<style");
   });
 
   it("the nothing-answered page still conforms to §1: lang falls back to the primary tag (Q3 ruling)", () => {
@@ -724,10 +733,12 @@ describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is
       '<p>Base body.</p>\n<a href="qwerty-uk.htm">UK</a> <a href="qwerty-uk.htm#fr">FR</a> ' +
       '<a href="https://example.org/page.htm">ext</a>\n</body>\n</html>';
     const rendered = renderHelpPhp(baseInput(), null, startWelcome);
-    expect(rendered.startsWith(helpSiteHeader("Piaroa"))).toBe(true);
-    const fragment = rendered.slice(helpSiteHeader("Piaroa").length);
+    // Criterion 11.3: the base's style rides in $pagestyle inside the header.
+    const header = helpSiteHeader("Piaroa", "<style>p { color: red; }</style>");
+    expect(rendered.startsWith(header)).toBe(true);
+    const fragment = rendered.slice(header.length);
     expect(fragment).toContain("<p>Base body.</p>");
-    expect(fragment).toContain("<style>p { color: red; }</style>");
+    expect(fragment).not.toMatch(/<style/i);
     // No document chrome inside the site's header.php (criterion 11.4).
     expect(fragment).not.toMatch(/<\/?(?:html|head|body)\b|<!DOCTYPE|<title>|<link\b/i);
     // Sibling pages point at their help-site twins; absolute links are untouched.
@@ -832,9 +843,8 @@ describe("helpDocsRender — spec 102 forms", () => {
     );
     expect(welcome).not.toContain("On Phones and Tablets");
     const help = renderHelpPhp(input, null);
-    expect(help.slice(helpSiteHeader("Piaroa").length)).toBe(
-      `<style>${DOC_PAGE_STYLE}</style>\n` +
-        welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, ""),
+    expect(help.slice(styledHeader("Piaroa").length)).toBe(
+      welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, ""),
     );
   });
 
@@ -859,6 +869,12 @@ describe("helpDocsRender — spec 102 forms", () => {
     const input = baseInput({ keyboardId: "piaroa", answers: answersWith() });
     expect(renderReadmeMd(input)).toContain("## Links\n- Online help: https://help.keyman.com/keyboard/piaroa\n");
     expect(renderReadmeHtm(input)).toContain('<a href="https://help.keyman.com/keyboard/piaroa">');
+  });
+
+  it("links the keyboard's keyman.com page (criterion 5.5)", () => {
+    const input = baseInput({ keyboardId: "piaroa", answers: null });
+    expect(renderReadmeMd(input)).toContain("- Keyman keyboards page: https://keyman.com/keyboards/piaroa\n");
+    expect(renderReadmeMd(baseInput({ answers: null }))).not.toContain("keyman.com/keyboards");
   });
 
   it("never puts the typing guide in the README", () => {

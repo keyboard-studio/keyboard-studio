@@ -33,6 +33,8 @@ interface EngineModule {
     stylesheets?: KpsStylesheetEntry[];
     startWelcomeHtmText?: string;
     startHelpPhpText?: string;
+    // The base's verbatim LICENSE.md (never written into the VFS).
+    startLicenseText?: string;
     // spec 080 US2 — the base documentation bundle (data-model §6).
     startReadmeMdText?: string;
     startHistoryMdText?: string;
@@ -1174,6 +1176,12 @@ export function useKeyboardArtifact(
           "Loading keyboard source",
         );
         const wc = useWorkingCopyStore.getState();
+        // Retain the base's verbatim LICENSE.md on this branch too (user ruling
+        // 2026-10-31: an adaptation carries the base license forward). The
+        // loader never writes it into the VFS, so the output projection seeds
+        // LICENSE.md from this slice; without it the adapt download shipped a
+        // bare MIT stub and lost the base's copyright.
+        wc.setStartLicenseText(fetchResult.startLicenseText ?? null);
         if (writesStartDocs && startDocsMode === "copy-on-switch") {
           // Output/Criteria's picker instantiates a Track 1 copy from this
           // fetch: the copy's slices, exactly as the scaffold branch writes.

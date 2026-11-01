@@ -28,6 +28,34 @@ function normalizeFamily(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/**
+ * Industry/system font families ("Arial, Times, Tahoma, etc."),
+ * normalised for comparison: lowercased with all non-alphanumerics
+ * removed ("Times New Roman" -> "timesnewroman"). Shared by 8.7 (these
+ * need not be bundled: the OS supplies them) and 8.12 (these must not be
+ * shipped in the package).
+ */
+export const INDUSTRY_FONTS: ReadonlySet<string> = new Set(
+  [
+    "Arial",
+    "Arial MT",
+    "Times",
+    "Times New Roman",
+    "Tahoma",
+    "Verdana",
+    "Helvetica",
+    "Courier New",
+    "Georgia",
+    "Calibri",
+    "Comic Sans MS",
+  ].map((n) => n.toLowerCase().replace(/[^a-z0-9]/g, "")),
+);
+
+/** True when `name` (a family or file stem) is an industry/system font. */
+export function isIndustryFont(name: string): boolean {
+  return INDUSTRY_FONTS.has(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+}
+
 /** The font families the keyboard requires, deduplicated by normalized name. */
 export function requiredFontFamilies(input: {
   kvks?: KvksIR;
@@ -39,9 +67,15 @@ export function requiredFontFamilies(input: {
     const norm = normalizeFamily(name);
     if (!byNorm.has(norm)) byNorm.set(norm, name.trim());
   };
-  add(input.kvks?.fontFamily);
+  // Industry/system fonts are supplied by the OS and must not be
+  // bundled (8.12), so 8.7 never requires them in the package.
+  const addBundlable = (name: string | undefined): void => {
+    if (name !== undefined && isIndustryFont(name)) return;
+    add(name);
+  };
+  addBundlable(input.kvks?.fontFamily);
   for (const platform of input.touchLayout?.platforms ?? []) {
-    add(platform.font);
+    addBundlable(platform.font);
   }
   return [...byNorm.values()];
 }

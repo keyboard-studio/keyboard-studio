@@ -3,7 +3,7 @@ import { makeLocation, walkTouchKeys } from "./_shared.js";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
 
 // _shared.ts holds the two helpers shared by the check-18-* (touch-layout /
-// DISCUS) checks: makeLocation (the placeholder line:1 location every
+// DISCUS) checks: makeLocation (the placeholder line:0 location every
 // check-18-* finding uses, since touch-layout checks operate on the parsed
 // IR rather than source text) and walkTouchKeys (the platform -> layer ->
 // row -> key iterator). This suite pins both helpers' contracts directly,
@@ -12,17 +12,17 @@ import type { TouchLayoutIR } from "@keyboard-studio/contracts";
 // checks' own fixtures.
 
 describe("makeLocation", () => {
-  it("returns the touch-layout path as file with a fixed placeholder line of 1", () => {
+  it("returns the touch-layout path as file with a fixed placeholder line of 0 (whole file)", () => {
     expect(makeLocation("source/test.keyman-touch-layout")).toEqual({
       file: "source/test.keyman-touch-layout",
-      line: 1,
+      line: 0,
     });
   });
 
   it("passes the path through verbatim, including nested VFS paths", () => {
     expect(makeLocation("source/nested/dir/keyboard.keyman-touch-layout")).toEqual({
       file: "source/nested/dir/keyboard.keyman-touch-layout",
-      line: 1,
+      line: 0,
     });
   });
 });

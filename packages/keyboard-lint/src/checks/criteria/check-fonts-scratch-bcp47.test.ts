@@ -54,7 +54,6 @@ describe("checkIndustryFonts (8.12)", () => {
   const base = {
     kpsFileNames: [] as string[],
     kpsFontRefs: [] as string[],
-    touchFonts: [] as string[],
     kpsPath: KPS_PATH,
   };
 
@@ -76,18 +75,21 @@ describe("checkIndustryFonts (8.12)", () => {
     expect(findings[0]!.code).toBe("KM_LINT_KPS_INDUSTRY_FONT");
   });
 
-  it("flags an industry family string even when the file was renamed", () => {
-    const { findings } = checkIndustryFonts({
-      ...base,
-      kvksFontFamily: "Times New Roman",
-    });
-    expect(findings).toHaveLength(1);
-    expect(findings[0]!.message).toContain("visual keyboard font");
+  it("does not judge a .kvks/touch display font that the .kps does not ship", () => {
+    // Arial is Keyman Developer's default .kvks font; the check input no
+    // longer carries it, so only kpsFileNames / kpsFontRefs are judged.
+    expect(
+      checkIndustryFonts({ ...base, kpsFileNames: ["..\\build\\demo.kvk"] }).findings,
+    ).toEqual([]);
   });
 
-  it("flags Tahoma among the touch layout fonts", () => {
-    const { findings } = checkIndustryFonts({ ...base, touchFonts: ["Tahoma"] });
+  it("flags an industry font named by a .kps font reference", () => {
+    const { findings } = checkIndustryFonts({
+      ...base,
+      kpsFontRefs: ["Times New Roman"],
+    });
     expect(findings).toHaveLength(1);
+    expect(findings[0]!.message).toContain("font reference");
   });
 });
 

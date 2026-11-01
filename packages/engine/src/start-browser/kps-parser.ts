@@ -109,11 +109,17 @@ const VALID_TARGETS = new Set<string>([
  * matches.
  */
 function extractInfoValue(xml: string, tag: string, fallback: string): string {
-  const infoRe = new RegExp(`<Info[\\s\\S]*?<${tag}\\s+value="([^"]+)"`);
-  const tagRe = new RegExp(`<${tag}\\s*>([^<]+)<\\/${tag}>`);
-  const infoMatch = xml.match(infoRe);
-  const tagMatch = xml.match(tagRe);
-  return (infoMatch?.[1] ?? tagMatch?.[1] ?? fallback).trim();
+  // Scope to <Info>: a <File><Name> or <Keyboard><Version> elsewhere in the
+  // file must never be read as the package name/version/description. Real
+  // files carry attributes on these tags (`<Name URL="">X</Name>`).
+  const info = new RegExp(`<Info(?:\\s[^>]*)?>([\\s\\S]*?)<\\/Info\\s*>`, "i").exec(xml)?.[1];
+  // Hand-edited legacy files with no <Info> keep the old text fallback, but only
+  // from <Keyboards> - never from <Files>.
+  const scope = info ?? /<Keyboards(?:\s[^>]*)?>([\s\S]*?)<\/Keyboards\s*>/i.exec(xml)?.[1];
+  if (scope === undefined) return fallback;
+  const valueRe = new RegExp(`<${tag}\\s[^>]*?\\bvalue="([^"]+)"`);
+  const textRe = new RegExp(`<${tag}(?:\\s[^>]*)?>([^<]+)<\\/${tag}\\s*>`);
+  return (scope.match(valueRe)?.[1] ?? scope.match(textRe)?.[1] ?? fallback).trim();
 }
 
 export function parseKps(xml: string): KpsMetadata {
@@ -121,7 +127,7 @@ export function parseKps(xml: string): KpsMetadata {
   const version = extractInfoValue(xml, "Version", "1.0");
 
   // <Targets>windows macosx linux web</Targets> — space-separated platform list
-  const targetsMatch = xml.match(/<Targets\s*>([^<]+)<\/Targets>/);
+  const targetsMatch = xml.match(/<Targets(?:\s[^>]*)?>([^<]+)<\/Targets>/);
   const rawTargets = (targetsMatch?.[1] ?? "").trim().split(/\s+/);
   const targets = rawTargets.filter(
     (t): t is KeymanPlatformTarget => VALID_TARGETS.has(t)
@@ -185,16 +191,16 @@ export function kpsRefToPosix(name: string): string {
  * block with no `<FileType>` yields `fileType: ""`.
  */
 export function parseKpsFiles(xml: string): KpsFileEntry[] {
-  const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
+  const fileBlockRe = /<File(?:\s[^>]*)?>([\s\S]*?)<\/File>/gi;
   const entries: KpsFileEntry[] = [];
   let blockMatch: RegExpExecArray | null;
   while ((blockMatch = fileBlockRe.exec(xml)) !== null) {
     const block = blockMatch[1] ?? "";
-    const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(block);
+    const nameMatch = /<Name(?:\s[^>]*)?>([^<]*)<\/Name>/i.exec(block);
     if (nameMatch === null) continue;
     const name = (nameMatch[1] ?? "").trim();
     if (name.length === 0) continue;
-    const typeMatch = /<FileType\s*>([^<]*)<\/FileType>/i.exec(block);
+    const typeMatch = /<FileType(?:\s[^>]*)?>([^<]*)<\/FileType>/i.exec(block);
     const fileType = (typeMatch?.[1] ?? "").trim().toLowerCase();
     entries.push({ name, fileType });
   }
@@ -276,13 +282,13 @@ export interface KpsPackageDetails {
 
 /** Extract one text-content element's trimmed text, or "" when absent. */
 function extractElementText(xml: string, tag: string): string {
-  const m = new RegExp(`<${tag}\\s*>([^<]*)<\\/${tag}>`, "i").exec(xml);
+  const m = new RegExp(`<${tag}(?:\\s[^>]*)?>([^<]*)<\\/${tag}\\s*>`, "i").exec(xml);
   return (m?.[1] ?? "").trim();
 }
 
 export function parseKpsPackageDetails(xml: string): KpsPackageDetails {
-  const keyboards = /<Keyboards\s*>([\s\S]*?)<\/Keyboards\s*>/i.exec(xml)?.[1] ?? "";
-  const options = /<Options\s*>([\s\S]*?)<\/Options\s*>/i.exec(xml)?.[1] ?? "";
+  const keyboards = /<Keyboards(?:\s[^>]*)?>([\s\S]*?)<\/Keyboards\s*>/i.exec(xml)?.[1] ?? "";
+  const options = /<Options(?:\s[^>]*)?>([\s\S]*?)<\/Options\s*>/i.exec(xml)?.[1] ?? "";
   const oskFont = extractElementText(keyboards, "OSKFont");
   const displayFont = extractElementText(keyboards, "DisplayFont");
   return {

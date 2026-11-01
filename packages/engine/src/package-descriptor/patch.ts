@@ -234,7 +234,7 @@ function migrateWelcomePaths(
   let out = text;
 
   out = out.replace(
-    /(<WelcomeFile\s*>)([^<]*)(<\/WelcomeFile\s*>)/i,
+    /(<WelcomeFile(?:\s[^>]*)?>)([^<]*)(<\/WelcomeFile\s*>)/i,
     (m, open: string, value: string, close: string) => {
       const key = memberKey(value);
       if (key.startsWith("welcome/")) return m;
@@ -247,15 +247,15 @@ function migrateWelcomePaths(
   );
 
   const wanted = normaliseWelcomeFolderFiles(welcomeFolderFiles);
-  const filesRe = /(<Files\s*>)([\s\S]*?)(<\/Files\s*>)/i;
+  const filesRe = /(<Files(?:\s[^>]*)?>)([\s\S]*?)(<\/Files\s*>)/i;
   if (!filesRe.test(out)) {
     return { text: out, rewrites, unlisted: wanted };
   }
 
   out = out.replace(filesRe, (_m, open: string, body: string, close: string) => {
     const listed = new Set<string>();
-    let patched = body.replace(/<File\s*>[\s\S]*?<\/File\s*>/gi, (block) => {
-      const nameMatch = /(<Name\s*>)([^<]*)(<\/Name\s*>)/i.exec(block);
+    let patched = body.replace(/<File(?:\s[^>]*)?>[\s\S]*?<\/File\s*>/gi, (block) => {
+      const nameMatch = /(<Name(?:\s[^>]*)?>)([^<]*)(<\/Name\s*>)/i.exec(block);
       if (nameMatch === null) return block;
       const key = memberKey(nameMatch[2] ?? "");
       if (key === "welcome.htm") {
@@ -322,14 +322,14 @@ function ensurePackageFonts(
   let out = text;
   let unlisted: string[] = [];
 
-  const filesRe = /(<Files\s*>)([\s\S]*?)(<\/Files\s*>)/i;
+  const filesRe = /(<Files(?:\s[^>]*)?>)([\s\S]*?)(<\/Files\s*>)/i;
   if (refs.length > 0 && !filesRe.test(out)) {
     unlisted = refs;
   } else if (refs.length > 0) {
     out = out.replace(filesRe, (_m, open: string, body: string, close: string) => {
       const listed = new Set<string>();
-      for (const block of body.match(/<File\s*>[\s\S]*?<\/File\s*>/gi) ?? []) {
-        const name = /<Name\s*>([^<]*)<\/Name\s*>/i.exec(block)?.[1];
+      for (const block of body.match(/<File(?:\s[^>]*)?>[\s\S]*?<\/File\s*>/gi) ?? []) {
+        const name = /<Name(?:\s[^>]*)?>([^<]*)<\/Name\s*>/i.exec(block)?.[1];
         if (name !== undefined) listed.add(memberKey(name));
       }
       const additions = refs.filter((ref) => !listed.has(memberKey(ref)));
@@ -440,9 +440,9 @@ function patchKpsIdentity(
     out = out.replace(KEYBOARD_ELEMENT_RE, (_m, open: string, body: string, close: string) => {
       let patched = replaceElementText(body, "Name", escapedName);
       const languageElement = buildLanguageElement(identity);
-      if (/<Languages\s*>[\s\S]*?<\/Languages\s*>/.test(patched)) {
+      if (/<Languages(?:\s[^>]*)?>[\s\S]*?<\/Languages\s*>/.test(patched)) {
         patched = patched.replace(
-          /(<Languages\s*>)([\s\S]*?)(<\/Languages\s*>)/,
+          /(<Languages(?:\s[^>]*)?>)([\s\S]*?)(<\/Languages\s*>)/,
           (_lm, lOpen: string, inner: string, lClose: string) =>
             `${lOpen}${indentOfFirstChild(inner)}${languageElement}${trailingWhitespaceOf(inner)}${lClose}`,
         );

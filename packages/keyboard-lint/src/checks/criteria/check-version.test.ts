@@ -4,6 +4,8 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
   checkVersionFormat,
   checkVersionLeadingZero,
+  checkSpuriousVersionBump,
+  checkVersionBumpRequired,
   checkVersionNotIncremented,
   checkVersionVPrefix,
 } from "./check-version.js";
@@ -75,20 +77,20 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
   });
 
   it("non-PR target is met-moot", () => {
-    const r = checkVersionNotIncremented(irWithVersion("1.0"), undefined);
+    const r = checkVersionNotIncremented(irWithVersion("1.0"), undefined, []);
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/version history is the repo/);
   });
 
   it("PR version greater than base is met", () => {
-    const r = checkVersionNotIncremented(irWithVersion("1.1"), prReview());
+    const r = checkVersionNotIncremented(irWithVersion("1.1"), prReview(), []);
     expect(r.code).toBe("KM_LINT_VERSION_NOT_INCREMENTED");
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/"1.1" > "1.0"/);
   });
 
   it("equal version on an upgrade is a finding", () => {
-    const r = checkVersionNotIncremented(irWithVersion("1.0"), prReview());
+    const r = checkVersionNotIncremented(irWithVersion("1.0"), prReview(), []);
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]!.code).toBe("KM_LINT_VERSION_NOT_INCREMENTED");
     expect(r.findings[0]!.message).toMatch(/not incremented from "1.0"/);
@@ -102,15 +104,27 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
         idConflictAtBase: { baseSha: SHA, existingTiers: [] },
         baseKmnVersion: { baseSha: SHA },
       }),
+      [],
     );
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/nothing to increment from/);
+  });
+
+  it("equal version on a docs-only upgrade is met-moot (agrees with 2.1/2.2)", () => {
+    const r = checkVersionNotIncremented(
+      irWithVersion("1.0"),
+      prReview({ treePaths: ["experimental/d/demo/README.md"] }),
+      [],
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.verified.join(" ")).toMatch(/No package file changed/);
   });
 
   it("PR version less than base is a finding", () => {
     const r = checkVersionNotIncremented(
       irWithVersion("0.9"),
       prReview({ baseKmnVersion: { baseSha: SHA, version: "1.0" } }),
+      [],
     );
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]!.message).toMatch(/"0.9" is less than the base version "1.0"/);
@@ -120,13 +134,14 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
     const r = checkVersionNotIncremented(
       irWithVersion("1.0"),
       prReview({ baseKmnVersion: { baseSha: SHA } }),
+      [],
     );
     expect(r.findings).toEqual([]);
     expect(r.verified.join(" ")).toMatch(/nothing to increment from/);
   });
 
   it("PR with no version declared is met-moot (judged elsewhere)", () => {
-    const r = checkVersionNotIncremented(irWithVersion(""), prReview());
+    const r = checkVersionNotIncremented(irWithVersion(""), prReview(), []);
     expect(r.findings).toEqual([]);
   });
 
@@ -134,7 +149,65 @@ describe("2.6 version strictly greater than base (KM_LINT_VERSION_NOT_INCREMENTE
     const r = checkVersionNotIncremented(
       irWithVersion("1.0"),
       prReview({ baseKmnVersion: undefined }),
+      [],
     );
     expect(r.findings).toEqual([]);
+  });
+});
+
+describe("2.1 / 2.2 version bump vs package files (NOT_BUMPED / SPURIOUS_VERSION_BUMP)", () => {
+  const SHA = "abc1234" + "0".repeat(33);
+  const KPS = ["..\build\demo.kmx", "welcome.htm", "LICENSE.md"];
+  const pr = (paths: string[], over: Partial<ReviewContext> = {}): ReviewContext => ({
+    repoPath: "experimental/d/demo",
+    treePaths: paths.map((p) => `experimental/d/demo/${p}`),
+    isPr: true,
+    baseKmnVersion: { baseSha: SHA, version: "1.0" },
+    idConflictAtBase: { baseSha: SHA, existingTiers: ["experimental"] },
+    ...over,
+  });
+  const both = (v: string, review: ReviewContext | undefined) => [
+    checkVersionBumpRequired(irWithVersion(v), review, KPS),
+    checkSpuriousVersionBump(irWithVersion(v), review, KPS),
+  ];
+
+  it("new submission (folder absent at base) is met-moot for both, listing the files", () => {
+    for (const r of both(
+      "1.0",
+      pr(["source/demo.kmn", "README.md"], {
+        idConflictAtBase: { baseSha: SHA, existingTiers: [] },
+        baseKmnVersion: { baseSha: SHA },
+      }),
+    )) {
+      expect(r.findings).toEqual([]);
+      expect(r.verified.join(" ")).toMatch(/New keyboard submission.*source\/demo\.kmn, README\.md/);
+    }
+  });
+
+  it("package file changed without a bump fails 2.1; 2.2 defers to 2.1", () => {
+    const [b, s] = both("1.0", pr(["source/welcome.htm"]));
+    expect(codes(b!.findings)).toEqual(["KM_LINT_VERSION_NOT_BUMPED"]);
+    expect(b!.findings[0]!.message).toMatch(/source\/welcome\.htm/);
+    expect(s!.findings).toEqual([]);
+    expect(s!.verified.join(" ")).toMatch(/judged by 2\.1/);
+  });
+
+  it("package file changed with a bump passes 2.1", () => {
+    const [b] = both("1.1", pr(["source/demo.kmn"]));
+    expect(b!.findings).toEqual([]);
+    expect(b!.verified.join(" ")).toMatch(/"1\.0" → "1\.1"/);
+  });
+
+  it("only non-package files: no bump required; a bump anyway is allowed", () => {
+    const [b, s] = both("1.0", pr(["README.md", "HISTORY.md"]));
+    expect(b!.findings).toEqual([]);
+    expect(s!.verified.join(" ")).toMatch(/no bump needed/);
+    const [, s2] = both("1.1", pr(["README.md"]));
+    expect(s2!.findings).toEqual([]);
+    expect(s2!.verified.join(" ")).toMatch(/allowed, but not required/);
+  });
+
+  it("non-PR target is met-moot", () => {
+    for (const r of both("1.0", undefined)) expect(r.findings).toEqual([]);
   });
 });

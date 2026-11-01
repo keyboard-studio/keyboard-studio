@@ -103,10 +103,11 @@ describe("useCompareCriteria", () => {
     // Foreign mode offers no controls on any row (FR-023 / plan D2).
     expect(judged?.rows.every((row) => row.controls === null)).toBe(true);
 
-    // D6: no scaffolder ran for a foreign keyboard, so no bake row is Met.
+    // D6: no scaffolder ran for a foreign keyboard, so no bake row is Met;
+    // each points at the lint twin that judges it instead.
     const bakeRows = judged?.rows.filter((row) => row.criterion.band === "scaffolder-bake") ?? [];
     expect(bakeRows.length).toBeGreaterThan(0);
-    expect(bakeRows.every((row) => row.status === "not-yet-checkable")).toBe(true);
+    expect(bakeRows.every((row) => row.status === "not-applicable")).toBe(true);
 
     // §18.6 needs an inventory a foreign keyboard does not have: it must
     // resolve Not yet checkable, never Met.
@@ -115,9 +116,15 @@ describe("useCompareCriteria", () => {
     );
     expect(inventoryRow?.status).toBe("not-yet-checkable");
 
-    // Facts warning: §§15–16 are applicable by default — no row there may
-    // resolve Not applicable on absent deprecation/partner data.
-    for (const prefix of ["15.", "16."]) {
+    // §15 follows the deprecation predicate (this fixture shows no
+    // deprecation signal, so it is Not applicable); §16 has no partner
+    // signal in a snapshot and stays applicable (D7).
+    expect(
+      judged?.rows
+        .filter((row) => row.criterion.section.startsWith("15."))
+        .every((row) => row.status === "not-applicable"),
+    ).toBe(true);
+    for (const prefix of ["16."]) {
       const rows = judged?.rows.filter((row) => row.criterion.section.startsWith(prefix)) ?? [];
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((row) => row.status !== "not-applicable")).toBe(true);

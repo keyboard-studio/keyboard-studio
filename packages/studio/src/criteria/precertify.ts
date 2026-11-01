@@ -11,8 +11,8 @@
 // supplies the set, and the resolver ignores it in foreign mode even
 // if a caller passes one by mistake.
 //
-// The set is deliberately tiny: only file-inventory hygiene, where
-// the generator's manifest IS the whole truth. Content properties
+// The set is deliberately tiny: only file-inventory and placement hygiene,
+// where the generator's manifest and fixed placement ARE the whole truth. Content properties
 // (targets, fonts, layouts) are author-influenced and stay CHECK-NOW
 // lint checks even in authored mode.
 
@@ -20,12 +20,21 @@
 export const PRECERTIFIED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_FILES_OUTSIDE_FOLDER",
   "KM_LINT_STRAY_SCRATCH_FILES",
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_ROOT_SOURCE",
 ]);
 
 /** The generation invariant behind each precertified code, as evidence. */
 export const PRECERTIFY_EVIDENCE: Readonly<Record<string, string>> = {
   KM_LINT_FILES_OUTSIDE_FOLDER:
     "Precertified by generation: the output bundle is built as a closed manifest of files inside the keyboard's own folder (buildOutputBundle / serializeWorkingCopy), and submission is confined to that folder's tree path — no file outside the folder can be modified.",
+  KM_LINT_REPO_PLACEMENT_BAD:
+    "Precertified by generation: the studio never lets the author choose a location. The download tells the author to copy the folder into release/<first-letter>/<id>/, and the pull-request path writes only under release/<first-letter>/<id>/ (the submit schema rejects any other path).",
+  KM_LINT_REPO_NO_ORGANIZING_FOLDER:
+    "Precertified by generation: the keyboard is always placed at release/<first-letter>/<id>/, which is under an alphabetic organizing subfolder by construction.",
+  KM_LINT_REPO_ROOT_SOURCE:
+    "Precertified by generation: every output file lives inside the keyboard's own folder (release/<first-letter>/<id>/); nothing is placed at the repository root.",
   KM_LINT_STRAY_SCRATCH_FILES:
     "Precertified by generation: every file in the output bundle enters through the generator's closed manifest (generator writes and manifest-enumerated base-carried files only) — no stray scratch or test file can appear in it.",
 };

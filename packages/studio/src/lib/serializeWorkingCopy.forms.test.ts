@@ -60,15 +60,15 @@ async function project(fixture: DocFixture, answers: Parameters<ReturnType<typeo
 /** The welcome page's body: inside <body>, with the welcome-only layout section set aside. */
 function welcomeBody(welcome: string): string {
   const inner = /<body>([\s\S]*)<\/body>/.exec(welcome)?.[1] ?? "";
-  return inner.replace(/\n<h2>Keyboard Layout<\/h2>[\s\S]*$/, "");
+  return inner.replace(/\n<h2>Keyboard Layout<\/h2>[\s\S]*$/, "").replace(/^\n/, "");
 }
 
 /**
- * The help page's body: the help-site header set aside, and the shared page
- * style it leads with (the welcome page carries that style in its head).
+ * The help page's body: the help-site header set aside. The shared page style
+ * rides inside that header (criterion 11.3), so nothing else leads the body.
  */
 function helpBody(help: string): string {
-  return help.replace(/^<\?php[\s\S]*?\?>\n/, "").replace(/^<style>[\s\S]*?<\/style>/, "");
+  return help.replace(/^<\?php[\s\S]*?\?>\n/, "");
 }
 
 /** A rough well-formedness check for the generated pages: no raw `<` or `&` outside a tag or entity. */

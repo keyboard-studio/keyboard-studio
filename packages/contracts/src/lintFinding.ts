@@ -96,4 +96,13 @@ export interface LintFinding {
    * Default (absent) is `"authored"`.
    */
   origin?: LintFindingOrigin;
+  /**
+   * /review only: whether the file the finding points at is part of the
+   * judged pull request's changed paths (`"changed"`) or was already in
+   * the keyboard before the PR (`"unchanged"`). Absent when the target is
+   * not a PR, or the finding's file is synthetic or empty. Distinct from
+   * {@link LintFinding.origin}, which mutes chips; this only annotates
+   * evidence and never changes a status.
+   */
+  prDelta?: "changed" | "unchanged";
 }

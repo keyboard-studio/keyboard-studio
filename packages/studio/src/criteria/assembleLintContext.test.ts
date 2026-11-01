@@ -217,15 +217,13 @@ describe("assembleLintContext", () => {
     expect(plain.ctx.criteriaInput?.contrastiveRegionAttested).toBe(false);
   });
 
-  it("Batch 2 §8.13: a .kps with no <Targets> element contributes no declared targets and names the gap", () => {
+  it("Batch 2 §8.13: a .kps with no <Targets> element contributes no declared targets and and is not a missing input", () => {
     const { ctx, contextMissing } = assembleLintContext({
       vfs: fixtureVfs(),
       keyboardId: KEYBOARD_ID,
     });
     expect(ctx.criteriaInput?.kpsTargets).toEqual([]);
-    expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBe(
-      "a <Targets> list in the .kps (the package does not declare targets)",
-    );
+    expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBeUndefined();
   });
 
   it("Batch 2 §8.13: a declared <Targets> list crosses into the criteria input and clears the gap", () => {
@@ -329,10 +327,6 @@ describe("assembleLintContext", () => {
     });
     expect(ctx.inventory).toBe(inventory);
     expect(contextMissing).toEqual({
-      // The fixture .kps declares no <Targets> element, so §8.13's
-      // input is honestly named missing (spec 084 Batch 2).
-      KM_LINT_KPS_TARGETS_MISMATCH:
-        "a <Targets> list in the .kps (the package does not declare targets)",
       // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
@@ -359,17 +353,21 @@ describe("assembleLintContext", () => {
       // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
       // input-gated.
       KM_LINT_REPO_PLACEMENT_BAD:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_NO_ORGANIZING_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_ROOT_SOURCE:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_FILES_OUTSIDE_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_DUPLICATE_KEYBOARD_ID:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_VERSION_NOT_INCREMENTED:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
+      KM_LINT_VERSION_NOT_BUMPED:
+        "the repository path and file list",
+      KM_LINT_SPURIOUS_VERSION_BUMP:
+        "the repository path and file list",
     });
   });
 
@@ -443,6 +441,25 @@ describe("assembleLintContext", () => {
         baseKmnVersion: { baseSha: "abc1234", version: "1.0" },
       },
     });
+    expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBeUndefined();
+    expect(contextMissing["KM_LINT_VERSION_NOT_BUMPED"]).toBeUndefined();
+    expect(contextMissing["KM_LINT_SPURIOUS_VERSION_BUMP"]).toBeUndefined();
+  });
+
+  it("2.1/2.2: a PR reviewContext without the base folder lookup names it context-missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      reviewContext: {
+        repoPath: "experimental/c/criteria_fixture",
+        treePaths: ["experimental/c/criteria_fixture/source/criteria_fixture.kmn"],
+        isPr: true,
+        baseKmnVersion: { baseSha: "abc1234", version: "1.0" },
+      },
+    });
+    expect(contextMissing["KM_LINT_VERSION_NOT_BUMPED"]).toBe(
+      "the PR base-commit keyboard-folder lookup",
+    );
     expect(contextMissing["KM_LINT_VERSION_NOT_INCREMENTED"]).toBeUndefined();
   });
 
@@ -549,10 +566,6 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       inventory: fixtureInventory(),
     });
     expect(contextMissing).toEqual({
-      // The fixture .kps declares no <Targets> element, so §8.13's
-      // input is honestly named missing (spec 084 Batch 2).
-      KM_LINT_KPS_TARGETS_MISMATCH:
-        "a <Targets> list in the .kps (the package does not declare targets)",
       // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
       // honestly named missing (spec 084 KPJ pair).
       KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
@@ -574,17 +587,21 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // + Group C + 1.5/2.6). The §19 rows are applicability-gated, not
       // input-gated.
       KM_LINT_REPO_PLACEMENT_BAD:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_NO_ORGANIZING_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_REPO_ROOT_SOURCE:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_FILES_OUTSIDE_FOLDER:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_DUPLICATE_KEYBOARD_ID:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
       KM_LINT_VERSION_NOT_INCREMENTED:
-        "the repository context (repo path and file list)",
+        "the repository path and file list",
+      KM_LINT_VERSION_NOT_BUMPED:
+        "the repository path and file list",
+      KM_LINT_SPURIOUS_VERSION_BUMP:
+        "the repository path and file list",
     });
 
     const { findings: findings } = await new KeyboardLintEngine().lintWithContext(
@@ -713,7 +730,7 @@ describe("applyInventoryOutcome (§18.6 Batch 4)", () => {
     });
     expect(result.ctx.inventory).toBeUndefined();
     expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
-      "no CLDR/SLDR entry for ewo",
+      "CLDR/SLDR exemplar baseline for ewo",
     );
   });
 
@@ -727,7 +744,7 @@ describe("applyInventoryOutcome (§18.6 Batch 4)", () => {
       missingTag: null,
     });
     expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
-      "no language target is recorded",
+      "recorded language target",
     );
   });
 

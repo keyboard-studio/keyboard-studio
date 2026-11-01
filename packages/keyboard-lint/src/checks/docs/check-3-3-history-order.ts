@@ -44,7 +44,7 @@ export function checkHistoryOrder(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `HISTORY.md's top entry is version ${top.version}, but ${newest.version} is a newer entry further down the file.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Move the ${newest.version} entry to the top of HISTORY.md so the most recent change is listed first.`,
     },
   ]);

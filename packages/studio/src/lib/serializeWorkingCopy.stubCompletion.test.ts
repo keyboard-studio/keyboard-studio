@@ -143,7 +143,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
 
     // spec 102 FR-029: the README links the keyboard's help-site page even before any answer.
     expect(readVfsText(projected!.vfs, "README.md")).toBe(
-      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n`,
+      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n- Keyman keyboards page: https://keyman.com/keyboards/${keyboardId}\n`,
     );
     // spec 079 FR-013: the placeholder page still references the generated
     // layout charts (a net-new keyboard has no base images), so the pre-076
@@ -168,7 +168,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const style = /<style>([\s\S]*?)<\/style>/.exec(welcome)?.[1];
     const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`);
     expect(help).toBe(
-      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<style>${style}</style>\n<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p>`,
+      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  $pagestyle = <<<'END'\n${style!.trim()}\nEND;\n  require_once('header.php');\n?>\n<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p>`,
     );
   });
 
@@ -181,8 +181,13 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
 
     const projected = await projectWorkingCopyForOutput();
     const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`)!;
-    const header = `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n`;
+    const welcomeForStyle = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
+    const pageStyle = /<style>([\s\S]*?)<\/style>/.exec(welcomeForStyle)?.[1];
+    // Criterion 11.3: the shared style rides in $pagestyle inside the header,
+    // as raw CSS (the site's header.php wraps it in <style>).
+    const header = `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  $pagestyle = <<<'END'\n${pageStyle!.trim()}\nEND;\n  require_once('header.php');\n?>\n`;
     expect(help.startsWith(header)).toBe(true);
+    expect(help.slice(help.indexOf("?>") + 2)).not.toMatch(/<style/i);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
     // Fresh help.php is a body fragment (criterion 11.4: no </body></html>).
     expect(help).not.toMatch(/<\/body>/i);
@@ -197,8 +202,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
       .replace(/<\/body>\n<\/html>$/, "");
     // The help fragment leads with the same shared style block the welcome
     // page carries in its head, then the identical inner body.
-    const style = /<style>([\s\S]*?)<\/style>/.exec(welcome)?.[1];
-    expect(help.slice(header.length)).toBe(`<style>${style}</style>\n${welcomeBody}`);
+    expect(help.slice(header.length)).toBe(welcomeBody.replace(/^\n/, ""));
     expect(welcomeSansLayout).not.toBe(welcome);
   });
 
@@ -254,5 +258,58 @@ describe("early production (Track 1, nothing answered yet)", () => {
     expect(charts.length).toBeGreaterThan(0);
     const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
     for (const p of charts) expect(welcome).toContain(p.slice("source/welcome/".length));
+  });
+});
+
+describe("adapt carries the base LICENSE.md forward (user ruling 2026-10-31)", () => {
+  const BASE_LICENSE = "MIT License\n\nCopyright (C) 2017-2025 Original Author\n\nPermission is hereby granted...\n";
+
+  it("seeds LICENSE.md verbatim from the base license on the adapt track", async () => {
+    const keyboardId = basicKbdus.id;
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromExisting(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().setStartLicenseText(BASE_LICENSE);
+
+    const projected = await projectWorkingCopyForOutput();
+    expect(readVfsText(projected!.vfs, "LICENSE.md")).toBe(BASE_LICENSE);
+    expect(projected!.warnings.join("\n")).not.toContain("generated missing package files: LICENSE.md");
+  });
+
+  it("still writes the holder-free MIT stub when the base shipped no license", async () => {
+    const keyboardId = basicKbdus.id;
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromExisting(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().setStartLicenseText(null);
+
+    const projected = await projectWorkingCopyForOutput();
+    expect(readVfsText(projected!.vfs, "LICENSE.md")).toContain("MIT License");
+    expect(projected!.warnings).toContain("[package] generated missing package files: LICENSE.md");
+  });
+});
+
+describe("output hygiene on the projection (criteria 1.10b, 4.6b)", () => {
+  it("stamps the .kpj format and strips copyright years from the .kmn", async () => {
+    const keyboardId = basicKbdus.id;
+    const vfs = createVirtualFS([
+      {
+        path: `source/${keyboardId}.kmn`,
+        content: "store(&NAME) 'Stub Test'\nstore(&COPYRIGHT) '\u00a9 2017-2025 Some Author'\nbegin Unicode > use(main)\ngroup(main) using keys\n",
+        isBinary: false,
+      },
+      {
+        path: `${keyboardId}.kpj`,
+        content: "<KeymanDeveloperProject>\n  <Options>\n    <ProjectType>keyboard</ProjectType>\n  </Options>\n</KeymanDeveloperProject>\n",
+        isBinary: false,
+      },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeTestIR([]) });
+
+    const projected = await projectWorkingCopyForOutput();
+    expect(readVfsText(projected!.vfs, `${keyboardId}.kpj`)).toContain("<Version>2.0</Version>");
+    const kmn = readVfsText(projected!.vfs, `source/${keyboardId}.kmn`)!;
+    expect(kmn).toMatch(/store\(&COPYRIGHT\) '\u00a9 Some Author'/);
+    expect(kmn).not.toMatch(/2017/);
   });
 });

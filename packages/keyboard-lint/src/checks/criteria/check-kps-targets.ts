@@ -76,7 +76,10 @@ export function checkKpsTargetsMatch(input: {
   const kpsTargets = expandTargets(input.kpsTargets);
   const problems: string[] = [];
 
-  const onlyKmn = setDifference(kmnTargets, kpsTargets);
+  // An undeclared .kps <Targets> list (empty) is not a disagreement:
+  // only the declared-set comparison is skipped, the shipped-file
+  // checks below still run.
+  const onlyKmn = kpsTargets.size > 0 ? setDifference(kmnTargets, kpsTargets) : [];
   const onlyKps = setDifference(kpsTargets, kmnTargets);
   if (onlyKmn.length > 0 || onlyKps.length > 0) {
     const parts: string[] = [];

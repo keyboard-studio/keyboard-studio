@@ -26,9 +26,13 @@
 //     `sourcedByTag` so this module stays pure and synchronous.
 //
 // Skip rule (the ruling's only skip): if ANY language target has no
-// CLDR/SLDR entry (the sourcing path returned null for it), the whole
-// build is skipped — §18.6 must not render a verdict on a partial
-// baseline. The caller turns the skip into a contextMissing reason
+// CLDR/SLDR entry (the sourcing path returned null for it) AND the author
+// confirmed no inventory, the whole build is skipped — §18.6 must not
+// render a verdict on a partial baseline. When the author DID confirm an
+// inventory, the build uses that inventory alone (no baseline from any
+// target): an under-resourced language is exactly where the author's own
+// confirmed characters are the only requirement there is, and a partial
+// CLDR baseline beside them would be the guess the skip exists to avoid. The caller turns the skip into a contextMissing reason
 // naming the tag ("no CLDR/SLDR entry for <tag>"). A keyboard with no
 // recorded language target at all is likewise skipped: there is no
 // baseline to form and guessing one would invent the requirement.
@@ -216,20 +220,31 @@ export function buildCriteriaInventory(
   );
   if (tags.length === 0) return { kind: "skipped", missingTag: null };
 
+  const { alphabet, confirmedInventory } = input.confirmed;
+  const authorSupplied =
+    confirmedInventory.length > 0 ||
+    (alphabet !== undefined &&
+      (alphabet.bases.length > 0 ||
+        alphabet.marks.length > 0 ||
+        alphabet.attestedStacks.length > 0));
+
   // The ruling's skip: ANY target without an entry skips the whole
-  // check — a verdict on a partial baseline would be a guess.
+  // check — a verdict on a partial baseline would be a guess — unless the
+  // author's confirmed inventory stands alone (no baseline then).
+  let useBaseline = true;
   for (const tag of tags) {
     if ((input.sourcedByTag.get(tag) ?? null) === null) {
-      return { kind: "skipped", missingTag: tag };
+      if (!authorSupplied) return { kind: "skipped", missingTag: tag };
+      useBaseline = false;
+      break;
     }
   }
 
   const pools = newPools();
-  const { alphabet, confirmedInventory } = input.confirmed;
   const declaredRoles = alphabet?.declaredRoles ?? {};
 
   // -- The baseline: CLDR/SLDR exemplars per target, unioned. -------
-  for (const tag of tags) {
+  for (const tag of useBaseline ? tags : []) {
     const sourced = input.sourcedByTag.get(tag);
     if (!sourced) continue; // unreachable: the skip loop above returned
     for (const { char, tier } of sourced.characters) {

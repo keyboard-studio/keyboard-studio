@@ -25,7 +25,7 @@ describe("useDocsPreview", () => {
     const { result } = renderHook(() => useDocsPreview());
 
     expect(result.current.readmeMd).toBe(
-      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${basicKbdus.id}\n`,
+      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${basicKbdus.id}\n- Keyman keyboards page: https://keyman.com/keyboards/${basicKbdus.id}\n`,
     );
     // The no-answer welcome page is the element-spec §1 shell around the
     // fallback body — the same bytes the engine's welcomeHtm stub pins.

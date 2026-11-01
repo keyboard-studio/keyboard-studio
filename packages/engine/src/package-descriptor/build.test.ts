@@ -189,6 +189,7 @@ describe("buildKpsContent — the parts this feature does NOT own (contract §2)
     const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
     expect(kps).toContain("<FollowKeyboardVersion/>");
     expect(kps).toContain("<ReadMeFile>readme.htm</ReadMeFile>");
+    expect(kps).toContain("<LicenseFile>..\\LICENSE.md</LicenseFile>");
     // spec 080 FR-002: the folder convention, in the corpus's backslash form.
     expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
     expect(kps.startsWith('<?xml version="1.0" encoding="utf-8"?>')).toBe(true);

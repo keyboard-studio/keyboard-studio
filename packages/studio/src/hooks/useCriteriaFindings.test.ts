@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { VirtualFS } from "@keyboard-studio/contracts";
 
 const { exemplarLookup } = vi.hoisted(() => ({ exemplarLookup: vi.fn() }));
@@ -119,9 +120,45 @@ describe("useCriteriaFindings", () => {
     // No working copy => no language target recorded => the Batch 4
     // build skips and §18.6 names the un-formable baseline.
     expect(result.current.contextMissing["KM_LINT_INVENTORY_UNCOVERED"]).toContain(
-      "no language target is recorded",
+      "a recorded language target",
     );
     expect(exemplarLookup).not.toHaveBeenCalled();
+  });
+
+  it("judges the OUTPUT projection, not the preview VFS, once a working copy exists", async () => {
+    // An adapt working copy whose preview VFS is the raw fetched source: no
+    // LICENSE.md, and a stray build/ artifact. The judged files are what the
+    // author downloads: the projection, with its LICENSE.md and without build/.
+    const id = basicKbdus.id;
+    const startVfs = createVirtualFS([
+      { path: `source/${id}.kmn`, content: KMN.replace("Criteria Hook Fixture", "Basic"), isBinary: false },
+      { path: `build/${id}.kmx`, content: "bin", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromExisting(basicKbdus, { vfs: startVfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().setStartLicenseText("MIT License\n\nCopyright (C) 2020 Base Author\n");
+    const previewVfs = createVirtualFS([
+      { path: `source/${id}.kmn`, content: KMN, isBinary: false },
+    ]);
+    const stage = {
+      kind: "ready",
+      vfs: previewVfs,
+      keyboardId: id,
+      compileResult: { diagnostics: [] },
+      jsBlobUrl: "",
+      scaffoldWarnings: [],
+    } as unknown as Stage;
+    const { result } = renderHook(() => useCriteriaFindings(stage));
+
+    await waitFor(() => expect(result.current.ready).toBe(true));
+
+    const judged = result.current.vfs!;
+    expect(judged).not.toBe(previewVfs);
+    expect(previewVfs.get("LICENSE.md")).toBeUndefined();
+    expect(judged.get("LICENSE.md")?.content).toContain("Base Author");
+    expect(judged.list().some((p) => p.startsWith("build/"))).toBe(false);
+    expect(result.current.keyboardId).toBe(id);
   });
 
   it("builds the inventory from the identity tag and runs §18.6 (Batch 4)", async () => {
@@ -172,7 +209,7 @@ describe("useCriteriaFindings", () => {
     const codes = result.current.lintFindings.map((f) => f.code);
     expect(codes).not.toContain("KM_LINT_INVENTORY_UNCOVERED");
     expect(result.current.contextMissing["KM_LINT_INVENTORY_UNCOVERED"]).toContain(
-      "no CLDR/SLDR entry for xyz",
+      "a CLDR/SLDR exemplar baseline for xyz",
     );
   });
 });

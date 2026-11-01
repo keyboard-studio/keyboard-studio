@@ -38,6 +38,12 @@ export interface KpsListingFacts {
   hasTouchLayout: boolean;
   /** VFS path of the judged .kps (finding location). */
   kpsPath: string;
+  /**
+   * Whether the keyboard's welcome page references any image (`<img>`).
+   * Graphics are required in the .kps only when it does (8.6b); when
+   * undefined (welcome text unavailable) graphics are still required.
+   */
+  welcomeHasImages?: boolean;
 }
 
 const IMAGE_EXTS = [".bmp", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
@@ -145,15 +151,18 @@ export function checkKpsReadmeAbsent(facts: KpsListingFacts): CheckResult {
 }
 
 /**
- * 8.6b — `welcome.htm` and/or associated graphics are not listed in the
- * .kps. One finding names everything missing.
+ * 8.6b — `welcome.htm` and/or associated graphics (when the welcome page
+ * references images) are not listed in the .kps. One finding names everything missing.
  */
 export function checkKpsWelcomeAbsent(facts: KpsListingFacts): CheckResult {
   const code = "KM_LINT_KPS_WELCOME_ABSENT";
   const names = facts.fileNames.map(norm);
   const missing: string[] = [];
   if (!names.some((n) => base(n) === "welcome.htm")) missing.push("welcome.htm");
-  if (!names.some((n) => IMAGE_EXTS.some((e) => n.endsWith(e)))) {
+  if (
+    facts.welcomeHasImages !== false &&
+    !names.some((n) => IMAGE_EXTS.some((e) => n.endsWith(e)))
+  ) {
     missing.push("graphics (no image file listed)");
   }
   if (missing.length === 0) {

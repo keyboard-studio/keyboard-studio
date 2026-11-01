@@ -320,6 +320,12 @@ describe("extractInlineStyles / arraysEqual", () => {
     expect(extractInlineStyles(html)).toEqual(["p{color:red;}"]);
   });
 
+  it("reads a help page's $pagestyle heredoc as the same CSS a <style> block holds", () => {
+    const php = "<?php\n  $pagename = 'X Keyboard Help';\n  $pagestyle = <<<'END'\np { color: red; }\nEND;\n  require_once('header.php');\n?>";
+    const welcome = "<style>p { color: red; }</style>";
+    expect(extractInlineStyles(php)).toEqual(extractInlineStyles(welcome));
+  });
+
   it("strips non-rendering whitespace differences", () => {
     expect(extractInlineStyles('<p style="color:  red">a</p>')).toEqual(["color:red"]);
   });

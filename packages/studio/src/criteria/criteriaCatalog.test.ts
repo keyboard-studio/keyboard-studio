@@ -59,7 +59,8 @@ function registeredLintCodes(): string[] {
         continue;
       const text = readFileSync(abs, "utf-8");
       for (const m of text.matchAll(
-        /code:\s*"(KM_(?:LINT|WARN|HINT|ERROR)_[A-Z0-9_]+)"/g,
+        // A check that never fails declares its code only as `const code =`.
+        /code(?::|\s*=)\s*"(KM_(?:LINT|WARN|HINT|ERROR)_[A-Z0-9_]+)"/g,
       ))
         out.add(m[1]!);
     }
@@ -102,12 +103,10 @@ describe("IMPLEMENTED_LINT_CODES", () => {
     }
   });
 
-  it("names its assembly-synthesized codes exactly: the compile mappings + the Batch 3 verdicts", () => {
+  it("names its assembly-synthesized codes exactly: the compile mappings", () => {
     expect([...ASSEMBLY_SYNTHESIZED_CODES].sort()).toEqual([
       "KM_LINT_COMPILE_ERRORS",
       "KM_LINT_COMPILE_HAS_WARNINGS",
-      "KM_LINT_SPURIOUS_VERSION_BUMP",
-      "KM_LINT_VERSION_NOT_BUMPED",
     ]);
     for (const code of ASSEMBLY_SYNTHESIZED_CODES) {
       expect(IMPLEMENTED_LINT_CODES.has(code)).toBe(true);

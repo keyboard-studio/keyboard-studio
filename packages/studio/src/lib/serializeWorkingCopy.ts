@@ -57,6 +57,7 @@ import {
   effectiveChartPreference,
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
+import { applyOutputHygiene } from "./outputHygiene.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 import { hasTestBuilds } from "../stores/testingStore.ts";
 import { testBuildDescriptionPrefix, testBuildNameSuffix, testBuildWelcomeNotice } from "./testBuildLabels.ts";
@@ -577,6 +578,11 @@ export async function projectWorkingCopyForOutput(
     );
   }
 
+  // 5b-ii. Criteria 1.10b / 4.6b: stamp the current .kpj format on a project
+  //     that predates the versioned shape, and keep copyright years out of the
+  //     .kmn / .kps strings (they live in LICENSE.md). Output projection only.
+  applyOutputHygiene(clonedVfs, resolvedKeyboardId);
+
   // 5c. spec 061 FR-010: regenerate the shipped documentation files from the
   //     author's CURRENT help-docs answers on EVERY call — not a write-if-absent
   //     guard — so an edited answer is reflected in the very next production
@@ -720,6 +726,18 @@ export async function projectWorkingCopyForOutput(
   //     completed here — write-if-absent, MIT body, no invented holder (spec 064
   //     FR-004). This used to run in buildOutputBundle, download path only,
   //     which left the pull-request tree without it.
+  // Adapt carries the base's own LICENSE.md forward verbatim (user ruling
+  //     2026-10-31; spec 064 FR-004 stays "no invented holder": the notice is the
+  //     base's, not ours). Seeded before ensurePackageFiles so its write-if-absent
+  //     MIT stub never fires when the base shipped a license.
+  if (
+    isAdaptation &&
+    startLicenseText !== null &&
+    startLicenseText.trim() !== "" &&
+    clonedVfs.get("LICENSE.md") === undefined
+  ) {
+    clonedVfs.set("LICENSE.md", startLicenseText, false);
+  }
   const { created } = ensurePackageFiles({ vfs: clonedVfs });
   if (created.length > 0) {
     docWarnings.push(`[package] generated missing package files: ${created.join(", ")}`);

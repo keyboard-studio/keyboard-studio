@@ -130,6 +130,32 @@ describe("buildCriteriaInventory", () => {
     expect(result).toEqual({ kind: "skipped", missingTag: "xyz" });
   });
 
+  it("builds from the author's confirmed inventory alone when a target has no CLDR/SLDR entry", () => {
+    const result = build({
+      languageTags: ["ewo", "xyz"],
+      confirmed: { confirmedInventory: ["q", "Q"] },
+      sourcedByTag: new Map<string, SourcedInventory | null>([
+        ["ewo", ewoBaseline()],
+        ["xyz", null],
+      ]),
+    });
+    expect(result.kind).toBe("built");
+    if (result.kind !== "built") return;
+    const chars = linguistInventoryChars(result.inventory);
+    expect(chars).toContain("q");
+    // No baseline from ANY target: the partial ewo baseline is not mixed in.
+    expect(chars).not.toContain("ŋ");
+  });
+
+  it("still skips an under-resourced target when the author confirmed nothing", () => {
+    const result = build({
+      languageTags: ["xyz"],
+      confirmed: { confirmedInventory: [] },
+      sourcedByTag: new Map<string, SourcedInventory | null>([["xyz", null]]),
+    });
+    expect(result).toEqual({ kind: "skipped", missingTag: "xyz" });
+  });
+
   it("skips when there is no language target at all", () => {
     const result = build({ languageTags: [], sourcedByTag: new Map() });
     expect(result).toEqual({ kind: "skipped", missingTag: null });

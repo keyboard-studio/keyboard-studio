@@ -25,6 +25,9 @@ export default defineConfig({
       process.env["VERCEL_GIT_COMMIT_SHA"] ?? "dev",
     ),
   },
+  // The /review judge worker is a module worker that lazy-loads langtags;
+  // code-splitting needs ES worker output (the default IIFE cannot split).
+  worker: { format: "es" },
   plugins: [
     // The Lingui macro transform runs via Babel; @vitejs/plugin-react only
     // spins up Babel when given plugins, so this is the one place dev-server

@@ -17,6 +17,8 @@ import type {
   LintFinding,
 } from "@keyboard-studio/contracts";
 
+import type { ReviewerSource } from "./reviewerSource.ts";
+
 /**
  * Which surface is asking for the judgment. "authored" judges the author's
  * own studio-built keyboard (the record may carry their answers);
@@ -100,12 +102,32 @@ export interface CriteriaFacts {
   /** The package is a partner-organization package. */
   partnerPackage: boolean;
   /**
+   * Foreign host only: the keyboard ships no help .php. The rows that
+   * judge the help page's content (11.2/11.3b/11.4b/11.6/11.7/11.8) are
+   * then Not applicable; the missing file itself is 11.1b's finding.
+   */
+  helpPhpAbsent?: boolean;
+  /**
+   * /review host only: the PR adds this keyboard (its folder is absent
+   * at the PR base commit), so there is no earlier HISTORY.md for 3.4's
+   * "prior entries are preserved" comparison.
+   */
+  newKeyboardAtBase?: boolean;
+  /**
    * How the judged keyboard was instantiated (Batch 3): the version
    * rows 2.1/2.2/2.6 are Not applicable on a new-from-base keyboard
    * (no previously deployed version). Absent when no instantiation
    * context exists (the foreign host never sets it).
    */
   instantiationMode?: "adapt-existing" | "new-from-base";
+  /**
+   * The lint pass ran and reported "no PUA codepoints in the produced
+   * output" (13.1's verified line). A positive fact, never inferred from
+   * a check that did not run.
+   */
+  noPuaInOutput?: boolean;
+  /** 13.4 ran and found no mathematical Latin look-alikes in the output. */
+  noMathLatinLookalikes?: boolean;
 }
 
 /**
@@ -134,7 +156,7 @@ export interface CriteriaInput {
   /**
    * Implemented checks whose required input is unavailable for this
    * keyboard, keyed by lintRuleId, with the human name of the missing
-   * input as the value (e.g. "the linguist inventory for this keyboard").
+   * input as the value, a plain noun phrase (e.g. "the linguist inventory").
    * A check named here resolves Not yet checkable, never Met: a check
    * that did not run is not a check that passed.
    */
@@ -177,6 +199,12 @@ export interface CriteriaInput {
    * per-font attestation does.
    */
   licenseTextHints?: readonly string[];
+  /**
+   * /review host only: source facts the yellow/red rows show the reviewer
+   * side by side (names, language tags, excerpts, PR scope). Text for
+   * evidence only; it never decides a status.
+   */
+  reviewerSource?: ReviewerSource;
 }
 
 /**

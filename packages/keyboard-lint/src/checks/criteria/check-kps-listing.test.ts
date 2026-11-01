@@ -169,3 +169,25 @@ describe("kps-listing twins", () => {
     );
   });
 });
+
+describe("8.6b graphics requirement", () => {
+  const noImages: KpsListingFacts = {
+    ...GOOD,
+    fileNames: GOOD.fileNames.filter((n) => !/\.bmp$/i.test(n)),
+  };
+
+  it("does not require graphics when the welcome page references no images", () => {
+    expect(
+      checkKpsWelcomeAbsent({ ...noImages, welcomeHasImages: false }).findings,
+    ).toEqual([]);
+  });
+
+  it("requires graphics when the welcome page references images", () => {
+    const { findings } = checkKpsWelcomeAbsent({
+      ...noImages,
+      welcomeHasImages: true,
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.message).toContain("graphics");
+  });
+});

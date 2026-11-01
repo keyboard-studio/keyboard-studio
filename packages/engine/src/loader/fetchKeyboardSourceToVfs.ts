@@ -592,7 +592,7 @@ export async function fetchKeyboardSourceToVfs(
 
 /** The `.kps` `<Options><WelcomeFile>` value, or undefined when absent/blank. */
 function parseKpsWelcomeFile(kpsText: string): string | undefined {
-  const m = /<WelcomeFile\s*>([^<]*)<\/WelcomeFile\s*>/i.exec(kpsText);
+  const m = /<WelcomeFile(?:\s[^>]*)?>([^<]*)<\/WelcomeFile\s*>/i.exec(kpsText);
   const value = m?.[1]?.trim() ?? "";
   return value !== "" ? value : undefined;
 }

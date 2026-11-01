@@ -33,7 +33,7 @@ function stringLiterals(src, varName) {
   return new Set([...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]));
 }
 
-/** code: "KM_…" literals per check file (the drift-guard scanner method). */
+/** code: "KM_…" / const code = "KM_…" literals per check file (the drift-guard scanner method). */
 function scanCheckCodes() {
   const dir = join(ROOT, "packages/keyboard-lint/src/checks");
   const byCode = new Map();
@@ -46,10 +46,10 @@ function scanCheckCodes() {
       }
       if (!name.endsWith(".ts") || name.endsWith(".test.ts") || name.startsWith("_shared")) continue;
       const text = readFileSync(abs, "utf8");
-      for (const m of text.matchAll(/code:\s*"(KM_(?:LINT|WARN|HINT|ERROR)_[A-Z0-9_]+)"/g)) {
-        const rel = abs.slice(ROOT.length + 1);
+      for (const m of text.matchAll(/code(?::|\s*=)\s*"(KM_(?:LINT|WARN|HINT|ERROR)_[A-Z0-9_]+)"/g)) {
+        const rel = abs.slice(ROOT.length + 1).replaceAll("\\", "/");
         if (!byCode.has(m[1])) byCode.set(m[1], []);
-        byCode.get(m[1]).push(rel);
+        if (!byCode.get(m[1]).includes(rel)) byCode.get(m[1]).push(rel);
       }
     }
   };

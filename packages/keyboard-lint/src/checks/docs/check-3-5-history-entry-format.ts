@@ -38,7 +38,7 @@ export function checkHistoryEntryFormat(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `HISTORY.md entr${plural ? "ies" : "y"} not in "<version> (<YYYY-MM-DD>)" plus bullet-list format: ${headings}.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Format each HISTORY.md entry as "## <version> (<YYYY-MM-DD>)" (or the same text underlined with hyphens) followed by one or more "* " or "- " bullet lines.`,
     },
   ]);

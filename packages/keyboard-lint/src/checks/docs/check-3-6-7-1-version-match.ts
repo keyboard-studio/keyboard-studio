@@ -47,7 +47,7 @@ export function checkHistoryVersionMatch(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message,
-      location: { file: historyPath, line: 1 },
+      location: { file: historyPath, line: 0 },
       hint: `Update HISTORY.md's top entry to version ${input.keyboardVersion} to match the .kmn file, or bump the .kmn version to ${top.version}.`,
     },
     {
@@ -55,7 +55,7 @@ export function checkHistoryVersionMatch(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message,
-      location: { file: kmnPath, line: 1 },
+      location: { file: kmnPath, line: 0 },
       hint: `Update the .kmn file's version to ${top.version} to match HISTORY.md's top entry, or update HISTORY.md's top entry to ${input.keyboardVersion}.`,
     },
   ]);

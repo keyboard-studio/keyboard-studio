@@ -369,3 +369,59 @@ export function fetchBaseKmnVersion(
   baseKmnVersionCache.set(key, p);
   return p;
 }
+
+/** Decode a GitHub contents-API base64 body as UTF-8 (atob alone yields Latin-1 bytes). */
+export function decodeBase64Utf8(base64: string): string {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/** A keyboard's HISTORY.md at a PR's base commit (criterion 3.4). */
+export type BaseHistoryResult =
+  | { kind: "text"; text: string }
+  | { kind: "absent" }
+  | { kind: "failed" };
+
+const baseHistoryCache = new Map<string, Promise<BaseHistoryResult>>();
+
+/**
+ * Criterion 3.4's base-commit lookup: HISTORY.md at the PR's base sha.
+ * A 404 is "absent" (the base had no HISTORY.md: nothing to preserve);
+ * any other failure is "failed" and must never read as Met.
+ */
+export function fetchBaseHistoryMd(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  /** Repo-relative HISTORY.md path at the base, e.g. "experimental/g/foo/HISTORY.md". */
+  historyRepoPath: string,
+): Promise<BaseHistoryResult> {
+  const key = `${owner}/${repo}#${prNumber}:basehist:${historyRepoPath}`;
+  const cached = baseHistoryCache.get(key);
+  if (cached) return cached;
+  const p = (async (): Promise<BaseHistoryResult> => {
+    try {
+      const pr = await fetchPrContext(owner, repo, prNumber);
+      if (!pr.baseSha) return { kind: "failed" };
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${historyRepoPath}?ref=${pr.baseSha}`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      );
+      if (res.status === 404) return { kind: "absent" };
+      if (!res.ok) return { kind: "failed" };
+      const body = (await res.json()) as {
+        content?: string;
+        encoding?: string;
+      };
+      if (typeof body.content !== "string" || body.encoding !== "base64")
+        return { kind: "failed" };
+      return { kind: "text", text: decodeBase64Utf8(body.content) };
+    } catch {
+      return { kind: "failed" };
+    }
+  })();
+  baseHistoryCache.set(key, p);
+  return p;
+}

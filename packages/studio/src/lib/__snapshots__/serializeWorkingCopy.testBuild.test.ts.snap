@@ -16,6 +16,7 @@ Author prose.
 
 ## Links
 - Online help: https://help.keyman.com/keyboard/basic_kbdus
+- Keyman keyboards page: https://keyman.com/keyboards/basic_kbdus
 
 ## Supported Platforms
 - any
@@ -34,6 +35,7 @@ group(main) using keys
   </System>
   <Options>
     <ReadMeFile>readme.htm</ReadMeFile>
+    <LicenseFile>..\\LICENSE.md</LicenseFile>
     <WelcomeFile>welcome\\welcome.htm</WelcomeFile>
     <FollowKeyboardVersion/>
   </Options>
@@ -83,13 +85,15 @@ group(main) using keys
   "source/help/basic_kbdus.php": "<?php
   $pagename = 'Bambara Keyboard Help';
   $pagetitle = $pagename;
-  require_once('header.php');
-?>
-<style>body { font-family: sans-serif; line-height: 1.4; margin: 1em; }
+  $pagestyle = <<<'END'
+body { font-family: sans-serif; line-height: 1.4; margin: 1em; }
 img { max-width: 100%; }
 table { border-collapse: collapse; }
 th, td { border: 1px solid #999; padding: 0.2em 0.5em; text-align: left; }
-kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 0.3em; }</style>
+kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 0.3em; }
+END;
+  require_once('header.php');
+?>
 <h1>Bambara</h1>
 <p>Author prose.</p>
 <p>This keyboard is for typing Bambara in the Latin script.</p>",
@@ -150,6 +154,7 @@ Author prose.
 
 ## Links
 - Online help: https://help.keyman.com/keyboard/bambara_test
+- Keyman keyboards page: https://keyman.com/keyboards/bambara_test
 
 ## Supported Platforms
 - any
@@ -182,6 +187,7 @@ group(main) using keys
   </System>
   <Options>
     <ReadMeFile>readme.htm</ReadMeFile>
+    <LicenseFile>..\\LICENSE.md</LicenseFile>
     <WelcomeFile>welcome\\welcome.htm</WelcomeFile>
     <FollowKeyboardVersion/>
   </Options>
@@ -231,13 +237,15 @@ group(main) using keys
   "source/help/bambara_test.php": "<?php
   $pagename = 'Bambara Keyboard Help';
   $pagetitle = $pagename;
-  require_once('header.php');
-?>
-<style>body { font-family: sans-serif; line-height: 1.4; margin: 1em; }
+  $pagestyle = <<<'END'
+body { font-family: sans-serif; line-height: 1.4; margin: 1em; }
 img { max-width: 100%; }
 table { border-collapse: collapse; }
 th, td { border: 1px solid #999; padding: 0.2em 0.5em; text-align: left; }
-kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 0.3em; }</style>
+kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 0.3em; }
+END;
+  require_once('header.php');
+?>
 <h1>Bambara</h1>
 <p>Author prose.</p>
 <p>This keyboard is for typing Bambara in the Latin script.</p>",

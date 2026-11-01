@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-31T18:15:34.193Z",
+ "generatedAt": "2026-10-31T20:20:03.430Z",
  "catalogSize": 188,
  "byBand": {
   "layer-c-enforce": 106,
@@ -19,6 +19,9 @@
  ],
  "precertified": [
   "KM_LINT_FILES_OUTSIDE_FOLDER",
+  "KM_LINT_REPO_NO_ORGANIZING_FOLDER",
+  "KM_LINT_REPO_PLACEMENT_BAD",
+  "KM_LINT_REPO_ROOT_SOURCE",
   "KM_LINT_STRAY_SCRATCH_FILES"
  ],
  "criteria": [
@@ -57,7 +60,7 @@
     "id": "KM_LINT_REPO_PLACEMENT_BAD"
    },
    "implemented": true,
-   "precertified": false,
+   "precertified": true,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
    ]
@@ -82,7 +85,7 @@
     "id": "KM_LINT_REPO_NO_ORGANIZING_FOLDER"
    },
    "implemented": true,
-   "precertified": false,
+   "precertified": true,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
    ]
@@ -107,7 +110,7 @@
     "id": "KM_LINT_REPO_ROOT_SOURCE"
    },
    "implemented": true,
-   "precertified": false,
+   "precertified": true,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
    ]
@@ -139,7 +142,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-identity.ts",
     "packages/keyboard-lint/src/checks/criteria/check-identity.ts"
    ]
   },
@@ -230,7 +232,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-kpj.ts",
     "packages/keyboard-lint/src/checks/criteria/check-kpj.ts"
    ]
   },
@@ -325,7 +326,9 @@
    },
    "implemented": true,
    "precertified": false,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-version.ts"
+   ]
   },
   {
    "id": "2.3-version-numeric-dot-separated",
@@ -384,7 +387,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-version.ts",
     "packages/keyboard-lint/src/checks/criteria/check-version.ts"
    ]
   },
@@ -581,7 +583,7 @@
    "id": "4.5b-copyright-syntax-exact",
    "band": "layer-c-enforce",
    "section": "4. `LICENSE.md` (copyright)",
-   "description": "The LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax.",
+   "description": "The LICENSE.md copyright line follows the `Copyright (C) <year> <holder>` syntax (the `©` symbol is accepted in place of `(C)`).",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_COPYRIGHT_SYNTAX"
@@ -666,7 +668,7 @@
    "id": "5.2b-no-version-in-readme-or-docs",
    "band": "layer-c-enforce",
    "section": "5. `README.md`",
-   "description": "No version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: any X.Y[.Z] pattern).",
+   "description": "No version number is embedded in README.md, readme.htm, welcome.htm, or the help .php (heuristic: an X.Y[.Z] pattern in the visible text; CSS, scripts, URLs and DOIs are ignored).",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_VERSION_IN_DOCS"
@@ -871,7 +873,7 @@
    "id": "6.6b-welcome-htm-lang-attribute",
    "band": "layer-c-enforce",
    "section": "6. Documentation files (`source/`)",
-   "description": "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag.",
+   "description": "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag (an English page may declare lang=\"en\").",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_WELCOME_LANG_MISMATCH"
@@ -1027,7 +1029,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-bitmap.ts",
     "packages/keyboard-lint/src/checks/criteria/check-bitmap.ts"
    ]
   },
@@ -1043,7 +1044,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-store-syntax.ts",
     "packages/keyboard-lint/src/checks/criteria/check-store-syntax.ts"
    ]
   },
@@ -1134,7 +1134,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-kvks.ts",
     "packages/keyboard-lint/src/checks/criteria/check-kvks.ts"
    ]
   },
@@ -1340,7 +1339,7 @@
    "id": "8.6b-kps-includes-welcome-and-graphics",
    "band": "layer-c-enforce",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
-   "description": "`welcome.htm` and associated graphics are listed in the `.kps` package.",
+   "description": "`welcome.htm` is listed in the `.kps` package, and its associated graphics when the welcome page references images.",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_KPS_WELCOME_ABSENT"
@@ -1470,7 +1469,7 @@
    "id": "8.12-kps-no-industry-fonts",
    "band": "layer-c-enforce",
    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
-   "description": "No industry fonts (Arial, Times, Tahoma, etc.) in the package",
+   "description": "No industry fonts (Arial, Times, Tahoma, etc.) shipped in the package (fonts the `.kps` lists or references; a `.kvks` display font is not judged)",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_KPS_INDUSTRY_FONT"
@@ -1783,7 +1782,7 @@
    "id": "11.1b-php-exists-with-header",
    "band": "layer-c-enforce",
    "section": "11. Online help (`source/help/<name>.php`)",
-   "description": "The <name>.php help file exists and has the proper PHP header (<?php + the /* Name: ... */ block).",
+   "description": "The <name>.php help file exists and has the proper PHP header (<?php + `$pagename = '...'` and `require_once('header.php')`).",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_PHP_HEADER_BAD"
@@ -1791,7 +1790,6 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": [
-    "packages/keyboard-lint/src/checks/criteria/check-text-content.ts",
     "packages/keyboard-lint/src/checks/criteria/check-text-content.ts"
    ]
   },

@@ -208,6 +208,25 @@ describe("checkKpsTargetsMatch (8.13)", () => {
     expect(findings[0]!.message).toContain("mobile");
   });
 
+  it("skips only the declared-set comparison when the .kps declares no targets", () => {
+    expect(
+      checkKpsTargetsMatch({
+        ir: irWithTargets(["windows", "web"]),
+        kpsTargets: [],
+        kpsFileNames: ["..\\build\\demo.kmx", "..\\build\\demo.js"],
+        kpsPath: KPS,
+      }).findings,
+    ).toEqual([]);
+    const { findings } = checkKpsTargetsMatch({
+      ir: irWithTargets(["windows"]),
+      kpsTargets: [],
+      kpsFileNames: ["..\\build\\demo.js"],
+      kpsPath: KPS,
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.message).toContain(".js");
+  });
+
   it("flags a shipped .js with no web-capable target declared", () => {
     const { findings } = checkKpsTargetsMatch({
       ir: irWithTargets(["windows"]),

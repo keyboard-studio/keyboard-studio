@@ -53,7 +53,7 @@ export function checkHistoryCumulative(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `HISTORY.md is missing ${plural ? "an entry" : "entries"} from the base keyboard: ${versions}.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: `Restore the ${versions} HISTORY.md entr${plural ? "y" : "ies"} instead of overwriting it — HISTORY.md must be cumulative.`,
     },
   ]);

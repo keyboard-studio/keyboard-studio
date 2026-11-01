@@ -45,7 +45,7 @@ export function checkHtmlWellFormed(input: DocLintInput): CheckResult {
           severity: "warning",
           layer: "C",
           message: `${path} has unbalanced or unclosed HTML element(s): ${tags}.`,
-          location: { file: path, line: 1 },
+          location: { file: path, line: 0 },
           hint: `Check that every opening tag (${tags}) in ${path} has a matching, properly nested closing tag.`,
         },
       ]),

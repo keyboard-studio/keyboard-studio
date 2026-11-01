@@ -36,6 +36,7 @@ const KVKS =
 describe("holder / notice parsing", () => {
   it("strips the copyright word, marker, years and reserved tail down to the holder", () => {
     expect(holderFromNotice("Copyright (c) 2024 Jane Doe")).toBe("Jane Doe");
+    expect(holderFromNotice("© Arno Klein (MIT License)")).toBe("Arno Klein");
     expect(holderFromNotice("© 2019-2024 Jane Doe. All rights reserved.")).toBe("Jane Doe");
     expect(holderFromNotice("Copyright: 2024, 2025 SIL Global")).toBe("SIL Global");
     expect(holderFromNotice("   ")).toBeUndefined();

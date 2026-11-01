@@ -86,7 +86,7 @@ export function checkLayerSwitchReturn(
           severity: "warning",
           layer: "C",
           message: `Platform "${platform.id}" layer "${targetLayerId}" is switched into but has no key with a nextlayer value (no exit).`,
-          location: { file: touchLayoutPath, line: 1 },
+          location: { file: touchLayoutPath, line: 0 },
           hint: `Add a key with nextlayer set in layer "${targetLayerId}" on ${platform.id} so users can navigate to another layer.`,
         });
       }
@@ -141,7 +141,7 @@ export function checkTouchMissingLayer(
       severity: "warning",
       layer: "C",
       message: `Platform "${platform}" layer "${layerId}" has a key whose nextlayer is "${target}", but that platform declares no such layer.`,
-      location: { file: touchLayoutPath, line: 1 },
+      location: { file: touchLayoutPath, line: 0 },
       hint: `Add a layer with id "${target}" to platform "${platform}", or repoint the key at an existing layer. As written the key does nothing, and every key on the intended layer becomes unreachable.`,
     };
   });

@@ -35,9 +35,20 @@ import { renderDocForm } from "./renderDocForm.js";
  * so "Foo Keyboard" never becomes "Foo Keyboard Keyboard Help". Pure function
  * of the display name (SC-004 determinism).
  */
-export function helpSiteHeader(displayName: string): string {
+/** `<style>` blocks reduced to the raw CSS $pagestyle carries. */
+export function pageStyleCss(styleHtml: string): string {
+  return styleHtml.replace(/<\/?style\b[^>]*>/gi, "").trim();
+}
+
+export function helpSiteHeader(displayName: string, styleHtml = ""): string {
   const pageName = helpSitePageName(displayName);
-  return `<?php\n  $pagename = '${phpSingleQuoteEscape(pageName)}';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n`;
+  // Criterion 11.3: style information lives INSIDE the PHP header block, in
+  // $pagestyle, never after its closing `?>`. A nowdoc, so a `$` in the CSS is
+  // never interpolated. Raw CSS, as in every corpus help page: the site's
+  // header.php wraps $pagestyle in its own <style> element.
+  const css = pageStyleCss(styleHtml);
+  const pageStyle = css === "" ? "" : `  $pagestyle = <<<'END'\n${css}\nEND;\n`;
+  return `<?php\n  $pagename = '${phpSingleQuoteEscape(pageName)}';\n  $pagetitle = $pagename;\n${pageStyle}  require_once('header.php');\n?>\n`;
 }
 
 /** The unescaped `$pagename` value for a display name (criterion 11.7 format). */

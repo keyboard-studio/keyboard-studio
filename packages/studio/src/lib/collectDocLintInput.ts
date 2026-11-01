@@ -65,6 +65,9 @@ export function holderFromNotice(notice: string | undefined | null): string | un
   s = s.replace(/^[\d\s,\-–—]+/, "").trim();
   s = s.replace(/[.\s]*all rights reserved\.?$/i, "").trim();
   s = s.replace(/[.,;\s]+$/, "").trim();
+  // A trailing parenthetical such as "(MIT License)" is not part of the holder.
+  s = s.replace(/\s*\([^()]*\)$/, "").trim();
+  s = s.replace(/[.,;\s]+$/, "").trim();
   return s === "" ? undefined : s;
 }
 

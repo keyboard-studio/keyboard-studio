@@ -120,7 +120,7 @@ export function checkOskImageConstrained(input: DocLintInput): CheckResult {
       severity: "warning",
       layer: "C",
       message: `${path} uses custom image(s) with no width constraint: ${named}.`,
-      location: { file: path, line: 1 },
+      location: { file: path, line: 0 },
       hint: "Give each custom image a width (a width attribute, an inline style, or a CSS class rule in the bundled stylesheet) so it cannot overflow the help page.",
     },
   ]);

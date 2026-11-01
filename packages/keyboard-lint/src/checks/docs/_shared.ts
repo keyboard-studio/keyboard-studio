@@ -461,6 +461,9 @@ export function normalizeDocBody(html: string): string {
 
 const STYLE_ATTR_RE = /\bstyle\s*=\s*"([^"]*)"|\bstyle\s*=\s*'([^']*)'/gi;
 const STYLE_BLOCK_RE = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+// A help page's styles live in its PHP header as raw CSS:
+// `$pagestyle = <<<END ... END;` (heredoc or nowdoc).
+const PAGESTYLE_RE = /\$pagestyle\s*=\s*<<<\s*'?(\w+)'?\s*\n([\s\S]*?)\n\s*\1\s*;/g;
 
 /**
  * Strip whitespace entirely rather than collapsing it to one space: unlike
@@ -475,7 +478,8 @@ function stripAllWhitespace(s: string): string {
 
 /**
  * Every inline style declaration in a document, in document order: `style="..."`
- * attribute values followed by `<style>...</style>` block contents, each with
+ * attribute values, then `<style>...</style>` block contents, then a help
+ * page's `$pagestyle` heredoc (raw CSS the site header wraps), each with
  * whitespace stripped entirely (criterion 11.10: "identical modulo non-rendering
  * whitespace").
  */
@@ -489,6 +493,10 @@ export function extractInlineStyles(html: string): string[] {
   STYLE_BLOCK_RE.lastIndex = 0;
   while ((m = STYLE_BLOCK_RE.exec(html)) !== null) {
     styles.push(stripAllWhitespace(m[1] ?? ""));
+  }
+  PAGESTYLE_RE.lastIndex = 0;
+  while ((m = PAGESTYLE_RE.exec(html)) !== null) {
+    styles.push(stripAllWhitespace(m[2] ?? ""));
   }
   return styles;
 }
