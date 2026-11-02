@@ -18,6 +18,8 @@
 // serializeWorkingCopy returns null so the caller can show a "nothing to download"
 // state.
 
+
+import { currentPickedLayoutIds, fallbackLeaksForProjection } from "./fallbackLeaks.ts";
 import type { Pattern, MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -510,6 +512,12 @@ export async function projectWorkingCopyForOutput(
   // spec 106 FR-005: every store-derived field comes from the same
   // projectionInputFromState the preview uses, so the download carries the
   // fallback policy, disabled families and keep-inert set the OSK compiled.
+  const fallbackLeaks = fallbackLeaksForProjection(
+    startIr,
+    state.fallbackPolicy,
+    state.fallbackPolicyConfirmed,
+    currentPickedLayoutIds(),
+  );
   const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs(
     projectionInputFromState({ ...state, startIr }, {
       vfs: clonedVfs,
@@ -519,6 +527,7 @@ export async function projectWorkingCopyForOutput(
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
       marksTreatment: getMarksTreatmentValue(),
+      ...(fallbackLeaks !== undefined ? { fallbackLeaks } : {}),
       welcomeFolderFiles,
       ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
       // Anchor for step 3's "is the display name an EDIT?" test. The no-identity

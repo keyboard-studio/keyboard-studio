@@ -632,6 +632,23 @@ export {
 } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 export { enumerateUnhandledPositions } from "./pattern-apply/unhandledPositions.js";
+export {
+  applySwallowUndefined,
+  anyClassSwallows,
+  swallowedPositions,
+  SWALLOW_UNDEFINED_OWNER,
+  proposeFallbackPolicy,
+  classifyChar,
+  LEAK_CLASSES,
+} from "./pattern-apply/index.js";
+export type {
+  Leak,
+  LeakOutcome,
+  Proposal,
+  ProposalEvidence,
+  FallbackProposalInput,
+  SwallowUndefinedInput,
+} from "./pattern-apply/index.js";
 export type { UnhandledPosition } from "./pattern-apply/unhandledPositions.js";
 // Issue #2374: the per-mark "start of line" sentinel lives on the attachment
 // row; the worklist builder reads it into `bareMarkAllowed`. Re-exported so

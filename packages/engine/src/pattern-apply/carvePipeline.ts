@@ -23,10 +23,18 @@
 //      ownedByBehaviour (suppression output) are never filter targets: the
 //      filter must not undo the compiler's in-place block rewrite, and
 //      allow-host removals are already gone (no double-removal).
+//   5. swallowUndefined — a confirmed per-class policy adds one store and one
+//      `nul` rule for the unhandled printable positions (swallowUndefined.ts).
 
-import type { Disposition, KeyboardIR } from "@keyboard-studio/contracts";
+import {
+  collapseFallbackPolicy,
+  type Disposition,
+  type FallbackPolicy,
+  type KeyboardIR,
+} from "@keyboard-studio/contracts";
 import { compileCarveSuppression } from "./carveSuppression.js";
-import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
+import { anyClassSwallows, dispositionsForFallbackPolicy, type Leak } from "./fallbackPolicy.js";
+import { applySwallowUndefined } from "./swallowUndefined.js";
 import { applyStoreSlotRemovals, type CascadedSlotRemoval } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
 import { pruneCarveUnusedDeadkeys } from "./carveDeadkeyPrune.js";
@@ -51,7 +59,19 @@ import { parseSlotId } from "./slotId.js";
 export interface CarvePipelineInput {
   deletedNodeIds: ReadonlySet<string>;
   deletedItemIds: ReadonlySet<string>;
-  fallbackPolicy?: Disposition;
+  fallbackPolicy?: Disposition | FallbackPolicy;
+  /**
+   * What the picked base keyboards type at each position (spec 109 FR-015).
+   * Read only for a per-class `fallbackPolicy` the author has confirmed.
+   */
+  leaks?: readonly Leak[];
+  /**
+   * The author confirmed the per-class policy (FR-021). While false, a
+   * per-class policy behaves exactly as the single keyboard-wide value did:
+   * carve suppression only, no `swallowUndefined`, so an unconfirmed draft's
+   * compiled output does not change.
+   */
+  fallbackPolicyConfirmed?: boolean;
   /**
    * Ids in the deletion sets that are plain removals, not carves (e.g. rules
    * of a disabled family). They are excluded from the policy expansion, so
@@ -112,15 +132,22 @@ export function deriveCarvedIr(
   startIr: KeyboardIR,
   input: CarvePipelineInput,
 ): CarvePipelineResult {
+  const policy = input.fallbackPolicy;
+  // A per-class policy takes effect only once confirmed; until then it reads
+  // as the single value it widened from (FR-021, SC-006).
+  const perClass =
+    typeof policy === "object" && input.fallbackPolicyConfirmed === true ? policy : undefined;
+  const flat: Disposition | undefined =
+    typeof policy === "object" ? collapseFallbackPolicy(policy) : policy;
+  const comboIds = [...input.deletedNodeIds, ...input.deletedItemIds].filter(
+    (id) => input.suppressionExemptIds?.has(id) !== true,
+  );
   const dispositions =
-    input.fallbackPolicy === undefined
-      ? []
-      : dispositionsForFallbackPolicy(
-          input.fallbackPolicy,
-          [...input.deletedNodeIds, ...input.deletedItemIds].filter(
-            (id) => input.suppressionExemptIds?.has(id) !== true,
-          ),
-        );
+    perClass !== undefined
+      ? dispositionsForFallbackPolicy(perClass, comboIds, { ir: startIr, leaks: input.leaks ?? [] })
+      : flat === undefined
+        ? []
+        : dispositionsForFallbackPolicy(flat, comboIds);
 
   // Stage 1 — suppression on the PRE-carve IR (T013 constraint).
   const suppressed = compileCarveSuppression(
@@ -155,12 +182,20 @@ export function deriveCarvedIr(
   // Stage 4 — prune deadkeys the carve left unconsumed (and the arming rules
   // that only existed to set them). Runs last so it sees every removal.
   const pruned = pruneCarveUnusedDeadkeys(startIr, filtered, {
-    swallow: input.fallbackPolicy === "swallow",
+    swallow: flat === "swallow",
     loud: input.loud === true,
   });
 
+  // Stage 5 — swallowUndefined (spec 109): one store and one `nul` rule for the
+  // unhandled printable positions in "Do nothing" classes. Runs last so it sees
+  // every binding the carve left, and only for a confirmed per-class policy.
+  const finalIr =
+    perClass !== undefined && anyClassSwallows(perClass)
+      ? applySwallowUndefined(pruned.ir, { policy: perClass, leaks: input.leaks ?? [] })
+      : pruned.ir;
+
   return {
-    ir: pruned.ir,
+    ir: finalIr,
     warnings: removalResult.warnings,
     notices: [...removalResult.notices, ...pruned.notices],
     cascadedRemovals: removalResult.cascaded,

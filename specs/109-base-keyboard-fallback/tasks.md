@@ -75,28 +75,28 @@ Files: `packages/engine/src/pattern-apply/swallowSet.ts`, `swallowUndefined.ts`,
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T014** [P] [US2] Per-class `isInSwallowSet` predicate; deadkey carves still always suppress (FR-012) · packages/engine/src/pattern-apply/swallowSet.ts
-- [ ] **T015** [P] [US2] Per-class dispositions: carved combination takes the class of its leak on the picked base keyboards, "any picked" rule (FR-015) · packages/engine/src/pattern-apply/fallbackPolicy.ts
-- [ ] **T016** [P] [US2] `proposeFallbackPolicy`: per-class proposal with evidence, target script, no-data fallback to catalog language tags (FR-020) · packages/engine/src/pattern-apply/fallbackProposal.ts
+- [x] **T014** [P] [US2] Per-class `isInSwallowSet` predicate; deadkey carves still always suppress (FR-012) · packages/engine/src/pattern-apply/swallowSet.ts
+- [x] **T015** [P] [US2] Per-class dispositions: carved combination takes the class of its leak on the picked base keyboards, "any picked" rule (FR-015) · packages/engine/src/pattern-apply/fallbackPolicy.ts
+- [x] **T016** [P] [US2] `proposeFallbackPolicy`: per-class proposal with evidence, target script, no-data fallback to catalog language tags (FR-020) · packages/engine/src/pattern-apply/fallbackProposal.ts
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T017** [US2] `applySwallowUndefined` via `mutate()`: one store, one `nul` rule, bound layers only, no frame keys, no `nomatch > nul`, nothing when all classes pass through (FR-010, FR-011, FR-013, FR-014) · packages/engine/src/pattern-apply/swallowUndefined.ts
+- [x] **T017** [US2] `applySwallowUndefined` via `mutate()`: one store, one `nul` rule, bound layers only, no frame keys, no `nomatch > nul`, nothing when all classes pass through (FR-010, FR-011, FR-013, FR-014) · packages/engine/src/pattern-apply/swallowUndefined.ts
 
 **⟶ Wait for Wave 1's tasks and T017, then:**
 
-- [ ] **T018** [US2] Thread per-class policy, leaks and the confirmed gate through the carve pipeline (FR-015, FR-021) · packages/engine/src/pattern-apply/carvePipeline.ts
+- [x] **T018** [US2] Thread per-class policy, leaks and the confirmed gate through the carve pipeline (FR-015, FR-021) · packages/engine/src/pattern-apply/carvePipeline.ts
 
 **⟶ Wait for T018 to finish, then:**
 
-- [ ] **T019** [US2] Pass picks and base-layout character data into projection; unconfirmed policy leaves compiled output unchanged · packages/studio/src/lib/projectWorkingCopyVfs.ts, packages/studio/src/lib/projectionInput.ts
+- [x] **T019** [US2] Pass picks and base-layout character data into projection; unconfirmed policy leaves compiled output unchanged · packages/studio/src/lib/projectWorkingCopyVfs.ts, packages/studio/src/lib/projectionInput.ts
 
 **⟶ Wait for T019 to finish, then:**
 
 ### Tests
 
-- [ ] **T020** [US2] Tests: `swallowSet`, `fallbackPolicy`, `swallowUndefined` (store recompute on binding change, no double emit with carve suppression, RALT unbound), `fallbackProposal` (SC-007 three keyboards with evidence) · packages/engine/src/pattern-apply/swallowUndefined.test.ts, fallbackProposal.test.ts, swallowSet.test.ts, carvePipeline.fallbackPolicy.test.ts
-- [ ] **T021** [US2] Corpus compile through Layer A/B and `kmcmplib` with "Do nothing" confirmed; no unhandled printable position outputs, frame keys intact (SC-002); unconfirmed draft output byte-equal before and after (SC-006) · packages/engine/src/pattern-apply/swallowUndefined.corpus.test.ts
+- [x] **T020** [US2] Tests: `swallowSet`, `fallbackPolicy`, `swallowUndefined` (store recompute on binding change, no double emit with carve suppression, RALT unbound), `fallbackProposal` (SC-007 three keyboards with evidence) · packages/engine/src/pattern-apply/swallowUndefined.test.ts, fallbackProposal.test.ts, swallowSet.test.ts, carvePipeline.fallbackPolicy.test.ts
+- [x] **T021** [US2] Corpus compile through Layer A/B and `kmcmplib` with "Do nothing" confirmed; no unhandled printable position outputs, frame keys intact (SC-002); unconfirmed draft output byte-equal before and after (SC-006) · packages/engine/src/pattern-apply/swallowUndefined.corpus.test.ts
 
 **Checkpoint**: "Do nothing" suppresses every unhandled printable position on covered layers.
 

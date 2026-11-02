@@ -92,8 +92,9 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import type { Disposition } from "@keyboard-studio/contracts";
-import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
+import type { Disposition, FallbackPolicy } from "@keyboard-studio/contracts";
+import type { KeyEditOperation, Leak, RenameKeyOp } from "@keyboard-studio/engine";
+import { anyClassSwallows, applySwallowUndefined } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
   applyCarveToVfs,
@@ -212,8 +213,18 @@ export interface ProjectWorkingCopyVfsInput {
    * store. The engine expands it over the live carve set, so it can never
    * rewrite an uncarved rule. Omitted degrades to the legacy carve behavior,
    * content-identical.
+   *
+   * A per-class policy (spec 109) reads as one collapsed value until
+   * `fallbackPolicyConfirmed`; once confirmed it also drives `swallowUndefined`.
    */
-  fallbackPolicy?: Disposition;
+  fallbackPolicy?: Disposition | FallbackPolicy;
+  /**
+   * What the picked base keyboards type at each unhandled position (spec 109).
+   * Joined by the caller from the base-layout data; the engine never reads the studio.
+   */
+  fallbackLeaks?: readonly Leak[];
+  /** The author confirmed the per-class policy. False or omitted leaves compiled output unchanged. */
+  fallbackPolicyConfirmed?: boolean;
   /**
    * Ids inside `deletedItemIds` that are plain removals rather than carves
    * (disabled-family rules). They are removed outright, never rewritten into
@@ -443,6 +454,8 @@ export function projectWorkingCopyVfs(
     carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
     fallbackPolicy,
+    fallbackLeaks,
+    fallbackPolicyConfirmed = false,
     suppressionExemptIds,
     carveLoud = false,
     carveTouchKeepInert,
@@ -590,7 +603,13 @@ export function projectWorkingCopyVfs(
   // no-additions path stays byte-identical.
   const additions = ruleAdditions;
   const additionsPresent = additions !== undefined && hasRuleAdditions(additions);
-  const hasProjectionEdit = hasCarveEdit || additionsPresent;
+  // spec 109: a confirmed per-class policy with a "Do nothing" class adds the
+  // swallow store even when nothing was carved, so it must reach the seam path.
+  const swallowPolicy =
+    fallbackPolicyConfirmed && typeof fallbackPolicy === "object" && anyClassSwallows(fallbackPolicy)
+      ? fallbackPolicy
+      : undefined;
+  const hasProjectionEdit = hasCarveEdit || additionsPresent || swallowPolicy !== undefined;
 
   let carveResult: ApplyCarveToVfsResult;
   // The post-carve IR, for the add-gallery mutate derivation (step 2) — only
@@ -639,6 +658,8 @@ export function projectWorkingCopyVfs(
       undefined,
       {
         ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
+        ...(fallbackLeaks !== undefined ? { leaks: fallbackLeaks } : {}),
+        ...(fallbackPolicyConfirmed ? { fallbackPolicyConfirmed: true as const } : {}),
         ...(suppressionExemptIds !== undefined ||
         claimedRuleIds.size > 0 ||
         removedTouchExemptions.size > 0
@@ -663,10 +684,16 @@ export function projectWorkingCopyVfs(
     // deletion set. irRewritten:true because there IS an edit (matching the
     // legacy emit-when-edited behavior) and the seam IR is already filtered,
     // not the parsed original; an unedited copy never reaches here.
-    const mergedSeamIr =
+    const splicedSeamIr =
       additions !== undefined
         ? spliceRuleAdditions(seamIr, additions, allWholeNodeIds)
         : seamIr;
+    // The rules step's additions bind positions the carve pipeline never saw;
+    // recompute the swallow store over the merged IR so it never covers them.
+    const mergedSeamIr =
+      swallowPolicy !== undefined && additions !== undefined
+        ? applySwallowUndefined(splicedSeamIr, { policy: swallowPolicy, leaks: fallbackLeaks ?? [] })
+        : splicedSeamIr;
     carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
       irRewritten: true,
     });

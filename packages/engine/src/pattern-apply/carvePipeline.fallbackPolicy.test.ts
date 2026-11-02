@@ -6,6 +6,9 @@ import { describe, it, expect } from "vitest";
 import { charRule, charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { deriveCarvedIr } from "./carvePipeline.js";
+import { uniformFallbackPolicy, type FallbackPolicy } from "@keyboard-studio/contracts";
+import type { Leak } from "./fallbackPolicy.js";
+import { SWALLOW_UNDEFINED_OWNER } from "./swallowUndefined.js";
 
 const ir = (): KeyboardIR =>
   makeTestIR({
@@ -133,5 +136,83 @@ describe("deriveCarvedIr fallbackPolicy", () => {
     const text = JSON.stringify(rules(out));
     for (const c of carved) expect(text).not.toContain(`"value":"${c}"`);
     expect(rules(out).map((r) => r.nodeId)).toEqual(["bksp"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-class policy and the confirmed gate (spec 109 FR-015, FR-021, SC-006).
+// ---------------------------------------------------------------------------
+
+
+const classIr = (): KeyboardIR =>
+  makeTestIR({
+    groups: [
+      irGroup({
+        nodeId: "group#main",
+        rules: [
+          vkeyRule({ nodeId: "letter", vkey: "K_A", output: "a" }),
+          vkeyRule({ nodeId: "digit", vkey: "K_1", output: "x" }),
+        ],
+      }),
+    ],
+  });
+
+const classLeaks: Leak[] = [
+  { position: { key: "K_A", modifiers: "" }, baseKeyboard: "us", outcome: { kind: "char", char: "a", leakClass: "letters" } },
+  { position: { key: "K_1", modifiers: "" }, baseKeyboard: "us", outcome: { kind: "char", char: "1", leakClass: "digits" } },
+];
+const LETTERS_ONLY: FallbackPolicy = { letters: "swallow", digits: "pass-through", punctuation: "pass-through" };
+const hasSwallow = (out: KeyboardIR) =>
+  out.stores.some((s) => s.ownedByBehaviour === SWALLOW_UNDEFINED_OWNER);
+
+describe("deriveCarvedIr per-class policy", () => {
+  it("confirmed: each carved combination follows its leak class", () => {
+    const { ir: out } = deriveCarvedIr(classIr(), {
+      deletedNodeIds: new Set(["letter", "digit"]),
+      deletedItemIds: new Set(),
+      fallbackPolicy: LETTERS_ONLY,
+      fallbackPolicyConfirmed: true,
+      leaks: classLeaks,
+    });
+    expect(rules(out).find((x) => x.nodeId === "letter")?.ownedByBehaviour).toBe("carve-suppression");
+    expect(rules(out).some((x) => x.nodeId === "digit")).toBe(false);
+  });
+
+  it("confirmed with a Do nothing class adds one swallow store, even with no carve", () => {
+    const { ir: out } = deriveCarvedIr(classIr(), {
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
+      fallbackPolicy: LETTERS_ONLY,
+      fallbackPolicyConfirmed: true,
+      leaks: classLeaks,
+    });
+    expect(hasSwallow(out)).toBe(true);
+    // The carved-and-suppressed position is not emitted twice.
+    const store = out.stores.find((s) => s.ownedByBehaviour === SWALLOW_UNDEFINED_OWNER);
+    expect(JSON.stringify(store?.items)).not.toContain("\"K_A\"");
+  });
+
+  it("unconfirmed: output equals the collapsed single-value output, byte for byte", () => {
+    for (const policy of [uniformFallbackPolicy("swallow"), LETTERS_ONLY, uniformFallbackPolicy("pass-through")]) {
+      const collapsed = policy.letters === "pass-through" && policy.digits === "pass-through" && policy.punctuation === "pass-through"
+        ? "pass-through"
+        : "swallow";
+      const input = { deletedNodeIds: new Set(["letter"]), deletedItemIds: new Set<string>() };
+      const per = deriveCarvedIr(classIr(), { ...input, fallbackPolicy: policy, leaks: classLeaks });
+      const flat = deriveCarvedIr(classIr(), { ...input, fallbackPolicy: collapsed });
+      expect(per.ir).toEqual(flat.ir);
+      expect(hasSwallow(per.ir)).toBe(false);
+    }
+  });
+
+  it("confirmed with every class passing through adds nothing", () => {
+    const { ir: out } = deriveCarvedIr(classIr(), {
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
+      fallbackPolicy: uniformFallbackPolicy("pass-through"),
+      fallbackPolicyConfirmed: true,
+      leaks: classLeaks,
+    });
+    expect(out).toEqual(classIr());
   });
 });

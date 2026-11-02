@@ -69,7 +69,9 @@
 //
 // None of the above change on every render, so the VfsTransform reference
 // is stable across renders when the working copy has not changed.
+
 
+import { fallbackLeaksForProjection, usePickedLayoutIdsKey } from "../lib/fallbackLeaks.ts";
 import { useMemo, useRef } from "react";
 import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
@@ -262,6 +264,10 @@ export function useWorkingCopyTransform(
   // loud/soft (FR-009) has no UI yet — the suppression stage defaults to soft
   // (loud: false).
   const fallbackPolicy = useWorkingCopyStore((s) => s.fallbackPolicy);
+  // spec 109: the confirmed gate and the picked base keyboards. Both are read
+  // reactively so a confirmation or a pick change rebuilds the projection.
+  const fallbackPolicyConfirmed = useWorkingCopyStore((s) => s.fallbackPolicyConfirmed);
+  const pickedLayoutIdsKey = usePickedLayoutIdsKey();
   // 076 FR-023 (T020): keep-inert chars for carved touch keys ("kept, does
   // nothing" instead of removed). The set is built inside the main useMemo;
   // this array feeds a primitive-stable memo key below.
@@ -495,6 +501,13 @@ export function useWorkingCopyTransform(
           ? identityKeyboardId
           : undefined;
 
+      const fallbackLeaks = fallbackLeaksForProjection(
+        startIr,
+        fallbackPolicy,
+        fallbackPolicyConfirmed,
+        pickedLayoutIdsKey === "" ? [] : pickedLayoutIdsKey.split(" "),
+      );
+
       // spec 106 FR-005: the same store-derived input the download builds.
       // Fields are read through the hook's own selectors so the memo keys
       // below stay the single trigger for rebuilding this closure.
@@ -509,6 +522,7 @@ export function useWorkingCopyTransform(
             deletedTouchKeyIds,
             disabledFamilyIds,
             fallbackPolicy,
+            fallbackPolicyConfirmed,
             carveTouchKeepInert: carveTouchKeepInertChars,
             deadkeyOverlay: { ops: deadkeyOps },
             contextToleranceOverlay: storeContextToleranceOverlay,
@@ -522,6 +536,7 @@ export function useWorkingCopyTransform(
             getPattern: (id) => patternMap?.get(id),
             identity: identityArg,
             marksTreatment,
+            ...(fallbackLeaks !== undefined ? { fallbackLeaks } : {}),
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
@@ -543,6 +558,8 @@ export function useWorkingCopyTransform(
     disabledKey,
     ruleAdditionsKey,
     fallbackPolicy,
+    fallbackPolicyConfirmed,
+    pickedLayoutIdsKey,
     carveTouchKeepInertKey,
     assignmentsKey,
     identityDisplayName,

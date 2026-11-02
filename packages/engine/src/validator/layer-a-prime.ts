@@ -30,6 +30,7 @@ import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
 import { computeSha256Hex } from "../codec/hash.js";
 import { generateCorpus } from "./corpus.js";
+import { expandedStoreItems } from "../pattern-apply/unhandledPositions.js";
 
 // ---------------------------------------------------------------------------
 // I1 — Parse completeness
@@ -763,10 +764,20 @@ export const NUL_ON_TEXT_CONTEXT_CODE = "KM_ERROR_NUL_ON_TEXT_CONTEXT";
  * keyboards such as sil_yoruba8. Ownership lives only in the IR, which is why
  * this is an IR check and not part of the source-text context-ordering scan.
  *
- * Text-bearing means any context element except `vkey`, `deadkey`, and the
- * untyped `+` divider marker, which matches the suppression compiler's own
- * verb selection.
+ * Text-bearing means any context element except `vkey`, `deadkey`, the
+ * untyped `+` divider marker, and an `any()` over a store
+ * holding only keys (the keystroke itself, as `swallowUndefined` writes it),
+ * which matches the suppression compiler's own verb selection.
  */
+/** A store whose every item is a key (`[K_A]`, `[SHIFT K_B]`), so `any()` over it matches keystrokes. */
+function isKeyStore(ir: KeyboardIR, storeRef: string): boolean {
+  const items = expandedStoreItems(ir, storeRef);
+  if (items.length === 0) return false;
+  return items.every(
+    (item) => item.kind === "vkey" || (item.kind === "raw" && /^\[[^\]]*K_\w+\]$/i.test(item.text.trim())),
+  );
+}
+
 export function checkBehaviourNulOnTextContext(ir: KeyboardIR): LintFinding[] {
   const findings: LintFinding[] = [];
   for (const group of ir.groups) {
@@ -781,7 +792,9 @@ export function checkBehaviourNulOnTextContext(ir: KeyboardIR): LintFinding[] {
         (el) =>
           el.kind !== "vkey" &&
           el.kind !== "deadkey" &&
-          !(el.kind === "raw" && el.text === "+"),
+          !(el.kind === "raw" && el.text === "+") &&
+          // `any()` over a store of keys is the keystroke itself, not text.
+          !(el.kind === "any" && isKeyStore(ir, el.storeRef)),
       );
       if (!textBearing) continue;
       findings.push({

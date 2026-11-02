@@ -13,7 +13,9 @@
 //   no shadowing surprises).
 
 import { describe, it, expect } from "vitest";
-import { isInSwallowSet } from "./swallowSet.js";
+import { isInSwallowSet, isPositionInSwallowSet } from "./swallowSet.js";
+import { uniformFallbackPolicy, type FallbackPolicy } from "@keyboard-studio/contracts";
+import type { LeakOutcome } from "./fallbackPolicy.js";
 import { compileCarveSuppression } from "./carveSuppression.js";
 import { charStore, charRule, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
@@ -175,5 +177,48 @@ describe("dispositionsForFallbackPolicy", () => {
       { comboId: "a", disposition: "allow-host", provenance: "bulk-default" },
     ]);
     expect(dispositionsForFallbackPolicy("swallow", [])).toEqual([]);
+  });
+});
+
+
+const DIGIT: LeakOutcome = { kind: "char", char: "1", leakClass: "digits" };
+const LETTER: LeakOutcome = { kind: "char", char: "q", leakClass: "letters" };
+const LETTERS_ONLY: FallbackPolicy = { letters: "swallow", digits: "pass-through", punctuation: "pass-through" };
+
+describe("isInSwallowSet per class (spec 109 FR-012)", () => {
+  it("a combination enters the set only when its leak class is Do nothing", () => {
+    expect(isInSwallowSet({ comboId: "r1", outcomes: [LETTER] }, LETTERS_ONLY, bareKeyIR())).toBe(true);
+    expect(isInSwallowSet({ comboId: "r1", outcomes: [DIGIT] }, LETTERS_ONLY, bareKeyIR())).toBe(false);
+  });
+
+  it("any picked base keyboard in a Do nothing class is enough", () => {
+    expect(isInSwallowSet({ comboId: "r1", outcomes: [DIGIT, LETTER] }, LETTERS_ONLY, bareKeyIR())).toBe(true);
+  });
+
+  it("an unclassed leak follows the most cautious reading", () => {
+    expect(isInSwallowSet({ comboId: "r1", outcomes: [{ kind: "unknown" }] }, LETTERS_ONLY, bareKeyIR())).toBe(true);
+    expect(
+      isInSwallowSet({ comboId: "r1", outcomes: [{ kind: "unknown" }] }, uniformFallbackPolicy("pass-through"), bareKeyIR()),
+    ).toBe(false);
+  });
+
+  it("a behaviour-owned rule still skips the combination", () => {
+    const ir = bareKeyIR();
+    (ir.groups[0]!.rules[0] as IRRule).ownedByBehaviour = "carve-suppression";
+    expect(isInSwallowSet({ comboId: "r1", outcomes: [LETTER] }, LETTERS_ONLY, ir)).toBe(false);
+  });
+
+  it("a deadkey-context carve always suppresses, even when every class passes through", () => {
+    expect(isInSwallowSet({ comboId: "paired" }, uniformFallbackPolicy("pass-through"), deadkeySlotIR())).toBe(true);
+  });
+});
+
+describe("isPositionInSwallowSet", () => {
+  it("applies the class decision and skips positions a behaviour-owned rule binds", () => {
+    const ir = bareKeyIR();
+    expect(isPositionInSwallowSet({ key: "K_Q", modifiers: "" }, LETTERS_ONLY, [LETTER], ir)).toBe(true);
+    expect(isPositionInSwallowSet({ key: "K_Q", modifiers: "" }, LETTERS_ONLY, [DIGIT], ir)).toBe(false);
+    (ir.groups[0]!.rules[0] as IRRule).ownedByBehaviour = "carve-suppression";
+    expect(isPositionInSwallowSet({ key: "K_E", modifiers: "" }, LETTERS_ONLY, [LETTER], ir)).toBe(false);
   });
 });

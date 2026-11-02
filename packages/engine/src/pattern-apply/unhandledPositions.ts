@@ -67,12 +67,12 @@ function isToken(t: string): t is ModifierToken {
   return TOKENS.has(t);
 }
 
-interface Binding {
+export interface Binding {
   key: string;
   layer: string;
 }
 
-function storeItemBinding(item: StoreItem): Binding | undefined {
+export function bindingsOfStoreItem(item: StoreItem): Binding | undefined {
   let parsed: { tokens: ModifierToken[]; vkey: string } | null = null;
   if (item.kind === "vkey") parsed = { tokens: [], vkey: item.name };
   else if (item.kind === "raw") parsed = parseKeySpec(item.text);
@@ -80,8 +80,31 @@ function storeItemBinding(item: StoreItem): Binding | undefined {
   return { key: parsed.vkey, layer: parsed.tokens.join(" ") };
 }
 
+/**
+ * A store's items with `outs(other)` references spliced in, so a store built
+ * from parts (as `swallowUndefined` does when one line would be too long)
+ * reads the same as its flattened form.
+ */
+export function expandedStoreItems(
+  ir: KeyboardIR,
+  storeName: string,
+  seen: ReadonlySet<string> = new Set(),
+): StoreItem[] {
+  if (seen.has(storeName)) return [];
+  const store = ir.stores.find((s) => s.name === storeName);
+  if (store === undefined) return [];
+  const next = new Set(seen).add(storeName);
+  const out: StoreItem[] = [];
+  for (const item of store.items) {
+    const ref = item.kind === "raw" ? /^outs\(([^)]+)\)$/.exec(item.text.trim()) : null;
+    if (ref?.[1] !== undefined) out.push(...expandedStoreItems(ir, ref[1], next));
+    else out.push(item);
+  }
+  return out;
+}
+
 /** The key bindings one rule makes, and whether they are unconditional. */
-function ruleBindings(ir: KeyboardIR, rule: IRRule): { bindings: Binding[]; bare: boolean } {
+export function bindingsOfRule(ir: KeyboardIR, rule: IRRule): { bindings: Binding[]; bare: boolean } {
   const bindings: Binding[] = [];
   let conditional = false;
   for (const el of rule.context) {
@@ -89,9 +112,8 @@ function ruleBindings(ir: KeyboardIR, rule: IRRule): { bindings: Binding[]; bare
       const layer = layerOf(el.modifiers);
       if (layer !== undefined) bindings.push({ key: el.name, layer });
     } else if (el.kind === "any") {
-      const store = ir.stores.find((s) => s.name === el.storeRef);
-      for (const item of store?.items ?? []) {
-        const b = storeItemBinding(item);
+      for (const item of expandedStoreItems(ir, el.storeRef)) {
+        const b = bindingsOfStoreItem(item);
         if (b) bindings.push(b);
       }
     } else if (!(el.kind === "raw" && el.text === "+")) {
@@ -114,7 +136,7 @@ export function enumerateUnhandledPositions(ir: KeyboardIR): UnhandledPosition[]
   for (const group of ir.groups) {
     if (group.readonly) continue;
     for (const rule of group.rules) {
-      const { bindings, bare } = ruleBindings(ir, rule);
+      const { bindings, bare } = bindingsOfRule(ir, rule);
       for (const { key, layer } of bindings) {
         if (!PRINTABLE_SET.has(key)) continue;
         boundLayers.add(layer);

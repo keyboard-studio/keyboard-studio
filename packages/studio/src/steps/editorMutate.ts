@@ -17,11 +17,13 @@
 // IR, ensuring idempotency and reversibility.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { Disposition } from "@keyboard-studio/contracts";
+import type { Disposition, FallbackPolicy } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import {
+  anyClassSwallows,
   parseSlotId,
   deriveCarvedIr,
+  type Leak,
   collectTaintedContributors,
 } from "@keyboard-studio/engine";
 
@@ -78,7 +80,11 @@ function partitionItemIds(
  */
 export interface CarveMutateOptions {
   /** Keyboard-wide fallback policy for the suppression stage (FR-019). */
-  fallbackPolicy?: Disposition;
+  fallbackPolicy?: Disposition | FallbackPolicy;
+  /** What the picked base keyboards type at each position (per-class policy only). */
+  leaks?: readonly Leak[];
+  /** The author confirmed the per-class policy; until then it reads as one value. */
+  fallbackPolicyConfirmed?: boolean;
   /** Removal ids that are not carves, e.g. disabled-family rules (never rewritten into suppression rules). */
   suppressionExemptIds?: ReadonlySet<string>;
   /** A6 loud/soft for the suppression stage. Default false (soft). */
@@ -158,10 +164,17 @@ export function buildCarvePatch(
     startIr,
     effectiveItemIds,
   );
+  // A confirmed per-class policy with a "Do nothing" class still derives an
+  // IR with no carve at all: the swallow store is not a carve edit.
+  const swallowActive =
+    opts?.fallbackPolicyConfirmed === true &&
+    typeof opts.fallbackPolicy === "object" &&
+    anyClassSwallows(opts.fallbackPolicy);
   if (
     deletedNodeIds.size === 0 &&
     slotIds.size === 0 &&
-    wholeNodeItemIds.size === 0
+    wholeNodeItemIds.size === 0 &&
+    !swallowActive
   ) {
     return {};
   }
@@ -175,6 +188,8 @@ export function buildCarvePatch(
     deletedNodeIds,
     deletedItemIds: effectiveItemIds,
     ...(opts?.fallbackPolicy !== undefined ? { fallbackPolicy: opts.fallbackPolicy } : {}),
+    ...(opts?.leaks !== undefined ? { leaks: opts.leaks } : {}),
+    ...(opts?.fallbackPolicyConfirmed === true ? { fallbackPolicyConfirmed: true as const } : {}),
     ...(opts?.suppressionExemptIds !== undefined
       ? { suppressionExemptIds: opts.suppressionExemptIds }
       : {}),

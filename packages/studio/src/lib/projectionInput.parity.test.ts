@@ -89,7 +89,8 @@ describe("projectionInputFromState — preview/download parity", () => {
       { vfs: createVirtualFS([]), keyboardId: basicKbdus.id, assignments: [], getPattern: () => undefined, identity: null },
     );
     expect(input.keyEditOps).toEqual([]);
-    expect(input.fallbackPolicy).toBe("swallow");
+    expect(input.fallbackPolicy).toEqual(uniformFallbackPolicy("swallow"));
+    expect(input.fallbackPolicyConfirmed).toBe(false);
     expect(input.suppressionExemptIds?.size).toBeGreaterThan(0);
   });
 });

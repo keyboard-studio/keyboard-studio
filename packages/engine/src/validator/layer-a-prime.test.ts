@@ -831,6 +831,24 @@ ${line}
     expect(checkBehaviourNulOnTextContext(ruleIr(line, true))).toEqual([]);
   });
 
+  it("accepts `+ any(keys)` over a key store (the swallowUndefined rule) but not over a text store", () => {
+    const withStore = (storeLine: string): KeyboardIR => {
+      const { ir } = parse(`begin Unicode > use(main)
+
+${storeLine}
+group(main) using keys
++ any(s) > nul
+`, "t");
+      const rule = ir.groups[0]!.rules[0]!;
+      return {
+        ...ir,
+        groups: [{ ...ir.groups[0]!, rules: [{ ...rule, ownedByBehaviour: "swallow-undefined" }] }],
+      };
+    };
+    expect(checkBehaviourNulOnTextContext(withStore("store(s) [K_A] [SHIFT K_B]"))).toEqual([]);
+    expect(checkBehaviourNulOnTextContext(withStore("store(s) 'ab'"))).toHaveLength(1);
+  });
+
   it("ignores hand-written nul on a text context (sil_yoruba8 backspace idiom)", () => {
     expect(checkBehaviourNulOnTextContext(ruleIr("'gb' + [K_BKSP] > nul", false))).toEqual([]);
   });

@@ -31,8 +31,7 @@ import type {
   Pattern,
   VirtualFS,
 } from "@keyboard-studio/contracts";
-import { collapseFallbackPolicy } from "@keyboard-studio/contracts";
-import type { KeyEditOperation } from "@keyboard-studio/engine";
+import type { KeyEditOperation, Leak } from "@keyboard-studio/engine";
 import type { WorkingCopyState } from "../stores/workingCopyStore.ts";
 import type {
   IdentityOverlay,
@@ -53,6 +52,7 @@ export type ProjectionState = Pick<
   | "deletedTouchKeyIds"
   | "disabledFamilyIds"
   | "fallbackPolicy"
+  | "fallbackPolicyConfirmed"
   | "carveTouchKeepInert"
   | "deadkeyOverlay"
   | "contextToleranceOverlay"
@@ -69,6 +69,8 @@ export interface ProjectionExtras {
   identity: IdentityOverlay | null;
   /** The recorded marks-treatment value, or undefined when none is recorded. */
   marksTreatment: MarksTreatmentValue | undefined;
+  /** What the picked base keyboards type at each position (spec 109); see buildFallbackLeaks. */
+  fallbackLeaks?: readonly Leak[];
   baseDisplayName?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
@@ -117,8 +119,9 @@ export function projectionInputFromState(
     ...(disabledRuleIds.size > 0 ? { suppressionExemptIds: disabledRuleIds } : {}),
     carveChars: state.carveChars,
     deletedTouchKeyIds: state.deletedTouchKeyIds,
-    // The pipeline is not class-aware yet: pass-through only when every class passes through.
-    fallbackPolicy: collapseFallbackPolicy(state.fallbackPolicy),
+    // The pipeline reads the per-class policy; it behaves as one collapsed value until confirmed.
+    fallbackPolicy: state.fallbackPolicy,
+    fallbackPolicyConfirmed: state.fallbackPolicyConfirmed,
     // T020 (FR-023): the store array is NFC-normalized at write time.
     ...(state.carveTouchKeepInert.length > 0
       ? { carveTouchKeepInert: new Set(state.carveTouchKeepInert) }

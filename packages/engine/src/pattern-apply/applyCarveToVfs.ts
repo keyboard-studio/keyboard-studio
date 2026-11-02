@@ -42,7 +42,8 @@
 // preserves ALL user stores (not just those referenced by typed rules).
 
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
-import type { Disposition } from "@keyboard-studio/contracts";
+import type { Disposition, FallbackPolicy } from "@keyboard-studio/contracts";
+import { anyClassSwallows, type Leak } from "./fallbackPolicy.js";
 import { emit } from "../codec/emit.js";
 import { reconcileSiblingAssetPaths } from "../compiler/reconcileSiblingAssetPaths.js";
 import { carveFilterIr } from "./carveFilterIr.js";
@@ -60,7 +61,11 @@ export interface CarvePipelineOpts {
   /** Glyph-level carve item ids (store-slot ids plus bare node ids). */
   deletedItemIds: ReadonlySet<string>;
   /** Keyboard-wide fallback policy for the suppression stage (FR-019). Omitted = no suppression. */
-  fallbackPolicy?: Disposition;
+  fallbackPolicy?: Disposition | FallbackPolicy;
+  /** What the picked base keyboards type at each position (per-class policy only). */
+  leaks?: readonly Leak[];
+  /** The author confirmed the per-class policy; until then it reads as one value. */
+  fallbackPolicyConfirmed?: boolean;
   /** Removal ids that are not carves (see CarvePipelineInput.suppressionExemptIds). */
   suppressionExemptIds?: ReadonlySet<string>;
   /** A6 loud/soft for the suppression stage. Default false (soft). */
@@ -105,6 +110,16 @@ export interface ApplyCarveToVfsResult {
   derivedIr?: KeyboardIR;
 }
 
+/** A confirmed per-class policy with a "Do nothing" class adds the swallow rule on its own. */
+function swallowUndefinedActive(pipeline: CarvePipelineOpts): boolean {
+  const policy = pipeline.fallbackPolicy;
+  return (
+    pipeline.fallbackPolicyConfirmed === true &&
+    typeof policy === "object" &&
+    anyClassSwallows(policy)
+  );
+}
+
 /**
  * Project carve deletions onto the VFS without mutating `startIr`.
  *
@@ -142,7 +157,8 @@ export function applyCarveToVfs(
   const pipelineEdit =
     pipeline !== undefined &&
     (pipeline.deletedItemIds.size > 0 ||
-      deletedNodeIds.size > 0);
+      deletedNodeIds.size > 0 ||
+      swallowUndefinedActive(pipeline));
   const irRewritten = opts?.irRewritten === true || pipelineEdit;
 
   if (deletedNodeIds.size === 0 && !irRewritten && !pipelineEdit) {
@@ -184,6 +200,8 @@ export function applyCarveToVfs(
       deletedNodeIds,
       deletedItemIds: pipeline.deletedItemIds,
       ...(pipeline.fallbackPolicy !== undefined ? { fallbackPolicy: pipeline.fallbackPolicy } : {}),
+      ...(pipeline.leaks !== undefined ? { leaks: pipeline.leaks } : {}),
+      ...(pipeline.fallbackPolicyConfirmed === true ? { fallbackPolicyConfirmed: true as const } : {}),
       ...(pipeline.suppressionExemptIds !== undefined
         ? { suppressionExemptIds: pipeline.suppressionExemptIds }
         : {}),

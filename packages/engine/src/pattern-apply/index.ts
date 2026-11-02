@@ -410,9 +410,30 @@ export type {
   CompileCarveSuppressionOptions,
   CompileCarveSuppressionResult,
 } from "./carveSuppression.js";
-export { isInSwallowSet } from "./swallowSet.js";
-export { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
+export { isInSwallowSet, isPositionInSwallowSet } from "./swallowSet.js";
+export {
+  dispositionsForFallbackPolicy,
+  isSwallowedByPolicy,
+  anyClassSwallows,
+  outcomesByPosition,
+  positionId,
+  positionsOfCombo,
+  LEAK_CLASSES,
+} from "./fallbackPolicy.js";
+export type { Leak, LeakOutcome } from "./fallbackPolicy.js";
 export type { SwallowCombo } from "./swallowSet.js";
+export {
+  applySwallowUndefined,
+  swallowedPositions,
+  SWALLOW_UNDEFINED_OWNER,
+} from "./swallowUndefined.js";
+export type { SwallowUndefinedInput } from "./swallowUndefined.js";
+export { proposeFallbackPolicy, classifyChar } from "./fallbackProposal.js";
+export type {
+  Proposal,
+  ProposalEvidence,
+  FallbackProposalInput,
+} from "./fallbackProposal.js";
 
 // Spec 104 Wave 3: the terminal-insertion primitive, exported so the
 // studio's severance/synthesis merge composes with the same placement

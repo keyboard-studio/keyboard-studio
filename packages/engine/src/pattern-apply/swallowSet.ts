@@ -14,7 +14,9 @@
 // choice is the single keyboard-wide fallback policy (the per-carve override
 // is retired; see specs/076-rule-behaviours/fallback-surface-design.md).
 
-import type { Disposition, KeyboardIR } from "@keyboard-studio/contracts";
+import type { Disposition, FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
+import { isSwallowedByPolicy, positionId, type LeakOutcome } from "./fallbackPolicy.js";
+import { bindingsOfRule, type UnhandledPosition } from "./unhandledPositions.js";
 import { parseSlotId } from "./slotId.js";
 import { slotGuardNodeIdPrefix } from "./carveSuppression.js";
 
@@ -26,6 +28,11 @@ import { slotGuardNodeIdPrefix } from "./carveSuppression.js";
  */
 export interface SwallowCombo {
   comboId: string;
+  /**
+   * What the picked base keyboards type at this combination's position(s).
+   * Only read under a per-class policy; absent or empty means "no data".
+   */
+  outcomes?: readonly LeakOutcome[];
 }
 
 /**
@@ -45,12 +52,53 @@ export interface SwallowCombo {
  */
 export function isInSwallowSet(
   combo: SwallowCombo,
-  policy: Disposition,
+  policy: Disposition | FallbackPolicy,
   ir: KeyboardIR,
 ): boolean {
-  if (policy === "pass-through") return false;
   if (isCoveredByBehaviourOwnedRule(combo.comboId, ir)) return false;
-  return true;
+  // A deadkey-context carve always suppresses, whatever the policy says: the
+  // compiler coerces it to `block`, so it never reaches the base keyboard.
+  if (isDeadkeyContextRule(combo.comboId, ir)) return true;
+  if (typeof policy === "string") return policy !== "pass-through";
+  return isSwallowedByPolicy(policy, combo.outcomes ?? []);
+}
+
+/**
+ * Position-level form of the predicate, for `swallowUndefined`: should this
+ * unhandled position enter the store? Same two answers as
+ * {@link isInSwallowSet} — the per-class policy decides, and a position some
+ * behaviour-owned rule already binds is skipped (no double emission).
+ */
+export function isPositionInSwallowSet(
+  position: Pick<UnhandledPosition, "key" | "modifiers">,
+  policy: FallbackPolicy,
+  outcomes: readonly LeakOutcome[],
+  ir: KeyboardIR,
+): boolean {
+  if (!isSwallowedByPolicy(policy, outcomes)) return false;
+  return !behaviourOwnedPositions(ir).has(positionId(position.key, position.modifiers));
+}
+
+/** Positions bound (bare or conditionally) by a behaviour-owned rule. */
+function behaviourOwnedPositions(ir: KeyboardIR): Set<string> {
+  const ids = new Set<string>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (rule.ownedByBehaviour === undefined) continue;
+      for (const b of bindingsOfRule(ir, rule).bindings) ids.add(positionId(b.key, b.layer));
+    }
+  }
+  return ids;
+}
+
+/** A rule whose context holds a deadkey (carving it must never leave it armed). */
+function isDeadkeyContextRule(comboId: string, ir: KeyboardIR): boolean {
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (rule.nodeId === comboId) return rule.context.some((el) => el.kind === "deadkey");
+    }
+  }
+  return false;
 }
 
 /**
