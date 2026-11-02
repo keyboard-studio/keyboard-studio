@@ -1,6 +1,6 @@
 # Contract: LDML findings — shape, routing, grouping, i18n
 
-**Spec**: FR-010–FR-019, FR-062 · **Research**: R23, R27
+**Spec**: FR-010–FR-019, FR-062 · **Research**: R25, R29
 
 ## Finding shape
 
@@ -34,10 +34,10 @@ to the Output page.
 
 | Code | Owner | Via |
 |---|---|---|
-| `KM_LINT_LDML_FRAME_KEY`, `KM_LINT_LDML_FORM_KEY_MISSING`, `KM_LINT_LDML_SHIFT_SIDE`, `KM_LINT_LDML_MNEMONIC`, `KM_LINT_LDML_CAPS_MODE` | `mechanisms` | question `physical-layout` |
+| `KM_LINT_LDML_FRAME_KEY`, `KM_LINT_LDML_FORM_KEY_MISSING`, `KM_LINT_LDML_SHIFT_SIDE`, `KM_LINT_LDML_MNEMONIC`, `KM_LINT_LDML_CAPS_MODE`, `KM_LINT_LDML_MODIFIER`, `KM_LINT_LDML_MODIFIER_SIDES`, `KM_LINT_LDML_BKSP_NO_CONTEXT` | `mechanisms` | question `physical-layout` |
 | `KM_LINT_LDML_TOUCH_PRESENTATION`, `KM_LINT_LDML_TOUCH_SPECIAL_KEY` | `touch` | question `touch-layout` |
 | `KM_LINT_LDML_NO_KEY_TRIGGER` | `touch`. The parser sets `readonly` only on `NewContext`/`PostKeystroke` groups (`parse.ts:1218`), so rows 1.3, 1.4, 1.4b and 1.10 are all touch layer behaviour | question `touch-layout` |
-| `KM_LINT_LDML_GROUP_CHAIN_PARTIAL`, `KM_LINT_LDML_MATCH_NOMATCH_OUTPUT`, `KM_LINT_LDML_CALL`, `KM_LINT_LDML_PLATFORM_CONDITION`, `KM_LINT_LDML_OPTION_STATE`, `KM_LINT_LDML_BASELAYOUT_CONDITION`, `KM_LINT_LDML_LAYER_STATE`, `KM_LINT_LDML_NORMALIZATION`, `KM_LINT_LDML_OPAQUE`, `KM_LINT_LDML_BEEP`, `KM_LINT_LDML_EXPANSION_LIMIT`, `KM_LINT_LDML_NOTANY_MULTI`, `KM_LINT_LDML_CAPTURE_LIMIT`, `KM_LINT_LDML_UNREACHABLE` | `rules` | step `rules` |
+| `KM_LINT_LDML_KEY_STORE`, `KM_LINT_LDML_NEGATED_CLASS`, `KM_LINT_LDML_CONTEXT_START`, `KM_LINT_LDML_GROUP_CHAIN_PARTIAL`, `KM_LINT_LDML_MATCH_NOMATCH_OUTPUT`, `KM_LINT_LDML_CALL`, `KM_LINT_LDML_PLATFORM_CONDITION`, `KM_LINT_LDML_OPTION_STATE`, `KM_LINT_LDML_BASELAYOUT_CONDITION`, `KM_LINT_LDML_LAYER_STATE`, `KM_LINT_LDML_NORMALIZATION`, `KM_LINT_LDML_OPAQUE`, `KM_LINT_LDML_BEEP`, `KM_LINT_LDML_EXPANSION_LIMIT`, `KM_LINT_LDML_NOTANY_MULTI`, `KM_LINT_LDML_CAPTURE_LIMIT`, `KM_LINT_LDML_UNREACHABLE` | `rules` | step `rules` |
 | `KM_LINT_LDML_NO_LOCALE` | `identity` | question `iso_code` |
 | `KM_LINT_LDML_HEADER_UNSUPPORTED`, `KM_LINT_LDML_METADATA_PACKAGE_ONLY`, `KM_LINT_LDML_KEYMAN_GAP`, `KM_LINT_LDML_ANSI_ONLY`, `KM_LINT_LDML_BASE_DEADKEY` | Output page (`BASE_DEADKEY` comes from the OS base keyboard, which the author changes through the layout survey answers, not through a key) | none |
 
@@ -69,9 +69,10 @@ to the Output page.
 - Id namespaces:
   - `output.download.ldml.*`: the button (`button.download`, `button.downloading`), the aria-label
     (`aria.ready`, plus the shared blocker descriptors), the profile picker (`profile.label`,
-    `profile.option`, `profile.compilable`, `profile.tr35Only`), help text, the error alert, and
+    `profile.option`, `profile.compilable`, `profile.tr35Only`), the base-keyboard picker (`base.label`, `base.option`, `base.default`,
+    `base.unavailable`; FR-027), help text, the error alert, and
     the findings section heading;
-  - `lint.ldml.<codeSlug>.{title,message,hint}`, one set per code (28 codes).
+  - `lint.ldml.<codeSlug>.{title,message,hint}`, one set per code (34 codes).
 - The aria-label carries the keyboard id from `resolveOutputKeyboardId`, the same function the
   filename uses (WCAG 2.5.3). A test asserts that the aria-label's id equals the downloaded
   filename's id. This is the first such test, and it is added for the `.zip` and `.kmp` buttons too.

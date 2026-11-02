@@ -1,17 +1,18 @@
 # Contract: LDML export package, report and determinism
 
-**Spec**: FR-004, FR-030, FR-031, FR-040–FR-042 · **Research**: R11, R24, R26
+**Spec**: FR-004, FR-030, FR-031, FR-040–FR-042 · **Research**: R11, R26, R28
 
 ## Package layout
 
-The zip root is the Keyman LDML project, in the layout `kmc generate ldml-keyboard` uses. Entries
+The zip root is the Keyman LDML project, in the layout `kmc generate ldml-keyboard` uses. The
+project and package id is `<kmnid>_ldml`, where `<kmnid>` is the KMN keyboard id (spec FR-040). Entries
 are written in this order, sorted by path within each group.
 
 | Path | Content | Source |
 |---|---|---|
-| `<id>.kpj` | Keyman project v2.0 (`<KeymanDeveloperProject><Options><Version>2.0</Version>…`) | generated |
-| `source/<id>.xml` | the keyboard3 document | exporter |
-| `source/<id>.kps` | package: `<Info>` (name, copyright, author, description, website), `<Keyboards>` with languages, `<Files>` listing `..\build\<id>.kmx`, `..\build\<id>.kvk`, the readme/welcome, icon and fonts | generated from the same identity, attribution and help-docs values the KMN `.kps` writer reads |
+| `<kmnid>_ldml.kpj` | Keyman project v2.0 (`<KeymanDeveloperProject><Options><Version>2.0</Version>…`) | generated |
+| `source/<kmnid>_ldml.xml` | the keyboard3 document | exporter |
+| `source/<kmnid>_ldml.kps` | package: `<Info>` (name, copyright, author, description, website), `<Keyboards>` with languages, `<Files>` listing `..\build\<kmnid>_ldml.kmx`, `..\build\<kmnid>_ldml.kvk`, the readme/welcome, icon and fonts | generated from the same identity, attribution and help-docs values the KMN `.kps` writer reads |
 | `source/readme.htm`, `source/welcome.htm` | the KMN package's documents, unchanged in content | projected VFS |
 | `LICENSE.md`, `README.md`, `HISTORY.md` | the KMN package's texts | projected VFS |
 | `source/<icon>`, `source/<font files>` | the files the KMN `.kps` lists | projected VFS (binary, stored) |
@@ -21,7 +22,7 @@ There is no `NEXT_STEPS.md`, no `.kmn`, no `.keyman-touch-layout`, no `build/` o
 `.studio/` metadata. The Story 5 compiled `.kmx`/`.kvk` go only into the separate LDML `.kmp`
 (FR-074, FR-076).
 
-## `source/<id>.xml` shape
+## `source/<kmnid>_ldml.xml` shape
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -53,6 +54,10 @@ There is no `NEXT_STEPS.md`, no `.kmn`, no `.keyman-touch-layout`, no `build/` o
     </transformGroup>
   </transforms>
   <transforms type="backspace">…</transforms>
+  <special xmlns:ks="https://keyboard-studio.github.io/ns/ldml-export/1">   <!-- FR-028; research R32 -->
+    <ks:baseKeyboard id="<host id>" source="author|primary-pick|likely-base|en-US"/>
+    <ks:position layer="<modifiers>" key="<vkey>" provenance="authored|filled|suppressed"/>
+  </special>
 </keyboard3>
 ```
 
@@ -71,8 +76,9 @@ The report is always English and contains no timestamp. Sections, in order:
 1. **Title and authority**: keyboard name, id and version. Profile id, namespace and TR35 revision.
    For profile 46, the pinned Keyman version that compiles it. For profile 49, "TR35-only
    (awaiting Keyman)".
-2. **Base keyboard**: the host label and id resolved against (research R24), how it was chosen
-   (picked / layout family / language / default), and, when row 2.7 applies, the mnemonic caveat.
+2. **Base keyboard**: the host label and id the export used (research R26), who chose it
+   (author / primary pick / likely-base / `en-US`, FR-027), the provenance counts per layer
+   (authored, filled, suppressed; FR-028), and, when row 2.7 applies, the mnemonic caveat.
 3. **Summary**: counts per status (M, A, N, K), and the sentence "Nothing was lost." when A and N
    are both zero.
 4. **Delivery note**: Keyman 19 delivers LDML keyboards to desktop only. When touch forms are

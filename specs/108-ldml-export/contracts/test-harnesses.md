@@ -1,7 +1,7 @@
 # Contract: LDML test harnesses
 
-**Spec**: FR-050–FR-053, FR-065, SC-001–SC-006, SC-009–SC-011, SC-013 · **Research**: R16,
-R19–R23, R28
+**Spec**: FR-050–FR-053, FR-065, SC-001–SC-006, SC-009–SC-011, SC-013 · **Research**: R18,
+R21–R25, R30
 
 The harnesses live in `packages/engine/src/ldml-export/__testing__/`, are excluded from the barrel,
 and depend only on devDependencies. The exception is H6, which needs studio code
@@ -25,7 +25,7 @@ Every keyboard named here must have a phonebook row (CLAUDE.md "Keyboard phonebo
 
 ## H1 — Keyman compile (FR-050, SC-001), profile 46 only
 
-- `keymanCompile(xml) → { messages: {code, severity, line?}[], kmx?, kvk? }` (research R19).
+- `keymanCompile(xml) → { messages: {code, severity, line?}[], kmx?, kvk? }` (research R21).
 - Assertion: `errorCodes(messages)` deep-equals `expectedKeymanCodes(classification)`. The
   expected set is the union of the codes the export's K items name. A hardware-only export with no
   K items must compile with **zero** errors. Warnings and hints are reported, and they fail the
@@ -54,13 +54,13 @@ returns no errors.
 
 ## H4 — TR35 conformance (FR-052, SC-010), every touch form, both profiles
 
-`tr35Conformance(xml) → Violation[]`. It must return `[]`. The rules are listed in research R21,
+`tr35Conformance(xml) → Violation[]`. It must return `[]`. The rules are listed in research R23,
 including the gap-key ban. Each rule has a negative unit test built from a minimal hand-written
 document.
 
 ## H5 — Keystroke equivalence (FR-051, SC-002, SC-003)
 
-- **KMN side**: the engine simulator on a test copy compiled with `&TARGETS any` (research R22).
+- **KMN side**: the engine simulator on a test copy compiled with `&TARGETS any` (research R24).
 - **LDML side**: `ldmlInterpreter(xml)`.
 - **Sequences**: each key × layer once, each context rule's path, and 200 seeded random walks of
   length 1–6 per keyboard.
@@ -89,7 +89,7 @@ For each corpus working copy, the harness:
 2. builds the preview-path classification from the preview projection;
 3. builds the download-path classification from `projectWorkingCopyForOutput`.
 
-It asserts that the site-key sets for A, N and K items are equal (research R23). It also asserts
+It asserts that the site-key sets for A, N and K items are equal (research R25). It also asserts
 that the studio findings built from (2) have exactly the A/N/K site keys of the report built from
 (3), excluding the row-5.15 delivery note (FR-012, SC-005).
 

@@ -175,7 +175,7 @@ use `KM_LINT_LDML_NORMALIZATION` (warning). `normalization="disabled"` is not us
 `HINT_NormalizationDisabled` and changes matching for every rule.
 
 **Consequence for FR-051**: the keystroke-equivalence harness NFC-normalises the KMN
-expected text before comparing (research R22).
+expected text before comparing (research R24).
 
 ## R10 — Upstream KMN↔LDML plans
 
@@ -264,7 +264,7 @@ Roadmap: `epic/web-core` (not merged), plus #11293, #8093, #13429 and #13424, al
 **Consequences for the profiles:**
 
 - **Profile `49`** (TR35-only) = profile 46 plus `conformsTo="49"`, the `…/cldr/49/keyboard3`
-  namespace (an identifier only; confirmed in R28), and
+  namespace (an identifier only; confirmed in R30), and
   `info/@attribution`. It adds no set-mapping capability. `keyboard3/@draft` is not emitted: it
   is a CLDR-repository review status, not author data.
 - **Set mapping is the same in both profiles.** Three facts:
@@ -286,7 +286,7 @@ Roadmap: `epic/web-core` (not merged), plus #11293, #8093, #13429 and #13424, al
   `tr35-modifications.html`. Only presence in 46.1 versus 49 was checked on 2026-11-01.
 - **Profile 46** already meets the product goal of spec-perfect touch, because the touch
   markup is identical in both.
-- CI validates profile 49 against the CLDR 49 XSD plus the FR-052 rules (R28). Under FR-065 it is
+- CI validates profile 49 against the CLDR 49 XSD plus the FR-052 rules (R30). Under FR-065 it is
   exempt from the Keyman compile check.
 
 ## R14 — KMX+ and where it fits
@@ -439,7 +439,7 @@ meaning-changing 46.1 to 49 differences outside those listed in R13.
 
 # Plan-phase research (2026-11-01, `/speckit-plan`)
 
-R16–R29 record the decisions the spec deferred to planning. Each one gives the decision, the
+R18–R31 record the decisions the spec deferred to planning. Each one gives the decision, the
 reason, and the alternatives rejected. The sources are:
 
 - the pinned npm builds in `node_modules` (`@keymanapp/*@19.0.240-alpha`);
@@ -449,7 +449,7 @@ reason, and the alternatives rejected. The sources are:
 - TR35 CLDR 49 (`tr35-79`) and CLDR `main` raw files;
 - the studio and engine source on this branch.
 
-## R16 — Which Keyman defines "compilable"
+## R18 — Which Keyman defines "compilable"
 
 - **Decision**: the pinned packages define it:
   - `@keymanapp/kmc-ldml@19.0.240-alpha`, a new engine devDependency;
@@ -459,13 +459,13 @@ reason, and the alternatives rejected. The sources are:
   Their own dependencies are exactly the 19.0.240-alpha set the engine already uses. The mapping
   contract's profile header names this pin. `origin/master` is evidence only.
 - **Rationale**: FR-050 and FR-065 test "the Keyman schema pinned in CI". `origin/master` is
-  20.0.10-alpha and differs: for example, it lets one touch form omit `minDeviceWidth` (R20).
+  20.0.10-alpha and differs: for example, it lets one touch form omit `minDeviceWidth` (R22).
 - **Alternatives**:
   - Track `origin/master` from source. Rejected: nothing in CI builds Keyman.
   - Use 19.0.318-beta. Rejected: it does not match the engine's pinned kmc-kmn. A bump moves all
     `@keymanapp` packages together.
 
-## R17 — Opaque and raw IR constructs
+## R19 — Opaque and raw IR constructs
 
 - **Facts** (`packages/contracts/src/keyboard-ir.ts`, `engine/src/codec/parse.ts`):
   - A rule has no key field. The keystroke follows a synthetic `{kind:"raw", text:"+"}`
@@ -490,7 +490,7 @@ reason, and the alternatives rejected. The sources are:
     territory. A lift row is recorded instead (mapping "Version deltas").
   - Parse `sourceText` in the exporter. Rejected by Art II.
 
-## R18 — Normalization follow-up
+## R20 — Normalization follow-up
 
 - **Decision**: as R9.
 - **Follow-up**: an opt-in `normalization="disabled"` export for keyboards that deliberately type
@@ -501,7 +501,7 @@ reason, and the alternatives rejected. The sources are:
   - Expiry: the spec 108 retirement pass, at which it is either filed as an issue or deleted
     (Art XI).
 
-## R19 — Compiling the export with Keyman in tests (FR-050)
+## R21 — Compiling the export with Keyman in tests (FR-050)
 
 - **Decision**: `__testing__/keymanCompile.ts` wraps the compiler:
   1. `new LdmlKeyboardCompiler()`;
@@ -529,7 +529,7 @@ reason, and the alternatives rejected. The sources are:
     package for about 40 lines of callbacks.
   - Spawning the `kmc` CLI. Rejected: there is no CLI in CI, and it is slower.
 
-## R20 — `minDeviceWidth`
+## R22 — `minDeviceWidth`
 
 - **Decision**: always write it. The phone form gets `1` (`PHONE_MIN_DEVICE_WIDTH`) and the
   tablet form `150` (`TABLET_MIN_DEVICE_WIDTH`, mm). Both are named constants in
@@ -549,7 +549,7 @@ reason, and the alternatives rejected. The sources are:
   - Omit it on the phone form. Rejected: the pinned compile fails.
   - Use 100 mm. Rejected for the landscape-phone reason. It stays a constant that can be retuned.
 
-## R21 — Gap keys and the conformance checker
+## R23 — Gap keys and the conformance checker
 
 - **Decision**: the FR-052 checker (`__testing__/tr35Conformance.ts`) enforces TR35's gap-key
   ban, which kmc-ldml does not check. A gap key may have no `output`, `layerId`, `flickId`,
@@ -565,7 +565,7 @@ reason, and the alternatives rejected. The sources are:
   - `width` is 0.01–100;
   - rows are joined by single spaces.
 
-## R22 — Keystroke equivalence (FR-051)
+## R24 — Keystroke equivalence (FR-051)
 
 - **Facts**:
   - No JS/TS runtime for LDML exists. KeymanWeb's LDML path is commented out, and Core WASM is
@@ -598,7 +598,7 @@ reason, and the alternatives rejected. The sources are:
   - Emit `keyboardTest3` XML from the same cases for a later Core run. Deferred; the
     interpreter's case format keeps this possible.
 
-## R23 — One classification, two paths (FR-012, SC-005)
+## R25 — One classification, two paths (FR-012, SC-005)
 
 - **Facts**:
   - The live preview already compiles the **projected** `.kmn` and parses it (`parsedIr` in
@@ -628,16 +628,24 @@ reason, and the alternatives rejected. The sources are:
   - Run `projectWorkingCopyForOutput` inside the cycle. Rejected: it is async and heavy, and it
     would add a second projection on every edit.
 
-## R24 — Base-keyboard resolution
+## R26 — Base-keyboard resolution (spec FR-027, per-export picker)
 
-- **Decision**:
-  - Use `resolveLikelyBases` (`components/rules/baseLayouts.ts:387`), the ranker whose order
-    matches the clarify answer: picked hosts, then layout family, then language tag, then `us`.
-    Take its first entry.
-  - Map that entry into the `referenceBaseLayouts` vocabulary (`intl` → `us-intl`, the inverse of
-    `demoBaseForReferenceBase`) and read the layout from `REFERENCE_BASES`.
-  - The studio passes it to the engine as an `LdmlBaseLayout` (see the data model). The engine
-    never imports the studio (depcruise rule `engine-not-to-studio`).
+- **Decision** (owner ruling, reconciled with the clarify session 2026-11-01): one base keyboard
+  per export, chosen with a **per-export picker** on the Output page. `lib/ldmlBaseLayout.ts`
+  computes the default and the options:
+  - **Default**: the primary hardware base, i.e. the first element of the `windows-layout`
+    decision's selection (`getPickedWindowsLayouts(…)[0]`, `lib/layoutFamily.ts:104`). If that
+    layout has no reference character data (`WindowsLayout.host` unset), the default is shown
+    as **unavailable**: the download is disabled with an explanation until the author picks
+    another. It is never silently substituted (FR-027, Art X).
+  - **Without a primary pick**: the first entry of `resolveLikelyBases`
+    (`components/rules/baseLayouts.ts:387`) with the picks removed, so layout family, then
+    language tag; then `us` (`en-US`).
+  - **Options**: every reference host with character data (`REFERENCE_BASES`: `us`,
+    `us-intl`, `uk`, `azerty`, `qwertz`), labelled with their names. The default is marked.
+  - The chosen entry is mapped into the `referenceBaseLayouts` vocabulary (`intl` → `us-intl`)
+    and passed to the engine as an `LdmlBaseLayout` whose `source` records who chose it. The
+    engine never imports the studio (depcruise rule `engine-not-to-studio`).
   - **Caps layers**: the tables have four layers (`base`, `shift`, `altgr`, `shiftAltgr`), so the
     caps layers are derived as Windows does. A key whose base character has a distinct uppercase
     gets the shifted character under caps, and caps+shift gives the base character. Every other
@@ -645,19 +653,23 @@ reason, and the alternatives rejected. The sources are:
   - **ISO family**: the host table has a `K_OE2` cell (FR-020).
   - **`info/@layout`**: the family label comes from the host id. `us`, `us-intl` and `uk` give
     QWERTY, `azerty` gives AZERTY, and `qwertz` gives QWERTZ.
-- **Base dead keys**: the tables mark 12 dead-key cells (AZERTY, US-International) with a sentinel only. A position no rule covers is omitted, and row 2.26 reports it (`KM_LINT_LDML_BASE_DEADKEY`, hint; added in tasks review, 2026-11-01).
-- **Limitation, reported**: only five reference hosts exist. A picked Windows layout outside them
-  contributes only its family, because `WindowsLayout.host` is unset. The report names the host
-  actually used.
+- **Fill**: the positions to fill come from spec 109's shared enumerator (its FR-040). Positions
+  whose class spec 109 swallows carry `nul` rules from `swallowUndefined` and export as gap keys
+  (rows 2.25, 3.15a), independent of the base keyboard. Only the remaining positions are filled.
+- **Base dead keys**: the tables mark 12 dead-key cells (AZERTY, US-International) with a
+  sentinel only. A position no rule covers is omitted, and row 2.26 reports it
+  (`KM_LINT_LDML_BASE_DEADKEY`, hint).
 - **Alternatives**:
-  - `resolveLikelyBaseLayouts` (`lib/layoutFamily.ts:243`). Rejected: it ignores the
-    Windows-layout picks, which the clarify answer puts first.
-  - A third ranker. Rejected.
+  - The clarify session's first answer, "first entry of the ranking, no export control".
+    Superseded: it predated the FR-027 ruling, and it silently skipped a primary pick without
+    character data.
+  - `resolveLikelyBaseLayouts` (`lib/layoutFamily.ts:243`) for the fallback. Rejected: a third
+    ranking order.
 
-## R25 — Persisting the profile choice
+## R27 — Persisting the profile and base-keyboard choices
 
-- **Decision**: a working-copy field `ldmlProfile: LdmlProfileId | null`, where `null` means the
-  default. It follows the `chartPreference` precedent:
+- **Decision**: two working-copy fields, `ldmlProfile: LdmlProfileId | null` and
+  `ldmlBaseLayout: BaseLayoutId | null` (FR-027), where `null` means the default. It follows the `chartPreference` precedent:
   - the store field and its setter;
   - `WorkingCopySnapshot` snapshot and apply (`persistWorkingCopy.ts:406,580`);
   - registration in `derivedSurfaceRegistry` as EDITOR-AUTHORED;
@@ -669,7 +681,7 @@ reason, and the alternatives rejected. The sources are:
     than one value needs.
   - A decision. Rejected: FR-062 makes it an export option, not a survey decision (Art IX).
 
-## R26 — Determinism (FR-030)
+## R28 — Determinism (FR-030)
 
 - **Facts**:
   - `toZip` always injects `NEXT_STEPS.md`, which holds keymanapp/keyboards submission steps and
@@ -689,7 +701,7 @@ reason, and the alternatives rejected. The sources are:
 - **Alternatives**: `KeymanXMLWriter`. Rejected because of the comments, and because a pinned
   dependency should not decide the export's bytes.
 
-## R27 — Findings routing and grouping (FR-015, FR-018)
+## R29 — Findings routing and grouping (FR-015, FR-018)
 
 - **Routing**:
   - Codes go to existing question surfaces where one exists: touch codes to `touch-layout`, key
@@ -707,7 +719,7 @@ reason, and the alternatives rejected. The sources are:
 - **Alternatives**: everything on the Output page. Rejected: FR-015 requires step routing for
   warnings and hints alike (clarify session).
 
-## R28 — Profile 49 validation and namespace
+## R30 — Profile 49 validation and namespace
 
 - **Decision**:
   - Profile 49 writes `conformsTo="49"` and `xmlns="https://schemas.unicode.org/cldr/49/keyboard3"`.
@@ -716,9 +728,9 @@ reason, and the alternatives rejected. The sources are:
     - the DTD declares `xmlns` as free text;
     - Keyman builds the namespace the same way (`kmc-ldml/src/util/serialize.ts:72-74`).
   - It is validated with **`xmllint-wasm`** (libxml2 compiled to WASM, a pinned devDependency)
-    against the vendored CLDR 49 `ldmlKeyboard3.xsd`, plus the R21 TS checker. `xmllint-wasm`
+    against the vendored CLDR 49 `ldmlKeyboard3.xsd`, plus the R23 TS checker. `xmllint-wasm`
     validates XSD only (its API is `validateXML({ xml, schema })`); CLDR generates the XSD from the
-    DTD and ships both. The DTD value-range annotations are checked by R21.
+    DTD and ships both. The DTD value-range annotations are checked by R23.
   - Profile 46 is also XSD-checked against the vendored CLDR 46 XSD, so FR-005's "valid TR35
     throughout" is tested for both profiles.
   - `version/@cldrVersion` is never written. The DTD fixes it to its own CLDR release, and Keyman
@@ -730,7 +742,7 @@ reason, and the alternatives rejected. The sources are:
 - The 46 → 49 format delta (R13) has no touch change. Profile 49 is therefore exactly the delta
   file [contracts/ldml-mapping-49.md](contracts/ldml-mapping-49.md).
 
-## R29 — FR-070 trial design (Story 5 gate)
+## R31 — FR-070 trial design (Story 5 gate)
 
 - **Pass criteria** (all required):
   1. `@keymanapp/kmc-ldml` loads lazily through the `kmp.ts` pattern (`_modulePromise`, sticky
@@ -755,3 +767,31 @@ reason, and the alternatives rejected. The sources are:
     compile, so the trial exercises it at no extra cost.
   - **Not offered as a separate in-browser check**: that would load common-types' precompiled AJV
     validator for no author-visible gain.
+
+## R32 — Decisions taken when merging the owner rulings (2026-11-01)
+
+The `km/108-spec-review` rulings (FR-027–FR-029, FR-080, package id, set mapping, six new rows)
+were merged after planning. Their plan consequences:
+
+- **FR-080 reuse, confirmed against the pin where checkable.** `@keymanapp/developer-utils`
+  19.0.240-alpha exports `KeymanXMLWriter`, `LDMLKeyboardXMLSourceFileReader` and the
+  `LDMLKeyboard` types; `@keymanapp/common-types` 19.0.240-alpha exports
+  `SchemaValidators.ldmlKeyboard3`. The remaining R16 entries (`NFDAnalyzer`,
+  `MarkerParser.nfd_markers`, `util.isNormalized`, `kmc-generate`'s `ldml-keyboard` template) are
+  confirmed, with their browser safety, by task T089 before any code uses them. The reuse and
+  exception table is in [plan.md](plan.md#upstream-reuse-fr-080).
+- **`<special>` (FR-028) needs no Keyman-gap row.** The pinned
+  `ldml-keyboard3.schema.js` lists `special` among `keyboard3`'s properties with the `any`
+  definition. The record is written as namespaced children
+  (`<special xmlns:ks="https://keyboard-studio.github.io/ns/ldml-export/1">`). T089 also checks that
+  the CLDR XSD accepts it; if not, the record goes to the report only and a K row is added, as
+  FR-028 says.
+- **`KM_LINT_LDML_REORDER_EMULATION` (row 3.25) is not added.** A hint on every
+  reordering-by-context rule would fire on most Indic and Southeast Asian keyboards for behaviour
+  that does carry over (the transforms are exported as written). Owner: engine team. Trigger: a
+  keyboard whose reorder rules misbehave under the H5 harness.
+- **Spec 109 dependency.** FR-021 and FR-028 use spec 109's enumerator (its FR-040). If spec 109
+  has not landed when T031 starts, T031 builds the enumerator at the location spec 109 names, as
+  its own commit, so spec 109 adopts it rather than duplicating it.
+- **Profile 49** no longer carries a set-mapping delta (research R13): its deltas are
+  `conformsTo`, the namespace and `info/@attribution`.

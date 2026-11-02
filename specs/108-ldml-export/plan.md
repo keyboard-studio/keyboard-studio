@@ -19,10 +19,18 @@ that classification:
 - **Download time.** The Output page projects the working copy the way the other downloads do,
   parses the projected `.kmn`, touch layout and `.kvks`, classifies them, lowers the result to
   a keyboard3 document, and zips a Keyman LDML project with `LDML-EXPORT-REPORT.md`. The package
-  is byte-deterministic (fixed zip mtime, no timestamps, ids derived from content).
+  is byte-deterministic (fixed zip mtime, no timestamps, ids derived from content). The
+  project and package id is `<kmnid>_ldml` (FR-040).
+- **Base keyboard.** One per export (FR-027), chosen with a per-export picker on the Output page
+  that defaults to the primary hardware base (the primary `windows-layout` pick). It fills the
+  positions spec 109's enumerator reports as unhandled. Each position's provenance (authored,
+  filled, suppressed) is recorded in a `<special>` element and the report (FR-028), and `nul`/
+  `beep` rules export as gap keys or empty-`to` transforms, never dropped (FR-029).
 
-The exporter writes its own deterministic XML serializer. It never imports a Keyman compiler at
-runtime. Keyman's tooling is used only:
+The exporter reuses Keyman's libraries wherever they provide the function (FR-080; see
+[Upstream reuse](#upstream-reuse-fr-080)). It writes its own deterministic XML serializer, over
+developer-utils' `LDMLKeyboard` types, because no library writes comments and stable bytes. It
+never imports a Keyman compiler at runtime on the Stories 1–4 path. Keyman's tooling is used only:
 
 - in tests, for the FR-050 compile check against the **pinned** `@keymanapp/kmc-ldml@19.0.240-alpha`;
 - in Story 5, behind the FR-070 trial, as a lazily loaded in-browser compile.
@@ -48,11 +56,11 @@ form (FR-061, SC-011).
   - `@keymanapp/common-types@19.0.240-alpha`, for `SchemaValidators.ldmlKeyboard3` (the engine
     cannot resolve it today);
   - `xmllint-wasm` (version pinned at implementation, at least two weeks old), for profile 49's
-    CLDR XSD validation (it is XSD-only; research R28).
+    CLDR XSD validation (it is XSD-only; research R30).
 - No new runtime dependency on the default (Stories 1–4) path. Story 5 promotes `kmc-ldml` to a
   lazily loaded runtime dependency only if the FR-070 trial passes.
 
-**Storage**: one new per-project output setting, `ldmlProfile`, saved in the working-copy snapshot
+**Storage**: two new per-project output settings, `ldmlProfile` and `ldmlBaseLayout`, saved in the working-copy snapshot
 inside the existing draft envelope (the `chartPreference` precedent; no `DRAFT_VERSION` bump). One
 new EPHEMERAL store field, `previewProjection`. See [data-model.md](data-model.md).
 
@@ -113,7 +121,7 @@ CI for the Keyman compile, CLDR XSD validation and the equivalence harness.
 | VII. Out of scope | PASS | This is the secondary LDML export of the 2.2.0 amendment. The `.xml` never enters the KMN `.kmp` or the pull-request projection (enforced by a test on `buildOutputBundle` and the PR path). There is no LDML import, no emission-format switch, and no touch-first authoring. |
 | VIII. House conventions | PASS | `[OK]`/`[WARN]` in harness console output. No issue numbers in shipped code or comments: upstream references such as #16868 stay in the spec and contracts, and the profile tables' lift conditions name the condition, not the issue. Commit titles use `feat(engine)`, `feat(studio)` and `feat(output)`. |
 | IX. Decision registry | PASS | No new survey surface. The profile picker is an Output-page export option, which FR-062 states explicitly. Findings attach to existing step and question surfaces through `lintToQuestion.ts`. |
-| X. Defaults are proposals | PASS | Profile `46` is the labelled default and is changeable in one interaction (SC-012). The base layout is the first entry of the existing ranking and is named in the report and the XML header. The author changes it through the survey answers that feed the ranking (clarify session); nothing is decided silently. |
+| X. Defaults are proposals | PASS | Profile `46` is the labelled default and is changeable in one interaction (SC-012). The base keyboard has a per-export picker whose default is the primary hardware base, shown with its source and changeable before download (FR-027). A default without character data is shown as unavailable and the download waits for the author's pick; it is never silently substituted. Fill is recorded per position (FR-028). |
 | XI. Done means integrated | PASS, conditions | Done means: the download is reachable on the Output page, the findings are visible on their steps, and the CI corpus jobs are green and required. The Story 5 phases are conditional on the FR-070 trial. If the trial fails, Story 5 is withdrawn in the spec and tasks (owner: engine team; trigger: trial result), not left as a parked surface. Follow-ups in research carry an owner and a trigger. |
 
 **Personal data**: none — no new store, recipient, category, or telemetry.
@@ -125,8 +133,30 @@ CI for the Keyman compile, CLDR XSD validation and the equivalence harness.
 - test-only tooling (the LDML interpreter, the CLDR XSD validation).
 
 The contract amendments are recorded in [contracts/ldml-mapping.md](contracts/ldml-mapping.md):
-R8 resolved, R9 widened, set/save/reset made opaque, the Keyman version pinned. None moves an
-article verdict.
+R8 resolved, set/save/reset made opaque, the Keyman version pinned, rows 2.26 and 4.16 added.
+The owner rulings merged afterwards (FR-027–FR-029, FR-080, package id, set mapping; research
+R32) are reflected throughout. None moves an article verdict.
+
+## Upstream reuse (FR-080)
+
+Product ruling: "As much as possible we should use Keyman libraries." Each need below names the
+library that serves it, or the recorded reason it does not (research R16, R32). T089 confirms
+every "reuse" row against the pinned `19.0.240-alpha` packages, including browser safety, before
+code depends on it. A row that fails T089 moves to "exception" with the failing reason, and this
+table is amended in the same commit.
+
+| Need | Decision | Library / reason |
+|---|---|---|
+| LDML document types | **reuse** | `@keymanapp/developer-utils` `LDMLKeyboard` types (`LDMLKeyboardXMLSourceFile`, `LKKey`, `LKLayer`, …) as the lowered model. Type-only imports, erased at build |
+| Writing the XML | **exception** | `KeymanXMLWriter` cannot place the FR-042 comments per group and per transform, and its formatting may change with a dependency bump, which breaks FR-030 byte identity. No Keyman library provides deterministic formatting (R16). The serializer writes the developer-utils model |
+| Schema validation | **reuse** (tests) | `LDMLKeyboardXMLSourceFileReader` + `SchemaValidators.ldmlKeyboard3`. Not run in the browser for Stories 1–4 (R31) |
+| Compile to KMX+ / `.kvk` | **reuse** | `@keymanapp/kmc-ldml` `LdmlKeyboardCompiler`: CI (H1) now; the browser only after the FR-070 trial |
+| Normalization (rows 3.10, 3.22, 3.23, marker drift) | **reuse** | `@keymanapp/common-types` `NFDAnalyzer`, `MarkerParser.nfd_markers`, `util.isNormalized`. `common-types` becomes an engine **runtime** dependency if T089 shows it browser-safe; otherwise **exception**: `String.prototype.normalize` with the reason recorded |
+| `\u{…}` escaping | **exception** | Keyman only unescapes (R16) |
+| Package build (`.kmp`, Story 5) | **reuse** | `@keymanapp/kmc-package` (already a dependency) |
+| Project scaffold (`.kpj`, `.kps`, readme, welcome, LICENSE, README, HISTORY) | **reuse if browser-safe** | `@keymanapp/kmc-generate` `ldml-keyboard` template. If T089 finds it reads templates from disk or fails bundle safety: **exception**, the engine writes the same layout itself |
+| KMN → LDML mapping, touch layout → LDML | **exception** | No library provides it (`kmc-convert` does keylayout → kmn only; R10, R16) |
+| Unhandled-position enumeration (FR-021, FR-028) | **reuse (studio engine)** | Spec 109's FR-040 enumerator, not a Keyman library (R32) |
 
 ## Project Structure
 
@@ -136,7 +166,7 @@ article verdict.
 specs/108-ldml-export/
 ├── spec.md
 ├── plan.md                    # this file
-├── research.md                # R1-R15 (specify; R8/R9 resolved in plan), R16-R29 (plan)
+├── research.md                # R1-R15 (specify; R8/R9 resolved in plan), R18-R31 (plan)
 ├── amendment.md               # G0/G1 rulings (adopted)
 ├── data-model.md              # CompatibilityItem, TargetProfile, LdmlDocument, ExportPackage, settings
 ├── quickstart.md              # how to run each check and what green looks like
@@ -185,14 +215,15 @@ packages/engine/src/ldml-export/
 │   ├── model.ts               # LdmlDocument, the lowered model the serializer writes
 │   └── writeKeyboard3.ts      # deterministic serializer with header/group/transform comments
 ├── project/
-│   ├── kps.ts  kpj.ts  docs.ts  # Keyman LDML project files (FR-040)
+│   ├── kps.ts  kpj.ts  docs.ts  # Keyman LDML project files (FR-040), via kmc-generate when T089 allows
+├── lower/provenance.ts        # FR-028 per-position provenance -> <special> + report
 ├── report.ts                  # LDML-EXPORT-REPORT.md (FR-031)
 ├── package.ts                 # buildLdmlExport(input) -> { files, zip, classification }
 ├── compile/
 │   └── loadLdmlCompiler.ts    # Story 5 only, if the FR-070 trial passes: lazy kmc-ldml loader
 └── __testing__/               # test-only, excluded from the barrel
-    ├── ldmlInterpreter.ts     # minimal LDML runtime for FR-051 (research R22)
-    ├── keymanCompile.ts       # kmc-ldml + in-memory callbacks (research R19)
+    ├── ldmlInterpreter.ts     # minimal LDML runtime for FR-051 (research R24)
+    ├── keymanCompile.ts       # kmc-ldml + in-memory callbacks (research R21)
     ├── tr35Conformance.ts     # FR-052 rule checker
     └── xsdValidate.ts         # xmllint-wasm against the vendored CLDR XSDs
 
@@ -202,13 +233,13 @@ packages/engine/src/index.ts               # re-export the ldml-export public AP
 packages/studio/src/
 ├── lib/buildOutputBundle.ts   # buildLdmlExportForDownload(profileId)
 ├── lib/services.ts            # getBuildLdmlExport(), getParseKmn()
-├── lib/ldmlBaseLayout.ts      # resolveLikelyBases()[0] -> LdmlBaseLayout (from referenceBaseLayouts)
+├── lib/ldmlBaseLayout.ts      # FR-027 default (primary windows-layout pick), options, override -> LdmlBaseLayout
 ├── hooks/useLdmlFindings.ts   # memoised classification -> findings (no timer)
 ├── hooks/useKeyboardArtifact.ts  # publish previewProjection {ir, touch, kvks} (EPHEMERAL)
 ├── lint/ldmlFindings.ts       # CompatibilityItem -> LintFinding (lint.ldml.* ids)
 ├── lint/lintToQuestion.ts     # LDML code routes; LINT_CODE_TO_STEP_IDS for step-only owners
 ├── lint/LintSummary.tsx       # groupByCode presentation (FR-018)
-├── components/output/LdmlDownloadPanel.tsx   # profile picker, button, findings, report note
+├── components/output/LdmlDownloadPanel.tsx   # profile picker, base-keyboard picker, button, findings, report note
 ├── components/OutputScreen.tsx               # mounts the panel under the shared gate
 ├── stores/workingCopyStore.ts                # ldmlProfile (+ setter), previewProjection
 ├── lib/persistWorkingCopy.ts                 # snapshot/apply ldmlProfile
@@ -246,6 +277,7 @@ from Phase 3 onward, and every later phase extends their corpus.
 | Violation / cost | Why needed | Simpler alternative rejected because |
 |---|---|---|
 | Layer C findings computed in the engine rather than in `@keymanapp/keyboard-lint` | The exporter and the warnings must share one classifier (FR-012). The exporter is engine code, and depcruise forbids `keyboard-lint → engine`. | Duplicating the classifier in `keyboard-lint` would let warnings and the report drift. The oe2 detector and the spec-080 documentation checks already set this precedent. |
+| An own XML serializer (FR-080 exception) | FR-042 comments per group and per transform, and FR-030 byte identity. | `KeymanXMLWriter` cannot place those comments and does not promise stable formatting across versions. |
 | Three new devDependencies (`kmc-ldml`, `common-types`, `xmllint-wasm`) | FR-050 requires Keyman's own compiler and schema. FR-052 and profile 49 require the CLDR schema; JS has no XSD validator of its own, and `xmllint-wasm` is libxml2 compiled to WASM. | A system `xmllint` fails on Windows developer machines. Re-implementing the schema check in TS would make the checker its own authority. |
-| A test-only LDML interpreter (`__testing__/ldmlInterpreter.ts`) | FR-051 needs to run LDML. No JS runtime for LDML exists: Keyman Core WASM is not on npm and needs emscripten (research R22). | Building Core WASM in CI is a large toolchain cost for a test. The interpreter is limited to what the exporter emits, and the FR-050 compile gives a second, independent check. |
+| A test-only LDML interpreter (`__testing__/ldmlInterpreter.ts`) | FR-051 needs to run LDML. No JS runtime for LDML exists: Keyman Core WASM is not on npm and needs emscripten (research R24). | Building Core WASM in CI is a large toolchain cost for a test. The interpreter is limited to what the exporter emits, and the FR-050 compile gives a second, independent check. |
 | A second projection consumer (the LDML download re-runs `projectWorkingCopyForOutput`) | The download must serialise the same projection the other downloads do (FR-003). | Sharing the preview's projection would export the preview id and identity, not the output identity. |

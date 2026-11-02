@@ -1,7 +1,7 @@
 # Contract: LDML exporter engine API
 
 **Spec**: [../spec.md](../spec.md) · **Data model**: [../data-model.md](../data-model.md) ·
-**Research**: R17, R23, R24, R26
+**Research**: R19, R25, R26, R28
 
 The module is `packages/engine/src/ldml-export/`, re-exported from the engine root barrel. The
 studio reaches it only through `lib/services.ts` (`getBuildLdmlExport`, `getClassifyForLdml`),
@@ -35,7 +35,8 @@ interface LdmlClassifyInput {
   ir: KeyboardIR;                  // parsed from the PROJECTED source/<id>.kmn
   touchLayout: TouchLayoutIR | null;
   visualKeyboard: KvksIR | null;
-  baseLayout: LdmlBaseLayout;      // research R24; never resolved inside the engine
+  baseLayout: LdmlBaseLayout;      // the export's one base keyboard (FR-027; research R26),
+                                   // chosen in the studio; never resolved inside the engine
 }
 
 interface LdmlExportInput extends LdmlClassifyInput {
@@ -63,7 +64,8 @@ type LdmlExportResult =
   | { ok: false; reason: "ansi-only"; classification: LdmlClassification };
 ```
 
-- `filename` = `${keyboardId}-${version}-ldml.zip`, where `version` is the normalised semver.
+- `filename` = `${keyboardId}_ldml-${version}.zip`, where `version` is the normalised semver. Every
+  project file uses the id `${keyboardId}_ldml` (FR-040).
 - `files` lists the package entries exactly as zipped; see [export-package.md](export-package.md).
 - `classification` is the object the report was rendered from. Tests compare it with the
   authoring-time classification by site key (SC-005).

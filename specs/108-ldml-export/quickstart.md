@@ -67,10 +67,12 @@ every corpus working copy (SC-005).
 3. **Output page (Story 1)**:
    - The LDML panel shows a profile picker with `46` preselected and labelled as compilable by
      Keyman, and `49` labelled "TR35-only (awaiting Keyman)".
+   - A base-keyboard picker defaults to the primary Windows layout picked during authoring, and
+     names where the default came from (FR-027).
    - Its findings list is grouped by code.
-   - "Download LDML" saves `<id>-<version>-ldml.zip`.
+   - "Download LDML" saves `<kmnid>_ldml-<version>.zip`.
 4. Unzip it and check:
-   - it contains `<id>.kpj`, `source/<id>.xml`, `source/<id>.kps`, the docs, and
+   - it contains `<kmnid>_ldml.kpj`, `source/<kmnid>_ldml.xml`, `source/<kmnid>_ldml.kps`, the docs, and
      `LDML-EXPORT-REPORT.md`;
    - there is no `NEXT_STEPS.md`;
    - the report names the profile, the base keyboard and every option-guarded rule by line.
@@ -78,12 +80,12 @@ every corpus working copy (SC-005).
    `sha256sum`).
 6. Switch the interface to French and download again. The zip is still identical.
 7. Switch to profile `49` and download. Check `conformsTo="49"` and `info/@attribution`, and
-   that the report's "Version change" section lists rows 4.10 and 3.7/3.8.
-8. Optionally, with Keyman Developer installed, run `kmc build <id>.kpj` on the extracted
+   that the report's "Version change" section lists row 4.10.
+8. Optionally, with Keyman Developer installed, run `kmc build <kmnid>_ldml.kpj` on the extracted
    profile-46 project. It builds with zero errors (Story 3).
 
 ## 5. Story 5 (only after the FR-070 trial passes)
 
 Use the Phase 7 Playwright spec, which builds the production bundle, runs a profile-46 compile
 in the browser, and compares its messages with H1's. Its result and the bundle-size cost are
-recorded in [research.md](research.md) R29.
+recorded in [research.md](research.md) R31.

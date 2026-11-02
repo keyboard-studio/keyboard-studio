@@ -7,9 +7,9 @@
 | Profile id / `conformsTo` | `46` |
 | Namespace | `https://schemas.unicode.org/cldr/46/keyboard3` |
 | TR35 revision written against | CLDR 49, `tr35-79` (2026-10-21) |
-| Keyman release defining the hardware subset | Keyman 19, as pinned in CI: `@keymanapp/kmc-ldml@19.0.240-alpha` and `@keymanapp/common-types@19.0.240-alpha` (research R16). `origin/master` `cbc752f67b` (20.0.10-alpha) is evidence only |
+| Keyman release defining the hardware subset | Keyman 19, as pinned in CI: `@keymanapp/kmc-ldml@19.0.240-alpha` and `@keymanapp/common-types@19.0.240-alpha` (research R18). `origin/master` `cbc752f67b` (20.0.10-alpha) is evidence only |
 | Status | Default profile |
-| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 5.1, 5.2, 5.13, 6.1; new rows 2.26, 4.15 and 4.16; severity column clarified; gap-key rule (research R17–R21, R24) |
+| Amended | 2026-11-01 in `/speckit-plan`: rows 1.8, 3.17, 3.18, 5.1, 5.2, 5.13, 6.1; new rows 2.26, 4.15 and 4.16; severity column clarified; gap-key rule (research R19–R23, R26) |
 
 This file is the **first target profile** (spec FR-060). A later LDML version gets its own
 profile, written as deltas from this one (FR-061). See "Version deltas" at the end. Research
@@ -137,7 +137,7 @@ exporter bridges the two this way:
 | 3.22 | rules whose behaviour depends on NFC vs NFD (e.g. `é` and `e`+U+0301 in contexts with different outputs) | normalization stays on; the conflated pair is reported | A | `KM_LINT_LDML_NORMALIZATION` | LDML matches in NFD. Normalization stays on per the R9 ruling. |
 | 3.23 | a rule output string that differs from its NFC form (deliberately decomposed output; composition-excluded characters such as Devanagari nukta U+0958–U+095F; canonical reordering of combining marks, e.g. Arabic harakat, Hebrew points, Vietnamese) | exported as written; reported per keyboard | A | `KM_LINT_LDML_NORMALIZATION` | Keyman Core's LDML processor converts output to NFC for the application. The KMX processor does not. Under KMN the application gets the exact codepoints; under the export it gets NFC (research R9). |
 | 3.24 | `nul` in context (start-of-text anchor) | leading `^` in `from` | A | `KM_LINT_LDML_CONTEXT_START` (hint) | TR35 (CLDR 49) §transform, Additional Features. Implementations may discard the input context at any time, so the anchor can match mid-text. |
-| 3.25 | no KMN reorder construct; context rules that reorder (Myanmar, Khmer, Indic) | ordinary transforms; `<reorder>` is never generated | M | — | An optional hint `KM_LINT_LDML_REORDER_EMULATION` for such rules is a plan decision. It is not added here. |
+| 3.25 | no KMN reorder construct; context rules that reorder (Myanmar, Khmer, Indic) | ordinary transforms; `<reorder>` is never generated | M | — | An optional hint `KM_LINT_LDML_REORDER_EMULATION` for such rules is a plan decision. It is not added here. Plan: not added (research R32). |
 | 3.26 | store item `raw` (e.g. `[SHIFT K_E]` in a store) | expanded when the parser's text is a key literal, else — | M/N | `KM_LINT_LDML_OPAQUE` | |
 
 ## 4. Header (system) stores and metadata
@@ -173,12 +173,12 @@ The touch markup is the same in profiles 46 and 49. CLDR 49 adds one sentence: a
 
 `minDeviceWidth` (rows 5.1/5.2) is in millimetres, a whole number from 1 to 999, with no
 default (TR35 (CLDR 49) §layers). Every touch form gets an explicit, distinct value. The source
-of the value (a fixed phone/tablet pair, or derived from the KMN platform) is a plan decision.
+of the value is a fixed phone/tablet pair, 1 and 150 (plan decision, research R22).
 
 | # | IR construct | LDML | Status | Code |
 |---|---|---|---|---|
-| 5.1 | `platforms[phone]` | `<layers formId="touch" minDeviceWidth="1">` (constant `PHONE_MIN_DEVICE_WIDTH`) | M | — (TR35: "the `layers` entry with the greatest matching width will be selected", so 1 is the fallback for every device. The pinned Keyman compiler also requires the attribute on every touch form; research R20) |
-| 5.2 | `platforms[tablet]` | a second `<layers formId="touch" minDeviceWidth="150">` (constant `TABLET_MIN_DEVICE_WIDTH`, millimetres) | M | — (Prior art discarded the tablet form whenever a phone form existed. 150 keeps landscape phones on the phone form, as KeymanWeb does; research R20) |
+| 5.1 | `platforms[phone]` | `<layers formId="touch" minDeviceWidth="1">` (constant `PHONE_MIN_DEVICE_WIDTH`) | M | — (TR35: "the `layers` entry with the greatest matching width will be selected", so 1 is the fallback for every device. The pinned Keyman compiler also requires the attribute on every touch form; research R22) |
+| 5.2 | `platforms[tablet]` | a second `<layers formId="touch" minDeviceWidth="150">` (constant `TABLET_MIN_DEVICE_WIDTH`, millimetres) | M | — (Prior art discarded the tablet form whenever a phone form existed. 150 keeps landscape phones on the phone form, as KeymanWeb does; research R22) |
 | 5.3 | `platforms[desktop]` | — (the hardware form covers desktop) | N | hint `KM_LINT_LDML_TOUCH_PRESENTATION` |
 | 5.4 | layer `id` (`default` → `base`), `nextlayer` | `<layer id>`; `key/@layerId` | M | — |
 | 5.5 | `sk` (long-press) incl. default | `longPressKeyIds`, `longPressDefaultKeyId` | M | — |

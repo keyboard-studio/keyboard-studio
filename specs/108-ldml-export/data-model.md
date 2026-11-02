@@ -17,7 +17,7 @@ engine-side types live in `packages/engine/src/ldml-export/types.ts` and
 | `isDefault` | boolean | exactly one profile; the newest with `keymanCompilable` |
 | `rows` | `ReadonlyMap<RowId, ProfileRow>` | profile 46: all rows. Later profiles: `resolveProfile` applies `deltas` to their base |
 | `deltas` | `RowDelta[]` | empty for 46 |
-| `writeAttribution`, `setMapping` | `boolean`, `"group1-whole" \| "any-group"` | the profile-level switches the lowering reads. They are data and are derived from rows 4.10 and 3.7. The lowering never compares profile ids |
+| `writeAttribution` | `boolean` | the profile-level switch the lowering reads, derived from row 4.10. Set mappings are the same in every profile (spec FR-023). The lowering never compares profile ids |
 
 **ProfileRow**: `{ id: RowId ("3.17"), status: "M"|"A"|"N"|"K"|"M/A"|"M/N", code?: LdmlCode,
 severity: "warning"|"hint"|null, form: string, lift?: string, keymanCodes?: string[] }`.
@@ -28,27 +28,40 @@ severity: "warning"|"hint"|null, form: string, lift?: string, keymanCodes?: stri
 **RowDelta**: `{ id: RowId; status?; code?; form?; lift? }`. Validation: a delta must name an
 existing base row (H7).
 
-## LdmlBaseLayout (engine input; research R24)
+## LdmlBaseLayout (engine input; research R26)
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | `"us" \| "us-intl" \| "azerty" \| "qwertz" \| "uk"` | the `referenceBaseLayouts` vocabulary |
 | `label` | string | named in the report and the XML header |
-| `source` | `"picked" \| "layout-family" \| "bcp47" \| "default"` | how `resolveLikelyBases` chose it |
+| `source` | `"author" \| "primary-pick" \| "likely-base" \| "en-US"` | who chose it (spec FR-027): the author's per-export pick, the primary `windows-layout` pick, the likely-base resolution, or the final default |
 | `family` | `"QWERTY" \| "AZERTY" \| "QWERTZ"` | goes to `info/@layout` |
 | `isoFamily` | boolean | the table has a `K_OE2` cell |
 | `layers` | `Record<"base"\|"shift"\|"altgr"\|"shiftAltgr", Record<VKey, string \| "deadkey">>` | copied from `REFERENCE_BASES` |
 
-The engine derives the caps layers from these four layers (R24). It never reads the studio
+The engine derives the caps layers from these four layers (R26). It never reads the studio
 tables directly.
+
+## PositionProvenance (engine; spec FR-028)
+
+| Field | Type | Notes |
+|---|---|---|
+| `layer` | string | the hardware layer's modifiers, e.g. `none`, `shift caps` |
+| `vkey` | `VKey` | the main-block position |
+| `provenance` | `"authored" \| "filled" \| "suppressed"` | from a rule; from the base keyboard; from a `nul`/`beep` rule (rows 3.15a, 3.16) |
+
+Written to the `<special>` element under `<keyboard3>` and summarised in the report, together with
+the base keyboard's id and its `source`. The "filled" set equals spec 109's enumerator output
+minus the suppressed positions (spec 109 SC-005).
 
 ## LdmlExportMetadata (engine input)
 
 | Field | Source in the studio (same values the KMN `.kps` writer reads) |
 |---|---|
+| `projectId` | `<kmnid>_ldml`, where `<kmnid>` is the output keyboard id (spec FR-040). Must match `/^[a-z_][a-z0-9_]*$/` |
 | `name` | identity `displayName`, else `startIr.header.name` |
 | `version` | `resolvePublishVersion(…)`. The original string goes to the header comment, and the normalised semver to `<version number>` (row 4.3) |
-| `languages` | identity `bcp47`, else `startKeyboard.languages`. The first goes to `@locale`, the rest to `<locales>`. When none exists: `und`, plus the row 4.16 `NO_LOCALE` hint |
+| `languages` | identity `bcp47`, else `startKeyboard.languages`. Each is reduced to its minimal likely-subtags form, with no `-k0-` (spec FR-041). The first goes to `@locale`, the rest to `<locales>`. When none exists: `und`, plus the row 4.16 `NO_LOCALE` hint |
 | `author`, `authorEmail` | `attribution.authorName`, `authorEmail` |
 | `copyright` | `effectiveHolder(attribution)`, rendered as the `.kps` does |
 | `licenceName` | from the licence the package carries |
@@ -61,7 +74,7 @@ tables directly.
 
 | Field | Type | Notes |
 |---|---|---|
-| `siteKey` | string | `${code}\|${rowId}\|${nodeKey}`. This is the identity used for FR-012/SC-005 (R23) |
+| `siteKey` | string | `${code}\|${rowId}\|${nodeKey}`. This is the identity used for FR-012/SC-005 (R25) |
 | `rowId` | `RowId` | the mapping-contract row |
 | `status` | `"M" \| "A" \| "N" \| "K"` | an `M/A` row resolves to one status per item |
 | `code` | `LdmlCode \| null` | `null` only for M |
@@ -108,6 +121,7 @@ is recomputed on every download.
 | Field | Store | Class | Persisted | Notes |
 |---|---|---|---|---|
 | `ldmlProfile` | `workingCopyStore` | EDITOR-AUTHORED (`derivedSurfaceRegistry`) | yes, in `WorkingCopySnapshot` inside the draft envelope; no `DRAFT_VERSION` bump | `LdmlProfileId \| null`. `null` = the default profile. It is reset with the other per-project output settings (the same reset points as `chartPreference`). Setter: `setLdmlProfile`. It is never written to the 088 DecisionSet or the 053 record (FR-062, Art IX) |
+| `ldmlBaseLayout` | `workingCopyStore` | EDITOR-AUTHORED | yes, beside `ldmlProfile` | `BaseLayoutId \| null`. `null` = the FR-027 default. The author's per-export base-keyboard pick from the Output page. Read by the download **and** by `useLdmlFindings`, so the warnings use the same base keyboard as the export. Setter: `setLdmlBaseLayout` |
 | `previewProjection` | `workingCopyStore` | EPHEMERAL | no | `{ ir: KeyboardIR; touchLayoutText: string \| null; kvksText: string \| null; keyboardId: string } \| null`. Set by `useKeyboardArtifact` when a run reaches `ready` and its IR parse succeeded. Cleared on base change. Superseded runs never write it (runId check) |
 
 **State transitions**:

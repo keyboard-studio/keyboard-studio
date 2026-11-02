@@ -78,7 +78,7 @@ or fails the bundle-safety tests. See FR-080.
 
 - Q: Profile 49 is TR35-only (FR-066), but FR-005/FR-023/FR-041/FR-050/SC-001 were written
   as if every export targets Keyman 19. Which rules apply under 49? → A: Each profile sets
-  its own rules. The Keyman-subset constraints (FR-005 hardware clause, FR-023, FR-041's
+  its own rules. The Keyman-subset constraints (FR-005 hardware clause, FR-041's
   `attribution` exclusion) and the Keyman compile requirement (FR-050, SC-001) apply only to
   Keyman-compilable profiles. Under a TR35-only profile, the hardware half follows TR35 in
   full, and the export must pass the keyboard3 DTD/schema for its `conformsTo` plus the TR35
@@ -362,10 +362,10 @@ not been done yet.
   only (FR-027).
 - **FR-022**: Within each transform group, transforms MUST be written in KMN's effective
   precedence (longest context first, then source order), not in source order (research R5).
-- **FR-023**: Under a Keyman-compilable profile, every transform MUST meet Keyman 19's
-  set-mapping limit: at most one mapping, as capture group 1, filling the whole replacement.
-  Anything else MUST be expanded or reported. Under a TR35-only profile, set mappings follow
-  TR35 (`$[N:set]` on any capture group, FR-066).
+- **FR-023**: Every transform MUST meet the set-mapping limit: at most one mapping, as capture
+  group 1, filling the whole replacement. Anything else MUST be expanded or reported. This holds
+  under every profile: Keyman 19 accepts only this form, and the CLDR 49 grammar admits only
+  `$[1:var]` (research R13).
 - **FR-024**: No trigger marker introduced by the exporter may survive into the output text.
   Every such marker MUST have a final catch-all transform.
 - **FR-025**: Context-only groups reached by `use()` MUST be exported as later transform
@@ -468,7 +468,7 @@ not been done yet.
 - **FR-066**: At launch, at least two profiles MUST exist, so the choice is real:
   - `46`: the default, compilable by Keyman 19;
   - the **current TR35 version**: TR35-only, spec-perfect, using the newest features the
-    standard allows, such as `info/@attribution` and set mappings on any capture group.
+    standard allows, such as `info/@attribution`.
 
   The second profile is `49`. Its deltas from 46 are `conformsTo`, namespace and
   `info/@attribution` (research R13). Set mappings are the same in both profiles. The touch
