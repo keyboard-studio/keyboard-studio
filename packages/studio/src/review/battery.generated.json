@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-10-31T20:20:03.430Z",
- "catalogSize": 188,
+ "generatedAt": "2026-11-02T18:07:47.133Z",
+ "catalogSize": 195,
  "byBand": {
-  "layer-c-enforce": 106,
+  "layer-c-enforce": 113,
   "scaffolder-bake": 40,
   "yellow-survey": 32,
   "red-checklist": 10
  },
- "implementedCount": 99,
+ "implementedCount": 106,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -301,6 +301,21 @@
    ]
   },
   {
+   "id": "1.14-kpj-file-exists",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "A `.kpj` project file exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "2.1-version-bumped-if-package-changed",
    "band": "layer-c-enforce",
    "section": "2. Version bumping",
@@ -516,6 +531,21 @@
    ]
   },
   {
+   "id": "4.0-license-md-exists",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "A `LICENSE.md` exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_LICENSE_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "4.1-copyright-present-with-year",
    "band": "scaffolder-bake",
    "section": "4. `LICENSE.md` (copyright)",
@@ -643,6 +673,21 @@
     "kind": "surveyQuestionId",
     "id": "copyright-year-range-starts-at-original"
    }
+  },
+  {
+   "id": "5.0-readme-md-exists",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "A `README.md` exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "5.1-readme-good-header",
@@ -893,6 +938,36 @@
     "kind": "surveyQuestionId",
     "id": "welcome-htm-not-political"
    }
+  },
+  {
+   "id": "7.0-kvks-file-exists",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "A `.kvks` on-screen keyboard file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KVKS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "7.0-ico-file-exists",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "An `.ico` icon file exists for the keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_ICO_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "7.1-kmn-version-matches-history",
@@ -1199,6 +1274,21 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": []
+  },
+  {
+   "id": "8.0-kps-file-exists",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "A `.kps` package file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "8.1-kps-includes-kmx",
@@ -2203,6 +2293,21 @@
    "hook": {
     "kind": "preSubmitChecklistText"
    }
+  },
+  {
+   "id": "18.0-touch-layout-exists",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "A `.keyman-touch-layout` touch layout file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_LAYOUT_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "18.1-longpress-within-limit",

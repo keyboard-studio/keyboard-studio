@@ -371,7 +371,12 @@ export function CriterionRow({
     (onAttestFontLicense !== undefined || onClearFontLicense !== undefined);
 
   return (
-    <li style={rowStyle} data-testid="criteria-row" data-status={row.status}>
+    <li
+      id={`criterion-${row.criterion.id}`}
+      style={rowStyle}
+      data-testid="criteria-row"
+      data-status={row.status}
+    >
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         <span style={{ flex: 1, minWidth: 0 }} data-testid="criteria-row-description">
           {description}

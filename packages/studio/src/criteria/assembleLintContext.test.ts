@@ -499,7 +499,7 @@ describe("assembleLintContext", () => {
     expect(ci?.deprecationInPlay).toBe(false);
   });
 
-  it("without a .kvks, names KM_LINT_KVKS_BLANK as context-missing (absent is not blank)", () => {
+  it("without a .kvks, leaves KM_LINT_KVKS_BLANK out of context-missing (it nests under 7.0 via applicability)", () => {
     const vfs = createVirtualFS([
       { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
     ]);
@@ -508,7 +508,9 @@ describe("assembleLintContext", () => {
       keyboardId: KEYBOARD_ID,
     });
     expect(ctx.criteriaInput?.kvksPath).toBeUndefined();
-    expect(contextMissing["KM_LINT_KVKS_BLANK"]).toContain(".kvks");
+    // 2026-11-02 ruling: the .kvks is a required file, so §7.16 resolves
+    // Not applicable naming 7.0-kvks-file-exists — never grey, never a pass.
+    expect(contextMissing["KM_LINT_KVKS_BLANK"]).toBeUndefined();
   });
 
   it("without a parsed IR, names every IR-dependent Batch 1 code as context-missing", () => {
