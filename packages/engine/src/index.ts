@@ -631,6 +631,8 @@ export {
   MARKS_WHOLESTACK_RULE_PREFIX,
 } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
+export { enumerateUnhandledPositions } from "./pattern-apply/unhandledPositions.js";
+export type { UnhandledPosition } from "./pattern-apply/unhandledPositions.js";
 // Issue #2374: the per-mark "start of line" sentinel lives on the attachment
 // row; the worklist builder reads it into `bareMarkAllowed`. Re-exported so
 // the survey layer uses this exact value instead of redefining it.

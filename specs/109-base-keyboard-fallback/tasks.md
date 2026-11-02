@@ -58,14 +58,14 @@ Files: `packages/engine/src/pattern-apply/unhandledPositions.ts` and its test, e
 
 **Wave 1 — one task:**
 
-- [ ] **T011** [US4] `enumerateUnhandledPositions(ir)`: positional, base-keyboard independent, sets `layerBound`, excludes frame keys (FR-040) · packages/engine/src/pattern-apply/unhandledPositions.ts
+- [x] **T011** [US4] `enumerateUnhandledPositions(ir)`: positional, base-keyboard independent, sets `layerBound`, excludes frame keys (FR-040) · packages/engine/src/pattern-apply/unhandledPositions.ts
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T012** [P] [US4] Unit tests: overlay keyboard, unused layer, Caps layer, deadkey rules, frame keys · packages/engine/src/pattern-apply/unhandledPositions.test.ts
-- [ ] **T013** [P] [US4] Export from the engine without importing the studio (FR-041) · packages/engine/src/index.ts
+- [x] **T012** [P] [US4] Unit tests: overlay keyboard, unused layer, Caps layer, deadkey rules, frame keys · packages/engine/src/pattern-apply/unhandledPositions.test.ts
+- [x] **T013** [P] [US4] Export from the engine without importing the studio (FR-041) · packages/engine/src/index.ts
 
 **Checkpoint**: one function answers "which positions are unhandled". The SC-005 equivalence test against spec 108's fill lands with that spec's fill (follow-up, owner Engine, trigger: spec 108 fill implementation).
 

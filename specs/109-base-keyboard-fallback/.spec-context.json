@@ -147,6 +147,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T19:13:31.616Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:21:23.327Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:21:23.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:21:24.068Z"
     }
   ],
   "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801",
@@ -321,7 +345,7 @@
       ]
     }
   },
-  "currentTask": "T010",
+  "currentTask": "T013",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -392,6 +416,27 @@
       "files": [
         "packages/studio/src/lib/referenceBaseLayouts.codegen.test.ts"
       ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "enumerateUnhandledPositions(ir)",
+      "files": [
+        "packages/engine/src/pattern-apply/unhandledPositions.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "unit tests (7)",
+      "files": [
+        "packages/engine/src/pattern-apply/unhandledPositions.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "engine index export",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
     }
   },
   "verified": [
@@ -402,6 +447,22 @@
       "warnings": [
         "those files hit the 10s hook timeout on a cold first import under load; not confirmed against a clean baseline"
       ]
+    },
+    {
+      "what": "unhandledPositions tests",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run src/pattern-apply/unhandledPositions.test.ts",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 2.6,
+      "result": "      Tests  7 passed (7) ·    Start at  13:21:26 ·    Duration  910ms (transform 457ms, setup 506ms, import 58ms, tests 6ms, environment 0ms)"
+    },
+    {
+      "what": "typecheck",
+      "command": "pnpm typecheck",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 24.6,
+      "result": "packages/engine typecheck: Done · packages/studio typecheck$ tsc --noEmit · packages/studio typecheck: Done"
     }
   ],
   "concerns": [
