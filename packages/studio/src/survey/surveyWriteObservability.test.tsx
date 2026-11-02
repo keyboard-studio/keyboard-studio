@@ -6,7 +6,7 @@
 // receive one:
 //   (a) the punctuation page's type-in box,
 //   (b) the punctuation-scope code-point field in the character-map pane,
-//   (c) the invisibles step's own toggle,
+//   (c) the invisibles gallery's own toggle (#2283: the pick surface),
 // and for each the outcome must be OBSERVABLE, one of:
 //   - confirmed: the character is in phaseCConfirmedInventory() (route c, and
 //     the hand-off routes too, since an accepted invisible is in the union);
@@ -26,6 +26,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { PunctuationStepHost } from "./punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "./invisibles/InvisiblesStepHost.tsx";
+import { InvisiblesGalleryPane } from "./characterMap/InvisiblesGalleryPane.tsx";
 import { CharacterMapPane } from "./CharacterMapPane.tsx";
 import {
   BIDI_CONTROL_CODE_POINTS,
@@ -67,7 +68,12 @@ function classify(cp: number): Outcome {
   const namesIt = (el: Element): boolean =>
     (el.textContent ?? "").includes(notation) || (el.textContent ?? "").includes(char);
   const handoffNote = Array.from(
-    document.querySelectorAll('[data-testid="punctuation-handoff-note"], [aria-live]'),
+    // The gallery's own toggle announcer names the character too — it is an
+    // aria-live confirmation of the pick, not a hand-off, so it is excluded
+    // (its testid is pinned in InvisiblesGalleryPane).
+    document.querySelectorAll(
+      '[data-testid="punctuation-handoff-note"], [aria-live]:not([data-testid="invisible-gallery-announcer"])',
+    ),
   ).some(namesIt);
   const statusNames = Array.from(
     document.querySelectorAll('[role="status"], [role="alert"]'),
@@ -110,13 +116,13 @@ describe("SC-004 / SC-009 — every offered invisible is observable through ever
       expect(getCharacterInventoryValue().controls).toEqual([]);
     });
 
-    it(`${notation} toggled on the invisibles step is confirmed into the phase-C inventory`, () => {
-      render(<InvisiblesStepHost onComplete={vi.fn()} />);
+    it(`${notation} toggled in the invisibles gallery is confirmed into the phase-C inventory`, () => {
+      render(<InvisiblesGalleryPane />);
       const hex = cp.toString(16).toLowerCase().padStart(4, "0");
-      if (screen.queryByTestId(`invisible-candidate-${hex}`) === null) {
-        fireEvent.click(screen.getByTestId("invisibles-bidi-expand"));
+      if (screen.queryByTestId(`invisible-gallery-cell-${hex}`) === null) {
+        fireEvent.click(screen.getByTestId("invisible-gallery-bidi-expand"));
       }
-      fireEvent.click(screen.getByTestId(`invisible-candidate-${hex}`));
+      fireEvent.click(screen.getByTestId(`invisible-gallery-cell-${hex}`));
       expect(classify(cp)).toBe("confirmed");
     });
   }
@@ -137,7 +143,7 @@ describe("SC-004 carry-over leg — a saved code-point invisible stays observabl
     render(<InvisiblesStepHost onComplete={vi.fn()} />);
     expect(classify(0x200c)).toBe("confirmed");
     expect(phaseCConfirmedInventory().filter((c) => c === "‌")).toHaveLength(1);
-    expect(screen.getAllByTestId("invisible-candidate-200c")).toHaveLength(1);
+    expect(screen.getAllByTestId("invisible-accepted-200c")).toHaveLength(1);
     expect(getCharacterInventoryValue().chars).toEqual(["a"]);
   });
 
@@ -149,7 +155,8 @@ describe("SC-004 carry-over leg — a saved code-point invisible stays observabl
     });
     render(<InvisiblesStepHost onComplete={vi.fn()} />);
     expect(classify(0x00ad)).toBe("confirmed");
-    expect(screen.getByTestId("invisible-candidate-00ad").getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByTestId("invisible-accepted-00ad")).toBeTruthy();
+    expect(screen.getByTestId("invisible-accepted-remove-00ad")).toBeTruthy();
     expect(phaseCConfirmedInventory()).toEqual(["!", "­"]);
   });
 });

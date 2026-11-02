@@ -310,8 +310,10 @@ export function InvisiblesGalleryPane() {
           onZoom={handleZoom}
         />
       </div>
-      {/* Screen-reader announcer for toggle actions — visually hidden. */}
-      <div aria-live="polite" style={visuallyHidden}>
+      {/* Screen-reader announcer for toggle actions — visually hidden.
+          Carries its own testid so the SC-004 observability harness can
+          tell it apart from a hand-off note (see surveyWriteObservability). */}
+      <div aria-live="polite" data-testid="invisible-gallery-announcer" style={visuallyHidden}>
         {announcement}
       </div>
 
