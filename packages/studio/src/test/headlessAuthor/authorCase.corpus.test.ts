@@ -266,13 +266,18 @@ describe.skipIf(!sc004GatesEnabled)("headless author: skips and failures name th
   }, RUN_TIMEOUT);
 });
 
-// The camazerty tolerance analysis fails (simulate: unknown virtual key T_0300), the
-// KNOWN_GAPS #2363 defect. Spec T039 says a proposal throw fails the case at that step; the
-// product never throws there: it publishes status "failed" and the series continues. This test
-// matches the product (a failed analysis is reported, the gap is owned) and does not demand a
-// hard failure. The owner rules on whether to hard-fail on analysis.status === "failed".
+// The camazerty tolerance analysis used to throw (simulate: unknown virtual
+// key T_0300), the KNOWN_GAPS #2363 defect. Spec T039 says a proposal throw
+// fails the case at that step; the product never throws there: it publishes
+// status "failed" and the series continues. #2363 fixed the throw: the
+// analysis now runs, skips the touch-only T_ rules with a not-analysed
+// reason, and reports the keyboard's genuine canonical-equivalence gaps.
+// This test matches the product post-fix: the station runs, the author takes
+// the station's pre-accepted proposal, and the remaining G2 failure is a
+// genuine gap owned by US6 (the story that normalises these by default), not
+// a crash. US6's landing should flip the G2 assertion below.
 describe.skipIf(!sc004GatesEnabled || (ONE !== undefined && ONE !== AZERTY_ID))(
-  "headless author: sil_cameroon_azerty tolerance analysis failure (T039)",
+  "headless author: sil_cameroon_azerty tolerance analysis (#2363 fixed)",
   () => {
     let c: Case;
     let run: AuthorRun;
@@ -282,23 +287,25 @@ describe.skipIf(!sc004GatesEnabled || (ONE !== undefined && ONE !== AZERTY_ID))(
       console.log(formatCaseLine(run));
     }, RUN_TIMEOUT);
 
-    it("reports the failed analysis as a skipped marks.context_tolerance step, never a substituted default", () => {
+    it("runs the tolerance station instead of skipping it: the author takes the pre-accepted proposal", () => {
       const skipped = run.report.skippedSteps.find((s) => s.step === "marks.context_tolerance");
-      expect(skipped, `skippedSteps: ${JSON.stringify(run.report.skippedSteps)}`).toBeDefined();
-      expect(skipped?.reason).toMatch(/^analysis-failed:/);
-      expect(
-        run.report.steps.some((s) => s.decisionId === "marks.context_tolerance"),
-        "no tolerance decision is invented for a failed analysis",
-      ).toBe(false);
+      expect(skipped, `skippedSteps: ${JSON.stringify(run.report.skippedSteps)}`).toBeUndefined();
+      const steps = run.report.steps.filter((s) => s.decisionId === "marks.context_tolerance");
+      expect(steps.length).toBe(1);
+      expect(steps[0]!.rule).toBe("top-suggestion");
+      expect(steps[0]!.proposalSource).toBe("toleranceProposalFor");
     });
 
     it("does not fail the case at the tolerance step", () => {
       expect(run.failure?.kind === "proposal-threw" && run.failure.step.includes("tolerance")).toBe(false);
     });
 
-    it("owns the resulting gate failure as a known gap", () => {
-      expect(ownerOf(c.base, POINT, "G2"), "KNOWN_GAPS owns G2 on camazerty").toBe("#2363");
+    it("owns the remaining G2 failure as a known gap (US6), reported once", () => {
+      expect(ownerOf(c.base, POINT, "G2"), "KNOWN_GAPS owns G2 on camazerty").toBe("US6");
       if (run.outcome !== "completed") return;
+      // Measured: the accepted proposal does not clear the 17 genuine gaps
+      // on the walked keyboard, so G2 still fails -- owned, not silent.
+      expect(run.gates.find((g) => g.gate === "G2")?.pass).toBe(false);
       for (const g of run.gates.filter((x) => x.applicable && !x.pass)) {
         expect(ownerOf(c.base, POINT, g.gate), `${g.gate} failed and no KNOWN_GAPS row owns it`).toBeDefined();
         expect(run.report.knownGaps).toContainEqual({ gate: g.gate, owner: ownerOf(c.base, POINT, g.gate) });

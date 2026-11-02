@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "../codec/parse.js";
-import { computeContextTolerance } from "./context-tolerance.js";
+import {
+  computeContextTolerance,
+  resolveKeyPart,
+  resolveKeyPartCandidates,
+} from "./context-tolerance.js";
 
 const HEADER = [
   "store(&NAME) 'ContextTolerance'",
@@ -168,6 +172,84 @@ describe("computeContextTolerance (spec 062, US2)", () => {
     const report = await computeContextTolerance(ir);
 
     expect(report.findings.length + report.notAnalysedCount).toBe(totalRuleCount);
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// Touch-only T_ keys (#2363): the desktop simulator's buildKeyEvent throws
+// `simulate: unknown virtual key "T_0300"` on anything that is not a physical
+// key code, so resolveKeyPart must refuse a T_-keyed rule with a not-analysed
+// reason instead of handing simulate() an unpressable key. The candidates
+// variant must agree, or the diagnosis and the fix generator would disagree
+// about what "this rule's key" means.
+// ---------------------------------------------------------------------------
+
+describe("resolveKeyPart — touch-only T_ keys (#2363)", () => {
+  it("refuses a touch-only T_ key with a not-analysed reason, never a simulatable key", () => {
+    const res = resolveKeyPart([{ kind: "vkey", name: "T_0300", modifiers: [] }], new Map());
+    expect("reason" in res).toBe(true);
+    if ("reason" in res) {
+      expect(res.reason).toBe(
+        "touch-only key T_0300 cannot be pressed by the desktop simulator; not analysed",
+      );
+    }
+  });
+
+  it("refuses a shifted touch-only key too (unpressable dominates unrepresentable modifiers)", () => {
+    const res = resolveKeyPart([{ kind: "vkey", name: "T_030D", modifiers: ["SHIFT"] }], new Map());
+    expect("reason" in res).toBe(true);
+    if ("reason" in res) expect(res.reason).toMatch(/touch-only key T_030D/);
+  });
+
+  it("still resolves physical K_ keys and U_ character keys", () => {
+    const k = resolveKeyPart([{ kind: "vkey", name: "K_A", modifiers: [] }], new Map());
+    expect("key" in k).toBe(true);
+    if ("key" in k) expect(k.key).toEqual({ vkey: "K_A", modifiers: [] });
+
+    const u = resolveKeyPart([{ kind: "vkey", name: "U_0041", modifiers: [] }], new Map());
+    expect("key" in u).toBe(true);
+    if ("key" in u) expect(u.key).toEqual({ vkey: "U_0041", modifiers: [] });
+  });
+
+  it("resolveKeyPartCandidates forwards the touch-only refusal so the generator agrees with the diagnosis", () => {
+    const res = resolveKeyPartCandidates([{ kind: "vkey", name: "T_0300", modifiers: [] }], new Map());
+    expect("reason" in res).toBe(true);
+    if ("reason" in res) expect(res.reason).toMatch(/touch-only key T_0300/);
+  });
+});
+
+describe("computeContextTolerance — rule keyed to a touch-only T_ key (#2363)", () => {
+  it("skips the T_-keyed rule with a not-analysed reason and analyses the rest of the keyboard normally", async () => {
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "store(acute) U+00E2",
+      "store(key.act) ']'",
+      "store(diablock) 'è' 'é' 'ç' 'à' 'ù'",
+      "",
+      "any(base) + any(key.act) > index(acute,1)",
+      "any(diablock) + [T_0300] > context",
+      "+ ']' > U+00B4",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "touch_key_fixture");
+
+    // Before the fix this threw `simulate: unknown virtual key "T_0300"`.
+    const report = await computeContextTolerance(ir);
+
+    const touchFinding = report.findings.find((f) => f.notAnalysedReason?.includes("T_0300"));
+    expect(touchFinding).toBeDefined();
+    expect(touchFinding?.status).toBe("not-analysed");
+    expect(touchFinding?.failingKeystrokes).toBeUndefined();
+
+    // The rest of the keyboard is analysed normally: the gap rule from the
+    // first fixture is still diagnosed via the both-forms comparison.
+    const gapFinding = report.findings.find((f) => f.failingKeystrokes !== undefined);
+    expect(gapFinding).toBeDefined();
+    expect(gapFinding?.failingKeystrokes).toEqual([{ vkey: "K_RBRKT", modifiers: [] }]);
+    expect(gapFinding?.precomposedOutput).toBe("â");
   }, 30_000);
 });
 
