@@ -4,8 +4,8 @@
 //
 // What matters here: every cell carries its name, notation and need
 // statement (a bare cell says nothing for a glyph-less character);
-// toggling a cell writes the same `invisibleDecisions` the in-step rows
-// toggle, in both directions; the Direction controls section is expanded
+// toggling a cell writes the same `invisibleDecisions` the step's accepted
+// list reads (remove = decline), in both directions; the Direction controls section is expanded
 // for RTL authors and collapsed-but-reachable for everyone else; a
 // format character handed off from the punctuation scope (FR-021)
 // appears pre-selected.
