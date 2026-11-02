@@ -560,11 +560,59 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T02:53:00.075Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T03:43:12.178Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T03:43:12.471Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T03:43:12.760Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T03:43:13.053Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T03:43:13.352Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T03:43:13.664Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T064",
+  "currentTask": "T070",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1087,6 +1135,54 @@
       "did": "Story 2 scenarios and recompute tests for useLdmlFindings",
       "files": [
         "packages/studio/src/hooks/useLdmlFindings.scenarios.test.tsx"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Studio metadata builder and package-file collector, wired into the LDML download and findings hook",
+      "files": [
+        "packages/studio/src/lib/ldmlExportMetadata.ts",
+        "packages/studio/src/lib/ldmlExportMetadata.test.ts",
+        "packages/studio/src/lib/buildOutputBundle.ts",
+        "packages/studio/src/hooks/useLdmlFindings.ts"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "info layout/indicator/attribution and locales already lowered in document.ts; covered by metadata tests",
+      "files": [
+        "packages/engine/src/ldml-export/lower/document.ts",
+        "packages/engine/src/ldml-export/metadata.test.ts"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Completed FR-042 header comment (description, copyright, licence, author, attribution, home page, studio version, profile)",
+      "files": [
+        "packages/engine/src/ldml-export/lower/document.ts"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "kps Info/Options/Files for docs, icon, fonts; project/docs.ts places package files; package.ts wired",
+      "files": [
+        "packages/engine/src/ldml-export/project/kps.ts",
+        "packages/engine/src/ldml-export/project/docs.ts",
+        "packages/engine/src/ldml-export/package.ts"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Story 3 metadata, header comment and package-file tests",
+      "files": [
+        "packages/engine/src/ldml-export/metadata.test.ts"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Corpus test: compile xml to kmx+kvk and build kmp with matching info",
+      "files": [
+        "packages/engine/src/ldml-export/project.corpus.test.ts"
       ]
     }
   }

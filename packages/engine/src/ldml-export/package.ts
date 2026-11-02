@@ -11,6 +11,7 @@ import { isMnemonicLayout } from "./classify/header.js";
 import { lowerDocument, minimalLocale, normaliseVersion } from "./lower/document.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
 import { renderKpj } from "./project/kpj.js";
+import { placePackageDocs, placeRootTexts } from "./project/docs.js";
 import { renderKps } from "./project/kps.js";
 import { renderReport } from "./report.js";
 import type { LdmlExportInput, LdmlExportResult } from "./types.js";
@@ -47,11 +48,17 @@ export async function buildLdmlExport(input: LdmlExportInput): Promise<LdmlExpor
 
   const files = new Map<string, string | Uint8Array>();
   files.set(`${id}.kpj`, renderKpj());
-  files.set(`source/${id}.xml`, xml);
-  files.set(
+  // Entry order: the project file, then `source/` by path (the document, the descriptor and the
+  // carried files), then the root texts, then the report.
+  const sourceFiles = new Map<string, string | Uint8Array>();
+  const members = placePackageDocs(sourceFiles, input.packageFiles);
+  sourceFiles.set(`source/${id}.xml`, xml);
+  sourceFiles.set(
     `source/${id}.kps`,
-    renderKps({ id, version, metadata: meta, languages: meta.languages.map(minimalLocale) }),
+    renderKps({ id, version, metadata: meta, languages: meta.languages.map(minimalLocale), members }),
   );
+  for (const path of [...sourceFiles.keys()].sort()) files.set(path, sourceFiles.get(path) as string | Uint8Array);
+  placeRootTexts(files, input.packageFiles);
   files.set("LDML-EXPORT-REPORT.md", report);
 
   const vfs = createVirtualFS();

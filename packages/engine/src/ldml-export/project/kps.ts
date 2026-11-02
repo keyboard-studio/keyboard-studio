@@ -1,9 +1,10 @@
-// Minimal Keyman package file for the LDML export (spec 108 FR-040; task T036).
-// Name, version and copyright `<Info>`, `<Keyboards>` with the languages, and `<Files>`
-// listing the compiled `.kmx` and `.kvk`. The full metadata, documents, icon and fonts
-// are added with the package files (user story 3).
+// Keyman package file for the LDML export (spec 108 FR-040; tasks T036, T068).
+// `<Info>` carries the name, copyright, author, description and web site from the same
+// metadata the KMN package reads; `<Keyboards>` lists the languages; `<Files>` lists the
+// compiled `.kmx` and `.kvk`, then the readme, welcome, licence, icon and fonts.
 
 import type { LdmlExportMetadata } from "../types.js";
+import type { PackageMembers } from "./docs.js";
 
 function esc(s: string): string {
   return s
@@ -11,6 +12,11 @@ function esc(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** An `<Info>` child, left out when the value is empty (an empty copyright claims no holder). */
+function info(tag: string, text: string, url = ""): string {
+  return text === "" ? "" : `    <${tag} URL="${esc(url)}">${esc(text)}</${tag}>\n`;
 }
 
 function file(name: string, type: string): string {
@@ -30,10 +36,24 @@ export interface KpsInput {
   metadata: LdmlExportMetadata;
   /** Minimal language tags. */
   languages: readonly string[];
+  /** The documents, icon and fonts the project carries; absent means none. */
+  members?: PackageMembers;
 }
 
 export function renderKps(i: KpsInput): string {
   const m = i.metadata;
+  const mem = i.members;
+  const options = [
+    mem?.readme ? "    <ReadMeFile>readme.htm</ReadMeFile>\n" : "",
+    mem?.license ? "    <LicenseFile>..\\LICENSE.md</LicenseFile>\n" : "",
+    mem?.welcome ? "    <WelcomeFile>welcome.htm</WelcomeFile>\n" : "",
+  ].join("");
+  const extra: string[] = [];
+  if (mem?.readme) extra.push(file("readme.htm", ".htm"));
+  if (mem?.welcome) extra.push(file("welcome.htm", ".htm"));
+  if (mem?.license) extra.push(file("..\\LICENSE.md", ".md"));
+  if (mem?.icon != null) extra.push(file(mem.icon, mem.icon.slice(mem.icon.lastIndexOf(".")).toLowerCase()));
+  for (const f of mem?.fonts ?? []) extra.push(file(f, f.slice(f.lastIndexOf(".")).toLowerCase()));
   const langs = i.languages.map((l) => `        <Language ID="${esc(l)}">${esc(l)}</Language>`).join("\n");
   return `<?xml version="1.0" encoding="utf-8"?>
 <Package>
@@ -45,7 +65,7 @@ export function renderKps(i: KpsInput): string {
     <ExecuteProgram></ExecuteProgram>
     <MSIFileName></MSIFileName>
     <MSIOptions></MSIOptions>
-    <FollowKeyboardVersion/>
+${options}    <FollowKeyboardVersion/>
   </Options>
   <StartMenu>
     <Folder></Folder>
@@ -53,13 +73,11 @@ export function renderKps(i: KpsInput): string {
   </StartMenu>
   <Info>
     <Name URL="">${esc(m.name)}</Name>
-    <Copyright URL="">${esc(m.copyright)}</Copyright>
-    <Author URL="${esc(m.authorEmail ? `mailto:${m.authorEmail}` : "")}">${esc(m.author)}</Author>
-    <Version URL="">${esc(i.version)}</Version>
+${info("Copyright", m.copyright)}${info("Author", m.author, m.authorEmail ? `mailto:${m.authorEmail}` : "")}${info("Description", m.description)}${info("WebSite", m.homePage, m.homePage)}    <Version URL="">${esc(i.version)}</Version>
   </Info>
   <Files>
 ${file(`..\\build\\${i.id}.kmx`, ".kmx")}
-${file(`..\\build\\${i.id}.kvk`, ".kvk")}
+${file(`..\\build\\${i.id}.kvk`, ".kvk")}${extra.map((e) => `\n${e}`).join("")}
   </Files>
   <Keyboards>
     <Keyboard>

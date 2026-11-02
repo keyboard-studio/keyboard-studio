@@ -459,18 +459,18 @@ complete Keyman LDML project that builds.
 `version` and locales match, and building the extracted project produces a `.kmx`, a `.kvk` and a
 `.kmp` with matching package info.
 
-- [ ] T065 [P] [US3] Implement `ST/lib/ldmlExportMetadata.ts`: `buildLdmlExportMetadata(state) → LdmlExportMetadata` and `collectLdmlPackageFiles(projectedVfs, keyboardId) → LdmlPackageFiles`. Take every field from the same sources the KMN `.kps` writer reads (the [data-model.md](data-model.md) table: identity, `attribution`, `effectiveHolder`, `helpDocs`, `resolvePublishVersion`, `resolveInheritedHolders`). Take the files from the projected VFS: readme, welcome, LICENSE, README, HISTORY, and the icon and fonts the KMN `.kps` lists. Wire both into `buildLdmlExportForDownload` (T045). Test it in `ST/lib/ldmlExportMetadata.test.ts`.
-- [ ] T066 [US3] In `LX/lower/document.ts`, fill `<info author layout indicator>`:
+- [x] T065 [P] [US3] Implement `ST/lib/ldmlExportMetadata.ts`: `buildLdmlExportMetadata(state) → LdmlExportMetadata` and `collectLdmlPackageFiles(projectedVfs, keyboardId) → LdmlPackageFiles`. Take every field from the same sources the KMN `.kps` writer reads (the [data-model.md](data-model.md) table: identity, `attribution`, `effectiveHolder`, `helpDocs`, `resolvePublishVersion`, `resolveInheritedHolders`). Take the files from the projected VFS: readme, welcome, LICENSE, README, HISTORY, and the icon and fonts the KMN `.kps` lists. Wire both into `buildLdmlExportForDownload` (T045). Test it in `ST/lib/ldmlExportMetadata.test.ts`.
+- [x] T066 [US3] In `LX/lower/document.ts`, fill `<info author layout indicator>`:
   - `layout` = `baseLayout.family`;
   - `attribution` only when the profile's `writeAttribution` is set (row 4.10; FR-041);
   - `<locales>` holds the remaining language tags, all minimal.
-- [ ] T067 [US3] In `LX/xml/writeKeyboard3.ts` (via the document `comment`), complete the FR-042 header documentation comment that T034 started, exactly as in [contracts/export-package.md](contracts/export-package.md): name, id, original version, description, copyright, licence, author, attribution, home page, studio version, profile and TR35 revision, the base keyboard resolved against, and the report pointer. There is no timestamp.
-- [ ] T068 [US3] Complete `LX/project/kps.ts` (`<Info>`: name, copyright, author, description, website; `<Keyboards>` with languages; `<Files>`: build outputs, readme, welcome, icon, fonts). Implement `LX/project/docs.ts`, which places `source/readme.htm`, `source/welcome.htm`, `LICENSE.md`, `README.md`, `HISTORY.md`, the icon and the fonts at the paths in [contracts/export-package.md](contracts/export-package.md) (FR-040).
-- [ ] T069 [US3] Write `LX/metadata.test.ts`:
+- [x] T067 [US3] In `LX/xml/writeKeyboard3.ts` (via the document `comment`), complete the FR-042 header documentation comment that T034 started, exactly as in [contracts/export-package.md](contracts/export-package.md): name, id, original version, description, copyright, licence, author, attribution, home page, studio version, profile and TR35 revision, the base keyboard resolved against, and the report pointer. There is no timestamp.
+- [x] T068 [US3] Complete `LX/project/kps.ts` (`<Info>`: name, copyright, author, description, website; `<Keyboards>` with languages; `<Files>`: build outputs, readme, welcome, icon, fonts). Implement `LX/project/docs.ts`, which places `source/readme.htm`, `source/welcome.htm`, `LICENSE.md`, `README.md`, `HISTORY.md`, the icon and the fonts at the paths in [contracts/export-package.md](contracts/export-package.md) (FR-040).
+- [x] T069 [US3] Write `LX/metadata.test.ts`:
   - Story 3 scenario 1: name, author, version `1.2` → `1.2.0`, `locale="ibn"`, `<locales>` holding `en`;
   - scenario 2: the header comment and the package files carry the description, copyright and licence;
   - under profile 49, `info/@attribution` is present.
-- [ ] T070 [US3] Write `LX/project.corpus.test.ts` (Story 3 scenario 3): for each corpus export, compile `source/<kmnid>_ldml.xml` with `keymanCompile(xml, { build: true })` (`.kmx` + `.kvk` produced), then package `source/<kmnid>_ldml.kps` with the engine's existing `KmpCompiler` load path (`packages/engine/src/output/kmp.ts`). Expect zero errors, and package info equal to the metadata.
+- [x] T070 [US3] Write `LX/project.corpus.test.ts` (Story 3 scenario 3): for each corpus export, compile `source/<kmnid>_ldml.xml` with `keymanCompile(xml, { build: true })` (`.kmx` + `.kvk` produced), then package `source/<kmnid>_ldml.kps` with the engine's existing `KmpCompiler` load path (`packages/engine/src/output/kmp.ts`). Expect zero errors, and package info equal to the metadata.
 
 **Checkpoint**: Story 3 is green. Commit `spec 108 T065-T070`.
 

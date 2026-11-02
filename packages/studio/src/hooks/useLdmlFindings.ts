@@ -21,6 +21,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { usePickedWindowsLayouts, useLayoutFamilyAnswer } from "../lib/layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "../lib/ldmlBaseLayout.ts";
 import { ldmlClassifyOptions } from "../lib/ldmlExportInputs.ts";
+import { ldmlAttributionText, ldmlMetadataLanguages } from "../lib/ldmlExportMetadata.ts";
 import { parseTouchLayoutOrNull } from "../lib/docContent.ts";
 import { buildLdmlFindings } from "../lint/ldmlFindings.ts";
 
@@ -36,6 +37,11 @@ export function useLdmlFindings(): LintFinding[] {
   const ldmlProfile = useWorkingCopyStore((s) => s.ldmlProfile);
   const ldmlBaseLayout = useWorkingCopyStore((s) => s.ldmlBaseLayout);
   const bcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
+  const identity = useWorkingCopyStore((s) => s.identity);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
+  const startHolderOverride = useWorkingCopyStore((s) => s.startHolderOverride);
   const picks = usePickedWindowsLayouts();
   const layoutFamily = useLayoutFamilyAnswer();
 
@@ -71,9 +77,12 @@ export function useLdmlFindings(): LintFinding[] {
         baseLayout: base.chosen,
       },
       resolveLdmlProfile(profileId),
-      ldmlClassifyOptions({ languages, attributionText: "" }),
+      ldmlClassifyOptions({
+        languages: ldmlMetadataLanguages({ identity, startKeyboard }),
+        attributionText: ldmlAttributionText({ instantiationMode, startLicenseText, startHolderOverride }),
+      }),
     );
     const findings = buildLdmlFindings(classification, i18n, projection.keyboardId);
     return findings.length === 0 ? EMPTY : findings;
-  }, [projection, ldmlProfile, ldmlBaseLayout, bcp47, picks, layoutFamily, i18n]);
+  }, [projection, ldmlProfile, ldmlBaseLayout, bcp47, identity, startKeyboard, instantiationMode, startLicenseText, startHolderOverride, picks, layoutFamily, i18n]);
 }

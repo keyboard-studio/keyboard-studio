@@ -32,6 +32,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getLayoutFamilyAnswer, getPickedWindowsLayouts } from "./layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "./ldmlBaseLayout.ts";
 import { LDML_STUDIO_VERSION } from "./ldmlExportInputs.ts";
+import { buildLdmlExportMetadata, collectLdmlPackageFiles } from "./ldmlExportMetadata.ts";
 import { readVfsText } from "./vfsText.ts";
 
 /** The compiled artifacts, keyed the way `buildKmp` expects them. */
@@ -259,7 +260,10 @@ export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Prom
 
   const state = useWorkingCopyStore.getState();
   const bcp47 = state.identity?.bcp47;
+  // The base keyboard resolves against the author's own tag only; the export's declared
+  // languages (metadata) may also fall back to the copied keyboard's.
   const languages = bcp47 !== undefined && bcp47 !== "" ? [bcp47] : [];
+  const metadata = buildLdmlExportMetadata(state, { keyboardId, displayName, version, vfs });
 
   const base = resolveLdmlBaseLayout({
     windowsLayoutPicks: getPickedWindowsLayouts(),
@@ -281,29 +285,8 @@ export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Prom
     baseLayout: base.chosen,
     profileId,
     keyboardId,
-    metadata: {
-      projectId: `${keyboardId}_ldml`,
-      name: displayName,
-      version,
-      languages,
-      author: "",
-      authorEmail: "",
-      copyright: "",
-      licenceName: "",
-      description: "",
-      homePage: "",
-      attributionText: "",
-      indicator: null,
-    },
-    packageFiles: {
-      readmeHtm: "",
-      welcomeHtm: "",
-      licenseMd: "",
-      readmeMd: "",
-      historyMd: "",
-      icon: null,
-      fonts: [],
-    },
+    metadata,
+    packageFiles: collectLdmlPackageFiles(vfs, keyboardId),
     studioVersion: LDML_STUDIO_VERSION,
   });
 

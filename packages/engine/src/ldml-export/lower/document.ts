@@ -281,6 +281,18 @@ export function lowerDocument(
   return { doc, grid, provenance, markers: markerNames };
 }
 
+const oneLine = (t: string): string => t.replace(/\s+/g, " ").trim().normalize("NFC");
+
+/** `Label: value` pieces joined by three spaces; absent values are left out, and so is an empty line. */
+function labelled(pairs: ReadonlyArray<readonly [string, string]>): string | null {
+  const parts = pairs.filter(([, v]) => oneLine(v) !== "").map(([k, v]) => `${k}: ${oneLine(v)}`);
+  return parts.length === 0 ? null : parts.join("   ");
+}
+
+/**
+ * The FR-042 documentation comment (contracts/export-package.md). Every value comes from the
+ * metadata or the input; there is no timestamp, so the same input always gives the same text.
+ */
 function headerComment(
   input: LdmlExportInput,
   profile: TargetProfile,
@@ -288,12 +300,18 @@ function headerComment(
   unplaced: readonly string[],
 ): string {
   const m = input.metadata;
-  const lines = [
-    `${(m.name || input.ir.header.name).normalize("NFC")} (${input.keyboardId}) version ${m.version || input.ir.header.version}`,
+  const name = oneLine(m.name || input.ir.header.name);
+  const lines: string[] = [`${name} (${input.keyboardId}) version ${oneLine(m.version || input.ir.header.version)}`];
+  if (oneLine(m.description) !== "") lines.push(oneLine(m.description));
+  const rights = labelled([["Copyright", m.copyright], ["Licence", m.licenceName]]);
+  if (rights !== null) lines.push(rights);
+  const who = labelled([["Author", m.author], ["Attribution", m.attributionText], ["Home page", m.homePage]]);
+  if (who !== null) lines.push(who);
+  lines.push(
     `Exported by Keyboard Studio ${input.studioVersion} under LDML profile ${profile.id} (TR35 ${profile.tr35Revision}).`,
     `Base keyboard resolved against: ${input.baseLayout.label} (${input.baseLayout.id}), chosen by: ${input.baseLayout.source}.`,
     "What did not carry over: LDML-EXPORT-REPORT.md",
-  ];
+  );
   void detail;
   for (const u of unplaced) lines.push(u);
   return lines.join("\n");
