@@ -491,11 +491,17 @@ function patchTouchLayout(
  * (modifier_as_layer_switch) assignment when the base keyboard has no
  * existing layer for that shift state.
  *
- * Inserts before `</encoding>` (or before `</visualkeyboard>` as fallback).
+ * Inserts before `</encoding>` when the kvks has one; when it doesn't (e.g.
+ * vietnamese_telex_legacy), a minimal `<encoding name="unicode">` wrapper is
+ * created first, because the kvks schema only allows `<layer>` inside
+ * `<encoding>` (#2403).
  * When `needsUseAltGr` is set (the combo contains RALT), also adds
  * `<usealtgr/>` to the header flags block if not already present, so KMW
- * exposes the AltGr layer in the desktop OSK. Combos without RALT (e.g. a
- * plain CTRL or ALT layer switch) have no equivalent KMW flag, so none is added.
+ * exposes the AltGr layer in the desktop OSK. A self-closing `<flags/>`
+ * (197 corpus files, e.g. adiga_danef) is expanded into an open block
+ * carrying the flag — the plain insert would otherwise strand `<usealtgr/>`
+ * as a child of `<header>`, which the kvks schema rejects (#2403).
+ * Combos without RALT (e.g. a plain CTRL or ALT layer switch) have no equivalent KMW flag, so none is added.
  */
 function synthesizeKvksLayer(
   xml: string,
@@ -506,23 +512,38 @@ function synthesizeKvksLayer(
 ): string {
   const newLayer = `\n<layer shift="${kvksLayer}">\n<key vkey="${vkey}">${escapedChar}</key>\n</layer>`;
 
-  // Insert before </encoding> if present, else before </visualkeyboard>.
+  // Insert before </encoding> if present; otherwise synthesize the <encoding>
+  // wrapper the kvks schema requires around <layer> (#2403).
   let patched = xml.replace(/(<\/encoding>)/i, `${newLayer}\n$1`);
   if (patched === xml) {
-    patched = xml.replace(/(<\/visualkeyboard>)/i, `${newLayer}\n$1`);
+    patched = xml.replace(
+      /(<\/visualkeyboard>)/i,
+      `<encoding name="unicode">${newLayer}\n</encoding>\n$1`,
+    );
   }
 
   if (!needsUseAltGr) return patched;
 
   // Ensure <usealtgr/> is present in the header flags so KMW shows the AltGr view.
   if (!/<usealtgr\s*\/?>/i.test(patched)) {
-    // Prefer inserting inside an existing <flags> block.
-    const flagsInserted = patched.replace(/(<flags\b[^>]*>)/i, "$1\n<usealtgr/>");
-    if (flagsInserted !== patched) {
-      patched = flagsInserted;
+    // A self-closing <flags/> matches the open-tag insert below as a whole,
+    // so <usealtgr/> would land OUTSIDE the flags element as a child of
+    // <header> — expand the self-closing tag into a block carrying the flag (#2403).
+    const expandedFlags = patched.replace(
+      /<flags\s*\/>/i,
+      "<flags>\n<usealtgr/>\n</flags>",
+    );
+    if (expandedFlags !== patched) {
+      patched = expandedFlags;
     } else {
-      // No <flags> block — insert a minimal one inside <header> (or as a sibling before </header>).
-      patched = patched.replace(/(<\/header>)/i, "<flags>\n<usealtgr/>\n</flags>\n$1");
+      // Prefer inserting inside an existing <flags> block.
+      const flagsInserted = patched.replace(/(<flags\b[^>]*>)/i, "$1\n<usealtgr/>");
+      if (flagsInserted !== patched) {
+        patched = flagsInserted;
+      } else {
+        // No <flags> block — insert a minimal one inside <header> (or as a sibling before </header>).
+        patched = patched.replace(/(<\/header>)/i, "<flags>\n<usealtgr/>\n</flags>\n$1");
+      }
     }
   }
 
