@@ -1,4 +1,5 @@
-// InvisiblesStep — the "Invisible characters" page (spec 075 US3).
+// InvisiblesStep — the "Invisible characters" page (spec 075 US3, as
+// amended by issue #2283).
 //
 // One always-rendering spine EditorStep between "punctuation" and
 // "convenience". Format characters (Unicode General Category Cf) — the
@@ -6,16 +7,25 @@
 // the word joiner and the bidi controls — have no glyph, so no character map
 // can show them and no exemplar tier attests them; until this step existed
 // the only way to reach one was a code-point entry that filed it into an
-// unrendered `controls` bucket. Here each is offered BY NAME, with its
+// unrendered `controls` bucket. Each is offered BY NAME, with its
 // `U+XXXX` notation and a one-line "you need this if…" statement, and the
 // author's yes/no per character is a recorded decision (FR-013, FR-015,
 // FR-018).
 //
+// #2283: this pane is the author's BUILD LIST, not a second picker. The
+// right-pane gallery (InvisiblesGalleryPane) is the single place to browse
+// and pick; this pane shows ONLY the accepted invisibles — name, U+XXXX and
+// a remove control (remove = `declineInvisible`) — the same shape as the
+// alphabet and punctuation steps. When nothing is accepted the pane shows
+// the "most keyboards need none" guidance plus a pointer to the gallery.
+// The bidi group's expanded-for-RTL / collapsed-never-hidden-for-LTR rule
+// lives in the gallery (it mirrors this step's old group); nothing in this
+// pane depends on the writing direction.
+//
 // Always renders (FR-020): there is no computed gate and no `null` return. A
-// language with nothing to offer still sees the list with nothing selected
-// and a note saying most keyboards need none. The bidi group is EXPANDED for
-// a right-to-left author and COLLAPSED — never hidden — for everyone else, so
-// an LTR author who genuinely needs a direction mark can still find it.
+// language with nothing accepted still sees the pane with the guidance note
+// — the FR-020 "list" is the selected list, empty-with-guidance when nothing
+// is selected.
 //
 // Decisions live in the invisibles-inventory decision record's sticky
 // decisions (keyed `U+XXXX`), NOT in `chars`: an accepted character reaches the phase-C
@@ -43,20 +53,14 @@
 // `carriedOver` guarantees a decided candidate is never dropped, so there is
 // only "proposed"/"current", never a stale confirmation to surface).
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useInventoryDraft } from "../useInventoryDraft.ts";
 import type { InventoryDecisionValue } from "../phaseBDraftOps.ts";
-import {
-  directionAnswersFromDecisions,
-  writingDirectionFrom,
-} from "./invisibleDirection.ts";
 export {
   directionAnswersFromDecisions,
   writingDirectionFrom,
@@ -77,72 +81,43 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
+  ERROR_RED,
   phaseHeadingFlush,
   mutedParaFlush,
   sectionHeading,
-  secondaryButton,
 } from "../surveyStyles.ts";
 
 // ---------------------------------------------------------------------------
-// CandidateRow — one named invisible character with a yes/no toggle
+// AcceptedRow — one accepted invisible character with a remove control
 // ---------------------------------------------------------------------------
 
-interface CandidateRowProps {
+interface AcceptedRowProps {
   candidate: InvisibleCharacterCandidate;
-  checked: boolean;
-  onToggle: (candidate: InvisibleCharacterCandidate) => void;
+  onRemove: (candidate: InvisibleCharacterCandidate) => void;
 }
 
-function CandidateRow({ candidate, checked, onToggle }: CandidateRowProps) {
-  const { i18n } = useLingui();
+function AcceptedRow({ candidate, onRemove }: AcceptedRowProps) {
+  const { t, i18n } = useLingui();
   const hex = candidate.codePoint.toString(16).toLowerCase().padStart(4, "0");
-  const labelId = `invisible-label-${hex}`;
-  const needId = `invisible-need-${hex}`;
+  const labelId = `invisible-accepted-label-${hex}`;
+  const needId = `invisible-accepted-need-${hex}`;
   return (
-    <li style={{ listStyle: "none", margin: 0 }}>
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={checked}
-        aria-labelledby={labelId}
-        aria-describedby={needId}
-        data-testid={`invisible-candidate-${hex}`}
-        onClick={() => onToggle(candidate)}
-        className="ks-focus-ring"
+    <li style={{ listStyle: "none", margin: 0 }} data-testid={`invisible-accepted-${hex}`}>
+      <div
         style={{
           display: "grid",
-          gridTemplateColumns: "20px 1fr",
+          gridTemplateColumns: "1fr auto",
           gap: 12,
-          width: "100%",
-          textAlign: "left",
+          alignItems: "center",
           padding: "10px 12px",
           background: BG_PAGE,
-          border: `1px solid ${checked ? ACCENT : BORDER}`,
+          border: `1px solid ${BORDER}`,
           borderRadius: 6,
           color: TEXT_MAIN,
           fontFamily: FONT,
-          cursor: "pointer",
         }}
       >
-        <span
-          aria-hidden="true"
-          style={{
-            display: "inline-block",
-            width: 16,
-            height: 16,
-            marginTop: 2,
-            border: `1px solid ${checked ? ACCENT : TEXT_DIM}`,
-            borderRadius: 3,
-            background: checked ? ACCENT : "transparent",
-            color: BG_PAGE,
-            fontSize: 12,
-            lineHeight: "16px",
-            textAlign: "center",
-          }}
-        >
-          {checked ? "x" : ""}
-        </span>
-        <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
           <span id={labelId} style={{ fontSize: 14, fontWeight: 600 }}>
             {candidate.label}{" "}
             <span style={{ fontFamily: "monospace", fontWeight: 400, color: TEXT_DIM }}>
@@ -153,7 +128,35 @@ function CandidateRow({ candidate, checked, onToggle }: CandidateRowProps) {
             {i18n._(needStatementFor(candidate.codePoint))}
           </span>
         </span>
-      </button>
+        <button
+          type="button"
+          data-testid={`invisible-accepted-remove-${hex}`}
+          onClick={() => onRemove(candidate)}
+          aria-label={t({
+            id: "survey.invisibles.removeAriaLabel",
+            message: `Remove ${{ name: candidate.label }} (${{ cp: candidate.notation }})`,
+          })}
+          aria-describedby={needId}
+          className="ks-focus-ring"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 28,
+            height: 28,
+            padding: 0,
+            background: "transparent",
+            border: `1px solid ${ERROR_RED}`,
+            borderRadius: 6,
+            color: ERROR_RED,
+            fontSize: 16,
+            lineHeight: 1,
+            cursor: "pointer",
+          }}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
     </li>
   );
 }
@@ -167,24 +170,13 @@ const INVISIBLES_STEP_ID = "invisibles";
 const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue>> = () => {
   const { onComplete, onBack } = useGalleryStepContext();
   const { t } = useLingui();
-  const decisions = useDecisionStore((s) => s.decisions);
-  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
-  const directionAnswers = useMemo(
-    () => directionAnswersFromDecisions(decisions),
-    [decisions],
-  );
-  const direction = useMemo(
-    () => writingDirectionFrom(directionAnswers, surveyContext),
-    [directionAnswers, surveyContext],
-  );
 
   // The shared Phase B/C draft, as decision values (spec 090 T022): the
-  // toggles are the bound ops, recorded through the gallery host under
-  // this step's attribution.
+  // remove controls are the bound ops, recorded through the gallery host
+  // under this step's attribution.
   const draft = useInventoryDraft(INVISIBLES_STEP_ID);
   const controls = draft.controls;
   const invisibleDecisions = draft.invisibleDecisions;
-  const acceptInvisible = draft.ops.acceptInvisible;
   const declineInvisible = draft.ops.declineInvisible;
   const adoptControlsAsInvisibles = draft.ops.adoptControlsAsInvisibles;
 
@@ -200,27 +192,22 @@ const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue
     adoptControlsAsInvisibles();
   }, [adoptControlsAsInvisibles]);
 
+  // The offer list is direction-invariant (invisibleCandidatesFor deliberately
+  // ignores its direction argument — the bidi group is always offered, and
+  // only the gallery's collapse state depends on the direction), so the step
+  // renders from a fixed "unknown" and never computes the direction itself.
   const candidates = useMemo(
-    () => invisiblesCandidates(direction, carriedOver),
-    [direction, carriedOver],
+    () => invisiblesCandidates("unknown", carriedOver),
+    [carriedOver],
   );
-  const alwaysCandidates = candidates.filter((c) => c.relevance !== "rtl");
-  const bidiCandidates = candidates.filter((c) => c.relevance === "rtl");
-
-  const [bidiExpanded, setBidiExpanded] = useState(direction === "rtl");
-  useEffect(() => {
-    if (direction === "rtl") setBidiExpanded(true);
-  }, [direction]);
-
-  const isAccepted = (c: InvisibleCharacterCandidate): boolean => isInvisibleAccepted(invisibleDecisions, c);
-  const acceptedCount = candidates.filter(isAccepted).length;
+  const accepted = candidates.filter((c) => isInvisibleAccepted(invisibleDecisions, c));
+  const acceptedCount = accepted.length;
 
   // Double-complete guard (mirrors the punctuation step).
   const completedRef = useRef(false);
 
-  function toggle(c: InvisibleCharacterCandidate): void {
-    if (isAccepted(c)) declineInvisible(c.notation);
-    else acceptInvisible(c.notation);
+  function remove(c: InvisibleCharacterCandidate): void {
+    declineInvisible(c.notation);
   }
 
   function complete(): void {
@@ -288,75 +275,46 @@ const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue
         <p style={{ margin: 0 }}>
           <Trans id="survey.invisibles.intro">
             Some keyboards need characters that print nothing but change how the
-            text around them joins, breaks or reads. Each one below is named,
-            with when you would need it. Select the ones your keyboard should be
-            able to type; leave the rest.
+            text around them joins, breaks or reads. Browse the gallery on the
+            right — each invisible character is named, with when you would need
+            it. Accept the ones your keyboard should be able to type; your
+            picks appear in the list below.
           </Trans>
         </p>
       </div>
 
-      {acceptedCount === 0 && (
-        <p style={mutedParaFlush} data-testid="invisibles-none-needed">
-          <Trans id="survey.invisibles.noneNeeded">
-            Most keyboards need none of these. If that is yours, just continue.
-          </Trans>
-        </p>
-      )}
-
-      <section
-        aria-labelledby="invisibles-common-heading"
-      >
-        <h3 id="invisibles-common-heading" style={sectionHeading}>
-          <Trans id="survey.invisibles.commonHeading">Joiners, breaks and hyphenation</Trans>
-        </h3>
-        <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-          {alwaysCandidates.map((c) => (
-            <CandidateRow key={c.notation} candidate={c} checked={isAccepted(c)} onToggle={toggle} />
-          ))}
-        </ul>
-      </section>
-
-      <section aria-labelledby="invisibles-bidi-heading" data-testid="invisibles-bidi-group">
-        <h3 id="invisibles-bidi-heading" style={sectionHeading}>
-          <Trans id="survey.invisibles.bidiGroup.heading">Direction controls</Trans>
-        </h3>
-        {direction !== "rtl" && (
-          <p style={{ ...mutedParaFlush, margin: "0 0 8px 0" }}>
-            <Trans id="survey.invisibles.bidiGroup.collapsedNote">
-              Usually only needed for right-to-left scripts such as Arabic, Hebrew,
-              Syriac or Thaana, so they are folded away here — open the list if
-              your keyboard mixes text directions.
+      {acceptedCount === 0 ? (
+        <>
+          <p style={mutedParaFlush} data-testid="invisibles-none-needed">
+            <Trans id="survey.invisibles.noneNeeded">
+              Most keyboards need none of these. If that is yours, just continue.
             </Trans>
           </p>
-        )}
-        {!bidiExpanded ? (
-          <button
-            type="button"
-            data-testid="invisibles-bidi-expand"
-            aria-expanded={false}
-            aria-controls="invisibles-bidi-list"
-            onClick={() => setBidiExpanded(true)}
-            style={secondaryButton}
-          >
-            {t({
-              id: "survey.invisibles.bidiGroup.expandButton",
-              message: plural(bidiCandidates.length, {
-                one: "Show # direction control",
-                other: "Show # direction controls",
-              }),
-            })}
-          </button>
-        ) : (
-          <ul
-            id="invisibles-bidi-list"
-            style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}
-          >
-            {bidiCandidates.map((c) => (
-              <CandidateRow key={c.notation} candidate={c} checked={isAccepted(c)} onToggle={toggle} />
+          <p style={mutedParaFlush} data-testid="invisibles-gallery-pointer">
+            <Trans id="survey.invisibles.galleryPointer">
+              Browse the gallery on the right to add the ones your keyboard needs.
+            </Trans>
+          </p>
+        </>
+      ) : (
+        <section
+          aria-label={t({
+            id: "survey.invisibles.listSectionAriaLabel",
+            message: "Your invisible characters",
+          })}
+        >
+          <h3 style={sectionHeading}>
+            <Trans id="survey.invisibles.listHeading">
+              Your invisible characters ({acceptedCount})
+            </Trans>
+          </h3>
+          <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {accepted.map((c) => (
+              <AcceptedRow key={c.notation} candidate={c} onRemove={remove} />
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 };

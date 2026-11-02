@@ -19,6 +19,24 @@ const HELP_PHP_CONTENT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_PHP_DATA_STATES_INCOMPLETE", // 11.6
   "KM_LINT_PHP_PAGENAME_FORMAT", // 11.7
   "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED", // 11.8
+  "KM_LINT_PHP_HTM_BODY_MISMATCH", // 11.9
+  "KM_LINT_PHP_HTM_STYLE_MISMATCH", // 11.10
+]);
+
+/** Lint codes of the criteria that judge HISTORY.md's content. */
+const HISTORY_MD_CONTENT_CODES: ReadonlySet<string> = new Set([
+  "KM_LINT_HISTORY_ORDER", // 3.3
+  "KM_LINT_HISTORY_TRUNCATED", // 3.4
+  "KM_LINT_HISTORY_ENTRY_FORMAT", // 3.5
+  "KM_LINT_HISTORY_VERSION_MISMATCH", // 3.6
+  "KM_LINT_KMN_VERSION_MISMATCH", // 7.1
+  "KM_LINT_HISTORY_STALE_FILE_REFS", // 3.7
+]);
+
+/** Lint codes of the criteria that judge welcome.htm's content. */
+const WELCOME_HTM_CONTENT_CODES: ReadonlySet<string> = new Set([
+  "KM_LINT_PHP_HTM_BODY_MISMATCH", // 11.9
+  "KM_LINT_PHP_HTM_STYLE_MISMATCH", // 11.10
 ]);
 
 /** A named applicability verdict: the criterion does not apply, and why. */
@@ -82,6 +100,62 @@ export function applicabilityFor(
   ) {
     return {
       reason: "No help .php; its absence is reported by 11.1b.",
+    };
+  }
+  // /review: the HISTORY.md content rows judge a HISTORY.md that is not
+  // there. Its absence is the §3.1b finding, not a pass or fail here.
+  if (
+    facts.historyMdAbsent === true &&
+    lintCode !== undefined &&
+    HISTORY_MD_CONTENT_CODES.has(lintCode)
+  ) {
+    return {
+      reason: "No HISTORY.md; its absence is reported by 3.1b.",
+    };
+  }
+  // /review: the README.md content row (5.7) judges a README.md that is
+  // not there. Its absence is the §5.0 finding, not a pass or fail here.
+  if (
+    facts.readmeMdAbsent === true &&
+    lintCode === "KM_LINT_README_TARGETS_MISMATCH"
+  ) {
+    return {
+      reason: "No README.md; its absence is reported by 5.0.",
+    };
+  }
+  // /review: the 11.9/11.10 parity rows judge a welcome.htm that is not
+  // there. Its absence is the §6.3b finding, not a pass or fail here.
+  if (
+    facts.welcomeHtmAbsent === true &&
+    lintCode !== undefined &&
+    WELCOME_HTM_CONTENT_CODES.has(lintCode)
+  ) {
+    return {
+      reason: "No welcome.htm; its absence is reported by 6.3b.",
+    };
+  }
+  // /review: 11.5 scans welcome.htm and the help .php; with neither
+  // present there is nothing to scan.
+  if (
+    facts.helpPhpAbsent === true &&
+    facts.welcomeHtmAbsent === true &&
+    lintCode === "KM_LINT_HTML_NOT_WELL_FORMED"
+  ) {
+    return {
+      reason:
+        "No welcome.htm and no help .php; their absence is reported by 6.3b and 11.1b.",
+    };
+  }
+  // /review: the 7.5/7.16 rows judge the .kvks's content. With no .kvks
+  // there is nothing to judge; its absence is the 7.0 finding.
+  if (
+    facts.kvksAbsent === true &&
+    lintCode !== undefined &&
+    (lintCode === "KM_LINT_RALT_MISSING_USEALTGR" ||
+      lintCode === "KM_LINT_KVKS_BLANK")
+  ) {
+    return {
+      reason: "No .kvks; its absence is reported by 7.0-kvks-file-exists.",
     };
   }
   // /review: 3.4 compares against the keyboard's earlier HISTORY.md; a

@@ -127,8 +127,10 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await continueBtn.waitFor({ state: "visible", timeout: 20_000 });
 
     // Check TWO candidates — one `Next` recording two answers under one screen.
-    await page.getByTestId("invisible-candidate-200d").click(); // ZWJ
-    await page.getByTestId("invisible-candidate-200c").click(); // ZWNJ
+    // #2283: the left pane is the accepted list, so the picks happen in the
+    // gallery (right pane), which is where the toggle surface lives.
+    await page.getByTestId("invisible-gallery-cell-200d").click(); // ZWJ
+    await page.getByTestId("invisible-gallery-cell-200c").click(); // ZWNJ
     await continueBtn.click();
 
     await driveConvenienceStep(page);

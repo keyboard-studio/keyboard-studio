@@ -1,28 +1,39 @@
 import { describe, expect, it } from "vitest";
 import {
   CORPUS,
-  REQUIRED_PICKS,
   corpusAvailable,
   experimentalAvailable,
   loadCorpusKeyboard,
-  resolvesFromRelease,
+  REQUIRED_PICKS,
+  resolvableCorpusEntries,
 } from "./corpus.js";
-
-/**
- * True when a corpus id cannot resolve in this checkout by construction:
- * the entry lives outside release/ and the checkout has no experimental/
- * tree (CI checks out release/ only). Such entries are skipped, never
- * failed — a release/ entry that fails to resolve is still a hard failure.
- */
-function unavailableInThisCheckout(id: string): boolean {
-  return !experimentalAvailable && !resolvesFromRelease(id);
-}
 
 describe.skipIf(!corpusAvailable)("ldml-export corpus resolver", () => {
   it("resolves every corpus keyboard from release/ or experimental/", () => {
-    for (const entry of CORPUS) {
-      if (unavailableInThisCheckout(entry.id)) continue;
+    // resolvableCorpusEntries() drops experimental-only entries (khmer_ldml)
+    // in CI's release-only sparse checkout; the seam test below proves the
+    // drop is real, not vacuous.
+    for (const entry of resolvableCorpusEntries()) {
       expect(loadCorpusKeyboard(entry.id), entry.id).toBeDefined();
+    }
+  });
+
+  it("the release/experimental seam annotations match the checkout", () => {
+    // Regression guard for the seam that broke CI on main (run 41480613430):
+    // khmer_ldml lives in experimental/, which CI's pinned corpus does not
+    // check out. In a release-only checkout the experimental-only entries
+    // must genuinely be unresolvable (otherwise the skip above is vacuous);
+    // in a full checkout every entry must resolve from an annotated tree.
+    for (const entry of CORPUS) {
+      if (!experimentalAvailable) {
+        if (!entry.trees.includes("release")) {
+          expect(loadCorpusKeyboard(entry.id), entry.id).toBeUndefined();
+        }
+      } else {
+        const kb = loadCorpusKeyboard(entry.id);
+        expect(kb, entry.id).toBeDefined();
+        expect(entry.trees, entry.id).toContain(kb?.tree);
+      }
     }
   });
 
@@ -36,24 +47,23 @@ describe.skipIf(!corpusAvailable)("ldml-export corpus resolver", () => {
 
   it("finds the hand-written LDML beside khmer_ldml and ibono_chwerty", () => {
     expect(loadCorpusKeyboard("ibono_chwerty")?.ldmlXml).toContain("<keyboard3");
-    if (unavailableInThisCheckout("khmer_ldml")) return;
-    expect(loadCorpusKeyboard("khmer_ldml")?.ldmlXml).toContain("<keyboard3");
+    const khmer = loadCorpusKeyboard("khmer_ldml");
+    if (!experimentalAvailable) {
+      // CI's pinned corpus is release-only sparse; khmer_ldml is experimental-only.
+      expect(khmer).toBeUndefined();
+    } else {
+      expect(khmer?.ldmlXml).toContain("<keyboard3");
+    }
   });
 
   it("the three picks have the features they were chosen for", () => {
     const mn = loadCorpusKeyboard(REQUIRED_PICKS.mnemonic);
-    if (!unavailableInThisCheckout(REQUIRED_PICKS.mnemonic)) {
-      expect(mn?.kmn).toMatch(/^\s*store\(&MnemonicLayout\)\s*['"]1['"]/im);
-    }
+    expect(mn?.kmn).toMatch(/^\s*store\(&MnemonicLayout\)\s*['"]1['"]/im);
     const pk = loadCorpusKeyboard(REQUIRED_PICKS.postKeystrokeTouch);
-    if (!unavailableInThisCheckout(REQUIRED_PICKS.postKeystrokeTouch)) {
-      expect(pk?.kmn).toMatch(/^\s*begin\s+PostKeystroke/im);
-      expect(pk?.touchLayout).toBeTruthy();
-    }
+    expect(pk?.kmn).toMatch(/^\s*begin\s+PostKeystroke/im);
+    expect(pk?.touchLayout).toBeTruthy();
     const op = loadCorpusKeyboard(REQUIRED_PICKS.optionStores);
-    if (!unavailableInThisCheckout(REQUIRED_PICKS.optionStores)) {
-      expect(op?.kmn).toMatch(/^\s*if\(\w+\s*=\s*'/m);
-      expect(op?.kmn).toMatch(/set\(\w+\s*='/);
-    }
+    expect(op?.kmn).toMatch(/^\s*if\(\w+\s*=\s*'/m);
+    expect(op?.kmn).toMatch(/set\(\w+\s*=\s*'/);
   });
 });

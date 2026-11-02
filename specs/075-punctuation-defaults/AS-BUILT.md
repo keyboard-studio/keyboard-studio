@@ -17,7 +17,7 @@
 - Draft store `packages/studio/src/stores/phaseBDraftStore.ts`: `DraftProvenance` gains `"base"` and `"ascii-floor"`; sticky `seededProposals: string[]` and `invisibleDecisions: Record<"U+XXXX", "accepted"|"declined">`; actions `seedProposals(chars, source, seedKey)`, `acceptInvisible`, `declineInvisible`, `adoptControlsAsInvisibles`. Both fields survive `reset()`, clear only through `resetPhaseBDraftDecisions()`, and round-trip through the snapshot.
 - `packages/studio/src/survey/phaseCInventory.ts`: `phaseCConfirmedInventory()` (union of punctuation slice and accepted invisibles); both steps emit `{ phase: "C", confirmedInventory }` from it and never touch the phase-B result.
 - Steps in `packages/studio/src/steps/manifest.ts`: `punctuation` and `invisibles`, both `inputs: []`, `writes: []`, `persistence: "phase-b-draft"`. Candidate list: `survey/invisibles/invisibleCandidates.ts`.
-- Test ids: `cldr-punctuation-group`, `base-punctuation-group`, `punctuation-missing-count`, `punctuation-handoff-note`, `invisibles-continue`; i18n ids under `survey.punctuation.*` and `survey.invisibles.*`. No `packages/contracts` change.
+- Test ids: `cldr-punctuation-group`, `base-punctuation-group`, `punctuation-missing-count`, `punctuation-handoff-note`, `invisibles-continue`, `invisibles-gallery-pointer`, `invisible-accepted-<hex>`, `invisible-accepted-remove-<hex>`; i18n ids under `survey.punctuation.*` and `survey.invisibles.*`. No `packages/contracts` change.
 
 ## Key decisions
 - Seed through a store action (`seedProposals`) keyed once per source, not a component effect loop; it honours `rejected` and never downgrades `"author"` (D-01).
@@ -34,7 +34,22 @@
 - Base group shows the floor only when coverage is unknown (opaque fragments); otherwise it shows exactly what the IR produces.
 
 ## Divergences from the spec
-None found. Every pinned identifier in the contract (exports, store fields, testids, step ids and declarations) exists in the code at `origin/main`.
+- Issue #2283 (left pane becomes the accepted list): the invisibles step's
+  left pane no longer offers candidates as checkbox rows. It lists ONLY the
+  accepted invisible characters — name, `U+XXXX`, need statement, and a
+  remove control (remove = `declineInvisible`) — the same build-list shape as
+  the alphabet and punctuation steps. The right-pane gallery
+  (`InvisiblesGalleryPane`) is the single browse-and-pick surface; the
+  gallery subtitle already described "the same list you're building on the
+  left". FR-020's "the list" is the selected list: with nothing accepted the
+  step renders the "Most keyboards need none of these" guidance plus a
+  pointer to the gallery. The bidi group's expanded-for-RTL /
+  collapsed-never-hidden-for-LTR rule moved from the left pane to the
+  gallery, which already implemented it. Result shape unchanged: `complete()`
+  still emits one boolean answer per offered candidate.
+- Otherwise none found: every other pinned identifier in the contract
+  (exports, store fields, testids, step ids and declarations) exists in the
+  code.
 
 ## Follow-ups and open issues
 - Teaching carve to honour a declined punctuation set is a separate carve feature (D-15).

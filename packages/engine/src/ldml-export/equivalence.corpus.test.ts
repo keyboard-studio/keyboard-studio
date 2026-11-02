@@ -11,7 +11,7 @@
 //
 // A missing corpus is a failed precondition, never a skip.
 import { describe, expect, it } from "vitest";
-import { CORPUS, loadCorpusKeyboard } from "./__testing__/corpus.js";
+import { loadCorpusKeyboard, resolvableCorpusEntries } from "./__testing__/corpus.js";
 import { corpusAvailable, corpusExportInput, KEYBOARDS_ROOT } from "./__testing__/corpusExport.js";
 import { checkEquivalence } from "./__testing__/equivalence.js";
 import { buildLdmlExport } from "./package.js";
@@ -23,7 +23,7 @@ describe("LDML equivalence corpus: precondition", () => {
   });
 });
 
-for (const entry of CORPUS) {
+for (const entry of resolvableCorpusEntries()) {
   it(`${entry.id}: keystroke equivalence`, async () => {
     const kb = loadCorpusKeyboard(entry.id);
     expect(kb, `${entry.id} is not in the corpus checkout`).toBeDefined();

@@ -48,6 +48,7 @@ export {
 export {
   applyNormalizationStep,
   normalizationStepCacheKey,
+  normalizationStepFingerprint,
   NORMALIZATION_GROUP,
   NORMALIZATION_STEP_GENERATOR_VERSION,
   proposeNormalizationStep,

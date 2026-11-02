@@ -1,7 +1,7 @@
 // Catalog counts tests for the criteria resolver (spec 084, Phase 1).
 //
 // The resolver's honesty rests on two pinned numbers: the real catalog is
-// 188 criteria in the 40/106/32/10 band split, and exactly 99 of its
+// 195 criteria in the 40/113/32/10 band split, and exactly 106 of its
 // layer-c lintRuleIds have a real mechanism behind them (the original
 // 19 — §18 touch/inventory + the doc band — plus spec 084 Batch 1's 20
 // criteria checks in keyboard-lint's checks/criteria/ and docs/, plus
@@ -15,7 +15,10 @@
 // .kps-metadata twins' 5 checks, plus the
 // text-content twins' 12 checks, plus the
 // repo-context twins' 5 checks and the Group C
-// extraneous-files check (1.1, no twin needed)).
+// extraneous-files check (1.1, no twin needed), plus the
+// 2026-11-02 required-file existence checks' 4 checks
+// (1.14 .kpj / 4.0 LICENSE.md / 5.0 README.md / 8.0 .kps — absence is
+// a finding; dependent checks nest under it via contextMissing).
 // The implemented set is re-derived here from its two named sources —
 // the keyboard-lint producer scan (the gateCoverage.test.ts method) and
 // ASSEMBLY_SYNTHESIZED_CODES — so adding a lint check fails this test
@@ -78,25 +81,25 @@ function catalogLintRuleIds(): Set<string> {
 }
 
 describe("criteria catalog", () => {
-  it("has 188 rows in the 40/106/32/10 band split, with unique ids", () => {
-    expect(ALL_CRITERIA).toHaveLength(188);
+  it("has 195 rows in the 40/113/32/10 band split, with unique ids", () => {
+    expect(ALL_CRITERIA).toHaveLength(195);
 
     const perBand = new Map<string, number>();
     for (const criterion of ALL_CRITERIA) {
       perBand.set(criterion.band, (perBand.get(criterion.band) ?? 0) + 1);
     }
     expect(perBand.get("scaffolder-bake")).toBe(40);
-    expect(perBand.get("layer-c-enforce")).toBe(106);
+    expect(perBand.get("layer-c-enforce")).toBe(113);
     expect(perBand.get("yellow-survey")).toBe(32);
     expect(perBand.get("red-checklist")).toBe(10);
 
-    expect(new Set(ALL_CRITERIA.map((c) => c.id)).size).toBe(188);
+    expect(new Set(ALL_CRITERIA.map((c) => c.id)).size).toBe(195);
   });
 });
 
 describe("IMPLEMENTED_LINT_CODES", () => {
-  it("has exactly 59 codes, every one a lintRuleId present in the catalog", () => {
-    expect(IMPLEMENTED_LINT_CODES.size).toBe(99);
+  it("has exactly 106 codes, every one a lintRuleId present in the catalog", () => {
+    expect(IMPLEMENTED_LINT_CODES.size).toBe(106);
     const catalogIds = catalogLintRuleIds();
     for (const code of IMPLEMENTED_LINT_CODES) {
       expect(catalogIds.has(code)).toBe(true);
