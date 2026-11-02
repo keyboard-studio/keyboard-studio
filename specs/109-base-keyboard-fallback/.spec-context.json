@@ -1,9 +1,9 @@
 {
-  "workflow": "speckit",
+  "workflow": "companion",
   "specName": "Base-keyboard fallback",
   "branch": "109-base-keyboard-fallback",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "plan",
+  "status": "planned",
   "history": [
     {
       "step": "specify",
@@ -11,7 +11,60 @@
       "kind": "start",
       "by": "km-lead",
       "at": "2026-11-01T18:00:00.000Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-02T17:10:13.126Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T17:11:51.142Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T17:11:51.493Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T17:11:52.872Z"
     }
   ],
-  "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801"
+  "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801",
+  "unattended": true,
+  "decisions": [
+    {
+      "decision": "Per-class policy with a studio-side confirmed flag",
+      "why": "FR-020 needs three values; unconfirmed state is working-copy state",
+      "rejected": "single value plus class filter"
+    },
+    {
+      "decision": "One positional engine enumerator shared by leak list, swallow store and spec 108",
+      "why": "FR-040, SC-005",
+      "rejected": "per-base-keyboard enumeration"
+    },
+    {
+      "decision": "Extend existing base-layout codegen to the full catalog",
+      "why": "already pins commit and hashes with a drift test",
+      "rejected": "second script or runtime parsing"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan: data codegen, shared enumerator, per-class policy plus swallowUndefined, rebuilt surface",
+      "key_finding": "the kmn form for a key-position swallow store must be proven against kmcmplib first"
+    }
+  },
+  "approach": "Generate char data for all catalog layouts, add a shared positional enumerator, split FallbackPolicy per class with a confirmed flag, compile swallowUndefined as one store plus nul rule via mutate(), rebuild the surface."
 }
