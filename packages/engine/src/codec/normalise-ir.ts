@@ -14,7 +14,10 @@
  *   emitter reflows the file (blank lines, store order).
  * - Strip `groupNodeId` on RawKmnFragment — holds a minted group nodeId; after
  *   emit→re-parse the owning group gets a new minted id (a differently-named
- *   field not caught by the plain nodeId strip).
+ *   field not caught by the plain nodeId strip). Dropped outright (not
+ *   placeholder-replaced) so a fragment that the #2404 dependency pass
+ *   relocated across the pre-begin/group boundary — present on one side,
+ *   absent on the other — still compares equal.
  * - Strip `storeSketch` on RawKmnFragment — a lenient parser annotation
  *   derived from *earlier* stores, so an IR filtered in place (e.g. by
  *   carveFilterIr) keeps the pre-filter sketch while a re-parse recomputes it.
@@ -31,7 +34,12 @@ export function normaliseForComparison(ir: KeyboardIR): unknown {
     JSON.stringify(ir, (key, value) => {
       if (key === "nodeId") return "__stripped__";
       if (key === "sourceLine") return undefined;
-      if (key === "groupNodeId") return "__stripped__";
+      // Dropped (not placeholder-replaced): the #2404 dependency pass may
+      // relocate a store-declaration fragment across the pre-begin/group
+      // boundary, so one side can lack groupNodeId while the other has it.
+      // A "__stripped__" placeholder would preserve that presence difference
+      // and report a spurious divergence.
+      if (key === "groupNodeId") return undefined;
       if (key === "storeSketch") return undefined;
       if (key === "anchorRef" && value != null && typeof value === "object") {
         return { ...(value as object), nodeId: "__stripped__" };
@@ -41,12 +49,22 @@ export function normaliseForComparison(ir: KeyboardIR): unknown {
     })
   ) as {
     stores: Array<{ name: string }>;
-    raw: Array<{ reason: string }>;
+    raw: Array<{ reason: string; sourceText: string }>;
     [k: string]: unknown;
   };
 
   clone.stores.sort((a, b) => a.name.localeCompare(b.name));
-  clone.raw.sort((a, b) => a.reason.localeCompare(b.reason));
+  // Sort raw by (reason, sourceText): fragment order is not semantically
+  // significant — store declarations are global/position-independent — and
+  // the #2404 dependency pass legitimately reorders same-reason declarations
+  // (e.g. two outs-expansion fragments) to satisfy declaration-before-use. A
+  // reason-only sort is stable, so it would report a spurious divergence on
+  // re-parse whenever two same-reason fragments swap relative order.
+  clone.raw.sort(
+    (a, b) =>
+      a.reason.localeCompare(b.reason) ||
+      a.sourceText.localeCompare(b.sourceText),
+  );
 
   return clone;
 }
