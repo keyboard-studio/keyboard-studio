@@ -6,7 +6,7 @@
 // aria-label carries the same keyboard id as the file it produces.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import { useDecisionStore } from "../stores/decisionStore";
@@ -225,5 +225,43 @@ describe("OutputScreen: LDML download panel", () => {
     expect(zipFile.replace(/-1\.0\.zip$/, "")).toBe(zipId);
     expect(kmpFile.replace(/\.kmp$/, "")).toBe(kmpId);
     expect(ldmlFile.replace(/_ldml-.*\.zip$/, "")).toBe(ldmlId);
+  });
+
+  it("lists every LDML finding with the LDML download, not in Other findings, and gates nothing (FR-015, FR-016)", async () => {
+    seed();
+    const ldmlFinding = (code: string, line: number) => ({
+      code,
+      severity: "warning" as const,
+      layer: "C" as const,
+      message: `${code} at ${line}`,
+      location: { file: "source/basic_kbdus.kmn", line },
+    });
+    act(() => {
+      useWorkingCopyStore.getState().setValidatorFindings([
+        ldmlFinding("KM_LINT_LDML_OPTION_STATE", 3),
+        ldmlFinding("KM_LINT_LDML_OPTION_STATE", 4),
+        ldmlFinding("KM_LINT_LDML_KEYMAN_GAP", 9),
+      ] as never);
+    });
+    render(<OutputScreen />);
+    await screen.findByTestId("emit-download-ldml");
+
+    const panel = screen.getByTestId("ldml-findings");
+    const groups = within(panel).getAllByTestId("lint-summary-group");
+    expect(groups).toHaveLength(2);
+    expect(within(panel).getByText("2 warnings")).toBeTruthy();
+    // The generic panel never repeats them.
+    expect(screen.queryByTestId("output-other-findings")).toBeNull();
+    // Downloads stay actionable.
+    for (const testId of ["emit-download", "emit-download-kmp", "emit-download-ldml"]) {
+      expect((screen.getByTestId(testId) as HTMLButtonElement).disabled).toBe(false);
+    }
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("emit-download-kmp"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("emit-download"));
+    });
+    expect(downloaded.current).toHaveLength(2);
   });
 });

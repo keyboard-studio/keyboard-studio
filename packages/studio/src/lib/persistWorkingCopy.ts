@@ -132,6 +132,8 @@ export type WorkingCopySnapshot = Omit<
   | "contextTolerance"
   | "contextToleranceOverlay"
   | "contextNormalizationStep"
+  // Republished by every preview compile (spec 108); never stored.
+  | "previewProjection"
   | "startWelcomeImages"
   | "disabledFamilyIds"
   | "keptGuardRuleIds"

@@ -962,6 +962,21 @@ export function useKeyboardArtifact(
     if (prevKeyboardCssBlobUrls.current.length > 0) {
       readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
     }
+    // Publish the projection the LDML findings classify from (spec 108): only a run that
+    // parsed, only while it is still the current run (checked above with no await since), and
+    // only for the committed working copy's own keyboard. Sibling instances compile other
+    // keyboards (the compare panel, a touch seed source), whose projection is not the author's.
+    // A failed parse leaves the previous value in place.
+    const wcState = useWorkingCopyStore.getState();
+    if (parsedIr !== null && wcState.startKeyboard?.id === kb.id) {
+      const touchPath = findTouchLayoutPath(vfs);
+      wcState.setPreviewProjection({
+        ir: parsedIr,
+        touchLayoutText: touchPath ? (readVfsText(vfs, touchPath) ?? null) : null,
+        kvksText: readVfsText(vfs, `source/${compileId}.kvks`) ?? null,
+        keyboardId: compileId,
+      });
+    }
     setStage(readyStage);
     // Functional I2 (#882) runs only now that `ready` has published — never
     // on the path the author is waiting on (its two compiles + corpus

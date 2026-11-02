@@ -61,6 +61,7 @@ import type {
   LdmlProfileId,
   StartDocCssText,
 } from "@keyboard-studio/engine";
+import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import type {
@@ -591,6 +592,12 @@ export interface WorkingCopyState {
    * Null means "use the resolved default". Persisted.
    */
   ldmlBaseLayout: LdmlBaseLayoutChoice | null;
+  /**
+   * The last successfully parsed preview projection (spec 108 T054): the parsed IR plus the
+   * touch-layout and `.kvks` text the same compile run read. The LDML findings view classifies
+   * from this. Ephemeral: never persisted, cleared on a base change.
+   */
+  previewProjection: PreviewProjection | null;
   /**
    * The author's recorded answers to the deterministic documentation-fix
    * proposals for an adaptation's inherited welcome/help pages (issue
@@ -1322,6 +1329,9 @@ export interface WorkingCopyState {
   /** Record the LDML export profile choice (spec 108 FR-027). */
   setLdmlProfile: (profile: LdmlProfileId | null) => void;
 
+  /** Publish the preview projection the LDML findings read (spec 108). Null clears. */
+  setPreviewProjection: (projection: PreviewProjection | null) => void;
+
   /** Record the LDML export base-keyboard override (spec 108 FR-027). */
   setLdmlBaseLayout: (layout: LdmlBaseLayoutChoice | null) => void;
 
@@ -1743,6 +1753,7 @@ export type WorkingCopyData = Omit<
   | "setChartPreference"
   | "setLdmlProfile"
   | "setLdmlBaseLayout"
+  | "setPreviewProjection"
   | "setDocFixProposals"
   | "setTouchKeyIdentity"
   | "setStartDocProfile"
@@ -1791,6 +1802,7 @@ const INITIAL_STATE: WorkingCopyData = {
   chartPreference: null,
   ldmlProfile: null,
   ldmlBaseLayout: null,
+  previewProjection: null,
   docFixProposals: null,
   touchKeyIdentity: null,
   startDocProfile: null,
@@ -2404,6 +2416,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       chartPreference: null,
       ldmlProfile: null,
       ldmlBaseLayout: null,
+      previewProjection: null,
       docFixProposals: null,
       touchKeyIdentity: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
@@ -2464,6 +2477,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       chartPreference: null,
       ldmlProfile: null,
       ldmlBaseLayout: null,
+      previewProjection: null,
       docFixProposals: null,
       touchKeyIdentity: null,
       baselineDocFindings: null,
@@ -2546,6 +2560,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setLdmlProfile: (profile) => set({ ldmlProfile: profile }),
 
   setLdmlBaseLayout: (layout) => set({ ldmlBaseLayout: layout }),
+
+  setPreviewProjection: (projection) => set({ previewProjection: projection }),
 
   setDocFixProposals: (proposals) => set({ docFixProposals: proposals }),
 

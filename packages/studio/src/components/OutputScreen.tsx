@@ -50,6 +50,8 @@ import { DocumentationFindingsSummary } from "./DocumentationFindingsSummary.tsx
 import { UnappliedRepairList } from "./TouchKeyIdentityList.tsx";
 import { LintSummary } from "../lint/LintSummary.tsx";
 import { selectUnmappedFindings } from "../lint/lintToQuestion.ts";
+import { isLdmlLintCode } from "../lint/ldmlFindings.ts";
+import { useRouteStepIds } from "../lib/routeStepIds.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -143,15 +145,23 @@ export function OutputScreen() {
   // Informational only: like the checklist, none of this gates download.
   const documentationFindings = useDocumentationFindings();
   const publishedFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const route = useRouteStepIds();
+  // spec 108 FR-015: every LDML finding is listed with the LDML download, so the generic
+  // panel below excludes them and no finding appears twice on this page.
+  const ldmlFindings = useMemo(
+    () => publishedFindings.filter((f) => isLdmlLintCode(f.code)),
+    [publishedFindings],
+  );
   const otherOutputFindings = useMemo(() => {
     const docCodes = new Set(documentationFindings.map((f) => f.code));
-    return selectUnmappedFindings(publishedFindings).filter(
+    return selectUnmappedFindings(publishedFindings, route).filter(
       (f) =>
         !docCodes.has(f.code) &&
+        !isLdmlLintCode(f.code) &&
         !f.code.startsWith("KM_WARN") &&
         f.severity !== "error",
     );
-  }, [publishedFindings, documentationFindings]);
+  }, [publishedFindings, documentationFindings, route]);
   const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
@@ -604,6 +614,7 @@ export function OutputScreen() {
               downloading={downloadingLdml}
               error={ldmlError}
               onDownload={() => { void handleDownloadLdml(); }}
+              findings={ldmlFindings}
             />
             {/* spec 094 FR-006: a labelled, numbered build for testers, from the
                 same working copy and behind the same gates as the package. */}

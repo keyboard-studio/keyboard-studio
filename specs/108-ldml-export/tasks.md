@@ -403,44 +403,44 @@ findings with source lines, and the `.kmp` and `.zip` downloads stay enabled.
 
 ### Tests for User Story 2
 
-- [ ] T051 [P] [US2] Write `ST/lint/ldmlFindings.test.ts`:
+- [x] T051 [P] [US2] Write `ST/lint/ldmlFindings.test.ts`:
   - severity follows FR-010;
   - `location` is set exactly when `line` is non-null;
   - message ids follow the `lint.ldml.<codeSlug>.*` pattern;
   - no finding is ever `error`;
   - M items without a code produce nothing; an M item with a hint (row 3.16) produces a hint.
-- [ ] T052 [P] [US2] Write `ST/lint/lintToQuestion.ldml.test.ts`:
+- [x] T052 [P] [US2] Write `ST/lint/lintToQuestion.ldml.test.ts`:
   - every code routes per the table in [contracts/findings-routing.md](contracts/findings-routing.md);
   - a code whose step is not in the route falls back to unmapped (Output);
   - `buildStepWarningCounts` counts distinct LDML codes per step, hints included, while other codes are still counted per finding (a step with 300 `OPTION_STATE` and 2 `CALL` badges 2).
-- [ ] T053 [P] [US2] Write `ST/test/ldmlParity/ldmlParity.corpus.test.ts` (H6, SC-005). For each corpus working copy, built with the spec 106 replay helpers in `ST/test/`, build both projections headlessly, with no React hook mounted. The **preview** projection calls `projectWorkingCopyVfs` (`ST/lib/projectWorkingCopyVfs.ts:432`) with the same input `ST/hooks/useWorkingCopyTransform.ts:501` passes (display-name identity only), then parses its `.kmn`, touch layout and `.kvks`. The **download** projection uses `projectWorkingCopyForOutput`. Both paths use the same `resolveLdmlBaseLayout` result; a working copy whose FR-027 default is unavailable gets the override `us`, never a skip. Assert that the coded-item `siteKey` set (A, N, K, and M with a hint) from the preview projection equals that from `projectWorkingCopyForOutput`, and that the studio findings' site keys equal the report's coded-item rows, excluding the row-5.15 delivery note (FR-012, SC-005).
+- [x] T053 [P] [US2] Write `ST/test/ldmlParity/ldmlParity.corpus.test.ts` (H6, SC-005). For each corpus working copy, built with the spec 106 replay helpers in `ST/test/`, build both projections headlessly, with no React hook mounted. The **preview** projection calls `projectWorkingCopyVfs` (`ST/lib/projectWorkingCopyVfs.ts:432`) with the same input `ST/hooks/useWorkingCopyTransform.ts:501` passes (display-name identity only), then parses its `.kmn`, touch layout and `.kvks`. The **download** projection uses `projectWorkingCopyForOutput`. Both paths use the same `resolveLdmlBaseLayout` result; a working copy whose FR-027 default is unavailable gets the override `us`, never a skip. Assert that the coded-item `siteKey` set (A, N, K, and M with a hint) from the preview projection equals that from `projectWorkingCopyForOutput`, and that the studio findings' site keys equal the report's coded-item rows, excluding the row-5.15 delivery note (FR-012, SC-005).
 
 ### Implementation for User Story 2
 
-- [ ] T054 [US2] Publish the preview projection from `ST/hooks/useKeyboardArtifact.ts` into `ST/stores/workingCopyStore.ts`:
+- [x] T054 [US2] Publish the preview projection from `ST/hooks/useKeyboardArtifact.ts` into `ST/stores/workingCopyStore.ts`:
   - In `ST/hooks/useKeyboardArtifact.ts`, when a run reaches `ready` with a successful parse, call `setPreviewProjection({ ir: parsedIr, touchLayoutText, kvksText, keyboardId })`. Read the touch-layout and `.kvks` text from the VFS that run compiled. A superseded run (runId check) never writes, and a failed parse leaves the previous value.
   - Add `previewProjection` and its setter to `ST/stores/workingCopyStore.ts`, cleared on a base change.
   - Register it as EPHEMERAL in `ST/decisions/derivedSurfaceRegistry.ts`.
   - Add a hook test.
-- [ ] T055 [US2] Implement `ST/lint/ldmlFindings.ts`: `buildLdmlFindings(classification, i18n) → LintFinding[]` per [contracts/findings-routing.md](contracts/findings-routing.md) (layer `"C"`, `msg({ id: "lint.ldml.<codeSlug>.message", values: item.params })`). Make T051 pass.
-- [ ] T056 [US2] Implement `ST/hooks/useLdmlFindings.ts`: a `useMemo` over `previewProjection`, `ldmlProfile`, `ldmlBaseLayout`, the base-layout inputs and `i18n`. When `chosen` is `null` (unavailable default, no override), it returns `[]`: the LDML panel (T047) already shows the unavailable state, and FR-011 admits no finding without a contract code. Inside it, run `parseTouchLayoutOrNull` and `parseKvks`, then `resolveLdmlBaseLayout`, then `classifyForLdml(input, resolveLdmlProfile(ldmlProfile ?? default))`, then `buildLdmlFindings`. Do not add a timer or an effect that schedules work (Art IV, FR-014). Test that it recomputes only when an input changes.
-- [ ] T057 [US2] In `ST/StudioShell.tsx`, merge `useLdmlFindings()` into the `findings` memo beside `documentationFindings` and `oe2Findings`, so it publishes through the existing `setValidatorFindings`.
-- [ ] T058 [US2] In `ST/lint/lintToQuestion.ts`:
+- [x] T055 [US2] Implement `ST/lint/ldmlFindings.ts`: `buildLdmlFindings(classification, i18n) → LintFinding[]` per [contracts/findings-routing.md](contracts/findings-routing.md) (layer `"C"`, `msg({ id: "lint.ldml.<codeSlug>.message", values: item.params })`). Make T051 pass.
+- [x] T056 [US2] Implement `ST/hooks/useLdmlFindings.ts`: a `useMemo` over `previewProjection`, `ldmlProfile`, `ldmlBaseLayout`, the base-layout inputs and `i18n`. When `chosen` is `null` (unavailable default, no override), it returns `[]`: the LDML panel (T047) already shows the unavailable state, and FR-011 admits no finding without a contract code. Inside it, run `parseTouchLayoutOrNull` and `parseKvks`, then `resolveLdmlBaseLayout`, then `classifyForLdml(input, resolveLdmlProfile(ldmlProfile ?? default))`, then `buildLdmlFindings`. Do not add a timer or an effect that schedules work (Art IV, FR-014). Test that it recomputes only when an input changes.
+- [x] T057 [US2] In `ST/StudioShell.tsx`, merge `useLdmlFindings()` into the `findings` memo beside `documentationFindings` and `oe2Findings`, so it publishes through the existing `setValidatorFindings`.
+- [x] T058 [US2] In `ST/lint/lintToQuestion.ts`:
   - add the LDML question routes;
   - add `LINT_CODE_TO_STEP_IDS` (the `rules` step codes);
   - add route-aware fallback, so that a step absent from the current route makes the finding unmapped;
   - add distinct-code counting for `KM_LINT_LDML_*` in `buildStepWarningCounts`.
 
   Make T052 pass. Do not cite issue numbers in comments (Art VIII).
-- [ ] T059 [P] [US2] In `ST/lint/LintSummary.tsx`, add `groupByCode?: boolean`: one row per code with its translated title, count and severity, expanding to the individual `LintChip`s, each with its line (FR-018). Write `ST/lint/LintSummary.groupByCode.test.tsx`.
-- [ ] T060 [US2] In `ST/survey/rules/RulesStep.tsx`, render the step-owned findings (`LINT_CODE_TO_STEP_IDS` → `rules`) as a grouped `LintSummary`. Check that the touch-layout and physical-layout question surfaces render their LDML chips through the existing `findingsByQuestionId` path, and add the chip there if a surface does not render one (findings-routing table).
-- [ ] T061 [US2] In `ST/components/OutputScreen.tsx`, exclude `KM_LINT_LDML_*` from the "Other findings" list, and have `LdmlDownloadPanel` list every LDML finding with `groupByCode` (FR-015).
-- [ ] T062 [US2] Add `lint.ldml.<codeSlug>.{title,message,hint}` for all 34 codes to `ST/locales/en/messages.json` and `ST/locales/fr/messages.json`, with French translations and the interpolated `params` names matching what `classify.ts` emits.
-- [ ] T063 [US2] Write `ST/lint/ldmlNoGating.test.ts` (FR-016):
+- [x] T059 [P] [US2] In `ST/lint/LintSummary.tsx`, add `groupByCode?: boolean`: one row per code with its translated title, count and severity, expanding to the individual `LintChip`s, each with its line (FR-018). Write `ST/lint/LintSummary.groupByCode.test.tsx`.
+- [x] T060 [US2] In `ST/survey/rules/RulesStep.tsx`, render the step-owned findings (`LINT_CODE_TO_STEP_IDS` → `rules`) as a grouped `LintSummary`. Check that the touch-layout and physical-layout question surfaces render their LDML chips through the existing `findingsByQuestionId` path, and add the chip there if a surface does not render one (findings-routing table).
+- [x] T061 [US2] In `ST/components/OutputScreen.tsx`, exclude `KM_LINT_LDML_*` from the "Other findings" list, and have `LdmlDownloadPanel` list every LDML finding with `groupByCode` (FR-015).
+- [x] T062 [US2] Add `lint.ldml.<codeSlug>.{title,message,hint}` for all 34 codes to `ST/locales/en/messages.json` and `ST/locales/fr/messages.json`, with French translations and the interpolated `params` names matching what `classify.ts` emits.
+- [x] T063 [US2] Write `ST/lint/ldmlNoGating.test.ts` (FR-016):
   - with only LDML findings present, `outputBlockers` is not blocked;
   - the criteria resolution (`ST/criteria/resolveCriteria.ts`) ignores `KM_LINT_LDML_*`;
   - the `.kmp` and `.zip` handlers stay actionable.
-- [ ] T064 [US2] Write `ST/hooks/useLdmlFindings.scenarios.test.tsx`:
+- [x] T064 [US2] Write `ST/hooks/useLdmlFindings.scenarios.test.tsx`:
   - Story 2 scenario 1: a warning with a line for an option rule;
   - scenario 2 / SC-008: removing the rule removes the warning on the next published findings array, with no extra tick;
   - scenario 4: 300 option-guarded rules present as one group with count 300, each locatable;

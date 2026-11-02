@@ -448,11 +448,123 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T02:15:53.895Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:55.149Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:55.602Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:56.105Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:56.542Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:56.972Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:57.348Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:57.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:58.044Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:58.409Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:58.764Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:59.109Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:59.428Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:52:59.755Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:53:00.075Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T050",
+  "currentTask": "T064",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -859,6 +971,122 @@
       "did": "Playwright ldml-export journey written and run green on desktop project",
       "files": [
         "packages/studio/e2e/ldml-export.spec.ts"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "ldmlFindings tests: severity, location, ids, never error, M-without-code",
+      "files": [
+        "packages/studio/src/lint/ldmlFindings.test.ts"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "lintToQuestion LDML routing, route fallback, distinct-code badge tests",
+      "files": [
+        "packages/studio/src/lint/lintToQuestion.ldml.test.ts"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "H6 parity corpus test, 4 bases x 2 points, preview vs download coded site keys",
+      "files": [
+        "packages/studio/src/test/ldmlParity/ldmlParity.corpus.test.ts"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "previewProjection published by useKeyboardArtifact into store, ephemeral, cleared on base change, with hook test",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/previewProjection.ts",
+        "packages/studio/src/decisions/derivedSurfaceRegistry.ts",
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/hooks/useKeyboardArtifact.previewProjection.test.ts"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "buildLdmlFindings and static copy table for 34 codes",
+      "files": [
+        "packages/studio/src/lint/ldmlFindings.ts",
+        "packages/studio/src/lint/ldmlMessages.ts"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "useLdmlFindings memo hook over previewProjection, no timer",
+      "files": [
+        "packages/studio/src/hooks/useLdmlFindings.ts"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "StudioShell merges ldmlFindings into the published findings memo",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "LDML question routes, LINT_CODE_TO_STEP_IDS, route fallback, distinct-code counting",
+      "files": [
+        "packages/studio/src/lint/lintToQuestion.ts",
+        "packages/studio/src/decisions/routeProvider.ts",
+        "packages/studio/src/lib/routeStepIds.ts",
+        "packages/studio/src/steps/manifest.ts",
+        "packages/studio/src/hooks/useValidatorFindings.ts",
+        "packages/studio/src/hooks/useWorkToDo.ts",
+        "packages/studio/src/lib/routeStepIds.test.ts"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "LintSummary groupByCode with details rows, lines, test",
+      "files": [
+        "packages/studio/src/lint/LintSummary.tsx",
+        "packages/studio/src/lint/LintSummary.groupByCode.test.tsx"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "RulesStep grouped LDML summary; physical-layout and touch-layout renderers show LDML chips",
+      "files": [
+        "packages/studio/src/survey/rules/RulesStep.tsx",
+        "packages/studio/src/survey/assignLoop/PhysicalLayoutDecisionRenderer.tsx",
+        "packages/studio/src/survey/assignLoop/TouchDecisionRenderer.tsx"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "OutputScreen excludes LDML from Other findings; LdmlDownloadPanel lists them grouped",
+      "files": [
+        "packages/studio/src/components/OutputScreen.tsx",
+        "packages/studio/src/components/output/LdmlDownloadPanel.tsx",
+        "packages/studio/src/components/OutputScreen.ldml.test.tsx"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "34 codes x title/message/hint plus 4 chrome ids in en and fr",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "no-gating tests: completeness, criteria, outputBlockers, severity",
+      "files": [
+        "packages/studio/src/lint/ldmlNoGating.test.ts"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Story 2 scenarios and recompute tests for useLdmlFindings",
+      "files": [
+        "packages/studio/src/hooks/useLdmlFindings.scenarios.test.tsx"
       ]
     }
   }

@@ -7,7 +7,9 @@
 
 import { useEffect, useId, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { LintFinding } from "@keyboard-studio/contracts";
 import type { LdmlProfileId, TargetProfile } from "@keyboard-studio/engine";
+import { LintSummary } from "../../lint/LintSummary.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePickedWindowsLayouts, getLayoutFamilyAnswer } from "../../lib/layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "../../lib/ldmlBaseLayout.ts";
@@ -24,6 +26,8 @@ export interface LdmlDownloadPanelProps {
   downloading: boolean;
   error: string | null;
   onDownload: () => void;
+  /** Every LDML finding, whatever its owner step (spec 108 FR-015); listed grouped by code. */
+  findings?: readonly LintFinding[];
 }
 
 const SELECT_STYLE: React.CSSProperties = {
@@ -37,10 +41,11 @@ const SELECT_STYLE: React.CSSProperties = {
 const LABEL_STYLE: React.CSSProperties = { fontSize: 12, color: "var(--app-text-subtle)" };
 
 export function LdmlDownloadPanel(props: LdmlDownloadPanelProps) {
-  const { keyboardId, gatedAriaLabel, otherBusy, downloading, error, onDownload } = props;
+  const { keyboardId, gatedAriaLabel, otherBusy, downloading, error, onDownload, findings = [] } = props;
   const { t } = useLingui();
   const profileSelectId = useId();
   const baseSelectId = useId();
+  const findingsHeadingId = useId();
 
   const ldmlProfile = useWorkingCopyStore((s) => s.ldmlProfile);
   const setLdmlProfile = useWorkingCopyStore((s) => s.setLdmlProfile);
@@ -228,6 +233,18 @@ export function LdmlDownloadPanel(props: LdmlDownloadPanelProps) {
           includes a report of what could not be carried over.
         </Trans>
       </p>
+      {findings.length > 0 && (
+        <section
+          aria-labelledby={findingsHeadingId}
+          data-testid="ldml-findings"
+          style={{ display: "flex", flexDirection: "column", gap: 4 }}
+        >
+          <h4 id={findingsHeadingId} style={{ margin: 0, fontSize: 13 }}>
+            <Trans id="output.download.ldml.findings.heading">What LDML does differently</Trans>
+          </h4>
+          <LintSummary findings={[...findings]} groupByCode />
+        </section>
+      )}
       {error !== null && (
         <div
           role="alert"
