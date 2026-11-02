@@ -192,11 +192,267 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T01:03:43.913Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:51:58.575Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:51:58.883Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:51:59.179Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:51:59.482Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:51:59.775Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:00.104Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:00.430Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:00.739Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:01.048Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:01.348Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:01.652Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:01.934Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:02.239Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:02.555Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T090",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:02.864Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:03.182Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:03.476Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:03.767Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:04.052Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:04.358Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:04.659Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:04.956Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:52:05.275Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:41.512Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:41.797Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:42.081Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:42.383Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:42.694Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:42.972Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:43.276Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:12:43.590Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T02:15:53.895Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T019",
+  "currentTask": "T050",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -352,6 +608,257 @@
       "files": [
         "packages/engine/src/ldml-export/__testing__/corpus.ts",
         "packages/engine/src/ldml-export/__testing__/corpus.test.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added the engine fixtures (plain, options-postkeystroke, ansi-only, unruled, shared-output, all-opaque, nul-beep, reread-rows kmn, us-base and azerty-base, test helpers)",
+      "files": [
+        "packages/engine/src/ldml-export/__fixtures__"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "rawText.ts: use/layer/platform/set(&layer) patterns plus the two row 6.2 additions (bare nul token, bracketed NUMLOCK/SCROLL key), fragment reason routing",
+      "files": [
+        "packages/engine/src/ldml-export/classify/rawText.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "callGraph.ts: entry points, use() edges from typed and raw outputs, every-path vs some-path reach, keystroke chains, unreachable and reserved groups",
+      "files": [
+        "packages/engine/src/ldml-export/classify/callGraph.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "keystrokes.ts: rule split at the keystroke (with and without separator), vkey/char/any/rawKey classes, modifiers incl RSHIFT, sided alt/ctrl, mixed sides, NUMLOCK/SCROLL, key-store expansion, form choice",
+      "files": [
+        "packages/engine/src/ldml-export/classify/keystrokes.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "ruleElements.ts: rows 3.1-3.26 per rule, RulePlan for the lowering, index mapping vs cartesian with MAX_TRANSFORMS_PER_RULE, guards evaluated at option defaults",
+      "files": [
+        "packages/engine/src/ldml-export/classify/ruleElements.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "header.ts: rows 1.2, 2.15, 4.1-4.16 from system stores and the header",
+      "files": [
+        "packages/engine/src/ldml-export/classify/header.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "classify.ts classifyForLdml/classifyDetailed: composes T023-T027, row 2.26 items, sorted, counted, deep-frozen; items.ts builds items from profile rows",
+      "files": [
+        "packages/engine/src/ldml-export/classify/classify.ts",
+        "packages/engine/src/ldml-export/classify/items.ts",
+        "packages/engine/src/ldml-export/index.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "classify.test.ts: one assertion per row of sections 1-4 and 6, exhaustiveness, fragment routing, severity, keys, sort and freeze",
+      "files": [
+        "packages/engine/src/ldml-export/classify/classify.test.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "capsExpand.ts (row 2.14, &CasedKeys driven shift inversion) with test",
+      "files": [
+        "packages/engine/src/ldml-export/lower/capsExpand.ts",
+        "packages/engine/src/ldml-export/lower/capsExpand.test.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "precedence.ts kmcmplib effective order with test",
+      "files": [
+        "packages/engine/src/ldml-export/lower/precedence.ts",
+        "packages/engine/src/ldml-export/lower/precedence.test.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "baseFill.ts (grid, fill, suppression, provenance) plus spec 109 FR-040 enumerator built as a separable change in base-fallback/unhandledPositions.ts, with tests",
+      "files": [
+        "packages/engine/src/ldml-export/lower/baseFill.ts",
+        "packages/engine/src/ldml-export/lower/baseFill.test.ts",
+        "packages/engine/src/base-fallback/unhandledPositions.ts",
+        "packages/engine/src/base-fallback/unhandledPositions.test.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "triggers.ts: trigger text, trigger markers on collision, catch-alls, with test",
+      "files": [
+        "packages/engine/src/ldml-export/lower/triggers.ts",
+        "packages/engine/src/ldml-export/lower/triggers.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "transforms.ts: from/to rendering, escaping by side, markers, captures, mapping and cartesian, comments, with test",
+      "files": [
+        "packages/engine/src/ldml-export/lower/transforms.ts",
+        "packages/engine/src/ldml-export/lower/transforms.test.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "document.ts: assembles LdmlDocument (form, layers, keys, variables, transform groups in call order, info, version, locale)",
+      "files": [
+        "packages/engine/src/ldml-export/lower/document.ts"
+      ]
+    },
+    "T090": {
+      "status": "DONE",
+      "did": "provenance.ts: per-position record, counts, extension element builder (record is report-only, row 4.17), with test",
+      "files": [
+        "packages/engine/src/ldml-export/lower/provenance.ts",
+        "packages/engine/src/ldml-export/lower/provenance.test.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "report.ts renderReport sections 1-8 with test",
+      "files": [
+        "packages/engine/src/ldml-export/report.ts",
+        "packages/engine/src/ldml-export/report.test.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "project/kpj.ts and project/kps.ts written directly (kmc-generate is not an engine dependency)",
+      "files": [
+        "packages/engine/src/ldml-export/project/kpj.ts",
+        "packages/engine/src/ldml-export/project/kps.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "package.ts buildLdmlExport, exported from the barrel and engine root",
+      "files": [
+        "packages/engine/src/ldml-export/package.ts",
+        "packages/engine/src/ldml-export/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "package.test.ts: Story 1 scenarios, determinism incl TZ, filename and ids, gap keys, provenance vs key map, markers, all-opaque",
+      "files": [
+        "packages/engine/src/ldml-export/package.test.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "compile.corpus.test.ts (H1+H2+H3), 18 corpus tests green",
+      "files": [
+        "packages/engine/src/ldml-export/compile.corpus.test.ts",
+        "packages/engine/src/ldml-export/__testing__/corpusExport.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "equivalence.corpus.test.ts and __testing__/equivalence.ts (H5), all corpus keyboards green with excuses by key/global",
+      "files": [
+        "packages/engine/src/ldml-export/equivalence.corpus.test.ts",
+        "packages/engine/src/ldml-export/__testing__/equivalence.ts"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "reference.corpus.test.ts (H9): ibono_chwerty vs hand-written file; 14 of 192 positions differ and all are the keyboard's own authored keys",
+      "files": [
+        "packages/engine/src/ldml-export/reference.corpus.test.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "timing.corpus.test.ts (H10)",
+      "files": [
+        "packages/engine/src/ldml-export/timing.corpus.test.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "resolveLdmlBaseLayout with five-source resolution and tests",
+      "files": [
+        "packages/studio/src/lib/ldmlBaseLayout.ts",
+        "packages/studio/src/lib/ldmlBaseLayout.test.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "LDML engine accessors in services.ts",
+      "files": [
+        "packages/studio/src/lib/services.ts"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "ldmlProfile and ldmlBaseLayout in store, persistence, registry, fixtures, round-trip test",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/lib/persistWorkingCopy.test.ts",
+        "packages/studio/src/decisions/derivedSurfaceRegistry.ts",
+        "packages/studio/src/lib/__fixtures__/prePrDraft.json",
+        "packages/studio/src/lib/__fixtures__/v1-draft-18e63aa4.json"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "buildLdmlExportForDownload plus ldmlExportInputs helper and buildOutputBundle tests",
+      "files": [
+        "packages/studio/src/lib/buildOutputBundle.ts",
+        "packages/studio/src/lib/buildOutputBundle.test.ts",
+        "packages/studio/src/lib/ldmlExportInputs.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "handleDownloadLdml, downloadingLdml, ldmlError in usePreviewArtifact",
+      "files": [
+        "packages/studio/src/hooks/usePreviewArtifact.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "LdmlDownloadPanel mounted in OutputScreen",
+      "files": [
+        "packages/studio/src/components/output/LdmlDownloadPanel.tsx",
+        "packages/studio/src/components/OutputScreen.tsx"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "output.download.ldml.* messages in en and fr, extracted and compiled",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "OutputScreen.ldml.test.tsx",
+      "files": [
+        "packages/studio/src/components/OutputScreen.ldml.test.tsx"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Playwright ldml-export journey written and run green on desktop project",
+      "files": [
+        "packages/studio/e2e/ldml-export.spec.ts"
       ]
     }
   }

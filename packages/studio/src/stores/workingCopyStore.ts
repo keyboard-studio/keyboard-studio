@@ -58,8 +58,10 @@ import type {
   ContextToleranceOverlay,
   KeyEditOperation,
   KeyEditOverlay,
+  LdmlProfileId,
   StartDocCssText,
 } from "@keyboard-studio/engine";
+import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import type {
   ContextVariantsResult,
@@ -578,6 +580,17 @@ export interface WorkingCopyState {
    * AFTER this slice was seeded still gets the right default. Persisted.
    */
   chartPreference: ChartPreference | null;
+  /**
+   * The LDML target profile the author picked for the LDML download (spec 108
+   * FR-027). Null means "not chosen": the newest profile applies at read time.
+   * Persisted; never reaches the `.kmp`, `.zip` or pull-request paths.
+   */
+  ldmlProfile: LdmlProfileId | null;
+  /**
+   * The author's override of the LDML export's base keyboard (spec 108 FR-027).
+   * Null means "use the resolved default". Persisted.
+   */
+  ldmlBaseLayout: LdmlBaseLayoutChoice | null;
   /**
    * The author's recorded answers to the deterministic documentation-fix
    * proposals for an adaptation's inherited welcome/help pages (issue
@@ -1306,6 +1319,12 @@ export interface WorkingCopyState {
   /** Record the author's keep-base-images / regenerate choice (spec 079 FR-015). */
   setChartPreference: (preference: ChartPreference | null) => void;
 
+  /** Record the LDML export profile choice (spec 108 FR-027). */
+  setLdmlProfile: (profile: LdmlProfileId | null) => void;
+
+  /** Record the LDML export base-keyboard override (spec 108 FR-027). */
+  setLdmlBaseLayout: (layout: LdmlBaseLayoutChoice | null) => void;
+
   /** Record the author's documentation-fix proposal answers (issue #1908). Whole-value replace; null clears (undo). */
   setDocFixProposals: (proposals: DocFixProposals | null) => void;
 
@@ -1722,6 +1741,8 @@ export type WorkingCopyData = Omit<
   | "setStartWelcomeConvention"
   | "setHistoryEntryState"
   | "setChartPreference"
+  | "setLdmlProfile"
+  | "setLdmlBaseLayout"
   | "setDocFixProposals"
   | "setTouchKeyIdentity"
   | "setStartDocProfile"
@@ -1768,6 +1789,8 @@ const INITIAL_STATE: WorkingCopyData = {
   startWelcomeImagesDropped: false,
   historyEntryState: null,
   chartPreference: null,
+  ldmlProfile: null,
+  ldmlBaseLayout: null,
   docFixProposals: null,
   touchKeyIdentity: null,
   startDocProfile: null,
@@ -2379,6 +2402,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // choice falls back to the FR-015 default.
       historyEntryState: null,
       chartPreference: null,
+      ldmlProfile: null,
+      ldmlBaseLayout: null,
       docFixProposals: null,
       touchKeyIdentity: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
@@ -2437,6 +2462,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // See instantiateFromStart: documentation decisions are per working copy.
       historyEntryState: null,
       chartPreference: null,
+      ldmlProfile: null,
+      ldmlBaseLayout: null,
       docFixProposals: null,
       touchKeyIdentity: null,
       baselineDocFindings: null,
@@ -2515,6 +2542,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setHistoryEntryState: (state) => set({ historyEntryState: state }),
 
   setChartPreference: (preference) => set({ chartPreference: preference }),
+
+  setLdmlProfile: (profile) => set({ ldmlProfile: profile }),
+
+  setLdmlBaseLayout: (layout) => set({ ldmlBaseLayout: layout }),
 
   setDocFixProposals: (proposals) => set({ docFixProposals: proposals }),
 

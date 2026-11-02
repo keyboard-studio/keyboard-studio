@@ -26,7 +26,13 @@
 
 import type { CompilerDiagnostic, VirtualFS } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput, zipProjectedVfs, type ProjectForOutputOptions } from "./serializeWorkingCopy.ts";
-import { getBuildKmp, getCompile } from "./services.ts";
+import type { LdmlProfileId } from "@keyboard-studio/engine";
+import { getBuildKmp, getBuildLdmlExport, getCompile, getParseKmn, getParseKvks, getParseTouchLayout } from "./services.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { getLayoutFamilyAnswer, getPickedWindowsLayouts } from "./layoutFamily.ts";
+import { resolveLdmlBaseLayout } from "./ldmlBaseLayout.ts";
+import { LDML_STUDIO_VERSION } from "./ldmlExportInputs.ts";
+import { readVfsText } from "./vfsText.ts";
 
 /** The compiled artifacts, keyed the way `buildKmp` expects them. */
 export interface OutputArtifacts {
@@ -218,4 +224,93 @@ export async function buildSourceZipForDownload(): Promise<DownloadResult | null
     filename: `${bundle.keyboardId}-${bundle.version}.zip`,
     warnings: bundle.warnings,
   };
+}
+
+/**
+ * Build the LDML keyboard export — a THIRD, separate download (spec 108 FR-002).
+ *
+ * It reads the same projection the `.zip` ships and writes nothing back to it (FR-007). It
+ * compiles nothing and runs no validator (FR-006): the classifier inside the exporter is the
+ * only judge, and the LDML files never reach the `.kmp`, the source `.zip` or a pull request.
+ *
+ * `source/<id>.kmn` is parsed with no try/catch: a projection the codec cannot parse fails
+ * here with the codec's own error (Art II). Throws {@link OutputBundleError} when the working
+ * copy is not instantiated, when no base keyboard can be chosen (FR-027), and for an
+ * ANSI-only keyboard, which the LDML path refuses.
+ */
+export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Promise<DownloadResult> {
+  const projected = await projectWorkingCopyForOutput();
+  if (projected === null) {
+    throw new OutputBundleError("Nothing to export: select a keyboard first.");
+  }
+  const { vfs, keyboardId, displayName, version } = projected;
+
+  const kmnText = readVfsText(vfs, `source/${keyboardId}.kmn`);
+  if (kmnText === undefined) {
+    throw new OutputBundleError(`The projected keyboard has no source/${keyboardId}.kmn to export.`);
+  }
+  const parseKmn = await getParseKmn();
+  const { ir } = parseKmn(kmnText, keyboardId);
+
+  const touchText = readVfsText(vfs, `source/${keyboardId}.keyman-touch-layout`);
+  const touchLayout = touchText === undefined ? null : (await getParseTouchLayout())(touchText);
+  const kvksText = readVfsText(vfs, `source/${keyboardId}.kvks`);
+  const visualKeyboard = kvksText === undefined ? null : (await getParseKvks())(kvksText);
+
+  const state = useWorkingCopyStore.getState();
+  const bcp47 = state.identity?.bcp47;
+  const languages = bcp47 !== undefined && bcp47 !== "" ? [bcp47] : [];
+
+  const base = resolveLdmlBaseLayout({
+    windowsLayoutPicks: getPickedWindowsLayouts(),
+    layoutFamily: getLayoutFamilyAnswer() ?? null,
+    bcp47: languages,
+    override: state.ldmlBaseLayout,
+  });
+  if (base.chosen === null) {
+    throw new OutputBundleError(
+      `The base keyboard "${base.defaultChoice.label}" has no reference data for the LDML export. Pick another base keyboard first.`,
+    );
+  }
+
+  const buildLdmlExport = await getBuildLdmlExport();
+  const result = await buildLdmlExport({
+    ir,
+    touchLayout,
+    visualKeyboard,
+    baseLayout: base.chosen,
+    profileId,
+    keyboardId,
+    metadata: {
+      projectId: `${keyboardId}_ldml`,
+      name: displayName,
+      version,
+      languages,
+      author: "",
+      authorEmail: "",
+      copyright: "",
+      licenceName: "",
+      description: "",
+      homePage: "",
+      attributionText: "",
+      indicator: null,
+    },
+    packageFiles: {
+      readmeHtm: "",
+      welcomeHtm: "",
+      licenseMd: "",
+      readmeMd: "",
+      historyMd: "",
+      icon: null,
+      fonts: [],
+    },
+    studioVersion: LDML_STUDIO_VERSION,
+  });
+
+  if (!result.ok) {
+    throw new OutputBundleError(
+      "This keyboard is ANSI-only (begin ANSI with no begin Unicode), and LDML has no ANSI mode. Convert it to Unicode before exporting.",
+    );
+  }
+  return { bytes: result.zip, filename: result.filename, warnings: [...projected.warnings] };
 }

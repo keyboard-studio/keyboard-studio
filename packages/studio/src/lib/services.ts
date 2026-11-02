@@ -212,6 +212,50 @@ export async function getBuildKmp(): Promise<BuildKmpFn> {
   return buildKmpCache;
 }
 
+// Spec 108 (LDML export). The six accessors below follow the cached `importEngine()` pattern
+// and, like getBuildKmp, throw when the real engine is off: an export built from mocks would be
+// a plausible-looking wrong artifact. None of them runs on a debounce; the export fires once per
+// explicit download click and the classifier is reached through the owning step's validation cycle.
+type LdmlExports = Pick<
+  EngineModule,
+  "buildLdmlExport" | "classifyForLdml" | "listLdmlProfiles" | "parseKmn" | "parseTouchLayout" | "parseKvks"
+>;
+let ldmlCache: LdmlExports | null = null;
+async function ldmlEngine(what: string): Promise<LdmlExports> {
+  if (!USE_REAL) {
+    throw new Error(`[output] ${what} requires the real engine (VITE_USE_REAL_ENGINE=false)`);
+  }
+  if (ldmlCache !== null) return ldmlCache;
+  const e = await importEngine();
+  ldmlCache = {
+    buildLdmlExport: e.buildLdmlExport,
+    classifyForLdml: e.classifyForLdml,
+    listLdmlProfiles: e.listLdmlProfiles,
+    parseKmn: e.parseKmn,
+    parseTouchLayout: e.parseTouchLayout,
+    parseKvks: e.parseKvks,
+  };
+  return ldmlCache;
+}
+export async function getBuildLdmlExport(): Promise<EngineModule["buildLdmlExport"]> {
+  return (await ldmlEngine("LDML export")).buildLdmlExport;
+}
+export async function getClassifyForLdml(): Promise<EngineModule["classifyForLdml"]> {
+  return (await ldmlEngine("LDML classification")).classifyForLdml;
+}
+export async function getListLdmlProfiles(): Promise<EngineModule["listLdmlProfiles"]> {
+  return (await ldmlEngine("LDML profile listing")).listLdmlProfiles;
+}
+export async function getParseKmn(): Promise<EngineModule["parseKmn"]> {
+  return (await ldmlEngine("KMN parsing")).parseKmn;
+}
+export async function getParseTouchLayout(): Promise<EngineModule["parseTouchLayout"]> {
+  return (await ldmlEngine("touch-layout parsing")).parseTouchLayout;
+}
+export async function getParseKvks(): Promise<EngineModule["parseKvks"]> {
+  return (await ldmlEngine("KVKS parsing")).parseKvks;
+}
+
 // The .kmn compile, for the output path. useKeyboardArtifact runs its own
 // compile for the live preview against the PREVIEW vfs; the output path needs a
 // compile against the PROJECTED vfs, which includes assignments and the final

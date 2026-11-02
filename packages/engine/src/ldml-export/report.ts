@@ -1,0 +1,135 @@
+// LDML-EXPORT-REPORT.md (spec 108 FR-031, FR-062, FR-064; task T035; contracts/export-package.md).
+//
+// The report is always English and has no timestamp. Rows are sorted by section, then line, then
+// code, so the order never depends on traversal. It is a projection of the same classification the
+// findings view reads.
+
+import { compareCodePoints } from "./lower/keyIds.js";
+import type { ProvenanceRecord } from "./lower/provenance.js";
+import { provenanceCounts } from "./lower/provenance.js";
+import { resolveLdmlProfile } from "./profiles/resolve.js";
+import type { TargetProfile } from "./profiles/types.js";
+import type { CompatibilityItem, LdmlBaseLayoutSource, LdmlClassification } from "./types.js";
+
+export interface ReportContext {
+  keyboardName: string;
+  keyboardId: string;
+  version: string;
+  /** The row 2.7 caveat applies. */
+  mnemonic: boolean;
+  /** Per-position provenance (FR-028); null when the keyboard was refused. */
+  provenance: ProvenanceRecord | null;
+}
+
+const SOURCE_TEXT: Record<LdmlBaseLayoutSource, string> = {
+  author: "the author's pick on the Output page",
+  "primary-pick": "the primary Windows layout pick",
+  "likely-base": "the likely base keyboard for the language",
+  "en-US": "the default (en-US)",
+};
+
+function cell(s: string): string {
+  return s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function location(item: CompatibilityItem, sourceName: string): string {
+  if (item.line !== null) return `${sourceName}:${item.line}`;
+  if (item.side === "touch") return item.nodeKey.replace(/^touch:/, "touch ");
+  return item.owner !== null ? `${item.owner}` : item.nodeKey;
+}
+
+function compareItems(a: CompatibilityItem, b: CompatibilityItem): number {
+  return (
+    (a.line ?? Number.MAX_SAFE_INTEGER) - (b.line ?? Number.MAX_SAFE_INTEGER) ||
+    compareCodePoints(a.code ?? "", b.code ?? "") ||
+    compareCodePoints(a.siteKey, b.siteKey)
+  );
+}
+
+function table(items: readonly CompatibilityItem[], sourceName: string): string[] {
+  if (items.length === 0) return ["None.", ""];
+  const lines = [
+    "| Location | Construct | Code | Status | What LDML does instead |",
+    "|---|---|---|---|---|",
+  ];
+  for (const i of [...items].sort(compareItems)) {
+    lines.push(
+      `| ${cell(location(i, sourceName))} | ${cell(i.construct)} | ${i.code ?? ""} | ${i.status} | ${cell(i.consequence)} |`,
+    );
+  }
+  lines.push("");
+  return lines;
+}
+
+export function renderReport(c: LdmlClassification, profile: TargetProfile, ctx: ReportContext): string {
+  const sourceName = `source/${ctx.keyboardId}.kmn`;
+  const out: string[] = [];
+  out.push(`# LDML export report: ${ctx.keyboardName} (${ctx.keyboardId}) version ${ctx.version}`, "");
+
+  // 1. Title and authority
+  out.push("## 1. Profile and authority", "");
+  out.push(`- Profile: ${profile.id} (namespace ${profile.namespace}).`);
+  out.push(`- TR35 revision this export was written against: ${profile.tr35Revision}.`);
+  out.push(
+    profile.keymanRelease === null
+      ? "- Keyman: TR35-only (awaiting Keyman). No Keyman release compiles this profile yet."
+      : `- Keyman: compiles with Keyman ${profile.keymanRelease}.`,
+  );
+  out.push(
+    "- Authority: the KMN keyboard is the source of truth. This report lists what the LDML file does differently. It is generated from the same classification the authoring warnings use.",
+    "",
+  );
+
+  // 2. Base keyboard
+  out.push("## 2. Base keyboard", "");
+  out.push(`The export filled every position the keyboard does not handle from ${c.baseLayout.label} (\`${c.baseLayout.id}\`), chosen by ${SOURCE_TEXT[c.baseLayout.source]}.`, "");
+  if (ctx.provenance !== null) {
+    out.push("| Layer | Authored | Filled | Suppressed |", "|---|---|---|---|");
+    for (const r of provenanceCounts(ctx.provenance)) out.push(`| ${r.layer} | ${r.authored} | ${r.filled} | ${r.suppressed} |`);
+    out.push("");
+  }
+  if (ctx.mnemonic) {
+    out.push(
+      "This keyboard is mnemonic. LDML is positional only, so its keys were resolved to positions through the base keyboard above. The exported layout matches the mnemonic keyboard only for people whose base keyboard is that one.",
+      "",
+    );
+  }
+
+  // 3. Summary
+  out.push("## 3. Summary", "");
+  out.push(`Mapped: ${c.counts.M}. Approximated: ${c.counts.A}. Not exported: ${c.counts.N}. Keyman gaps: ${c.counts.K}.`, "");
+  if (c.counts.A === 0 && c.counts.N === 0) out.push("Nothing was lost.", "");
+
+  // 4. Delivery note
+  out.push("## 4. Delivery note", "");
+  out.push("Keyman 19 delivers LDML keyboards to desktop only.");
+  if (c.touchPresent) {
+    out.push(
+      "",
+      "The touch layout is written to TR35 and is ready for Keyman's touch pipeline. No Keyman runs it yet, so touch devices do not use it today.",
+    );
+  }
+  out.push("");
+
+  const coded = c.items.filter((i) => i.code !== null);
+  out.push("## 5. What did not carry over: physical keyboard", "");
+  out.push(...table(coded.filter((i) => i.side === "hardware"), sourceName));
+  out.push("## 6. What did not carry over: touch", "");
+  out.push(...table(coded.filter((i) => i.side === "touch"), sourceName));
+  out.push("## 7. Other items", "");
+  out.push(...table(coded.filter((i) => i.side === "package"), sourceName));
+
+  // 8. Version change
+  if (profile.id !== "46") {
+    const base = resolveLdmlProfile("46");
+    out.push("## 8. Version change from profile 46", "");
+    const moved = profile.deltas.filter((d) => d.status !== undefined);
+    if (moved.length === 0) out.push("No rows changed.", "");
+    else {
+      out.push("| Row | Profile 46 | This profile |", "|---|---|---|");
+      for (const d of moved) out.push(`| ${d.id} | ${base.rows.get(d.id)?.status ?? ""} | ${d.status ?? ""} |`);
+      out.push("");
+    }
+  }
+  return out.join("\n");
+}

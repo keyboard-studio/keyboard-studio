@@ -65,6 +65,7 @@ import { unreachableReasonLabel } from "../decisions/progressDots.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
+import { LdmlDownloadPanel } from "./output/LdmlDownloadPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
 import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
@@ -166,6 +167,9 @@ export function OutputScreen() {
     kmpError,
     kmpDiagnostics,
     handleDownloadKmp,
+    downloadingLdml,
+    ldmlError,
+    handleDownloadLdml,
     coverageGate,
     showIdentityWarn,
     // spec 064: the two attribution hard-blocks and the D5 escape hatch.
@@ -354,8 +358,9 @@ export function OutputScreen() {
 
   // Both buttons disable while EITHER download is in flight: they share one
   // projection + compile, so overlapping clicks would do the same work twice.
-  const kmpActionable = !outputGate.blocked && !buildingKmp && !downloading;
-  const zipActionable = !outputGate.blocked && !downloading && !buildingKmp;
+  // The LDML export (spec 108) is a third download and joins the same busy state.
+  const kmpActionable = !outputGate.blocked && !buildingKmp && !downloading && !downloadingLdml;
+  const zipActionable = !outputGate.blocked && !downloading && !buildingKmp && !downloadingLdml;
 
   // Left pane (desktop) / collapsed disclosure after the Output pane (narrow).
   // Shipping details once instantiated, else the cold-arrival picker — see
@@ -591,12 +596,21 @@ export function OutputScreen() {
                 contributing upstream.
               </Trans>
             </p>
+            {/* spec 108 FR-002: the LDML export, a third download behind the same gate. */}
+            <LdmlDownloadPanel
+              keyboardId={downloadKeyboardId}
+              gatedAriaLabel={outputGate.blocked ? downloadAriaLabel : null}
+              otherBusy={buildingKmp || downloading}
+              downloading={downloadingLdml}
+              error={ldmlError}
+              onDownload={() => { void handleDownloadLdml(); }}
+            />
             {/* spec 094 FR-006: a labelled, numbered build for testers, from the
                 same working copy and behind the same gates as the package. */}
             <TestBuildPanel
               gate={gateInput}
               nextTestVersion={artifact.nextTestVersion}
-              busy={buildingKmp || downloading}
+              busy={buildingKmp || downloading || downloadingLdml}
               onMakeTestBuild={artifact.handleMakeTestBuild}
             />
             {touchStale && (

@@ -1,0 +1,10 @@
+c keys with no rule
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Unruled'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > 'ä'

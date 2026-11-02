@@ -1162,3 +1162,16 @@ export type {
   LdmlVKey,
   RowId,
 } from "./ldml-export/index.js";
+
+export {
+  buildLdmlExport,
+  classifyForLdml,
+  listLdmlProfiles,
+  renderReport,
+  resolveLdmlProfile,
+} from "./ldml-export/index.js";
+export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
+
+// Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
+export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
+export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";

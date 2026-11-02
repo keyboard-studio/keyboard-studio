@@ -1,0 +1,9 @@
+c ansi only
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Ansi'
+
+begin ANSI > use(main)
+
+group(main) using keys
+
++ [K_A] > 'a'

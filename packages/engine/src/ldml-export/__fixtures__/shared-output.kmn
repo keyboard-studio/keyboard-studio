@@ -1,0 +1,13 @@
+c two keys with the same output and different contexts
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Shared'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > 'x'
++ [K_B] > 'x'
+'p' + [K_A] > 'q'
+'r' + [K_B] > 's'

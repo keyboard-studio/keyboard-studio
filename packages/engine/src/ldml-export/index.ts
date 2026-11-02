@@ -25,3 +25,9 @@ export type {
 
 export type { ProfileRow, ProfileRowStatus, RowDelta, TargetProfile } from "./profiles/types.js";
 export { listLdmlProfiles, resolveLdmlProfile } from "./profiles/resolve.js";
+
+export { classifyForLdml } from "./classify/classify.js";
+export type { ClassifyOptions } from "./classify/classify.js";
+export { buildLdmlExport } from "./package.js";
+export { renderReport } from "./report.js";
+export type { ReportContext } from "./report.js";

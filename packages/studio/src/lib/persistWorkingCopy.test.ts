@@ -1011,6 +1011,29 @@ describe("persistWorkingCopy", () => {
       expect(useWorkingCopyStore.getState().chartPreference).toBe("regenerate");
     });
 
+    it("round-trips ldmlProfile and ldmlBaseLayout through snapshot/rehydrate (spec 108 FR-027)", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setLdmlProfile("49");
+      useWorkingCopyStore.getState().setLdmlBaseLayout("azerty");
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().ldmlProfile).toBeNull();
+      expect(useWorkingCopyStore.getState().ldmlBaseLayout).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().ldmlProfile).toBe("49");
+      expect(useWorkingCopyStore.getState().ldmlBaseLayout).toBe("azerty");
+    });
+
+    it("tolerates a snapshot saved before the LDML choices existed, restoring null", () => {
+      instantiate();
+      const legacy = { ...snapshotWorkingCopyData() } as Partial<WorkingCopySnapshot>;
+      delete legacy.ldmlProfile;
+      delete legacy.ldmlBaseLayout;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.ldmlProfile).toBeNull();
+      expect(prepared.ldmlBaseLayout).toBeNull();
+    });
+
     it("tolerates a snapshot written before the fields existed, restoring null", () => {
       instantiate();
       const snapshot = snapshotWorkingCopyData();

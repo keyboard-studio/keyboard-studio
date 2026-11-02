@@ -108,3 +108,8 @@ const POSITIONS: Record<LdmlForm, ReadonlyMap<string, KeyPosition>> = (() => {
 export function vkeyPosition(form: LdmlForm, vkey: string): KeyPosition | undefined {
   return POSITIONS[form].get(vkey);
 }
+
+/** Every main-block vkey on any form, in the table's spelling. */
+export const MAIN_BLOCK_VKEYS: ReadonlySet<string> = new Set(
+  LDML_FORMS.flatMap((f) => FORM_ROWS[f].flatMap((row) => row.map((cell) => cell.vkey))),
+);
