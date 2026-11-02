@@ -34,8 +34,9 @@ import {
 } from "./reviewSources.ts";
 import {
   fetchPrKeyboards,
-  useOpenPrs,
+  usePrs,
   useRepoKeyboards,
+  type PrStateFilter,
 } from "./useReviewIndex.ts";
 
 type RepoChoice = "ks" | "km";
@@ -62,7 +63,7 @@ const KINDS: Array<{ id: KindChoice; label: string; blurb: string }> = [
   },
   {
     id: "prs",
-    label: "Open pull requests",
+    label: "Pull requests",
     blurb: "Proposed additions & fixes, judged at the PR head",
   },
 ];
@@ -167,21 +168,31 @@ export function ReviewPicker({
   const [selectedPr, setSelectedPr] = useState<ReviewPrEntry | null>(null);
   const [prKeyboards, setPrKeyboards] = useState<ReviewKeyboardEntry[] | null>(null);
   const [prKeyboardsError, setPrKeyboardsError] = useState<string | null>(null);
+  const [prStateFilter, setPrStateFilter] = useState<PrStateFilter>("open");
 
   const src: ReviewSourceId | null =
     repo && kind ? sourceId(repo, kind) : null;
   const repoKeyboards = useRepoKeyboards(index, src ?? "ks-repo", query);
-  const openPrs = useOpenPrs(index, src ?? "ks-prs", query);
+  const {
+    prs: openPrs,
+    live: prsLive,
+    loading: prsLoading,
+    error: prsError,
+  } = usePrs(index, src ?? "ks-prs", query, prStateFilter);
 
-  // Hard link: preselect the PR by number once the list loads.
+  // Hard link: preselect the PR by number once the list loads. If the PR
+  // isn't under the current state filter (e.g. a link to a closed PR),
+  // widen the filter to All so it can be found.
   useEffect(() => {
     if (initialPrNumber === undefined || selectedPr) return;
     const pr = openPrs.find((p) => p.number === initialPrNumber);
     if (pr) {
       setSelectedPr(pr);
       setSelected(null);
+    } else if (!prsLoading && prStateFilter !== "all") {
+      setPrStateFilter("all");
     }
-  }, [initialPrNumber, openPrs, selectedPr]);
+  }, [initialPrNumber, openPrs, selectedPr, prsLoading, prStateFilter]);
 
   // Hard link: auto-run when the PR touches exactly one keyboard.
   const autoRanRef = useRef(false);
@@ -360,15 +371,50 @@ export function ReviewPicker({
       {repo && kind === "prs" && !selectedPr && (
         <section aria-label="Pick a pull request">
           <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>3. Pick a pull request</h3>
+          <div
+            role="group"
+            aria-label="Filter pull requests by state"
+            style={{ display: "flex", gap: 6, marginBottom: 8 }}
+          >
+            {(["all", "open", "closed"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={prStateFilter === f}
+                onClick={() => setPrStateFilter(f)}
+                style={{
+                  background: prStateFilter === f ? BG_CARD : BG_INSET,
+                  border: `1px solid ${prStateFilter === f ? ACCENT : BORDER}`,
+                  borderRadius: 20,
+                  padding: "3px 12px",
+                  cursor: "pointer",
+                  fontFamily: FONT,
+                  fontSize: 12,
+                  color: prStateFilter === f ? CSS_TEXT : TEXT_DIM,
+                  textTransform: "capitalize",
+                }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
           <SearchInput
             value={query}
             onChange={setQuery}
             placeholder="Search pull requests by number or title…"
             label="Search pull requests"
           />
+          <p style={{ fontSize: 11, color: TEXT_DIM, margin: "0 0 8px" }}>
+            {prsLoading && "Loading the live pull request list…"}
+            {!prsLoading && prsLive && "Live from GitHub · refreshed on each visit."}
+            {!prsLoading &&
+              !prsLive &&
+              prsError &&
+              `Live list unavailable (${prsError}) — showing the cached list from ${index?.generatedAt?.slice(0, 10) ?? "the last index build"}.`}
+          </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {openPrs.length === 0 && (
-              <p style={{ fontSize: 13, color: TEXT_DIM }}>No open pull requests.</p>
+            {openPrs.length === 0 && !prsLoading && (
+              <p style={{ fontSize: 13, color: TEXT_DIM }}>No pull requests match.</p>
             )}
             {openPrs.map((pr) => (
               <button
@@ -392,6 +438,19 @@ export function ReviewPicker({
                 <span style={{ fontFamily: CSS_FONT_MONO, fontWeight: 700, fontSize: 13 }}>
                   #{pr.number}
                 </span>{" "}
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 20,
+                    padding: "1px 8px",
+                    marginRight: 6,
+                    color: pr.state === "open" ? CSS_SIL_GREEN : TEXT_DIM,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {pr.state}
+                </span>
                 <span style={{ fontSize: 13 }}>{pr.title}</span>
                 <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
                   head {pr.headSha.slice(0, 7)}

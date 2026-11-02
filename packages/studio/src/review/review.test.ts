@@ -13,6 +13,7 @@ import {
   type ReviewTarget,
 } from "./reviewSources.ts";
 import { targetFromParams } from "./ReviewScreen.tsx";
+import { fetchLivePrs } from "./useReviewIndex.ts";
 import { parseReviewPath } from "./reviewLinks.ts";
 import type { ReviewIndex } from "./reviewSources.ts";
 import { rehydrateResult, runJudgeJob } from "./judgeWorkerProtocol.ts";
@@ -322,5 +323,55 @@ describe("parseReviewPath", () => {
 
   it("rejects path traversal", () => {
     expect(parseReviewPath("/review/keymanapp/keyboards/../secret")).toBeNull();
+  });
+});
+
+describe("fetchLivePrs", () => {
+  function pullsFetch(
+    pages: Array<Array<Record<string, unknown>>>,
+    status = 200,
+  ): typeof fetch {
+    let calls = 0;
+    return (async () => {
+      const page = pages[Math.min(calls, pages.length - 1)] ?? [];
+      calls += 1;
+      return {
+        ok: status === 200,
+        status,
+        json: async () => page,
+      };
+    }) as unknown as typeof fetch;
+  }
+
+  const row = (n: number, state: string) => ({
+    number: n,
+    title: `PR ${n}`,
+    head: { sha: `sha${n}` },
+    updated_at: "2026-11-01T00:00:00Z",
+    state,
+  });
+
+  it("maps API rows to entries with state, newest first", async () => {
+    const prs = await fetchLivePrs("keymanapp", "keyboards", pullsFetch([[row(4205, "open"), row(4200, "closed")]]));
+    expect(prs).toEqual([
+      { number: 4205, title: "PR 4205", headSha: "sha4205", updatedAt: "2026-11-01T00:00:00Z", state: "open" },
+      { number: 4200, title: "PR 4200", headSha: "sha4200", updatedAt: "2026-11-01T00:00:00Z", state: "closed" },
+    ]);
+  });
+
+  it("throws on API failure so callers can fall back to the index", async () => {
+    // Distinct repo key: fetchLivePrs is session-cached per owner/repo.
+    await expect(fetchLivePrs("keymanapp", "keyboards-403", pullsFetch([[]], 403))).rejects.toThrow(
+      /PR list API: HTTP 403/,
+    );
+  });
+
+  it("skips rows without a number or head sha", async () => {
+    const prs = await fetchLivePrs(
+      "keymanapp",
+      "keyboards-partial",
+      pullsFetch([[{ number: 1 }, { title: "no head", head: {} }, row(2, "open")]]),
+    );
+    expect(prs.map((p) => p.number)).toEqual([2]);
   });
 });
