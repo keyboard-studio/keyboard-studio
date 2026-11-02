@@ -7,7 +7,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { buildKmp } from "../output/kmp.js";
-import { CORPUS, loadCorpusKeyboard } from "./__testing__/corpus.js";
+import { loadCorpusKeyboard, resolvableCorpusEntries } from "./__testing__/corpus.js";
 import { corpusAvailable, corpusExportInput, KEYBOARDS_ROOT } from "./__testing__/corpusExport.js";
 import { keymanCompile } from "./__testing__/keymanCompile.js";
 import { buildLdmlExport } from "./package.js";
@@ -51,7 +51,7 @@ function withDocs(input: LdmlExportInput): LdmlExportInput {
   };
 }
 
-for (const entry of CORPUS) {
+for (const entry of resolvableCorpusEntries()) {
   if (!entry.profiles.includes(46)) continue;
   describe(`${entry.id}`, () => {
     it("builds a .kmx, a .kvk and a .kmp whose info equals the metadata", async () => {

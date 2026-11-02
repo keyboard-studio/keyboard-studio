@@ -1,10 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { CORPUS, REQUIRED_PICKS, corpusAvailable, loadCorpusKeyboard } from "./corpus.js";
+import {
+  CORPUS,
+  corpusAvailable,
+  experimentalAvailable,
+  loadCorpusKeyboard,
+  REQUIRED_PICKS,
+  resolvableCorpusEntries,
+} from "./corpus.js";
 
 describe.skipIf(!corpusAvailable)("ldml-export corpus resolver", () => {
   it("resolves every corpus keyboard from release/ or experimental/", () => {
-    for (const entry of CORPUS) {
+    // resolvableCorpusEntries() drops experimental-only entries (khmer_ldml)
+    // in CI's release-only sparse checkout; the seam test below proves the
+    // drop is real, not vacuous.
+    for (const entry of resolvableCorpusEntries()) {
       expect(loadCorpusKeyboard(entry.id), entry.id).toBeDefined();
+    }
+  });
+
+  it("the release/experimental seam annotations match the checkout", () => {
+    // Regression guard for the seam that broke CI on main (run 41480613430):
+    // khmer_ldml lives in experimental/, which CI's pinned corpus does not
+    // check out. In a release-only checkout the experimental-only entries
+    // must genuinely be unresolvable (otherwise the skip above is vacuous);
+    // in a full checkout every entry must resolve from an annotated tree.
+    for (const entry of CORPUS) {
+      if (!experimentalAvailable) {
+        if (!entry.trees.includes("release")) {
+          expect(loadCorpusKeyboard(entry.id), entry.id).toBeUndefined();
+        }
+      } else {
+        const kb = loadCorpusKeyboard(entry.id);
+        expect(kb, entry.id).toBeDefined();
+        expect(entry.trees, entry.id).toContain(kb?.tree);
+      }
     }
   });
 
@@ -17,8 +46,14 @@ describe.skipIf(!corpusAvailable)("ldml-export corpus resolver", () => {
   });
 
   it("finds the hand-written LDML beside khmer_ldml and ibono_chwerty", () => {
-    expect(loadCorpusKeyboard("khmer_ldml")?.ldmlXml).toContain("<keyboard3");
     expect(loadCorpusKeyboard("ibono_chwerty")?.ldmlXml).toContain("<keyboard3");
+    const khmer = loadCorpusKeyboard("khmer_ldml");
+    if (!experimentalAvailable) {
+      // CI's pinned corpus is release-only sparse; khmer_ldml is experimental-only.
+      expect(khmer).toBeUndefined();
+    } else {
+      expect(khmer?.ldmlXml).toContain("<keyboard3");
+    }
   });
 
   it("the three picks have the features they were chosen for", () => {
