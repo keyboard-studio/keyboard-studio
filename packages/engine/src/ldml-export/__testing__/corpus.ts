@@ -1,6 +1,12 @@
 // Test-only corpus resolver for the LDML export harnesses (contracts/test-harnesses.md "Corpus").
 // Resolves keyboards from the sibling ../keyboards checkout (release/ and experimental/) and loads
 // their source files from disk. Never import this from product code.
+//
+// CI's pinned corpus (.github/workflows/ci.yml KEYBOARDS_CORPUS_SHA) is a release-only sparse
+// checkout, so experimental-only keyboards (e.g. khmer_ldml) resolve only in a full local
+// checkout. The `trees` annotation on each CORPUS entry plus `experimentalAvailable` and
+// `resolvableCorpusEntries()` keep the suites green in both shapes without failing on a
+// keyboard that is absent by design.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +21,9 @@ export const EXPERIMENTAL_ROOT = join(KEYBOARDS_ROOT, "experimental");
 
 /** True when the sibling checkout is present; corpus suites skip (not fail) when it is not. */
 export const corpusAvailable: boolean = existsSync(RELEASE_ROOT);
+
+/** True when the sibling checkout has an experimental/ tree (false in CI's release-only sparse checkout). */
+export const experimentalAvailable: boolean = existsSync(EXPERIMENTAL_ROOT);
 
 export type CorpusRole =
   | "scaffold-fixture"
@@ -31,6 +40,14 @@ export interface CorpusEntry {
   why: string;
   /** LDML profiles (CLDR major versions) the keyboard is exercised under. */
   profiles: readonly (46 | 49)[];
+  /**
+   * Tree(s) of the pinned corpus checkout the keyboard lives in. Suites iterate
+   * `resolvableCorpusEntries()` so experimental-only entries are skipped, not
+   * failed, in CI's release-only sparse checkout. Re-check against
+   * KEYBOARDS_CORPUS_SHA when the pin moves; the seam test in corpus.test.ts
+   * keeps these annotations honest.
+   */
+  trees: readonly ("release" | "experimental")[];
 }
 
 /**
@@ -46,17 +63,31 @@ export const REQUIRED_PICKS = {
 } as const;
 
 export const CORPUS: readonly CorpusEntry[] = [
-  { id: "basic_kbdus", role: "scaffold-fixture", why: "broad positional coverage", profiles: [46, 49] },
-  { id: "basic_kbdfr", role: "scaffold-fixture", why: "AZERTY host", profiles: [46, 49] },
-  { id: "sil_cameroon_qwerty", role: "scaffold-fixture", why: "broad positional coverage", profiles: [46, 49] },
-  { id: "sil_cameroon_azerty", role: "scaffold-fixture", why: "AZERTY host", profiles: [46, 49] },
-  { id: "ibono_chwerty", role: "handwritten-ldml-compare", why: "compare with the hand-written extras/ibono_chwerty.xml", profiles: [46] },
-  { id: "khmer_angkor", role: "ldml-pair", why: "variables, sets, reorder-free and backspace transforms (vs khmer_ldml)", profiles: [46, 49] },
-  { id: "khmer_ldml", role: "ldml-pair", why: "hand-written LDML counterpart of khmer_angkor", profiles: [46, 49] },
-  { id: REQUIRED_PICKS.mnemonic, role: "mnemonic", why: "mnemonic layout, row 2.7", profiles: [46] },
-  { id: REQUIRED_PICKS.postKeystrokeTouch, role: "post-keystroke-touch", why: "begin PostKeystroke and a touch layout", profiles: [46, 49] },
-  { id: REQUIRED_PICKS.optionStores, role: "option-stores", why: "if()/set() option stores", profiles: [46] },
+  { id: "basic_kbdus", role: "scaffold-fixture", why: "broad positional coverage", profiles: [46, 49], trees: ["release"] },
+  { id: "basic_kbdfr", role: "scaffold-fixture", why: "AZERTY host", profiles: [46, 49], trees: ["release"] },
+  { id: "sil_cameroon_qwerty", role: "scaffold-fixture", why: "broad positional coverage", profiles: [46, 49], trees: ["release"] },
+  { id: "sil_cameroon_azerty", role: "scaffold-fixture", why: "AZERTY host", profiles: [46, 49], trees: ["release"] },
+  { id: "ibono_chwerty", role: "handwritten-ldml-compare", why: "compare with the hand-written extras/ibono_chwerty.xml", profiles: [46], trees: ["release"] },
+  { id: "khmer_angkor", role: "ldml-pair", why: "variables, sets, reorder-free and backspace transforms (vs khmer_ldml)", profiles: [46, 49], trees: ["release"] },
+  // The only experimental-only entry: CI's release-only sparse checkout has no experimental/ tree.
+  { id: "khmer_ldml", role: "ldml-pair", why: "hand-written LDML counterpart of khmer_angkor", profiles: [46, 49], trees: ["experimental"] },
+  { id: REQUIRED_PICKS.mnemonic, role: "mnemonic", why: "mnemonic layout, row 2.7", profiles: [46], trees: ["release"] },
+  { id: REQUIRED_PICKS.postKeystrokeTouch, role: "post-keystroke-touch", why: "begin PostKeystroke and a touch layout", profiles: [46, 49], trees: ["release"] },
+  { id: REQUIRED_PICKS.optionStores, role: "option-stores", why: "if()/set() option stores", profiles: [46], trees: ["release"] },
 ];
+
+/**
+ * The CORPUS entries resolvable in the current checkout shape: an entry is
+ * included when at least one of its annotated trees is present. In CI's
+ * release-only sparse checkout this drops experimental-only entries
+ * (khmer_ldml); a full local checkout keeps them. Corpus suites iterate this,
+ * never CORPUS directly, when they assert resolution.
+ */
+export function resolvableCorpusEntries(): CorpusEntry[] {
+  return CORPUS.filter((e) =>
+    e.trees.some((t) => (t === "release" ? corpusAvailable : experimentalAvailable)),
+  );
+}
 
 export interface CorpusKeyboard {
   id: string;

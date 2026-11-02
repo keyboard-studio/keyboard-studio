@@ -17,7 +17,7 @@ import { stripDanglingAssetStores } from "../compiler/stripDanglingAssetStores.j
 import { compile } from "../compiler/index.js";
 import { TouchTapSession } from "../simulator/tapSimulation.js";
 import { US_BASE } from "./__fixtures__/us-base.js";
-import { CORPUS, loadCorpusKeyboard, type CorpusKeyboard } from "./__testing__/corpus.js";
+import { loadCorpusKeyboard, resolvableCorpusEntries, type CorpusKeyboard } from "./__testing__/corpus.js";
 import { corpusAvailable, corpusExportInput, KEYBOARDS_ROOT } from "./__testing__/corpusExport.js";
 import { withTargetsAny } from "./__testing__/equivalence.js";
 import { loadLdml } from "./__testing__/ldmlInterpreter.js";
@@ -40,7 +40,7 @@ describe("LDML touch corpus: precondition", () => {
   });
 
   it("the corpus has touch-bearing keyboards (otherwise SC-010 is vacuous)", () => {
-    const touch = CORPUS.filter((e) => loadCorpusKeyboard(e.id)?.touchLayout !== undefined);
+    const touch = resolvableCorpusEntries().filter((e) => loadCorpusKeyboard(e.id)?.touchLayout !== undefined);
     expect(touch.length, "no corpus keyboard has a .keyman-touch-layout").toBeGreaterThan(0);
   });
 });
@@ -157,7 +157,7 @@ async function touchPass(kb: CorpusKeyboard): Promise<{ compared: number; unexpl
   return { compared, unexplained, explained };
 }
 
-for (const entry of CORPUS) {
+for (const entry of resolvableCorpusEntries()) {
   describe(`${entry.id}`, () => {
     for (const p of entry.profiles) {
       const profileId = String(p) as "46" | "49";

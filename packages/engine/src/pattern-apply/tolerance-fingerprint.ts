@@ -17,7 +17,7 @@ const FNV64_OFFSET = 0xcbf29ce484222325n;
 const FNV64_PRIME = 0x100000001b3n;
 const MASK64 = 0xffffffffffffffffn;
 
-function fnv1a64Hex(text: string): string {
+export function fnv1a64Hex(text: string): string {
   let hash = FNV64_OFFSET;
   for (const byte of new TextEncoder().encode(text)) {
     hash ^= BigInt(byte);

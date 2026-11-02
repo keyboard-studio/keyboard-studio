@@ -2,9 +2,9 @@
 // retained normalization-step acceptance (spec 086 step, spec 093 T017).
 //
 // The accepted step is fingerprint-scoped: the decision in the
-// marks-treatment value names the digest of the OLD base's fixable rules
-// (for a step, `normalization-step|<cache key of the old base's source>`),
-// and the overlay it built replays the OLD base's generated group. Neither
+// marks-treatment value names the digest of the OLD base's gap rules and
+// generated step (for a step, `normalization-step|<gap-rule digest>|<step
+// digest>`), and the overlay it built replays the OLD base's generated group. Neither
 // can carry to a new base — the apply hook would only ever call it stale.
 // Under the T017 ruling the decision must therefore be RE-PROPOSED, never
 // silently dropped and never silently carried: this transform supersedes

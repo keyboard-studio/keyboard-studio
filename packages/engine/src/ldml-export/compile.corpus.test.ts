@@ -7,7 +7,7 @@
 //
 // A missing corpus is a failed precondition, never a skip: this suite is the proof of SC-001.
 import { describe, expect, it } from "vitest";
-import { CORPUS, loadCorpusKeyboard } from "./__testing__/corpus.js";
+import { loadCorpusKeyboard, resolvableCorpusEntries } from "./__testing__/corpus.js";
 import { corpusAvailable, corpusExportInput, KEYBOARDS_ROOT } from "./__testing__/corpusExport.js";
 import { errorCodes, keymanCompile } from "./__testing__/keymanCompile.js";
 import { tr35Conformance } from "./__testing__/tr35Conformance.js";
@@ -31,7 +31,7 @@ function expectedKeymanCodes(profileId: "46" | "49", items: readonly { rowId: st
   return [...codes].sort();
 }
 
-for (const entry of CORPUS) {
+for (const entry of resolvableCorpusEntries()) {
   describe(`${entry.id}`, () => {
     for (const p of entry.profiles) {
       const profileId = String(p) as "46" | "49";
