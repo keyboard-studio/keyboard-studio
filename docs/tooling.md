@@ -56,7 +56,9 @@ ESLint over `packages/*/src`, then in order:
 - `pnpm run i18n-catalog-lint` — drift **and** message-id key order of
   `packages/studio/src/locales/*/messages.json` (see Catalog sort order below). Also fails on any
   empty (`""`) target-locale value: a new UI string lands with its French in the same change, or
-  the next Crowdin sync turns the blank into English.
+  the next Crowdin sync turns the blank into English. And fails on a key that appears twice in any
+  locale's raw catalog text, which parsing alone hides (the last copy wins, so a blank original
+  survives under an appended translation).
 - `pnpm run content-i18n-freshness` — tsx-run `utilities/i18n-content-extract/cli.ts --check`;
   freshness of `content/i18n/en/*.json` against a fresh extraction. Single-sources the
   `flowQuestions.json` freshness the plain-JS `content-i18n-lint` can't re-derive from TS-module
