@@ -16,6 +16,7 @@ import { packNormalization } from "./pack.js";
 
 export * from "./constants.js";
 export { applyNormalizationStep, removeNormalizationStep };
+export { normalizationStepFingerprint } from "./fingerprint.js";
 export type {
   NormalizationMap,
   NormalizationRefusalReason,

@@ -83,14 +83,12 @@ export async function analyseContextTolerance(
 
   // Spec 086: the normalization step is the default proposal for gap findings.
   let step: NormalizationStep | null = null;
-  let stepCacheKey = "";
   let fallbackReason: NormalizationRefusalReason | "verification-regressed" | undefined;
   let proposeVariants = true;
   if (gapRuleIds.size > 0) {
     const lookup = await getOrProposeNormalizationStep(analysedIr, options.normalizationSnapshot);
     if (!isCurrent()) return null;
     if (lookup.stored !== null) options.onNormalizationStored?.(lookup.stored);
-    stepCacheKey = lookup.cacheKey;
     if (lookup.result.kind === "step") {
       let verdict: NormalizationVerification = "unknown";
       if (options.verificationLookup !== undefined) {
@@ -126,7 +124,16 @@ export async function analyseContextTolerance(
   if (step !== null) {
     fixableRuleIds = [engine.NORMALIZATION_STEP_SITE_ID];
     siteKeys = { [engine.NORMALIZATION_STEP_SITE_ID]: engine.NORMALIZATION_STEP_SITE_ID };
-    fingerprint = `${engine.NORMALIZATION_STEP_SITE_ID}|${stepCacheKey}`;
+    // Issue #2395: the decision fingerprint covers only what the acceptance
+    // depends on — the gap rules the step fixes and the step's own content —
+    // so later steps that change unrelated IR (carve, caps, assignments, the
+    // touch seed) no longer invalidate the decision. The whole-source cache
+    // key stays the authoring cache's business: the generated maps genuinely
+    // depend on the whole source.
+    fingerprint =
+      `${engine.NORMALIZATION_STEP_SITE_ID}` +
+      `|${engine.toleranceFingerprint(analysedIr, [...gapRuleIds])}` +
+      `|${engine.normalizationStepFingerprint(step)}`;
     fixedSites = new Set(applied === null ? [] : engine.presentContextToleranceSites(ir, applied.overlay));
     // The step covers every gap: once it is really in the keyboard, none is a gap.
     if (fixedSites.has(engine.NORMALIZATION_STEP_SITE_ID)) {
