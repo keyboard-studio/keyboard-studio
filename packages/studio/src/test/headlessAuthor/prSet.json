@@ -40,7 +40,7 @@
   {
     "caseId": "p4-unwrap-ewondo-camazerty",
     "shape": ["deadkey-heavy"],
-    "reason": "About 37 deadkey references. Carries the open tolerance-analysis throw (spec 106 KNOWN_GAPS owner #2363) as an expected failure. Has a committed walk record (camazerty.json)."
+    "reason": "About 37 deadkey references. The tolerance analysis runs since #2363 (touch-only T_ rules skipped); the keyboard's 17 genuine canonical-equivalence gaps are a spec 106 KNOWN_GAPS US6 expected failure. Has a committed walk record (camazerty.json)."
   },
   {
     "case": {
