@@ -44,6 +44,10 @@ so the English is preserved as the fallback and the extractor can see it.
 { "welcome.title": "", ... }
 ```
 
+(Since adopted: that `""` must not reach `main`. `i18n-catalog-lint` now rejects empty target
+values, so a new string lands with its French, which is uploaded to Crowdin on merge. See
+[specs/046-i18n-localization/AS-BUILT.md](../specs/046-i18n-localization/AS-BUILT.md).)
+
 Because the English is the **value** under a stable **key**, Crowdin (which
 fingerprints the value for a key-value JSON file) sees an edit whenever the
 English changes under an unchanged id, and **resets that string's approvals to
@@ -163,6 +167,8 @@ as `pnpm run i18n-catalog-lint`. It:
   added/removed strings *and edited English under an unchanged id* — the drift
   signal the stable-id scheme would otherwise hide);
 - fails if a **target** locale's key set drifts (a new string not propagated);
+- (added later) fails on an empty target value, and on a key that appears twice in any catalog's
+  raw text — both have their own fix message, since `messages:extract` is not the fix;
 - fix on failure: `pnpm --filter @keyboard-studio/studio messages:extract`, commit.
 
 Verified: green when in sync; on an English edit under a stable id it reports
