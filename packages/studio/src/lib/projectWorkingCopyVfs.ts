@@ -115,6 +115,7 @@ import {
   applyIdentityToKps,
   applyContextToleranceOverlay,
   applyMarkGuards,
+  removedTouchKeyRuleIds,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
@@ -604,18 +605,48 @@ export function projectWorkingCopyVfs(
     // effectiveItemIds already carries the #1809 §1 aggregated union, so
     // carveChars takes the plain default (buildCarvePatch would union it
     // again idempotently).
+    //
+    // Issue #2418: the .kmn-side rule consequences of the touch keys this
+    // carve removes from the touch surface (step 1.5's T020 default removal,
+    // same inputs). Rules bound only to those gone keys are whole-node
+    // deletions, not fallback-policy suppressions — their keystrokes can
+    // never fire, so the suppression stage would leave dead `> nul` rules
+    // behind. Unnamed binding rules (the `any()` guard lines) join the
+    // deletion set fresh every projection, never stored (the spec 082
+    // FR-018 precedent for projection-time deletions); named ones join
+    // suppressionExemptIds.
+    const touchKeyRules =
+      fallbackPolicy === undefined
+        ? null
+        : removedTouchKeyRuleIds(startIr, touchLayoutJson, {
+          slotIds,
+          wholeNodeIds: carvedWholeNodeIds,
+          ...(carveTouchKeepInert !== undefined
+            ? { keepInertTouchChars: carveTouchKeepInert }
+            : {}),
+          ...(deletedTouchKeyIds.size > 0 ? { deletedTouchKeyIds } : {}),
+        });
+    const carveDeletedNodeIds =
+      touchKeyRules !== null && touchKeyRules.additionalDeletedRuleIds.size > 0
+        ? new Set([...deletedNodeIds, ...touchKeyRules.additionalDeletedRuleIds])
+        : deletedNodeIds;
+    const removedTouchExemptions =
+      touchKeyRules !== null ? touchKeyRules.suppressionExemptIds : new Set<string>();
     const seamIr = applyCarveMutate(
       startIr,
-      deletedNodeIds,
+      carveDeletedNodeIds,
       effectiveItemIds,
       undefined,
       {
         ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
-        ...(suppressionExemptIds !== undefined || claimedRuleIds.size > 0
+        ...(suppressionExemptIds !== undefined ||
+        claimedRuleIds.size > 0 ||
+        removedTouchExemptions.size > 0
           ? {
             suppressionExemptIds: new Set([
               ...(suppressionExemptIds ?? []),
               ...claimedRuleIds,
+              ...removedTouchExemptions,
             ]),
           }
           : {}),

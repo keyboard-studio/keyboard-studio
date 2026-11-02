@@ -106,3 +106,17 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   (verify normalises it) and `.studio/decision-record.json` its
   wall-clock timestamps (presence-checked only). Every other entry is
   byte-identical. Verify mode passes against it locally.
+- **Re-capture: 2026-11-01 (America/Chicago), from PR #2425
+  (`km/ci-copyright-fidelity`).** Taken in-sandbox (Playwright desktop,
+  pinned corpus `435f82d6`, vite dev server). The copyright-carry fix
+  changed what the walk emits: the walk now carries the source keyboard's
+  `&COPYRIGHT` instead of year-stripping it. The old baseline (2026-10-31,
+  from PR #2415) differed in exactly two entries: `source/test.kmn` line
+  15 (`store(&COPYRIGHT) '(c) SIL International'` →
+  `store(&COPYRIGHT) '(c) 2009-2019 SIL International'` — basic_kbdfr's
+  own notice, carried byte-identical) and the recompiled `build/test.kmx`
+  (+20 bytes, the carried notice in UTF-16LE). `HISTORY.md` carries the
+  2026-11-01 capture date (verify normalises it) and
+  `.studio/decision-record.json` its wall-clock timestamps
+  (presence-checked only). Every other entry is byte-identical. Verify
+  mode passes against it locally.

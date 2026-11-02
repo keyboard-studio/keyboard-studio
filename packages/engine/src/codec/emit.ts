@@ -24,7 +24,14 @@
  *   6. Faithful path only: any unsourced user stores not yet emitted via the
  *      per-group pass are swept here as a catch-all, preserving the invariant
  *      that ALL user stores in the IR appear in the output. (D9)
- *   7. Trailing newline.
+ *   7. Store-declaration dependency order (both paths, #2404): user store
+ *      declarations — typed stores and opaque `store(...)` fragments — are
+ *      reordered by a stable topological sort over `outs(X)` references, so a
+ *      store that expands `outs(X)` is always emitted after X's declaration
+ *      (kmcmplib resolves outs() at declaration time; KMCMP 5251101
+ *      otherwise). Where there is no dependency the existing order is kept,
+ *      and a declaration only ever moves later, never earlier.
+ *   8. Trailing newline.
  *
  * Comments:
  *   - "leading" comments are emitted immediately before their anchorRef's line.
@@ -455,6 +462,187 @@ function referencedStoreNamesIn(rules: IRRule[]): Set<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Store-declaration dependency ordering (#2404)
+// ---------------------------------------------------------------------------
+
+/**
+ * kmcmplib resolves `outs(X)` at *declaration* time: a store whose body
+ * expands `outs(X)` must be declared AFTER X, or compilation fails with
+ * KMCMP 5251101 "Store referenced does not exist".
+ *
+ * The per-path placement above can invert that order. On eo_plus the opaque
+ * `store(letters) outs(letters_lower) outs(letters_upper)` fragment is a
+ * global pre-`begin` fragment (it precedes every group header in the source)
+ * while the typed stores it expands are attributed into the first group's
+ * body — so the emitter writes the `outs()` store before its targets.
+ *
+ * `orderStoreDeclarations` repairs this with a dependency-ordered topological
+ * sort over every user store declaration about to be emitted (typed stores
+ * and opaque `store(...)` fragments alike), keeping the existing order
+ * wherever there is no dependency: declarations are visited in stable
+ * topological order and each one moves — never earlier, only later — to just
+ * after the latest-placed declaration its `outs()` references resolve to.
+ * Declarations with no `outs()` dependencies never move, so output is
+ * byte-identical when the feature is absent.
+ */
+
+/** Declared store name from a `store(name) ...` declaration line, or null. */
+function parseStoreDeclName(text: string): string | null {
+  const m = /^\s*(?:\$[^:]+:\s*)?store\s*\(\s*(&?[^\s(),]+)\s*\)/i.exec(text);
+  return m?.[1] ?? null;
+}
+
+/**
+ * `outs(name)` references in a store declaration's text. Mirrors the
+ * parse-side token classification (parse.ts `parseOuts` over whitespace-
+ * delimited tokens): the scan is quote-, bracket- and trailing-comment-aware,
+ * so a literal `'outs(x)'` string, a `[K_...]` key name, or a `c` comment
+ * mentioning outs() is never mistaken for a store reference.
+ */
+function outsRefsInDecl(text: string): string[] {
+  const refs: string[] = [];
+  let token = "";
+  let inS = false;
+  let inD = false;
+  let depth = 0;
+  const flush = (): void => {
+    const m = /^outs\s*\(\s*([^\s(),]+)\s*\)$/i.exec(token);
+    if (m?.[1] !== undefined) refs.push(m[1]);
+    token = "";
+  };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i] ?? "";
+    if (ch === "'" && !inD) { inS = !inS; continue; }
+    if (ch === '"' && !inS) { inD = !inD; continue; }
+    if (inS || inD) continue;
+    if (ch === "[") { depth++; continue; }
+    if (ch === "]") { depth--; continue; }
+    // A whitespace-delimited `c` at depth 0 outside quotes starts a trailing
+    // comment running to end of line (parse.ts stripTrailingComment) — nothing
+    // after it can be a store reference.
+    if (
+      depth === 0 && ch === "c" &&
+      /\s/.test(text[i - 1] ?? "") &&
+      (i === text.length - 1 || /\s/.test(text[i + 1] ?? ""))
+    ) break;
+    if (/\s/.test(ch)) { flush(); continue; }
+    token += ch;
+  }
+  flush();
+  return refs;
+}
+
+interface StoreDecl {
+  item: GroupBodyItem;
+  nameKey: string;
+  targets: StoreDecl[];
+}
+
+/**
+ * Reorder user store declarations across the given emission sites (visited in
+ * site order) so every `outs(X)` use follows X's declaration. Mutates the
+ * site arrays in place; rules and non-store fragments keep their exact
+ * positions.
+ */
+function orderStoreDeclarations(sites: GroupBodyItem[][]): void {
+  // Collect declarations in existing global emission order.
+  const decls: StoreDecl[] = [];
+  const byName = new Map<string, StoreDecl>();
+  for (const site of sites) {
+    for (const item of site) {
+      if (item.kind !== "store" && item.kind !== "frag") continue;
+      const name = item.kind === "store" ? item.name : parseStoreDeclName(item.text);
+      if (name === null || name.startsWith("&")) continue; // not a user store declaration
+      const nameKey = name.toLowerCase();
+      // A duplicate declaration is a kmcmplib error regardless of order;
+      // first wins for dependency resolution.
+      if (!byName.has(nameKey)) {
+        const decl: StoreDecl = { item, nameKey, targets: [] };
+        byName.set(nameKey, decl);
+        decls.push(decl);
+      }
+    }
+  }
+  // Resolve outs() references to declared stores.
+  for (const decl of decls) {
+    const seen = new Set<string>();
+    for (const ref of outsRefsInDecl(decl.item.text)) {
+      const key = ref.toLowerCase();
+      if (key === decl.nameKey || seen.has(key)) continue;
+      seen.add(key);
+      const target = byName.get(key);
+      if (target !== undefined) decl.targets.push(target);
+    }
+  }
+  // Stable topological order: Kahn's algorithm, each round picking the first
+  // ready declaration in existing order.
+  const topo: StoreDecl[] = [];
+  const indegree = new Map<StoreDecl, number>();
+  const dependents = new Map<StoreDecl, StoreDecl[]>();
+  for (const d of decls) { indegree.set(d, d.targets.length); dependents.set(d, []); }
+  for (const d of decls) for (const t of d.targets) dependents.get(t)?.push(d);
+  const remaining = new Set(decls);
+  for (;;) {
+    let pick: StoreDecl | undefined;
+    for (const d of decls) {
+      if (remaining.has(d) && indegree.get(d) === 0) { pick = d; break; }
+    }
+    if (pick === undefined) break;
+    remaining.delete(pick);
+    topo.push(pick);
+    for (const dep of dependents.get(pick) ?? []) indegree.set(dep, (indegree.get(dep) ?? 1) - 1);
+  }
+  // Cyclic leftovers are uncompilable in any order; keep existing order and
+  // never relocate them.
+  for (const d of decls) {
+    if (remaining.has(d)) { d.targets = []; topo.push(d); }
+  }
+  // Topological order identical to existing order means every dependency is
+  // already satisfied — nothing to relocate.
+  if (topo.every((d, i) => decls[i] === d)) return;
+
+  // Place each declaration no earlier than its existing slot and no earlier
+  // than its targets' final slots. Topological order guarantees every target
+  // is already final when its dependents are placed.
+  const siteRank = new Map<GroupBodyItem[], number>(sites.map((s, i) => [s, i]));
+  const pos = new Map<GroupBodyItem, { site: GroupBodyItem[]; idx: number }>();
+  const rebuildPos = (): void => {
+    pos.clear();
+    for (const site of sites) site.forEach((item, idx) => pos.set(item, { site, idx }));
+  };
+  rebuildPos();
+  const isLater = (
+    a: { site: GroupBodyItem[]; idx: number },
+    b: { site: GroupBodyItem[]; idx: number },
+  ): boolean =>
+    siteRank.get(a.site)! > siteRank.get(b.site)! ||
+    (a.site === b.site && a.idx > b.idx);
+  // Chain tail per anchor: a dependent is inserted immediately after the tail,
+  // preserving existing relative order among dependents of the same target.
+  const lastPlaced = new Map<StoreDecl, StoreDecl>(topo.map(d => [d, d]));
+  for (const d of topo) {
+    let anchor = d;
+    let anchorPos = pos.get(d.item);
+    if (anchorPos === undefined) continue; // unreachable; defensive
+    for (const t of d.targets) {
+      const p = pos.get(t.item);
+      if (p !== undefined && isLater(p, anchorPos)) { anchor = t; anchorPos = p; }
+    }
+    if (anchor === d) continue;
+    const from = pos.get(d.item);
+    if (from === undefined) continue; // unreachable; defensive
+    from.site.splice(from.idx, 1);
+    rebuildPos();
+    const tail = lastPlaced.get(anchor);
+    const at = tail === undefined ? undefined : pos.get(tail.item);
+    if (at === undefined) continue; // unreachable; defensive
+    at.site.splice(at.idx + 1, 0, d.item);
+    lastPlaced.set(anchor, d);
+    rebuildPos();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Position-faithful emit helpers (fragment-bearing keyboards only)
 // ---------------------------------------------------------------------------
 
@@ -464,7 +652,7 @@ function referencedStoreNamesIn(rules: IRRule[]): Set<string> {
  * original source order.
  */
 type GroupBodyItem =
-  | { kind: "store"; sourceLine: number; text: string; nodeId: string }
+  | { kind: "store"; sourceLine: number; text: string; nodeId: string; name: string }
   | { kind: "rule";  sourceLine: number; text: string; nodeId: string }
   | { kind: "frag";  sourceLine: number; text: string };
 
@@ -554,6 +742,9 @@ function storeNameInText(storeName: string, text: string): boolean {
  *
  * Items without sourceLine sort to the BACK (Number.MAX_SAFE_INTEGER fallback)
  * so unsourced synthesized nodes append after the original source-ordered content.
+ *
+ * Returns the ordered items; the caller emits them (and their leading
+ * comments) after the store-declaration dependency pass (#2404) has run.
  */
 function emitGroupBodyFaithful(
   group: IRGroup,
@@ -561,9 +752,7 @@ function emitGroupBodyFaithful(
   positionalStores: IRStore[],      // stores positionally attributed to this group
   unsourcedStores: IRStore[],       // stores without sourceLine — use name-ref fallback
   emittedStores: Set<string>,       // dedup guard: nodeIds already emitted
-  commentMap: Map<string, IRComment[]>,
-  lines: string[],
-): void {
+): GroupBodyItem[] {
   const items: GroupBodyItem[] = [];
 
   // Positionally-attributed stores for this group.
@@ -575,6 +764,7 @@ function emitGroupBodyFaithful(
       sourceLine: store.sourceLine ?? Number.MAX_SAFE_INTEGER,
       text: emitStore(store),
       nodeId: store.nodeId,
+      name: store.name,
     });
   }
 
@@ -592,6 +782,7 @@ function emitGroupBodyFaithful(
       sourceLine: Number.MAX_SAFE_INTEGER,
       text: emitStore(store),
       nodeId: store.nodeId,
+      name: store.name,
     });
   }
 
@@ -631,12 +822,7 @@ function emitGroupBodyFaithful(
   // insertion order.
   items.sort((a, b) => a.sourceLine - b.sourceLine);
 
-  for (const item of items) {
-    if (item.kind === "store" || item.kind === "rule") {
-      pushLeadingComments(item.nodeId, commentMap, lines);
-    }
-    lines.push(item.text);
-  }
+  return items;
 }
 
 // ---------------------------------------------------------------------------
@@ -700,6 +886,9 @@ export function emit(ir: KeyboardIR): string {
   // source layout; store declarations are global/position-independent so this
   // re-parses identically. Preserve over warn — emit() has no diagnostic
   // channel and faithful emit (D9) requires lossless store round-trip.
+  // Collected as an item site first: the #2404 dependency pass may relocate
+  // an outs()-dependent store later.
+  const orphanSite: GroupBodyItem[] = [];
   if (ir.raw.length === 0) {
     const allReferenced = new Set<string>();
     for (const g of ir.groups) {
@@ -707,8 +896,13 @@ export function emit(ir: KeyboardIR): string {
     }
     for (const store of ir.stores) {
       if (!store.isSystem && !allReferenced.has(store.name)) {
-        pushLeadingComments(store.nodeId, commentMap, lines);
-        lines.push(emitStore(store));
+        orphanSite.push({
+          kind: "store",
+          sourceLine: Number.MAX_SAFE_INTEGER,
+          text: emitStore(store),
+          nodeId: store.nodeId,
+          name: store.name,
+        });
       }
     }
   }
@@ -716,24 +910,30 @@ export function emit(ir: KeyboardIR): string {
   // When fragments are present, emit global (pre-begin) fragments before the
   // begin directive, in sourceLine order. These are fragments whose groupNodeId
   // is undefined (UNKNOWN_PRE_BEGIN and similar global-scope opaques).
+  // Collected as an item site first: the #2404 dependency pass may relocate
+  // an outs()-dependent store fragment later.
+  const preBeginSite: GroupBodyItem[] = [];
   if (ir.raw.length > 0) {
     const globalFrags = ir.raw
       .filter(f => f.groupNodeId === undefined)
       .sort((a, b) => (a.sourceLine ?? 0) - (b.sourceLine ?? 0));
     for (const frag of globalFrags) {
-      lines.push("");
-      lines.push(frag.sourceText);
+      preBeginSite.push({
+        kind: "frag",
+        sourceLine: frag.sourceLine ?? 0,
+        text: frag.sourceText,
+      });
     }
   }
 
   // begin directive — FR-004: reuse the modelled entry group so a keyboard
   // with more than one entry group round-trips without the emitter
   // rebuilding a single entry from the first non-readonly group.
+  // (Emitted below, after the orphan / pre-begin sites.)
   const entryName = ir.header.entryPoints?.main
     ?? ir.groups.find(g => !g.readonly)?.name
     ?? "main";
-  lines.push("");
-  lines.push(`begin ${ir.header.encoding ?? "Unicode"} > use(${entryName})`);
+  const beginLine = `begin ${ir.header.encoding ?? "Unicode"} > use(${entryName})`;
 
   // Build the positional store attribution map once (reused per group).
   // Only constructed on the fragment-bearing path to avoid overhead on the
@@ -762,23 +962,25 @@ export function emit(ir: KeyboardIR): string {
   // Dedup guard: tracks user store nodeIds already emitted in the faithful path.
   const emittedStores = new Set<string>();
 
-  // Groups.
+  // Groups: build one item site per group (the #2404 dependency pass reorders
+  // store declarations across sites before anything is written to lines).
+  const groupHeaders: string[] = [];
+  const groupSites: GroupBodyItem[][] = [];       // faithful path: stores+rules+frags
+  const groupStoreSites: GroupBodyItem[][] = [];  // fragment-free path: stores only
   for (const group of ir.groups) {
-    lines.push("");
-    const groupHeader = group.usingKeys
+    groupHeaders.push(group.usingKeys
       ? `group(${group.name}) using keys`
-      : `group(${group.name})`;
-    lines.push(groupHeader);
+      : `group(${group.name})`);
 
     if (ir.raw.length > 0) {
       // Position-faithful path: interleave ALL user stores + rules + group-owned
       // fragments in their original source order.
       const groupFragments = ir.raw.filter(f => f.groupNodeId === group.nodeId);
       const positionalStores = storeAttribution?.get(group.nodeId) ?? [];
-      emitGroupBodyFaithful(
+      groupSites.push(emitGroupBodyFaithful(
         group, groupFragments, positionalStores, unsourcedStores,
-        emittedStores, commentMap, lines,
-      );
+        emittedStores,
+      ));
     } else {
       // Standard path (fragment-free, byte-identical to pre-fix): heuristic
       // store attribution + rules in IR order.
@@ -786,6 +988,7 @@ export function emit(ir: KeyboardIR): string {
       // User stores that belong to this group: heuristic — stores referenced in
       // this group's rules. Iterated in ir.stores declaration order to preserve
       // round-trip comment anchoring (I3).
+      const site: GroupBodyItem[] = [];
       const referencedStoreNames = referencedStoreNamesIn(group.rules);
       for (const store of ir.stores) {
         if (!store.isSystem && referencedStoreNames.has(store.name)) {
@@ -794,22 +997,18 @@ export function emit(ir: KeyboardIR): string {
           // a duplicate `store(...)` is a kmcmplib error and breaks round-trip).
           if (emittedStores.has(store.nodeId)) continue;
           emittedStores.add(store.nodeId);
-          pushLeadingComments(store.nodeId, commentMap, lines);
-          lines.push(emitStore(store));
+          site.push({
+            kind: "store",
+            sourceLine: Number.MAX_SAFE_INTEGER,
+            text: emitStore(store),
+            nodeId: store.nodeId,
+            name: store.name,
+          });
         }
       }
-
-      // Rules.
-      for (const rule of group.rules) {
-        pushLeadingComments(rule.nodeId, commentMap, lines);
-        lines.push(emitRule(rule, group.usingKeys));
-      }
+      groupStoreSites.push(site);
     }
   }
-
-  // When fragments are absent, there are none to emit. When they are present,
-  // group-owned fragments were already emitted inside each group block above.
-  // Global fragments were emitted before the begin directive. Nothing remains.
 
   // Catch-all backstop: emit any non-system user store not yet output by the
   // positional or per-group passes. This covers two cases:
@@ -822,14 +1021,67 @@ export function emit(ir: KeyboardIR): string {
   // closes this gap with no effect on correct keyboards — every normally-emitted
   // store is already in emittedStores and is therefore skipped.
   // (D9 faithful emit — preserve ALL user stores.)
+  // Collected as an item site first: the #2404 dependency pass may relocate
+  // an outs()-dependent store later.
+  const catchAllSite: GroupBodyItem[] = [];
   if (ir.raw.length > 0) {
     for (const store of userStores) {
       if (emittedStores.has(store.nodeId)) continue;
       emittedStores.add(store.nodeId);
-      pushLeadingComments(store.nodeId, commentMap, lines);
-      lines.push(emitStore(store));
+      catchAllSite.push({
+        kind: "store",
+        sourceLine: Number.MAX_SAFE_INTEGER,
+        text: emitStore(store),
+        nodeId: store.nodeId,
+        name: store.name,
+      });
     }
   }
+
+  // Store-declaration dependency order (#2404): reorder user store
+  // declarations across emission sites so every `outs(X)` use follows X's
+  // declaration. Stable — sites are byte-identical when no dependency exists.
+  if (ir.raw.length === 0) {
+    orderStoreDeclarations([orphanSite, ...groupStoreSites]);
+  } else {
+    orderStoreDeclarations([preBeginSite, ...groupSites, catchAllSite]);
+  }
+
+  // Emit. Fragment-free: orphan stores, begin, per-group stores then rules.
+  // Faithful: global fragments, begin, per-group interleaved bodies, catch-all.
+  const pushStoreSite = (site: GroupBodyItem[]): void => {
+    for (const item of site) {
+      if (item.kind !== "store") continue; // unreachable; these sites hold stores only
+      pushLeadingComments(item.nodeId, commentMap, lines);
+      lines.push(item.text);
+    }
+  };
+  pushStoreSite(orphanSite);
+  for (const item of preBeginSite) {
+    lines.push("");
+    lines.push(item.text);
+  }
+  lines.push("");
+  lines.push(beginLine);
+  ir.groups.forEach((group, gi) => {
+    lines.push("");
+    lines.push(groupHeaders[gi] ?? "");
+    if (ir.raw.length > 0) {
+      for (const item of groupSites[gi] ?? []) {
+        if (item.kind === "store" || item.kind === "rule") {
+          pushLeadingComments(item.nodeId, commentMap, lines);
+        }
+        lines.push(item.text);
+      }
+    } else {
+      pushStoreSite(groupStoreSites[gi] ?? []);
+      for (const rule of group.rules) {
+        pushLeadingComments(rule.nodeId, commentMap, lines);
+        lines.push(emitRule(rule, group.usingKeys));
+      }
+    }
+  });
+  pushStoreSite(catchAllSite);
 
   lines.push(""); // trailing newline
   return lines.join("\n");

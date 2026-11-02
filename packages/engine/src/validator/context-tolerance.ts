@@ -30,6 +30,7 @@ import { compile } from '../compiler/index.js';
 import { emit } from '../codec/emit.js';
 import { stripDanglingAssetStores } from '../compiler/stripDanglingAssetStores.js';
 import { analyzeStores } from '../pattern-apply/applyStoreSlotRemovals.js';
+import { touchKeyIdFamily } from '../pattern-apply/touch-mechanism-shared.js';
 import { simulate } from '../simulator/index.js';
 import { reverseUsLayoutKey } from '../simulator/reverseUsLayout.js';
 
@@ -78,6 +79,15 @@ export function resolveKeyPart(keyPart: ContextElement[], storeChars: Map<string
   }
   const el = keyPart[0]!;
   if (el.kind === 'vkey') {
+    // Touch-only keys (T_…): the desktop simulator's `buildKeyEvent` only
+    // knows physical key codes and throws `simulate: unknown virtual key`
+    // on anything else, so a rule keyed to a touch-only key can never be
+    // pressed by the simulation. Skip it with a "not analysed" reason
+    // instead of crashing the whole analysis (#2363). Checked before the
+    // modifier mapping: unpressable dominates unrepresentable modifiers.
+    if (touchKeyIdFamily(el.name) === 'T_') {
+      return { reason: `touch-only key ${el.name} cannot be pressed by the desktop simulator; not analysed` };
+    }
     const mods = resolveVkeyModifiers(el.modifiers);
     if (mods === null) return { reason: `modifier on key ${el.name} not representable by the simulator` };
     return { key: { vkey: el.name, ...mods } };
