@@ -74,3 +74,29 @@ describe("copyright year stripping (criterion 4.6b)", () => {
     expect(readVfsText(vfs, "source/k.kps")).toBe("<Copyright>\u00a9 Jo</Copyright>");
   });
 });
+
+describe("carried copyright (issue #2281)", () => {
+  const CARRIED = "\u00a9 2008-2020 SIL International";
+
+  it("stripCopyrightYearsFromKmn leaves the starting point's line byte-identical", () => {
+    const kmn = `store(&COPYRIGHT) '${CARRIED}'\nstore(&NAME) 'US Basic'\n`;
+    expect(stripCopyrightYearsFromKmn(kmn, CARRIED)).toBe(kmn);
+  });
+
+  it("still strips a session-authored line that differs from the carried one", () => {
+    expect(stripCopyrightYearsFromKmn("store(&COPYRIGHT) '\u00a9 2017-2025 Prof. A B'\n", CARRIED)).toBe(
+      "store(&COPYRIGHT) '\u00a9 Prof. A B'\n",
+    );
+  });
+
+  it("applyOutputHygiene carries the start line but still stamps the kpj and kps", () => {
+    const vfs = createVirtualFS();
+    vfs.set("k.kpj", KPJ_NO_VERSION, false);
+    vfs.set("source/k.kmn", `store(&COPYRIGHT) '${CARRIED}'\n`, false);
+    vfs.set("source/k.kps", "<Copyright>\u00a9 2017 Jo</Copyright>", false);
+    applyOutputHygiene(vfs, "k", { carriedCopyright: CARRIED });
+    expect(readVfsText(vfs, "k.kpj")).toContain("<Version>2.0</Version>");
+    expect(readVfsText(vfs, "source/k.kmn")).toBe(`store(&COPYRIGHT) '${CARRIED}'\n`);
+    expect(readVfsText(vfs, "source/k.kps")).toBe("<Copyright>\u00a9 Jo</Copyright>");
+  });
+});

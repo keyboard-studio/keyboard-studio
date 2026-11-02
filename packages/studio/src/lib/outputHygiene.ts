@@ -48,12 +48,19 @@ function withoutYears(s: string): string {
  * Strip the year from `store(&COPYRIGHT) '...'` in a `.kmn` and from the
  * `<Copyright>` element of a `.kps` (criterion 4.6). Only those two strings
  * are touched; a year in a comment or anywhere else is the author's.
+ *
+ * `carriedValue` is the starting keyboard's `&COPYRIGHT` value (unquoted, as
+ * parsed). A line that carries the starting point's own notice is left
+ * byte-identical — offered/carried, never silently replaced (#2281) — so the
+ * 4.6 year strip applies only to lines this session authored.
  */
-export function stripCopyrightYearsFromKmn(kmnText: string): string {
+export function stripCopyrightYearsFromKmn(kmnText: string, carriedValue?: string): string {
   return kmnText.replace(
     /(store\(\s*&COPYRIGHT\s*\)\s*)(['"])([^\r\n]*?)\2/i,
-    (_m, head: string, quote: string, value: string) =>
-      `${head}${quote}${withoutYears(value)}${quote}`,
+    (m, head: string, quote: string, value: string) =>
+      carriedValue !== undefined && value === carriedValue
+        ? m
+        : `${head}${quote}${withoutYears(value)}${quote}`,
   );
 }
 
@@ -65,11 +72,24 @@ export function stripCopyrightYearsFromKps(kpsText: string): string {
 }
 
 /**
+ * Options for {@link applyOutputHygiene}.
+ */
+export interface OutputHygieneOptions {
+  /**
+   * The starting keyboard's `store(&COPYRIGHT)` value (unquoted, as parsed
+   * into the start IR's header). When the projected `.kmn` carries that line
+   * through, the 4.6b year strip leaves it byte-identical: the starting
+   * point's notice is carried, never silently replaced (#2281).
+   */
+  carriedCopyright?: string | undefined;
+}
+
+/**
  * Apply both hygiene rewrites to a projected tree, in place. `keyboardId` is
  * the output id (the projection has already renamed `source/<id>.*` and the
  * root `<id>.kpj`).
  */
-export function applyOutputHygiene(vfs: VirtualFS, keyboardId: string): void {
+export function applyOutputHygiene(vfs: VirtualFS, keyboardId: string, opts?: OutputHygieneOptions): void {
   const kpjPath = `${keyboardId}.kpj`;
   const kpj = readVfsText(vfs, kpjPath);
   if (kpj !== undefined) {
@@ -79,7 +99,7 @@ export function applyOutputHygiene(vfs: VirtualFS, keyboardId: string): void {
   const kmnPath = `source/${keyboardId}.kmn`;
   const kmn = readVfsText(vfs, kmnPath);
   if (kmn !== undefined) {
-    const next = stripCopyrightYearsFromKmn(kmn);
+    const next = stripCopyrightYearsFromKmn(kmn, opts?.carriedCopyright);
     if (next !== kmn) vfs.set(kmnPath, next, false);
   }
   const kpsPath = `source/${keyboardId}.kps`;

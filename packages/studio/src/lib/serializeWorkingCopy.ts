@@ -581,7 +581,12 @@ export async function projectWorkingCopyForOutput(
   // 5b-ii. Criteria 1.10b / 4.6b: stamp the current .kpj format on a project
   //     that predates the versioned shape, and keep copyright years out of the
   //     .kmn / .kps strings (they live in LICENSE.md). Output projection only.
-  applyOutputHygiene(clonedVfs, resolvedKeyboardId);
+  //     A `store(&COPYRIGHT)` carried through from the starting keyboard is
+  //     the starting point's own notice — carried, never silently replaced
+  //     (#2281) — so the year strip leaves it byte-identical.
+  applyOutputHygiene(clonedVfs, resolvedKeyboardId, {
+    carriedCopyright: startIr.header.copyright || undefined,
+  });
 
   // 5c. spec 061 FR-010: regenerate the shipped documentation files from the
   //     author's CURRENT help-docs answers on EVERY call — not a write-if-absent
