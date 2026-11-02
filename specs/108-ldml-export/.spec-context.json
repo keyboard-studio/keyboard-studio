@@ -608,11 +608,75 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T03:43:13.664Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:07:19.171Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:08:30.828Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:09:56.369Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:15:25.578Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:16:10.513Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:23:45.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:27:28.400Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:34:23.768Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T070",
+  "currentTask": "T078",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1184,6 +1248,88 @@
       "files": [
         "packages/engine/src/ldml-export/project.corpus.test.ts"
       ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "layerRules.ts: static PostKeystroke/NewContext evaluation, 1.4a layerId decisions and 1.4b per-behaviour items; replaced group-level 1.3/1.4 items",
+      "files": [
+        "packages/engine/src/ldml-export/classify/layerRules.ts",
+        "packages/engine/src/ldml-export/classify/layerRules.test.ts",
+        "packages/engine/src/ldml-export/classify/classify.ts",
+        "packages/engine/src/ldml-export/classify/ruleElements.ts"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "classify/touch.ts rows 5.3/5.8/5.9/5.11-5.14 per touch key, wired into classifyForLdml; touchPresent excludes desktop-only",
+      "files": [
+        "packages/engine/src/ldml-export/classify/touch.ts",
+        "packages/engine/src/ldml-export/classify/touch.test.ts",
+        "packages/engine/src/ldml-export/classify/classify.ts",
+        "packages/engine/src/ldml-export/classify/items.ts",
+        "packages/engine/src/ldml-export/__fixtures__/touchLayouts.ts"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "hardware <displays> from KvksIR labels via shared DisplaySet (first label per key id, U+25CC rule, never equals output, no gap refs)",
+      "files": [
+        "packages/engine/src/ldml-export/lower/displays.ts",
+        "packages/engine/src/ldml-export/lower/displays.test.ts",
+        "packages/engine/src/ldml-export/lower/document.ts"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "lower/touchForms.ts: phone(1)/tablet(150) touch forms, shared key resolution and ids, gap/special keys, gestures, flicks, layerId from layer rules, displays",
+      "files": [
+        "packages/engine/src/ldml-export/lower/touchForms.ts",
+        "packages/engine/src/ldml-export/lower/touchForms.test.ts",
+        "packages/engine/src/ldml-export/lower/document.ts",
+        "packages/engine/src/ldml-export/classify/touch.ts",
+        "packages/engine/src/ldml-export/classify/classify.ts"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "report touch section: forms written, layer carry-over line, coded touch items; delivery statement still once",
+      "files": [
+        "packages/engine/src/ldml-export/report.ts",
+        "packages/engine/src/ldml-export/report.test.ts"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "buildLdmlExportForDownload passes the projected touch layout only when &TARGETS includes a touch/web target (targetsIncludeTouch); desktop-only test",
+      "files": [
+        "packages/studio/src/lib/buildOutputBundle.ts",
+        "packages/studio/src/lib/buildOutputBundle.test.ts"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "touch.test.ts: Story 4 scenarios 1-4 plus 1.4a layerId cases and 1.4b single-behaviour item",
+      "files": [
+        "packages/engine/src/ldml-export/touch.test.ts",
+        "packages/engine/src/ldml-export/lower/touchForms.test.ts"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "touch.corpus.test.ts: H3+H4+H1 over touch-bearing corpus (46: Keyman compile with touch forms returns exactly the K-row codes, i.e. none) and H5 touch pass; all green",
+      "files": [
+        "packages/engine/src/ldml-export/touch.corpus.test.ts",
+        "packages/engine/src/ldml-export/lower/touchForms.ts",
+        "packages/engine/src/ldml-export/lower/document.ts",
+        "packages/engine/src/ldml-export/__testing__/equivalence.ts"
+      ]
     }
-  }
+  },
+  "concerns": [
+    {
+      "note": "km-keyman review of classify/layerRules.ts: (1) single char/any(store) context treated as the key own output; in KMN it matches the last context char, so keyless outputs (bksp, set, layer, deadkey) and multi-char outputs are mis-evaluated (lines ~161-163, 277-286); no backspace behaviour item. (2) IRContext if has no operator, so if(&layer != x) may be read as equality (~132-138). (3) nul context always labelled start-of-field (~108). Fixture lacks if(&layer), any(store), NewContext, set(&layer), backspace, nomatch-precedence cases.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "phase 6 T071-T078 folded; tests green; review concerns recorded"
 }

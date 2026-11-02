@@ -37,7 +37,7 @@ describe("buildLdmlExport: Story 1", () => {
     expect(report).toMatch(/source\/options_postkeystroke\.kmn:15 \|/);
     expect(report).toMatch(/source\/options_postkeystroke\.kmn:12 \|/);
     const items = r.classification.items;
-    expect(items.some((i) => i.rowId === "1.4" && i.line !== null)).toBe(true);
+    expect(items.some((i) => i.rowId === "1.4b" && i.line !== null)).toBe(true);
     expect(items.some((i) => i.rowId === "3.18" && i.params["reason"] === "option-store-directive")).toBe(true);
     expect(items.some((i) => i.rowId === "3.17" && i.params["default"] === "0")).toBe(true);
     // PostKeystroke is omitted: nothing in the document calls it.

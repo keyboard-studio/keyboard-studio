@@ -61,6 +61,7 @@ import {
   buildKmpForDownload,
   buildLdmlExportForDownload,
   buildSourceZipForDownload,
+  targetsIncludeTouch,
   OutputBundleError,
 } from "./buildOutputBundle.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
@@ -77,7 +78,9 @@ const KMN = [
   "",
 ].join("\n");
 
-function instantiate(kmn: string = KMN): void {
+const TOUCH_JSON = JSON.stringify({ phone: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A" }] }] }] } });
+
+function instantiate(kmn: string = KMN, touchLayoutJson: string | null = null): void {
   const vfs = createVirtualFS([{ path: "source/ldml_fixture.kmn", content: kmn, isBinary: false }]);
   const { ir } = parseKmn(kmn, "ldml_fixture");
   useWorkingCopyStore.setState({
@@ -86,6 +89,7 @@ function instantiate(kmn: string = KMN): void {
     startVfs: vfs,
     startIr: ir,
     ir,
+    touchLayoutJson,
     identity: { keyboardId: "ldml_fixture", bcp47: "en", displayName: "Ldml Fixture" },
     attribution: { authorName: "Test Author", copyrightHolder: "Test Author" },
   });
@@ -111,6 +115,19 @@ beforeEach(() => {
   spies.validateWithOracle.mockClear();
   spies.projected.current = null;
   i18n.activate("en");
+});
+
+describe("targetsIncludeTouch", () => {
+  it.each([
+    [[], true],
+    [["any"], true],
+    [["windows macosx linux"], false],
+    [["windows", "web"], true],
+    [["androidphone"], true],
+    [["desktop"], false],
+  ] as const)("%j -> %s", (targets, expected) => {
+    expect(targetsIncludeTouch(targets)).toBe(expected);
+  });
 });
 
 describe("buildLdmlExportForDownload", () => {
@@ -168,6 +185,17 @@ describe("buildLdmlExportForDownload", () => {
     await expect(buildLdmlExportForDownload("46")).rejects.toThrow(/no reference data/);
     useWorkingCopyStore.getState().setLdmlBaseLayout("uk");
     await expect(buildLdmlExportForDownload("46")).resolves.toBeDefined();
+  });
+
+  it("passes the touch layout through only when &TARGETS includes a touch or web target (row 4.6)", async () => {
+    const xmlOf = async (kmn: string): Promise<string> => {
+      instantiate(kmn, TOUCH_JSON);
+      const r = await buildLdmlExportForDownload("46");
+      return strFromU8(unzipSync(r.bytes)["source/ldml_fixture_ldml.xml"]!);
+    };
+    expect(await xmlOf(KMN)).toContain('formId="touch"');
+    expect(await xmlOf(KMN.replace("'any'", "'windows macosx linux'"))).not.toContain('formId="touch"');
+    expect(await xmlOf(KMN.replace("'any'", "'windows web'"))).toContain('formId="touch"');
   });
 
   it("throws an OutputBundleError with the ANSI-only reason for a begin ANSI keyboard", async () => {

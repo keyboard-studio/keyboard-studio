@@ -228,7 +228,7 @@ export async function checkEquivalence(
   const xml = [...result.files.entries()].find(([k]) => k.endsWith(".xml"))?.[1] as string;
   const ldml = loadLdml(xml);
 
-  const touchOnly = ["1.3", "1.4", "1.10", "1.11", "4.9", "4.11", "4.12", "2.15", "4.16", "4.17", "2.26"];
+  const touchOnly = ["1.3", "1.4", "1.4a", "1.4b", "1.10", "1.11", "4.9", "4.11", "4.12", "2.15", "4.16", "4.17", "2.26"];
   const lossyItems = result.classification.items.filter((i) => (i.status === "A" || i.status === "N") && !touchOnly.includes(i.rowId));
   const lossyLines = new Set<number>();
   for (const i of lossyItems) if (i.line !== null) lossyLines.add(i.line);

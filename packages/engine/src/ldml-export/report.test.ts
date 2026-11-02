@@ -3,6 +3,7 @@ import { classifyFixture, exportFixture, exportInput } from "./__fixtures__/help
 import { classifyDetailed } from "./classify/classify.js";
 import { lowerDocument } from "./lower/document.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
+import { key, layout, platform } from "./__fixtures__/touchLayouts.js";
 import { renderReport, type ReportContext } from "./report.js";
 
 const CTX: ReportContext = { keyboardName: "Plain", keyboardId: "plain", version: "1.0", mnemonic: false, provenance: null };
@@ -117,5 +118,26 @@ describe("LDML-EXPORT-REPORT.md (contracts/export-package.md)", () => {
     const profile = resolveLdmlProfile("46");
     const detail = classifyDetailed(input, profile, { languages: ["en"] });
     expect(lowerDocument(input, profile, detail).provenance.positions.length).toBeGreaterThan(0);
+  });
+
+  it("fills the touch section: forms written, and the K item is not repeated per key (T075)", () => {
+    const input = exportInput("plain.kmn");
+    const profile = resolveLdmlProfile("46");
+    const c = classifyDetailed(
+      {
+        ...input,
+        touchLayout: layout(
+          platform("phone", { default: [[key("K_A"), key("K_BKSP")]] }),
+          platform("tablet", { default: [[key("K_A")]] }),
+        ),
+      },
+      profile,
+    ).classification;
+    const text = renderReport(c, profile, CTX);
+    const touchSection = text.slice(text.indexOf("## 6."), text.indexOf("## 7."));
+    expect(touchSection).toContain("phone (minDeviceWidth 1), tablet (minDeviceWidth 150)");
+    expect(touchSection).toContain("KM_LINT_LDML_TOUCH_SPECIAL_KEY");
+    expect(text.match(/ready for Keyman's touch pipeline/g)).toHaveLength(1);
+    expect(text.match(/touch pipeline/g)).toHaveLength(1);
   });
 });

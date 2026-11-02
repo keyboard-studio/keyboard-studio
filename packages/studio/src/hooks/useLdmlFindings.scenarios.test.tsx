@@ -46,7 +46,7 @@ const HEAD = [
   "group(main) using keys",
   "",
 ];
-const TAIL = ["", "group(PostKeystroke) readonly", "", "nomatch > layer('default')", ""];
+const TAIL = ["", "group(PostKeystroke) readonly", "", "'.' ' ' > layer('shift')", "nomatch > layer('default')", ""];
 
 function kmn(optionRules: string[]): string {
   return [...HEAD, ...optionRules, "+ [K_B] > 'b'", "+ [K_C] > set(opt = '1')", ...TAIL].join("\n");
@@ -89,7 +89,7 @@ describe("useLdmlFindings", () => {
     expect(first.severity).toBe("warning");
     expect(first.layer).toBe("C");
     expect(first.location).toEqual({ file: "source/opts.kmn", line: HEAD.length + 1 });
-    // The PostKeystroke group is touch layer behaviour: it is reported too.
+    // A PostKeystroke rule that reads earlier text is a lost touch layer behaviour: it is reported too.
     expect(byCode(result.current, "KM_LINT_LDML_NO_KEY_TRIGGER").length).toBeGreaterThan(0);
     expect(result.current.every((f) => f.severity === "warning" || f.severity === "hint")).toBe(true);
   });

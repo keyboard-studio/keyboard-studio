@@ -8,7 +8,11 @@ import type { LDMLKeyboard } from "@keymanapp/developer-utils";
 import { resolveLangtag } from "../../langtags/index.js";
 import type { ClassifyDetail } from "../classify/classify.js";
 import { findStore, isGuardElement, type RulePlan } from "../classify/ruleElements.js";
-import { layerModifiers } from "../classify/keystrokes.js";
+import { layerModifiers, tableVKey } from "../classify/keystrokes.js";
+import { touchLayerModifiers } from "../classify/layerRules.js";
+import { kvksShiftTokenToLayerId } from "../../pattern-apply/modifierCombos.js";
+import { DisplaySet } from "./displays.js";
+import { buildTouchForms, planTouchForms, type TouchLowered } from "./touchForms.js";
 import type { TargetProfile } from "../profiles/types.js";
 import type { LdmlExportInput } from "../types.js";
 import type { LdmlDocument, LdmlTransform, LdmlTransformGroup } from "../xml/model.js";
@@ -28,6 +32,8 @@ export interface LowerResult {
   provenance: ProvenanceRecord;
   /** Marker id to the deadkey name it stands for. */
   markers: ReadonlyMap<string, string>;
+  /** Where each touch key went (for the touch equivalence harness). */
+  touchKeyMap: TouchLowered["keyMap"];
 }
 
 /** `major.minor.patch` from a KMN version (`1.0` gives `1.0.0`; anything else gives `1.0.0`). */
@@ -148,8 +154,31 @@ export function lowerDocument(
     keyParts.set(pk, parts);
     requests.push({ source: pk, id: keyIdProposal(parts, markerOf) });
   }
+  // Touch keys type the same text through the same resolution, so they share these ids.
+  const touchPlan = planTouchForms({
+    layout: input.touchLayout,
+    grid,
+    trig,
+    plans,
+    ir,
+    baseLayout,
+    layerRules: detail.layerRules,
+    cased,
+  });
+  for (const parts of touchPlan.plainParts) {
+    const pk = partsKey(parts);
+    if (keyParts.has(pk)) continue;
+    keyParts.set(pk, parts);
+    requests.push({ source: pk, id: keyIdProposal(parts, markerOf) });
+  }
   const resolved = resolveIds(requests);
   for (const [pk] of keyParts) keyIdOf.set(pk, resolved.get(pk) as string);
+  const touch = buildTouchForms(touchPlan, {
+    idOf: (parts) => resolved.get(partsKey(parts)) as string,
+    taken: new Set(resolved.values()),
+    markerOf,
+    proposal: (parts) => keyIdProposal(parts, markerOf),
+  });
 
   for (const c of trig.catchAlls) {
     const id = markerOf(c.source);
@@ -235,6 +264,23 @@ export function lowerDocument(
     } as LDMLKeyboard.LKLayer;
   });
 
+  // --- displays (row 4.8): visual-keyboard labels that differ from the key's output ----------------------
+  const displays = new DisplaySet();
+  for (const kl of input.visualKeyboard?.layers ?? []) {
+    const state = touchLayerModifiers(kvksShiftTokenToLayerId(kl.shift));
+    const layer = grid.layers.find((l) => l.caps === state.caps && l.components.join(" ") === state.components.join(" "));
+    if (layer === undefined) continue;
+    const byVKey = new Map(layer.cells.map((c) => [c.vkey, c] as const));
+    for (const k of kl.keys) {
+      const cell = byVKey.get(tableVKey(k.vkey));
+      const kind = cell === undefined ? undefined : trig.cells.get(cellKey(layer, cell.vkey));
+      if (kind === undefined || kind.kind !== "text") continue;
+      const id = keyIdOf.get(partsKey(kind.parts));
+      if (id === undefined) continue;
+      displays.add(id, k.label, kind.parts.map((x) => (x.t === "text" ? x.v : "")).join(""));
+    }
+  }
+
   // --- document -------------------------------------------------------------------------------------------
   const meta = input.metadata;
   const langs = meta.languages.map(minimalLocale);
@@ -254,10 +300,19 @@ export function lowerDocument(
     version: { number: normaliseVersion(meta.version || ir.header.version) },
   };
   if (langs.length > 1) doc.locales = langs.slice(1).map((id) => ({ id }));
-  if (keyDefs.size > 0) {
-    doc.keys = [...keyDefs].sort(([a], [b]) => compareCodePoints(a, b)).map(([id, output]) => ({ id, output }));
+  for (const d of touch.displays) displays.add(d.keyId, d.label, d.output);
+  const displayList = displays.toDisplays();
+  if (displayList !== undefined) doc.displays = displayList;
+  const allKeys = new Map<string, Record<string, string | number | boolean>>();
+  for (const [id, output] of keyDefs) allKeys.set(id, { id, output });
+  for (const k of touch.keys) if (!allKeys.has(k["id"] as string)) allKeys.set(k["id"] as string, k);
+  if (allKeys.size > 0) {
+    doc.keys = [...allKeys]
+      .sort(([a], [b]) => compareCodePoints(a, b))
+      .map(([, k]) => k) as unknown as NonNullable<LdmlDocument["keys"]>;
   }
-  doc.layers = [{ formId: grid.form, layer: layers } as LDMLKeyboard.LKLayers];
+  if (touch.flicks.length > 0) doc.flicks = touch.flicks;
+  doc.layers = [{ formId: grid.form, layer: layers } as LDMLKeyboard.LKLayers, ...touch.layers];
   if (setStores.size > 0) {
     doc.variables = {
       set: [...setStores]
@@ -278,7 +333,7 @@ export function lowerDocument(
   const provenance = buildProvenance(grid, { id: baseLayout.id, source: baseLayout.source });
   void layerModifiers;
   void ruleParts;
-  return { doc, grid, provenance, markers: markerNames };
+  return { doc, grid, provenance, markers: markerNames, touchKeyMap: touch.keyMap };
 }
 
 const oneLine = (t: string): string => t.replace(/\s+/g, " ").trim().normalize("NFC");

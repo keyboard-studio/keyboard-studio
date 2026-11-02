@@ -235,13 +235,14 @@ describe("classifyForLdml: group rows (1.x)", () => {
 
   it("1.3, 1.4 and 1.10: NewContext and PostKeystroke groups are N", () => {
     const c = classifyFixture("options-postkeystroke.kmn");
-    const post = c.items.filter((i) => i.rowId === "1.4");
-    expect(post.length).toBeGreaterThan(0);
+    const post = c.items.filter((i) => i.rowId === "1.4b");
+    expect(post.length).toBe(1);
     expect(post.every((i) => i.status === "N" && i.code === "KM_LINT_LDML_NO_KEY_TRIGGER")).toBe(true);
-    const nc = classify("+ [K_A] > 'x'\n\ngroup(NewContext) readonly\nnomatch > use(g2)\ngroup(g2)\n'a' > 'b'\n", {
+    expect(c.items.some((i) => i.rowId === "1.4")).toBe(false);
+    const nc = classify("+ [K_A] > 'x'\n\ngroup(NewContext) readonly\nnul > layer('shift')\nnomatch > layer('default')\n", {
       extra: "begin NewContext > use(NewContext)\n",
     });
-    expect(nc.items.some((i) => i.rowId === "1.3")).toBe(true);
+    expect(nc.items.some((i) => i.rowId === "1.4b" && i.nodeKey === "behaviour:start-of-field")).toBe(true);
   });
 
   it("1.12 call(): the fragment reason selects the row", () => {

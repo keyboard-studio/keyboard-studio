@@ -12,6 +12,7 @@ import type { LdmlClassification, LdmlClassifyInput, LdmlStatus } from "../types
 import { buildCallGraph, type CallGraph } from "./callGraph.js";
 import { classifyHeader, isAnsiOnly, isMnemonicLayout, type HeaderOptions } from "./header.js";
 import { ItemSink, deepFreeze } from "./items.js";
+import { addLayerRuleItems, analyseLayerRules, type LayerRules } from "./layerRules.js";
 import {
   analyseModifiers,
   chooseForm,
@@ -21,6 +22,7 @@ import {
   storeKeyTargets,
   type ResolveContext,
 } from "./keystrokes.js";
+import { buildTouchRuleIndex, classifyTouch } from "./touch.js";
 import { parseBracketKey, routeFragmentReason } from "./rawText.js";
 import { analyseRule, dkKey, findStore, type RulePlan } from "./ruleElements.js";
 
@@ -33,6 +35,7 @@ export interface ClassifyDetail {
   graph: CallGraph;
   form: import("../lower/positions.js").LdmlForm;
   rc: ResolveContext;
+  layerRules: LayerRules;
 }
 
 const BASE_LAYER_WORDS = {
@@ -82,6 +85,16 @@ function collectVKeys(ir: KeyboardIR, rc: ResolveContext): string[] {
   return out;
 }
 
+/** Layer names (KMN spelling) of the exported touch forms. */
+function touchLayerNames(input: LdmlClassifyInput): string[] {
+  const names = new Set<string>();
+  for (const p of input.touchLayout?.platforms ?? []) {
+    if (p.id === "desktop") continue;
+    for (const l of p.layers) names.add(l.id);
+  }
+  return [...names].sort(compareCodePoints);
+}
+
 function groupNodeKey(g: IRGroup): string {
   return `group:${g.name}#group`;
 }
@@ -96,7 +109,8 @@ export function classifyDetailed(
   const rc: ResolveContext = { mnemonic: isMnemonicLayout(ir), baseLayout };
   const graph = buildCallGraph(ir);
   const ansiOnly = isAnsiOnly(ir);
-  const touchPresent = (input.touchLayout?.platforms.length ?? 0) > 0;
+  // A touch form is written for a phone or tablet platform; a desktop platform is covered by the hardware form.
+  const touchPresent = (input.touchLayout?.platforms ?? []).some((p) => p.id !== "desktop");
   const form = chooseForm(collectVKeys(ir, rc), baseLayout);
   const plans: RulePlan[] = [];
 
@@ -119,9 +133,10 @@ export function classifyDetailed(
       const facts = graph.facts.get(g);
       if (facts === undefined) continue;
       const gk = { nodeKey: groupNodeKey(g), line: g.sourceLine, owner: `group ${g.name}`, params: { group: g.name } };
-      if (facts.role === "newContext") sink.add("1.3", gk);
-      else if (facts.role === "postKeystroke") sink.add("1.4", gk);
-      else if (facts.role === "unreachable") sink.add("1.11", gk);
+      // NewContext / PostKeystroke groups are reported per behaviour by the layer-rule evaluation below.
+      if (facts.role === "newContext" || facts.role === "postKeystroke") {
+        // no group-level item
+      } else if (facts.role === "unreachable") sink.add("1.11", gk);
       else if (g === graph.entry) sink.add("1.1", gk);
       else if (facts.reach === "every") sink.add("1.5", gk);
       else if (g.usingKeys && facts.calledFromKeystrokeGroup) sink.add("1.7", { ...gk, status: "A" });
@@ -159,6 +174,9 @@ export function classifyDetailed(
     addBaseDeadkeys(plans, input, sink);
   }
 
+  const layerRules = analyseLayerRules(ir, graph, touchLayerNames(input));
+  if (!ansiOnly) addLayerRuleItems(layerRules, sink, touchPresent);
+  classifyTouch(input.touchLayout, sink, buildTouchRuleIndex(plans, ir));
   if (touchPresent) sink.add("5.15", { nodeKey: "header:touch", side: "touch" });
 
   const items = sink.all().sort((a, b) => compareCodePoints(a.siteKey, b.siteKey));
@@ -172,7 +190,7 @@ export function classifyDetailed(
     ansiOnly,
     touchPresent,
   });
-  return { classification, plans, graph, form, rc };
+  return { classification, plans, graph, form, rc, layerRules };
 }
 
 /** The classifier entry point (pure, synchronous). */

@@ -227,6 +227,17 @@ export async function buildSourceZipForDownload(): Promise<DownloadResult | null
   };
 }
 
+const TOUCH_TARGET_WORDS = new Set(["any", "web", "mobile", "tablet", "iphone", "ipad", "androidphone", "androidtablet"]);
+
+/**
+ * True when `&TARGETS` names a target that runs a touch layout (`any`, `web`, `mobile`, `tablet`,
+ * `iphone`, `ipad`, `androidphone`, `androidtablet`). An absent `&TARGETS` means `any`.
+ */
+export function targetsIncludeTouch(targets: readonly string[]): boolean {
+  const words = targets.flatMap((t) => t.toLowerCase().split(/\s+/)).filter((w) => w !== "");
+  return words.length === 0 || words.some((w) => TOUCH_TARGET_WORDS.has(w));
+}
+
 /**
  * Build the LDML keyboard export — a THIRD, separate download (spec 108 FR-002).
  *
@@ -253,7 +264,11 @@ export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Prom
   const parseKmn = await getParseKmn();
   const { ir } = parseKmn(kmnText, keyboardId);
 
-  const touchText = readVfsText(vfs, `source/${keyboardId}.keyman-touch-layout`);
+  // The touch form is exported only when &TARGETS names a touch or web target (mapping row 4.6);
+  // a desktop-only keyboard exports the hardware form alone.
+  const touchText = targetsIncludeTouch(ir.header.targets)
+    ? readVfsText(vfs, `source/${keyboardId}.keyman-touch-layout`)
+    : undefined;
   const touchLayout = touchText === undefined ? null : (await getParseTouchLayout())(touchText);
   const kvksText = readVfsText(vfs, `source/${keyboardId}.kvks`);
   const visualKeyboard = kvksText === undefined ? null : (await getParseKvks())(kvksText);

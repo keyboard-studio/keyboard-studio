@@ -217,8 +217,11 @@ export function analyseRule(
   };
 
   // --- Role of the group (rows 1.3, 1.4, 1.11) ---------------------------------------------------
-  if (facts.role === "newContext") return reject("1.3");
-  if (facts.role === "postKeystroke") return reject("1.4");
+  // Layer groups are evaluated as a whole (layerRules.ts), which reports their behaviours.
+  if (facts.role === "newContext" || facts.role === "postKeystroke") {
+    plan.lower = false;
+    return plan;
+  }
   if (facts.role === "unreachable") return reject("1.11");
 
   // --- match / nomatch (rows 1.8, 1.9, 3.21) -----------------------------------------------------

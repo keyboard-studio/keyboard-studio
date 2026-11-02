@@ -16,4 +16,5 @@ if(opt = '1') + [K_A] > 'A1'
 
 group(PostKeystroke) readonly
 
+'.' ' ' > layer('shift')
 nomatch > layer('default')

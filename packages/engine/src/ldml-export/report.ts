@@ -5,6 +5,7 @@
 // findings view reads.
 
 import { compareCodePoints } from "./lower/keyIds.js";
+import { PHONE_MIN_DEVICE_WIDTH, TABLET_MIN_DEVICE_WIDTH } from "./lower/touchForms.js";
 import type { ProvenanceRecord } from "./lower/provenance.js";
 import { provenanceCounts } from "./lower/provenance.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
@@ -58,6 +59,23 @@ function table(items: readonly CompatibilityItem[], sourceName: string): string[
     );
   }
   lines.push("");
+  return lines;
+}
+
+const FORM_WIDTH: Record<string, number> = { phone: PHONE_MIN_DEVICE_WIDTH, tablet: TABLET_MIN_DEVICE_WIDTH };
+
+/** What the touch half carried, before the table of what it did not (FR-031, Story 4 scenario 3). */
+function touchSummary(c: LdmlClassification): string[] {
+  const platforms = [...new Set(c.items.map((i) => /^touch:(phone|tablet)\//.exec(i.nodeKey)?.[1]).filter((p): p is string => p !== undefined))].sort();
+  const lines: string[] = [];
+  if (platforms.length > 0) {
+    const forms = platforms.map((p) => `${p} (minDeviceWidth ${FORM_WIDTH[p]})`).join(", ");
+    lines.push(`Touch forms written to TR35: ${forms}. Each touch key types the same output as the matching key in the rules above.`);
+  }
+  if (c.items.some((i) => i.rowId === "1.4a")) {
+    lines.push("Automatic layer switching that depends only on the current layer and the key pressed was carried over as key layerId.");
+  }
+  if (lines.length > 0) lines.push("");
   return lines;
 }
 
@@ -115,6 +133,7 @@ export function renderReport(c: LdmlClassification, profile: TargetProfile, ctx:
   out.push("## 5. What did not carry over: physical keyboard", "");
   out.push(...table(coded.filter((i) => i.side === "hardware"), sourceName));
   out.push("## 6. What did not carry over: touch", "");
+  if (c.touchPresent) out.push(...touchSummary(c));
   out.push(...table(coded.filter((i) => i.side === "touch"), sourceName));
   out.push("## 7. Other items", "");
   out.push(...table(coded.filter((i) => i.side === "package"), sourceName));

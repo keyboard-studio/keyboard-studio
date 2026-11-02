@@ -486,13 +486,13 @@ on the key pressed.
 switch. Two touch forms (`minDeviceWidth` 1 and 150) pass H3 and H4, and each touch key's output
 equals the KMN rule output for that key.
 
-- [ ] T071 [US4] Implement `LX/classify/layerRules.ts` (FR-026; rows 1.4a/1.4b). For every (touch layer, output key) pair, evaluate the `PostKeystroke`/`NewContext` groups statically. They consist of typed `if(&layer = …)` rules, `raw` `layer('x')` outputs, `set(&layer='x')` fragments read through `rawText.ts`, `any(store)` over the key's own output, and `nomatch`.
+- [x] T071 [US4] Implement `LX/classify/layerRules.ts` (FR-026; rows 1.4a/1.4b). For every (touch layer, output key) pair, evaluate the `PostKeystroke`/`NewContext` groups statically. They consist of typed `if(&layer = …)` rules, `raw` `layer('x')` outputs, `set(&layer='x')` fragments read through `rawText.ts`, `any(store)` over the key's own output, and `nomatch`.
   - A result that depends only on the current layer and the key's output becomes a `layerId` decision (M).
   - A rule that depends on earlier text (sentence punctuation plus space, start of field, backspace re-evaluation) gives **one** N `KM_LINT_LDML_NO_KEY_TRIGGER` item per behaviour (`nodeKey` `behaviour:<name>`), with a touch-specific consequence such as "start-of-sentence auto-shift".
   - Never emulate it with transforms.
 
   This replaces the single-item treatment of these groups from T024. Test it in `LX/classify/layerRules.test.ts` with the casing-template rules quoted in research R15.
-- [ ] T072 [P] [US4] Implement `LX/classify/touch.ts` (rows 5.1–5.15):
+- [x] T072 [P] [US4] Implement `LX/classify/touch.ts` (rows 5.1–5.15):
   - 5.3 desktop platform → hint;
   - 5.8 gestures on a gesture target → hint;
   - 5.11 `font`, `fontsize`, `hint`, `defaultHint`, `displayUnderlying`, `dk` → hints;
@@ -501,7 +501,7 @@ equals the KMN rule output for that key.
   - every touch key gets an item with `nodeKey` `touch:<platform>/<layer>/<key>`.
 
   Wire it into `classifyForLdml`. Test it in `LX/classify/touch.test.ts`.
-- [ ] T073 [US4] Implement `LX/lower/touchForms.ts`:
+- [x] T073 [US4] Implement `LX/lower/touchForms.ts`:
   - the phone form gets `minDeviceWidth="1"` and the tablet form `"150"`, from the exported constants `PHONE_MIN_DEVICE_WIDTH` and `TABLET_MIN_DEVICE_WIDTH`;
   - the `default` layer becomes `base`, and touch layers get an `id` and no `modifiers`;
   - rows are joined by single spaces;
@@ -511,16 +511,16 @@ equals the KMN rule output for that key.
   - `nextlayer` and the T071 decisions → `layerId`;
   - special keys → same-width gap keys `bksp`/`enter`/`tab`, with no output, `layerId`, gestures or display;
   - labels that differ from the output → `<display keyId>`.
-- [ ] T074 [P] [US4] Write `<displays>` for hardware keys from `KvksIR` labels that differ from their output (row 4.8), in `LX/lower/document.ts`. Gap keys are never referenced by a display (TR35). A label that is a bare nonspacing mark gets U+25CC prepended, and a display never equals its key's `output` (rows 4.8, 5.10).
-- [ ] T075 [US4] In `LX/report.ts`, fill the touch section, plus the single 5.15 delivery statement, when `touchPresent` (Story 4 scenario 3; FR-031).
-- [ ] T076 [US4] In `ST/lib/buildOutputBundle.ts` (T045), pass the projected `.keyman-touch-layout` into the export input whenever `&TARGETS` includes mobile or web (row 4.6). Add a test that a desktop-only target exports no touch form.
-- [ ] T077 [US4] Write `LX/touch.test.ts`, covering Story 4:
+- [x] T074 [P] [US4] Write `<displays>` for hardware keys from `KvksIR` labels that differ from their output (row 4.8), in `LX/lower/document.ts`. Gap keys are never referenced by a display (TR35). A label that is a bare nonspacing mark gets U+25CC prepended, and a display never equals its key's `output` (rows 4.8, 5.10).
+- [x] T075 [US4] In `LX/report.ts`, fill the touch section, plus the single 5.15 delivery statement, when `touchPresent` (Story 4 scenario 3; FR-031).
+- [x] T076 [US4] In `ST/lib/buildOutputBundle.ts` (T045), pass the projected `.keyman-touch-layout` into the export input whenever `&TARGETS` includes mobile or web (row 4.6). Add a test that a desktop-only target exports no touch form.
+- [x] T077 [US4] Write `LX/touch.test.ts`, covering Story 4:
   - scenario 1: two touch forms with distinct widths;
   - scenario 2: a label that differs from the output becomes a display, and the key types the rule output;
   - scenario 3: the report states the Keyman touch-pipeline note once;
   - scenario 4: a TR35-valid construct Keyman ignores is still written, and the K item is a hint;
   - the 1.4a cases (one-shot shift, caps stays caps, numeric stays numeric) produce `layerId`.
-- [ ] T078 [US4] Write `LX/touch.corpus.test.ts` (H3 + H4 + H1, SC-010). For every touch-bearing corpus keyboard under both profiles:
+- [x] T078 [US4] Write `LX/touch.corpus.test.ts` (H3 + H4 + H1, SC-010). For every touch-bearing corpus keyboard under both profiles:
   - CLDR XSD valid;
   - `tr35Conformance` returns `[]`;
   - under 46, the Keyman compile with the touch forms included returns exactly the K-row codes.
