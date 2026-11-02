@@ -1,10 +1,14 @@
 // Checks 1.7b / 1.8b / 1.11b / 1.12b / 3.1b / 6.1b / 6.3b — the file-inventory
-// twins (Group A2, Batch 1).
+// twins (Group A2, Batch 1) — plus the four required-file existence checks
+// (1.14 / 4.0 / 5.0 / 8.0): README.md, LICENSE.md, the .kpj and the .kps
+// are required files (2026-11-02 ruling), so their absence is a finding,
+// and the checks that read them nest under that absence via the
+// assembly's contextMissing (never a vacuous pass).
 //
 // Each is the post-hoc checkable twin of a scaffolder-bake criterion: the
 // bake row is Met-by-guarantee for studio-built keyboards and
 // not-yet-checkable ("foreign-bake") for foreign keyboards; the twin row is
-// a real layer-c check that reads the judged VFS. All seven are pure
+// a real layer-c check that reads the judged VFS. All eleven are pure
 // functions of the VFS path list — no parsing, no IR.
 //
 // Conventions: comparisons are case-insensitive on the basename (the
@@ -175,7 +179,73 @@ export function checkWelcomeHtmAbsent(paths: readonly string[]): CheckResult {
   ]);
 }
 
-/** Run all seven file-inventory checks over one VFS path list. */
+/** 1.14 — a `.kpj` project file is absent from the keyboard root. */
+export function checkKpjAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => p.toLowerCase().endsWith(".kpj"));
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_KPJ_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
+  return checkFailed("KM_LINT_KPJ_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_KPJ_ABSENT",
+      file: "<keyboard-id>.kpj",
+      message: "No .kpj project file at the keyboard root.",
+      hint: "Add the <keyboard-id>.kpj Keyman Developer project file.",
+    }),
+  ]);
+}
+
+/** 4.0 — `LICENSE.md` is absent from the keyboard root. */
+export function checkLicenseMdAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => {
+    const segments = p.toLowerCase().split("/");
+    return segments.length === 1 && segments[0] === "license.md";
+  });
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_LICENSE_MD_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
+  return checkFailed("KM_LINT_LICENSE_MD_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_LICENSE_MD_ABSENT",
+      file: "LICENSE.md",
+      message: "No LICENSE.md at the keyboard root.",
+      hint: "Add a LICENSE.md with the copyright statement at the keyboard root.",
+    }),
+  ]);
+}
+
+/** 5.0 — `README.md` is absent from the keyboard root. */
+export function checkReadmeMdAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => {
+    const segments = p.toLowerCase().split("/");
+    return segments.length === 1 && segments[0] === "readme.md";
+  });
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_README_MD_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
+  return checkFailed("KM_LINT_README_MD_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_README_MD_ABSENT",
+      file: "README.md",
+      message: "No README.md at the keyboard root.",
+      hint: "Add a README.md describing the keyboard at the keyboard root.",
+    }),
+  ]);
+}
+
+/** 8.0 — a `.kps` package file is absent from `source/`. */
+export function checkKpsAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => p.toLowerCase().endsWith(".kps"));
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_KPS_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
+  return checkFailed("KM_LINT_KPS_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_KPS_ABSENT",
+      file: "source/<keyboard-id>.kps",
+      message: "No .kps package file in source/.",
+      hint: "Add the source/<keyboard-id>.kps Keyman package source file.",
+    }),
+  ]);
+}
+
+/** Run all eleven file-inventory checks over one VFS path list. */
 export function checkFileInventory(paths: readonly string[]): ReturnType<typeof mergeResults> {
   return mergeResults(
     checkKeyboardInfoPresent(paths),
@@ -185,5 +255,9 @@ export function checkFileInventory(paths: readonly string[]): ReturnType<typeof 
     checkHistoryMdAbsent(paths),
     checkReadmeHtmAbsent(paths),
     checkWelcomeHtmAbsent(paths),
+    checkKpjAbsent(paths),
+    checkLicenseMdAbsent(paths),
+    checkReadmeMdAbsent(paths),
+    checkKpsAbsent(paths),
   );
 }

@@ -317,6 +317,12 @@ export async function judgeForeignKeyboard(
           .find((n) => n !== "") ?? displayName)
       : displayName;
 
+  const docInput = collectDocLintInputFromVfs(
+    vfs,
+    keyboardId,
+    effectiveDisplayName,
+  );
+
   // 3.4 (PR targets): decide what the base HISTORY.md comparison can claim.
   let historyVerified: string | undefined;
   let startHistoryMdText: string | undefined;
@@ -343,13 +349,14 @@ export async function judgeForeignKeyboard(
         contextMissing[HISTORY_TRUNCATED_CODE] = "the base-commit HISTORY.md";
       }
     }
+  } else {
+    // Compare and non-PR review targets: there is no base commit to
+    // compare against, so the cumulative check cannot run — nested,
+    // never a vacuous pass.
+    contextMissing[HISTORY_TRUNCATED_CODE] =
+      "a base HISTORY.md to compare against";
   }
 
-  const docInput = collectDocLintInputFromVfs(
-    vfs,
-    keyboardId,
-    effectiveDisplayName,
-  );
   const { findings: docFindings, verifiedByCode: docVerified } = runDocChecks(
     startHistoryMdText !== undefined
       ? { ...docInput, startHistoryMdText }
@@ -383,6 +390,7 @@ export async function judgeForeignKeyboard(
   const bundledFonts = [
     ...new Set([...(base.bundledFonts ?? []), ...sharedFonts.map(baseName)]),
   ].sort();
+  const loweredPaths = new Set(vfs.list().map((p) => p.toLowerCase()));
   const facts = {
     ...base,
     fontBundled: bundledFonts.length > 0,
@@ -390,7 +398,16 @@ export async function judgeForeignKeyboard(
     deprecated: deprecationInPlay,
     // No partner signal exists in a snapshot: §16 stays applicable (D7).
     partnerPackage: true,
-    helpPhpAbsent: !vfs.list().some((p) => p.toLowerCase().endsWith(".php")),
+    helpPhpAbsent: ![...loweredPaths].some((p) => p.endsWith(".php")),
+    // Nested checks (2026-11-02 ruling): the content rows for a missing
+    // required file resolve Not applicable, naming the parent row that
+    // reports the absence (the 2026-10-31 help-.php precedent).
+    historyMdAbsent:
+      !loweredPaths.has("history.md") && !loweredPaths.has("history.txt"),
+    readmeMdAbsent: !loweredPaths.has("readme.md"),
+    welcomeHtmAbsent:
+      !loweredPaths.has("source/welcome.htm") &&
+      !loweredPaths.has("source/welcome/welcome.htm"),
     newKeyboardAtBase,
     // §19 adaptation signal: the PR body or HISTORY.md mentions an
     // adaptation. Without it the §19 rows resolve Not applicable.

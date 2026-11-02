@@ -105,6 +105,95 @@ describe("foreign judge: help .php absent", () => {
   });
 });
 
+describe("foreign judge: nested checks under a missing required file", () => {
+  // 2026-11-02 ruling: a required file's absence is an error on its own
+  // row, and the checks that read the file resolve Not applicable naming
+  // that row (the 2026-10-31 help-.php precedent) — never a vacuous Met.
+  const HISTORY_ROWS = ["3.3-", "3.4-", "3.5-", "3.6-", "3.7-", "7.1-"];
+
+  function vfsWithout(...names: string[]) {
+    const base = [
+      entry(`source/${ID}.kmn`, KMN),
+      entry("HISTORY.md", "# History\n\n## 1.0 (2026-01-01)\n"),
+      entry("README.md", "# Fixture\n"),
+    ];
+    return createVirtualFS(base.filter((e) => !names.includes(e.path)));
+  }
+
+  it("the history cluster is Not applicable without HISTORY.md, naming 3.1b", async () => {
+    const { row } = await judge(vfsWithout("HISTORY.md"));
+    for (const prefix of HISTORY_ROWS) {
+      const r = row(prefix);
+      expect(r.status, prefix).toBe("not-applicable");
+      expect(r.evidence().lines).toEqual([
+        "No HISTORY.md; its absence is reported by 3.1b.",
+      ]);
+    }
+    expect(row("3.1b-").status).toBe("not-met");
+  });
+
+  it("5.7 is Not applicable without README.md, naming 5.0", async () => {
+    const { row } = await judge(vfsWithout("README.md"));
+    expect(row("5.7-").status).toBe("not-applicable");
+    expect(row("5.7-").evidence().lines).toEqual([
+      "No README.md; its absence is reported by 5.0.",
+    ]);
+    expect(row("5.0-").status).toBe("not-met");
+  });
+
+  it("11.9/11.10 are Not applicable without the help .php, naming 11.1b", async () => {
+    const { row } = await judge(vfsOf());
+    for (const prefix of ["11.9-", "11.10-"]) {
+      const r = row(prefix);
+      expect(r.status, prefix).toBe("not-applicable");
+      expect(r.evidence().lines).toEqual([
+        "No help .php; its absence is reported by 11.1b.",
+      ]);
+    }
+  });
+
+  it("11.9/11.10 are Not applicable without welcome.htm, naming 6.3b", async () => {
+    const php = "<?php\n$pagename = 'Ibibio Tonal Keyboard Help';\n";
+    const { row } = await judge(vfsOf([entry(`source/help/${ID}.php`, php)]));
+    for (const prefix of ["11.9-", "11.10-"]) {
+      const r = row(prefix);
+      expect(r.status, prefix).toBe("not-applicable");
+      expect(r.evidence().lines).toEqual([
+        "No welcome.htm; its absence is reported by 6.3b.",
+      ]);
+    }
+  });
+
+  it("11.5 is Not applicable only when both welcome.htm and the help .php are absent", async () => {
+    const { row } = await judge(vfsOf());
+    expect(row("11.5-").status).toBe("not-applicable");
+    expect(row("11.5-").evidence().lines).toEqual([
+      "No welcome.htm and no help .php; their absence is reported by 6.3b and 11.1b.",
+    ]);
+    // welcome.htm present, .php absent: 11.5 still scans welcome.htm.
+    const { row: withWelcome } = await judge(
+      vfsOf([entry("source/welcome.htm", "<html></html>")]),
+    );
+    expect(withWelcome("11.5-").status).not.toBe("not-applicable");
+  });
+
+  it("3.4 nests under the missing file on a PR that cannot compare", async () => {
+    const { row } = await judge(vfsWithout("HISTORY.md"), {
+      reviewContext: {
+        repoPath: `experimental/i/${ID}`,
+        isPr: true,
+        treePaths: [`experimental/i/${ID}/source/${ID}.kmn`],
+        idConflictAtBase: { baseSha: "abc", existingTiers: ["experimental"] },
+      },
+    });
+    const r = row("3.4-");
+    expect(r.status).toBe("not-applicable");
+    expect(r.evidence().lines).toEqual([
+      "No HISTORY.md; its absence is reported by 3.1b.",
+    ]);
+  });
+});
+
 describe("foreign judge: deprecation and partner predicates", () => {
   it("15.x is Not applicable (15.3 not falsely not-met) with no deprecation signal", async () => {
     const { row, result } = await judge(vfsOf([], kps()));

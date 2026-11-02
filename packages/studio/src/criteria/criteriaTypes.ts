@@ -103,10 +103,30 @@ export interface CriteriaFacts {
   partnerPackage: boolean;
   /**
    * Foreign host only: the keyboard ships no help .php. The rows that
-   * judge the help page's content (11.2/11.3b/11.4b/11.6/11.7/11.8) are
-   * then Not applicable; the missing file itself is 11.1b's finding.
+   * judge the help page's content (11.2/11.3b/11.4b/11.6/11.7/11.8 plus
+   * the 11.9/11.10 parity rows) are then Not applicable; the missing
+   * file itself is 11.1b's finding.
    */
   helpPhpAbsent?: boolean;
+  /**
+   * Foreign host only: the keyboard ships no HISTORY.md. The rows that
+   * judge its content (3.3–3.7, 7.1) are then Not applicable; the
+   * missing file itself is 3.1b's finding.
+   */
+  historyMdAbsent?: boolean;
+  /**
+   * Foreign host only: the keyboard ships no README.md. The row that
+   * judges its content (5.7) is then Not applicable; the missing file
+   * itself is 5.0's finding.
+   */
+  readmeMdAbsent?: boolean;
+  /**
+   * Foreign host only: the keyboard ships no welcome.htm. The rows that
+   * judge its content (11.9/11.10, and 11.5 when the help .php is also
+   * absent) are then Not applicable; the missing file itself is 6.3b's
+   * finding.
+   */
+  welcomeHtmAbsent?: boolean;
   /**
    * /review host only: the PR adds this keyboard (its folder is absent
    * at the PR base commit), so there is no earlier HISTORY.md for 3.4's
