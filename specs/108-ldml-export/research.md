@@ -779,6 +779,26 @@ reason, and the alternatives rejected. The sources are:
   - **Not offered as a separate in-browser check**: that would load common-types' precompiled AJV
     validator for no author-visible gain.
 
+### Trial results (2026-11-01)
+
+Setup: `pnpm --filter @keyboard-studio/studio build` (tsc -b, then vite build; postbuild index step ran), then `vite preview` serving `dist/` on port 5274 through `packages/studio/playwright.trial.config.ts`. No `vite.config.ts` change was needed: `optimizeDeps.exclude` only affects the dev server, kmc-ldml needs no sibling `.wasm` fetch, and the four import files are TypeScript string constants (`LX/compile/ldmlImportAssets.ts`, byte-equality test against the pinned developer-utils), because developer-utils' `exports` map blocks a deep `?raw` import. The in-browser seam is `window.__ksE2E__.compileLdml`, which is live in production builds under `?e2e=1`, so the measured build is the tested build.
+
+- **Chunks the lazy compile adds** (gzip -9; Vite's own figure matches): `main-DANsw5YO.js` (kmc-ldml) 96.6 kB raw, **27.8 kB gzip**; `ldmlImportAssets-C8yEVfyx.js` (the four XML files) 7.3 kB raw, 1.7 kB gzip. Total about **29.5 kB gzip**, fetched only when a compile is requested. Its other dependencies (`index-B3qrmLxr.js` developer-utils/common-types, `kvk-file-writer`, `version.inc`, `main-Bt7_7Ke0.js`) are chunks the kmc-package/kmc-kmn imports already preload. Attribution is from the chunk graph (`__vite__mapDeps` of the kmc-ldml import site); no pre-change baseline build was made to diff against.
+- **WASM files in `dist/`**: 1 (`wasm-host-CBnZIFrP.wasm`, the kmcmplib). The browser run requested at most one `.wasm`.
+- **Entry chunk** (`index-Bcciy05Z.js`): contains no kmc-ldml marker (`ERROR_SchemaValidationError` count 0; `keys-Latn-implied` count 0). Those strings occur only in `index-B3qrmLxr.js`/`main-DANsw5YO.js` and the assets chunk. The entry holds the loader's own code (`ldml-imports`, the `LdmlCompilerMessages` property name) and a dynamic `import("./main-DANsw5YO.js")`.
+- **Browser compile**: `ldml-compile-trial.spec.ts` (2 passed). `chechen_latin` (touch layout, phone/tablet forms written, `formId="touch"` present), profile 46: browser code set `[]` equals H1's `[]`, `ok` true both. A deliberately broken copy gives `["ERROR_InvalidFile","ERROR_InvalidXml"]` in both, so the equal sets are not vacuous. The XML is the same string on both sides (exported once in Node, passed to `page.evaluate`).
+
+### Trial verdict
+
+1. **PASS** lazy load through the `kmp.ts` pattern, out of the entry chunk: `_modulePromise` plus sticky `_down` in `loadLdmlCompiler.ts`; entry has no kmc-ldml marker and reaches it only through a dynamic import.
+2. **PASS** no second kmcmplib: exactly one `.wasm` in `dist/`.
+3. **PASS** the four `import/46/*.xml` files are bundled and served through `loadFile` (as a lazy string-constant chunk, 1.7 kB gzip), byte-equal to the pinned package (`loadLdmlCompiler.test.ts`); a real `46/keys-Latn-implied.xml` import resolved in the browser compile.
+4. **PASS** a real Vite production build succeeds (`vite build`, 0 errors; the existing chunk-size and mixed static/dynamic import warnings are unchanged in kind).
+5. **PASS** a complete profile-46 export with touch forms compiles in the built bundle with the same message set as CI (Playwright, served by `vite preview`; the spec asserts the page is not the dev server).
+6. **PASS** gzip added by the lazy chunks recorded above: 27.8 kB (kmc-ldml) + 1.7 kB (assets), about 29.5 kB.
+
+**Overall: PASS** on all six criteria. Caveats: the size delta is chunk-graph attribution, not a baseline diff; the trial exercises compile (`init`, `load`, `validate`), not `run`.
+
 ## R32 — Decisions taken when merging the owner rulings (2026-11-01)
 
 The `km/108-spec-review` rulings (FR-027–FR-029, FR-080, package id, set mapping, six new rows)

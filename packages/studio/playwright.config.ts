@@ -76,7 +76,7 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /\/e2e\/mobile-[^/]*\.spec\.ts/,
+      testIgnore: /\/e2e\/(mobile-[^/]*|ldml-compile-trial)\.spec\.ts/,
     },
     {
       name: "mobile",

@@ -672,11 +672,43 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T04:34:23.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T04:55:02.064Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T05:09:09.089Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T05:09:09.658Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T082",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T05:09:10.143Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T078",
+  "currentTask": "T082",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1323,13 +1355,98 @@
         "packages/engine/src/ldml-export/lower/document.ts",
         "packages/engine/src/ldml-export/__testing__/equivalence.ts"
       ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "loadLdmlCompiler lazy kmc-ldml loader, bundled CLDR 46 import assets with drift test, kmc-ldml moved to dependencies",
+      "files": [
+        "packages/engine/src/ldml-export/compile/loadLdmlCompiler.ts",
+        "packages/engine/src/ldml-export/compile/ldmlImportAssets.ts",
+        "packages/engine/package.json",
+        "pnpm-lock.yaml"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Production build measured (kmc-ldml chunk 27.8 kB gz + assets 1.7 kB gz, one wasm, entry clean); results in research.md R31",
+      "files": [
+        "specs/108-ldml-export/research.md"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "Playwright production-build trial via vite preview on 5274; browser codes equal H1 for chechen_latin, 2 passed",
+      "files": [
+        "packages/studio/e2e/ldml-compile-trial.spec.ts",
+        "packages/studio/playwright.trial.config.ts",
+        "packages/studio/playwright.config.ts",
+        "packages/studio/src/lib/e2eHook.ts",
+        "docs/tooling.md"
+      ]
+    },
+    "T082": {
+      "status": "DONE",
+      "did": "Trial verdict recorded in research.md R31: all six criteria PASS",
+      "files": [
+        "specs/108-ldml-export/research.md"
+      ]
     }
   },
   "concerns": [
     {
       "note": "km-keyman review of classify/layerRules.ts: (1) single char/any(store) context treated as the key own output; in KMN it matches the last context char, so keyless outputs (bksp, set, layer, deadkey) and multi-char outputs are mis-evaluated (lines ~161-163, 277-286); no backspace behaviour item. (2) IRContext if has no operator, so if(&layer != x) may be read as equality (~132-138). (3) nul context always labelled start-of-field (~108). Fixture lacks if(&layer), any(store), NewContext, set(&layer), backspace, nomatch-precedence cases.",
       "step": "implement"
+    },
+    {
+      "note": "T082 Pass follow-on (/speckit-plan + /speckit-tasks amendment for FR-071..FR-076, then T083) not run: it is a plan/tasks step, outside an implement round",
+      "step": "implement"
+    },
+    {
+      "note": "useKeyboardArtifact contextTolerance/startDocs beforeEach exceeds the 10s default hookTimeout under load; pre-existing, not fixed here",
+      "step": "implement"
     }
   ],
-  "last_action": "phase 6 T071-T078 folded; tests green; review concerns recorded"
+  "last_action": "Phase 7 T079-T082 done; verdict PASS recorded in R31",
+  "decisions": [
+    {
+      "decision": "CLDR 46 import XML shipped as TS string constants behind a dynamic import",
+      "why": "developer-utils exports map blocks deep ?raw imports; a test pins byte equality to the package",
+      "rejected": "vite ?raw import of node_modules path"
+    },
+    {
+      "decision": "trial served by vite preview on 5274 via playwright.trial.config.ts, compile driven through the ?e2e=1 window hook",
+      "why": "tests the measured production build without a new build mode",
+      "rejected": "UI walk (preview has no local-keyboards corpus plugin)"
+    }
+  ],
+  "verified": [
+    {
+      "what": "pnpm typecheck",
+      "command": "pnpm typecheck",
+      "result": "exit 0"
+    },
+    {
+      "what": "pnpm lint",
+      "command": "pnpm lint",
+      "result": "exit 0, 0 errors, 459 pre-existing warnings"
+    },
+    {
+      "what": "FR-070 Playwright trial on vite preview of the production build",
+      "command": "npx playwright test --config playwright.trial.config.ts",
+      "result": "2 passed"
+    },
+    {
+      "what": "studio vitest full suite",
+      "command": "pnpm --filter @keyboard-studio/studio exec vitest run --testTimeout=120000",
+      "result": "10747 passed, 3 failed (beforeEach hook timeouts in useKeyboardArtifact.contextTolerance/startDocs)",
+      "warnings": [
+        "the 3 timeouts reproduce identically with the phase changes stashed (alternating runs), and pass with --hookTimeout=120000: pre-existing load-sensitive flake"
+      ]
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Phase 7 FR-070 trial: lazy in-browser kmc-ldml compile, all six R31 criteria PASS"
+    }
+  }
 }

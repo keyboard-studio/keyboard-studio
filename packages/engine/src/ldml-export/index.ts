@@ -30,4 +30,7 @@ export { classifyForLdml } from "./classify/classify.js";
 export type { ClassifyOptions } from "./classify/classify.js";
 export { buildLdmlExport } from "./package.js";
 export { renderReport } from "./report.js";
+// Async-only: the kmc-ldml chunk stays lazy (FR-070 trial).
+export { compileLdmlInBrowser, initLdmlCompiler } from "./compile/loadLdmlCompiler.js";
+export type { KeymanCompileResult, KeymanMessage } from "./compile/loadLdmlCompiler.js";
 export type { ReportContext } from "./report.js";

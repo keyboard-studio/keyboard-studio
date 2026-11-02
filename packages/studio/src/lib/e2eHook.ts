@@ -20,6 +20,7 @@ import { readEnvFlag } from "./envFlag.ts";
 import { _forceCrashForE2E } from "../components/CrashErrorBoundary.tsx";
 import { _setCrashSendStateForTest } from "../crash/send.ts";
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import { compileLdmlInBrowser, type KeymanCompileResult } from "@keyboard-studio/engine";
 
 /**
  * A whole VFS reduced to `path -> exact content`, for the byte-identity half of
@@ -43,6 +44,11 @@ function snapshotVfs(vfs: VirtualFS): KsE2EFileSnapshot {
 }
 
 export interface KsE2EHook {
+  /**
+   * Compile an LDML document in the browser with the lazily loaded kmc-ldml (the FR-070
+   * trial). Lets the production-build trial spec drive the compile without a UI path.
+   */
+  compileLdml: (xml: string) => Promise<KeymanCompileResult>;
   /** The live working-copy IR (pre-carve-filter), or null before instantiation. */
   getWorkingIr: () => KeyboardIR | null;
   /** nodeIds currently marked deleted via the carve gallery. */
@@ -127,6 +133,7 @@ function isE2eEnabled(): boolean {
 export function installE2eHook(): void {
   if (!isE2eEnabled()) return;
   window.__ksE2E__ = {
+    compileLdml: (xml) => compileLdmlInBrowser(xml),
     getWorkingIr: () => useWorkingCopyStore.getState().ir,
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
     getDeletedItemIds: () => [...useWorkingCopyStore.getState().deletedItemIds],

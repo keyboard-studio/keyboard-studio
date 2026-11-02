@@ -1166,10 +1166,13 @@ export type {
 export {
   buildLdmlExport,
   classifyForLdml,
+  compileLdmlInBrowser,
+  initLdmlCompiler,
   listLdmlProfiles,
   renderReport,
   resolveLdmlProfile,
 } from "./ldml-export/index.js";
+export type { KeymanCompileResult, KeymanMessage } from "./ldml-export/index.js";
 export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
 
 // Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).

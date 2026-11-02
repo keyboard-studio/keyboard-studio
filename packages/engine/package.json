@@ -62,6 +62,7 @@
     "@keymanapp/common-types": "19.0.240-alpha",
     "@keymanapp/developer-utils": "19.0.240-alpha",
     "@keymanapp/kmc-kmn": "19.0.240-alpha",
+    "@keymanapp/kmc-ldml": "19.0.240-alpha",
     "@keymanapp/kmc-package": "19.0.240-alpha",
     "buffer": "6.0.3",
     "eventemitter3": "^5.0.4",
@@ -70,7 +71,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@keymanapp/kmc-ldml": "19.0.240-alpha",
     "cldr-misc-full": "48.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6",

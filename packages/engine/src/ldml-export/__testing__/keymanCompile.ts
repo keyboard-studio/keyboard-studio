@@ -7,13 +7,8 @@ import { CompilerError, DeveloperUtilsMessages } from "@keymanapp/developer-util
 import type { CompilerCallbacks, CompilerEvent } from "@keymanapp/developer-utils";
 import { LdmlCompilerMessages, LdmlKeyboardCompiler } from "@keymanapp/kmc-ldml";
 
-export interface KeymanMessage {
-  /** Symbolic name such as `ERROR_SchemaValidationError`, or the formatted numeric code. */
-  code: string;
-  severity: "debug" | "verbose" | "info" | "hint" | "warn" | "error" | "fatal";
-  text: string;
-  line?: number | undefined;
-}
+export type { KeymanMessage } from "../compile/loadLdmlCompiler.js";
+import type { KeymanMessage } from "../compile/loadLdmlCompiler.js";
 
 export interface KeymanCompileResult {
   messages: KeymanMessage[];

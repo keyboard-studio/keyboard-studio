@@ -88,6 +88,9 @@ importers:
       '@keymanapp/kmc-kmn':
         specifier: 19.0.240-alpha
         version: 19.0.240-alpha
+      '@keymanapp/kmc-ldml':
+        specifier: 19.0.240-alpha
+        version: 19.0.240-alpha
       '@keymanapp/kmc-package':
         specifier: 19.0.240-alpha
         version: 19.0.240-alpha
@@ -107,9 +110,6 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@keymanapp/kmc-ldml':
-        specifier: 19.0.240-alpha
-        version: 19.0.240-alpha
       cldr-misc-full:
         specifier: 48.2.0
         version: 48.2.0(cldr-core@48.2.0)
