@@ -29,10 +29,17 @@
 //      when a target actually changed the file; when a layer file is present
 //      but nothing matched, the VFS entry is left untouched (a `changed` /
 //      identity guard, matching the sibling applyCarveKeycapRemovalsToVfs).
+//  15. kvks schema validity (#2403) — the two corpus shapes that used to
+//      produce schema-invalid output (self-closing <flags/> in adiga_danef,
+//      missing <encoding> in vietnamese_telex_legacy) are now validated
+//      against kmcmplib's real kvks schema via @keymanapp/developer-utils'
+//      KvksFileReader, plus a negative control proving the validator rejects
+//      the pre-fix broken shapes.
 
 import { describe, it, expect, vi } from "vitest";
 import { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 import { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
+import { KvksFileReader } from "@keymanapp/developer-utils";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type {
   KeyboardIR,
@@ -871,5 +878,105 @@ describe("applyKeycapLabelsToVfs — change-gated write when nothing matched", (
       false,
     );
     expect(vfs.get("source/test.keyman-touch-layout")?.content).toBe(touchRightaltOnly);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. kvks schema validity (#2403) — synthesizeKvksLayer used to emit XML
+// that kmcmplib's kvks schema rejects in two corpus cases:
+//   (a) self-closing <flags/> (adiga_danef): the <usealtgr/> insert landed
+//       OUTSIDE the flags element as a direct child of <header>
+//       ("additionalProperty usealtgr");
+//   (b) no <encoding> element (vietnamese_telex_legacy): the new <layer> was
+//       inserted directly under <visualkeyboard> ("additionalProperty layer").
+// Both shapes are validated below against the real kvks schema via
+// @keymanapp/developer-utils' KvksFileReader (read + validate).
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates a .kvks document against kmcmplib's kvks schema
+ * (keymanapp/keyman common/schemas/kvks/kvks.schema.json). Fails the test
+ * when the document is rejected.
+ */
+function expectValidKvksXml(xml: string): void {
+  const reader = new KvksFileReader();
+  const source = reader.read(new TextEncoder().encode(xml));
+  expect(() => reader.validate(source)).not.toThrow();
+}
+
+/** adiga_danef shape: self-closing <flags/>, encoding present, no RA layer. */
+const KVKS_FLAGS_SELF_CLOSING = `<?xml version="1.0" encoding="utf-8"?>
+<visualkeyboard>
+<header>
+<version>10.0</version>
+<kbdname>adiga_danef</kbdname>
+<flags/>
+</header>
+<encoding name="unicode" fontname="Arial" fontsize="-12">
+<layer shift="">
+<key vkey="K_A">a</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+/** vietnamese_telex_legacy shape: flags block present, NO <encoding> at all. */
+const KVKS_NO_ENCODING = `<?xml version="1.0" encoding="utf-8"?>
+<visualkeyboard>
+<header>
+<version>10.0</version>
+<kbdname>vietnamese_telex_legacy</kbdname>
+<flags>
+<displayunderlying/>
+</flags>
+</header>
+</visualkeyboard>`;
+
+describe("applyKeycapLabelsToVfs — kvks schema validity (#2403)", () => {
+  it("expands a self-closing <flags/> so <usealtgr/> lands inside the flags element (adiga_danef)", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_FLAGS_SELF_CLOSING }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [makeS08Assignment("Q", "K_B")]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    // The self-closing tag is expanded into a block carrying the flag —
+    // <usealtgr/> must not be stranded as a child of <header>.
+    expect(xml).not.toContain("<flags/>");
+    expect(xml).toMatch(/<flags>[\s\S]*<usealtgr\/>[\s\S]*<\/flags>/);
+    expect(xml).toContain('<layer shift="RA">');
+    expectValidKvksXml(xml);
+  });
+
+  it("creates an <encoding> wrapper when the kvks has none (vietnamese_telex_legacy)", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_NO_ENCODING }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [makeS08Assignment("Q", "K_B")]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    // The new layer lives inside a synthesized <encoding name="unicode"> —
+    // the kvks schema forbids <layer> directly under <visualkeyboard>.
+    expect(xml).toMatch(/<encoding name="unicode">[\s\S]*<layer shift="RA">[\s\S]*<\/encoding>/);
+    // The existing flags block gains <usealtgr/> alongside <displayunderlying/>
+    // (order within <flags> is schema-irrelevant, so assert membership, not order).
+    expect(xml).toMatch(/<flags>[\s\S]*<usealtgr\/>[\s\S]*<\/flags>/);
+    expect(xml).toContain("<displayunderlying/>");
+    expectValidKvksXml(xml);
+  });
+
+  it("negative control: the pre-fix broken shapes are rejected by the kvks schema", () => {
+    // Proves the validator above is not vacuous: these are the exact shapes
+    // the old code produced (hand-written, since the fix no longer emits them).
+    const reader = new KvksFileReader();
+    const strayUseAltGr =
+      `<visualkeyboard><header><version>10.0</version><flags/><usealtgr/></header>` +
+      `<encoding name="unicode"><layer shift="RA"><key vkey="K_A">q</key></layer></encoding></visualkeyboard>`;
+    const strayLayer =
+      `<visualkeyboard><header><version>10.0</version><flags><usealtgr/></flags></header>` +
+      `<layer shift="RA"><key vkey="K_A">q</key></layer></visualkeyboard>`;
+    for (const xml of [strayUseAltGr, strayLayer]) {
+      const source = reader.read(new TextEncoder().encode(xml));
+      expect(() => reader.validate(source)).toThrow();
+    }
   });
 });
