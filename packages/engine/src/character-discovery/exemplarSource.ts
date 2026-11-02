@@ -11,12 +11,14 @@
  * resolves await `loadExemplarSource()` once, off the startup critical path.
  */
 
+import { resolveEffectiveScript, scriptSubtagOf } from "@keyboard-studio/contracts";
 import {
   augmentSpecialsWithUppercase,
   exemplarLocaleCandidates,
   parseUnicodeSet,
   type ExemplarResult,
 } from "./cldr.js";
+import { getLanguageDefaults } from "../langtags/index.js";
 import {
   loadExemplarIndex,
   lookup,
@@ -107,6 +109,31 @@ export function isGatedTag(tag: string, source: ExemplarSource): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Script match (#2396)
+// ---------------------------------------------------------------------------
+
+/**
+ * True when `candidate` may serve a request whose explicit script is
+ * `requestedScript`.
+ *
+ * A request WITHOUT an explicit script subtag is unconstrained — the ladder's
+ * first index hit wins exactly as before.
+ *
+ * When the request DOES carry an explicit script (e.g. `ce-Latn` for a Latin
+ * Chechen keyboard), a candidate wins only if its own resolved script matches:
+ * the candidate's explicit script subtag, else the langtags default script for
+ * its primary language (the CLDR likely-subtags equivalent — bare `ce`
+ * resolves to Cyrl). A non-matching candidate is skipped so the ladder keeps
+ * walking; when nothing matches, the caller returns null and the author falls
+ * through to whole-script behaviour (FR-010) instead of seeding an alphabet
+ * in the wrong script.
+ */
+function candidateMatchesScript(candidate: string, requestedScript: string | undefined): boolean {
+  if (requestedScript === undefined) return true;
+  return resolveEffectiveScript(candidate, getLanguageDefaults) === requestedScript;
+}
+
+// ---------------------------------------------------------------------------
 // Tier extraction
 // ---------------------------------------------------------------------------
 
@@ -188,9 +215,14 @@ export async function loadExemplarSource(): Promise<void> {
  * Resolves the exemplar inventory for a BCP47 tag from the committed offline
  * index.
  *
- * Resolution order (normative — contracts/exemplar-sourcing.md):
+ * Resolution order (normative; amends the archived spec-044 contract at
+ * specs/_archive/044-cldr-sldr-exemplars/contracts/exemplar-sourcing.md):
  *  1. `exemplarLocaleCandidates(tag)`, most specific first.
- *  2. First candidate present in the index wins; its id becomes `resolvedTag`.
+ *  2. First candidate present in the index whose script serves the request
+ *     wins (#2396); its id becomes `resolvedTag`. When the tag carries an
+ *     explicit script, a candidate's resolved script (its explicit subtag,
+ *     else the langtags default) must match it — non-matching candidates are
+ *     skipped, never fallen through to.
  *  3. Confidence gate, per source.
  *  4. Precedence: the CLDR side if present, else the SLDR side.
  *  5. Tier extraction through the canonical `parseUnicodeSet`, highest tier wins.
@@ -206,7 +238,13 @@ export async function loadExemplarSource(): Promise<void> {
 export function sourceExemplars(bcp47: string): ExemplarInventory | null {
   if (typeof bcp47 !== "string") return null;
 
+  // #2396: an explicit script on the request constrains the ladder — a Latin
+  // Chechen request (`ce-Latn`) must not seed the Cyrillic `ce` locale.
+  const requestedScript = scriptSubtagOf(bcp47);
+
   for (const candidate of exemplarLocaleCandidates(bcp47)) {
+    if (!candidateMatchesScript(candidate, requestedScript)) continue;
+
     const entry = lookup(candidate);
     if (entry === undefined) continue;
 
@@ -261,6 +299,9 @@ function cldrStamp(
  * `SourcedCharacter` lets the UI show which characters came from where.
  *
  * Returns null when neither side covers the tag (same as `sourceExemplars`).
+ *
+ * The #2396 script constraint applies here too — one candidate ladder, one
+ * precedence rule, for both entry points.
  */
 export function sourceExemplarsBoth(bcp47: string): {
   resolvedTag: string;
@@ -269,7 +310,11 @@ export function sourceExemplarsBoth(bcp47: string): {
 } | null {
   if (typeof bcp47 !== "string") return null;
 
+  const requestedScript = scriptSubtagOf(bcp47);
+
   for (const candidate of exemplarLocaleCandidates(bcp47)) {
+    if (!candidateMatchesScript(candidate, requestedScript)) continue;
+
     const entry = lookup(candidate);
     if (entry === undefined) continue;
 
