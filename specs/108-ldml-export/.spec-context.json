@@ -704,11 +704,19 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T05:09:10.143Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T083",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:04:53.008Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T082",
+  "currentTask": "T083",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1389,6 +1397,14 @@
       "did": "Trial verdict recorded in research.md R31: all six criteria PASS",
       "files": [
         "specs/108-ldml-export/research.md"
+      ]
+    },
+    "T083": {
+      "status": "DONE",
+      "did": "Planned FR-071-076 as plan.md Phase 8 amendment and tasks T091-T107",
+      "files": [
+        "specs/108-ldml-export/plan.md",
+        "specs/108-ldml-export/tasks.md"
       ]
     }
   },

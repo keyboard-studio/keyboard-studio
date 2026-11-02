@@ -122,7 +122,7 @@ CI for the Keyman compile, CLDR XSD validation and the equivalence harness.
 | VIII. House conventions | PASS | `[OK]`/`[WARN]` in harness console output. No issue numbers in shipped code or comments: upstream references such as #16868 stay in the spec and contracts, and the profile tables' lift conditions name the condition, not the issue. Commit titles use `feat(engine)`, `feat(studio)` and `feat(output)`. |
 | IX. Decision registry | PASS | No new survey surface. The profile picker and the base-keyboard picker are Output-page export options, which FR-062 and FR-027 state explicitly. Findings attach to existing step and question surfaces through `lintToQuestion.ts`. |
 | X. Defaults are proposals | PASS | Profile `46` is the labelled default and is changeable in one interaction (SC-012). The base keyboard has a per-export picker whose default is the primary hardware base, shown with its source and changeable before download (FR-027). A default without character data is shown as unavailable and the download waits for the author's pick; it is never silently substituted. Fill is recorded per position (FR-028). |
-| XI. Done means integrated | PASS, conditions | Done means: the download is reachable on the Output page, the findings are visible on their steps, and the CI corpus jobs are green and required. The Story 5 phases are conditional on the FR-070 trial. If the trial fails, Story 5 is withdrawn in the spec and tasks (owner: engine team; trigger: trial result), not left as a parked surface. Follow-ups in research carry an owner and a trigger. |
+| XI. Done means integrated | PASS | Done means: the download is reachable on the Output page, the findings are visible on their steps, and the CI corpus jobs are green and required. The FR-070 trial passed (R31), so the Story 5 phase is planned and in scope. Follow-ups in research carry an owner and a trigger. |
 
 **Personal data**: none — no new store, recipient, category, or telemetry.
 
@@ -266,11 +266,55 @@ keeps `kmc-ldml`, `common-types` and `xmllint-wasm` devDependencies only.
 | 5 US3 (P2) | metadata in `info`/`version`/locales and the header comment; full Keyman LDML project (FR-040–042) | Story 3 scenarios; `kmc build` on the extracted project in CI | 3 |
 | 6 US4 (P2) | touch forms (section 5), FR-026 static layer evaluation, R8 special keys, touch report items | Story 4 scenarios; SC-010 TR35 touch conformance; profile-46 compile with touch forms (the FR-070 premise, checked in CI first) | 3 |
 | 7 US5 trial (P3) | FR-070 in-browser compile trial: lazy `kmc-ldml`, the kmcmplib WASM reused, the `import/46` XMLs served through `loadFile`, a real Vite build plus bundle-size measurement | **Pass**: a complete profile-46 export (touch included) compiles in the browser bundle with the same error set as CI, and the size cost is recorded. **Fail**: Story 5 is withdrawn in spec and tasks | 6 |
-| 8 US5 (P3, conditional) | FR-071–FR-076: compile check UI, expected-vs-unexpected errors, the LDML `.kmp` staged in a clone, its desktop-only note | Story 5 scenarios; SC-013; SC-014 run manually on Windows and recorded | 7 passes |
+| 8 US5 (P3) | FR-071–FR-076: compile check at download time, expected-vs-unexpected errors, the LDML `.kmp` staged in a clone, its desktop-only note, versions in the report (amendment below) | Story 5 scenarios; SC-013; SC-014 run manually on Windows and recorded | 7 (passed, research R31) |
 | 9 Polish | docs (`docs/tooling.md` LDML section, `docs/architecture.md` output paths), the phonebook rows for corpus keyboards, the R9 follow-up filed | quickstart run end to end | all |
 
 Phases 4, 5 and 6 can run in parallel once Phase 3's classifier is merged. FR-051 and FR-050 run
 from Phase 3 onward, and every later phase extends their corpus.
+
+### Phase 8 amendment (FR-070 trial passed, research R31)
+
+Story 5 proceeds. The trial settled the loader (`ldml-export/compile/loadLdmlCompiler.ts`: lazy,
+sticky `_down`, one kmcmplib WASM, the `import/46` files as a lazy string-constant chunk, about
+29.5 kB gzip). Phase 8 adds only the product behaviour on top of it:
+
+- **When it runs (FR-072, Art IV).** The compile check runs only on the author's explicit
+  action in the LDML download panel. It is never in the 300 ms validation cycle, never in
+  `useLdmlFindings`, and starts no timer. The compiler chunk loads on that action, not on page load.
+- **Expected versus unexpected.** The engine compares the compiler's message codes with the
+  `keymanCodes` of the Keyman-gap (K) rows present in the export's classification (the same data
+  the H1 harness asserts in CI). A code covered by a present K row is a known Keyman limitation. Any
+  other error is an exporter defect and is shown with the compiler's message. The comparison is a
+  pure engine function, so the studio only renders it.
+- **Compile produces bytes, the studio does not (FR-071).** `loadLdmlCompiler` gains a build
+  path that asks the pinned `kmc-ldml` to run and returns the `.kmx` (KMX+) and `.kvk` it produces.
+  No studio or engine code writes KMX+ itself. The trial exercised init, load and validate only
+  (R31 caveat), so the `run` path is new and gets its own test and a real-build Playwright check.
+- **The LDML `.kmp` (FR-074, FR-076).** Built with the existing `kmc-package` load
+  (`output/kmp.ts` `buildKmp`) from the export's own `source/<kmnid>_ldml.kps`. The compiled
+  `.kmx` and `.kvk` are staged into `build/` on a clone, exactly as `buildKmp` stages the KMN
+  artifacts, so the export's file set and the shared projection are never mutated. Package id
+  `<kmnid>_ldml` already differs from the KMN `.kmp` (FR-040). It is offered only on a compile
+  with zero errors of any kind, touch forms included; an expected (Keyman-gap) error also
+  means no package, with the source export still available. The exporter never strips touch
+  forms to get a clean compile.
+- **Download path.** `buildLdmlExportForDownload` stays the source-export path and keeps FR-006
+  (no compile). A sibling `buildLdmlKmpForDownload` in `buildOutputBundle.ts` is the only
+  compiled path. Neither touches the PR path or the shared projection (SS1).
+- **Desktop-only (FR-074).** The `.kmp` carries a readme line, the package description and the
+  panel copy saying it is desktop-only until Keyman can load LDML keyboards on web and mobile. The
+  package declares desktop platforms only.
+- **Versions in the report (FR-075).** The report names the compiler version (the pinned
+  `@keymanapp/kmc-ldml` version) and the KMX+ file version read from the produced `.kmx`. Neither
+  is an author option. Because the compile happens after the source export, the compile-time
+  versions are written into a compile report section that ships inside the `.kmp` download
+  only, while `LDML-EXPORT-REPORT.md` in the source export stays byte-identical (FR-030).
+- **Profiles the pinned schema rejects (FR-073).** Compile and package are disabled, with the
+  reason, whenever the selected profile's `conformsTo` is not accepted by the pinned Keyman schema
+  (today profile 49, marked "TR35-only (awaiting Keyman)"). The panel reads `TargetProfile.keymanCompilable`
+  (the field FR-065 tests; `getListLdmlProfiles()` already supplies the profiles), not a hard-coded id.
+- **Constitution.** Art IV, V, VIII and XI are unchanged by this amendment. The only new
+  dependency move was T079 (`kmc-ldml` to dependencies). Complexity Tracking needs no new row.
 
 ## Complexity Tracking
 

@@ -768,7 +768,7 @@ reason, and the alternatives rejected. The sources are:
      ignores the touch half without errors.
   6. The gzip size added to the lazy chunk is recorded in this file.
 - **Fail**: Story 5 is withdrawn in the spec and the tasks, and FR-050 stays CI-only (FR-070).
-- **Not planned until the trial passes**: FR-071–FR-076 (spec FR-070). The plan's Phase 8 is a
+- **Planned after the trial passed (2026-11-01)**: FR-071–FR-076 are in plan.md "Phase 8 amendment"; the Phase 8 row was a
   placeholder.
 - **The Keyman schema validator in the browser** (left as a plan decision by the spec's
   assumptions):

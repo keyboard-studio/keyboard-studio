@@ -551,12 +551,89 @@ included, in the browser, with the same messages as CI.
 
 ---
 
-## Phase 8: User Story 5 — Compile and package the LDML export (Priority: P3, conditional)
+## Phase 8: User Story 5 — Compile and package the LDML export (Priority: P3)
 
-**Not planned** until T082 records a pass (spec FR-070). Owner: engine team. Trigger: T082.
-Expiry: the spec 108 retirement pass.
+**Goal**: at download time the author can run Keyman's own compiler on the LDML export, see known
+Keyman limitations apart from exporter defects, and download an installable desktop-only LDML
+`.kmp`. Planned as the Phase 8 amendment in [plan.md](plan.md#phase-8-amendment-fr-070-trial-passed-research-r31).
+The trial passed on all six criteria ([research.md](research.md) R31).
 
-- [ ] T083 [US5] In `specs/108-ldml-export/tasks.md`, replace this phase with the FR-071–FR-076 tasks produced by the T082 `/speckit-plan` → `/speckit-tasks` amendment, or strike it with the reason recorded in T082.
+**Independent Test**: export a hardware-only corpus keyboard under profile 46. The compile check
+reports zero errors and the LDML `.kmp` installs in Keyman for Windows (SC-014). Under profile 49
+compile and package are disabled with the reason. A keyboard with Keyman-gap rows shows exactly
+those errors as known limitations and offers no package.
+
+- [x] T083 [US5] Plan Phase 8: this task list and the [plan.md](plan.md) amendment replace the former placeholder, now that T082 recorded a pass. (Closed by the orchestrator, not by this edit.)
+
+### Tests first
+
+- [ ] T091 [P] [US5] Write `LX/compile/compareToKeymanGaps.test.ts` (FR-072, Story 5 scenarios 1 and 2):
+  - a compile with no errors and an export with no K rows gives no expected and no unexpected errors;
+  - errors whose codes equal the `keymanCodes` of the K rows present are all `expected`, each tied to its row;
+  - any error code not covered by a present K row is `unexpected` and keeps the compiler message and line;
+  - a code listed by a K row that is absent from this export is still `unexpected`;
+  - warnings and hints are passed through and never counted as errors.
+  Files: `packages/engine/src/ldml-export/compile/compareToKeymanGaps.test.ts`. Wait: the test must fail first (T094 absent).
+- [ ] T092 [P] [US5] Extend `LX/compile/loadLdmlCompiler.test.ts` for the build path (FR-071, FR-075):
+  - `buildLdmlInBrowser(xml)` on the hardware sample returns non-empty `kmx` and `kvk` with zero errors, and the `kmx` starts with the KMX file magic;
+  - the KMX+ version read from the produced bytes is a number the report can name, and the compiler version is a non-empty string;
+  - an invalid document returns `ok: false`, no bytes, and the same codes as `compileLdmlInBrowser`;
+  - a failed chunk load stays sticky (`_down`), as for `compileLdmlInBrowser`;
+  - no engine or studio source writes KMX+ bytes: a source scan test fails on any `.kmx` writer outside the compiler's own output.
+  Files: `packages/engine/src/ldml-export/compile/loadLdmlCompiler.test.ts`. Wait: fails until T095.
+- [ ] T093 [P] [US5] Write `LX/compile/buildLdmlKmp.test.ts` (FR-074, FR-076, Story 5 scenarios 3, 3a):
+  - a zero-error compile of a touch-bearing profile-46 export yields `<kmnid>_ldml.kmp` whose members include `<kmnid>_ldml.kmx` and `<kmnid>_ldml.kvk`, under package id `<kmnid>_ldml`;
+  - the package id and file name differ from the KMN `.kmp` for the same keyboard;
+  - the input file map is byte-identical before and after the call (the staging happened on a clone);
+  - any compile error, expected or not, returns `{ ok: false }` with no `.kmp`, and the touch forms are never removed to retry;
+  - the package text says it is desktop-only.
+  Files: `packages/engine/src/ldml-export/compile/buildLdmlKmp.test.ts`. Wait: fails until T096.
+
+### Engine implementation
+
+- [ ] T094 [US5] Implement `LX/compile/compareToKeymanGaps.ts`: `compareToKeymanGaps(messages: KeymanMessage[], classification: LdmlClassification, profile: TargetProfile)` returns `{ expected: { message, row }[], unexpected: KeymanMessage[], warnings: KeymanMessage[] }`. It reads `keymanCodes` from the K rows that are present in the classification (profile rows, `profiles/types.ts`) and has no I/O. Export it, with its types, from the engine barrel. Depends on T091.
+  Files: `packages/engine/src/ldml-export/compile/compareToKeymanGaps.ts`, `packages/engine/src/ldml-export/index.ts`, `packages/engine/src/index.ts`.
+- [ ] T095 [US5] Add the build path to `LX/compile/loadLdmlCompiler.ts` (FR-071, FR-075): `buildLdmlInBrowser(xml)` reuses `initLdmlCompiler` and the same callbacks, then calls the pinned compiler's `run`, and returns `{ ok, messages, kmx?, kvk?, compilerVersion, kmxPlusVersion }`. It keeps every export async or type-only, so the chunk stays lazy. `kmxPlusVersion` is read from the produced bytes, and `compilerVersion` from the pinned `@keymanapp/kmc-ldml` package version. Neither is a parameter. Mirror the call shape of `__testing__/keymanCompile.ts` (`compiler.run`), which today is test-only. Depends on T092, and on the T079 loader.
+  Files: `packages/engine/src/ldml-export/compile/loadLdmlCompiler.ts`.
+- [ ] T096 [US5] Implement `LX/compile/buildLdmlKmp.ts` (FR-074, FR-076): `buildLdmlKmp(exportFiles, keyboardId, compiled)` clones the export's file map into a `createVirtualFS` clone, stages `build/<kmnid>_ldml.kmx` and `build/<kmnid>_ldml.kvk` the way `buildKmp` does in `packages/engine/src/output/kmp.ts` (staging clone, `kpsPath` `source/<kmnid>_ldml.kps`), and returns the packaged `.kmp` through `buildKmp` rather than a second packager. It returns `{ ok: false, reason }` unless the compile had zero errors, and never alters the touch forms. `source/<kmnid>_ldml.kps` and the package readme carry the desktop-only sentence (FR-074); if that text is not already in `project/kps.ts` and `project/docs.ts` (T036, T067), add it there under the same deterministic-output rule (FR-030) and extend their tests. Depends on T093, T095.
+  Files: `packages/engine/src/ldml-export/compile/buildLdmlKmp.ts`, `packages/engine/src/ldml-export/project/kps.ts`, `packages/engine/src/ldml-export/project/docs.ts`, `packages/engine/src/index.ts`.
+- [ ] T097 [US5] Add the compile report (FR-075, FR-072): `LX/report.ts` gains `renderCompileReport({ compilerVersion, kmxPlusVersion, expected, unexpected, warnings })`, a section named in the `.kmp` download as `LDML-COMPILE-REPORT.md`, placed in the package as a doc. `LDML-EXPORT-REPORT.md` in the source export stays byte-identical (FR-030, SC-009). Add the cases to `LX/report.test.ts`: both versions named, expected errors listed under their rows, unexpected errors labelled as exporter defects with the compiler text. Depends on T094, T095.
+  Files: `packages/engine/src/ldml-export/report.ts`, `packages/engine/src/ldml-export/report.test.ts`.
+
+### Studio wiring
+
+- [ ] T098 [P] [US5] Write `packages/studio/src/lib/buildOutputBundle.test.ts` additions and `packages/studio/src/components/output/LdmlCompilePanel.test.tsx` (Story 5 scenarios 1-4, FR-072, FR-073):
+  - `buildLdmlKmpForDownload` stages nothing into the projection `buildLdmlExportForDownload` and the source `.zip` read (compare the entries before and after), and the PR path never receives the `.kmp`;
+  - the compile action loads the compiler only when clicked (the service mock is not called on render);
+  - profile 49 (`keymanCompilable` false) disables compile and package with the "TR35-only (awaiting Keyman)" reason, the source download stays enabled;
+  - expected errors render as known Keyman limitations and unexpected errors as exporter defects with the compiler text; with any error the package button is absent and the source download works;
+  - a zero-error compile shows the package button and the desktop-only note, plus the compiler and KMX+ versions;
+  - a compiler load failure shows a message and leaves the source download working;
+  - no timer is created: the compile hook has no `setTimeout`/`setInterval` (the D3 guard test pattern used for `useLdmlFindings`).
+  Files: `packages/studio/src/lib/buildOutputBundle.test.ts`, `packages/studio/src/components/output/LdmlCompilePanel.test.tsx`. Wait: fails until T099-T101.
+- [ ] T099 [US5] Add the services in `packages/studio/src/lib/services.ts`: `getCompileLdml()` and `getBuildLdmlKmp()`, lazy dynamic imports of the engine functions, like `getBuildLdmlExport()`. Neither runs at module load (bundle-safety). Depends on T094-T096.
+  Files: `packages/studio/src/lib/services.ts`.
+- [ ] T100 [US5] Implement `buildLdmlKmpForDownload(profileId)` in `packages/studio/src/lib/buildOutputBundle.ts`, beside `buildLdmlExportForDownload` and sharing its input resolution (extract the shared part rather than copying it; the existing function's behaviour and FR-006 doc comment are unchanged). It runs `buildLdmlExport`, then the compile (`getCompileLdml`), then `compareToKeymanGaps`, and, only on zero errors, `getBuildLdmlKmp`. It returns `{ compile: { expected, unexpected, warnings, versions }, kmp?: DownloadResult }`, and throws `OutputBundleError` for the same preconditions as the source export. It refuses a profile whose `keymanCompilable` is false. It stages only on clones (FR-076). Depends on T098, T099.
+  Files: `packages/studio/src/lib/buildOutputBundle.ts`.
+- [ ] T101 [US5] Add `packages/studio/src/components/output/LdmlCompilePanel.tsx`, mounted inside `LdmlDownloadPanel.tsx` under the existing shared gate: a "Check with Keyman's compiler" action (author-initiated only, FR-072), the result lists (known Keyman limitations, exporter defects), the versions line, a separate "Download LDML .kmp" action shown only on zero errors with the desktop-only note, and the disabled-with-reason state for `keymanCompilable === false` (FR-073). Semantic buttons, an `aria-live` result region fed by the click and not by a timer, labels per [docs/accessibility.md](../../docs/accessibility.md). Depends on T100.
+  Files: `packages/studio/src/components/output/LdmlCompilePanel.tsx`, `packages/studio/src/components/output/LdmlDownloadPanel.tsx`.
+- [ ] T102 [US5] Add the i18n messages with their French in the same change: `output.download.ldml.compile.*` ids in `packages/studio/src/locales/en/messages.json` and `packages/studio/src/locales/fr/messages.json` (run `messages:extract`, then write the French), and make `pnpm run i18n-catalog-lint` pass. Depends on T101.
+  Files: `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`.
+- [ ] T103 [US5] Hook the compile action into the e2e seam so Playwright can drive it: extend `packages/studio/src/lib/e2eHook.ts` only if the existing `window.__ksE2E__.compileLdml` cannot reach `buildLdmlKmpForDownload`. Depends on T100.
+  Files: `packages/studio/src/lib/e2eHook.ts`.
+
+### Integration and evidence
+
+- [ ] T104 [US5] Write the Playwright test `packages/studio/e2e/ldml-compile-package.spec.ts` against the production build (as the T081 trial does, `vite preview` and `playwright.trial.config.ts`): a hardware-only profile-46 corpus keyboard shows zero errors and offers the `.kmp` (inspect its members and package id); a touch-bearing corpus keyboard compiles with touch included; profile 49 shows both actions disabled; the source download works in every case. Depends on T101.
+  Files: `packages/studio/e2e/ldml-compile-package.spec.ts`.
+- [ ] T105 [US5] Corpus test (SC-013): for every profile-46 corpus export, the in-browser compile result (`compileLdmlInBrowser`) equals the H1 compile, and the `compareToKeymanGaps` split puts every error of a K-row keyboard in `expected`. Add it to the existing LDML corpus suite `LX/package.corpus.test.ts` (or `LX/project.corpus.test.ts`, whichever holds the per-keyboard compile, T040 and T070) so it runs in the engine corpus step without a new CI job. Depends on T094.
+  Files: `packages/engine/src/ldml-export/package.corpus.test.ts`.
+- [ ] T106 [US5] Manual SC-014 check on Windows: install the `.kmp` built from a hardware-only corpus keyboard in Keyman for Windows and confirm that typing matches the KMN keyboard for the mapped rules. Record the Keyman version, keyboard, and result in [research.md](research.md) as R33. If it fails, record the diagnosis and leave T106 unchecked. Depends on T104.
+  Files: `specs/108-ldml-export/research.md`.
+- [ ] T107 [US5] Confirm the bundle after Phase 8: run the production build and record in [research.md](research.md) R33 that the entry chunk still has no kmc-ldml marker and `dist/` still has one `.wasm`, and the new gzip delta of the panel chunk. The R31 criteria 1 and 2 must still hold. Depends on T101.
+  Files: `specs/108-ldml-export/research.md`.
+
+**Checkpoint**: Story 5 is green: scenarios 1-4 pass, SC-013 holds in CI, SC-014 is recorded, and the entry chunk is unchanged. Commit `spec 108 T083, T091-T107`.
 
 ---
 
@@ -565,8 +642,8 @@ Expiry: the spec 108 retirement pass.
 - [ ] T084 [P] Document the LDML export in `docs/tooling.md`: how to run the H1–H10 suites, the vendored schemas and their regeneration, and the pinned Keyman packages. Update `docs/packages.md` (engine `ldml-export` module) and `docs/architecture.md` (output paths: the LDML export is a secondary download, never on the `.kmp`/PR paths).
 - [ ] T085 [P] Record the R20 follow-up (opt-in `normalization="disabled"`), with its owner, trigger and expiry, as a GitHub issue titled `feat(output): opt-in normalization="disabled" for LDML export`, and link it from [research.md](research.md) R20. Do not cite the issue number in code (Art VIII).
 - [ ] T086 In `.github/workflows/ci.yml`, confirm the engine corpus step runs `LX/*.corpus.test.ts` and the studio corpus step runs `ST/test/ldmlParity/`. Measure the time added. If the existing job exceeds its budget, split the LDML corpus suites into a parallel job and record the decision in [plan.md](plan.md) Complexity Tracking.
-- [ ] T087 Run [quickstart.md](quickstart.md) end to end (sections 1–4). Record SC-001–SC-012 evidence in the phase commit message, and check off this file's tasks only for verified work.
-- [ ] T088 Run `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, both corpus configs, and `pnpm --filter @keyboard-studio/studio exec playwright test ldml-export`. All must be green before the PR.
+- [ ] T087 Run [quickstart.md](quickstart.md) end to end (sections 1–4). Record SC-001–SC-012 evidence (and SC-013, SC-014 from T105 and T106) in the phase commit message, and check off this file's tasks only for verified work.
+- [ ] T088 Run `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, both corpus configs, and `pnpm --filter @keyboard-studio/studio exec playwright test ldml-export`, the compile specs (`ldml-compile-trial`, `ldml-compile-package`, T081 and T104, against the production build), and `pnpm run i18n-catalog-lint`. All must be green before the PR.
 
 ---
 
@@ -581,7 +658,7 @@ Expiry: the spec 108 retirement pass.
 | 5 US3 (P2) | T037, T045 | |
 | 6 US4 (P2) | T028, T032–T034 (key resolution and the document) | |
 | 7 US5 trial (P3) | 6 (needs a touch-bearing export) | gate |
-| 8 US5 (P3) | T082 pass | conditional |
+| 8 US5 (P3) | 7 (T082 passed, R31) | T091-T093 tests first; engine T094-T097; studio T098-T103; evidence T104-T107 |
 | 9 Polish | all chosen stories | |
 
 **Within a story**: tests are written first and fail, then the classifier, then the lowering,
