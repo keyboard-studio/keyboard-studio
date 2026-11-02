@@ -289,6 +289,10 @@ describe("runJudgeJob", () => {
     const evidence = result.rows[0]!.evidence();
     expect(typeof evidence.kind).toBe("string");
     expect(Array.isArray(evidence.lines)).toBe(true);
+    // The folder-tree inventory survives serialization.
+    expect(output.result.fileTree).toBeDefined();
+    expect(result.fileTree).toBeDefined();
+    expect(result.fileTree![0]!.name).toBe("t");
   }, 120_000);
 });
 
