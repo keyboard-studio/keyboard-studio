@@ -106,15 +106,15 @@ Files: `packages/studio/src/editors/fallback/FallbackPolicySection.tsx` and its 
 
 **Wave 1 — one task:**
 
-- [ ] **T022** [US1] Rebuild the section: title naming the base keyboards (FR-001), one leak list per picked base keyboard grouped by class, primary first (FR-002), deadkey and "unknown" entries, studio-guess caption when no picks (FR-003), A2 copy rules (FR-004), "Do nothing" copy variant chosen by whether `swallowUndefined` is active (FR-005), per-class summary line when collapsed (FR-006), per-class proposals with evidence and a confirm action (FR-020, FR-021), "not covered" marks for unbound layers; derived on render, no timer (FR-007) · packages/studio/src/editors/fallback/FallbackPolicySection.tsx
+- [x] **T022** [US1] Rebuild the section: title naming the base keyboards (FR-001), one leak list per picked base keyboard grouped by class, primary first (FR-002), deadkey and "unknown" entries, studio-guess caption when no picks (FR-003), A2 copy rules (FR-004), "Do nothing" copy variant chosen by whether `swallowUndefined` is active (FR-005), per-class summary line when collapsed (FR-006), per-class proposals with evidence and a confirm action (FR-020, FR-021), "not covered" marks for unbound layers; derived on render, no timer (FR-007) · packages/studio/src/editors/fallback/FallbackPolicySection.tsx
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T023** [P] [US1] Lingui message ids with French in the same change (spec 046) · packages/studio/src/locales/en, packages/studio/src/locales/fr
-- [ ] **T024** [P] [US1] Component tests: two picks, no-data base, deadkey entry, collapsed summary, no picks, copy-variant pairing (SC-003), retired slogan absent, accessibility (spec 056) · packages/studio/src/editors/fallback/FallbackPolicySection.test.tsx
-- [ ] **T025** [P] [US1] Playwright walk: `sil_cameroon_qwerty` with UK English lists AltGr+4 → € (SC-001) · packages/studio/e2e/fallback-policy.spec.ts
+- [x] **T023** [P] [US1] Lingui message ids with French in the same change (spec 046) · packages/studio/src/locales/en, packages/studio/src/locales/fr
+- [x] **T024** [P] [US1] Component tests: two picks, no-data base, deadkey entry, collapsed summary, no picks, copy-variant pairing (SC-003), retired slogan absent, accessibility (spec 056) · packages/studio/src/editors/fallback/FallbackPolicySection.test.tsx
+- [x] **T025** [P] [US1] Playwright walk: `sil_cameroon_qwerty` with UK English lists AltGr+4 → € (SC-001) · packages/studio/e2e/fallback-policy.spec.ts
 
 **Checkpoint**: the author sees every leak per base keyboard and confirms a per-class choice.
 

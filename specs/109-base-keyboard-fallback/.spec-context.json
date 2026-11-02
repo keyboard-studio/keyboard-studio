@@ -235,6 +235,38 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T20:24:29.327Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T21:12:59.006Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T21:12:59.321Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T21:12:59.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T21:12:59.954Z"
     }
   ],
   "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801",
@@ -409,7 +441,7 @@
       ]
     }
   },
-  "currentTask": "T021",
+  "currentTask": "T025",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -575,6 +607,35 @@
       "did": "Corpus sweep over ../keyboards (ran, not skipped): all parsed keyboards swallow, compile no worse via kmcmplib, unconfirmed byte-equal",
       "files": [
         "packages/engine/src/pattern-apply/swallowUndefined.corpus.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Rebuilt FallbackPolicySection: per-base-keyboard leak lists by class, per-class proposals with evidence and confirm, FR-005 copy variant, summary counts, derived on render",
+      "files": [
+        "packages/studio/src/editors/fallback/FallbackPolicySection.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Lingui ids for the new section with French; extract --clean, catalog lint and sort pass",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Component tests: two picks, no-data base, deadkey, collapsed summary, no picks, copy-variant pairing, slogan absent, a11y",
+      "files": [
+        "packages/studio/src/editors/fallback/FallbackPolicySection.test.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Playwright walk on sil_cameroon_qwerty with UK English: leak list, confirm per class; passes locally",
+      "files": [
+        "packages/studio/e2e/fallback-policy.spec.ts"
       ]
     }
   },
