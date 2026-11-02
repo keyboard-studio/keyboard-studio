@@ -2,7 +2,15 @@ import { describe, it, expect } from "vitest";
 import { emit } from "./emit.js";
 import { parse } from "./parse.js";
 import { normaliseForComparison } from "./normalise-ir.js";
-import type { KeyboardIR, IRGroup, IRRule, IRStore, IRComment } from "@keyboard-studio/contracts";
+import { compile } from "../compiler/index.js";
+import {
+  createVirtualFS,
+  type KeyboardIR,
+  type IRGroup,
+  type IRRule,
+  type IRStore,
+  type IRComment,
+} from "@keyboard-studio/contracts";
 
 function makeIR(): KeyboardIR {
   const stores: IRStore[] = [
@@ -1234,4 +1242,99 @@ describe("emit: unsourced rules keep their group position", () => {
       });
     });
   }
+});
+
+describe("emit — store-declaration dependency order (#2404)", () => {
+  // eo_plus shape: `store(letters) outs(letters_lower) outs(letters_upper)`
+  // parses as an opaque store fragment (the typed model can't express outs()
+  // in a store body). The fragment precedes every group header, so the
+  // faithful path emitted it as a global pre-`begin` fragment while the typed
+  // stores it expands landed in the first group's body. kmcmplib resolves
+  // outs() at declaration time, so the round trip failed to compile with
+  // KMCMP 5251101 "Store referenced does not exist".
+  const EO_PLUS_LIKE = [
+    "store(&VERSION) '15.0'",
+    "store(&NAME) 'Outs Order'",
+    "store(&KEYBOARDVERSION) '1.0'",
+    "store(&TARGETS) 'any'",
+    "store(letters_lower) 'abc'",
+    "store(letters_upper) 'ABC'",
+    "store(letters) outs(letters_lower) outs(letters_upper)",
+    "",
+    "begin Unicode > use(main)",
+    "",
+    "group(main)",
+    "any(letters) > 'x'",
+    "",
+  ].join("\n");
+
+  const declLines = (kmn: string): string[] =>
+    kmn
+      .split(/\r?\n/)
+      .filter((l) => /^store\((letters|letters_lower|letters_upper)\)/.test(l));
+
+  it("emits an outs() store after the stores it expands", () => {
+    const { ir } = parse(EO_PLUS_LIKE, "outs_order");
+    expect(declLines(emit(ir))).toEqual([
+      "store(letters_lower) 'abc'",
+      "store(letters_upper) 'ABC'",
+      "store(letters) outs(letters_lower) outs(letters_upper)",
+    ]);
+  });
+
+  it("round-trips parse → emit → kmc-kmn compile with no error/fatal diagnostics", async () => {
+    const { ir } = parse(EO_PLUS_LIKE, "outs_order");
+    const vfs = createVirtualFS([
+      { path: "source/outs_order.kmn", content: emit(ir), isBinary: false },
+    ]);
+    const result = await compile(vfs, "outs_order");
+
+    const kmx = result.artifacts.find((a) => a.filename.endsWith(".kmx"));
+    expect(kmx).toBeDefined();
+    expect(kmx?.sizeBytes ?? 0).toBeGreaterThan(0);
+
+    const blocking = result.diagnostics.filter(
+      (d) => d.severity === "error" || d.severity === "fatal",
+    );
+    expect(blocking).toEqual([]);
+  }, 60_000);
+
+  it("orders a synthesized outs() store after its target on the fragment-free path", () => {
+    // Typed stores never carry outs() from the parser (they go opaque), but a
+    // synthesized IR can; the dependency rule applies on both emit paths.
+    const ir = makeIR();
+    ir.stores.push(
+      {
+        nodeId: "store#outs-dep",
+        name: "combo",
+        items: [{ kind: "raw", text: "outs(base)" }],
+        isSystem: false,
+      },
+      {
+        nodeId: "store#outs-base",
+        name: "base",
+        items: [{ kind: "char", value: "z" }],
+        isSystem: false,
+      },
+    );
+    // Reference both stores so they emit in ir.stores declaration order
+    // (combo before base) on the fragment-free path.
+    ir.groups[0]!.rules.push(
+      {
+        nodeId: "rule#outs-1",
+        context: [{ kind: "any", storeRef: "combo" }],
+        output: [{ kind: "char", value: "q" }],
+      },
+      {
+        nodeId: "rule#outs-2",
+        context: [{ kind: "any", storeRef: "base" }],
+        output: [{ kind: "char", value: "w" }],
+      },
+    );
+    const out = emit(ir);
+    const idxCombo = out.indexOf("store(combo)");
+    const idxBase = out.indexOf("store(base)");
+    expect(idxBase).toBeGreaterThanOrEqual(0);
+    expect(idxCombo).toBeGreaterThan(idxBase);
+  });
 });
