@@ -583,7 +583,7 @@ export async function projectWorkingCopyForOutput(
   //     .kmn / .kps strings (they live in LICENSE.md). Output projection only.
   //     A `store(&COPYRIGHT)` carried through from the starting keyboard is
   //     the starting point's own notice — carried, never silently replaced
-  //     (#2281) — so the year strip leaves it byte-identical.
+  //     (issue 2281) — so the year strip leaves it byte-identical.
   applyOutputHygiene(clonedVfs, resolvedKeyboardId, {
     carriedCopyright: startIr.header.copyright || undefined,
   });

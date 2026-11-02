@@ -51,7 +51,7 @@ function withoutYears(s: string): string {
  *
  * `carriedValue` is the starting keyboard's `&COPYRIGHT` value (unquoted, as
  * parsed). A line that carries the starting point's own notice is left
- * byte-identical — offered/carried, never silently replaced (#2281) — so the
+ * byte-identical — offered/carried, never silently replaced (issue 2281) — so the
  * 4.6 year strip applies only to lines this session authored.
  */
 export function stripCopyrightYearsFromKmn(kmnText: string, carriedValue?: string): string {
@@ -79,7 +79,7 @@ export interface OutputHygieneOptions {
    * The starting keyboard's `store(&COPYRIGHT)` value (unquoted, as parsed
    * into the start IR's header). When the projected `.kmn` carries that line
    * through, the 4.6b year strip leaves it byte-identical: the starting
-   * point's notice is carried, never silently replaced (#2281).
+   * point's notice is carried, never silently replaced (issue 2281).
    */
   carriedCopyright?: string | undefined;
 }
