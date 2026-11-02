@@ -160,12 +160,21 @@ describe("DocumentationChecklist — Go to (never advance)", () => {
 });
 
 describe("DocumentationChecklist — layout-chart preference (FR-015)", () => {
-  it("renders the control only when the base ships welcome images, defaulting to keep", () => {
+  it("renders the control only when the base ships welcome images; a copy defaults to regenerate", () => {
     instantiateTrackOne();
     const { unmount } = render(<DocumentationChecklist />);
     expect(screen.queryByRole("radiogroup", { name: /layout images/i })).toBeNull();
     unmount();
 
+    useWorkingCopyStore.getState().setStartWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
+    render(<DocumentationChecklist />);
+    const group = screen.getByRole("radiogroup", { name: /layout images/i });
+    expect((within(group).getByLabelText(/keep starting keyboard images/i) as HTMLInputElement).checked).toBe(false);
+    expect((within(group).getByLabelText(/regenerate layout charts/i) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("an adaptation defaults to keeping the starting keyboard's images", () => {
+    instantiateAdaptation();
     useWorkingCopyStore.getState().setStartWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
     render(<DocumentationChecklist />);
     const group = screen.getByRole("radiogroup", { name: /layout images/i });
@@ -177,10 +186,10 @@ describe("DocumentationChecklist — layout-chart preference (FR-015)", () => {
     instantiateTrackOne();
     useWorkingCopyStore.getState().setStartWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
     render(<DocumentationChecklist />);
-    fireEvent.click(screen.getByLabelText(/regenerate layout charts/i));
-    expect(useWorkingCopyStore.getState().chartPreference).toBe("regenerate");
     fireEvent.click(screen.getByLabelText(/keep starting keyboard images/i));
     expect(useWorkingCopyStore.getState().chartPreference).toBe("keep-base-images");
+    fireEvent.click(screen.getByLabelText(/regenerate layout charts/i));
+    expect(useWorkingCopyStore.getState().chartPreference).toBe("regenerate");
   });
 });
 

@@ -41,9 +41,12 @@ and inherited. **A fresh help page opens with the corpus-standard help-site head
 `renderLayoutCharts` (`packages/engine/src/layout-chart/`) — is written into `source/welcome/`,
 referenced from the welcome page's "Keyboard Layout" section, and listed in the descriptor.
 Combining marks draw on a dotted-circle carrier, characters outside the renderer's declared
-coverage table as `U+XXXX`, empty keys with a distinct keycap. When the base ships its own
-images they are kept and no charts are generated unless the author opts to regenerate (the
-control sits on the checklist's welcome row).
+coverage table as `U+XXXX`, empty keys with a distinct keycap. When an adaptation's base
+ships its own images they are kept and no charts are generated unless the author opts to
+regenerate. A copy generates charts by default, because the copied keyboard's images picture
+a layout the author has since changed; its carried images still ship and appear under
+"Other", after the generated layers, and the author can opt to keep the images alone. The
+control sits on the checklist's welcome row.
 
 **Every file is rendered from a form** (spec 102). The six files and the shared welcome/help
 body are fill-in forms in

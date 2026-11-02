@@ -104,9 +104,10 @@ export function DocumentationChecklist({ typingGuideSuppressed = false }: Docume
   const chartPreference = useWorkingCopyStore((s) => s.chartPreference);
   const setChartPreference = useWorkingCopyStore((s) => s.setChartPreference);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const isCopy = instantiationMode === "new-from-base";
   // What the projection actually carries for this track.
   const baseShipsImages = carriedWelcomeImages(startWelcomeImages, instantiationMode !== "adapt-existing").length > 0;
-  const effectivePreference: ChartPreference = effectiveChartPreference(chartPreference, baseShipsImages);
+  const effectivePreference: ChartPreference = effectiveChartPreference(chartPreference, baseShipsImages, isCopy);
 
   const memberName = (member: DocMemberId): string => {
     switch (member) {

@@ -12,15 +12,19 @@ import { extractWelcomeImageRefs } from "@keyboard-studio/engine";
 
 /**
  * The layout-chart choice in force (spec 079 FR-015): the author's explicit
- * choice when made, else keep the base's own images when it ships any and
- * generate charts otherwise. The one place the default is resolved — the
- * Output checklist control and the projection both read it.
+ * choice when made, else keep the base's own images when an adaptation's base
+ * ships any and generate charts otherwise. A Track 1 copy always defaults to
+ * generating: the base's images picture the copied keyboard's layout, which
+ * the author has since changed (product ruling 2026-10-23, option (a)). The
+ * one place the default is resolved — the Output checklist control and the
+ * projection both read it.
  */
 export function effectiveChartPreference(
   chartPreference: ChartPreference | null,
   baseShipsImages: boolean,
+  isCopy: boolean,
 ): ChartPreference {
-  return chartPreference ?? (baseShipsImages ? "keep-base-images" : "regenerate");
+  return chartPreference ?? (baseShipsImages && !isCopy ? "keep-base-images" : "regenerate");
 }
 
 /** The `source/`-relative welcome folder (spec 079 FR-002). */
