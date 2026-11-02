@@ -39,6 +39,10 @@
 //     which is exactly what a real Crowdin sync did once (3 keys of 1214).
 //   • target locales, additionally: no value may be empty. A new string lands
 //     with its translation; a "" left for Crowdin comes back as English.
+//   • every locale: no key may appear twice in the raw file. JSON.parse keeps
+//     the LAST occurrence, so every check above sees one value and passes —
+//     including the empty-value check, when a hand edit appends a translated
+//     copy of a key below its original "" line.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 //
@@ -83,6 +87,9 @@ const orderProblems = [];
 // Empty target values get their own channel too: the fix is writing the
 // translation, and `messages:extract` is what put the "" there in the first place.
 const untranslatedProblems = [];
+// Duplicate keys likewise: `messages:extract` would silently keep the last copy,
+// which hides which of the two values someone meant to commit.
+const duplicateProblems = [];
 
 function readCatalog(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
@@ -115,6 +122,30 @@ function resolveLinguiBin() {
     );
   }
   return found;
+}
+
+// Keys that occur more than once in a catalog's raw text. Must read the text:
+// once parsed, a duplicate is already gone. Catalogs are the flat "minimal"
+// format (one `"id": value` per line), so a key is a quoted string opening a line.
+function duplicateKeys(file) {
+  const seen = new Set();
+  const dupes = new Set();
+  for (const m of fs.readFileSync(file, "utf8").matchAll(/^\s*("(?:[^"\\]|\\.)*")\s*:/gm)) {
+    const key = JSON.parse(m[1]);
+    if (seen.has(key)) dupes.add(key);
+    seen.add(key);
+  }
+  return [...dupes];
+}
+
+// Like key order, read off the committed tree with no extraction or baseline.
+if (fs.existsSync(COMMITTED_DIR)) {
+  for (const d of fs.readdirSync(COMMITTED_DIR, { withFileTypes: true })) {
+    const file = path.join(COMMITTED_DIR, d.name, CATALOG_FILE);
+    if (!d.isDirectory() || !fs.existsSync(file)) continue;
+    const dupes = duplicateKeys(file);
+    if (dupes.length) duplicateProblems.push(`[${d.name}] ${dupes.length} duplicate key(s): ${dupes.join(", ")}`);
+  }
 }
 
 // Key order is read straight off the committed tree, deliberately before (and
@@ -377,6 +408,22 @@ if (untranslatedProblems.length > 0) {
   );
 }
 
-if (problems.length > 0 || orderProblems.length > 0 || untranslatedProblems.length > 0) process.exit(1);
+if (duplicateProblems.length > 0) {
+  console.error("[ERROR] i18n-catalog-lint: catalogs contain the same key more than once.");
+  for (const p of duplicateProblems) console.error("  - " + p);
+  console.error(
+    "\nFix: keep one line per key, the one with the value you mean (usually the translation), and delete the other. " +
+      "Only the last copy is ever read, so the other checks cannot see the one you delete.",
+  );
+}
+
+if (
+  problems.length > 0 ||
+  orderProblems.length > 0 ||
+  untranslatedProblems.length > 0 ||
+  duplicateProblems.length > 0
+) {
+  process.exit(1);
+}
 
 console.log("[OK] i18n-catalog-lint: message catalogs are in sync and in message-id order.");
