@@ -1,0 +1,20 @@
+c options and PostKeystroke
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Options'
+store(&TARGETS) 'any'
+store(opt) '0'
+
+begin Unicode > use(main)
+begin PostKeystroke > use(PostKeystroke)
+
+group(main) using keys
+
+if(opt = '1') + [K_A] > 'A1'
++ [K_A] > 'a'
++ [K_B] > 'b'
++ [K_C] > set(opt = '1')
+
+group(PostKeystroke) readonly
+
+'.' ' ' > layer('shift')
+nomatch > layer('default')

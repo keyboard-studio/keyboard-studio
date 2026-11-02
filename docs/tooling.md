@@ -405,6 +405,14 @@ Live and passing:
   copy-track walk; the convenience question must offer its loanword-only letters (strict
   `driveConvenienceStep`). Manual/local only, not in the CI `e2e` job
 
+Production-build only (its own config, not part of the dev-server lane):
+
+- [ldml-compile-trial.spec.ts](../packages/studio/e2e/ldml-compile-trial.spec.ts) — spec 108 FR-070
+  trial. Compiles a touch-bearing profile-46 export in the built bundle and compares its message
+  codes with the CI harness. Build first, then run
+  `npx playwright test --config playwright.trial.config.ts` from `packages/studio` (serves `dist/`
+  with `vite preview` on 5274; the default config ignores it).
+
 Skipped, each with an un-skip recipe at the top of its file:
 
 - [touch-key-add-remove.spec.ts](../packages/studio/e2e/touch-key-add-remove.spec.ts) — spec 063

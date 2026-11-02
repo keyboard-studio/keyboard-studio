@@ -1,0 +1,40 @@
+// Public barrel of the LDML keyboard export module (spec 108).
+// Never exports `__testing__`: test tooling stays out of the product graph.
+
+export type {
+  CompatibilityItem,
+  LdmlBaseLayout,
+  LdmlBaseLayoutId,
+  LdmlBaseLayoutLayerName,
+  LdmlBaseLayoutSource,
+  LdmlClassification,
+  LdmlClassifyInput,
+  LdmlCode,
+  LdmlExportInput,
+  LdmlExportMetadata,
+  LdmlExportResult,
+  LdmlPackageBinaryFile,
+  LdmlPackageFiles,
+  LdmlProfileId,
+  LdmlSeverity,
+  LdmlSide,
+  LdmlStatus,
+  LdmlVKey,
+  RowId,
+} from "./types.js";
+
+export type { ProfileRow, ProfileRowStatus, RowDelta, TargetProfile } from "./profiles/types.js";
+export { listLdmlProfiles, resolveLdmlProfile } from "./profiles/resolve.js";
+
+export { classifyForLdml } from "./classify/classify.js";
+export type { ClassifyOptions } from "./classify/classify.js";
+export { buildLdmlExport } from "./package.js";
+export { renderCompileReport, renderReport } from "./report.js";
+// Async-only: the kmc-ldml chunk stays lazy (FR-070 trial).
+export { buildLdmlInBrowser, compileLdmlInBrowser, initLdmlCompiler } from "./compile/loadLdmlCompiler.js";
+export type { KeymanBuildResult, KeymanCompileResult, KeymanMessage } from "./compile/loadLdmlCompiler.js";
+export { compareToKeymanGaps } from "./compile/compareToKeymanGaps.js";
+export type { ExpectedKeymanError, KeymanGapComparison } from "./compile/compareToKeymanGaps.js";
+export { buildLdmlKmp, LDML_COMPILE_REPORT_NAME } from "./compile/buildLdmlKmp.js";
+export type { BuildLdmlKmpOptions, BuildLdmlKmpResult } from "./compile/buildLdmlKmp.js";
+export type { ReportContext } from "./report.js";

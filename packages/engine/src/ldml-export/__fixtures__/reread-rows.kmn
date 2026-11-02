@@ -1,0 +1,20 @@
+c rows reread
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Reread'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+store(keys) [K_A] [K_B]
+store(out) 'xy'
+store(prec) 'é'
+
+group(main) using keys
+
++ [NUMLOCK K_A] > 'n'
++ [SCROLL K_B] > 's'
++ [LCTRL RALT K_C] > 'c'
++ [K_BKSP] > 'z'
++ any(keys) > index(out, 1)
+nul + [K_D] > 'd'
+notany(prec) + [K_E] > 'e'

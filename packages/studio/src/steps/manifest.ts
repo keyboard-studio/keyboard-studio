@@ -37,6 +37,7 @@ import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
+import { registerRouteProvider } from "../decisions/routeProvider.ts";
 import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
 import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
@@ -365,6 +366,26 @@ export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolea
       s.gatedBy !== undefined ? [[s.id, s.gatedBy] as const] : [],
     ),
   );
+
+// The author's current route for the lint fallback (spec 108 FR-015): a screen is on the route
+// while its derived gate passes, and a screen with no gate always is. Registered here, not
+// imported by the consumers, because they sit upstream of this module's evaluation.
+registerRouteProvider((decisions) => {
+  const route = new Set<string>();
+  for (const { id } of derivedScreens) {
+    const gate = screenGates.get(id);
+    let on = true;
+    if (gate !== undefined) {
+      try {
+        on = gate(decisions);
+      } catch {
+        on = true;
+      }
+    }
+    if (on) route.add(id);
+  }
+  return route;
+});
 
 /**
  * Derived screen trails by screen id (spine membership + join target),

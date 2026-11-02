@@ -1140,3 +1140,55 @@ export type {
 export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
 export type { RgbaImage } from "./icon/icoEncoder.js";
 export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
+
+// LDML keyboard export (spec 108). The barrel exposes the public API only; it
+// exposes no test tooling (`ldml-export/__testing__` is never re-exported).
+export type {
+  CompatibilityItem,
+  LdmlBaseLayout,
+  LdmlBaseLayoutId,
+  LdmlBaseLayoutLayerName,
+  LdmlBaseLayoutSource,
+  LdmlClassification,
+  LdmlClassifyInput,
+  LdmlCode,
+  LdmlExportInput,
+  LdmlExportMetadata,
+  LdmlExportResult,
+  LdmlPackageBinaryFile,
+  LdmlPackageFiles,
+  LdmlProfileId,
+  LdmlSeverity,
+  LdmlSide,
+  LdmlStatus,
+  LdmlVKey,
+  RowId,
+} from "./ldml-export/index.js";
+
+export {
+  buildLdmlExport,
+  buildLdmlInBrowser,
+  buildLdmlKmp,
+  classifyForLdml,
+  compareToKeymanGaps,
+  compileLdmlInBrowser,
+  initLdmlCompiler,
+  listLdmlProfiles,
+  renderCompileReport,
+  renderReport,
+  resolveLdmlProfile,
+} from "./ldml-export/index.js";
+export type {
+  BuildLdmlKmpOptions,
+  BuildLdmlKmpResult,
+  ExpectedKeymanError,
+  KeymanBuildResult,
+  KeymanCompileResult,
+  KeymanGapComparison,
+  KeymanMessage,
+} from "./ldml-export/index.js";
+export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
+
+// Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
+export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
+export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";

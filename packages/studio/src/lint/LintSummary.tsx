@@ -6,15 +6,42 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { LintFinding, LintSeverity } from "@keyboard-studio/contracts";
 import { LintChip } from "./LintChip";
+import { ldmlCodeTitle } from "./ldmlFindings.ts";
 import { SEVERITY_COLORS, SEVERITY_ORDER } from "./colors";
 import { TEXT_MAIN } from "../ui/theme.ts";
 
 export interface LintSummaryProps {
   findings: LintFinding[];
+  /**
+   * One row per code: its translated title, count and severity, expanding to the individual
+   * chips, each with its line (spec 108 FR-018). Every LDML surface uses this mode.
+   */
+  groupByCode?: boolean;
 }
 
-export function LintSummary({ findings }: LintSummaryProps) {
-  const { t } = useLingui();
+interface CodeGroup {
+  code: string;
+  severity: LintSeverity;
+  findings: LintFinding[];
+}
+
+/** Groups in order of first appearance; a group's severity is its most severe finding. */
+function groupFindings(findings: LintFinding[]): CodeGroup[] {
+  const groups = new Map<string, CodeGroup>();
+  for (const f of findings) {
+    const g = groups.get(f.code);
+    if (g === undefined) {
+      groups.set(f.code, { code: f.code, severity: f.severity, findings: [f] });
+    } else {
+      g.findings.push(f);
+      if (SEVERITY_ORDER.indexOf(f.severity) < SEVERITY_ORDER.indexOf(g.severity)) g.severity = f.severity;
+    }
+  }
+  return [...groups.values()];
+}
+
+export function LintSummary({ findings, groupByCode = false }: LintSummaryProps) {
+  const { t, i18n } = useLingui();
 
   /** Pluralise a severity label for the badge (e.g. "1 error" / "2 errors"). */
   function labelFor(severity: LintSeverity, count: number): string {
@@ -173,7 +200,55 @@ export function LintSummary({ findings }: LintSummaryProps) {
       </div>
 
       {/* Scrollable findings list */}
-      {findings.length > 0 && (
+      {findings.length > 0 && groupByCode && (
+        <ul
+          aria-label={t({ id: "lint.summary.findingsListAriaLabel", message: "Lint findings" })}
+          style={{
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            maxHeight: 320,
+            overflowY: "auto",
+          }}
+        >
+          {groupFindings(findings).map((group) => (
+            <li key={group.code} data-testid="lint-summary-group">
+              <details>
+                <summary style={{ cursor: "pointer", fontSize: 13 }}>
+                  <span>{ldmlCodeTitle(group.code, i18n)}</span>{" "}
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: group.severity === "warning" ? TEXT_MAIN : SEVERITY_COLORS[group.severity],
+                    }}
+                  >
+                    {labelFor(group.severity, group.findings.length)}
+                  </span>
+                </summary>
+                <ul style={{ margin: "4px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {group.findings.map((finding, idx) => (
+                    <li key={`${finding.code}-${idx}`}>
+                      {finding.location !== undefined && (
+                        <span style={{ fontSize: 12, color: "var(--app-text-subtle)" }}>
+                          {t({
+                            id: "lint.summary.group.line",
+                            message: `Line ${{ line: finding.location.line }}`,
+                          })}
+                        </span>
+                      )}
+                      <LintChip finding={finding} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          ))}
+        </ul>
+      )}
+      {findings.length > 0 && !groupByCode && (
         <ul
           aria-label={t({ id: "lint.summary.findingsListAriaLabel", message: "Lint findings" })}
           style={{

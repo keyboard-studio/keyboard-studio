@@ -102,6 +102,16 @@ export interface ToZipOptions {
    * byte-for-byte what it was before the feature existed.
    */
   decisionRecord?: DecisionRecord;
+  /**
+   * Inject `NEXT_STEPS.md` (default `true`). The LDML export package supplies
+   * its own documentation and turns this off.
+   */
+  nextSteps?: boolean;
+  /**
+   * Modification time stamped on every entry. fflate otherwise uses the
+   * current time, so a fixed value is what makes two calls byte-identical.
+   */
+  fixedMtime?: Date;
 }
 
 /**
@@ -125,6 +135,7 @@ export interface ToZipOptions {
  */
 export async function toZip(fs: VirtualFS, opts: ToZipOptions = {}): Promise<Uint8Array> {
   const files: Zippable = {};
+  const mtimeOpt = opts.fixedMtime === undefined ? {} : { mtime: opts.fixedMtime };
 
   const source =
     opts.decisionRecord === undefined
@@ -138,13 +149,13 @@ export async function toZip(fs: VirtualFS, opts: ToZipOptions = {}): Promise<Uin
         : entry.content;
     const name = safeEntryName(entry.path);
     if (name === "") continue; // path resolved to nothing outside the root — drop it
-    files[name] = entry.isBinary
-      ? [bytes, { level: 0 }]
-      : [bytes, { level: 6 }];
+    files[name] = [bytes, { level: entry.isBinary ? 0 : 6, ...mtimeOpt }];
   }
 
-  // Always inject NEXT_STEPS.md (spec §12 "Download .zip" requirement)
-  files["NEXT_STEPS.md"] = [enc.encode(NEXT_STEPS_MD), { level: 6 }];
+  // Inject NEXT_STEPS.md (spec §12 "Download .zip" requirement) unless suppressed
+  if (opts.nextSteps !== false) {
+    files["NEXT_STEPS.md"] = [enc.encode(NEXT_STEPS_MD), { level: 6, ...mtimeOpt }];
+  }
 
   return zipSync(files);
 }

@@ -17,6 +17,9 @@ import type { PhysicalLayoutValue } from "./physicalLayoutValue.ts";
 import { currentPhysicalLayoutValue } from "./physicalLayoutValue.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
+import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
+import { isLdmlLintCode } from "../../lint/ldmlFindings.ts";
+import { LintSummary } from "../../lint/LintSummary.tsx";
 import { MechanismGallery } from "../../editors/assignLoop/MechanismGallery.tsx";
 
 export function PhysicalLayoutDecisionRenderer({
@@ -24,12 +27,21 @@ export function PhysicalLayoutDecisionRenderer({
 }: DecisionRendererProps<PhysicalLayoutValue>) {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const placementMap = usePlacementPriors();
+  // The LDML export notes this decision owns (spec 108 FR-015), grouped by code.
+  const findings = (useValidatorFindings()["physical-layout"] ?? []).filter((f) => isLdmlLintCode(f.code));
 
   return (
-    <MechanismGallery
-      selectedStartKeyboard={startKeyboard}
-      onComplete={() => onChange(currentPhysicalLayoutValue())}
-      {...(placementMap ? { placementMap } : {})}
-    />
+    <>
+      {findings.length > 0 && (
+        <div data-testid="physical-layout-ldml-findings" style={{ padding: "0 12px 8px" }}>
+          <LintSummary findings={findings} groupByCode />
+        </div>
+      )}
+      <MechanismGallery
+        selectedStartKeyboard={startKeyboard}
+        onComplete={() => onChange(currentPhysicalLayoutValue())}
+        {...(placementMap ? { placementMap } : {})}
+      />
+    </>
   );
 }

@@ -25,7 +25,7 @@
 // UnsupportedScriptStub instead of the step body — same routing as the other
 // working-copy steps.
 
-import { useRef, type ComponentType } from "react";
+import { useMemo, useRef, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
@@ -40,10 +40,19 @@ import { RuleBuilderMount } from "../../components/rules/RuleBuilderMount.tsx";
 import { FullStepPage } from "../../components/FullStepPage.tsx";
 import { rulesSection, rulesSectionHeading } from "../../components/rules/rulesStyles.ts";
 import { phaseHeading, leadParagraph } from "../surveyStyles.ts";
+import { LintSummary } from "../../lint/LintSummary.tsx";
+import { selectStepOwnedFindings } from "../../lint/lintToQuestion.ts";
 
 const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
   const script = useWorkingCopyStore((s) => s.startKeyboard?.script);
+  // The LDML findings this step owns (spec 108 FR-015): rules the export approximates or
+  // leaves out. Informational; they gate nothing.
+  const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const ownedFindings = useMemo(
+    () => selectStepOwnedFindings(validatorFindings, "rules"),
+    [validatorFindings],
+  );
 
   // The step's result lives in the working copy, so completion carries
   // no answer payload. Guarded against double-clicks. Spec 090 T034:
@@ -98,6 +107,14 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
           review the rule list, and add rules of your own.
         </Trans>
       </p>
+      {ownedFindings.length > 0 && (
+        <section style={rulesSection} aria-labelledby="rules-ldml-findings-heading" data-testid="rules-ldml-findings">
+          <h3 id="rules-ldml-findings-heading" style={rulesSectionHeading}>
+            <Trans id="survey.rules.ldmlFindingsHeading">LDML export notes</Trans>
+          </h3>
+          <LintSummary findings={ownedFindings} groupByCode />
+        </section>
+      )}
       <DemoPane />
       <section style={rulesSection} aria-labelledby="rules-list-heading">
         <h3 id="rules-list-heading" style={rulesSectionHeading}>

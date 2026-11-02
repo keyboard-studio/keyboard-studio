@@ -1,0 +1,25 @@
+c plain positional keyboard
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Plain'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+store(vowels) 'aeiou'
+store(accented) 'áéíóú'
+
+group(main) using keys
+
++ [K_Q] > 'q'
++ [K_A] > 'ä'
++ [SHIFT K_A] > 'Ä'
++ [K_BKQUOTE] > dk(grave)
+dk(grave) + [K_E] > 'è'
+dk(grave) + [K_O] > 'ò'
+'a' + [K_E] > 'æ'
++ [K_X] > 'x'
+any(vowels) + [K_COMMA] > index(accented, 1)
+'z' + [K_Z] > 'Z'
+'e' 'e' + [K_SPACE] > 'ee '
+'q' + [K_Q] > nul
+'x' + [K_BKSP] > 'y'

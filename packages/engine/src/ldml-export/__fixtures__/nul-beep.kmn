@@ -1,0 +1,13 @@
+c nul and beep
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'NulBeep'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_Q] > nul
++ [K_W] > beep
+'a' + [K_E] > nul
++ [K_E] > 'e'

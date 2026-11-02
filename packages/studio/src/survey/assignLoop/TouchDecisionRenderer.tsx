@@ -20,18 +20,30 @@ import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import type { TouchLayoutValue } from "./touchLayoutValue.ts";
 import { currentTouchLayoutValue } from "./touchLayoutValue.ts";
 import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
+import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
+import { isLdmlLintCode } from "../../lint/ldmlFindings.ts";
+import { LintSummary } from "../../lint/LintSummary.tsx";
 import { TouchGallery } from "../../editors/assignLoop/TouchGallery.tsx";
 
 export function TouchDecisionRenderer({
   onChange,
 }: DecisionRendererProps<TouchLayoutValue>) {
   const placementMap = usePlacementPriors();
+  // The LDML export notes this decision owns (spec 108 FR-015), grouped by code.
+  const findings = (useValidatorFindings()["touch-layout"] ?? []).filter((f) => isLdmlLintCode(f.code));
 
   return (
-    <TouchGallery
-      onComplete={() => onChange(currentTouchLayoutValue())}
-      onBack={() => undefined}
-      {...(placementMap ? { placementMap } : {})}
-    />
+    <>
+      {findings.length > 0 && (
+        <div data-testid="touch-layout-ldml-findings" style={{ padding: "0 12px 8px" }}>
+          <LintSummary findings={findings} groupByCode />
+        </div>
+      )}
+      <TouchGallery
+        onComplete={() => onChange(currentTouchLayoutValue())}
+        onBack={() => undefined}
+        {...(placementMap ? { placementMap } : {})}
+      />
+    </>
   );
 }
