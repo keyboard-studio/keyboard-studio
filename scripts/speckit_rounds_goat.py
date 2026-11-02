@@ -177,7 +177,7 @@ def run_advisor(claude, args, root, feature_dir, res):
     )
     proc = base.run_claude(claude, prompt, routed, root)
     try:
-        out = json.loads(proc.stdout)
+        out = base.parse_claude_json(proc.stdout)
     except ValueError:
         return "?", f"advisor round: claude exited {proc.returncode} without JSON"
     if out.get("is_error"):
@@ -291,7 +291,7 @@ def main():
         print(f"      spec sync: {sync_spec(feature_dir, f'docs(spec): spec {feature_dir.name.split('-')[0]} round {n} -- {label}')}")
 
         try:
-            out = json.loads(proc.stdout)
+            out = base.parse_claude_json(proc.stdout)
         except ValueError:
             print(f"[FAIL] round {n}: claude exited {proc.returncode} without JSON\n{proc.stderr[-2000:]}")
             return 1
