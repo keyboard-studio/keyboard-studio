@@ -27,10 +27,10 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BASE_KEYBOARDS } from "./codegen-base-layouts.mjs";
+import { BASE_KEYBOARDS, listCatalogKeyboardIds } from "./codegen-base-layouts.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..");
@@ -108,13 +108,12 @@ export function deriveFamily(o) {
 
 export function buildCatalog(keyboardsDir) {
   const basic = join(keyboardsDir, "release", "basic");
-  const ids = readdirSync(basic).filter((d) => /^basic_kbd/.test(d)).sort();
+  const ids = listCatalogKeyboardIds(keyboardsDir);
   const layouts = [];
   const authors = {};
   for (const id of ids) {
     const kps = join(basic, id, "source", `${id}.kps`);
     const kmn = join(basic, id, "source", `${id}.kmn`);
-    if (!existsSync(kps) || !existsSync(kmn)) continue;
     const info = parseKps(readFileSync(kps, "utf8"));
     const family = deriveFamily(baseOutputs(readFileSync(kmn, "utf8"), ["K_Q", "K_W", "K_Y", "K_Z", "K_A"]));
     const entry = {

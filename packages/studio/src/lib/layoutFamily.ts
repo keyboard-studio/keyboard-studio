@@ -29,7 +29,7 @@ import {
   REFERENCE_BASE_IDS,
   likelyBaseLayouts as t011LikelyBaseLayouts,
 } from "./referenceBaseLayouts.ts";
-import type { BaseLayoutId, LayoutFamilyAnswer } from "./referenceBaseLayouts.ts";
+import type { ReferenceHostId, LayoutFamilyAnswer } from "./referenceBaseLayouts.ts";
 import { windowsLayoutById } from "./windowsLayouts.ts";
 import type { WindowsLayout } from "./windowsLayouts.ts";
 
@@ -209,7 +209,7 @@ export interface LikelyBaseDeps {
   layoutFamilyBases?: (answer: LayoutFamilyValue, bcp47: string[]) => BaseLayoutRef[];
 }
 
-function toRefs(ids: readonly BaseLayoutId[]): BaseLayoutRef[] {
+function toRefs(ids: readonly ReferenceHostId[]): BaseLayoutRef[] {
   return ids.map((id) => ({ id, label: BASE_LAYOUTS[id].label }));
 }
 
@@ -250,7 +250,7 @@ export function resolveLikelyBaseLayouts(opts: {
    * answers, ahead of any family or language-tag inference (spec 076 A4;
    * multi-select since #1902 — order preserved, duplicates collapsed).
    */
-  pickedBases?: readonly BaseLayoutId[] | undefined;
+  pickedBases?: readonly ReferenceHostId[] | undefined;
 }): LikelyBaseResolution {
   const picked = (opts.pickedBases ?? []).filter((id, i, all) => all.indexOf(id) === i);
   if (picked.length > 0) {
@@ -310,7 +310,7 @@ export function useLikelyBaseLayouts(bcp47: string | undefined): LikelyBaseResol
   const layoutFamily = useLayoutFamilyAnswer();
   const picks = usePickedWindowsLayouts();
   const pickedBases = useMemo(() => {
-    const out: BaseLayoutId[] = [];
+    const out: ReferenceHostId[] = [];
     for (const pick of picks) {
       if (pick.host !== undefined && !out.includes(pick.host)) out.push(pick.host);
     }

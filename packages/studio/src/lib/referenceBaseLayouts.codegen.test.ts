@@ -60,7 +60,39 @@ describe("codegen-base-layouts parser", () => {
   });
 
   it("fails loudly on an output it cannot model", () => {
-    expect(() => codegen.parseBasicKeyboard("+ [K_A] > 'a'", "t")).toThrow(/unsupported rule output/);
+    expect(() => codegen.parseBasicKeyboard("+ [K_A] > beep", "t")).toThrow(/unsupported rule output/);
+  });
+
+  it("reads quoted literals and leaves nul keys unknown", () => {
+    const layers = codegen.parseBasicKeyboard(
+      ["+ [K_A] > 'a'", "+ [SHIFT K_A] > nul", "+ [SHIFT K_A] > U+0041", "+ [K_B] > 'b' U+0301"].join("\n"),
+      "t",
+    );
+    expect(layers.base).toEqual({ K_A: "a", K_B: "b́" });
+    expect(layers.shift).toEqual({});
+  });
+});
+
+describe("catalog coverage (FR-030, SC-004)", () => {
+  it("keeps the five reference host ids as aliases of their basic keyboards", () => {
+    expect(codegen.layoutKeyFor("basic_kbdgr")).toBe("qwertz");
+    expect(codegen.layoutKeyFor("basic_kbdsomething")).toBe("basic_kbdsomething");
+  });
+
+  it.skipIf(!HAS_CORPUS)("has data and a pinned hash for every catalog layout, including basic_kbdgr", () => {
+    const committed = JSON.parse(readFileSync(codegen.OUTPUT_PATH, "utf8"));
+    const ids: string[] = codegen.listCatalogKeyboardIds(KEYBOARDS_DIR);
+    expect(ids).toContain("basic_kbdgr");
+    expect(ids).toHaveLength(186);
+    expect(typeof committed.source.commit).toBe("string");
+    for (const id of ids) {
+      expect(committed.source.files[id], `hash for ${id}`).toMatch(/^[0-9a-f]{64}$/);
+      const host = committed.hosts[codegen.layoutKeyFor(id)];
+      expect(host, `data for ${id}`).toBeDefined();
+      expect(host.keyboard).toBe(id);
+      expect(Object.keys(host.base).length, `base cells for ${id}`).toBeGreaterThan(0);
+    }
+    expect(Object.keys(committed.hosts)).toHaveLength(ids.length);
   });
 });
 

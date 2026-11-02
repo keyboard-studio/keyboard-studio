@@ -11,7 +11,7 @@
 import { z } from "zod";
 import generated from "./generated/windowsLayouts.generated.json";
 import { likelyBaseLayouts } from "./referenceBaseLayouts.ts";
-import type { BaseLayoutId, LayoutFamilyAnswer } from "./referenceBaseLayouts.ts";
+import type { ReferenceHostId, LayoutFamilyAnswer } from "./referenceBaseLayouts.ts";
 
 export type WindowsLayoutFamily = LayoutFamilyAnswer | "other";
 
@@ -35,7 +35,7 @@ export interface WindowsLayout {
   languages: readonly { id: string; name: string }[];
   family: WindowsLayoutFamily;
   /** Present when this layout IS one of the five reference hosts. */
-  host?: BaseLayoutId;
+  host?: ReferenceHostId;
 }
 
 const parsed = CatalogSchema.parse(generated);
@@ -55,7 +55,7 @@ export function windowsLayoutById(id: string | undefined): WindowsLayout | undef
 }
 
 /** The catalog entry for a reference host (e.g. "azerty" -> basic_kbdfr). */
-export function windowsLayoutForBase(host: BaseLayoutId): WindowsLayout | undefined {
+export function windowsLayoutForBase(host: ReferenceHostId): WindowsLayout | undefined {
   return WINDOWS_LAYOUTS.find((l) => l.host === host);
 }
 

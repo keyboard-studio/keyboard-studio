@@ -69,10 +69,18 @@ import generatedBaseLayouts from "./generated/baseLayouts.generated.json";
 export const REFERENCE_DATA_VERSION = 2;
 export const REGION_LAYOUT_MAPPING_VERSION = 2;
 
-export type BaseLayoutId = "us" | "us-intl" | "azerty" | "qwertz" | "uk";
+/** The five reference hosts. Ids are persisted; never renumber. */
+export type ReferenceHostId = "us" | "us-intl" | "azerty" | "qwertz" | "uk";
+
+/**
+ * Any layout in the Windows-layout catalog: a reference host id, or a
+ * `basic_kbd*` keyboard id. A layout without character data yields "unknown"
+ * from the lookup, never a guess from its family.
+ */
+export type BaseLayoutId = ReferenceHostId | `basic_kbd${string}`;
 
 /** Stable display order for the five reference hosts. */
-export const REFERENCE_BASE_IDS: readonly BaseLayoutId[] = [
+export const REFERENCE_BASE_IDS: readonly ReferenceHostId[] = [
   "us",
   "us-intl",
   "azerty",
@@ -81,14 +89,14 @@ export const REFERENCE_BASE_IDS: readonly BaseLayoutId[] = [
 ];
 
 export interface BaseLayoutMeta {
-  id: BaseLayoutId;
+  id: ReferenceHostId;
   /** Short label for selectors and table headers. */
   label: string;
   /** One-line description for the gallery caption context. */
   description: string;
 }
 
-export const BASE_LAYOUTS: Record<BaseLayoutId, BaseLayoutMeta> = {
+export const BASE_LAYOUTS: Record<ReferenceHostId, BaseLayoutMeta> = {
   us: {
     id: "us",
     label: "US English",
@@ -143,8 +151,26 @@ export interface BaseLayoutData {
 // upper-cased Keyman virtual-key ids.
 // ---------------------------------------------------------------------------
 
-export const REFERENCE_BASES: Record<BaseLayoutId, BaseLayoutData> =
+/**
+ * Keyed by reference host id for the five hosts and by `basic_kbd*` id for the
+ * rest of the catalog.
+ */
+export const REFERENCE_BASES: Readonly<Record<string, BaseLayoutData>> =
   generatedBaseLayouts.hosts;
+
+/** The basic keyboard behind each reference host, so either id addresses the same data. */
+const HOST_ALIAS: Readonly<Record<string, ReferenceHostId>> = {
+  basic_kbdus: "us",
+  basic_kbdusx: "us-intl",
+  basic_kbdfr: "azerty",
+  basic_kbdgr: "qwertz",
+  basic_kbduk: "uk",
+};
+
+/** The table for a catalog layout, or undefined when it has no data. */
+export function baseLayoutData(id: string): BaseLayoutData | undefined {
+  return REFERENCE_BASES[HOST_ALIAS[id] ?? id];
+}
 
 // ---------------------------------------------------------------------------
 // Lookup — key+modifiers, generally (reused by carve demo now, swallowUndefined
@@ -185,7 +211,7 @@ export function lookupHostOutput(
 ): BaseCell | undefined {
   const layer = canonicalBaseLayer(modifiers);
   // Tables use upper-cased ids (K_OE2); the IR keeps Keyman's spelling (K_oE2).
-  return REFERENCE_BASES[host][layer][key.toUpperCase()];
+  return baseLayoutData(host)?.[layer][key.toUpperCase()];
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +253,7 @@ export type LayoutFamilyAnswer = "qwerty" | "qwertz" | "azerty" | "non-roman";
  *   hosts) rather than a wrong US answer. CSA is additive later, never a
  *   silent redesign (see header).
  */
-const REGION_TO_HOST: Record<string, BaseLayoutId> = {
+const REGION_TO_HOST: Record<string, ReferenceHostId> = {
   US: "us",
   CA: "us",
   GB: "uk",
@@ -284,7 +310,7 @@ function languageOf(tag: string): string {
 export function likelyBaseLayouts(
   bcp47: string[],
   layoutFamilyAnswer?: string,
-): BaseLayoutId[] {
+): ReferenceHostId[] {
   const family = (layoutFamilyAnswer ?? "").trim().toLowerCase();
 
   // (1) The author's answer is primary.
@@ -302,7 +328,7 @@ export function likelyBaseLayouts(
   // the default set: neither discriminates among the five reference hosts.
 
   // (2) Language-tag-derived likely hosts.
-  const seen = new Set<BaseLayoutId>();
+  const seen = new Set<ReferenceHostId>();
   for (const tag of bcp47) {
     const region = regionOf(tag);
     // fr-CA: French-Canadian typists use CSA, not US — and CSA is not in the

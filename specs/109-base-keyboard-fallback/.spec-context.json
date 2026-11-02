@@ -107,6 +107,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T18:10:12.527Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:13:30.190Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:13:30.546Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:13:30.906Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:13:31.261Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T19:13:31.616Z"
     }
   ],
   "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801",
@@ -135,6 +175,9 @@
     },
     "tasks": {
       "summary": "27 tasks in 6 phases: foundational policy, data, enumerator, compile, surface, polish"
+    },
+    "implement": {
+      "summary": "Phase 2: 186 catalog layouts carry character data"
     }
   },
   "approach": "Generate char data for all catalog layouts, add a shared positional enumerator, split FallbackPolicy per class with a confirmed flag, compile swallowUndefined as one store plus nul rule via mutate(), rebuild the surface.",
@@ -278,7 +321,7 @@
       ]
     }
   },
-  "currentTask": "T005",
+  "currentTask": "T010",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -314,6 +357,41 @@
       "files": [
         "packages/contracts/src/fallbackPolicy.test.ts"
       ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "BASE_KEYBOARDS extended to 186 catalog layouts with pinned corpus sha and per-source SHA-256",
+      "files": [
+        "scripts/codegen-base-layouts.mjs"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "windows codegen shares the catalog id list",
+      "files": [
+        "scripts/codegen-windows-layouts.mjs"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "BaseLayoutId widened; baseLayoutData lookup",
+      "files": [
+        "packages/studio/src/lib/referenceBaseLayouts.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "regenerated JSON via codegen (186 layouts)",
+      "files": [
+        "packages/studio/src/lib/generated/baseLayouts.generated.json"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "drift test over all 186 layouts incl basic_kbdgr",
+      "files": [
+        "packages/studio/src/lib/referenceBaseLayouts.codegen.test.ts"
+      ]
     }
   },
   "verified": [
@@ -334,7 +412,11 @@
     {
       "note": "Engine pipeline stays single-valued; studio collapses per-class policy at projectionInput, so mixed policies are not honored until Phase 4",
       "step": "implement"
+    },
+    {
+      "note": "nul rules leave a cell unknown rather than recording produces-nothing; leak logic shows such keys as unknown",
+      "step": "implement"
     }
   ],
-  "last_action": "Phase 1 done"
+  "last_action": "phase 2 done, typecheck/lint/studio lib tests green"
 }

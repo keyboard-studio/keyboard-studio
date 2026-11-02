@@ -36,19 +36,19 @@ Files: `scripts/codegen-base-layouts.mjs`, `scripts/codegen-windows-layouts.mjs`
 
 **Wave 1 — one task:**
 
-- [ ] **T006** [US3] Extend `BASE_KEYBOARDS` to all 186 catalog layouts from their `basic_kbd*` sources, pin the corpus commit and a SHA-256 per source (FR-030, FR-031, FR-032) · scripts/codegen-base-layouts.mjs
+- [x] **T006** [US3] Extend `BASE_KEYBOARDS` to all 186 catalog layouts from their `basic_kbd*` sources, pin the corpus commit and a SHA-256 per source (FR-030, FR-031, FR-032) · scripts/codegen-base-layouts.mjs
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T007** [P] [US3] Keep the Windows-layout codegen in step with the widened import · scripts/codegen-windows-layouts.mjs
-- [ ] **T008** [P] [US3] Widen `BaseLayoutId` to the catalog ids; a layout without data yields "unknown", never a family guess · packages/studio/src/lib/referenceBaseLayouts.ts
+- [x] **T007** [P] [US3] Keep the Windows-layout codegen in step with the widened import · scripts/codegen-windows-layouts.mjs
+- [x] **T008** [P] [US3] Widen `BaseLayoutId` to the catalog ids; a layout without data yields "unknown", never a family guess · packages/studio/src/lib/referenceBaseLayouts.ts
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T009** [US3] Regenerate the JSON (`pnpm prebuild` path, never hand-edit) · packages/studio/src/lib/generated/baseLayouts.generated.json
-- [ ] **T010** [US3] Codegen drift test over all catalog layouts, including `basic_kbdgr` (SC-004) · packages/studio/src/lib/referenceBaseLayouts.codegen.test.ts
+- [x] **T009** [US3] Regenerate the JSON (`pnpm prebuild` path, never hand-edit) · packages/studio/src/lib/generated/baseLayouts.generated.json
+- [x] **T010** [US3] Codegen drift test over all catalog layouts, including `basic_kbdgr` (SC-004) · packages/studio/src/lib/referenceBaseLayouts.codegen.test.ts
 
 **Checkpoint**: all 186 layouts carry data; the codegen test fails on drift.
 

@@ -35,7 +35,7 @@
 // The prompt asks the ONE question only the author can answer: "do your
 // typists expect a character on this key?"
 
-import type { BaseLayoutId as ReferenceBaseLayoutId } from "../../lib/referenceBaseLayouts.ts";
+import type { ReferenceHostId as ReferenceBaseLayoutId } from "../../lib/referenceBaseLayouts.ts";
 
 export type BaseLayoutId = "us" | "intl" | "azerty" | "qwertz" | "uk" | "blocked";
 
