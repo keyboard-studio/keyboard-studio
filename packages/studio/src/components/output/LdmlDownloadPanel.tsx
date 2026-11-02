@@ -10,6 +10,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { LdmlProfileId, TargetProfile } from "@keyboard-studio/engine";
 import { LintSummary } from "../../lint/LintSummary.tsx";
+import { LdmlCompilePanel } from "./LdmlCompilePanel.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePickedWindowsLayouts, getLayoutFamilyAnswer } from "../../lib/layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "../../lib/ldmlBaseLayout.ts";
@@ -233,6 +234,11 @@ export function LdmlDownloadPanel(props: LdmlDownloadPanelProps) {
           includes a report of what could not be carried over.
         </Trans>
       </p>
+      <LdmlCompilePanel
+        profileId={selectedProfile}
+        keymanCompilable={profiles.find((p) => p.id === selectedProfile)?.keymanCompilable ?? false}
+        enabled={gatedAriaLabel === null && !ansiOnly && !baseBlocked && !otherBusy && !downloading}
+      />
       {findings.length > 0 && (
         <section
           aria-labelledby={findingsHeadingId}

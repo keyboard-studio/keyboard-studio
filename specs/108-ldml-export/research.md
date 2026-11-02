@@ -883,3 +883,26 @@ not committed.
    - Knock-on edits left for the owners (not made in T089): the `<special>` lines in
      [contracts/export-package.md](contracts/export-package.md), FR-028 and SC wording in
      [spec.md](spec.md), and the tasks that write or test `<special>`.
+
+## R33 — Phase 8 build, bundle confirmation and manual check (2026-11-02)
+
+### Decisions taken building Story 5
+
+- **Build path (T095).** `buildLdmlInBrowser` runs init, load and validate, then the pinned compiler's `run`. `run` loads and compiles again, so a message raised by both passes is kept once (keyed on code, line and text). `run` does not lint, which is why `validate` runs first: the message set equals `compileLdmlInBrowser`'s. `kmxPlusVersion` is the little-endian `dwFileVersion` at byte 4 of the produced `.kmx` (a test cross-checks it against the Node build and `KMX.KMXFile.VERSION_170`). `compilerVersion` is a constant in the loader, because `@keymanapp/kmc-ldml`'s `exports` map exposes no `package.json`; a test fails if it drifts from the installed package.
+- **Desktop-only text (FR-074).** The sentence is added to the `.kps` `<Description>` of the download-path clone (`markKpsDesktopOnly`) and is also in `LDML-COMPILE-REPORT.md`. It is not in `renderKps`, so the source export's descriptor and `LDML-EXPORT-REPORT.md` stay byte-identical (FR-030). `docs.ts` is unchanged: the author's readme and welcome pages are carried verbatim. Owners may prefer the sentence in the source export's descriptor too; that would change the existing "no Description" expectation in `metadata.test.ts`.
+- **Report membership.** `LDML-COMPILE-REPORT.md` is a `.kmp` member only because `addKpsFile` lists it in the clone's descriptor. `buildLdmlKmp` therefore takes the report text as an option beside the three arguments the task named.
+- **T105 coverage is narrow.** Every K row in profile 46 has `keymanCodes: []`, so on the corpus the comparison only ever shows "no errors, nothing expected, nothing unexpected". The split logic itself is covered by `compareToKeymanGaps.test.ts` with a hand-built profile. The corpus assertion lives in `compile.corpus.test.ts` (the file that already holds the per-keyboard Keyman compile); `package.corpus.test.ts` does not exist.
+- **T104 reach.** `vite preview` has no keyboard picker corpus, so the Playwright spec builds the export in Node and runs the engine pipeline through `window.__ksE2E__.packageLdml` (T103). The panel's disabled state for profile 49 is covered by `LdmlCompilePanel.test.tsx` and the engine's `keymanCompilable` data, not by driving the production UI.
+
+### Bundle confirmation (T107)
+
+Production build after Phase 8 (`pnpm --filter @keyboard-studio/studio build`):
+
+- **R31 criterion 1 holds.** The entry chunk (`index-Bh3_4H77.js`) has no kmc-ldml marker: `ERROR_SchemaValidationError` count 0, `keys-Latn-implied` count 0. The compiler is still reached only through a dynamic import.
+- **R31 criterion 2 holds.** `dist/assets` has exactly one `.wasm` (`wasm-host-CBnZIFrP.wasm`). The Playwright run (`ldml-compile-package`, `ldml-compile-trial`: 5 passed) compiled, built and packaged in the browser.
+- **The lazy chunks did not grow.** kmc-ldml (`main-Bhzqz2b3.js`) is 96.6 kB raw and 27.8 kB gzip, and the import-file chunk (`ldmlImportAssets-C8yEVfyx.js`) is 7.3 kB raw and 1.7 kB gzip: the same figures as R31. `run` and the KMX writer ship inside that same kmc-ldml chunk.
+- **The panel is not a chunk of its own.** `LdmlCompilePanel` is statically imported by `LdmlDownloadPanel`, so it sits in the entry chunk with the Output screen (entry now 10.19 MB raw, 2.38 MB gzip). No baseline build of the entry chunk exists, and the working tree holds other uncommitted work, so a diff against a pre-Phase 8 build was not made. The panel is one small component plus a download helper, and the compiler stays behind the click.
+
+### Manual SC-014 check (T106)
+
+Not done in this change. Install the `.kmp` built from a hardware-only corpus keyboard in Keyman for Windows, confirm that typing matches the KMN keyboard for the mapped rules, and record the Keyman version, keyboard and result here. T106 stays unchecked.

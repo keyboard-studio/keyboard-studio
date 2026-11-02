@@ -20,7 +20,28 @@ import { readEnvFlag } from "./envFlag.ts";
 import { _forceCrashForE2E } from "../components/CrashErrorBoundary.tsx";
 import { _setCrashSendStateForTest } from "../crash/send.ts";
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
-import { compileLdmlInBrowser, type KeymanCompileResult } from "@keyboard-studio/engine";
+import {
+  buildLdmlInBrowser,
+  buildLdmlKmp,
+  compareToKeymanGaps,
+  compileLdmlInBrowser,
+  renderCompileReport,
+  resolveLdmlProfile,
+  type KeymanCompileResult,
+  type LdmlClassification,
+  type LdmlProfileId,
+} from "@keyboard-studio/engine";
+
+/** What `packageLdml` reports: the same pipeline the Output page runs, on supplied export files. */
+export interface KsE2ELdmlPackage {
+  ok: boolean;
+  compilerVersion: string;
+  kmxPlusVersion: number;
+  expectedCodes: string[];
+  unexpectedCodes: string[];
+  kmpFilename: string | null;
+  kmpBytes: number[] | null;
+}
 
 /**
  * A whole VFS reduced to `path -> exact content`, for the byte-identity half of
@@ -49,6 +70,18 @@ export interface KsE2EHook {
    * trial). Lets the production-build trial spec drive the compile without a UI path.
    */
   compileLdml: (xml: string) => Promise<KeymanCompileResult>;
+  /**
+   * Compile an LDML export's files, split the errors against its Keyman-gap rows, and package the
+   * `.kmp` on a clean compile (spec 108 Story 5). `vite preview` has no keyboard picker corpus, so
+   * the production-build spec supplies the export files built in Node. Runs the same engine
+   * functions as `buildLdmlKmpForDownload`.
+   */
+  packageLdml: (
+    files: Readonly<Record<string, string>>,
+    keyboardId: string,
+    classification: LdmlClassification,
+    profileId: LdmlProfileId,
+  ) => Promise<KsE2ELdmlPackage>;
   /** The live working-copy IR (pre-carve-filter), or null before instantiation. */
   getWorkingIr: () => KeyboardIR | null;
   /** nodeIds currently marked deleted via the carve gallery. */
@@ -134,6 +167,33 @@ export function installE2eHook(): void {
   if (!isE2eEnabled()) return;
   window.__ksE2E__ = {
     compileLdml: (xml) => compileLdmlInBrowser(xml),
+    packageLdml: async (files, keyboardId, classification, profileId) => {
+      const map = new Map<string, string | Uint8Array>(Object.entries(files));
+      const xml = files[`source/${keyboardId}_ldml.xml`] ?? "";
+      const compiled = await buildLdmlInBrowser(xml);
+      const cmp = compareToKeymanGaps(compiled.messages, classification, resolveLdmlProfile(profileId));
+      const clean = compiled.ok && cmp.expected.length === 0 && cmp.unexpected.length === 0;
+      const kmp = clean
+        ? await buildLdmlKmp(map, keyboardId, compiled, {
+            compileReport: renderCompileReport({
+              compilerVersion: compiled.compilerVersion,
+              kmxPlusVersion: compiled.kmxPlusVersion,
+              expected: cmp.expected,
+              unexpected: cmp.unexpected,
+              warnings: cmp.warnings,
+            }),
+          })
+        : null;
+      return {
+        ok: compiled.ok,
+        compilerVersion: compiled.compilerVersion,
+        kmxPlusVersion: compiled.kmxPlusVersion,
+        expectedCodes: cmp.expected.map((e) => e.message.code),
+        unexpectedCodes: cmp.unexpected.map((m) => m.code),
+        kmpFilename: kmp?.ok === true ? kmp.filename : null,
+        kmpBytes: kmp?.ok === true ? Array.from(kmp.bytes) : null,
+      };
+    },
     getWorkingIr: () => useWorkingCopyStore.getState().ir,
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
     getDeletedItemIds: () => [...useWorkingCopyStore.getState().deletedItemIds],

@@ -13,7 +13,7 @@ const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "e2e",
-  testMatch: /ldml-compile-trial\.spec\.ts/,
+  testMatch: /ldml-compile-(trial|package)\.spec\.ts/,
   timeout: 240_000,
   workers: 1,
   reporter: "list",

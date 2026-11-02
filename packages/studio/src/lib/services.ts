@@ -218,7 +218,16 @@ export async function getBuildKmp(): Promise<BuildKmpFn> {
 // explicit download click and the classifier is reached through the owning step's validation cycle.
 type LdmlExports = Pick<
   EngineModule,
-  "buildLdmlExport" | "classifyForLdml" | "listLdmlProfiles" | "parseKmn" | "parseTouchLayout" | "parseKvks"
+  | "buildLdmlExport"
+  | "classifyForLdml"
+  | "listLdmlProfiles"
+  | "parseKmn"
+  | "parseTouchLayout"
+  | "parseKvks"
+  | "buildLdmlInBrowser"
+  | "buildLdmlKmp"
+  | "compareToKeymanGaps"
+  | "renderCompileReport"
 >;
 let ldmlCache: LdmlExports | null = null;
 async function ldmlEngine(what: string): Promise<LdmlExports> {
@@ -234,11 +243,29 @@ async function ldmlEngine(what: string): Promise<LdmlExports> {
     parseKmn: e.parseKmn,
     parseTouchLayout: e.parseTouchLayout,
     parseKvks: e.parseKvks,
+    buildLdmlInBrowser: e.buildLdmlInBrowser,
+    buildLdmlKmp: e.buildLdmlKmp,
+    compareToKeymanGaps: e.compareToKeymanGaps,
+    renderCompileReport: e.renderCompileReport,
   };
   return ldmlCache;
 }
 export async function getBuildLdmlExport(): Promise<EngineModule["buildLdmlExport"]> {
   return (await ldmlEngine("LDML export")).buildLdmlExport;
+}
+// Story 5: the compile check and the LDML package run only on the author's click. Each accessor is
+// a lazy engine import; none runs at module load (bundle-safety).
+export async function getCompileLdml(): Promise<EngineModule["buildLdmlInBrowser"]> {
+  return (await ldmlEngine("LDML compile")).buildLdmlInBrowser;
+}
+export async function getBuildLdmlKmp(): Promise<EngineModule["buildLdmlKmp"]> {
+  return (await ldmlEngine("LDML package")).buildLdmlKmp;
+}
+export async function getCompareToKeymanGaps(): Promise<EngineModule["compareToKeymanGaps"]> {
+  return (await ldmlEngine("LDML compile comparison")).compareToKeymanGaps;
+}
+export async function getRenderCompileReport(): Promise<EngineModule["renderCompileReport"]> {
+  return (await ldmlEngine("LDML compile report")).renderCompileReport;
 }
 export async function getClassifyForLdml(): Promise<EngineModule["classifyForLdml"]> {
   return (await ldmlEngine("LDML classification")).classifyForLdml;

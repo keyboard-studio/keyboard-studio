@@ -93,3 +93,34 @@ ${langs}
 </Package>
 `;
 }
+
+/** FR-074: the compiled package is desktop-only until Keyman loads LDML keyboards on web and mobile. */
+export const DESKTOP_ONLY_NOTE =
+  "Desktop only: Keyman loads LDML keyboards on desktop only, not yet on web or mobile.";
+
+/**
+ * Appends the desktop-only sentence to the descriptor's `<Description>` (adding one when the
+ * keyboard has none). Applied on the download path's clone only: the source export's descriptor is
+ * unchanged (FR-030, FR-076).
+ */
+export function markKpsDesktopOnly(kps: string): string {
+  const existing = /(<Description URL="[^"]*">)([^<]*)(<\/Description>)/.exec(kps);
+  if (existing !== null) {
+    const [whole, open, text, close] = existing as unknown as [string, string, string, string];
+    return kps.replace(whole, `${open}${text} ${esc(DESKTOP_ONLY_NOTE)}${close}`);
+  }
+  const anchor = '    <Version URL="">';
+  if (!kps.includes(anchor)) throw new Error("LDML descriptor has no <Info> version line");
+  return kps.replace(anchor, () => `    <Description URL="">${esc(DESKTOP_ONLY_NOTE)}</Description>\n${anchor}`);
+}
+
+/**
+ * Adds one documentation member (a file the package carries beside the keyboard) to a rendered
+ * descriptor, after the last `<File>`. Used on the download path's clone only (FR-076).
+ */
+export function addKpsFile(kps: string, name: string, type: string): string {
+  const marker = "\n  </Files>";
+  const at = kps.indexOf(marker);
+  if (at < 0) throw new Error("LDML descriptor has no <Files> list");
+  return `${kps.slice(0, at)}\n${file(name, type)}${kps.slice(at)}`;
+}

@@ -10,6 +10,8 @@ import type { ProvenanceRecord } from "./lower/provenance.js";
 import { provenanceCounts } from "./lower/provenance.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
 import type { TargetProfile } from "./profiles/types.js";
+import type { ExpectedKeymanError } from "./compile/compareToKeymanGaps.js";
+import type { KeymanMessage } from "./compile/loadLdmlCompiler.js";
 import type { CompatibilityItem, LdmlBaseLayoutSource, LdmlClassification } from "./types.js";
 
 export interface ReportContext {
@@ -149,6 +151,58 @@ export function renderReport(c: LdmlClassification, profile: TargetProfile, ctx:
       for (const d of moved) out.push(`| ${d.id} | ${base.rows.get(d.id)?.status ?? ""} | ${d.status ?? ""} |`);
       out.push("");
     }
+  }
+  return out.join("\n");
+}
+
+export interface CompileReportInput {
+  /** The pinned `@keymanapp/kmc-ldml` version (FR-075). */
+  compilerVersion: string;
+  /** The file version the compiler wrote into the `.kmx` header; 0 when none. */
+  kmxPlusVersion: number;
+  expected: readonly ExpectedKeymanError[];
+  unexpected: readonly KeymanMessage[];
+  warnings: readonly KeymanMessage[];
+}
+
+/** `0x1100` is KMX file version 17.0: major in the high byte, minor in the low byte. */
+function kmxVersionText(v: number): string {
+  return v === 0 ? "unknown" : `${v >> 8}.${v & 0xff} (0x${v.toString(16).padStart(4, "0")})`;
+}
+
+function messageLine(m: KeymanMessage): string {
+  return `- ${m.code}${m.line === undefined ? "" : ` (line ${m.line})`}: ${m.text.replace(/\r?\n/g, " ")}`;
+}
+
+/**
+ * LDML-COMPILE-REPORT.md (FR-072, FR-075): what Keyman's own compiler said about the export, with
+ * the two versions that produced the `.kmx`. It ships in the `.kmp` download only; the source
+ * export's `LDML-EXPORT-REPORT.md` is unchanged (FR-030). Always English, no timestamp.
+ */
+export function renderCompileReport(i: CompileReportInput): string {
+  const out: string[] = ["# LDML compile report", ""];
+  out.push(`- Compiler: Keyman kmc-ldml ${i.compilerVersion}.`);
+  out.push(`- KMX+ file version written by the compiler: ${kmxVersionText(i.kmxPlusVersion)}.`);
+  out.push("- Delivery: this package is desktop-only until Keyman can load LDML keyboards on web and mobile.", "");
+
+  out.push("## Known Keyman limitations", "");
+  if (i.expected.length === 0) out.push("None.", "");
+  else {
+    for (const e of i.expected) out.push(`- Row ${e.row.id} (${e.row.form}): ${messageLine(e.message).slice(2)}`);
+    out.push("");
+  }
+  out.push("## Exporter defects", "");
+  if (i.unexpected.length === 0) out.push("None.", "");
+  else {
+    out.push("Keyman raised these errors and no known Keyman limitation accounts for them. They are exporter defects.", "");
+    for (const m of i.unexpected) out.push(messageLine(m));
+    out.push("");
+  }
+  out.push("## Warnings and hints", "");
+  if (i.warnings.length === 0) out.push("None.", "");
+  else {
+    for (const m of i.warnings) out.push(messageLine(m));
+    out.push("");
   }
   return out.join("\n");
 }

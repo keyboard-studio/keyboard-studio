@@ -21,11 +21,34 @@ export interface KeymanCompileResult {
   ok: boolean;
 }
 
+export interface KeymanBuildResult {
+  messages: KeymanMessage[];
+  /** True only when the compile produced bytes and raised no error or fatal message. */
+  ok: boolean;
+  /** The compiled KMX+ keyboard; absent unless `ok`. */
+  kmx?: Uint8Array | undefined;
+  /** The compiled visual keyboard; absent unless `ok`. */
+  kvk?: Uint8Array | undefined;
+  /** The pinned `@keymanapp/kmc-ldml` version that compiled this document. */
+  compilerVersion: string;
+  /** The file version Keyman wrote into the produced `.kmx` header (`dwFileVersion`); 0 when none. */
+  kmxPlusVersion: number;
+}
+
 interface LdmlCompilerLike {
   init(callbacks: CompilerCallbacks, options: never): Promise<boolean>;
   load(name: string): unknown;
   validate(source: never): Promise<boolean>;
+  run(inputFilename: string): Promise<{
+    artifacts: { kmx?: { data: Uint8Array } | null; kvk?: { data: Uint8Array } | null };
+  } | null>;
 }
+
+/**
+ * The version of the pinned `@keymanapp/kmc-ldml`. The package's `exports` map exposes no
+ * `package.json`, so the value is kept here and a test compares it with the installed package.
+ */
+const COMPILER_VERSION = "19.0.240-alpha";
 
 interface LoadedCompiler {
   Compiler: new () => LdmlCompilerLike;
@@ -116,43 +139,39 @@ function joinPaths(base: string, name: string): string {
   return `${base.replace(/[/\\]+$/, "")}/${name}`;
 }
 
-/**
- * Compile an LDML keyboard document with the pinned kmc-ldml: init, load (which schema-checks),
- * validate. Message codes use the same names as the CI harness (`__testing__/keymanCompile.ts`).
- */
-export async function compileLdmlInBrowser(xml: string): Promise<KeymanCompileResult> {
-  await initLdmlCompiler();
-  const { Compiler, nameOf, severityOf, imports } = _loaded as LoadedCompiler;
-  const messages: KeymanMessage[] = [];
+const pathApi = {
+  dirname: (n: string) => n.replace(/[/\\][^/\\]*$/, ""),
+  extname: (n: string) => /\.[^./\\]*$/.exec(n)?.[0] ?? "",
+  basename: (n: string, ext?: string) => {
+    const b = n.replace(/^.*[/\\]/, "");
+    return ext !== undefined && b.endsWith(ext) ? b.slice(0, -ext.length) : b;
+  },
+  join: (...parts: string[]) => parts.join("/"),
+  normalize: (n: string) => n,
+  isAbsolute: (n: string) => /^([/\\]|[A-Za-z]:)/.test(n),
+  relative: (_from: string, to: string) => to,
+  resolve: (...parts: string[]) => parts.join("/"),
+};
+
+/** In-memory callbacks: the one document, plus the bundled import files. Nothing touches a disk. */
+function makeCallbacks(
+  xml: string,
+  loaded: LoadedCompiler,
+  report: (m: KeymanMessage) => void,
+): CompilerCallbacks {
   const encoder = new TextEncoder();
   const encoded = encoder.encode(xml);
-
-  const pathApi = {
-    dirname: (n: string) => n.replace(/[/\\][^/\\]*$/, ""),
-    extname: (n: string) => /\.[^./\\]*$/.exec(n)?.[0] ?? "",
-    basename: (n: string, ext?: string) => {
-      const b = n.replace(/^.*[/\\]/, "");
-      return ext !== undefined && b.endsWith(ext) ? b.slice(0, -ext.length) : b;
-    },
-    join: (...parts: string[]) => parts.join("/"),
-    normalize: (n: string) => n,
-    isAbsolute: (n: string) => /^([/\\]|[A-Za-z]:)/.test(n),
-    relative: (_from: string, to: string) => to,
-    resolve: (...parts: string[]) => parts.join("/"),
-  };
-
   const loadFile = (filename: string): Uint8Array | undefined => {
     if (filename === SOURCE_NAME) return encoded;
     const normalized = filename.replace(/\\/g, "/");
     const dir = `${IMPORTS_PREFIX}/46/`;
     if (normalized.startsWith(dir)) {
-      const text = imports[normalized.slice(dir.length)];
+      const text = loaded.imports[normalized.slice(dir.length)];
       return text === undefined ? undefined : encoder.encode(text);
     }
     return undefined;
   };
-
-  const callbacks = {
+  return {
     loadFile,
     fileSize: (f: string) => loadFile(f)?.length,
     isDirectory: () => false,
@@ -167,19 +186,74 @@ export async function compileLdmlInBrowser(xml: string): Promise<KeymanCompileRe
     net: {},
     resolveFilename: joinPaths,
     reportMessage: (event: CompilerEvent) => {
-      messages.push({ code: nameOf(event.code), severity: severityOf(event.code), text: event.message, line: event.line });
+      report({ code: loaded.nameOf(event.code), severity: loaded.severityOf(event.code), text: event.message, line: event.line });
     },
     debug: () => undefined,
     fileURLToPath: (u: string | URL) => String(u),
   } as unknown as CompilerCallbacks;
+}
 
-  const compiler = new Compiler();
-  const initOk = await compiler.init(callbacks, {
-    readerOptions: { cldrImportsPath: IMPORTS_PREFIX, localImportsPaths: [] },
-  } as never);
+const COMPILER_OPTIONS = { readerOptions: { cldrImportsPath: IMPORTS_PREFIX, localImportsPaths: [] } } as never;
+
+/**
+ * Compile an LDML keyboard document with the pinned kmc-ldml: init, load (which schema-checks),
+ * validate. Message codes use the same names as the CI harness (`__testing__/keymanCompile.ts`).
+ */
+export async function compileLdmlInBrowser(xml: string): Promise<KeymanCompileResult> {
+  await initLdmlCompiler();
+  const loaded = _loaded as LoadedCompiler;
+  const messages: KeymanMessage[] = [];
+  const compiler = new loaded.Compiler();
+  const initOk = await compiler.init(makeCallbacks(xml, loaded, (m) => messages.push(m)), COMPILER_OPTIONS);
   if (!initOk) return { messages, ok: false };
   const source = compiler.load(SOURCE_NAME);
   if (source === null) return { messages, ok: false };
   const valid = await compiler.validate(source as never);
   return { messages, ok: valid };
+}
+
+/** `dwFileVersion` of a compiled KMX: the little-endian u32 after the `KXTS` identifier. */
+function readKmxFileVersion(kmx: Uint8Array): number {
+  if (kmx.byteLength < 8) return 0;
+  return new DataView(kmx.buffer, kmx.byteOffset, kmx.byteLength).getUint32(4, true);
+}
+
+/**
+ * Compile and build: the same init, load and validate as {@link compileLdmlInBrowser}, then the
+ * pinned compiler's own `run`, which returns the `.kmx` and `.kvk` (FR-071). This module writes no
+ * KMX+ bytes. `run` loads and compiles the document again, so a message is kept once however many
+ * passes raised it. The KMX+ version is read from the produced header; the compiler version is the
+ * pinned package's. Neither is a parameter (FR-075).
+ */
+export async function buildLdmlInBrowser(xml: string): Promise<KeymanBuildResult> {
+  await initLdmlCompiler();
+  const loaded = _loaded as LoadedCompiler;
+  const messages: KeymanMessage[] = [];
+  const seen = new Set<string>();
+  const report = (m: KeymanMessage): void => {
+    const key = `${m.code}|${m.line ?? ""}|${m.text}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    messages.push(m);
+  };
+  const failed = (): KeymanBuildResult => ({ messages, ok: false, compilerVersion: COMPILER_VERSION, kmxPlusVersion: 0 });
+
+  const compiler = new loaded.Compiler();
+  if (!(await compiler.init(makeCallbacks(xml, loaded, report), COMPILER_OPTIONS))) return failed();
+  const source = compiler.load(SOURCE_NAME);
+  if (source === null) return failed();
+  if (!(await compiler.validate(source as never))) return failed();
+  const result = await compiler.run(SOURCE_NAME);
+  const kmx = result?.artifacts.kmx?.data;
+  if (result === null || kmx === undefined || messages.some((m) => m.severity === "error" || m.severity === "fatal")) {
+    return failed();
+  }
+  return {
+    messages,
+    ok: true,
+    kmx,
+    kvk: result.artifacts.kvk?.data,
+    compilerVersion: COMPILER_VERSION,
+    kmxPlusVersion: readKmxFileVersion(kmx),
+  };
 }

@@ -26,8 +26,20 @@
 
 import type { CompilerDiagnostic, VirtualFS } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput, zipProjectedVfs, type ProjectForOutputOptions } from "./serializeWorkingCopy.ts";
-import type { LdmlProfileId } from "@keyboard-studio/engine";
-import { getBuildKmp, getBuildLdmlExport, getCompile, getParseKmn, getParseKvks, getParseTouchLayout } from "./services.ts";
+import type { KeymanGapComparison, KeymanMessage, LdmlExportInput, LdmlProfileId } from "@keyboard-studio/engine";
+import {
+  getBuildKmp,
+  getBuildLdmlExport,
+  getBuildLdmlKmp,
+  getCompareToKeymanGaps,
+  getCompile,
+  getCompileLdml,
+  getListLdmlProfiles,
+  getParseKmn,
+  getParseKvks,
+  getParseTouchLayout,
+  getRenderCompileReport,
+} from "./services.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getLayoutFamilyAnswer, getPickedWindowsLayouts } from "./layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "./ldmlBaseLayout.ts";
@@ -251,6 +263,19 @@ export function targetsIncludeTouch(targets: readonly string[]): boolean {
  * ANSI-only keyboard, which the LDML path refuses.
  */
 export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Promise<DownloadResult> {
+  const { input, warnings } = await resolveLdmlExportInput(profileId);
+  const result = await (await getBuildLdmlExport())(input);
+  if (!result.ok) throw new OutputBundleError(ANSI_ONLY_MESSAGE);
+  return { bytes: result.zip, filename: result.filename, warnings };
+}
+
+const ANSI_ONLY_MESSAGE =
+  "This keyboard is ANSI-only (begin ANSI with no begin Unicode), and LDML has no ANSI mode. Convert it to Unicode before exporting.";
+
+/** The projection, parsed and resolved into the exporter's input; shared by both LDML downloads. */
+async function resolveLdmlExportInput(
+  profileId: LdmlProfileId,
+): Promise<{ input: LdmlExportInput; warnings: string[] }> {
   const projected = await projectWorkingCopyForOutput();
   if (projected === null) {
     throw new OutputBundleError("Nothing to export: select a keyboard first.");
@@ -292,8 +317,7 @@ export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Prom
     );
   }
 
-  const buildLdmlExport = await getBuildLdmlExport();
-  const result = await buildLdmlExport({
+  const input: LdmlExportInput = {
     ir,
     touchLayout,
     visualKeyboard,
@@ -303,12 +327,66 @@ export async function buildLdmlExportForDownload(profileId: LdmlProfileId): Prom
     metadata,
     packageFiles: collectLdmlPackageFiles(vfs, keyboardId),
     studioVersion: LDML_STUDIO_VERSION,
-  });
+  };
+  return { input, warnings: [...projected.warnings] };
+}
 
-  if (!result.ok) {
+export interface LdmlCompileOutcome {
+  /** Errors a present Keyman-gap row accounts for (known Keyman limitations). */
+  expected: KeymanGapComparison["expected"];
+  /** Errors nothing accounts for: exporter defects, with the compiler's message. */
+  unexpected: KeymanMessage[];
+  warnings: KeymanMessage[];
+  versions: { compiler: string; kmxPlus: number };
+}
+
+/**
+ * Compile the LDML export with Keyman's own compiler and, only on a clean compile, package it as
+ * `<id>_ldml.kmp` (spec 108 Story 5, FR-072, FR-074, FR-076). Runs once per author click and has
+ * no timer. The export is built from the same projection as {@link buildLdmlExportForDownload};
+ * compiled artifacts are staged only on clones inside the engine, so the shared projection (read by
+ * the source .zip and the pull-request paths) never carries them.
+ *
+ * Throws {@link OutputBundleError} for the source export's preconditions and for a profile whose
+ * `keymanCompilable` is false.
+ */
+export async function buildLdmlKmpForDownload(
+  profileId: LdmlProfileId,
+): Promise<{ compile: LdmlCompileOutcome; kmp?: DownloadResult }> {
+  const profile = (await getListLdmlProfiles())().find((p) => p.id === profileId);
+  if (profile === undefined || !profile.keymanCompilable) {
     throw new OutputBundleError(
-      "This keyboard is ANSI-only (begin ANSI with no begin Unicode), and LDML has no ANSI mode. Convert it to Unicode before exporting.",
+      `LDML ${profileId} is TR35-only (awaiting Keyman): Keyman's compiler does not accept it yet, so there is nothing to check or package.`,
     );
   }
-  return { bytes: result.zip, filename: result.filename, warnings: [...projected.warnings] };
+  const { input, warnings } = await resolveLdmlExportInput(profileId);
+  const exported = await (await getBuildLdmlExport())(input);
+  if (!exported.ok) throw new OutputBundleError(ANSI_ONLY_MESSAGE);
+
+  const xml = exported.files.get(`source/${input.metadata.projectId}.xml`);
+  if (typeof xml !== "string") throw new OutputBundleError("The LDML export has no keyboard document to compile.");
+  const compiled = await (await getCompileLdml())(xml);
+  const comparison = (await getCompareToKeymanGaps())(compiled.messages, exported.classification, profile);
+  const unexpected = [...comparison.unexpected];
+  if (!compiled.ok && comparison.expected.length === 0 && unexpected.length === 0) {
+    unexpected.push({ code: "COMPILE_FAILED", severity: "error", text: "The compiler did not produce a keyboard." });
+  }
+  const compile: LdmlCompileOutcome = {
+    expected: comparison.expected,
+    unexpected,
+    warnings: comparison.warnings,
+    versions: { compiler: compiled.compilerVersion, kmxPlus: compiled.kmxPlusVersion },
+  };
+  if (!compiled.ok || comparison.expected.length > 0 || unexpected.length > 0) return { compile };
+
+  const compileReport = (await getRenderCompileReport())({
+    compilerVersion: compiled.compilerVersion,
+    kmxPlusVersion: compiled.kmxPlusVersion,
+    expected: comparison.expected,
+    unexpected,
+    warnings: comparison.warnings,
+  });
+  const kmp = await (await getBuildLdmlKmp())(exported.files, input.keyboardId, compiled, { compileReport });
+  if (!kmp.ok) throw new OutputBundleError(kmp.reason);
+  return { compile, kmp: { bytes: kmp.bytes, filename: kmp.filename, warnings } };
 }

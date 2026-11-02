@@ -3,6 +3,8 @@
 // @vitest-environment node
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { unzipSync, strFromU8 } from "fflate";
 import { i18n } from "@lingui/core";
 import type { VirtualFS, StartKeyboard } from "@keyboard-studio/contracts";
@@ -19,6 +21,8 @@ const spies = vi.hoisted(() => ({
   buildKmp: vi.fn(),
   validateWithOracle: vi.fn(),
   projected: { current: null as VirtualFS | null },
+  compileLdml: vi.fn(),
+  compileOverride: { current: null as null | ((xml: string) => Promise<unknown>) },
 }));
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
@@ -37,6 +41,11 @@ vi.mock("./services.ts", async (importOriginal) => {
         diagnostics: [],
         artifacts: [{ filename: "ldml_fixture.kmx", data: new Uint8Array([1, 2, 3]) }],
       });
+    },
+    getCompileLdml: async () => {
+      spies.compileLdml();
+      const override = spies.compileOverride.current;
+      return override ?? (await actual.getCompileLdml());
     },
     getBuildKmp: async () => async (vfs: VirtualFS) => {
       spies.buildKmp([...vfs.list()]);
@@ -60,6 +69,7 @@ vi.mock("./serializeWorkingCopy.ts", async (importOriginal) => {
 import {
   buildKmpForDownload,
   buildLdmlExportForDownload,
+  buildLdmlKmpForDownload,
   buildSourceZipForDownload,
   targetsIncludeTouch,
   OutputBundleError,
@@ -114,6 +124,8 @@ beforeEach(() => {
   spies.buildKmp.mockClear();
   spies.validateWithOracle.mockClear();
   spies.projected.current = null;
+  spies.compileLdml.mockClear();
+  spies.compileOverride.current = null;
   i18n.activate("en");
 });
 
@@ -230,5 +242,70 @@ describe("the other outputs never carry LDML (FR-002, Art VII)", () => {
     expect(paths.filter((n) => KEYBOARD_XML.test(n))).toEqual([]);
     expect(paths).not.toContain("LDML-EXPORT-REPORT.md");
     expect(paths.some((n) => n.includes("_ldml"))).toBe(false);
+  });
+});
+
+describe("buildLdmlKmpForDownload (spec 108 Story 5, FR-072, FR-074, FR-076)", () => {
+  it("compiles a clean export and returns <id>_ldml.kmp with the versions", async () => {
+    instantiate();
+    const result = await buildLdmlKmpForDownload("46");
+    expect(spies.compileLdml).toHaveBeenCalledTimes(1);
+    expect(result.compile.unexpected).toEqual([]);
+    expect(result.compile.expected).toEqual([]);
+    expect(result.compile.versions.compiler).not.toBe("");
+    expect(result.compile.versions.kmxPlus).toBeGreaterThan(0);
+    expect(result.kmp?.filename).toBe("ldml_fixture_ldml.kmp");
+    const members = Object.keys(unzipSync(result.kmp!.bytes));
+    expect(members).toEqual(expect.arrayContaining(["ldml_fixture_ldml.kmx", "kmp.json", "LDML-COMPILE-REPORT.md"]));
+  });
+
+  it("stages nothing into the projection the source .zip and the PR path read", async () => {
+    instantiate();
+    const zipBefore = Object.keys(unzipSync((await buildSourceZipForDownload())!.bytes)).sort();
+    await buildLdmlKmpForDownload("46");
+    const during = spies.projected.current!;
+    const before = snapshot(during);
+    const projected = await projectWorkingCopyForOutput();
+    const paths = projected!.vfs.list();
+    expect(paths.some((p) => p.startsWith("build/") || p.endsWith(".kmp") || p.endsWith(".kmx"))).toBe(false);
+    expect(paths.some((p) => p.includes("_ldml"))).toBe(false);
+    expect(snapshot(during)).toBe(before);
+    const zipAfter = Object.keys(unzipSync((await buildSourceZipForDownload())!.bytes)).sort();
+    expect(zipAfter).toEqual(zipBefore);
+  });
+
+  it("returns no package and keeps the messages when the compile has an error", async () => {
+    instantiate();
+    spies.compileOverride.current = async () => ({
+      ok: false,
+      messages: [{ code: "ERROR_Surprise", severity: "error", text: "bad thing", line: 3 }],
+      compilerVersion: "x",
+      kmxPlusVersion: 0,
+    });
+    const result = await buildLdmlKmpForDownload("46");
+    expect(result.kmp).toBeUndefined();
+    expect(result.compile.unexpected.map((m) => m.code)).toEqual(["ERROR_Surprise"]);
+    expect(result.compile.unexpected[0]?.text).toBe("bad thing");
+  });
+
+  it("refuses a profile Keyman's schema does not accept, before compiling", async () => {
+    instantiate();
+    await expect(buildLdmlKmpForDownload("49")).rejects.toThrow(OutputBundleError);
+    await expect(buildLdmlKmpForDownload("49")).rejects.toThrow(/TR35-only/);
+    expect(spies.compileLdml).not.toHaveBeenCalled();
+  });
+
+  it("throws for the same preconditions as the source export", async () => {
+    await expect(buildLdmlKmpForDownload("46")).rejects.toThrow(OutputBundleError);
+    useWorkingCopyStore.getState().reset();
+    instantiate(KMN.replace("begin Unicode", "begin ANSI"));
+    await expect(buildLdmlKmpForDownload("46")).rejects.toThrow(/ANSI-only/);
+  });
+
+  it("creates no timer: the compiled path is event-driven (D3)", () => {
+    const src = readFileSync(fileURLToPath(new URL("./buildOutputBundle.ts", import.meta.url)), "utf8");
+    const at = src.indexOf("export async function buildLdmlKmpForDownload");
+    expect(at).toBeGreaterThan(0);
+    expect(src.slice(at)).not.toMatch(/setTimeout|setInterval/);
   });
 });

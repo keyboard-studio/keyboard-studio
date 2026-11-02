@@ -712,11 +712,139 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T06:04:53.008Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:37:59.058Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:37:59.369Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T093",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:37:59.669Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:37:59.965Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:00.296Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:00.599Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:00.914Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T098",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:01.235Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T099",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:01.545Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T100",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:01.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T101",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:02.138Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T102",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:02.440Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T103",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:02.748Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T104",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:03.055Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T105",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:03.354Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T107",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T06:38:03.664Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T083",
+  "currentTask": "T107",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1406,6 +1534,128 @@
         "specs/108-ldml-export/plan.md",
         "specs/108-ldml-export/tasks.md"
       ]
+    },
+    "T091": {
+      "status": "DONE",
+      "did": "compareToKeymanGaps tests (hand-built K-row profile; expected/unexpected/warnings)",
+      "files": [
+        "packages/engine/src/ldml-export/compile/compareToKeymanGaps.test.ts"
+      ]
+    },
+    "T092": {
+      "status": "DONE",
+      "did": "buildLdmlInBrowser tests: bytes, versions, invalid doc, sticky load, dedupe, no KMX writer in product source",
+      "files": [
+        "packages/engine/src/ldml-export/compile/loadLdmlCompiler.test.ts"
+      ]
+    },
+    "T093": {
+      "status": "DONE",
+      "did": "buildLdmlKmp tests: members, package id, clone staging, error gating, desktop-only text",
+      "files": [
+        "packages/engine/src/ldml-export/compile/buildLdmlKmp.test.ts"
+      ]
+    },
+    "T094": {
+      "status": "DONE",
+      "did": "compareToKeymanGaps implemented and exported from both barrels",
+      "files": [
+        "packages/engine/src/ldml-export/compile/compareToKeymanGaps.ts",
+        "packages/engine/src/ldml-export/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "buildLdmlInBrowser: validate then run, deduped messages, KMX header version, pinned compiler version",
+      "files": [
+        "packages/engine/src/ldml-export/compile/loadLdmlCompiler.ts"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "buildLdmlKmp via buildKmp on a clone; desktop-only Description and compile report member added on the clone",
+      "files": [
+        "packages/engine/src/ldml-export/compile/buildLdmlKmp.ts",
+        "packages/engine/src/ldml-export/project/kps.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "renderCompileReport with versions, known limitations, exporter defects, warnings; report tests",
+      "files": [
+        "packages/engine/src/ldml-export/report.ts",
+        "packages/engine/src/ldml-export/report.test.ts"
+      ]
+    },
+    "T098": {
+      "status": "DONE",
+      "did": "buildLdmlKmpForDownload tests and LdmlCompilePanel tests incl. D3 source guard",
+      "files": [
+        "packages/studio/src/lib/buildOutputBundle.test.ts",
+        "packages/studio/src/components/output/LdmlCompilePanel.test.tsx"
+      ]
+    },
+    "T099": {
+      "status": "DONE",
+      "did": "services: getCompileLdml, getBuildLdmlKmp, getCompareToKeymanGaps, getRenderCompileReport (lazy)",
+      "files": [
+        "packages/studio/src/lib/services.ts"
+      ]
+    },
+    "T100": {
+      "status": "DONE",
+      "did": "buildLdmlKmpForDownload with shared input resolution; refuses non-compilable profiles",
+      "files": [
+        "packages/studio/src/lib/buildOutputBundle.ts"
+      ]
+    },
+    "T101": {
+      "status": "DONE",
+      "did": "LdmlCompilePanel mounted in LdmlDownloadPanel; click-only compile, live result region, disabled-with-reason",
+      "files": [
+        "packages/studio/src/components/output/LdmlCompilePanel.tsx",
+        "packages/studio/src/components/output/LdmlDownloadPanel.tsx"
+      ]
+    },
+    "T102": {
+      "status": "DONE",
+      "did": "output.download.ldml.compile.* ids in en and fr; i18n-catalog-lint passes",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T103": {
+      "status": "DONE",
+      "did": "e2e seam packageLdml added to window.__ksE2E__",
+      "files": [
+        "packages/studio/src/lib/e2eHook.ts"
+      ]
+    },
+    "T104": {
+      "status": "DONE",
+      "did": "Playwright ldml-compile-package against production build (3 passed); trial config and default-config ignore updated",
+      "files": [
+        "packages/studio/e2e/ldml-compile-package.spec.ts",
+        "packages/studio/playwright.trial.config.ts",
+        "packages/studio/playwright.config.ts"
+      ]
+    },
+    "T105": {
+      "status": "DONE",
+      "did": "SC-013 in-browser vs H1 compile and K-row split added to compile.corpus.test.ts; corpus config green",
+      "files": [
+        "packages/engine/src/ldml-export/compile.corpus.test.ts"
+      ]
+    },
+    "T107": {
+      "status": "DONE",
+      "did": "Bundle confirmed after Phase 8; recorded in research.md R33",
+      "files": [
+        "specs/108-ldml-export/research.md"
+      ]
     }
   },
   "concerns": [
@@ -1420,9 +1670,13 @@
     {
       "note": "useKeyboardArtifact contextTolerance/startDocs beforeEach exceeds the 10s default hookTimeout under load; pre-existing, not fixed here",
       "step": "implement"
+    },
+    {
+      "note": "T106 manual SC-014 Keyman for Windows install check not done (unverifiable here); left unchecked. studio useKeyboardArtifact.contextTolerance beforeEach hits the 10s hook timeout on cold store import (passes with --hookTimeout=60000); not in phase files, baseline not compared. api/bundle-safety.test.ts not run.",
+      "step": "implement"
     }
   ],
-  "last_action": "Phase 7 T079-T082 done; verdict PASS recorded in R31",
+  "last_action": "phase 8 T091-T105,T107 done; T106 manual",
   "decisions": [
     {
       "decision": "CLDR 46 import XML shipped as TS string constants behind a dynamic import",
@@ -1458,6 +1712,26 @@
       "warnings": [
         "the 3 timeouts reproduce identically with the phase changes stashed (alternating runs), and pass with --hookTimeout=120000: pre-existing load-sensitive flake"
       ]
+    },
+    {
+      "what": "engine ldml-export+output suites",
+      "command": "vitest run src/ldml-export src/output (engine)",
+      "result": "542 passed"
+    },
+    {
+      "what": "engine corpus config ldml-export",
+      "command": "vitest corpus config",
+      "result": "73 passed, no skip"
+    },
+    {
+      "what": "playwright ldml-compile-package + trial, production build",
+      "command": "playwright test -c playwright.trial.config.ts",
+      "result": "5 passed"
+    },
+    {
+      "what": "typecheck, lint, i18n-catalog-lint",
+      "command": "pnpm typecheck; pnpm lint; pnpm run i18n-catalog-lint",
+      "result": "green"
     }
   ],
   "step_summaries": {

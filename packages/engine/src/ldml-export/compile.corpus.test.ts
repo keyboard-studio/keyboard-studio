@@ -12,6 +12,8 @@ import { corpusAvailable, corpusExportInput, KEYBOARDS_ROOT } from "./__testing_
 import { errorCodes, keymanCompile } from "./__testing__/keymanCompile.js";
 import { tr35Conformance } from "./__testing__/tr35Conformance.js";
 import { validateAgainstCldr } from "./__testing__/xsdValidate.js";
+import { compareToKeymanGaps } from "./compile/compareToKeymanGaps.js";
+import { compileLdmlInBrowser } from "./compile/loadLdmlCompiler.js";
 import { buildLdmlExport } from "./package.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
 
@@ -59,6 +61,18 @@ for (const entry of CORPUS) {
           const expected = expectedKeymanCodes("46", result.classification.items);
           if (JSON.stringify(codes) !== JSON.stringify(expected)) failures.push(`keyman: ${codes.join(",")} (expected ${expected.join(",")})`);
           if (k.messages.some((m) => m.code.includes("StringDenorm"))) failures.push("keyman: WARN_StringDenorm");
+          // SC-013: the in-browser compile equals the H1 compile, message for message, and the
+          // K-row comparison puts every error in `expected`. (Profile 46's K rows list no Keyman
+          // codes today, so a clean corpus keyboard has none to place: this holds the invariant
+          // that no unexplained error exists, and starts to exercise the split once a code is listed.)
+          const browser = await compileLdmlInBrowser(xml);
+          const key = (ms: readonly { code: string; severity: string; text: string; line?: number | undefined }[]) =>
+            ms.map((m) => `${m.code}|${m.severity}|${m.line ?? ""}|${m.text}`).sort();
+          if (browser.ok !== k.ok) failures.push(`browser: ok ${browser.ok} vs H1 ${k.ok}`);
+          if (JSON.stringify(key(browser.messages)) !== JSON.stringify(key(k.messages))) failures.push("browser: messages differ from H1");
+          const split = compareToKeymanGaps(browser.messages, result.classification, resolveLdmlProfile("46"));
+          if (split.unexpected.length > 0) failures.push(`unexpected: ${split.unexpected.map((m) => m.code).join(",")}`);
+          if (split.expected.map((e) => e.message.code).sort().join(",") !== expected.join(",")) failures.push("split: expected set differs from the K rows");
         }
         console.info(failures.length === 0 ? `[OK] ${entry.id} ${profileId}` : `[FAIL] ${entry.id} ${profileId} ${failures.join("; ")}`);
         expect(failures).toEqual([]);

@@ -4,7 +4,7 @@ import { classifyDetailed } from "./classify/classify.js";
 import { lowerDocument } from "./lower/document.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
 import { key, layout, platform } from "./__fixtures__/touchLayouts.js";
-import { renderReport, type ReportContext } from "./report.js";
+import { renderCompileReport, renderReport, type ReportContext } from "./report.js";
 
 const CTX: ReportContext = { keyboardName: "Plain", keyboardId: "plain", version: "1.0", mnemonic: false, provenance: null };
 
@@ -139,5 +139,45 @@ describe("LDML-EXPORT-REPORT.md (contracts/export-package.md)", () => {
     expect(touchSection).toContain("KM_LINT_LDML_TOUCH_SPECIAL_KEY");
     expect(text.match(/ready for Keyman's touch pipeline/g)).toHaveLength(1);
     expect(text.match(/touch pipeline/g)).toHaveLength(1);
+  });
+});
+
+describe("LDML-COMPILE-REPORT.md (FR-072, FR-075)", () => {
+  const row = resolveLdmlProfile("46").rows.get("5.15")!;
+  const base = { compilerVersion: "19.0.240-alpha", kmxPlusVersion: 0x1100, expected: [], unexpected: [], warnings: [] };
+
+  it("names the compiler version and the KMX+ file version", () => {
+    const text = renderCompileReport(base);
+    expect(text).toContain("kmc-ldml 19.0.240-alpha");
+    expect(text).toContain("17.0 (0x1100)");
+    expect(text).toContain("desktop-only");
+  });
+
+  it("lists expected errors under their rows as known Keyman limitations", () => {
+    const text = renderCompileReport({
+      ...base,
+      expected: [{ message: { code: "ERROR_TouchGap", severity: "error", text: "touch is not supported", line: 4 }, row }],
+    });
+    const known = text.slice(text.indexOf("## Known Keyman limitations"), text.indexOf("## Exporter defects"));
+    expect(known).toContain("Row 5.15");
+    expect(known).toContain("ERROR_TouchGap (line 4): touch is not supported");
+    expect(text.slice(text.indexOf("## Exporter defects"))).toContain("None.");
+  });
+
+  it("labels unexpected errors as exporter defects with the compiler text", () => {
+    const text = renderCompileReport({
+      ...base,
+      unexpected: [{ code: "ERROR_Surprise", severity: "error", text: "bad thing" }],
+      warnings: [{ code: "HINT_Y", severity: "hint", text: "consider" }],
+    });
+    const defects = text.slice(text.indexOf("## Exporter defects"), text.indexOf("## Warnings"));
+    expect(defects).toContain("exporter defects");
+    expect(defects).toContain("ERROR_Surprise: bad thing");
+    expect(text.slice(text.indexOf("## Warnings"))).toContain("HINT_Y: consider");
+  });
+
+  it("is deterministic and leaves the source export's report unchanged", async () => {
+    expect(renderCompileReport(base)).toBe(renderCompileReport(base));
+    expect(await reportOf("plain.kmn")).not.toContain("kmc-ldml");
   });
 });
