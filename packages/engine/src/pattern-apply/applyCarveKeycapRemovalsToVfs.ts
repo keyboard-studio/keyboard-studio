@@ -478,7 +478,7 @@ function touchKeycapHelpers(ctx: TouchKeycapMatchContext): {
   mainKeyValueMatches: (value: string | undefined) => boolean;
   subKeyMatchesCarved: (entry: TouchLayoutKeyEntry, layerId: string) => boolean;
 } {
-  const { carved, carvedUnicodeIds, carvedKeyIds, production } = ctx;
+  const { carved, carvedKeyIds, production } = ctx;
   const resolverMatches = makeResolverMatches(production);
   // Main-key text/output match, separate from isTouchSubKeyDuplicate below:
   // sub-key popup entries compare exactly, but the main-key path (like the
