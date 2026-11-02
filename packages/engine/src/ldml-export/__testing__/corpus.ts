@@ -16,6 +16,12 @@ export const EXPERIMENTAL_ROOT = join(KEYBOARDS_ROOT, "experimental");
 /** True when the sibling checkout is present; corpus suites skip (not fail) when it is not. */
 export const corpusAvailable: boolean = existsSync(RELEASE_ROOT);
 
+/**
+ * True when the sibling checkout includes the experimental/ tree. CI checks
+ * out release/ only (sparse), so this is false there.
+ */
+export const experimentalAvailable: boolean = existsSync(EXPERIMENTAL_ROOT);
+
 export type CorpusRole =
   | "scaffold-fixture"
   | "handwritten-ldml-compare"
@@ -91,6 +97,17 @@ function findKeyboardDir(root: string, id: string): string | null {
   }
   dirCache.set(key, found);
   return found;
+}
+
+/**
+ * Whether a corpus id resolves from release/ alone. Entries that live only
+ * in experimental/ (e.g. khmer_ldml) cannot resolve in a release-only
+ * checkout (CI) — that is a checkout limitation, not a resolver failure,
+ * so callers skip such entries instead of failing. A release/ keyboard
+ * that fails to resolve is still a hard failure: never skip on this.
+ */
+export function resolvesFromRelease(id: string): boolean {
+  return findKeyboardDir(RELEASE_ROOT, id) !== null;
 }
 
 function readIfPresent(dir: string, names: readonly string[]): string | undefined {
