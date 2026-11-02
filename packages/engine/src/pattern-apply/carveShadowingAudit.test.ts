@@ -52,9 +52,13 @@
 // a down oracle would make every "no new findings" assertion meaningless.
 
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { compileCarveSuppression, restoreCarveSuppression } from "./carveSuppression.js";
 import { deriveCarvedIr } from "./carvePipeline.js";
 import { emit } from "../codec/emit.js";
+import { parse } from "../codec/parse.js";
 import { validateWithOracle } from "../validator/oracle.js";
 import {
   makeTestIR,
@@ -489,5 +493,134 @@ describe("carve shadowing audit: fully-carved any() store", () => {
     expect(compiled.groups[0]?.rules.some((r) => r.nodeId === "consumer")).toBe(false);
     const restored = restoreCarveSuppression(compiled, restorations);
     expect(restored.groups[0]?.rules.map((r) => r.nodeId)).toEqual(["consumer"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// bj_cree_woods carve (issue #2397): no dead any() consumers, no new hints
+// ---------------------------------------------------------------------------
+//
+// The issue's shape, on the real keyboard: store(Cii) holds the nine ii-vowel
+// syllabics, positionally paired (via index()) with store(ConsKey) "ptkcmnsyf"
+// and store(CapConsKey) "PTKCMNSYF". Carving the ii-vowel characters drops the
+// Cii slots; the coordinated drop splices the same positions from the paired
+// key stores. Two carves matter:
+//
+// - whole Cii: every slot carved → the removal pass empties ConsKey /
+//   CapConsKey / CC / Cii and drops every rule that references them (089eb37a).
+// - partial Cii (k/m kept — the issue's case): ConsKey="km", CapConsKey="KM",
+//   and the `+ any(ConsKey) > index(CC,1)` / `+ any(CapConsKey) > index(CC,1)`
+//   consumers stay live on the kept keys.
+//
+// In both cases kmcmplib must report no unreachable-rule hints. The issue's
+// 4-hint G1 failure came from the old would-empty refusal: the guards blocked
+// the kept keys while the dead consumer survived. Skipped when the sibling
+// keymanapp/keyboards checkout is absent (CI) — the carveViaSplice.corpus
+// convention.
+
+const __dir2397 = dirname(fileURLToPath(import.meta.url));
+const CREE_WOODS_KMN = resolve(
+  __dir2397,
+  "../../../../../keyboards/release/bj/bj_cree_woods/source/bj_cree_woods.kmn",
+);
+const creeWoodsAvailable = existsSync(CREE_WOODS_KMN);
+
+function creeWoodsIr(): KeyboardIR {
+  return parse(readFileSync(CREE_WOODS_KMN, "utf8"), "bj_cree_woods").ir;
+}
+
+/** Slot ids for every Cii slot except the k/m positions (found via ConsKey). */
+function ciiSlotIdsExceptKm(ir: KeyboardIR): Set<string> {
+  const cii = ir.stores.find((s) => s.name === "Cii");
+  const consKey = ir.stores.find((s) => s.name === "ConsKey");
+  expect(cii).toBeDefined();
+  expect(consKey).toBeDefined();
+  const keep = new Set<number>();
+  consKey!.items.forEach((item, i) => {
+    if (item.kind === "char" && (item.value === "k" || item.value === "m")) keep.add(i);
+  });
+  expect(keep.size).toBe(2);
+  return new Set(
+    cii!.items
+      .map((_, i) => i)
+      .filter((i) => !keep.has(i))
+      .map((i) => `${cii!.nodeId}#${i}`),
+  );
+}
+
+function storeChars(ir: KeyboardIR, name: string): string | undefined {
+  const store = ir.stores.find((s) => s.name === name);
+  return store?.items.map((i) => (i.kind === "char" ? i.value : "?")).join("");
+}
+
+/** The `+ any(ConsKey) > index(CC,1)` / `+ any(CapConsKey)` consumer rules. */
+function consKeyConsumers(ir: KeyboardIR): IRRule[] {
+  return ir.groups.flatMap((g) =>
+    g.rules.filter((r) =>
+      r.context.some((el) => el.kind === "any" && (el.storeRef === "ConsKey" || el.storeRef === "CapConsKey")),
+    ),
+  );
+}
+
+describe.skipIf(!creeWoodsAvailable)("carve shadowing audit: bj_cree_woods (issue #2397)", () => {
+  it(
+    "partial Cii carve (k/m kept): key stores shrink to km/KM, consumers stay live, no unreachable hints",
+    async () => {
+      const carved = deriveCarvedIr(creeWoodsIr(), {
+        deletedNodeIds: new Set(),
+        deletedItemIds: ciiSlotIdsExceptKm(creeWoodsIr()),
+        fallbackPolicy: "swallow",
+      }).ir;
+
+      // The coordinated drop kept exactly the k/m positions everywhere.
+      expect(storeChars(carved, "ConsKey")).toBe("km");
+      expect(storeChars(carved, "CapConsKey")).toBe("KM");
+      // The consumers survive — k and m still type their finals.
+      const consumers = consKeyConsumers(carved);
+      expect(consumers).toHaveLength(2);
+      expect(consumers.every((r) => r.ownedByBehaviour === undefined)).toBe(true);
+
+      const kmn = emit(carved);
+      expect(await unreachableRuleTexts(kmn)).toEqual([]);
+    },
+    120_000,
+  );
+
+  it(
+    "whole-Cii carve: emptied stores and their consumers are gone, no unreachable hints",
+    async () => {
+      const ir = creeWoodsIr();
+      const cii = ir.stores.find((s) => s.name === "Cii")!;
+      const carved = deriveCarvedIr(ir, {
+        deletedNodeIds: new Set(),
+        deletedItemIds: new Set(cii.items.map((_, i) => `${cii.nodeId}#${i}`)),
+        fallbackPolicy: "swallow",
+      }).ir;
+
+      // The removal pass emptied the pair-set stores and dropped the rules
+      // that referenced them — no dead consumer is left behind.
+      for (const name of ["Cii", "ConsKey", "CapConsKey", "CC"]) {
+        expect(carved.stores.some((s) => s.name === name), `store ${name} removed`).toBe(false);
+      }
+      expect(consKeyConsumers(carved)).toHaveLength(0);
+
+      const kmn = emit(carved);
+      expect(kmn).not.toMatch(/any\(ConsKey\)/);
+      expect(await unreachableRuleTexts(kmn)).toEqual([]);
+    },
+    120_000,
+  );
+
+  it("partial Cii carve records no consumer removal: un-carve is the exact inverse", () => {
+    const ir = creeWoodsIr();
+    const dispositions = [...ciiSlotIdsExceptKm(ir)].map(blockDisposition);
+    const { ir: compiled, restorations } = compileCarveSuppression(ir, dispositions);
+    // Nothing was fully carved, so no consumer is removed; the kept-key
+    // consumers are untouched and no guard was synthesized for them
+    // (whole-context key rules take no key-side guards).
+    expect(restorations.filter((r) => r.kind === "removed")).toHaveLength(0);
+    expect(consKeyConsumers(compiled)).toHaveLength(2);
+    const restored = restoreCarveSuppression(compiled, restorations);
+    expect(restored).toEqual(ir);
   });
 });
