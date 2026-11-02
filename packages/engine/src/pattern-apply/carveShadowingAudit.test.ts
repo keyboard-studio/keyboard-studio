@@ -53,7 +53,7 @@
 
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileCarveSuppression, restoreCarveSuppression } from "./carveSuppression.js";
 import { deriveCarvedIr } from "./carvePipeline.js";
