@@ -48,26 +48,26 @@ corpus suites where named.
 
 **Purpose**: dependencies, vendored schemas, the empty module, and test discovery.
 
-- [ ] T001 Add engine **devDependencies** to `packages/engine/package.json`, pinned exactly (no `^`): `@keymanapp/kmc-ldml` `19.0.240-alpha`, `@keymanapp/common-types` `19.0.240-alpha`, and `xmllint-wasm` at the newest version published at least two weeks before today. Run `pnpm install` and commit `pnpm-lock.yaml`. Record the chosen `xmllint-wasm` version in [research.md](research.md) R30. Confirm with `pnpm why` that kmc-ldml resolves to the same `@keymanapp/developer-utils@19.0.240-alpha` and `kmc-kmn` the engine already uses (research R18)
-- [ ] T002 [P] Vendor the CLDR schemas into `LX/__testing__/cldr/46/` and `LX/__testing__/cldr/49/`, each holding `ldmlKeyboard3.xsd` and `ldmlKeyboard3.dtd`:
+- [x] T001 Add engine **devDependencies** to `packages/engine/package.json`, pinned exactly (no `^`): `@keymanapp/kmc-ldml` `19.0.240-alpha`, `@keymanapp/common-types` `19.0.240-alpha`, and `xmllint-wasm` at the newest version published at least two weeks before today. Run `pnpm install` and commit `pnpm-lock.yaml`. Record the chosen `xmllint-wasm` version in [research.md](research.md) R30. Confirm with `pnpm why` that kmc-ldml resolves to the same `@keymanapp/developer-utils@19.0.240-alpha` and `kmc-kmn` the engine already uses (research R18)
+- [x] T002 [P] Vendor the CLDR schemas into `LX/__testing__/cldr/46/` and `LX/__testing__/cldr/49/`, each holding `ldmlKeyboard3.xsd` and `ldmlKeyboard3.dtd`:
   - 46: copy from `../keyman/resources/standards-data/ldml-keyboards/46/dtd/`;
   - 49: copy from the CLDR repository tag `release-49`, `keyboards/dtd/`;
   - write `LX/__testing__/cldr/PROVENANCE.md` with the source, the commit or tag, the copy date, and the rule "regenerate, never hand-edit".
-- [ ] T003 [P] Vendor two CLDR sample keyboards for harness self-tests into `LX/__testing__/fixtures/cldr-samples/`, with their provenance in the same `PROVENANCE.md`:
+- [x] T003 [P] Vendor two CLDR sample keyboards for harness self-tests into `LX/__testing__/fixtures/cldr-samples/`, with their provenance in the same `PROVENANCE.md`:
   - one hardware sample from `../keyman/resources/standards-data/ldml-keyboards/46/3.0/`;
   - `fr-t-k0-test.xml`, which has touch forms and the `enter` gap key.
-- [ ] T004 Create the module skeleton in `packages/engine/src/ldml-export/` (`LX/index.ts`, `LX/types.ts`) and wire `packages/engine/src/index.ts`:
+- [x] T004 Create the module skeleton in `packages/engine/src/ldml-export/` (`LX/index.ts`, `LX/types.ts`) and wire `packages/engine/src/index.ts`:
   - `LX/index.ts` (barrel; never exports `__testing__`);
   - `LX/types.ts` with every engine type in [data-model.md](data-model.md): `CompatibilityItem`, `LdmlClassification`, `LdmlClassifyInput`, `LdmlExportInput`, `LdmlExportResult`, `LdmlBaseLayout`, `LdmlExportMetadata`, `LdmlPackageFiles`, `LdmlProfileId`, `LdmlCode` (the union of the 34 codes in the mapping contract's code table), `RowId`;
   - in `packages/engine/src/index.ts`, re-export the ldml-export public API, with a comment stating that the barrel exposes no test tooling.
-- [ ] T005 [P] Confirm test discovery in `packages/engine/vitest.config.ts`, `packages/engine/vitest.corpus.config.ts` and `packages/studio/vitest.corpus.config.ts`:
+- [x] T005 [P] Confirm test discovery in `packages/engine/vitest.config.ts`, `packages/engine/vitest.corpus.config.ts` and `packages/studio/vitest.corpus.config.ts`:
   - the default `packages/engine/vitest.config.ts` runs `LX/**/*.test.ts` and excludes `*.corpus.test.ts`;
   - `packages/engine/vitest.corpus.config.ts` runs `LX/**/*.corpus.test.ts`;
   - `packages/studio/vitest.corpus.config.ts` runs `ST/test/ldmlParity/*.corpus.test.ts`.
 
   Adjust only the `include`/`exclude` globs.
-- [ ] T006 [P] Add the depcruise rule `ldml-testing-not-in-product` to `.dependency-cruiser.cjs`: no file under `packages/*/src` that is not a test (`*.test.ts`) and not under `LX/__testing__/` may import `LX/__testing__/`. Severity `error`. Confirm `pnpm lint` runs it.
-- [ ] T089 [P] Confirm the FR-080 reuse table in [plan.md](plan.md#upstream-reuse-fr-080) against the pinned `19.0.240-alpha` packages, and record the result in [research.md](research.md) R32. (ID appended so existing IDs stay stable.)
+- [x] T006 [P] Add the depcruise rule `ldml-testing-not-in-product` to `.dependency-cruiser.cjs`: no file under `packages/*/src` that is not a test (`*.test.ts`) and not under `LX/__testing__/` may import `LX/__testing__/`. Severity `error`. Confirm `pnpm lint` runs it.
+- [x] T089 [P] Confirm the FR-080 reuse table in [plan.md](plan.md#upstream-reuse-fr-080) against the pinned `19.0.240-alpha` packages, and record the result in [research.md](research.md) R32. (ID appended so existing IDs stay stable.)
   - Check that `@keymanapp/common-types` exports `NFDAnalyzer`, `MarkerParser.nfd_markers` and `util.isNormalized`, and that importing them passes `packages/engine/src/browser-bundle-safety.test.ts` and a Vite build of the studio. If they pass, move `common-types` from devDependencies to dependencies in `packages/engine/package.json`. If not, mark the row "exception" with the failing reason.
   - Check whether `@keymanapp/kmc-generate@19.0.240-alpha`'s `ldml-keyboard` template can run in the browser: no `fs`/`path`/`node:` imports on its path, and its templates available without disk reads. If so, add it as an engine dependency for T036/T068. If not, mark the row "exception".
   - Check that a `<special xmlns:ks="https://keyboard-studio.github.io/ns/ldml-export/1">` child of `<keyboard3>` with namespaced children passes the pinned `LDMLKeyboardXMLSourceFileReader` (schema) and the vendored CLDR 46 and 49 XSDs (T015). If either rejects it, record a K row in [contracts/ldml-mapping.md](contracts/ldml-mapping.md) and write the FR-028 record to the report only (FR-028).

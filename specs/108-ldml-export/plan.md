@@ -149,12 +149,12 @@ table is amended in the same commit.
 |---|---|---|
 | LDML document types | **reuse** | `@keymanapp/developer-utils` `LDMLKeyboard` types (`LDMLKeyboardXMLSourceFile`, `LKKey`, `LKLayer`, …) as the lowered model. Type-only imports, erased at build |
 | Writing the XML | **exception** | `KeymanXMLWriter` cannot place the FR-042 comments per group and per transform, and its formatting may change with a dependency bump, which breaks FR-030 byte identity. No Keyman library provides deterministic formatting (R16). The serializer writes the developer-utils model |
-| Schema validation | **reuse** (tests) | `LDMLKeyboardXMLSourceFileReader` + `SchemaValidators.ldmlKeyboard3`. Not run in the browser for Stories 1–4 (R31) |
+| Schema validation | **reuse** (tests) | `LDMLKeyboardXMLSourceFileReader` + `SchemaValidators.default.ldmlKeyboard3` (T089). Not run in the browser for Stories 1–4 (R31) |
 | Compile to KMX+ / `.kvk` | **reuse** | `@keymanapp/kmc-ldml` `LdmlKeyboardCompiler`: CI (H1) now; the browser only after the FR-070 trial |
-| Normalization (rows 3.10, 3.22, 3.23, marker drift) | **reuse** | `@keymanapp/common-types` `NFDAnalyzer`, `MarkerParser.nfd_markers`, `util.isNormalized`. `common-types` becomes an engine **runtime** dependency if T089 shows it browser-safe; otherwise **exception**: `String.prototype.normalize` with the reason recorded |
+| Normalization (rows 3.10, 3.22, 3.23, marker drift) | **reuse** | `@keymanapp/common-types` `NFDAnalyzer`, `MarkerParser.nfd_markers`, `util.isNormalized`. T089 confirmed it browser-safe (Vite build of a probe, no Node imports), so `common-types` is an engine **runtime** dependency |
 | `\u{…}` escaping | **exception** | Keyman only unescapes (R16) |
 | Package build (`.kmp`, Story 5) | **reuse** | `@keymanapp/kmc-package` (already a dependency) |
-| Project scaffold (`.kpj`, `.kps`, readme, welcome, LICENSE, README, HISTORY) | **reuse if browser-safe** | `@keymanapp/kmc-generate` `ldml-keyboard` template. If T089 finds it reads templates from disk or fails bundle safety: **exception**, the engine writes the same layout itself |
+| Project scaffold (`.kpj`, `.kps`, readme, welcome, LICENSE, README, HISTORY) | **exception** (T089) | `@keymanapp/kmc-generate` `ldml-keyboard` template. Its templates are plain files outside the package `exports` map and it pulls `@keymanapp/langtags` (about 8.4 MB) into the browser graph, for files the export overwrites. The engine writes the same layout itself (R32) |
 | KMN → LDML mapping, touch layout → LDML | **exception** | No library provides it (`kmc-convert` does keylayout → kmn only; R10, R16) |
 | Unhandled-position enumeration (FR-021, FR-028) | **reuse (studio engine)** | Spec 109's FR-040 enumerator, not a Keyman library (R32) |
 

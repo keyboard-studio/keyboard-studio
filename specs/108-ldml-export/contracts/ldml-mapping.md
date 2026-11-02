@@ -160,6 +160,7 @@ exporter bridges the two this way:
 | 4.14 | `&MNEMONICLAYOUT` | drives row 2.7 | A | `KM_LINT_LDML_MNEMONIC` |
 | 4.15 | CLDR imports | none written. Every key the export uses is defined in the file, except implied keys (`a`–`z`, `A`–`Z`, `0`–`9`, `space`, `gap`), which Keyman imports itself. This keeps both profiles' files free of version-specific import paths | M | — |
 | 4.16 | no language tag in the identity overlay or package metadata | `keyboard3/@locale="und"`, no `<locales>` | A | hint `KM_LINT_LDML_NO_LOCALE` |
+| 4.17 | base-keyboard id and per-position provenance record (FR-028) | not written. A `<special xmlns:ks=…>` child of `<keyboard3>` loads in Keyman's pinned reader, but CLDR's 46 and 49 XSDs reject it (`special` is typed `any`, strict wildcard, so `ks:*` children need declarations). The record goes to the report only (research R32, T089) | K | hint `KM_LINT_LDML_KEYMAN_GAP` |
 
 ## 5. Touch layout (`TouchLayoutIR`)
 
@@ -253,7 +254,7 @@ documentation travels in two places:
 | `KM_LINT_LDML_UNREACHABLE` | hint | 1.11, 3.4 |
 | `KM_LINT_LDML_HEADER_UNSUPPORTED` | hint | 4.12 |
 | `KM_LINT_LDML_METADATA_PACKAGE_ONLY` | hint | 4.9, 4.11 |
-| `KM_LINT_LDML_KEYMAN_GAP` | hint | 4.10 |
+| `KM_LINT_LDML_KEYMAN_GAP` | hint | 4.10, 4.17 |
 | `KM_LINT_LDML_TOUCH_PRESENTATION` | hint | 5.3, 5.8, 5.11 |
 | `KM_LINT_LDML_TOUCH_SPECIAL_KEY` | hint | 5.13 |
 
@@ -272,6 +273,7 @@ condition. These are the known candidates for the next profile:
 
 | Row | Today (profile 46) | Lift condition | Next status |
 |---|---|---|---|
+| 4.17 `<special>` provenance record | K, report only | CLDR's XSD (or an extension schema for the `ks` namespace accepted by the harness) admits foreign-namespace children of `<special>` | M, written to the file |
 | 4.10 `info/@attribution` | K, omitted | a profile whose `conformsTo` is ≥ 47 **and** a Keyman schema that accepts `attribution` | M |
 | 3.7/3.8 set mapping not in group 1 | M by expansion, in both profiles (CLDR 49 grammar allows only `$[1:var]`) | Keyman accepts `$[N:var]` (upstream #16868 / PR #16870) **and** TR35 grammar admits N > 1 | M without expansion (smaller output) |
 | 3.8 several mappings in one `to` | M by expansion; N past the cap (3.9) | Keyman supports several maps per transform (#16868, "v20?") | M without expansion; 3.9 shrinks |

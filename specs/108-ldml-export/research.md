@@ -453,8 +453,9 @@ reason, and the alternatives rejected. The sources are:
 
 - **Decision**: the pinned packages define it:
   - `@keymanapp/kmc-ldml@19.0.240-alpha`, a new engine devDependency;
-  - `@keymanapp/common-types@19.0.240-alpha`, also a new engine devDependency (the engine cannot
-    resolve it today).
+  - `@keymanapp/common-types@19.0.240-alpha`, also a new engine dependency (the engine cannot
+    resolve it today). T001 added it as a devDependency; T089 moved it to `dependencies` after
+    confirming it is browser-safe (R32).
 
   Their own dependencies are exactly the 19.0.240-alpha set the engine already uses. The mapping
   contract's profile header names this pin. `origin/master` is evidence only.
@@ -739,6 +740,16 @@ reason, and the alternatives rejected. The sources are:
   - System `xmllint`. Rejected: it is missing on Windows developer machines.
   - A hand-written schema checker. Rejected: the CLDR schema is the authority.
   - A JS DTD validator. Rejected: none was found that works without a native libxml2.
+- **Pinned version (T001, 2026-11-01)**: `xmllint-wasm` **5.3.0**, published 2026-08-05, the
+  newest release and more than two weeks old on 2026-11-01 (previous: 5.2.0, 2026-03-24). Pinned
+  exactly in `packages/engine/package.json` devDependencies.
+- **XSD harness consequences found in T089** (also in R32): CLDR's XSD has no
+  `targetNamespace`, so a document that carries the default `xmlns` is rejected by
+  `xmllint-wasm` with "No matching global declaration available for the validation root". The XSD
+  check (T015) must strip the default `xmlns="…"` attribute from a copy of the document before
+  validating. The 46 XSD's `conformsTo` enumeration is 45 and 46, so a file written with
+  `conformsTo="49"` validates only against the vendored 49 XSD. A source-text probe of the 49
+  XSD also shows `<special>` is typed `any` with `processContents="strict"` (R32).
 - The 46 → 49 format delta (R13) has no touch change. Profile 49 is therefore exactly the delta
   file [contracts/ldml-mapping-49.md](contracts/ldml-mapping-49.md).
 
@@ -795,3 +806,60 @@ were merged after planning. Their plan consequences:
   its own commit, so spec 109 adopts it rather than duplicating it.
 - **Profile 49** no longer carries a set-mapping delta (research R13): its deltas are
   `conformsTo`, the namespace and `info/@attribution`.
+
+### T089 results (2026-11-01, run against the pinned `19.0.240-alpha` packages)
+
+Method: the checks below were run, not read off documentation. Probe files were temporary and are
+not committed.
+
+1. **`common-types` normalization helpers: exported and browser-safe. Row stays "reuse".**
+   - Exports (from `build/src`): `util.NFDAnalyzer`, `util.isNormalized`,
+     `LdmlKeyboardTypes.MarkerParser` (with static `nfd_markers`). The spec's wording
+     `MarkerParser.nfd_markers` is reached through the `LdmlKeyboardTypes` namespace.
+   - The package's only runtime dependencies are `restructure` and two Keyman constant packages.
+     A search of its `build/src` JavaScript finds no `node:`, `fs`, `path` or `process` imports.
+   - A production Vite build (the studio's own Vite 7.3.5, library mode, browser target) of a probe
+     module importing all three symbols succeeded: 66 modules, no "externalized for browser
+     compatibility" warning. The helpers also ran under Node.
+   - `src/browser-bundle-safety.test.ts` follows relative imports only and never follows bare
+     specifiers, so it cannot fail on this package either way (R31, criterion 4). It is green.
+     A full studio build is not yet meaningful: nothing in the engine imports `common-types` until
+     the first task that does. That task runs the studio Vite build.
+   - Outcome: `@keymanapp/common-types` moved from devDependencies to `dependencies` in
+     `packages/engine/package.json`.
+   - Accessor correction: the Keyman schema validator is
+     `SchemaValidators.default.ldmlKeyboard3` (the module has only a default export), not
+     `SchemaValidators.ldmlKeyboard3` as written above.
+2. **`kmc-generate`'s `ldml-keyboard` template: not adopted. Row becomes "exception".**
+   - The generator does not touch the disk itself. It asks `callbacks.loadFile` for each template,
+     with the path built from `import.meta.url` and `callbacks.path`. A browser caller could
+     supply those callbacks.
+   - But the templates are plain files under `build/src/template/ldml-keyboard/` (`keyboard.kpj`,
+     `source/keyboard.xml`, `keyboard.kps`, `readme.htm`, `welcome.htm`, `LICENSE.md`, `README.md`,
+     `HISTORY.md`). The package `exports` map exposes only `"."`, so they are not importable as
+     assets. Using them means copying them out of `node_modules` by path.
+   - The package pulls `@keymanapp/langtags` (about 8.4 MB unpacked), `keyman-version` and
+     `common-types` into the browser graph, for output the export overwrites (`keyboard.xml`,
+     `keyboard.kps`).
+   - Outcome: the engine writes the same layout itself (T036, T068), using the template files as
+     the reference layout. `kmc-generate` is not added as a dependency.
+3. **`<special>` with namespaced children (FR-028): Keyman accepts it, both CLDR XSDs reject it.**
+   - Probe document: `<keyboard3>` with one key, one hardware layer and
+     `<special xmlns:ks="https://keyboard-studio.github.io/ns/ldml-export/1">` holding
+     `<ks:baseKeyboard>` and `<ks:position>`, for `conformsTo` 46 and 49.
+   - Pinned `LDMLKeyboardXMLSourceFileReader.load`: loads, no messages, the `special` array is kept
+     intact. Row stays reuse.
+   - Vendored CLDR 46 XSD and CLDR 49 XSD (via `xmllint-wasm`, default `xmlns` stripped as noted
+     in R30): the same document **without** `<special>` is valid; **with** it, both reject it.
+     The `special` element is typed `any`, whose wildcard is `processContents="strict"`, so every
+     foreign-namespace child needs its own global declaration, and `ks:*` has none.
+   - Per FR-028 and T089: mapping row **4.17** (K, hint `KM_LINT_LDML_KEYMAN_GAP`, an existing
+     code) is added to [contracts/ldml-mapping.md](contracts/ldml-mapping.md), and the FR-028
+     provenance record goes to the report only. The exporter does not write `<special>`. The rows'
+     "Keyman gap" wording is loose here: the rejecting validator is CLDR's XSD, and Keyman accepts.
+     The alternative that keeps the in-file record is a small extension XSD for the `ks`
+     namespace supplied to the XSD harness (T015); it is not adopted without an owner ruling,
+     because the file would then no longer validate against CLDR's own schema alone.
+   - Knock-on edits left for the owners (not made in T089): the `<special>` lines in
+     [contracts/export-package.md](contracts/export-package.md), FR-028 and SC wording in
+     [spec.md](spec.md), and the tasks that write or test `<special>`.

@@ -5,8 +5,8 @@
 
 The module is `packages/engine/src/ldml-export/`, re-exported from the engine root barrel. The
 studio reaches it only through `lib/services.ts` (`getBuildLdmlExport`, `getClassifyForLdml`),
-which keeps it in the lazily imported engine chunk. Nothing here imports `@keymanapp/kmc-ldml`,
-`@keymanapp/common-types` or any Node built-in. `browser-bundle-safety.test.ts` covers the
+which keeps it in the lazily imported engine chunk. Nothing here imports `@keymanapp/kmc-ldml` or any Node
+built-in. It may import `@keymanapp/common-types` (browser-safe, an engine dependency since T089). `browser-bundle-safety.test.ts` covers the
 module's static graph.
 
 ## Entry points

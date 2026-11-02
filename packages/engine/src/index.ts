@@ -1138,3 +1138,27 @@ export type {
 export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
 export type { RgbaImage } from "./icon/icoEncoder.js";
 export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
+
+// LDML keyboard export (spec 108). The barrel exposes the public API only; it
+// exposes no test tooling (`ldml-export/__testing__` is never re-exported).
+export type {
+  CompatibilityItem,
+  LdmlBaseLayout,
+  LdmlBaseLayoutId,
+  LdmlBaseLayoutLayerName,
+  LdmlBaseLayoutSource,
+  LdmlClassification,
+  LdmlClassifyInput,
+  LdmlCode,
+  LdmlExportInput,
+  LdmlExportMetadata,
+  LdmlExportResult,
+  LdmlPackageBinaryFile,
+  LdmlPackageFiles,
+  LdmlProfileId,
+  LdmlSeverity,
+  LdmlSide,
+  LdmlStatus,
+  LdmlVKey,
+  RowId,
+} from "./ldml-export/index.js";

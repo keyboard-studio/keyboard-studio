@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "LDML keyboard export",
   "branch": "108-ldml-export",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -25,7 +25,127 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-01T22:57:09.019Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-02T00:43:22.056Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:56.488Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:56.854Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:57.219Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:57.607Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:58.030Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:58.431Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T089",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T00:56:58.785Z"
     }
   ],
-  "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051"
+  "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
+  "unattended": true,
+  "currentTask": "T089",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "added kmc-ldml, common-types, xmllint-wasm 5.3.0 pinned; lockfile; R30",
+      "files": [
+        "packages/engine/package.json",
+        "pnpm-lock.yaml"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "vendored CLDR 46/49 xsd+dtd with PROVENANCE.md",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/cldr"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "vendored fr.xml and fr-t-k0-test.xml samples",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/fixtures/cldr-samples"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "module skeleton index.ts, types.ts, engine barrel re-export",
+      "files": [
+        "packages/engine/src/ldml-export/index.ts",
+        "packages/engine/src/ldml-export/types.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "discovery globs confirmed, no edit needed",
+      "files": [
+        "packages/engine/vitest.config.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "depcruise rule ldml-testing-not-in-product",
+      "files": [
+        ".dependency-cruiser.cjs"
+      ]
+    },
+    "T089": {
+      "status": "DONE",
+      "did": "reuse table confirmed; kmc-generate exception; special rejected by CLDR XSD -> row 4.17",
+      "files": [
+        "specs/108-ldml-export/research.md",
+        "specs/108-ldml-export/plan.md"
+      ]
+    }
+  }
 }
