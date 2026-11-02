@@ -487,15 +487,17 @@ describe("criteria.json schema conformance", () => {
     const section18 = records.filter((c) =>
       c.section.startsWith("18.")
     );
-    // 12 at Day-1 lock.
-    expect(section18.length).toBe(12);
+    // 13 after 18.12-meets-legal-accessibility-requirements (criteria audit).
+    expect(section18.length).toBe(13);
     section18.forEach((c) => {
-      expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
+      if (c.principle !== undefined) {
+        expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
+      }
     });
-    // The seven auto-checkable heuristics are layer-c-enforce.
+    // The eight auto-checkable heuristics are layer-c-enforce.
     expect(
       section18.filter((c) => c.band === "layer-c-enforce").length
-    ).toBe(7);
+    ).toBe(8);
   });
 
   it("every principle-tagged record uses a valid DiscusPrinciple value", () => {

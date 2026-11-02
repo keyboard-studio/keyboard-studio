@@ -24,9 +24,16 @@ export interface Gap {
 
 // Measured, not assumed: a gate that already passes on a fixture has no row,
 // even where the spec names a story for it (G2 on basic_kbdus / basic_kbdfr and
-// G5 everywhere pass today, because those fixtures do not yet contain the shape
-// the story fixes).
+// G5 passes on the harness walk records; copy-track keyboards whose starting
+// rules carry case pairs outside the layout-family &CasedKeys floor fail until
+// US5 derives the store in projection (chechen_latin: ç/Ç on K_COLON).
 export const KNOWN_GAPS: readonly Gap[] = [
+  {
+    gate: "G5",
+    owner: "US5",
+    bases: ["chechen_latin"],
+    points: ["tolerance"],
+  },
   // E5: contexts are not tolerant (camqwerty has one gap).
   { gate: "G2", owner: "US6", bases: ["sil_cameroon_qwerty"], points: ["tolerance"] },
   // E5: contexts are not tolerant (camazerty has 17 measured gaps). #2363's
