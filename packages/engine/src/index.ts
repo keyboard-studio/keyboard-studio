@@ -937,6 +937,8 @@ export {
   applyKeycapLabelsToVfs,
   applyCarveKeycapRemovalsToVfs,
   collectCarvedKeycapTexts,
+  scanRemovedTouchKeyIds,
+  removedTouchKeyRuleIds,
   resolveRenderableMechanisms,
   applyTouchAssignments,
   applyTouchAssignmentsToRawJson,

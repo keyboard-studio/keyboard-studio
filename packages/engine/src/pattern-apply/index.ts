@@ -64,8 +64,10 @@ export { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 export {
   applyCarveKeycapRemovalsToVfs,
   collectCarvedKeycapTexts,
+  scanRemovedTouchKeyIds,
+  removedTouchKeyRuleIds,
 } from "./applyCarveKeycapRemovalsToVfs.js";
-export type { CarveKeycapRemovalInput } from "./applyCarveKeycapRemovalsToVfs.js";
+export type { CarveKeycapRemovalInput, RemovedTouchKeyScan, RemovedTouchKeyRuleIdsInput, RemovedTouchKeyRuleIds } from "./applyCarveKeycapRemovalsToVfs.js";
 
 export { applyTouchAssignments } from "./applyTouchAssignments.js";
 export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
