@@ -120,3 +120,9 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   `.studio/decision-record.json` its wall-clock timestamps
   (presence-checked only). Every other entry is byte-identical. Verify
   mode passes against it locally.
+- **Re-capture: 2026-11-02 (UTC), from main `7488502e`.** Taken locally
+  (Playwright desktop, keyboards corpus at pinned `435f82d6`, vite dev server).
+  PR #2440 merge did not change the walk; `711c145c` (welcome layout SVG
+  charts for copy keyboards with welcome images) added nine
+  `source/welcome/ks-layout-*.svg` entries and updated `welcome.htm` img refs.
+  Verify mode passes against it locally.
