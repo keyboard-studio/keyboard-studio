@@ -31,7 +31,7 @@ import type {
   IRRule,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import { parseKmn, emitKmn, deriveCarvedIr } from "@keyboard-studio/engine";
+import { parseKmn, emitKmn, deriveCarvedIr, collectCharContributors, removedTouchKeyRuleIds } from "@keyboard-studio/engine";
 import {
   lookupHostOutput,
   REFERENCE_BASES,
@@ -40,6 +40,11 @@ import {
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const KMN_PATH = resolve(__dir, "__fixtures__/sil_cameroon_qwerty.kmn");
+// Fixture provenance: downloaded verbatim from
+// https://github.com/keymanapp/keyboards/blob/master/release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.keyman-touch-layout
+// (2026-11-01) — the real keyboard's touch layout, needed for the #2418
+// carve-continue case (which keys the carve removes from the touch surface).
+const TOUCH_LAYOUT_PATH = resolve(__dir, "__fixtures__/sil_cameroon_qwerty.keyman-touch-layout");
 
 const FIVE_BASES = Object.keys(REFERENCE_BASES) as BaseLayoutId[];
 
@@ -349,5 +354,125 @@ describe("T022 sil_cameroon_qwerty carve regression (real keyboard, FR-019/FR-02
     expect(kmn).toContain("> context");
     // The carved RALT+A rule's own line now suppresses instead of emitting ɛ.
     expect(kmn).toMatch(/\+\s*\[RALT K_A\]\s*>\s*nul/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #2418: carving a T_ mark key must DELETE its .kmn rules, not rewrite
+// them to `> nul`.
+//
+// The issue's repro is the carve step's Continue (spec 106 FR-042) on a copy
+// of sil_cameroon_qwerty with the combining marks discarded: the carved
+// T_0301/T_0327/T_030D/T_0330/T_1DC4–T_1DC7 keys leave the touch layout, but
+// the .kmn kept `+ [T_0301] > nul` plus dead `any(diablock)` guard lines.
+//
+// Root cause (the issue's second hypothesis, confirmed): the deletion sets
+// DO reach the carve pipeline as whole-node deletions, but the
+// fallback-policy ("swallow") expansion turns every deleted id into a
+// `block` disposition, `compileCarveSuppression` rewrites the rules in
+// place to `> nul`, and `carveFilterIr` skips suppression-owned rules —
+// so the whole-node deletion never happens. The fix exempts rules bound
+// only to touch keys the carve removes from the touch surface
+// (`suppressionExemptIdsForRemovedTouchKeys`): their keystrokes can never
+// fire, so the spec-104 contract is deletion, not suppression.
+//
+// The deletion sets below mirror carve-continue exactly: per discarded
+// character, `collectCharContributors` — the same function the carve
+// gallery's suggestion rows use — unions rule + store-slot contributors.
+// ---------------------------------------------------------------------------
+
+const CARVED_MARKS_2418 = [
+  "́", // U+0301
+  "̧", // U+0327
+  "̍", // U+030D
+  "̰", // U+0330
+  "᷄", // U+1DC4
+  "᷅", // U+1DC5
+  "᷆", // U+1DC6
+  "᷇", // U+1DC7
+];
+
+const CARVED_TOUCH_IDS_2418 = [
+  "T_0301",
+  "T_0327",
+  "T_030D",
+  "T_0330",
+  "T_1DC4",
+  "T_1DC5",
+  "T_1DC6",
+  "T_1DC7",
+];
+
+describe("issue #2418: carved T_ mark keys lose their .kmn rules (real keyboard)", () => {
+  let carveRuleIds: Set<string>;
+  let carveSlotIds: Set<string>;
+  let layoutJson: string;
+
+  beforeAll(() => {
+    carveRuleIds = new Set();
+    carveSlotIds = new Set();
+    for (const ch of CARVED_MARKS_2418) {
+      const contributors = collectCharContributors(startIr, ch);
+      expect(contributors.blocked).toHaveLength(0);
+      for (const id of contributors.ruleNodeIds) carveRuleIds.add(id);
+      for (const id of contributors.storeSlotIds) carveSlotIds.add(id);
+    }
+    expect(carveRuleIds.size).toBeGreaterThan(0);
+    layoutJson = readFileSync(TOUCH_LAYOUT_PATH, "utf-8");
+  });
+
+  it("control: without the exemption the pipeline reproduces the issue — `+ [T_0301] > nul`", () => {
+    const buggy = deriveCarvedIr(startIr, {
+      deletedNodeIds: carveRuleIds,
+      deletedItemIds: new Set([...carveRuleIds, ...carveSlotIds]),
+      fallbackPolicy: "swallow",
+    });
+    expect(emitKmn(buggy.ir)).toMatch(/\+\s*\[T_0301\]\s*>\s*nul/);
+  });
+
+  it("the outcome covers the carved T_ binding rules but not the desktop K_LBRKT producer of the same mark", () => {
+    const outcome = removedTouchKeyRuleIds(startIr, layoutJson, {
+      slotIds: carveSlotIds,
+      wholeNodeIds: carveRuleIds,
+    });
+    // `+ [T_0301] > U+0301`: binds only T_0301, which the carve removes from
+    // the touch layout — exempt from the suppression rewrite.
+    const t0301Rule = findBareKeyRule(startIr, "T_0301", []);
+    expect(carveRuleIds.has(t0301Rule.nodeId)).toBe(true);
+    expect(outcome.suppressionExemptIds.has(t0301Rule.nodeId)).toBe(true);
+    // `+ [K_LBRKT] > U+0301`: the desktop key stays pressable, so the FR-019
+    // swallow suppression remains load-bearing — not exempt.
+    const kLbrktRule = findBareKeyRule(startIr, "K_LBRKT", []);
+    expect(carveRuleIds.has(kLbrktRule.nodeId)).toBe(true);
+    expect(outcome.suppressionExemptIds.has(kLbrktRule.nodeId)).toBe(false);
+    // The `any(diablock)` guard bound to T_0301 was never a carve
+    // contributor, but its key is gone — it joins the deletion set as a
+    // provably dead binding rule.
+    const guard = findVkeyWithContext(startIr, "T_0301", [], ["any"]);
+    expect(carveRuleIds.has(guard.nodeId)).toBe(false);
+    expect(outcome.additionalDeletedRuleIds.has(guard.nodeId)).toBe(true);
+  });
+
+  it("with the outcome applied the carved T_ rules are deleted whole-node — no `> nul`, no T_ ids left", () => {
+    const outcome = removedTouchKeyRuleIds(startIr, layoutJson, {
+      slotIds: carveSlotIds,
+      wholeNodeIds: carveRuleIds,
+    });
+    const fixed = deriveCarvedIr(startIr, {
+      deletedNodeIds: new Set([...carveRuleIds, ...outcome.additionalDeletedRuleIds]),
+      deletedItemIds: new Set([...carveRuleIds, ...carveSlotIds]),
+      fallbackPolicy: "swallow",
+      suppressionExemptIds: outcome.suppressionExemptIds,
+    });
+    const t0301Rule = findBareKeyRule(startIr, "T_0301", []);
+    expect(ruleById(fixed.ir, t0301Rule.nodeId)).toBeUndefined();
+    const fixedKmn = emitKmn(fixed.ir);
+    for (const id of CARVED_TOUCH_IDS_2418) {
+      expect(fixedKmn, `carved key ${id} must leave no rule behind`).not.toContain(id);
+    }
+    expect(fixedKmn).not.toMatch(/\+\s*\[T_0301\]\s*>\s*nul/);
+    // Surgical: the desktop producer of the same carved mark is still
+    // suppressed (`> nul`), not deleted — its key remains pressable.
+    expect(fixedKmn).toMatch(/\+\s*\[K_LBRKT\]\s*>\s*nul/);
   });
 });
