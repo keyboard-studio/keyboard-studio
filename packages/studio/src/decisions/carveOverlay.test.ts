@@ -5,6 +5,7 @@
 // (D-090-30 (i)) this fold discharges.
 
 import { describe, it, expect } from "vitest";
+import { uniformFallbackPolicy } from "@keyboard-studio/contracts";
 import type { CarvedLayoutValue } from "../survey/carve/carveValue.ts";
 import { carvedLayoutValueFromOverlay } from "../survey/carve/carveValue.ts";
 import { carveOverlayFromValue } from "./carveOverlay.ts";
@@ -53,6 +54,6 @@ describe("carveOverlayFromValue", () => {
     });
     expect([...partial.deletedNodeIds]).toEqual(["n9"]);
     // An unrecognised legacy card reads as the default policy, never throws.
-    expect(partial.legacyFallbackPolicy).toBe("swallow");
+    expect(partial.legacyFallbackPolicy).toEqual(uniformFallbackPolicy("swallow"));
   });
 });

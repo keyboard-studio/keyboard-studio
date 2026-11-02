@@ -92,7 +92,7 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import type { FallbackPolicy } from "@keyboard-studio/contracts";
+import type { Disposition } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
@@ -213,7 +213,7 @@ export interface ProjectWorkingCopyVfsInput {
    * rewrite an uncarved rule. Omitted degrades to the legacy carve behavior,
    * content-identical.
    */
-  fallbackPolicy?: FallbackPolicy;
+  fallbackPolicy?: Disposition;
   /**
    * Ids inside `deletedItemIds` that are plain removals rather than carves
    * (disabled-family rules). They are removed outright, never rewritten into

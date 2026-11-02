@@ -11,10 +11,10 @@
 // spec carries it separately. A spec that omits it runs with the store default,
 // which is what every recorded walk before this field ran with.
 
-import { makeStartKeyboard, type StartKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard, uniformFallbackPolicy, type StartKeyboard } from "@keyboard-studio/contracts";
 import type {
   CompileResult,
-  FallbackPolicy,
+  Disposition,
   KeyboardIR,
   MechanismAssignment,
   SimKeyInput,
@@ -70,7 +70,7 @@ export interface DecisionPointFixtureSpec {
    */
   touchLayoutJson?: string | null;
   /** The keyboard-wide carve fallback policy the walk ended with. Default: the store's. */
-  fallbackPolicy?: FallbackPolicy;
+  fallbackPolicy?: Disposition;
 }
 
 export interface DecisionPointFixture {
@@ -222,7 +222,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
   // 5. install what replay leaves elsewhere.
   installUnreplayedSlices(spec.decisions);
   if (spec.touchLayoutJson !== undefined) useWorkingCopyStore.getState().setTouchLayoutJson(spec.touchLayoutJson);
-  if (spec.fallbackPolicy !== undefined) useWorkingCopyStore.getState().setFallbackPolicy(spec.fallbackPolicy);
+  if (spec.fallbackPolicy !== undefined) useWorkingCopyStore.getState().setFallbackPolicy(uniformFallbackPolicy(spec.fallbackPolicy));
   const toleranceStaleSiteIds = spec.point === "tolerance" ? await installToleranceOverlay(spec.decisions) : undefined;
 
   // 6. the real download path.

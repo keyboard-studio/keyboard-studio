@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createVirtualFS, makePattern } from "@keyboard-studio/contracts";
-import type { FallbackPolicy, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
+import type { Disposition, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
@@ -45,7 +45,7 @@ function swap(kmnRules: string): MechanismAssignment {
   };
 }
 
-function project(assignments: MechanismAssignment[], fallbackPolicy?: FallbackPolicy, kmn: string = KMN): string {
+function project(assignments: MechanismAssignment[], fallbackPolicy?: Disposition, kmn: string = KMN): string {
   const vfs = createVirtualFS();
   vfs.set("source/projected.kmn", kmn, false);
   projectWorkingCopyVfs({

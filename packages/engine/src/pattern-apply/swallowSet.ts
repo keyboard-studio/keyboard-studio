@@ -14,7 +14,7 @@
 // choice is the single keyboard-wide fallback policy (the per-carve override
 // is retired; see specs/076-rule-behaviours/fallback-surface-design.md).
 
-import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
+import type { Disposition, KeyboardIR } from "@keyboard-studio/contracts";
 import { parseSlotId } from "./slotId.js";
 import { slotGuardNodeIdPrefix } from "./carveSuppression.js";
 
@@ -45,7 +45,7 @@ export interface SwallowCombo {
  */
 export function isInSwallowSet(
   combo: SwallowCombo,
-  policy: FallbackPolicy,
+  policy: Disposition,
   ir: KeyboardIR,
 ): boolean {
   if (policy === "pass-through") return false;

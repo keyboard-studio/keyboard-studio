@@ -6,7 +6,7 @@
 // it coerces `allow-host` on a deadkey-context rule back to `block`, so a
 // `pass-through` policy can never leave a deadkey armed.
 
-import type { CarveDisposition, FallbackPolicy } from "@keyboard-studio/contracts";
+import type { CarveDisposition, Disposition } from "@keyboard-studio/contracts";
 
 /**
  * One disposition per carved combo id, all carrying the policy's value.
@@ -15,7 +15,7 @@ import type { CarveDisposition, FallbackPolicy } from "@keyboard-studio/contract
  * Duplicates are collapsed; order follows first appearance.
  */
 export function dispositionsForFallbackPolicy(
-  policy: FallbackPolicy,
+  policy: Disposition,
   comboIds: Iterable<string>,
 ): CarveDisposition[] {
   const disposition = policy === "pass-through" ? "allow-host" : "block";

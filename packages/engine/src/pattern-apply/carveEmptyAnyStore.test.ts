@@ -8,7 +8,7 @@ import { deriveCarvedIr } from "./carvePipeline.js";
 import { emit } from "../codec/emit.js";
 import { validateWithOracle } from "../validator/oracle.js";
 import { makeTestIR, irGroup, charRule, charStore } from "@keyboard-studio/contracts/fixtures";
-import type { FallbackPolicy, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import type { Disposition, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
 
 function consumerIr(ctx: IRRule["context"]): KeyboardIR {
   return makeTestIR(
@@ -33,7 +33,7 @@ function consumerIr(ctx: IRRule["context"]): KeyboardIR {
 }
 
 const ALL = new Set(["store#ka#0", "store#ka#1", "store#kb#0", "store#kb#1"]);
-const POLICIES: FallbackPolicy[] = ["pass-through", "swallow"];
+const POLICIES: Disposition[] = ["pass-through", "swallow"];
 
 async function compileProblems(kmn: string): Promise<string[]> {
   const findings = await validateWithOracle(kmn);

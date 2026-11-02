@@ -22,7 +22,7 @@
 // content are meaningful. services.ts IS mocked to avoid WASM / network I/O.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createVirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, uniformFallbackPolicy } from "@keyboard-studio/contracts";
 import { basicKbdus, charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -155,7 +155,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     // so the removed rule leaves no trace in the .kmn. Under the default
     // swallow policy it would become a `+ [K_A] > nul` suppression rule,
     // which is a different test (carvePipelineParity.test.ts).
-    useWorkingCopyStore.getState().setFallbackPolicy("pass-through");
+    useWorkingCopyStore.getState().setFallbackPolicy(uniformFallbackPolicy("pass-through"));
 
     // Apply the two deletions through the store overlay (mirrors deleteNode() in the SPA).
     useWorkingCopyStore.getState().deleteNode("rule#remove");

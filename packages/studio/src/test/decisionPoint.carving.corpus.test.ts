@@ -20,7 +20,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ContextElement, FallbackPolicy, IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
+import type { ContextElement, Disposition, IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import type { CarvedLayoutValue } from "../survey/carve/carveValue.ts";
@@ -146,7 +146,7 @@ describe.skipIf(!sc004GatesEnabled)("carving fixture (Bafut on Cameroon QWERTY)"
     expect(carved.chars.size).toBe(PAIRS[0].indices.length);
   });
 
-  const RUNS: { point: DecisionPoint; policy?: FallbackPolicy }[] = [
+  const RUNS: { point: DecisionPoint; policy?: Disposition }[] = [
     ...POINTS.map((point) => ({ point })),
     { point: "assignments", policy: "pass-through" },
   ];

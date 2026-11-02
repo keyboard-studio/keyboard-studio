@@ -17,7 +17,7 @@
 // IR, ensuring idempotency and reversibility.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { FallbackPolicy } from "@keyboard-studio/contracts";
+import type { Disposition } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import {
   parseSlotId,
@@ -78,7 +78,7 @@ function partitionItemIds(
  */
 export interface CarveMutateOptions {
   /** Keyboard-wide fallback policy for the suppression stage (FR-019). */
-  fallbackPolicy?: FallbackPolicy;
+  fallbackPolicy?: Disposition;
   /** Removal ids that are not carves, e.g. disabled-family rules (never rewritten into suppression rules). */
   suppressionExemptIds?: ReadonlySet<string>;
   /** A6 loud/soft for the suppression stage. Default false (soft). */

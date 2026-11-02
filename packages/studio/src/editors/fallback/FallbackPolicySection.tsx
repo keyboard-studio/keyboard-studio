@@ -14,7 +14,8 @@
 
 import { useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { FallbackPolicy } from "@keyboard-studio/contracts";
+import { collapseFallbackPolicy, uniformFallbackPolicy } from "@keyboard-studio/contracts";
+import type { Disposition } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useLikelyBaseLayouts } from "../../lib/layoutFamily.ts";
 import { hostOutcomeText, resolveCarvedCombos } from "../../lib/carvedCombo.ts";
@@ -30,7 +31,7 @@ export interface FallbackPolicySectionProps {
 
 export function FallbackPolicySection({ defaultOpen = false }: FallbackPolicySectionProps) {
   const { t } = useLingui();
-  const policy = useWorkingCopyStore((s) => s.fallbackPolicy);
+  const policy = useWorkingCopyStore((s) => collapseFallbackPolicy(s.fallbackPolicy));
   const setFallbackPolicy = useWorkingCopyStore((s) => s.setFallbackPolicy);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
@@ -53,7 +54,7 @@ export function FallbackPolicySection({ defaultOpen = false }: FallbackPolicySec
     return SAMPLE_KEY;
   }, [startIr, deletedNodeIds, deletedItemIds]);
 
-  const choose = (next: FallbackPolicy) => () => setFallbackPolicy(next);
+  const choose = (next: Disposition) => () => setFallbackPolicy(uniformFallbackPolicy(next));
 
   const unknownText = t({ id: "fallback.hosts.unknown", message: "unknown" });
   const deadkeyText = t({ id: "fallback.hosts.deadkey", message: "starts a deadkey" });

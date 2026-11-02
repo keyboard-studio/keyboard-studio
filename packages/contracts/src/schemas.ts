@@ -26,7 +26,8 @@ import type {
   CarveDispositionProvenance,
   CarveDispositionValue,
 } from "./carveDisposition";
-import type { FallbackPolicy } from "./fallbackPolicy";
+import type { Disposition, FallbackPolicy } from "./fallbackPolicy";
+import { uniformFallbackPolicy } from "./fallbackPolicy";
 import type {
   TouchKeyProvenance,
   TouchKeyIR,
@@ -131,7 +132,20 @@ export const CarveDispositionSchema = z.object({
 });
 
 /** Keyboard-wide fallback policy (specs/076-rule-behaviours/fallback-surface-design.md). */
-export const FallbackPolicySchema = z.enum(["swallow", "pass-through"]);
+export const DispositionSchema = z.enum(["swallow", "pass-through"]);
+
+/**
+ * Per-class policy. A legacy single value parses to that value for all three
+ * classes (the schema's output is always the per-class object).
+ */
+export const FallbackPolicySchema = z.union([
+  z.object({
+    letters: DispositionSchema,
+    digits: DispositionSchema,
+    punctuation: DispositionSchema,
+  }),
+  DispositionSchema.transform((d) => uniformFallbackPolicy(d)),
+]);
 
 // ---------------------------------------------------------------------------
 // AxisFill (spec §7.2 script-class default-fill prior) — provenance primitive
@@ -1030,6 +1044,8 @@ type _FallbackPolicyGuard = Expect<
 type _FallbackPolicyReverseGuard = Expect<
   AssignableTo<FallbackPolicy, z.infer<typeof FallbackPolicySchema>>
 >;
+type _DispositionGuard = Expect<AssignableTo<z.infer<typeof DispositionSchema>, Disposition>>;
+type _DispositionReverseGuard = Expect<AssignableTo<Disposition, z.infer<typeof DispositionSchema>>>;
 // AxisFill (spec §7.2). `axis`/`value` are validated loosely (see
 // AxisFillSchema doc) so the guard only pins `source`, which is where real
 // drift (a renamed/added fill-source literal) would occur.

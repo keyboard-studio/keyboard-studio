@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { createVirtualFS, type FallbackPolicy, type VirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, type Disposition, uniformFallbackPolicy, type VirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, charRule, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { emitKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -42,13 +42,13 @@ function startIr() {
   });
 }
 
-function seed(fallbackPolicy: FallbackPolicy): VirtualFS {
+function seed(fallbackPolicy: Disposition): VirtualFS {
   const ir = startIr();
   const vfs = createVirtualFS([{ path: KMN_PATH, content: emitKmn(ir), isBinary: false }]);
   const wc = useWorkingCopyStore.getState();
   wc.instantiateFromStart(basicKbdus, { vfs, ir });
   wc.setAttribution({ authorName: "Parity", copyrightHolder: "Parity" });
-  wc.setFallbackPolicy(fallbackPolicy);
+  wc.setFallbackPolicy(uniformFallbackPolicy(fallbackPolicy));
   wc.deleteNode("rule#carved");
   const families = groupRules(ir.groups.flatMap((g) => g.rules));
   const family = families.find((f) => !f.memberIds.includes("rule#carved"));
@@ -72,7 +72,7 @@ async function downloadKmn(): Promise<string> {
 }
 
 describe("projectionInputFromState — preview/download parity", () => {
-  it.each<FallbackPolicy>(["swallow", "pass-through"])(
+  it.each<Disposition>(["swallow", "pass-through"])(
     "a carved rule under %s and a disabled family project identically",
     async (policy) => {
       const startVfs = seed(policy);

@@ -24,7 +24,7 @@ import {
   makeTestIR,
   vkeyRule,
 } from "@keyboard-studio/contracts/fixtures";
-import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
+import type { Disposition, KeyboardIR } from "@keyboard-studio/contracts";
 import { applyCarveToVfs, emitKmn } from "@keyboard-studio/engine";
 import { applyCarveMutate } from "../steps/editorMutate.js";
 import { stubKmnVfs } from "../test/workingCopy.ts";
@@ -81,7 +81,7 @@ const DELETED_NODE_IDS = new Set(["rule#blockMe"]);
 const DELETED_ITEM_IDS = new Set(["store#dkt003b#1"]);
 
 /** Engine path: applyCarveToVfs with the T015 carvePipeline opts. */
-function enginePath(startIr: KeyboardIR, fallbackPolicy: FallbackPolicy = "swallow"): string {
+function enginePath(startIr: KeyboardIR, fallbackPolicy: Disposition = "swallow"): string {
   const vfs = stubKmnVfs("test");
   const result = applyCarveToVfs(vfs, "test", startIr, DELETED_NODE_IDS, {
     carvePipeline: {
@@ -97,7 +97,7 @@ function enginePath(startIr: KeyboardIR, fallbackPolicy: FallbackPolicy = "swall
 }
 
 /** Studio path: the mutate seam, then emit. */
-function seamPath(startIr: KeyboardIR, fallbackPolicy: FallbackPolicy = "swallow"): string {
+function seamPath(startIr: KeyboardIR, fallbackPolicy: Disposition = "swallow"): string {
   const seamIr = applyCarveMutate(
     startIr,
     DELETED_NODE_IDS,

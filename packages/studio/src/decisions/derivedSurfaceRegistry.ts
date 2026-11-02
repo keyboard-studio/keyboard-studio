@@ -246,8 +246,8 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     label: "Keyboard-wide fallback policy (Assign Mechanisms step)",
     phase: 3,
     status: "pending",
-    storeActions: ["setFallbackPolicy"],
-    fields: ["fallbackPolicy"],
+    storeActions: ["setFallbackPolicy", "setFallbackPolicyConfirmed"],
+    fields: ["fallbackPolicy", "fallbackPolicyConfirmed"],
     // Not sourced from the carved-layout decision: the policy is an
     // author-set working-copy setting persisted in the draft. Recording it
     // in the carve value would let a replay rebuild revert a later choice.
@@ -385,6 +385,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   carveChars: { kind: "field", class: "DECISION-DERIVED" },
   undoStack: { kind: "field", class: "EPHEMERAL" },
   fallbackPolicy: { kind: "field", class: "EDITOR-AUTHORED" },
+  fallbackPolicyConfirmed: { kind: "field", class: "EDITOR-AUTHORED" },
   carveTouchKeepInert: { kind: "field", class: "UNCLASSIFIED" },
   setCarveTouchKeepInert: { kind: "action", class: "UNCLASSIFIED" },
   carveSuggestion: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -430,6 +431,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   cascadeDelete: { kind: "action", class: "DECISION-DERIVED" },
   cascadeRestore: { kind: "action", class: "DECISION-DERIVED" },
   setFallbackPolicy: { kind: "action", class: "EDITOR-AUTHORED" },
+  setFallbackPolicyConfirmed: { kind: "action", class: "EDITOR-AUTHORED" },
   recordPhase: { kind: "action", class: "SURVEY-SLOT" },
   recordAssignments: { kind: "action", class: "SURVEY-SLOT" },
   setIrAxes: { kind: "action", class: "SURVEY-SLOT" },

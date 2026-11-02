@@ -31,6 +31,7 @@ import type {
   Pattern,
   VirtualFS,
 } from "@keyboard-studio/contracts";
+import { collapseFallbackPolicy } from "@keyboard-studio/contracts";
 import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { WorkingCopyState } from "../stores/workingCopyStore.ts";
 import type {
@@ -116,7 +117,8 @@ export function projectionInputFromState(
     ...(disabledRuleIds.size > 0 ? { suppressionExemptIds: disabledRuleIds } : {}),
     carveChars: state.carveChars,
     deletedTouchKeyIds: state.deletedTouchKeyIds,
-    fallbackPolicy: state.fallbackPolicy,
+    // The pipeline is not class-aware yet: pass-through only when every class passes through.
+    fallbackPolicy: collapseFallbackPolicy(state.fallbackPolicy),
     // T020 (FR-023): the store array is NFC-normalized at write time.
     ...(state.carveTouchKeepInert.length > 0
       ? { carveTouchKeepInert: new Set(state.carveTouchKeepInert) }

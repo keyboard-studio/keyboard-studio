@@ -1,6 +1,7 @@
 // FallbackPolicySection — the keyboard-wide fallback policy surface.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { uniformFallbackPolicy } from "@keyboard-studio/contracts";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { charRule, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
@@ -44,14 +45,14 @@ describe("FallbackPolicySection", () => {
   it("defaults to Do nothing and choosing each option updates the store", () => {
     render(<FallbackPolicySection defaultOpen />);
     expect((screen.getByRole("radio", { name: "Do nothing" }) as HTMLInputElement).checked).toBe(true);
-    expect(store().fallbackPolicy).toBe("swallow");
+    expect(store().fallbackPolicy).toEqual(uniformFallbackPolicy("swallow"));
 
     fireEvent.click(screen.getByRole("radio", { name: "Use the computer's layout" }));
-    expect(store().fallbackPolicy).toBe("pass-through");
+    expect(store().fallbackPolicy).toEqual(uniformFallbackPolicy("pass-through"));
     expect((screen.getByRole("radio", { name: "Use the computer's layout" }) as HTMLInputElement).checked).toBe(true);
 
     fireEvent.click(screen.getByRole("radio", { name: "Do nothing" }));
-    expect(store().fallbackPolicy).toBe("swallow");
+    expect(store().fallbackPolicy).toEqual(uniformFallbackPolicy("swallow"));
   });
 
   it("states the deadkey rule as a rule, not a choice", () => {
@@ -89,7 +90,7 @@ describe("FallbackPolicySection", () => {
   });
 
   it("the collapsed summary names the current choice", () => {
-    store().setFallbackPolicy("pass-through");
+    store().setFallbackPolicy(uniformFallbackPolicy("pass-through"));
     render(<FallbackPolicySection />);
     expect(screen.getByTestId("fallback-policy-current").textContent).toBe("Use the computer's layout");
   });

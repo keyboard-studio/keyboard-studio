@@ -682,9 +682,9 @@ export interface WorkingCopyState {
 
   // -- Keyboard-wide fallback policy (076 FR-019, retired per-carve override) ---
   /**
-   * What a key that is not in the keyboard does: `"swallow"` (nothing; the
-   * default) or `"pass-through"` (the computer's own layout answers). One
-   * value per working copy, set by the author in the Assign Mechanisms step
+   * What a key that is not in the keyboard does, per character class:
+   * `"swallow"` (nothing; the default) or `"pass-through"` (the computer's
+   * own layout answers). One policy per working copy, set by the author in the Assign Mechanisms step
    * and never re-prompted on recompile. Deadkey carves always suppress
    * regardless (engine backstop). Replaces the per-combination
    * `carveDispositions` store and the closed-keyboard card, which are folded
@@ -693,6 +693,13 @@ export interface WorkingCopyState {
    * Persisted with the working copy; never in the IR or the emitted keyboard.
    */
   fallbackPolicy: FallbackPolicy;
+
+  /**
+   * True once the author has confirmed the policy on the surface; false for a
+   * default or a widened legacy value. Persisted in the draft envelope; a
+   * draft saved before it existed reads as false.
+   */
+  fallbackPolicyConfirmed: boolean;
 
   /**
    * Touch-layout keep-inert overrides, 076 FR-023 (T020): carved NFC
@@ -1016,6 +1023,8 @@ export interface WorkingCopyState {
   // -- Actions: keyboard-wide fallback policy (076 FR-019) ---------------------
   /** Record the author's fallback policy. Idempotent. */
   setFallbackPolicy: (policy: FallbackPolicy) => void;
+  /** Record whether the author has confirmed the fallback policy. */
+  setFallbackPolicyConfirmed: (confirmed: boolean) => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -1591,7 +1600,8 @@ function freshInstantiationTail() {
     // store and closed-keyboard card are NOT slots here — #2340 removed
     // them, and re-adding them (as the shared-tail refactor did from
     // dev's older tracks) resurrects them in the store state.
-    fallbackPolicy: DEFAULT_FALLBACK_POLICY,
+    fallbackPolicy: { ...DEFAULT_FALLBACK_POLICY },
+    fallbackPolicyConfirmed: false,
     carveTouchKeepInert: [],
     displacedDeclined: [],
     carveSuggestion: null,
@@ -1687,6 +1697,7 @@ export type WorkingCopyData = Omit<
   | "cascadeDelete"
   | "cascadeRestore"
   | "setFallbackPolicy"
+  | "setFallbackPolicyConfirmed"
   | "setCarveTouchKeepInert"
   | "declineDisplacement"
   | "setCarveSuggestion"
@@ -1782,7 +1793,8 @@ const INITIAL_STATE: WorkingCopyData = {
   carveChars: new Set(),
   undoStack: [],
   // keyboard-wide fallback policy (076 FR-019): flat swallow default
-  fallbackPolicy: DEFAULT_FALLBACK_POLICY,
+  fallbackPolicy: { ...DEFAULT_FALLBACK_POLICY },
+  fallbackPolicyConfirmed: false,
   carveTouchKeepInert: [],
   displacedDeclined: [],
   carveSuggestion: null,
@@ -2102,7 +2114,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- keyboard-wide fallback policy (076 FR-019) ------------------------------
 
-  setFallbackPolicy: (policy) => set({ fallbackPolicy: policy }),
+  setFallbackPolicy: (policy) => set({ fallbackPolicy: { ...policy } }),
+  setFallbackPolicyConfirmed: (confirmed) => set({ fallbackPolicyConfirmed: confirmed }),
 
   // 076 FR-023 (T020): wholesale replace; NFC-normalize so the engine seam
   // comparison stays exact.

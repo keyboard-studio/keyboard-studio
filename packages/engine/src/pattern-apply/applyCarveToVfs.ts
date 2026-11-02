@@ -42,7 +42,7 @@
 // preserves ALL user stores (not just those referenced by typed rules).
 
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
-import type { FallbackPolicy } from "@keyboard-studio/contracts";
+import type { Disposition } from "@keyboard-studio/contracts";
 import { emit } from "../codec/emit.js";
 import { reconcileSiblingAssetPaths } from "../compiler/reconcileSiblingAssetPaths.js";
 import { carveFilterIr } from "./carveFilterIr.js";
@@ -60,7 +60,7 @@ export interface CarvePipelineOpts {
   /** Glyph-level carve item ids (store-slot ids plus bare node ids). */
   deletedItemIds: ReadonlySet<string>;
   /** Keyboard-wide fallback policy for the suppression stage (FR-019). Omitted = no suppression. */
-  fallbackPolicy?: FallbackPolicy;
+  fallbackPolicy?: Disposition;
   /** Removal ids that are not carves (see CarvePipelineInput.suppressionExemptIds). */
   suppressionExemptIds?: ReadonlySet<string>;
   /** A6 loud/soft for the suppression stage. Default false (soft). */

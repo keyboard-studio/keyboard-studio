@@ -24,7 +24,7 @@
 //      filter must not undo the compiler's in-place block rewrite, and
 //      allow-host removals are already gone (no double-removal).
 
-import type { FallbackPolicy, KeyboardIR } from "@keyboard-studio/contracts";
+import type { Disposition, KeyboardIR } from "@keyboard-studio/contracts";
 import { compileCarveSuppression } from "./carveSuppression.js";
 import { dispositionsForFallbackPolicy } from "./fallbackPolicy.js";
 import { applyStoreSlotRemovals, type CascadedSlotRemoval } from "./applyStoreSlotRemovals.js";
@@ -51,7 +51,7 @@ import { parseSlotId } from "./slotId.js";
 export interface CarvePipelineInput {
   deletedNodeIds: ReadonlySet<string>;
   deletedItemIds: ReadonlySet<string>;
-  fallbackPolicy?: FallbackPolicy;
+  fallbackPolicy?: Disposition;
   /**
    * Ids in the deletion sets that are plain removals, not carves (e.g. rules
    * of a disabled family). They are excluded from the policy expansion, so

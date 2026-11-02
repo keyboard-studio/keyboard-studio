@@ -4,6 +4,7 @@
 // rebuilt state carries the IR and the overlay channels (I-1).
 
 import { describe, it, expect, beforeEach } from "vitest";
+import { uniformFallbackPolicy } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
@@ -243,7 +244,7 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
     expect([...wc.disabledFamilyIds]).toEqual(["fam1"]);
     expect([...wc.carveChars]).toEqual(["é"]);
     // The fallback policy is an author-set setting: a rebuild leaves it as it stands.
-    expect(wc.fallbackPolicy).toBe("swallow");
+    expect(wc.fallbackPolicy).toEqual(uniformFallbackPolicy("swallow"));
   });
 
   it("recalculateForStartingPointChangeFromStores: retained decisions re-derive against the new base (T017)", () => {

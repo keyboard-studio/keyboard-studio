@@ -7,7 +7,7 @@ import { deriveCarvedIr } from "./carvePipeline.js";
 import { emit } from "../codec/emit.js";
 import { validateWithOracle } from "../validator/oracle.js";
 import { makeTestIR, irGroup, charStore } from "@keyboard-studio/contracts/fixtures";
-import type { ContextElement, FallbackPolicy, IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
+import type { ContextElement, Disposition, IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 
 const K = (name: string): ContextElement => ({ kind: "vkey", name, modifiers: [] });
 const PLUS: ContextElement = { kind: "raw", text: "+" };
@@ -41,8 +41,8 @@ function ir(rules: IRRule[]): KeyboardIR {
 }
 
 const ALL = new Set(["store#ka#0", "store#ka#1", "store#kb#0", "store#kb#1"]);
-const POLICIES: FallbackPolicy[] = ["pass-through", "swallow"];
-const carve = (start: KeyboardIR, policy: FallbackPolicy, ids: ReadonlySet<string> = ALL) =>
+const POLICIES: Disposition[] = ["pass-through", "swallow"];
+const carve = (start: KeyboardIR, policy: Disposition, ids: ReadonlySet<string> = ALL) =>
   deriveCarvedIr(start, { deletedNodeIds: new Set(), deletedItemIds: ids, fallbackPolicy: policy });
 const ids = (x: KeyboardIR) => x.groups[0]!.rules.map((r) => r.nodeId);
 

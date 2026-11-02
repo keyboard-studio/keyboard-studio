@@ -2,8 +2,8 @@
   "workflow": "companion",
   "specName": "Base-keyboard fallback",
   "branch": "109-base-keyboard-fallback",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -39,6 +39,74 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T17:11:52.872Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-02T17:17:38.522Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T17:18:31.074Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T17:18:31.503Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-02T17:23:45.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T18:10:11.108Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T18:10:11.452Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T18:10:11.813Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T18:10:12.173Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T18:10:12.527Z"
     }
   ],
   "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801",
@@ -64,7 +132,209 @@
     "plan": {
       "summary": "Plan: data codegen, shared enumerator, per-class policy plus swallowUndefined, rebuilt surface",
       "key_finding": "the kmn form for a key-position swallow store must be proven against kmcmplib first"
+    },
+    "tasks": {
+      "summary": "27 tasks in 6 phases: foundational policy, data, enumerator, compile, surface, polish"
     }
   },
-  "approach": "Generate char data for all catalog layouts, add a shared positional enumerator, split FallbackPolicy per class with a confirmed flag, compile swallowUndefined as one store plus nul rule via mutate(), rebuild the surface."
+  "approach": "Generate char data for all catalog layouts, add a shared positional enumerator, split FallbackPolicy per class with a confirmed flag, compile swallowUndefined as one store plus nul rule via mutate(), rebuild the surface.",
+  "coverage": {
+    "FR-001": {
+      "title": "Question says what it is about and names fallback to the base keyboard",
+      "tasks": [
+        "T022"
+      ]
+    },
+    "FR-002": {
+      "title": "Per-base-keyboard leak lists grouped by class",
+      "tasks": [
+        "T022"
+      ]
+    },
+    "FR-003": {
+      "title": "No picks: likely base keyboards labelled as guess",
+      "tasks": [
+        "T022"
+      ]
+    },
+    "FR-004": {
+      "title": "Copy follows A2 rules",
+      "tasks": [
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-005": {
+      "title": "Copy matches what compiled keyboard does",
+      "tasks": [
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-006": {
+      "title": "Collapsed per-class summary",
+      "tasks": [
+        "T022"
+      ]
+    },
+    "FR-007": {
+      "title": "Derived on render, no timer",
+      "tasks": [
+        "T022"
+      ]
+    },
+    "FR-010": {
+      "title": "Swallow unhandled printable positions in Do-nothing classes",
+      "tasks": [
+        "T017",
+        "T020"
+      ]
+    },
+    "FR-011": {
+      "title": "Never frame keys, no nomatch > nul",
+      "tasks": [
+        "T017",
+        "T020"
+      ]
+    },
+    "FR-012": {
+      "title": "Recompute on binding change, respect skip-set",
+      "tasks": [
+        "T014",
+        "T020"
+      ]
+    },
+    "FR-013": {
+      "title": "Behaviour-owned IR via mutate(), compiles cleanly",
+      "tasks": [
+        "T017",
+        "T021"
+      ]
+    },
+    "FR-014": {
+      "title": "All pass-through emits nothing extra",
+      "tasks": [
+        "T017",
+        "T020"
+      ]
+    },
+    "FR-015": {
+      "title": "Carve suppression reads per-class value",
+      "tasks": [
+        "T015",
+        "T018"
+      ]
+    },
+    "FR-020": {
+      "title": "Per-class proposals with evidence",
+      "tasks": [
+        "T001",
+        "T016",
+        "T020",
+        "T022"
+      ]
+    },
+    "FR-021": {
+      "title": "Unconfirmed drafts do not change",
+      "tasks": [
+        "T003",
+        "T004",
+        "T018",
+        "T019",
+        "T021"
+      ]
+    },
+    "FR-030": {
+      "title": "All catalog layouts have pinned generated data",
+      "tasks": [
+        "T006",
+        "T009",
+        "T010"
+      ]
+    },
+    "FR-031": {
+      "title": "Data keyed by key and modifiers",
+      "tasks": [
+        "T006"
+      ]
+    },
+    "FR-032": {
+      "title": "No data shows unknown",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-040": {
+      "title": "One positional enumerator",
+      "tasks": [
+        "T011",
+        "T012"
+      ]
+    },
+    "FR-041": {
+      "title": "Engine does not import studio",
+      "tasks": [
+        "T013"
+      ]
+    }
+  },
+  "currentTask": "T005",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "FallbackPolicy per class (letters/digits/punctuation), LeakClass, Disposition",
+      "files": [
+        "packages/contracts/src/fallbackPolicy.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Schema per class, legacy single value widened, drift guards kept",
+      "files": [
+        "packages/contracts/src/schemas.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Legacy value widened to three classes, confirmed false",
+      "files": [
+        "packages/studio/src/survey/carve/fallbackPolicyMigration.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Store holds per-class policy and confirmed flag, persisted in envelope",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Contract, migration and store persistence tests",
+      "files": [
+        "packages/contracts/src/fallbackPolicy.test.ts"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "pnpm typecheck, lint, full pnpm -r test with long hook timeouts on the cold-import studio files",
+      "command": "pnpm typecheck; pnpm lint; pnpm -r test",
+      "result": "typecheck and lint clean; all suites pass; useKeyboardArtifact and OutputScreen files pass at 120s timeouts",
+      "warnings": [
+        "those files hit the 10s hook timeout on a cold first import under load; not confirmed against a clean baseline"
+      ]
+    }
+  ],
+  "concerns": [
+    {
+      "note": "useKeyboardArtifact and OutputScreen tests time out at the default 10s hook limit on cold import; pass with longer timeouts. Baseline not compared.",
+      "step": "implement"
+    },
+    {
+      "note": "Engine pipeline stays single-valued; studio collapses per-class policy at projectionInput, so mixed policies are not honored until Phase 4",
+      "step": "implement"
+    }
+  ],
+  "last_action": "Phase 1 done"
 }

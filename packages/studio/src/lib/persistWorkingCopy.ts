@@ -63,7 +63,7 @@ import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
-import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
+import { migrateFallbackPolicyState } from "../survey/carve/fallbackPolicyMigration.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -138,14 +138,19 @@ export type WorkingCopySnapshot = Omit<
   | "dismissedMissingGroups"
   | "narrowedGuardQuestions"
   | "fallbackPolicy"
+  | "fallbackPolicyConfirmed"
 > & {
   /**
-   * Keyboard-wide fallback policy. Absent in drafts written before it
-   * existed; those carry the legacy `closedKeyboardCard` / `carveDispositions`
-   * below instead, and the read side folds them into a policy
-   * (`migrateFallbackPolicy`). Never written in the legacy shape.
+   * Keyboard-wide fallback policy, per character class. Absent in drafts
+   * written before it existed (those carry the legacy `closedKeyboardCard` /
+   * `carveDispositions` below), and a single `"swallow"` / `"pass-through"`
+   * string in drafts written before it became per-class; the read side folds
+   * both into a policy (`migrateFallbackPolicyState`). Never written in a
+   * legacy shape.
    */
-  fallbackPolicy?: FallbackPolicy;
+  fallbackPolicy?: FallbackPolicy | "swallow" | "pass-through";
+  /** Whether the author confirmed the policy. Absent in older drafts; reads as false. */
+  fallbackPolicyConfirmed?: boolean;
   /** LEGACY (read-only): the closed-keyboard card outcome of a pre-policy draft. */
   closedKeyboardCard?: unknown;
   /** LEGACY (read-only): the per-combination dispositions of a pre-policy draft. */
@@ -443,6 +448,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // read side is the tolerant half: a pre-policy snapshot carries the
     // legacy card/dispositions fields instead and is migrated on read.
     fallbackPolicy: s.fallbackPolicy,
+    fallbackPolicyConfirmed: s.fallbackPolicyConfirmed,
     // 076 FR-023 T020 keep-inert overrides: plain JSON-safe string array,
     // same passthrough + tolerant-read idiom as axisFills above.
     carveTouchKeepInert: s.carveTouchKeepInert,
@@ -533,6 +539,7 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
   const snapshot = withLegacySnapshotKeys(input);
   const startVfs = createVirtualFS(snapshot.startVfsEntries.map(deserializeEntry));
 
+  const fallbackState = migrateFallbackPolicyState(snapshot);
   const removalCapabilities =
     snapshot.startIr !== null
       ? classifyRemovalCapabilities(snapshot.startIr)
@@ -622,7 +629,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // policy and the legacy fields are dropped. Never throws; an absent or
     // unrecognised shape reads as the default. The choice is recorded once
     // here and never re-prompted.
-    fallbackPolicy: migrateFallbackPolicy(snapshot),
+    fallbackPolicy: fallbackState.policy,
+    fallbackPolicyConfirmed: fallbackState.confirmed,
     carveTouchKeepInert: snapshot.carveTouchKeepInert ?? [],
     displacedDeclined: snapshot.displacedDeclined ?? [],
     carveSuggestion: snapshot.carveSuggestion ?? null,

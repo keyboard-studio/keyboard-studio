@@ -18,6 +18,7 @@
 // reconstructing a real non-Latin bcp47/langtags scenario.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { uniformFallbackPolicy } from '@keyboard-studio/contracts';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render, i18n } from '../../test/renderWithI18n.tsx';
 import { messages as frMessages } from '../../locales/fr/messages.json?lingui';
@@ -1023,7 +1024,7 @@ describe('CarveGalleryV2 — no fallback controls; plain carve review', () => {
     renderGalleryV2(makeFixtureIR());
     await screen.findByTestId('carve-v2-suggested-group');
     expect(Object.keys(useWorkingCopyStore.getState())).not.toContain('carveDispositions');
-    expect(useWorkingCopyStore.getState().fallbackPolicy).toBe('swallow');
+    expect(useWorkingCopyStore.getState().fallbackPolicy).toEqual(uniformFallbackPolicy('swallow'));
   });
 
   it('offers a Review carved keys button that opens a disposition-free list', async () => {
