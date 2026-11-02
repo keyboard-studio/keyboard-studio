@@ -146,6 +146,18 @@ export function applicabilityFor(
         "No welcome.htm and no help .php; their absence is reported by 6.3b and 11.1b.",
     };
   }
+  // /review: the 7.5/7.16 rows judge the .kvks's content. With no .kvks
+  // there is nothing to judge; its absence is the 7.0 finding.
+  if (
+    facts.kvksAbsent === true &&
+    lintCode !== undefined &&
+    (lintCode === "KM_LINT_RALT_MISSING_USEALTGR" ||
+      lintCode === "KM_LINT_KVKS_BLANK")
+  ) {
+    return {
+      reason: "No .kvks; its absence is reported by 7.0-kvks-file-exists.",
+    };
+  }
   // /review: 3.4 compares against the keyboard's earlier HISTORY.md; a
   // keyboard the PR adds has none.
   if (

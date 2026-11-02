@@ -497,6 +497,20 @@
     "surveyQuestionId": "welcome-htm-not-political"
   },
   {
+    "id": "7.0-kvks-file-exists",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "A `.kvks` on-screen keyboard file exists in `source/`.",
+    "lintRuleId": "KM_LINT_KVKS_ABSENT"
+  },
+  {
+    "id": "7.0-ico-file-exists",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "An `.ico` icon file exists for the keyboard.",
+    "lintRuleId": "KM_LINT_ICO_ABSENT"
+  },
+  {
     "id": "7.1-kmn-version-matches-history",
     "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
     "band": "layer-c-enforce",
@@ -1230,6 +1244,13 @@
     "band": "red-checklist",
     "description": "After the build runs, any issues it catches that local review missed were fed back to the author",
     "preSubmitChecklistText": "Any issues the TeamCity build caught that local review missed have been fed back to the author."
+  },
+  {
+    "id": "18.0-touch-layout-exists",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "description": "A `.keyman-touch-layout` touch layout file exists in `source/`.",
+    "lintRuleId": "KM_LINT_TOUCH_LAYOUT_ABSENT"
   },
   {
     "id": "18.1-longpress-within-limit",

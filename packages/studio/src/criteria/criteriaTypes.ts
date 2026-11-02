@@ -128,6 +128,12 @@ export interface CriteriaFacts {
    */
   welcomeHtmAbsent?: boolean;
   /**
+   * Foreign host only: the keyboard ships no .kvks. The rows that judge
+   * its content (7.5, 7.16) are then Not applicable; the missing file
+   * itself is 7.0-kvks-file-exists' finding.
+   */
+  kvksAbsent?: boolean;
+  /**
    * /review host only: the PR adds this keyboard (its folder is absent
    * at the PR base commit), so there is no earlier HISTORY.md for 3.4's
    * "prior entries are preserved" comparison.
@@ -324,4 +330,10 @@ export interface CriteriaResult {
   total: number;
   /** Rows with a definite verdict: met + not-met + not-applicable. */
   resolvedCount: number;
+  /**
+   * /review only: the judged keyboard's file-inventory tree (required
+   * files with placement status, optionals, others). Set by the foreign
+   * judge; absent in authored mode.
+   */
+  fileTree?: import("../review/fileTree.ts").FileTreeNode[];
 }

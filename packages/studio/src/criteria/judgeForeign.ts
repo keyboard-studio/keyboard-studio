@@ -56,6 +56,7 @@ import {
 } from "./criteriaTypes.ts";
 import { collectDocLintInputFromVfs } from "../lib/collectDocLintInputFromVfs.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { buildFileTree } from "../review/fileTree.ts";
 import { mergeLintFindings } from "./mergeFindings.ts";
 import {
   buildReviewerSource,
@@ -408,6 +409,7 @@ export async function judgeForeignKeyboard(
     welcomeHtmAbsent:
       !loweredPaths.has("source/welcome.htm") &&
       !loweredPaths.has("source/welcome/welcome.htm"),
+    kvksAbsent: ![...loweredPaths].some((p) => p.endsWith(".kvks")),
     newKeyboardAtBase,
     // §19 adaptation signal: the PR body or HISTORY.md mentions an
     // adaptation. Without it the §19 rows resolve Not applicable.
@@ -443,7 +445,7 @@ export async function judgeForeignKeyboard(
     ...(languageTags !== undefined ? { languageTags } : {}),
   });
   const prComments = rc?.prCommentCounts;
-  return resolveCriteria({
+  const resolved = resolveCriteria({
     criteria: ALL_CRITERIA,
     mode: "foreign",
     lintFindings: stampPrDelta(
@@ -473,4 +475,8 @@ export async function judgeForeignKeyboard(
     licenseTextHints: licenseTextHints(readVfsText(vfs, "LICENSE.md")),
     reviewerSource,
   });
+  return {
+    ...resolved,
+    fileTree: buildFileTree(vfs.list(), keyboardId),
+  };
 }

@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-11-02T17:00:50.774Z",
- "catalogSize": 192,
+ "generatedAt": "2026-11-02T18:07:47.133Z",
+ "catalogSize": 195,
  "byBand": {
-  "layer-c-enforce": 110,
+  "layer-c-enforce": 113,
   "scaffolder-bake": 40,
   "yellow-survey": 32,
   "red-checklist": 10
  },
- "implementedCount": 103,
+ "implementedCount": 106,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -938,6 +938,36 @@
     "kind": "surveyQuestionId",
     "id": "welcome-htm-not-political"
    }
+  },
+  {
+   "id": "7.0-kvks-file-exists",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "A `.kvks` on-screen keyboard file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KVKS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "7.0-ico-file-exists",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "An `.ico` icon file exists for the keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_ICO_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "7.1-kmn-version-matches-history",
@@ -2263,6 +2293,21 @@
    "hook": {
     "kind": "preSubmitChecklistText"
    }
+  },
+  {
+   "id": "18.0-touch-layout-exists",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "A `.keyman-touch-layout` touch layout file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_LAYOUT_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "18.1-longpress-within-limit",

@@ -42,9 +42,12 @@
 // CriteriaInput.contextMissing — the resolver then resolves §18.6 to
 // Not yet checkable with that reason, never Met. The same treatment
 // applies to the Batch 1 IR-dependent codes when the .kmn does not
-// parse (their checks cannot run without an IR) and to §7.16 when the
-// package has no .kvks at all: a missing file is not a blank file, so
-// absence is a named missing input, never a finding and never a pass.
+// parse (their checks cannot run without an IR).
+//
+// §7.16 is not a contextMissing case: the .kvks is a required file
+// (2026-11-02 ruling), so when it is absent §7.16 nests under the
+// 7.0-kvks-file-exists row via the applicability rule — Not applicable
+// naming the parent, never grey and never a pass.
 //
 // Batch 4: the authored host builds the inventory with
 // buildCriteriaInventory (the author's confirmed decisions unioned with
@@ -129,7 +132,7 @@ export function sharedFontRefsMissingFromVfs(
 /** The one criteria-mapped code whose inputs this assembly can fail to supply. */
 export const INVENTORY_UNCOVERED_CODE = "KM_LINT_INVENTORY_UNCOVERED";
 
-/** §7.16's code: named here because its absent-file case is a missing input. */
+/** §7.16's code, for the applicability nesting (absent .kvks → N/A). */
 export const KVKS_BLANK_CODE = "KM_LINT_KVKS_BLANK";
 
 /** §1.10b's code: named here because its absent-.kpj case is a missing input. */
@@ -140,7 +143,6 @@ export const KPJ_VERSION_BUMPED_CODE = "KM_LINT_KPJ_VERSION_BUMPED";
 
 const MISSING_IR = "the parsed keyboard source";
 const MISSING_INVENTORY = "the linguist inventory";
-const MISSING_KVKS = "the .kvks visual keyboard file";
 const MISSING_KPJ = "the .kpj project file";
 const MISSING_KPS = "the .kps package file";
 
@@ -527,9 +529,9 @@ export function assembleLintContext(
       contextMissing[code] = MISSING_IR;
     }
   }
-  if (kvksPath === undefined) {
-    contextMissing[KVKS_BLANK_CODE] = MISSING_KVKS;
-  }
+  // No contextMissing for a missing .kvks: §7.16 nests under the .kvks
+  // existence row (7.0-kvks-file-exists) via the applicability rule, so it
+  // resolves Not applicable naming the parent — never grey, never a pass.
   if (kpjPath === undefined || kpjText === undefined) {
     // No .kpj in the judged VFS (or none readable as text): neither
     // KPJ-pair row can be judged — name the missing file for both

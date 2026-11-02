@@ -1,6 +1,7 @@
 // Checks 1.7b / 1.8b / 1.11b / 1.12b / 3.1b / 6.1b / 6.3b — the file-inventory
-// twins (Group A2, Batch 1) — plus the four required-file existence checks
-// (1.14 / 4.0 / 5.0 / 8.0): README.md, LICENSE.md, the .kpj and the .kps
+// twins (Group A2, Batch 1) — plus the seven required-file existence checks
+// (1.14 / 4.0 / 5.0 / 8.0 / 18.0 / 7.0-kvks / 7.0-ico): README.md,
+// LICENSE.md, the .kpj, the .kps, the touch layout, the .kvks and the .ico
 // are required files (2026-11-02 ruling), so their absence is a finding,
 // and the checks that read them nest under that absence via the
 // assembly's contextMissing (never a vacuous pass).
@@ -8,7 +9,7 @@
 // Each is the post-hoc checkable twin of a scaffolder-bake criterion: the
 // bake row is Met-by-guarantee for studio-built keyboards and
 // not-yet-checkable ("foreign-bake") for foreign keyboards; the twin row is
-// a real layer-c check that reads the judged VFS. All eleven are pure
+// a real layer-c check that reads the judged VFS. All fourteen are pure
 // functions of the VFS path list — no parsing, no IR.
 //
 // Conventions: comparisons are case-insensitive on the basename (the
@@ -245,7 +246,57 @@ export function checkKpsAbsent(paths: readonly string[]): CheckResult {
   ]);
 }
 
-/** Run all eleven file-inventory checks over one VFS path list. */
+/** 18.0 — a `.keyman-touch-layout` file is absent from the keyboard. */
+export function checkTouchLayoutAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) =>
+    p.toLowerCase().endsWith(".keyman-touch-layout"),
+  );
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_TOUCH_LAYOUT_ABSENT", [
+      `File: ${hit}`,
+      `Found: ${hit}`,
+    ]);
+  return checkFailed("KM_LINT_TOUCH_LAYOUT_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_TOUCH_LAYOUT_ABSENT",
+      file: "source/<keyboard-id>.keyman-touch-layout",
+      message: "No .keyman-touch-layout touch layout file in source/.",
+      hint: "Add the source/<keyboard-id>.keyman-touch-layout touch layout file.",
+    }),
+  ]);
+}
+
+/** 7.0 (kvks) — a `.kvks` on-screen keyboard file is absent. */
+export function checkKvksAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => p.toLowerCase().endsWith(".kvks"));
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_KVKS_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
+  return checkFailed("KM_LINT_KVKS_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_KVKS_ABSENT",
+      file: "source/<keyboard-id>.kvks",
+      message: "No .kvks on-screen keyboard file in source/.",
+      hint: "Add the source/<keyboard-id>.kvks visual keyboard file.",
+    }),
+  ]);
+}
+
+/** 7.0 (ico) — an `.ico` icon file is absent. */
+export function checkIcoAbsent(paths: readonly string[]): CheckResult {
+  const hit = paths.find((p) => p.toLowerCase().endsWith(".ico"));
+  if (hit !== undefined)
+    return checkPassed("KM_LINT_ICO_ABSENT", [`File: ${hit}`, `Found: ${hit}`]);
+  return checkFailed("KM_LINT_ICO_ABSENT", [
+    criteriaFinding({
+      code: "KM_LINT_ICO_ABSENT",
+      file: "source/<keyboard-id>.ico",
+      message: "No .ico icon file for the keyboard.",
+      hint: "Add the keyboard's .ico icon file (referenced by store(&BITMAP)).",
+    }),
+  ]);
+}
+
+/** Run all fourteen file-inventory checks over one VFS path list. */
 export function checkFileInventory(paths: readonly string[]): ReturnType<typeof mergeResults> {
   return mergeResults(
     checkKeyboardInfoPresent(paths),
@@ -259,5 +310,8 @@ export function checkFileInventory(paths: readonly string[]): ReturnType<typeof 
     checkLicenseMdAbsent(paths),
     checkReadmeMdAbsent(paths),
     checkKpsAbsent(paths),
+    checkTouchLayoutAbsent(paths),
+    checkKvksAbsent(paths),
+    checkIcoAbsent(paths),
   );
 }

@@ -192,6 +192,34 @@ describe("foreign judge: nested checks under a missing required file", () => {
       "No HISTORY.md; its absence is reported by 3.1b.",
     ]);
   });
+
+  it("7.5/7.16 are Not applicable without the .kvks, naming 7.0", async () => {
+    const { row } = await judge(vfsWithout());
+    for (const prefix of ["7.5-", "7.16-"]) {
+      const r = row(prefix);
+      expect(r.status, prefix).toBe("not-applicable");
+      expect(r.evidence().lines).toEqual([
+        "No .kvks; its absence is reported by 7.0-kvks-file-exists.",
+      ]);
+    }
+    expect(row("7.0-kvks-").status).toBe("not-met");
+  });
+
+  it("7.5/7.16 judge normally when a .kvks exists", async () => {
+    const kvks =
+      '<?xml version="1.0" encoding="utf-8"?><kvks><layers></layers></kvks>';
+    const { row } = await judge(vfsOf([entry(`source/${ID}.kvks`, kvks)]));
+    for (const prefix of ["7.5-", "7.16-"]) {
+      expect(row(prefix).status, prefix).not.toBe("not-applicable");
+    }
+  });
+
+  it("18.0/7.0-kvks/7.0-ico report not-met when their files are absent", async () => {
+    const { row } = await judge(vfsWithout());
+    expect(row("18.0-").status).toBe("not-met");
+    expect(row("7.0-kvks-").status).toBe("not-met");
+    expect(row("7.0-ico-").status).toBe("not-met");
+  });
 });
 
 describe("foreign judge: deprecation and partner predicates", () => {

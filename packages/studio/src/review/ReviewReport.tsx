@@ -29,6 +29,7 @@ import {
   severityForReviewRow,
   type ReviewSeverity,
 } from "./reviewSeverity.ts";
+import { FileTree } from "./FileTree.tsx";
 import {
   ERROR_TEXT,
   SUCCESS_ACCENT,
@@ -369,6 +370,7 @@ export function ReviewReport({
       </div>
 
       <div style={{ minHeight: 0, flex: 1 }}>
+        {result.fileTree !== undefined && <FileTree tree={result.fileTree} />}
         <CriteriaPage
           result={resultWithAuthor}
           mode="foreign"

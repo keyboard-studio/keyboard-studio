@@ -137,12 +137,16 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_README_HTM_ABSENT",
   "KM_LINT_WELCOME_HTM_ABSENT",
   // Required-file existence checks (2026-11-02 ruling: README.md,
-  // LICENSE.md, the .kpj and the .kps are required files — absence is
-  // a finding, and dependent checks nest under it via contextMissing).
+  // LICENSE.md, the .kpj, the .kps, the touch layout, the .kvks and the
+  // .ico are required files — absence is a finding, and dependent checks
+  // nest under it via contextMissing).
   "KM_LINT_KPJ_ABSENT",
   "KM_LINT_LICENSE_MD_ABSENT",
   "KM_LINT_README_MD_ABSENT",
   "KM_LINT_KPS_ABSENT",
+  "KM_LINT_TOUCH_LAYOUT_ABSENT",
+  "KM_LINT_KVKS_ABSENT",
+  "KM_LINT_ICO_ABSENT",
   // Group A2 .kps-listing twins (check-kps-listing): post-hoc checks of
   // the scaffolder-bake package-listing guarantees — 8.1b–8.6b /
   // 8.8b–8.11b. Pure functions of the .kps <File> names.

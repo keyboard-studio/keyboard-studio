@@ -1,6 +1,6 @@
 // Tests for the Group A2 file-inventory twins
 // (1.7b / 1.8b / 1.11b / 1.12b / 3.1b / 6.1b / 6.3b) and the required-file
-// existence checks (1.14 / 4.0 / 5.0 / 8.0).
+// existence checks (1.14 / 4.0 / 5.0 / 8.0 / 18.0 / 7.0-kvks / 7.0-ico).
 
 import { describe, expect, it } from "vitest";
 import {
@@ -8,13 +8,16 @@ import {
   checkDuplicateDocsSubfolder,
   checkFileInventory,
   checkHistoryMdAbsent,
+  checkIcoAbsent,
   checkKeyboardInfoPresent,
   checkKpjAbsent,
   checkKpjUserPresent,
   checkKpsAbsent,
+  checkKvksAbsent,
   checkLicenseMdAbsent,
   checkReadmeHtmAbsent,
   checkReadmeMdAbsent,
+  checkTouchLayoutAbsent,
   checkWelcomeHtmAbsent,
 } from "./check-file-inventory.js";
 
@@ -23,6 +26,8 @@ const CLEAN = [
   "source/gff_amharic.kmn",
   "source/gff_amharic.kvks",
   "source/gff_amharic.kps",
+  "source/gff_amharic.keyman-touch-layout",
+  "source/gff_amharic.ico",
   "source/readme.htm",
   "source/welcome.htm",
   "HISTORY.md",
@@ -132,6 +137,29 @@ describe("file-inventory twins", () => {
     expect(findings[0]!.code).toBe("KM_LINT_README_MD_ABSENT");
   });
 
+  it("18.0 flags a missing touch layout", () => {
+    const without = CLEAN.filter(
+      (p) => !p.toLowerCase().endsWith(".keyman-touch-layout"),
+    );
+    const { findings } = checkTouchLayoutAbsent(without);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.code).toBe("KM_LINT_TOUCH_LAYOUT_ABSENT");
+  });
+
+  it("7.0 flags a missing .kvks", () => {
+    const without = CLEAN.filter((p) => !p.toLowerCase().endsWith(".kvks"));
+    const { findings } = checkKvksAbsent(without);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.code).toBe("KM_LINT_KVKS_ABSENT");
+  });
+
+  it("7.0 flags a missing .ico", () => {
+    const without = CLEAN.filter((p) => !p.toLowerCase().endsWith(".ico"));
+    const { findings } = checkIcoAbsent(without);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.code).toBe("KM_LINT_ICO_ABSENT");
+  });
+
   it("8.0 flags a missing .kps", () => {
     const without = CLEAN.filter((p) => !p.toLowerCase().endsWith(".kps"));
     const { findings } = checkKpsAbsent(without);
@@ -156,6 +184,18 @@ describe("file-inventory twins", () => {
       "File: source/gff_amharic.kps",
       "Found: source/gff_amharic.kps",
     ]);
+    expect(checkTouchLayoutAbsent(CLEAN).verified).toEqual([
+      "File: source/gff_amharic.keyman-touch-layout",
+      "Found: source/gff_amharic.keyman-touch-layout",
+    ]);
+    expect(checkKvksAbsent(CLEAN).verified).toEqual([
+      "File: source/gff_amharic.kvks",
+      "Found: source/gff_amharic.kvks",
+    ]);
+    expect(checkIcoAbsent(CLEAN).verified).toEqual([
+      "File: source/gff_amharic.ico",
+      "Found: source/gff_amharic.ico",
+    ]);
   });
 
   it("reports every violation code through the aggregate", () => {
@@ -171,13 +211,16 @@ describe("file-inventory twins", () => {
         "KM_LINT_BUILD_FOLDER_PRESENT",
         "KM_LINT_DOCS_SUBFOLDER_DUPLICATES",
         "KM_LINT_HISTORY_MD_ABSENT",
+        "KM_LINT_ICO_ABSENT",
         "KM_LINT_KEYBOARD_INFO_PRESENT",
         "KM_LINT_KPJ_ABSENT",
         "KM_LINT_KPJ_USER_PRESENT",
         "KM_LINT_KPS_ABSENT",
+        "KM_LINT_KVKS_ABSENT",
         "KM_LINT_LICENSE_MD_ABSENT",
         "KM_LINT_README_HTM_ABSENT",
         "KM_LINT_README_MD_ABSENT",
+        "KM_LINT_TOUCH_LAYOUT_ABSENT",
         "KM_LINT_WELCOME_HTM_ABSENT",
       ].sort(),
     );
