@@ -98,4 +98,55 @@ describe("applyContextToleranceDecision for a normalization step (spec 086)", ()
     expect(Object.values(again?.classification ?? {})).not.toContain("gap");
     expect(Object.values(again?.classification ?? {})).toContain("made-tolerant");
   }, 60_000);
+
+  // Issue #2395: the decision fingerprint covers only the gap rules the step
+  // fixes and the step's own content, so a later step that changes unrelated
+  // IR (here the touch seed adding touch-only rules, as on sil_cameroon_qwerty)
+  // must not drop the accepted normalization.
+  it("an unrelated later-step change keeps the accepted decision applied", async () => {
+    const { analysis } = await analyse();
+    const decision = { acceptedSiteIds: ["normalization-step"], fingerprint: analysis.fingerprint };
+
+    const touched = parseKmn(
+      [KMN, "group(touch) using keys", "+ [T_A] > U+00B4", "+ [T_B] > U+00B4", ""].join("\n"),
+      "step_fixture",
+    ).ir;
+    const later = await analyseContextTolerance(touched, () => true);
+    if (later === null) throw new Error("analysis was superseded");
+    // The fingerprint survives the unrelated change: same gap rules, same step.
+    expect(later.fingerprint).toBe(analysis.fingerprint);
+    expect(later.normalizationStep).toBeDefined();
+
+    const engine = await loadContextToleranceEngine();
+    const outcome = await applyContextToleranceDecision(
+      decision,
+      { status: "ready", runId: 2, ...later },
+      { engine, applyFacetTransform },
+    );
+    expect(outcome.kind).toBe("applied");
+  }, 60_000);
+
+  // Control for the above: a real change to one of the normalized (gap) rules
+  // must still invalidate the decision.
+  it("a change to a gap rule invalidates the decision", async () => {
+    const { analysis } = await analyse();
+    const decision = { acceptedSiteIds: ["normalization-step"], fingerprint: analysis.fingerprint };
+
+    const edited = parseKmn(
+      KMN.replace("any(base) + any(key.act) > index(acute,1)", "any(acute) + any(key.act) > index(acute,1)"),
+      "step_fixture",
+    ).ir;
+    const later = await analyseContextTolerance(edited, () => true);
+    if (later === null) throw new Error("analysis was superseded");
+    expect(later.normalizationStep).toBeDefined();
+    expect(later.fingerprint).not.toBe(analysis.fingerprint);
+
+    const engine = await loadContextToleranceEngine();
+    const outcome = await applyContextToleranceDecision(
+      decision,
+      { status: "ready", runId: 2, ...later },
+      { engine, applyFacetTransform },
+    );
+    expect(outcome.kind).toBe("stale");
+  }, 60_000);
 });

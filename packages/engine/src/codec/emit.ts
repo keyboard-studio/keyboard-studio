@@ -385,7 +385,7 @@ function emitStoreItems(items: StoreItem[], metadata = false): string {
   return parts.join(" ");
 }
 
-function emitStore(store: IRStore): string {
+export function emitStore(store: IRStore): string {
   const nameToken = store.isSystem ? `&${store.name}` : store.name;
   // &CasedKeys holds virtual keys, not a string — it keeps the token form.
   const metadata = store.isSystem && store.name.toUpperCase() !== "CASEDKEYS";
