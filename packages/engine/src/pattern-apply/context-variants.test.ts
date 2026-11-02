@@ -421,6 +421,21 @@ describe("addBackspaceUnwrap (spec 062 US4, FR-014)", () => {
     expect(twice.variants).toEqual(once.variants);
   }, 30_000);
 
+  it("skips backspace unwrap for a unit the author already deletes with plain [K_BKSP] (el_dinka class)", async () => {
+    const kmn = [
+      BKSP_HEADER,
+      "store(dia) U+00E4 U+00EB",
+      "group(main) using keys",
+      "",
+      "any(dia) + [K_BKSP] > nul",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "bksp_author_nul");
+    const report = await computeContextTolerance(ir);
+    const { variants } = await proposeContextVariants(ir, report);
+    expect(variants.some((v) => v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX))).toBe(false);
+  }, 30_000);
+
   it("generates no backspace-unwrap variant when no composed multi-mark unit is attested", async () => {
     const kmn = [BKSP_HEADER, "group(main) using keys", "", "+ 'a' > 'a'", ""].join("\n");
     const { ir } = parse(kmn, "bksp_no_units");

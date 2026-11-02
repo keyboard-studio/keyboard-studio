@@ -309,14 +309,19 @@ export async function proposeContextVariants(
     comments: strippedComments,
   };
 
+  const compileStrippedForSimulation = async (): Promise<Awaited<ReturnType<typeof compile>> | undefined> => {
+    const result = await compile(buildToleranceCompileVfs(strippedIr), ir.header.keyboardId);
+    return hasSimulatableJs(result) ? result : undefined;
+  };
+
   if (gapRuleIds.size === 0) {
-    return addBackspaceUnwrap(strippedIr);
+    return addBackspaceUnwrap(strippedIr, [], {}, await compileStrippedForSimulation());
   }
 
   const storeChars = buildStoreCharIndex(ir);
   const entry = entryGroupOf(strippedGroups);
   if (entry === undefined) {
-    return addBackspaceUnwrap(strippedIr);
+    return addBackspaceUnwrap(strippedIr, [], {}, await compileStrippedForSimulation());
   }
 
   const compiled = await compile(buildToleranceCompileVfs(strippedIr), ir.header.keyboardId);
@@ -324,7 +329,7 @@ export async function proposeContextVariants(
   // `&TARGETS 'any'`, which can add web-target-only errors the keyboard's own
   // build never hits (see `hasSimulatableJs`).
   if (!hasSimulatableJs(compiled)) {
-    return addBackspaceUnwrap(strippedIr);
+    return addBackspaceUnwrap(strippedIr, [], {}, undefined);
   }
 
   const variants: ContextVariant[] = [];
@@ -408,7 +413,7 @@ export async function proposeContextVariants(
   }
 
   if (variants.length === 0) {
-    return addBackspaceUnwrap(strippedIr);
+    return addBackspaceUnwrap(strippedIr, [], {}, compiled);
   }
 
   const newGroups = strippedGroups.map((group) => {
@@ -430,6 +435,7 @@ export async function proposeContextVariants(
     { ...strippedIr, groups: newGroups, comments: newComments },
     variants,
     disclosures,
+    compiled,
   );
 }
 
@@ -547,11 +553,60 @@ export async function proposeContextVariants(
  * per-pair table; see this module's write-back-policy note for the same
  * substitution). Closing that case for a grapheme-cluster-deleting host is
  * a follow-up, not silently claimed here.
+ *
+ * Author-rule coexistence: when the keyboard already defines a plain
+ * `[K_BKSP]` rule whose single-element context matches a composed unit and
+ * whose measured output is not the one-mark-shorter peel this generator would
+ * emit (e.g. `> nul` on `el_dinka`'s diaeresis deletes), inserting the
+ * unwrap block would outrank that author rule and regress the precomposed
+ * path (FR-004). Those units are omitted from the unwrap inventory.
  */
+function isPlainBkspKeyPart(keyPart: ContextElement[]): boolean {
+  if (keyPart.length !== 1) return false;
+  const el = keyPart[0]!;
+  return el.kind === 'vkey' && el.name === 'K_BKSP' && el.modifiers.length === 0;
+}
+
+function hasAuthorPlainBkspRuleForUnit(
+  ir: KeyboardIR,
+  unit: string,
+  storeChars: Map<string, string[]>,
+): boolean {
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (rule.nodeId.startsWith(GENERATED_MARKER_PREFIX)) continue;
+      const split = splitRuleAtPlus(rule);
+      if (split === undefined || split.before.length !== 1) continue;
+      if (!isPlainBkspKeyPart(split.keyPart)) continue;
+      const resolution = resolveContextCandidates(split.before[0]!, storeChars);
+      if ('reason' in resolution) continue;
+      if (!resolution.chars.includes(unit)) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+function filterUnwrapPairsSkippingAuthorBksp(
+  pairs: OneMarkShorterPair[],
+  ir: KeyboardIR,
+  compiled: Awaited<ReturnType<typeof compile>> | undefined,
+  storeChars: Map<string, string[]>,
+): OneMarkShorterPair[] {
+  if (compiled === undefined || !hasSimulatableJs(compiled)) return pairs;
+  const bkspKey: SimKeyInput = { vkey: 'K_BKSP', modifiers: [] };
+  return pairs.filter((pair) => {
+    if (!hasAuthorPlainBkspRuleForUnit(ir, pair.unit, storeChars)) return true;
+    const preOut = simulate(compiled, [bkspKey], { text: pair.unit }).finalOutput;
+    return preOut === pair.to;
+  });
+}
+
 function addBackspaceUnwrap(
   ir: KeyboardIR,
   existingVariants: ContextVariant[] = [],
   existingDisclosures: Record<string, VariantDisclosure> = {},
+  compiled?: Awaited<ReturnType<typeof compile>>,
 ): ContextVariantsResult {
   const units = new Set<string>();
   for (const store of ir.stores) {
@@ -569,7 +624,13 @@ function addBackspaceUnwrap(
     }
   }
 
-  const pairs = [...units].map((unit) => oneMarkShorterPair(unit)).filter((p): p is OneMarkShorterPair => p !== undefined);
+  const storeChars = buildStoreCharIndex(ir);
+  const pairs = filterUnwrapPairsSkippingAuthorBksp(
+    [...units].map((unit) => oneMarkShorterPair(unit)).filter((p): p is OneMarkShorterPair => p !== undefined),
+    ir,
+    compiled,
+    storeChars,
+  );
 
   if (pairs.length === 0) return { ir, variants: existingVariants, disclosures: existingDisclosures };
 
