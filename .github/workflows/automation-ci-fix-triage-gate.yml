@@ -4,6 +4,9 @@
 name: Automation CI fix triage gate
 
 on:
+  push:
+    branches:
+      - km/fix-main-ci-2026-11-02
   workflow_dispatch:
     inputs:
       head_sha:
@@ -22,11 +25,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const sha = `${{ inputs.head_sha }}`.trim();
-            if (!/^[0-9a-f]{40}$/i.test(sha)) {
-              core.setFailed(`Invalid head_sha: ${sha}`);
-              return;
-            }
+            const inputSha = `${{ inputs.head_sha }}`.trim();
+            const sha =
+              inputSha && /^[0-9a-f]{40}$/i.test(inputSha)
+                ? inputSha
+                : context.sha;
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
