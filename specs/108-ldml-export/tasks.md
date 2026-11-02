@@ -85,21 +85,21 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
 
 ### Profiles (FR-060, FR-061, FR-063, FR-065, FR-066)
 
-- [ ] T007 Implement `LX/profiles/types.ts` per [data-model.md](data-model.md):
+- [x] T007 Implement `LX/profiles/types.ts` per [data-model.md](data-model.md):
   - `TargetProfile`;
   - `ProfileRow` (`id`, `status`, `code`, `severity`, `form`, `lift`, `keymanCodes`);
   - `RowDelta`.
-- [ ] T008 Implement `LX/profiles/profile46.ts`. It holds **every** row of [contracts/ldml-mapping.md](contracts/ldml-mapping.md) sections 1–6, including 1.4a, 1.4b, 2.22–2.26, 3.15a, 3.15b, 3.24–3.26, 4.15 and 4.16, with:
+- [x] T008 Implement `LX/profiles/profile46.ts`. It holds **every** row of [contracts/ldml-mapping.md](contracts/ldml-mapping.md) sections 1–6, including 1.4a, 1.4b, 2.22–2.26, 3.15a, 3.15b, 3.24–3.26, 4.15 and 4.16, with:
   - status, code and severity as the tables state;
   - a short `form` summary;
   - `lift` from the "Version deltas" table for every K row and every A/N row it lists (FR-063);
   - `keymanCodes: []` for K rows 4.10 and 5.15. The export writes the conservative form, so Keyman raises nothing.
 
   Profile fields: `namespace` `https://schemas.unicode.org/cldr/46/keyboard3`, `tr35Revision` `CLDR 49, tr35-79 (2026-10-21)`, `keymanRelease` `19.0.240-alpha`, `keymanCompilable: true`, `isDefault: true`, `writeAttribution: false`.
-- [ ] T009 Implement `LX/profiles/profile49.ts` (the deltas of [contracts/ldml-mapping-49.md](contracts/ldml-mapping-49.md): row 4.10 only; set mappings are not a delta (FR-023); `keymanRelease: null`, `keymanCompilable: false`, `writeAttribution: true`) and `LX/profiles/resolve.ts`:
+- [x] T009 Implement `LX/profiles/profile49.ts` (the deltas of [contracts/ldml-mapping-49.md](contracts/ldml-mapping-49.md): row 4.10 only; set mappings are not a delta (FR-023); `keymanRelease: null`, `keymanCompilable: false`, `writeAttribution: true`) and `LX/profiles/resolve.ts`:
   - `resolveLdmlProfile(id)` applies the deltas to profile 46, deep-freezes the result, and throws on an unknown id or on a delta naming a missing row;
   - `listLdmlProfiles()` lists the profiles newest first.
-- [ ] T010 Write `LX/profiles/profiles.test.ts` (H7), after T007–T009. It can run in parallel with T011–T018:
+- [x] T010 Write `LX/profiles/profiles.test.ts` (H7), after T007–T009. It can run in parallel with T011–T018:
   - (a) parse the first column and the code table of both contract markdown files, and assert that the set of row ids and codes equals the profile tables, both ways;
   - (b) for FR-065, both ways: read the `conformsTo` enum from `@keymanapp/common-types` `Schemas.ldmlKeyboard3`, and assert `enum.includes(id) === profile.keymanCompilable` for every profile;
   - (c) exactly one default, and it is the newest compilable profile;
@@ -107,11 +107,11 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
 
 ### Deterministic output (FR-030)
 
-- [ ] T011 [P] Extend `packages/engine/src/output/zip.ts`: `ToZipOptions` gains `nextSteps?: boolean` (default `true`) and `fixedMtime?: Date`, which is passed to every fflate entry as `mtime`. Add to `packages/engine/src/output/zip.test.ts`:
+- [x] T011 [P] Extend `packages/engine/src/output/zip.ts`: `ToZipOptions` gains `nextSteps?: boolean` (default `true`) and `fixedMtime?: Date`, which is passed to every fflate entry as `mtime`. Add to `packages/engine/src/output/zip.test.ts`:
   - default output unchanged (existing tests);
   - `nextSteps: false` omits `NEXT_STEPS.md`;
   - two calls with `fixedMtime: new Date(1980, 0, 1)` are byte-identical across a 2-second wait.
-- [ ] T012 [P] Define the internal document model `LdmlDocument` in `LX/xml/model.ts` over developer-utils' `LDMLKeyboard` types (type-only imports; FR-080), adding a `comment` field where FR-042 needs one and a `special` record for FR-028: keys, flicks, displays, hardware `layers`, touch `layers[]`, variables, simple and backspace transform groups, and a `comment` on the header, each group and each transform. Then implement `LX/xml/writeKeyboard3.ts`:
+- [x] T012 [P] Define the internal document model `LdmlDocument` in `LX/xml/model.ts` over developer-utils' `LDMLKeyboard` types (type-only imports; FR-080), adding a `comment` field where FR-042 needs one and a `special` record for FR-028: keys, flicks, displays, hardware `layers`, touch `layers[]`, variables, simple and backspace transform groups, and a `comment` on the header, each group and each transform. Then implement `LX/xml/writeKeyboard3.ts`:
   - element order from the DTD content model `keyboard3 ( import*, locales?, version?, info, settings?, displays?, keys?, flicks?, forms?, layers*, variables?, transforms*, special* )`;
   - attribute order fixed per element as in [contracts/export-package.md](contracts/export-package.md);
   - XML escaping of `& < > "` and of C0 controls in attributes;
@@ -120,7 +120,7 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
   - empty containers omitted.
 
   Test it in `LX/xml/writeKeyboard3.test.ts`.
-- [ ] T013 [P] Implement `LX/lower/keyIds.ts`:
+- [x] T013 [P] Implement `LX/lower/keyIds.ts`:
   - implied ids (`a`–`z`, `A`–`Z`, `0`–`9`, `space`, `gap`) when the output matches;
   - otherwise `u` + the lowercase hex code points joined by `_`, or `m_<marker>`, or `l_<layer>`;
   - marker ids mapped injectively to `[0-9A-Za-z_]{1,32}`;
@@ -128,7 +128,7 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
   - every id matches `[A-Za-z0-9][A-Za-z0-9_-]*`.
 
   Test it in `LX/lower/keyIds.test.ts`.
-- [ ] T014 [P] Implement `LX/lower/positions.ts`:
+- [x] T014 [P] Implement `LX/lower/positions.ts`:
   - for each hardware form `us`, `iso`, `jis` and `abnt2`, the main-block `K_*` vkey → `{row, column}` rows (research R6);
   - the frame-key set (row 2.5), the form-only key sets (`K_oE2` → iso, `K_oC1` → abnt2, `K_oE0`/`K_oE1` → jis), and `K_SPACE` → `space`.
 
@@ -136,15 +136,15 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
 
 ### Harnesses (test-only, `LX/__testing__/`)
 
-- [ ] T015 [P] Implement `LX/__testing__/xsdValidate.ts` (H3): `validateAgainstCldr(xml, conformsTo)` removes the default `xmlns` attribute, runs `xmllint-wasm` `validateXML({ xml, schema })` with `LX/__testing__/cldr/<conformsTo>/ldmlKeyboard3.xsd`, and returns the errors. Self-test in `LX/__testing__/xsdValidate.test.ts`: the T003 samples validate under 46, and a document with an unknown element fails.
-- [ ] T016 [P] Implement `LX/__testing__/keymanCompile.ts` (H1, H2; research R21): `keymanCompile(xml, { build?: boolean }) → { messages: {code, severity, text}[], kmx?, kvk? }`:
+- [x] T015 [P] Implement `LX/__testing__/xsdValidate.ts` (H3): `validateAgainstCldr(xml, conformsTo)` removes the default `xmlns` attribute, runs `xmllint-wasm` `validateXML({ xml, schema })` with `LX/__testing__/cldr/<conformsTo>/ldmlKeyboard3.xsd`, and returns the errors. Self-test in `LX/__testing__/xsdValidate.test.ts`: the T003 samples validate under 46, and a document with an unknown element fails.
+- [x] T016 [P] Implement `LX/__testing__/keymanCompile.ts` (H1, H2; research R21): `keymanCompile(xml, { build?: boolean }) → { messages: {code, severity, text}[], kmx?, kvk? }`:
   - uses `LdmlKeyboardCompiler` (`init`, `load`, `validate`, and `run` when `build`);
   - in-memory callbacks modelled on `packages/engine/src/compiler/index.ts:328-363`, with a real path join in `resolveFilename`;
   - `loadFile` serves the source and `developer-utils/build/src/types/import/46/*.xml`.
 
   Self-test in `LX/__testing__/keymanCompile.test.ts`: the T003 hardware sample compiles with zero errors, and a document with `conformsTo="49"` yields `Error_SchemaValidationError`.
-- [ ] T017 [P] Implement `LX/__testing__/tr35Conformance.ts` (H4; research R23): `tr35Conformance(xml) → Violation[]` covering every rule listed in R23, including the gap-key ban. In `LX/__testing__/tr35Conformance.test.ts`, write one minimal failing document per rule, and assert that the T003 touch sample conforms.
-- [ ] T018 [P] Implement `LX/__testing__/ldmlInterpreter.ts` (H5; research R24): `loadLdml(xml)`, then `type(keys: {vkey, modifiers, caps}[], initialContext?) → string`. It supports:
+- [x] T017 [P] Implement `LX/__testing__/tr35Conformance.ts` (H4; research R23): `tr35Conformance(xml) → Violation[]` covering every rule listed in R23, including the gap-key ban. In `LX/__testing__/tr35Conformance.test.ts`, write one minimal failing document per rule, and assert that the T003 touch sample conforms.
+- [x] T018 [P] Implement `LX/__testing__/ldmlInterpreter.ts` (H5; research R24): `loadLdml(xml)`, then `type(keys: {vkey, modifiers, caps}[], initialContext?) → string`. It supports:
   - the hardware key map by layer (exact modifier match, caps layers);
   - `simple` transform groups in document order, first match per group, with every group run after each outputting key;
   - `backspace` transforms on `K_BKSP`;
@@ -154,7 +154,7 @@ four harnesses, each proven on CLDR's own samples before any exporter code exist
   - `tapTouch(formWidth, layerId, keyId, context?)`: select the touch form by `minDeviceWidth`, apply the key's output, then run the transforms (used by the H5 touch pass in T078).
 
   Unit-test each feature with hand-written mini documents in `LX/__testing__/ldmlInterpreter.test.ts`.
-- [ ] T019 Implement `LX/__testing__/corpus.ts`. It resolves the corpus in [contracts/test-harnesses.md](contracts/test-harnesses.md) from `../keyboards/release` and `../keyboards/experimental` (path pattern of `packages/engine/src/pattern-apply/touchProductionEquivalence.corpus.test.ts:128`) and loads each keyboard's `.kmn`, `.keyman-touch-layout` and `.kvks` from disk for tests. It also needs three keyboards, picked using [docs/keyboard-index.md](../../docs/keyboard-index.md) and the `../keyboards` tree:
+- [x] T019 Implement `LX/__testing__/corpus.ts`. It resolves the corpus in [contracts/test-harnesses.md](contracts/test-harnesses.md) from `../keyboards/release` and `../keyboards/experimental` (path pattern of `packages/engine/src/pattern-apply/touchProductionEquivalence.corpus.test.ts:128`) and loads each keyboard's `.kmn`, `.keyman-touch-layout` and `.kvks` from disk for tests. It also needs three keyboards, picked using [docs/keyboard-index.md](../../docs/keyboard-index.md) and the `../keyboards` tree:
   - one mnemonic keyboard (`&MNEMONICLAYOUT '1'`);
   - one with `begin PostKeystroke` and a touch layout;
   - one with option stores (`if(&opt = '1')` and `set()`).

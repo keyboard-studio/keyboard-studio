@@ -88,11 +88,115 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T00:56:58.785Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:00:07.981Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:00:38.633Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:00:38.929Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:00:39.237Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:06.980Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:48.522Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:48.921Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:49.281Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:49.840Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:50.241Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:50.545Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:01:50.895Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T01:03:43.913Z"
     }
   ],
   "telemetryInstanceId": "b4a4ed73-99fc-4d56-ae3b-a3357b409051",
   "unattended": true,
-  "currentTask": "T089",
+  "currentTask": "T019",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -145,6 +249,109 @@
       "files": [
         "specs/108-ldml-export/research.md",
         "specs/108-ldml-export/plan.md"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "LdmlDocument model and keyboard3 XML writer with tests",
+      "files": [
+        "packages/engine/src/ldml-export/xml/model.ts",
+        "packages/engine/src/ldml-export/xml/writeKeyboard3.ts",
+        "packages/engine/src/ldml-export/xml/writeKeyboard3.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "toZip gains nextSteps and fixedMtime options plus tests",
+      "files": [
+        "packages/engine/src/output/zip.ts",
+        "packages/engine/src/output/zip.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "deterministic key and marker id generation with code-point collision resolution",
+      "files": [
+        "packages/engine/src/ldml-export/lower/keyIds.ts",
+        "packages/engine/src/ldml-export/lower/keyIds.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "hardware form position tables checked against scanCodes-implied.xml",
+      "files": [
+        "packages/engine/src/ldml-export/lower/positions.ts",
+        "packages/engine/src/ldml-export/lower/positions.test.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Test-only LDML interpreter (hardware us/iso layers, simple+backspace transforms, markers, vars, set mapping, NFD/NFC, tapTouch) with 20 unit tests",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/ldmlInterpreter.ts",
+        "packages/engine/src/ldml-export/__testing__/ldmlInterpreter.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "xsdValidate harness H3 with self-test (samples valid under 46, unknown element fails)",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/xsdValidate.ts",
+        "packages/engine/src/ldml-export/__testing__/xsdValidate.test.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "keymanCompile harness H1/H2 over kmc-ldml with in-memory callbacks; self-test incl. conformsTo 49 schema error",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/keymanCompile.ts",
+        "packages/engine/src/ldml-export/__testing__/keymanCompile.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "tr35Conformance harness H4 covering R23 rules incl. gap-key ban; one negative per rule",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/tr35Conformance.ts",
+        "packages/engine/src/ldml-export/__testing__/tr35Conformance.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Profile types: TargetProfile, ProfileRow, RowDelta",
+      "files": [
+        "packages/engine/src/ldml-export/profiles/types.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Profile 46: all contract rows with status, code, severity, form, lift",
+      "files": [
+        "packages/engine/src/ldml-export/profiles/profile46.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Profile 49 deltas and resolveLdmlProfile/listLdmlProfiles",
+      "files": [
+        "packages/engine/src/ldml-export/profiles/profile49.ts",
+        "packages/engine/src/ldml-export/profiles/resolve.ts",
+        "packages/engine/src/ldml-export/index.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "H7 profile tests: contract parity, FR-065 schema enum, default, K lifts",
+      "files": [
+        "packages/engine/src/ldml-export/profiles/profiles.test.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "LX/__testing__/corpus.ts corpus resolver (release/experimental loader) with picks enggano, chechen_latin, sil_yoruba8, plus corpus.test.ts",
+      "files": [
+        "packages/engine/src/ldml-export/__testing__/corpus.ts",
+        "packages/engine/src/ldml-export/__testing__/corpus.test.ts"
       ]
     }
   }

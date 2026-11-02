@@ -22,3 +22,6 @@ export type {
   LdmlVKey,
   RowId,
 } from "./types.js";
+
+export type { ProfileRow, ProfileRowStatus, RowDelta, TargetProfile } from "./profiles/types.js";
+export { listLdmlProfiles, resolveLdmlProfile } from "./profiles/resolve.js";
