@@ -6,7 +6,7 @@ name: Automation CI fix triage gate
 on:
   push:
     branches:
-      - km/fix-main-ci-2026-11-02
+      - 'km/fix-main-*'
   workflow_dispatch:
     inputs:
       head_sha:
