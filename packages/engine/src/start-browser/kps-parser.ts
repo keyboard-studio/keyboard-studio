@@ -1,6 +1,7 @@
 // see spec.md §8 step 1 — .kps XML metadata extraction
 
 import type { KeymanPlatformTarget } from "@keyboard-studio/contracts";
+import { resolveLangtag } from "../langtags/tagsets.js";
 
 export interface KpsMetadata {
   displayName: string;
@@ -94,8 +95,12 @@ const VALID_TARGETS = new Set<string>([
  * attributes on Info children (`<Name value="..."/>`).  A text-content
  * fallback (`<Name>...</Name>`) handles hand-edited or non-standard files.
  *
- * `script` is derived from the first BCP47 Language ID that contains a
- * four-letter script subtag (e.g. "hi-Deva" → "Deva").  Defaults to "Latn".
+ * `script` is derived from the declared BCP47 Language IDs:
+ *   1. the first ID carrying an explicit four-letter script subtag
+ *      (e.g. "hi-Deva" → "Deva") — a deliberate author declaration wins;
+ *   2. langtags likely-subtags for the first ID langtags knows
+ *      (e.g. "te" → "te-Telu-IN" → "Telu");
+ *   3. "Latn" only when langtags has no entry for any declared language.
  *
  * Font and stylesheet references are intentionally excluded — call
  * {@link parseKpsFontRefs} separately when they are needed (e.g. in the
@@ -122,6 +127,26 @@ function extractInfoValue(xml: string, tag: string, fallback: string): string {
   return (scope.match(valueRe)?.[1] ?? scope.match(textRe)?.[1] ?? fallback).trim();
 }
 
+/**
+ * Derive a keyboard's script from its declared BCP47 Language IDs:
+ *  1. the first ID carrying an explicit four-letter script subtag
+ *     (e.g. "hi-Deva" → "Deva") — a deliberate author declaration wins;
+ *  2. langtags likely-subtags for the first ID langtags knows
+ *     (e.g. "te" → "te-Telu-IN" → "Telu");
+ *  3. "Latn" only when langtags has no entry for any declared language.
+ */
+function detectKpsScript(languages: readonly string[]): string {
+  for (const langId of languages) {
+    const explicit = extractScriptSubtag(langId);
+    if (explicit !== null) return explicit;
+  }
+  for (const langId of languages) {
+    const likely = resolveLangtag(langId)?.script;
+    if (likely !== undefined) return likely;
+  }
+  return "Latn";
+}
+
 export function parseKps(xml: string): KpsMetadata {
   const displayName = extractInfoValue(xml, "Name", "");
   const version = extractInfoValue(xml, "Version", "1.0");
@@ -133,24 +158,16 @@ export function parseKps(xml: string): KpsMetadata {
     (t): t is KeymanPlatformTarget => VALID_TARGETS.has(t)
   );
 
-  // Extract all BCP47 Language IDs and derive the script subtag from the first
-  // one that contains a four-letter script code (Latn, Deva, Arab, …).
+  // Extract all BCP47 Language IDs; the script is derived from them by
+  // detectKpsScript (explicit subtag > langtags likely-subtags > "Latn").
   const langRe = /Language[^>]+ID="([^"]+)"/g;
   const languages: string[] = [];
-  let script = "Latn";
-  let scriptFound = false;
   for (const match of xml.matchAll(langRe)) {
     const langId = match[1];
     if (langId === undefined) continue;
     languages.push(langId);
-    if (!scriptFound) {
-      const scriptPart = extractScriptSubtag(langId);
-      if (scriptPart !== null) {
-        script = scriptPart;
-        scriptFound = true;
-      }
-    }
   }
+  const script = detectKpsScript(languages);
 
   return {
     displayName,
