@@ -69,25 +69,123 @@ export function useRepoKeyboards(
   }, [index, source, query]);
 }
 
-/** Open PRs for a PR source, filtered by the search query. */
-export function useOpenPrs(
+/**
+ * Fetch the live open+closed PR list for a repo from the anonymous GitHub
+ * API (state=all, newest first). Session-cached per repo: one call per repo
+ * per page load. Throws on API failure — callers fall back to the static
+ * index. `fetchImpl` defaults to global fetch; tests inject a stub.
+ */
+const livePrCache = new Map<string, Promise<ReviewPrEntry[]>>();
+
+export function fetchLivePrs(
+  owner: string,
+  repo: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ReviewPrEntry[]> {
+  const key = `${owner}/${repo}`;
+  const cached = livePrCache.get(key);
+  if (cached) return cached;
+  const p = (async (): Promise<ReviewPrEntry[]> => {
+    const out: ReviewPrEntry[] = [];
+    // The API default sort is by creation, newest first; keep that order.
+    for (let page = 1; page <= 3; page += 1) {
+      const res = await fetchImpl(
+        `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100&page=${page}`,
+        { headers: { Accept: "application/vnd.github+json" } },
+      );
+      if (!res.ok) throw new Error(`PR list API: HTTP ${res.status}`);
+      const batch = (await res.json()) as Array<{
+        number?: number;
+        title?: string;
+        head?: { sha?: string } | null;
+        updated_at?: string | null;
+        state?: string;
+      }>;
+      if (!Array.isArray(batch)) throw new Error("PR list API: unexpected response");
+      for (const pr of batch) {
+        if (typeof pr.number !== "number" || !pr.head?.sha) continue;
+        out.push({
+          number: pr.number,
+          title: typeof pr.title === "string" ? pr.title : "",
+          headSha: pr.head.sha,
+          updatedAt: typeof pr.updated_at === "string" ? pr.updated_at : null,
+          state: pr.state === "closed" ? "closed" : "open",
+        });
+      }
+      if (batch.length < 100) break;
+    }
+    return out.sort((a, b) => b.number - a.number);
+  })();
+  livePrCache.set(key, p);
+  return p;
+}
+
+export type PrStateFilter = "all" | "open" | "closed";
+
+export interface UsePrsResult {
+  /** PRs after live/index merge, state filter, and search. */
+  prs: ReviewPrEntry[];
+  /** True when the list came from the live API; false = static index fallback. */
+  live: boolean;
+  loading: boolean;
+  error: string | null;
+}
+
+/**
+ * PRs for a PR source, filtered by state and the search query.
+ *
+ * The live list (state=all) wins when it loads: it is authoritative for
+ * which PRs are open and carries current head shas. Index entries missing
+ * from the live list have closed and are dropped. On API failure the static
+ * index is used instead (its entries are treated as open — the index only
+ * ever listed open PRs).
+ */
+export function usePrs(
   index: ReviewIndex | null,
   source: ReviewSourceId,
   query: string,
-): ReviewPrEntry[] {
-  return useMemo(() => {
-    if (!index) return [];
-    const src = reviewSourceById(source);
-    if (src.kind !== "prs") return [];
-    const key = source === "ks-prs" ? "ks" : "km";
-    const all = index.prs[key] ?? [];
-    const q = query.trim().toLowerCase();
-    if (!q) return all;
-    return all.filter(
-      (p) =>
-        String(p.number).includes(q) || p.title.toLowerCase().includes(q),
+  stateFilter: PrStateFilter,
+): UsePrsResult {
+  const src = reviewSourceById(source);
+  const isPrs = src.kind === "prs";
+  const [livePrs, setLivePrs] = useState<ReviewPrEntry[] | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isPrs) return;
+    let cancelled = false;
+    setLivePrs(null);
+    setLiveError(null);
+    fetchLivePrs(src.owner, src.repo).then(
+      (prs) => {
+        if (!cancelled) setLivePrs(prs);
+      },
+      (e: unknown) => {
+        if (!cancelled) setLiveError(e instanceof Error ? e.message : String(e));
+      },
     );
-  }, [index, source, query]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isPrs, src.owner, src.repo]);
+
+  return useMemo(() => {
+    if (!index || !isPrs) return { prs: [], live: false, loading: false, error: null };
+    const live = livePrs !== null;
+    const base: ReviewPrEntry[] = live
+      ? livePrs
+      : ((index.prs[source === "ks-prs" ? "ks" : "km"] ?? []).map((p) => ({
+          ...p,
+          state: (p.state ?? "open") as "open" | "closed",
+        })) as ReviewPrEntry[]);
+    const q = query.trim().toLowerCase();
+    const prs = base
+      .filter((p) => stateFilter === "all" || p.state === stateFilter)
+      .filter(
+        (p) => !q || String(p.number).includes(q) || p.title.toLowerCase().includes(q),
+      );
+    return { prs, live, loading: isPrs && !live && liveError === null, error: liveError };
+  }, [index, isPrs, livePrs, liveError, source, query, stateFilter]);
 }
 
 /**
