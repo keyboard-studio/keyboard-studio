@@ -66,7 +66,11 @@ export function useTouchDrag<T>(opts: {
     }
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
-    const intent = optsRef.current.directional
+    // Directional mode (tray) only applies to touch/pen: on a touchscreen a
+    // horizontal-dominant move is a tray scroll and must stand down. Mouse
+    // has a scrollbar for that — any move beyond slop is a drag, even
+    // diagonal ones headed for the board.
+    const intent = optsRef.current.directional && e.pointerType !== "mouse"
       ? touchGestureIntent(dx, dy)
       : Math.hypot(dx, dy) < 10
         ? "undecided"
