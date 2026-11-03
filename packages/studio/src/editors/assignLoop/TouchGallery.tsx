@@ -289,6 +289,7 @@ import {
 } from "./existingMethodLabels.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useTouchKeyDiagnostics } from "../../hooks/useValidatorFindings.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
@@ -1681,6 +1682,9 @@ export interface TouchGalleryProps {
 
 export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryProps) {
   const { t, i18n } = useLingui();
+  // Narrow viewports: the KB editor goes edge-to-edge (no left-right page
+  // margins) — 2026-11-02.
+  const isNarrow = useIsNarrow();
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -7379,7 +7383,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        padding: "24px 20px",
+        padding: isNarrow ? "24px 0" : "24px 20px",
         overflowY: "auto",
         boxSizing: "border-box",
         height: "100%",
