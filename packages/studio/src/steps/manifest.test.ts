@@ -130,6 +130,7 @@ const EXPECTED_SPINE_ORDER = [
   "deadkeys",
   "rules",
   "mechanisms",
+  "osk",
   "touch",
   "help",
   "package",
@@ -369,10 +370,10 @@ describe("Off-spine step inventory", () => {
 // omit the field (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "deadkeys", "rules", "mechanisms", "touch", "touch_seed_source"] as const;
+const FULL_LAYOUT_IDS = ["carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "touch_seed_source"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly six steps declare layout:'full'", () => {
+  it("exactly seven steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());

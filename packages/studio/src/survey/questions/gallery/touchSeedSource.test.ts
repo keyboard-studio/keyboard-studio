@@ -35,9 +35,9 @@ beforeEach(() => {
 });
 
 describe("touchSeedSource module contract", () => {
-  it("provides touch-seed-source, requires physical-layout, writes nothing", () => {
+  it("provides touch-seed-source, requires osk-layout, writes nothing", () => {
     expect(touchSeedSource.provides).toEqual(["touch-seed-source"]);
-    expect(touchSeedSource.requires).toEqual(["physical-layout"]);
+    expect(touchSeedSource.requires).toEqual(["osk-layout"]);
     expect(touchSeedSource.writes).toEqual([]);
     expect(touchSeedSource.renderer).toBe(TouchSeedSourceRenderer);
   });

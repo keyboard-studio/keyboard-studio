@@ -4,9 +4,9 @@
 
 import { describe, expect, it } from "vitest";
 import { generateKvksFromIR } from "./generate-kvks.js";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { ContextElement, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 
-function makeIR(rules: Array<{ context: any[]; output: any[] }>): KeyboardIR {
+function makeIR(rules: Array<{ context: ContextElement[]; output: OutputElement[] }>): KeyboardIR {
   return {
     origin: "import",
     header: { name: "test", version: "1.0" },

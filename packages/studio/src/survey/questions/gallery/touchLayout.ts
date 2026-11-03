@@ -52,7 +52,7 @@ const touchLayout: GalleryModule<TouchLayoutValue> = {
   definition,
   provides: ["touch-layout"],
   screen: "touch",
-  requires: ["physical-layout", "touch-seed-source"],
+  requires: ["osk-layout", "touch-seed-source"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the
   // module real IR writes updates decisionIRPaths in the same change

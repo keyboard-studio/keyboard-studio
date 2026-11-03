@@ -54,6 +54,9 @@ export const INVENTORY: readonly InventoryEntry[] = [
   // --- The step loop: the completion path and reducer deps the UI runs ---
   { fn: "completeStep", module: "lib/completeStep.ts", callers: ["components/StepHost.tsx"] },
   { fn: "createStudioReducerDeps", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
+  { fn: "completeOskStep", module: "lib/oskStepCompletion.ts", callers: ["editors/adapters/oskAdapter.tsx"] },
+  { fn: "oskContinueResult", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
+  { fn: "generateKvksFromIR", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "createStudioRecordDecision", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
   { fn: "createStudioSnapshotter", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
   { fn: "clearTouchSeedChoice", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },

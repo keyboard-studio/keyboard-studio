@@ -230,8 +230,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       setError(
         t({
           id: "editor.assignLoop.osk.blankBlockedError",
-          message:
-            "Cannot blank this key — it has output. Change the label instead.",
+          message: "Cannot blank this key — it has output. Change the label instead.",
         }),
       );
       return;
@@ -382,10 +381,11 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
                   key={vkey}
                   type="button"
                   aria-pressed={isSelected}
-                  aria-label={t({
-                    id: "editor.assignLoop.osk.keyAriaLabel",
-                    message: `Key ${vkey}${label ? `, label ${label}` : ", blank"}`,
-                  })}
+                  aria-label={
+                    isBlank
+                      ? i18n._("editor.assignLoop.osk.keyAriaLabelBlank", { vkey })
+                      : i18n._("editor.assignLoop.osk.keyAriaLabelLabeled", { vkey, label })
+                  }
                   onClick={() => handleSelectKey(vkey)}
                   style={{
                     flex: `${width} 1 0`,
@@ -424,11 +424,11 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
           }}
         >
           <h2 style={{ margin: "0 0 12px", fontSize: 15, color: TEXT_MAIN }}>
-            {t({ id: "editor.assignLoop.osk.selectedKeyTitle", message: `Key ${selected.vkey}` })}
+            {i18n._("editor.assignLoop.osk.selectedKeyTitle", { vkey: selected.vkey })}
           </h2>
           {selectedKey.chars && (
             <div style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 8 }}>
-              {t({ id: "editor.assignLoop.osk.outputLabel", message: `Output: ${selectedKey.chars}` })}
+              {i18n._("editor.assignLoop.osk.outputLabel", { chars: selectedKey.chars })}
             </div>
           )}
           <label

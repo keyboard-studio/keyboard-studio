@@ -89,6 +89,7 @@ import { convenienceDrivers } from "./stepDrivers/convenience.ts";
 import { carveDrivers } from "./stepDrivers/carve.ts";
 import { mechanismDrivers } from "./stepDrivers/mechanism.ts";
 import { startShipsUsableTouch, touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
+import { oskDrivers } from "./stepDrivers/osk.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
 
 export interface AuthorRunOptions {
@@ -118,6 +119,7 @@ const DRIVERS: StepDrivers = {
   ...convenienceDrivers,
   ...carveDrivers,
   ...mechanismDrivers,
+  ...oskDrivers,
   ...touchSeedDrivers,
   ...capsDrivers,
 };

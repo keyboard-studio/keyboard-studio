@@ -42,6 +42,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], MessageDescriptor> = {
   deadkeys: msg({ id: "resumeDraft.steps.deadkeys", message: "deadkeys" }),
   rules: msg({ id: "resumeDraft.steps.rules", message: "rules" }),
   mechanisms: msg({ id: "resumeDraft.steps.mechanisms", message: "mechanisms" }),
+  osk: msg({ id: "resumeDraft.steps.osk", message: "on-screen keyboard" }),
   touch_seed_source: msg({ id: "resumeDraft.steps.touchSeedSource", message: "touch starting point" }),
   touch: msg({ id: "resumeDraft.steps.touch", message: "touch layout" }),
   help: msg({ id: "resumeDraft.steps.help", message: "help & docs" }),

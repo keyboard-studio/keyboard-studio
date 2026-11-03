@@ -28,7 +28,9 @@ import { DeadkeyAdapter } from "../editors/adapters/deadkeyAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
-import { OskEditor } from "../editors/assignLoop/OskEditor.tsx";
+import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
+import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
+import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -243,7 +245,7 @@ export const oskStep: EditorStep = step({
   id: "osk",
   title: "On-Screen Keyboard",
   layout: "full",
-  component: OskEditor,
+  component: OskEditorAdapter,
   specRef: ["specs/osk-editor"],
   persistence: "working-copy",
 });
@@ -296,6 +298,26 @@ export const touchStep: EditorStep = step({
 });
 
 // ---------------------------------------------------------------------------
+// CSS editor step (optional, after Touch)
+// ---------------------------------------------------------------------------
+
+/**
+ * CSS editor step: custom stylesheet for the keyboard (`&KMW_EMBEDCSS`).
+ * Optional — the user can skip it. If CSS is provided, it's written to
+ * `source/<keyboardId>.css` in the VFS; if empty, no file is written.
+ * Includes a live preview showing the CSS applied to both the touch layout
+ * and the desktop OSK (CSS affects mostly touch, but possibly desktop too).
+ */
+export const cssStep: EditorStep = step({
+  id: "css",
+  title: "Custom CSS",
+  layout: "full",
+  component: CssEditor,
+  specRef: ["specs/css-editor"],
+  persistence: "working-copy",
+});
+
+// ---------------------------------------------------------------------------
 // Help step (Phase F)
 // ---------------------------------------------------------------------------
 
@@ -320,6 +342,26 @@ export const helpStep: EditorStep = step({
   component: PhaseFGate,
   specRef: ["§8", "specs/061-help-docs-generation", "specs/080-documentation-completeness"],
   persistence: "answer-store",
+});
+
+// ---------------------------------------------------------------------------
+// HTML/Markdown editor step (after Help, before Package)
+// ---------------------------------------------------------------------------
+
+/**
+ * HTML/Markdown editor step: edits the keyboard's `welcome.htm` documentation
+ * file (Markdown despite the extension). This is the full user manual.
+ *
+ * `readme.htm`, `README.md`, and `.php` versions are generated exports from
+ * this source — the output pipeline handles them, not this editor.
+ */
+export const htmlStep: EditorStep = step({
+  id: "html",
+  title: "Documentation",
+  layout: "full",
+  component: HtmlEditor,
+  specRef: ["specs/html-editor"],
+  persistence: "working-copy",
 });
 
 /**
