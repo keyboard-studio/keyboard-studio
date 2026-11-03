@@ -88,11 +88,115 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-03T22:04:11.671Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:21:34.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:21:34.926Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:21:35.127Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:36:29.527Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:36:29.709Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:36:29.879Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:39.963Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:40.187Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:40.363Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:40.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:47:50.226Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:47:50.381Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:47:50.530Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T006",
+  "currentTask": "T023",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -146,6 +250,118 @@
       "files": [
         "packages/engine/src/pattern-apply/spliceKmn.ts",
         "packages/engine/src/index.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "keepKps option keeps .kps in VFS with ..\\build entries rewritten to staged paths; tests",
+      "files": [
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts",
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "OpenKpsOptions branch in applyIdentityToKps/patchKpsIdentity (keep Description, author language list, no migration); tests",
+      "files": [
+        "packages/engine/src/package-descriptor/patch.ts",
+        "packages/engine/src/package-descriptor/patch.test.ts",
+        "packages/engine/src/package-descriptor/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "open option inserts &KEYBOARDVERSION after &VERSION, keeps CRLF; tests",
+      "files": [
+        "packages/engine/src/stub-mutator/index.ts",
+        "packages/engine/src/stub-mutator/index.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "No-edit round trip test over the corpus sample set incl. 278-language Cameroon .kps",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.open.test.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "One-rule-delete test: .kmn differs only in that rule's lines (plus version)",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.open.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Art II/III amendment applied, footer 2.3.0",
+      "files": [
+        ".specify/memory/constitution.md"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Updated lineage in renderHistoryMd; serialize writes it on Open",
+      "files": [
+        "packages/engine/src/shared/renderHistoryMd.ts",
+        "packages/engine/src/shared/renderHistoryMd.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Open skips README/readme.htm/welcome/help/chart/hygiene regeneration, carries originals (VFS, slice fallback)",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "projectKmnText on Open edit paths (carve seam, rename, marks, tolerance) with consent hold + reformatRequired; touch layout untouched when unchanged",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+        "packages/studio/src/lib/projectionInput.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.open.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Seed identity.languages from .kps (parseKpsLanguages); identitySeedFromSession branches on mode",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/stores/identityPatch.ts",
+        "packages/studio/src/lib/confirmRebase.ts",
+        "packages/studio/src/stores/workingCopyStore.openLanguages.test.ts",
+        "packages/engine/src/start-browser/kps-parser.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "OpenKeyboardEntry on welcome (picker, records base-keyboard + authoring-track=adapt, previews, navigates), mounted in StudioShell, open.entry.* ids with FR; walk landing awaits gates (T019 deferred)",
+      "files": [
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/components/OpenKeyboardEntry.test.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "repairOpenDraftDescriptor refetches .kps for old Adapt drafts, rewrites build entries, seeds languages; wired after draft restore",
+      "files": [
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/lib/persistWorkingCopy.openRepair.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Adapt to Open wording (track choice, footer stage); messages extracted, FR written, catalogs sorted and lint-clean",
+      "files": [
+        "packages/studio/src/survey/questions/g/track_choice.ts",
+        "packages/studio/src/decisions/progressDots.ts",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
       ]
     }
   },

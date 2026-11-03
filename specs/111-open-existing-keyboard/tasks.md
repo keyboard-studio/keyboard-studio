@@ -44,25 +44,25 @@
 
 ### Tests
 
-- [ ] T008 [P] [US1] No-edit round-trip integration test over T001's sample set (SC-001, SC-002; the Cameroon `.kps` keeps 278 languages in order) in `packages/studio/src/lib/serializeWorkingCopy.open.test.ts`
-- [ ] T009 [P] [US1] One-rule-edit test, where the `.kmn` diff touches only that rule plus the version line (SC-003), in the same file
+- [x] T008 [P] [US1] No-edit round-trip integration test over T001's sample set (SC-001, SC-002; the Cameroon `.kps` keeps 278 languages in order) in `packages/studio/src/lib/serializeWorkingCopy.open.test.ts`
+- [x] T009 [P] [US1] One-rule-edit test, where the `.kmn` diff touches only that rule plus the version line (SC-003), in the same file
 
 ### Implementation
 
-- [ ] T010 [US1] Apply the Article II/III amendment exactly as in [contracts/constitution-amendment.md](contracts/constitution-amendment.md) (owner-approved 2026-11-03) to `.specify/memory/constitution.md`, editing the existing text and bumping the footer to 2.3.0
-- [ ] T011 [US1] On Open, keep the `.kps` in the VFS and rewrite its `../build/` `<File>` entries to the studio's build paths in `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts` (option flag; Copy's call site unchanged)
-- [ ] T012 [US1] Add an Open branch to `patchKpsIdentity` in `packages/engine/src/package-descriptor/patch.ts`: keep `<Description>` unless the author edited it, and write `<Languages>` from the author's list instead of the single identity tag. Add tests in `patch.test.ts`, including spec 057 SC-002 still holding for Copy.
-- [ ] T013 [US1] Insert `&KEYBOARDVERSION` after `&VERSION` when absent, and never touch `&VERSION`, in `packages/engine/src/stub-mutator/index.ts`, with a test using a fixture without `&KEYBOARDVERSION`
-- [ ] T014 [P] [US1] Write the "Updated" HISTORY entry above the existing history on Open, with no "Adapted from <self>", in `packages/engine/src/shared/renderHistoryMd.ts` and its caller at `packages/studio/src/lib/serializeWorkingCopy.ts` (~:720-731)
-- [ ] T015 [US1] On Open, stop regenerating README.md and readme.htm in `packages/studio/src/lib/serializeWorkingCopy.ts` (~:658-659). Carry the starting files unchanged.
-- [ ] T016 [US1] On Open, replace the `emitKmn` calls on the edit paths of `packages/studio/src/lib/projectWorkingCopyVfs.ts` (~:859, :1045, :1079) with `projectKmnText(startText, startIr, ir)`. On `ok:false`, surface the file name and wait for the author's consent before falling back to `emitKmn` (FR-009).
-- [ ] T017 [US1] Seed the language list from the parsed `.kps` (`parseKps`, `packages/engine/src/start-browser/kps-parser.ts`) into working-copy identity on Open, instead of the single-tag seed, in `packages/studio/src/stores/workingCopyStore.ts` (`instantiateFromExisting`) and `packages/studio/src/lib/confirmRebase.ts` (`identitySeedFromSession`, branching on mode)
+- [x] T010 [US1] Apply the Article II/III amendment exactly as in [contracts/constitution-amendment.md](contracts/constitution-amendment.md) (owner-approved 2026-11-03) to `.specify/memory/constitution.md`, editing the existing text and bumping the footer to 2.3.0
+- [x] T011 [US1] On Open, keep the `.kps` in the VFS and rewrite its `../build/` `<File>` entries to the studio's build paths in `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts` (option flag; Copy's call site unchanged)
+- [x] T012 [US1] Add an Open branch to `patchKpsIdentity` in `packages/engine/src/package-descriptor/patch.ts`: keep `<Description>` unless the author edited it, and write `<Languages>` from the author's list instead of the single identity tag. Add tests in `patch.test.ts`, including spec 057 SC-002 still holding for Copy.
+- [x] T013 [US1] Insert `&KEYBOARDVERSION` after `&VERSION` when absent, and never touch `&VERSION`, in `packages/engine/src/stub-mutator/index.ts`, with a test using a fixture without `&KEYBOARDVERSION`
+- [x] T014 [P] [US1] Write the "Updated" HISTORY entry above the existing history on Open, with no "Adapted from <self>", in `packages/engine/src/shared/renderHistoryMd.ts` and its caller at `packages/studio/src/lib/serializeWorkingCopy.ts` (~:720-731)
+- [x] T015 [US1] On Open, stop regenerating README.md and readme.htm in `packages/studio/src/lib/serializeWorkingCopy.ts` (~:658-659). Carry the starting files unchanged.
+- [x] T016 [US1] On Open, replace the `emitKmn` calls on the edit paths of `packages/studio/src/lib/projectWorkingCopyVfs.ts` (~:859, :1045, :1079) with `projectKmnText(startText, startIr, ir)`. On `ok:false`, surface the file name and wait for the author's consent before falling back to `emitKmn` (FR-009).
+- [x] T017 [US1] Seed the language list from the parsed `.kps` (`parseKps`, `packages/engine/src/start-browser/kps-parser.ts`) into working-copy identity on Open, instead of the single-tag seed, in `packages/studio/src/stores/workingCopyStore.ts` (`instantiateFromExisting`) and `packages/studio/src/lib/confirmRebase.ts` (`identitySeedFromSession`, branching on mode)
 - [ ] T018 [US1] Add an editable language-list question (add / remove / reorder), declared through the decision registry (Article IX), under `packages/studio/src/survey/questions/`, writing the list the `.kps` patch uses (T012)
 - [ ] T019 [US1] Add screen gates hiding `identity_lite`, `layout`, `choose_base` and `track` when `authoring-track` is `"adapt"` in `packages/studio/src/survey/questions/registry.ts` (`declaredScreenGates`, ~:180-186)
 - [ ] T020 [US1] Add an "Open an existing keyboard" entry on the welcome screen that searches by name, id or language (reusing `StartKeyboardPicker` / `StartBrowserService`), records `authoring-track = "adapt"`, and calls `instantiateFromExisting`. New file `packages/studio/src/components/OpenKeyboardEntry.tsx`, mounted in `packages/studio/src/StudioShell.tsx`. Lingui ids under `open.entry.*`, with FR translations.
 - [ ] T021 [US1] On Open, make the remove tool (carve) and the feature galleries optional, reachable from the menu, not in the walk, via screen gates in `packages/studio/src/survey/questions/registry.ts` and menu entries in `packages/studio/src/StudioShell.tsx`
-- [ ] T022 [US1] Restore old Adapt drafts. In `packages/studio/src/lib/persistWorkingCopy.ts` (`prepareWorkingCopySnapshot`, ~:537-549), when the snapshot lacks the `.kps`, refetch it at the draft's starting commit and list already-regenerated files as changes to keep or revert.
-- [ ] T023 [US1] Update user-facing wording from "Adapt" to "Open" in the studio (Lingui ids keep their handles; only English text changes), and run `pnpm --filter @keyboard-studio/studio messages:extract`
+- [x] T022 [US1] Restore old Adapt drafts. In `packages/studio/src/lib/persistWorkingCopy.ts` (`prepareWorkingCopySnapshot`, ~:537-549), when the snapshot lacks the `.kps`, refetch it at the draft's starting commit and list already-regenerated files as changes to keep or revert.
+- [x] T023 [US1] Update user-facing wording from "Adapt" to "Open" in the studio (Lingui ids keep their handles; only English text changes), and run `pnpm --filter @keyboard-studio/studio messages:extract`
 
 **Checkpoint**: T008/T009 green, Copy golden walk unchanged ([quickstart.md §6](quickstart.md)), manual walk step 1–2 of [quickstart.md §5](quickstart.md). Commit and push the phase.
 
