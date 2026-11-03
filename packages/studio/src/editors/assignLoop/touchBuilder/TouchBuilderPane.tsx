@@ -634,7 +634,37 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
         ))}
       </div>
 
-      {/* Wedge controls (TIKE add-key-left/right, delete). */}
+      {/* Key toolbar — one op per commit (TIKE `saveOnce` semantics). */}
+      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
+        <KeyToolbar
+          address={selectedKeyAddress!}
+          targetKey={selectedKey}
+          layerIds={layerIds}
+          layerOverrideOptions={layerOverrideOptions}
+          fieldEpoch={fieldEpoch}
+          onInvalid={() => setFieldEpoch((n) => n + 1)}
+          commitOp={commitOp}
+        />
+      )}
+
+      {/* Subkey panel — longpress / flick compass / multitap. */}
+      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
+        <SubkeyPanel
+          address={selectedKeyAddress!}
+          targetKey={selectedKey}
+          layerIds={layerIds}
+          layerOverrideOptions={layerOverrideOptions}
+          selection={subSel}
+          onSelect={setSubSel}
+          fieldEpoch={fieldEpoch}
+          onInvalid={() => setFieldEpoch((n) => n + 1)}
+          commitOp={commitOp}
+          layout={layout}
+        />
+      )}
+
+      {/* Wedge controls (TIKE add-key-left/right, delete) — below the key
+          and longpress sections. */}
       {selectedOnActiveLayer !== undefined && (
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -671,35 +701,6 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
             })}
           </button>
         </div>
-      )}
-
-      {/* Key toolbar — one op per commit (TIKE `saveOnce` semantics). */}
-      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
-        <KeyToolbar
-          address={selectedKeyAddress!}
-          targetKey={selectedKey}
-          layerIds={layerIds}
-          layerOverrideOptions={layerOverrideOptions}
-          fieldEpoch={fieldEpoch}
-          onInvalid={() => setFieldEpoch((n) => n + 1)}
-          commitOp={commitOp}
-        />
-      )}
-
-      {/* Subkey panel — longpress / flick compass / multitap. */}
-      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
-        <SubkeyPanel
-          address={selectedKeyAddress!}
-          targetKey={selectedKey}
-          layerIds={layerIds}
-          layerOverrideOptions={layerOverrideOptions}
-          selection={subSel}
-          onSelect={setSubSel}
-          fieldEpoch={fieldEpoch}
-          onInvalid={() => setFieldEpoch((n) => n + 1)}
-          commitOp={commitOp}
-          layout={layout}
-        />
       )}
 
       {templateOpen && (
