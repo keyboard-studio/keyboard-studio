@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Caps Lock and `&CasedKeys`",
   "branch": "km/casedkeys-criterion",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "plan",
@@ -18,6 +18,62 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-03T22:18:50.432Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-03T22:36:16.050Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:38:50.201Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:38:50.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:38:50.726Z"
     }
-  ]
+  ],
+  "unattended": true,
+  "currentTask": "T003",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "upstream basic_kbdus kmn + touch layout fixtures with PROVENANCE, -text gitattributes",
+      "files": [
+        "packages/engine/src/caps/__fixtures__/upstream_basic_kbdus"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "7 synthetic kmn fixtures, all parse with codec",
+      "files": [
+        "packages/engine/src/caps/__fixtures__/*.kmn"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "2 touch layout fixtures",
+      "files": [
+        "packages/engine/src/caps/__fixtures__/touch"
+      ]
+    }
+  }
 }

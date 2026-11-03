@@ -1,0 +1,3 @@
+{"step": "implement", "substep": null, "task": "T001", "kind": "complete", "by": "ai", "at": "2026-11-03T22:38:50.201Z", "did": "upstream basic_kbdus kmn + touch layout fixtures with PROVENANCE, -text gitattributes", "files": ["packages/engine/src/caps/__fixtures__/upstream_basic_kbdus"]}
+{"step": "implement", "substep": null, "task": "T002", "kind": "complete", "by": "ai", "at": "2026-11-03T22:38:50.481Z", "did": "7 synthetic kmn fixtures, all parse with codec", "files": ["packages/engine/src/caps/__fixtures__/*.kmn"]}
+{"step": "implement", "substep": null, "task": "T003", "kind": "complete", "by": "ai", "at": "2026-11-03T22:38:50.726Z", "did": "2 touch layout fixtures", "files": ["packages/engine/src/caps/__fixtures__/touch"]}
