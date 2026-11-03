@@ -206,13 +206,28 @@ export function bindManifest(m: readonly Step[]): void {
  *           out of `undoStack` by `seq`, so a caller that bypasses
  *           `undoDelete` never leaves an orphaned entry pointing at a
  *           removed op.
+ * 'kb'    — a BATCH of key-level touch layout edits committed atomically via
+ *           commitKeyEditBatch (TIKE touch-builder port, Code tab — Q2 ruling:
+ *           one Apply = one undo step). Carries the committed ops' `seqs` in
+ *           commit order. `undoDelete`'s branch verifies the seqs match the
+ *           TAIL of `keyEditOverlay.ops` in order, then pops all N — the same
+ *           LIFO lock-step the 'k' branch documents, generalized: a 'kb'
+ *           entry still in `undoStack` is, in relative order, the current
+ *           tail run of `keyEditOverlay.ops`, because commits always append
+ *           and undos always pop from the tail. `undoKeyEditBatch` is the
+ *           direct-removal counterpart (mirrors `undoKeyEdit`): it removes
+ *           the most recently committed batch's ops by `seq` and filters the
+ *           matching 'kb' entry out of `undoStack`, so a caller that bypasses
+ *           `undoDelete` never leaves an orphaned entry pointing at removed
+ *           ops.
  */
 export type UndoEntry =
   | { k: "n"; id: string }
   | { k: "i"; id: string }
   | { k: "t"; id: string }
   | { k: "batch"; nodeIds: string[]; itemIds: string[]; chars: string[] }
-  | { k: "k"; seq: number };
+  | { k: "k"; seq: number }
+  | { k: "kb"; seqs: number[] };
 
 // ---------------------------------------------------------------------------
 // Key edit overlay (spec 063) — the ordered op log for the touch key grid,
@@ -1134,6 +1149,33 @@ export interface WorkingCopyState {
    */
   undoKeyEdit: () => void;
   /**
+   * Commit a batch of key-level touch layout edits as ONE undo step (TIKE
+   * touch-builder port, Code tab — Q2 ruling: one Apply = one undo step).
+   * Appends every op to `keyEditOverlay.ops` with consecutive `seq`s (the
+   * current op count, then +1 per op — the commit order) and pushes a single
+   * `'kb'` {@link UndoEntry} (`{ k: 'kb', seqs }`) onto the shared
+   * chronological `undoStack`. A no-op for an empty array (no ops, no entry).
+   *
+   * The ops array stays append-only and every commit assigns seqs in order,
+   * so the entry's seqs always name a contiguous tail run of
+   * `keyEditOverlay.ops` — which is what `undoDelete`'s `'kb'` branch
+   * verifies before popping.
+   */
+  commitKeyEditBatch: (ops: PendingKeyEditOperation[]) => void;
+  /**
+   * Remove the most recently committed key-edit batch (the highest `seq`s).
+   * No-op when no `'kb'` entry is on the stack.
+   *
+   * The direct-removal counterpart to `undoDelete`'s `'kb'` branch — mirrors
+   * `undoKeyEdit`: removes the batch's ops from `keyEditOverlay.ops` by
+   * `seq` AND filters the matching `'kb'` entry out of `undoStack`, so a
+   * caller using this action directly (bypassing `undoDelete`) never leaves
+   * an orphaned undo entry pointing at removed ops. Ops committed after the
+   * batch (higher seqs) are untouched; seqs are stable identifiers, so the
+   * remaining entries' tail correspondence is preserved.
+   */
+  undoKeyEditBatch: () => void;
+  /**
    * Commit a deadkey lifecycle mutation: appends `op` to
    * `deadkeyOverlay.ops`, in commit order. The caller is the Deadkeys step
    * component that just committed the same mutation to the working IR via
@@ -1772,6 +1814,8 @@ export type WorkingCopyData = Omit<
   | "setAxisFills"
   | "commitKeyEdit"
   | "undoKeyEdit"
+  | "commitKeyEditBatch"
+  | "undoKeyEditBatch"
   | "commitDeadkeyOp"
   | "commitTouchKeyRename"
   | "setTouchEditorMode"
@@ -1939,6 +1983,26 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         // entry kinds have been pushed after it.
         return {
           keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -1) },
+          undoStack: s.undoStack.slice(0, -1),
+        };
+      } else if (last.k === "kb") {
+        // Batch key-edit entry (TIKE touch-builder port, Code tab — Q2
+        // ruling: one Apply = one undo step): the entry's seqs were appended
+        // contiguously by one commitKeyEditBatch call, so they name the tail
+        // run of keyEditOverlay.ops in order. Verify before popping — the
+        // same LIFO lock-step the 'k' branch documents, generalized to N
+        // ops. A mismatch is unreachable through the store's own actions
+        // (every action that removes ops also removes the entries that
+        // reference them); refusing to pop beats silently corrupting the
+        // overlay.
+        const n = last.seqs.length;
+        if (n === 0) return s;
+        const tail = s.keyEditOverlay.ops.slice(-n);
+        const matches =
+          tail.length === n && tail.every((op, i) => op.seq === last.seqs[i]);
+        if (!matches) return s;
+        return {
+          keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -n) },
           undoStack: s.undoStack.slice(0, -1),
         };
       } else {
@@ -2242,6 +2306,44 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         undoStack: s.undoStack.filter(
           (e) => !(e.k === "k" && e.seq === removed.seq),
         ),
+      };
+    }),
+
+  commitKeyEditBatch: (ops) =>
+    set((s) => {
+      // An empty Apply is not an undo step: no ops, no entry.
+      if (ops.length === 0) return s;
+      const base = s.keyEditOverlay.ops.length;
+      const committed = ops.map(
+        (op, i) => ({ ...op, seq: base + i }) as KeyEditOperation,
+      );
+      const undoEntry: UndoEntry = {
+        k: "kb",
+        seqs: committed.map((o) => o.seq),
+      };
+      return {
+        keyEditOverlay: { ops: [...s.keyEditOverlay.ops, ...committed] },
+        undoStack: [...s.undoStack, undoEntry],
+      };
+    }),
+
+  undoKeyEditBatch: () =>
+    set((s) => {
+      // Most-recently-committed batch: the LAST 'kb' entry on the stack.
+      // Filter by seq (not by position): ops committed after the batch keep
+      // their higher seqs, and every remaining entry's tail correspondence
+      // is untouched.
+      let idx = s.undoStack.length - 1;
+      while (idx >= 0 && s.undoStack[idx]!.k !== "kb") idx--;
+      if (idx < 0) return s;
+      const entry = s.undoStack[idx]!;
+      if (entry.k !== "kb") return s;
+      const seqs = new Set(entry.seqs);
+      return {
+        keyEditOverlay: {
+          ops: s.keyEditOverlay.ops.filter((o) => !seqs.has(o.seq)),
+        },
+        undoStack: s.undoStack.filter((_, i) => i !== idx),
       };
     }),
 

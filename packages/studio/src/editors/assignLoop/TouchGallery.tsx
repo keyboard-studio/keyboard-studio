@@ -230,6 +230,10 @@ const TouchCodePane = lazy(() =>
     default: m.TouchCodePane,
   })),
 );
+// TIKE touch-builder port (slice-spec §3.2): the visual builder pane
+// replacing the "By key" tab's old grid/inspector surface. Eager — it
+// carries no Monaco weight, unlike the code tab above.
+import { TouchBuilderPane } from "./touchBuilder/TouchBuilderPane.tsx";
 import {
   useKeyCommands,
   buildAddKeyAfterOutcome,
@@ -494,6 +498,7 @@ export type UndoTargetDescription =
   | { kind: "touchKey"; keyId: string }
   | { kind: "batch"; count: number }
   | { kind: "keyEdit"; keyId: string; opKind: KeyEditOperation["kind"] }
+  | { kind: "keyEditBatch"; count: number }
   | null;
 
 export function describeUndoTarget(
@@ -517,6 +522,14 @@ export function describeUndoTarget(
       if (op === undefined) return null;
       const parts = parseTouchKeyAddress(op.address);
       return { kind: "keyEdit", keyId: parts?.keyId ?? op.address, opKind: op.kind };
+    }
+    case "kb": {
+      // Code-tab batch (TIKE touch-builder port): one Apply = one undo
+      // step. Null when the batch's ops were removed out from under the
+      // entry (mirrors the 'k' branch's never-crash convention).
+      const ops = entry.seqs.map((seq) => keyEditOps.find((o) => o.seq === seq));
+      if (ops.some((op) => op === undefined)) return null;
+      return { kind: "keyEditBatch", count: entry.seqs.length };
     }
     default:
       return null;
@@ -7423,30 +7436,16 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </Trans>
       </p>
 
-      {/* T014 (FR-004/FR-006) — the layer selector, above the grid. Sourced
-          from the ACTIVE PLATFORM's DECLARED `layers[]` (never any key's
-          `nextlayer`), which is what makes "including layers no key's
-          next-layer reaches" true by construction. */}
-      {activeKeyPlatformEntry !== undefined && (
-        <LayerSelector
-          layerIds={activeKeyPlatformEntry.layers.map((l) => l.id)}
-          activeLayerId={activeKeyLayerId}
-          onSelectLayer={setActiveKeyLayerId}
-          findingCountsByLayerId={keyLayerFindingCounts}
-        />
-      )}
-
-      {/* Add and remove are reached FROM A KEY, never from a pane-level
-          toolbar copy. Adding: the `(+)` hover wedge, Insert, and the command
-          menu's "Add key after" — all three anchored on the key the new one
-          follows. Removing: the property panel's "Delete this key" (FR-019),
-          which opens the SAME `remove-key-dialog` this toolbar's button used
-          to. Two controls that do one thing is one control too many: the
-          toolbar pair said nothing the key-anchored routes did not already
-          say, and a second "Remove key" beside the panel's "Delete this key"
-          reads as two different operations. What remains here is the one
-          control that genuinely has no key to hang off: finding a key you
-          cannot yet see. */}
+      {/* TIKE touch-builder port (slice-spec §3.2): the visual builder pane
+          replaces the old "By key" editor surface (layer selector, grid,
+          gesture panel, property panel, key dialogs). Step chrome — nav,
+          gate notices, find, invalidation warnings, rejections, the
+          dead-key repair list — stays: it belongs to the step, not the
+          editor surface. */}
+      {/* The one key-mode control that genuinely has no key to hang off:
+          finding a key you cannot yet see. `handleFindJump` sets the
+          platform/layer/selection the builder pane reads, so it keeps
+          working against the new surface. */}
       <div style={{ display: "flex", gap: 8 }}>
         <button
           type="button"
@@ -7466,248 +7465,16 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         />
       )}
 
-      {repointNextlayerPrompt !== null && (
-        <div
-          role="group"
-          aria-label={t({
-            id: "editor.assignLoop.touch.keyMode.repointNextlayerPromptLabel",
-            message: "Choose the layer to go to",
-          })}
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
-        >
-          <SelectMenu
-            value=""
-            onChange={(v) => {
-              commitKeyEditOp({
-                address: repointNextlayerPrompt.address,
-                kind: "set",
-                fields: { nextlayer: v },
-              });
-              setRepointNextlayerPrompt(null);
-            }}
-            ariaLabel={t({
-              id: "editor.assignLoop.touch.keyMode.repointNextlayerPromptLabel",
-              message: "Choose the layer to go to",
-            })}
-            options={repointNextlayerPrompt.candidates.map((c) => ({ value: c, label: c }))}
-            style={selectStyle}
-          />
-        </div>
-      )}
-
-      {/* Grid + inspector + AssignPanel share ONE detail region (spec 063
-          T085-T089 composition): Escape anywhere inside it returns focus to
-          the selected cell (handleKeyModeDetailEscape), and Enter on a
-          gridcell (handleKeyModeGridKeyDown) jumps straight into
-          AssignPanel's character field — the keyboard-only path SC-004
-          measures. */}
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
-          bubbled Escape-handling only, mirroring this pane's own outer div
-          above; not made pointer-interactive. */}
-      <div
-        ref={keyModeDetailContainerRef}
-        onKeyDown={handleKeyModeDetailEscape}
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        {/* THE BOARD AND ITS DETAILS, SIDE BY SIDE (issue #1530: "the key
-            details must show on the same screen as the keyboard").
-            They used to be stacked, which put the property panel below the
-            fold of a pane that scrolls: an author changing a key's width could
-            not see the key change. Keyman Developer docks the properties to the
-            right of the design surface, and so does this.
-
-            Key mode already passes NO right pane to `AssignLoopShell` (T037,
-            FR-024), so the whole window width is available — this column is
-            carved out of the editor's own space, not out of the live preview's.
-
-            `flexWrap` with a generous grid basis rather than a media query: a
-            narrow window drops the details BELOW the grid on its own, which is
-            the same stacked layout as before and correct at that width. The
-            details column is `sticky` so it stays beside the board while long
-            rows scroll past. */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              flex: "1 1 460px",
-              minWidth: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {keyModeViewModel !== undefined ? (
-              <KeyGrid
-                viewModel={keyModeViewModel}
-                selectedAddress={selectedKeyAddress}
-                onSelectCell={handleSelectKeyCell}
-                onKeyDown={handleKeyModeGridKeyDown}
-                label={t({
-                  id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
-                  message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
-                })}
-                platforms={keyModePlatforms}
-                {...(activeKeyPlatformId !== null
-                  ? { activePlatformId: activeKeyPlatformId }
-                  : {})}
-                onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
-                provenance={keyModeProvenance}
-                onAddKeyAfter={handleAddKeyAfterCell}
-                onOpenCommandMenu={handleOpenCommandMenu}
-                onFollowNextLayer={handleFollowNextLayer}
-              />
-            ) : (
-              <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
-                <Trans id="editor.assignLoop.touch.keyMode.notReady">
-                  The key layout isn&rsquo;t ready yet.
-                </Trans>
-              </p>
-            )}
-
-            {commandMenuState !== null && (
-              <KeyGridCommandMenu
-                commands={commandMenuCommands}
-                {...(commandMenuState.anchor !== undefined ? { anchor: commandMenuState.anchor } : {})}
-                onClose={() => {
-                  setCommandMenuState(null);
-                  dialogInvokerRef.current?.focus();
-                }}
-              />
-            )}
-
-            {/* Gestures stay UNDER the board, not in the details column: a
-                longpress/flick/multitap editor is a wide surface with its own
-                rows, and Developer likewise puts them in a strip beneath the
-                design area rather than in the properties pane. Renders nothing
-                with no key selected — its own early return. */}
-            <GesturePanel
-              selectedKey={selectedKeyNode}
-              selection={selectedGesture}
-              onSelectGesture={setSelectedGesture}
-              onAddGesture={handleAddGesture}
-              onEditGesture={handleEditGesture}
-              onRemoveGesture={handleRemoveGesture}
-            />
-          </div>
-
-          {/* THE DETAILS COLUMN. `sticky` + its own `overflowY` so a panel
-              taller than the viewport is still fully reachable without
-              scrolling the board away.
-
-              The three dialogs are deliberately NOT in here. They are
-              `position: fixed`, and a fixed descendant is still clipped by an
-              ancestor with `overflow: auto` — the same CSS surprise
-              `ui/SelectMenu.tsx` documents portalling to `document.body` to
-              escape. Mounted below this row instead, where nothing clips them.
-              (`SelectMenu` inside the panel is unaffected: it portals.) */}
-          <div
-            data-testid="touch-key-details-column"
-            style={{
-              flex: "0 1 320px",
-              minWidth: 268,
-              position: "sticky",
-              top: 0,
-              maxHeight: "calc(100vh - 140px)",
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {/* ONE panel (spec 065 T036, FR-018). The stacked
-                read-only-inspector-above-editing-panel mount is gone: both
-                surfaces are now composed INSIDE `KeyPropertyPanel`, which adds
-                the eight editable fields, delete and the four move buttons
-                around them. Everything still takes the SAME
-                selectedKeyCell/effective layout the grid renders, so nothing
-                here can disagree with the board. */}
-            <KeyPropertyPanel
-              selectedCell={selectedKeyCell}
-              {...(effectiveKeyModeLayout !== null
-                ? { layout: effectiveKeyModeLayout }
-                : {})}
-              {...(selectedKeyPosition !== undefined ? { position: selectedKeyPosition } : {})}
-              onSpChange={handleSpChange}
-              onApplyFix={handleApplyFix}
-              onFieldChange={handleKeyFieldChange}
-              onDelete={handleOpenRemoveDialog}
-              onMove={handleKeyMove}
-              {...(selectedIdentityNote !== undefined ? { identityNote: selectedIdentityNote } : {})}
-              {...(selectedKeyIdProposal !== undefined
-                ? { idProposal: selectedKeyIdProposal }
-                : {})}
-              {...(selectedKeyIdentity !== undefined
-                ? { identityInfo: selectedKeyIdentity, onRelinkKey: handleRelinkKey }
-                : {})}
-              {...(ir !== null && keyModeRuleIndex !== undefined
-                ? {
-                    assignSlot: (
-                      <AssignPanel
-                        selectedCell={selectedKeyCell}
-                        layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
-                        ir={ir}
-                        ruleIndex={keyModeRuleIndex}
-                        inventoryChars={inventory}
-                        capsHandled={capsHandled}
-                        {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
-                        bareMarkAllowedByMark={bareMarkAllowedByMark}
-                        repertoire={guardRepertoire}
-                        onCommit={handleAssignPanelCommit}
-                      />
-                    ),
-                  }
-                : {})}
-            />
-
-            {/* Spec 104 T016 — transient severance notice + the held
-                Track 2 identity choice (helpers below the commit chain). */}
-            {renderSeveranceNotices()}
-            {renderIdentityChoice()}
-          </div>
-        </div>
-
-        <RemoveKeyDialog
-          open={removeDialogOpen}
-          selectedCell={selectedKeyCell}
-          {...(removeKeyProposal !== undefined
-            ? { proposedOutcome: removeKeyProposal.outcome, proposedReason: removeKeyProposal.reason }
-            : {})}
-          isLastKeyInRow={selectedKeyRow?.keys.length === 1}
-          onCancel={handleRemoveKeyCancel}
-          onConfirm={handleRemoveKeyConfirm}
-        />
-
-        {ir !== null && keyModeRuleIndex !== undefined && (
-          <RenameDialog
-            open={renameDialogTarget !== null}
-            selectedCell={renameDialogTarget}
-            layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
-            ir={ir}
-            ruleIndex={keyModeRuleIndex}
-            bareMarkAllowedByMark={bareMarkAllowedByMark}
-            onCancel={handleRenameCancel}
-            onConfirm={handleRenameConfirm}
-          />
-        )}
-
-        {familyApplyState !== null && effectiveKeyModeLayout !== null && (
-          <FamilyApplyDialog
-            open
-            op={familyApplyState.op}
-            layout={effectiveKeyModeLayout}
-            familyLayerIds={familyApplyState.familyLayerIds}
-            {...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {})}
-            onCancel={handleFamilyApplyCancel}
-            onConfirm={handleFamilyApplyConfirm}
-          />
-        )}
+      <TouchBuilderPane
+        layout={effectiveKeyModeLayout}
+        activePlatformId={activeKeyPlatformId}
+        onSelectPlatform={setActiveKeyPlatformId}
+        activeLayerId={activeKeyLayerId}
+        onSelectLayer={setActiveKeyLayerId}
+        selectedKeyAddress={selectedKeyAddress}
+        onSelectKey={setSelectedKeyAddress}
+        commitOp={commitKeyEditOp}
+      />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
             invalidates a by-character assignment — never deferred to the
@@ -7849,7 +7616,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
         {/* Spec 104 T015 — the dead-key repair list at its owning step. */}
         {touchKeyIdentityList}
-      </div>
     </div>
   );
 
@@ -7862,7 +7628,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       keyModeContent
     ) : touchEditorMode === "code" ? (
       <Suspense fallback={null}>
-        <TouchCodePane />
+        <TouchCodePane layout={effectiveKeyModeLayout} />
       </Suspense>
     ) : (
       characterModeContent
@@ -7980,6 +7746,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.keyEdit",
           message: `Undo the ${{ opKind: undoTargetDescription.opKind }} edit on ${{ id: undoTargetDescription.keyId }}`,
+        });
+        break;
+      case "keyEditBatch":
+        undoAffordanceLabel = t({
+          id: "editor.assignLoop.touch.undo.keyEditBatch",
+          message: plural(undoTargetDescription.count, {
+            one: "Undo # touch-layout code edit",
+            other: "Undo # touch-layout code edits",
+          }),
         });
         break;
     }
