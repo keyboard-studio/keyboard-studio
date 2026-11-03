@@ -5,10 +5,9 @@
 // and the display-underlying / 102nd-key toggles.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { I18nProvider } from "@lingui/react";
-import { i18n } from "@lingui/core";
-import type { KvksIR, KeyboardIR } from "@keyboard-studio/contracts";
+import { screen, fireEvent } from "@testing-library/react";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { render } from "../../test/renderWithI18n.tsx";
 import { OskEditor } from "./OskEditor.tsx";
 
 // Mock the working copy store.
@@ -50,16 +49,14 @@ vi.mock("@keyboard-studio/engine", () => ({
     { id: "K_B", row: 3, x: 6.25, width: 1 },
     { id: "K_C", row: 3, x: 4.25, width: 1 },
   ],
+  oskContinueResult: (kvks: { kbdname?: string } | null) =>
+    kvks === null ? undefined : { kvksXml: "<visualkeyboard/>" },
 }));
 
 function renderEditor(props: { onComplete?: (r: unknown) => void; onBack?: () => void } = {}) {
   const onComplete = props.onComplete ?? vi.fn();
   const onBack = props.onBack ?? vi.fn();
-  render(
-    <I18nProvider i18n={i18n}>
-      <OskEditor onComplete={onComplete} onBack={onBack} />
-    </I18nProvider>,
-  );
+  render(<OskEditor onComplete={onComplete} onBack={onBack} />);
   return { onComplete, onBack };
 }
 
