@@ -209,6 +209,8 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     storeActions: [
       "commitKeyEdit",
       "undoKeyEdit",
+      "commitKeyEditBatch",
+      "undoKeyEditBatch",
       "deleteTouchKey",
       "restoreTouchKey",
       // Read accessor for the same EDITOR-AUTHORED slice
