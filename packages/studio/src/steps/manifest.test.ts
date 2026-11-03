@@ -132,7 +132,9 @@ const EXPECTED_SPINE_ORDER = [
   "mechanisms",
   "osk",
   "touch",
+  "css",
   "help",
+  "html",
   "package",
 ] as const;
 
@@ -200,8 +202,12 @@ describe("M2 — spine order matches FR-012", () => {
     assertStepOrder(spine, "convenience", "carve");
   });
 
-  it("'help' appears before 'package' on the spine", () => {
-    assertStepOrder(spineSteps(manifest), "help", "package");
+  it("'css' and 'html' sit between touch and package on the spine", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "touch", "css");
+    assertStepOrder(spine, "css", "help");
+    assertStepOrder(spine, "help", "html");
+    assertStepOrder(spine, "html", "package");
   });
 
   it("'project_name' is NOT a spine step (it is the copy-track CYOA fork)", () => {

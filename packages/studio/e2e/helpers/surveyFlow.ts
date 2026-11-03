@@ -1116,7 +1116,10 @@ export async function advanceThroughTailToOutput(page: Page): Promise<void> {
       await next.click();
       continue;
     }
-    const editorContinue = page.getByRole("button", { name: "Continue" });
+    const editorContinue = page
+      .getByTestId("html-continue")
+      .or(page.getByTestId("css-continue"))
+      .or(page.getByRole("button", { name: "Continue" }));
     if (await editorContinue.isVisible().catch(() => false)) {
       await editorContinue.click();
       continue;
@@ -1132,10 +1135,17 @@ export async function advanceThroughTailToOutput(page: Page): Promise<void> {
 /** Optional custom CSS step (after touch): skip and continue with empty CSS. */
 export async function driveCssEditorStep(page: Page): Promise<void> {
   const skip = page.getByRole("button", { name: "No custom CSS (skip)" });
+  const continueBtn = page.getByTestId("css-continue");
+
+  await Promise.race([
+    waitVisible(skip, 30_000),
+    waitVisible(continueBtn, 30_000),
+  ]);
+
   if (await skip.isVisible().catch(() => false)) {
     await skip.click();
   }
-  await page.getByRole("button", { name: "Continue" }).click({ timeout: 30_000 });
+  await continueBtn.click({ timeout: 30_000 });
 }
 
 /**

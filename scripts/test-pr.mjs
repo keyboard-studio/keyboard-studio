@@ -45,7 +45,7 @@ const CURATED_CORE = {
   ],
   "packages/studio": [
     "src/lib/serializeWorkingCopy*.test.ts",
-    "src/lib/projectWorkingCopyVfs.test.ts",
+    "src/lib/projectWorkingCopyVfs*.test.ts",
     "src/hooks/useWorkingCopyTransform.test.ts",
     "src/survey/PhaseBExemplarPrefill.test.tsx",
     "src/survey/PhaseFAdaptiveDescription.integration.test.tsx",
