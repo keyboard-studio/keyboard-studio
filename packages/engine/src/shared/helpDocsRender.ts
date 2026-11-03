@@ -13,17 +13,18 @@
 // slot values, escaped per target file, and owns the Track 2 splice.
 // `welcome.htm` and `help/<id>.php` both render the ONE `body` form — a
 // structural guarantee of FR-005 parity, not a style preference (research
-// D-02). `README.md`/`readme.htm` follow a deliberately narrower shape
-// (description, links, platforms only): the opt-in battery, the default-path
-// extras and the derived sections are welcome/help-page content, never README
-// content.
+// D-02). `README.md`/`readme.htm` have their own shape, rendered from the
+// studio's ReadmeFacts (spec 110): a short summary of the characters and how
+// to type them, not the full typing guide; the opt-in battery stays
+// welcome/help-page content.
 //
 // Track 2 (a start keyboard's own page was fetched) keeps that page as the
 // start of the document and adds the generated sections after it, between
 // DOC_GENERATED_START/END. Any earlier generated block in the inherited page
 // is stripped first, so re-rendering never stacks blocks (spec 102 FR-033).
 
-import { DOC_FORMS, scriptSubtagOf, type HelpDocsAnswers } from "@keyboard-studio/contracts";
+import { DOC_FORMS, fillDocPhrase, scriptSubtagOf, type HelpDocsAnswers } from "@keyboard-studio/contracts";
+import type { ReadmeFacts } from "./readmeFacts.js";
 import { escapeHtml, phpSingleQuoteEscape } from "./escapeHtml.js";
 import { DOC_PAGE_STYLE, helpSiteHeader, helpSitePageName, pageStyleCss } from "./packageDocs.js";
 import {
@@ -71,6 +72,8 @@ export interface HelpDocsRenderInput {
   keyboardId?: string;
   /** Derived sections from the studio's buildDocContent; absent means none. */
   generated?: GeneratedDocSlots;
+  /** The README.md / readme.htm facts (spec 110); absent means those files carry only the description, links and platforms. */
+  readme?: ReadmeFacts;
   /**
    * Accepted documentation-fix proposals for an adaptation (issue #1908).
    * Populated only by the adapt path, only from the author's recorded
@@ -578,36 +581,139 @@ function replaceBodyContent(page: string, body: string): string {
   return `${page}\n<body>\n${body}\n</body>\n`;
 }
 
-/**
- * `README.md` — package-listing description, links and supported platforms,
- * from the `readmeMd` form. No version/copyright (FR-007), no typing guide
- * (spec 102 FR-029). Platform tokens keep their raw spellings (`- any`), so
- * the generator satisfies its own 5.7 readme-targets check even
- * before a description is written.
- *
- * @param startReadmeMdText spec 080 FR-006: a fetched base's own `README.md`.
- *   No description yet -> the base text verbatim (one trailing newline); a
- *   description answered -> the base text, one blank line, then the form's
- *   sections WITHOUT a second `# title` heading (the base already has one).
- */
-export function renderReadmeMd(
-  input: HelpDocsRenderInput,
-  startReadmeMdText: string | null = null,
-): string {
-  const description = descriptionOf(input);
-  if (startReadmeMdText !== null && description === undefined) {
-    return withOneTrailingNewline(startReadmeMdText);
+// ---------------------------------------------------------------------------
+// README.md / readme.htm (spec 110): both rendered from one ReadmeFacts, each
+// escaping for its own format, so the two files never state different facts.
+// ---------------------------------------------------------------------------
+
+/** Past this many letters and marks, readme.htm's "Adds:" line ends "… and N more". */
+export const README_HTM_ADDS_CAP = 20;
+
+const PHRASES = DOC_FORMS.readmePhrases;
+
+/** The README description: the author's answer, else (Track 2) the inherited one. */
+function readmeDescriptionOf(input: HelpDocsRenderInput): string | undefined {
+  return descriptionOf(input) ?? nonBlank(input.readme?.fallbackDescription);
+}
+
+/** "a, b and c". */
+function joinAnd(items: readonly string[]): string {
+  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** The language line and, on Track 1, the "Based on" sentence. `tag` formats a BCP47 tag for the target file. */
+function readmeIntroOf(facts: ReadmeFacts, esc: (s: string) => string, tag: (s: string) => string): string {
+  const sentences: string[] = [];
+  if (facts.languages.length > 0) {
+    const languages = joinAnd(
+      facts.languages.map((l) => {
+        const inner = [l.autonym !== undefined ? esc(l.autonym) : undefined, tag(l.tag)].filter((s) => s !== undefined);
+        return `${esc(l.name)} (${inner.join(", ")})`;
+      }),
+    );
+    const subtag = scriptSubtagOf(facts.languages[0]!.tag) ?? facts.script;
+    const scriptName = subtag !== undefined ? SCRIPT_DISPLAY_NAME[subtag] : undefined;
+    sentences.push(
+      scriptName !== undefined
+        ? fillDocPhrase(PHRASES.languageLine, { languages, script: esc(scriptName) })
+        : fillDocPhrase(PHRASES.languageLineNoScript, { languages }),
+    );
   }
+  if (facts.basedOn !== undefined) {
+    const { name, layoutFamily } = facts.basedOn;
+    sentences.push(
+      layoutFamily !== undefined
+        ? fillDocPhrase(PHRASES.basedOnWithLayout, { name: esc(name), layout: esc(layoutFamily) })
+        : fillDocPhrase(PHRASES.basedOn, { name: esc(name) }),
+    );
+  }
+  return sentences.join(" ");
+}
+
+function compositionOf(facts: ReadmeFacts): string {
+  switch (facts.composition) {
+    case "precomposed":
+      return PHRASES.compositionPrecomposed;
+    case "decomposed":
+      return PHRASES.compositionDecomposed;
+    case "mixed":
+      return PHRASES.compositionMixed;
+    default:
+      return "";
+  }
+}
+
+/** The author's font note, else the generic note when the facts call for it; plain text, one entry per paragraph. */
+function fontParagraphsOf(input: HelpDocsRenderInput): string[] {
+  const answered = input.answers !== null ? nonBlank(input.answers.fontGuidance) : undefined;
+  if (answered !== undefined) return answered.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  return input.readme?.needsFontNote === true ? [PHRASES.fontGeneric] : [];
+}
+
+/** A Markdown table cell: escaped, with `|` escaped too so it cannot split the row. */
+function markdownCell(value: string): string {
+  return escapeDocMarkdown(value).replace(/\|/g, "\\|");
+}
+
+function readmeMdFactSlots(input: HelpDocsRenderInput): Partial<DocSlotModel> {
+  const facts = input.readme;
+  if (facts === undefined) return {};
+  const removedLabel = fillDocPhrase(PHRASES.removedFrom, { name: facts.basedOn?.name ?? input.displayName });
+  const characterLines = [
+    ...facts.characterGroups.map((g) => `- ${escapeDocMarkdown(g.label)}: ${g.chars.map(escapeDocMarkdown).join(" ")}`),
+    ...(facts.removed.length > 0
+      ? [`- ${escapeDocMarkdown(removedLabel)}: ${facts.removed.map(escapeDocMarkdown).join(" ")}`]
+      : []),
+  ];
+  const rows = [...facts.typingRows, ...facts.literalRows];
+  const typingTable =
+    rows.length > 0
+      ? ["| Keys | Gives |", "|------|-------|", ...rows.map((r) => `| ${markdownCell(r.keys)} | ${markdownCell(r.output)} |`)].join("\n")
+      : "";
+  const limitations = input.answers !== null ? nonBlank(input.answers.knownLimitations) : undefined;
+  return {
+    readmeIntro: readmeIntroOf(facts, escapeDocMarkdown, (t) => `\`${t}\``),
+    useCase: facts.useCase !== undefined ? escapeDocMarkdown(facts.useCase) : "",
+    characterList: characterLines.join("\n"),
+    composition: compositionOf(facts),
+    typingTable,
+    typingMore: typingTable !== "" && facts.typingRowsOmitted ? "1" : "",
+    knownLimitations:
+      limitations !== undefined
+        ? limitations.split("\n").map((l) => l.trim()).filter((l) => l !== "").map(escapeDocMarkdown).join("\n\n")
+        : "",
+    designNotes: facts.designNotes.map((n) => `- ${escapeDocMarkdown(n)}`).join("\n"),
+  };
+}
+
+/**
+ * `README.md` (spec 110, amending spec 102 FR-029): title, description, the
+ * language line, then the sections built from `input.readme` — characters, a
+ * short typing summary, fonts, tips, limitations, design notes — and the
+ * links and platforms. Each optional part is dropped when empty. No
+ * version/copyright (spec 102 FR-007). Platform tokens keep their raw
+ * spellings (`- any`), so the generator satisfies its own 5.7 readme-targets
+ * check.
+ *
+ * Track 2 regenerates the README rather than keeping the inherited one (spec
+ * 110 FR-011, amending spec 080 FR-006); the inherited description reaches it
+ * as `readme.fallbackDescription`.
+ */
+export function renderReadmeMd(input: HelpDocsRenderInput): string {
+  const description = readmeDescriptionOf(input);
   const helpUrl = helpPageUrl(input);
   const homeUrl = safeUrl(input.answers?.projectHomeUrl) ?? "";
   // Criterion 5.5: the README links the keyboard's keyman.com page.
   const keymanId = nonBlank(input.keyboardId);
   const keymanPageUrl = keymanId !== undefined ? `https://keyman.com/keyboards/${keymanId}` : "";
-  const rendered = withOneTrailingNewline(
+  const tips = input.answers?.usageTips.map((t) => t.trim()).filter((t) => t !== "") ?? [];
+  return withOneTrailingNewline(
     renderDocForm(DOC_FORMS.forms.readmeMd, {
-      // An empty title slot drops the `# title` line under an inherited README.
-      displayName: startReadmeMdText === null ? escapeDocMarkdown(input.displayName) : "",
+      displayName: escapeDocMarkdown(input.displayName),
       description: description !== undefined ? escapeDocMarkdown(description) : "",
+      ...readmeMdFactSlots(input),
+      fontLine: fontParagraphsOf(input).map(escapeDocMarkdown).join("\n\n"),
+      usageTips: tips.map((t) => `- ${escapeDocMarkdown(t)}`).join("\n"),
       helpPageUrl: helpUrl,
       keymanPageUrl,
       projectHomeUrl: homeUrl,
@@ -615,16 +721,35 @@ export function renderReadmeMd(
       platforms: input.platforms.map((p) => `- ${p}`).join("\n"),
     }),
   );
-  return startReadmeMdText === null ? rendered : `${startReadmeMdText.replace(/\s+$/, "")}\n${rendered}`;
 }
 
-/** `source/readme.htm` — the description, condensed for the package-details popup, and a pointer to the help page (spec 102 FR-029). */
+/** readme.htm's "Adds:" line: the letters and marks, cut at README_HTM_ADDS_CAP. */
+function addsLineOf(facts: ReadmeFacts): string {
+  const chars = facts.characterGroups.filter((g) => g.kind === "letters" || g.kind === "marks").flatMap((g) => g.chars);
+  if (chars.length === 0) return "";
+  const shown = chars.slice(0, README_HTM_ADDS_CAP).map(escapeDocHtml).join(" ");
+  const more = chars.length - README_HTM_ADDS_CAP;
+  return more > 0 ? `${shown} … and ${more} more` : shown;
+}
+
+/**
+ * `source/readme.htm` — the brief page Keyman shows while the package installs
+ * (spec 110 FR-009; criterion 6.2): name, description, language line, the
+ * letters and marks it adds, the font line, a pointer to the welcome page, and
+ * the help link. No typing table: Keyman keeps instructions on the welcome page.
+ */
 export function renderReadmeHtm(input: HelpDocsRenderInput): string {
-  const description = descriptionOf(input);
+  const description = readmeDescriptionOf(input);
+  const facts = input.readme;
+  const hasTyping = facts !== undefined && facts.typingRows.length + facts.literalRows.length > 0;
   return renderDocForm(DOC_FORMS.forms.readmeHtm, {
     displayName: escapeDocHtml(input.displayName),
     description: description !== undefined ? escapeDocHtml(description) : "",
     noDescription: description === undefined ? "1" : "",
+    readmeIntro: facts !== undefined ? readmeIntroOf(facts, escapeDocHtml, escapeDocHtml) : "",
+    addsLine: facts !== undefined ? addsLineOf(facts) : "",
+    fontLine: fontParagraphsOf(input).map(escapeDocHtml).join(" "),
+    typingTable: hasTyping ? "1" : "",
     helpPageUrl: escapeDocHtml(helpPageUrl(input)),
   });
 }

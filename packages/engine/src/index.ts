@@ -239,12 +239,23 @@ export {
   // `<img src>` extractor the projection diffs carried images against.
   renderWelcomeLayoutSection,
   extractWelcomeImageRefs,
+  README_HTM_ADDS_CAP,
 } from "./shared/helpDocsRender.js";
 export type {
   DocSection,
   GeneratedDocSlots,
   HelpDocsRenderInput,
 } from "./shared/helpDocsRender.js";
+// spec 110 — the facts README.md and readme.htm are both rendered from.
+export { extractReadmeDescription } from "./shared/readmeFacts.js";
+export type {
+  ReadmeCharacterGroup,
+  ReadmeCharacterKind,
+  ReadmeComposition,
+  ReadmeFacts,
+  ReadmeLanguage,
+  ReadmeTypingRow,
+} from "./shared/readmeFacts.js";
 
 // spec 102 — documentation forms: the renderer, the slot vocabulary, the
 // per-file escapers and the markers around Track 2's generated sections.

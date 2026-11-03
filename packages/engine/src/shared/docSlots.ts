@@ -67,6 +67,25 @@ export interface DocSlotModel {
   layoutPictures: string;
   touchNotes: string;
   characterInventory: string;
+  // README.md / readme.htm only (spec 110), from ReadmeFacts
+  /** The language line, plus the "Based on" sentence on Track 1. */
+  readmeIntro: string;
+  /** The use-case phrase; empty for "general" or unanswered. */
+  useCase: string;
+  /** One line per character group, then the removed-characters line. */
+  characterList: string;
+  /** The precomposed / combining sentence. */
+  composition: string;
+  /** The capped example rows plus the trigger-key rows. */
+  typingTable: string;
+  /** Non-empty when example rows were left out, so the README points to the welcome page. */
+  typingMore: string;
+  /** The author's font note, else the generic one when it applies. */
+  fontLine: string;
+  knownLimitations: string;
+  designNotes: string;
+  /** readme.htm only: letters and marks, truncated past a cap. */
+  addsLine: string;
 }
 
 export type DocSlotId = keyof DocSlotModel;
@@ -106,6 +125,16 @@ const SLOT_ID_RECORD: Record<DocSlotId, true> = {
   layoutPictures: true,
   touchNotes: true,
   characterInventory: true,
+  readmeIntro: true,
+  useCase: true,
+  characterList: true,
+  composition: true,
+  typingTable: true,
+  typingMore: true,
+  fontLine: true,
+  knownLimitations: true,
+  designNotes: true,
+  addsLine: true,
 };
 
 /** Every slot id a form may reference. Built from a total record, so a slot added to the model without an entry here fails to compile. */

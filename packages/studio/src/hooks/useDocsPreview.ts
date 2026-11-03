@@ -21,6 +21,9 @@ import {
   type HelpDocsRenderInput,
 } from "@keyboard-studio/engine";
 import { buildDocContent, parseTouchLayoutOrNull } from "../lib/docContent.ts";
+import { buildReadmeFacts } from "../lib/readmeFacts.ts";
+import { readmeFactsInputFrom } from "../lib/readmeFactsInput.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 
 export interface DocsPreview {
@@ -49,11 +52,18 @@ export function useDocsPreview(): DocsPreview {
   // spec 102 US2: the derived sections come from the working-copy IR as built.
   const workingIr = useWorkingCopyStore((s) => s.ir);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
-  // spec 080 FR-006: the base README is inherited on an adaptation only; the
+  // Spec 110: an adaptation's README keeps only the inherited description; the
   // slice is null on Track 1 by construction, and the track guard keeps it so.
   const startReadmeMdText = useWorkingCopyStore((s) =>
     s.instantiationMode === "adapt-existing" ? s.startReadmeMdText : null,
   );
+  // Spec 110: the README facts' other sources, read the way the output
+  // projection reads them (readmeFactsInputFrom).
+  const isAdaptation = useWorkingCopyStore((s) => s.instantiationMode === "adapt-existing");
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  const fallbackPolicy = useWorkingCopyStore((s) => s.fallbackPolicy);
+  const decisions = useDecisionStore((s) => s.decisions);
   // Issue #1908: the recorded documentation-fix proposals. Read under the
   // same adapt guard as the README inheritance — the copy track never
   // carries inherited prose, so its fixes can never engage there.
@@ -97,14 +107,30 @@ export function useDocsPreview(): DocsPreview {
       ...(startKeyboard !== null ? { keyboardId: resolveOutputKeyboardId(identity, startKeyboard) } : {}),
       platforms,
       ...(docContent !== null ? { generated: docContent.slots } : {}),
+      readme: buildReadmeFacts(
+        readmeFactsInputFrom({
+          ir,
+          touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+          decisions,
+          isAdaptation,
+          startKeyboard,
+          ...(identity?.bcp47 !== undefined && identity.bcp47 !== "" ? { primaryBcp47: identity.bcp47 } : {}),
+          ...(identity?.languageName !== undefined ? { languageName: identity.languageName } : {}),
+          carveChars,
+          fallbackPolicy,
+          helpDocs,
+          startVfs,
+          startReadmeMdText,
+        }),
+      ),
       ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
     };
     return {
-      readmeMd: renderReadmeMd(input, startReadmeMdText),
+      readmeMd: renderReadmeMd(input),
       readmeHtm: renderReadmeHtm(input),
       welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
       helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, fallbackPolicy, decisions]);
 }

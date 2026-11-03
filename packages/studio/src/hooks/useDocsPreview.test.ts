@@ -24,8 +24,10 @@ describe("useDocsPreview", () => {
     instantiate();
     const { result } = renderHook(() => useDocsPreview());
 
+    // Spec 110: a copy names its copied keyboard, even before any answers.
     expect(result.current.readmeMd).toBe(
-      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${basicKbdus.id}\n- Keyman keyboards page: https://keyman.com/keyboards/${basicKbdus.id}\n`,
+      `# ${basicKbdus.displayName}\n\nBased on ${basicKbdus.displayName}.\n\n` +
+        `## Design notes\n\n- Started from ${basicKbdus.displayName}.\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${basicKbdus.id}\n- Keyman keyboards page: https://keyman.com/keyboards/${basicKbdus.id}\n`,
     );
     // The no-answer welcome page is the element-spec §1 shell around the
     // fallback body — the same bytes the engine's welcomeHtm stub pins.
