@@ -1211,3 +1211,6 @@ export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowD
 // Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
 export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
 export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";
+
+// Spec 112 - shared cased-key derivation and key-scoped caps rewrite.
+export * from "./caps/index.js";

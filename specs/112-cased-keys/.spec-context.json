@@ -49,10 +49,82 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-03T22:38:50.726Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:40:54.849Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:40:55.014Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:18.759Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:18.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:19.003Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:42:21.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:42:21.486Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:49:43.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:51:38.679Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T003",
+  "currentTask": "T012",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -74,6 +146,96 @@
       "files": [
         "packages/engine/src/caps/__fixtures__/touch"
       ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Moved caseCounterpart+localeCase to contracts ir/casedKeys.ts, casePair.ts re-exports, tests moved",
+      "files": [
+        "packages/contracts/src/ir/casedKeys.ts",
+        "packages/contracts/src/ir/casedKeys.test.ts",
+        "packages/contracts/src/index.ts",
+        "packages/engine/src/character-discovery/casePair.ts",
+        "packages/engine/src/character-discovery/casePair.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Exported CASED_KEYS_FLOOR_QWERTY/AZERTY arrays and casedKeysFloor() in scaffold-ir.ts",
+      "files": [
+        "packages/engine/src/scaffolder/scaffold-ir.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "replaceCapsRules key-scoped caps rewrite with tests",
+      "files": [
+        "packages/engine/src/caps/replaceCapsRules.ts",
+        "packages/engine/src/caps/replaceCapsRules.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "write/removeCasedKeysStore with version raise and tests",
+      "files": [
+        "packages/engine/src/caps/casedKeysStore.ts",
+        "packages/engine/src/caps/casedKeysStore.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "caps/index.ts barrel, exported from engine index",
+      "files": [
+        "packages/engine/src/caps/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Tests for keyPlaneOutputs, declaredCasedKeys, casedKeySet, casedKeysStoreText",
+      "files": [
+        "packages/contracts/src/ir/casedKeys.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Implement Plane, keyPlaneOutputs, declaredCasedKeys, casedKeySet, casedKeysStoreText; capsExpand delegates to declaredCasedKeys",
+      "files": [
+        "packages/contracts/src/ir/casedKeys.ts",
+        "packages/engine/src/ldml-export/lower/capsExpand.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "casedKeys() in capsExpand.ts now delegates to contracts declaredCasedKeys (mapped via tableVKey)",
+      "files": [
+        "packages/engine/src/ldml-export/lower/capsExpand.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "gated and committed phase 2",
+      "files": [
+        "packages/contracts/src/ir/casedKeys.ts",
+        "packages/engine/src/caps"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "contracts vitest (1073) and engine caps/ldml-export/scaffolder vitest (640)",
+      "command": "pnpm --filter ... exec vitest run",
+      "result": "all pass"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "pnpm typecheck/lint fail only on osk/* files absent or stale on this branch vs main (complete-osk-step missing, generate-kvks.test any, OskEditor.test unused import); T013 rebase addresses it",
+      "step": "implement"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Phase 2 foundational: shared cased-key derivation and key-scoped caps rewrite"
     }
   }
 }

@@ -246,9 +246,35 @@ export function removeCapsContextElements(ir: KeyboardIR): void {
   }
 }
 
-const CASED_KEYS_QWERTY = "[K_A]..[K_Z]";
-const CASED_KEYS_AZERTY =
+const CASED_KEYS_QWERTY_TEXT = "[K_A]..[K_Z]";
+const CASED_KEYS_AZERTY_TEXT =
   "[K_A]..[K_Z] [K_0]..[K_9] [K_HYPHEN] [K_EQUAL] [K_LBRKT] [K_RBRKT] [K_BKSLASH] [K_QUOTE] [K_COMMA] [K_PERIOD] [K_SLASH] [K_COLON]";
+
+/** Family floors for the `&CasedKeys` store, as key arrays. */
+export const CASED_KEYS_FLOOR_QWERTY: readonly string[] = Array.from(
+  { length: 26 },
+  (_, i) => `K_${String.fromCharCode(65 + i)}`,
+);
+export const CASED_KEYS_FLOOR_AZERTY: readonly string[] = [
+  ...CASED_KEYS_FLOOR_QWERTY,
+  ...Array.from({ length: 10 }, (_, i) => `K_${i}`),
+  "K_HYPHEN",
+  "K_EQUAL",
+  "K_LBRKT",
+  "K_RBRKT",
+  "K_BKSLASH",
+  "K_QUOTE",
+  "K_COMMA",
+  "K_PERIOD",
+  "K_SLASH",
+  "K_COLON",
+];
+
+/** The family floor for a routing group; `[]` for `non-roman`. */
+export function casedKeysFloor(group: RoutingGroup): readonly string[] {
+  if (group === "non-roman") return [];
+  return group === "azerty" ? CASED_KEYS_FLOOR_AZERTY : CASED_KEYS_FLOOR_QWERTY;
+}
 
 /**
  * Insert a `&CasedKeys` system store if missing. Skipped for non-Roman
@@ -259,7 +285,7 @@ export function ensureCasedKeysStore(ir: KeyboardIR, group: RoutingGroup): void 
   if (group === "non-roman") return;
   if (hasSystemStore(ir, "CASEDKEYS")) return;
 
-  const value = group === "azerty" ? CASED_KEYS_AZERTY : CASED_KEYS_QWERTY;
+  const value = group === "azerty" ? CASED_KEYS_AZERTY_TEXT : CASED_KEYS_QWERTY_TEXT;
   const store: IRStore = {
     nodeId: "store:CasedKeys",
     name: "CasedKeys",

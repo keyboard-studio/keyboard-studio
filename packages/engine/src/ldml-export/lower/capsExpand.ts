@@ -7,7 +7,7 @@
 // cased key, and the `caps` layer on every other key. Which keys are cased comes from
 // `&CasedKeys`; a keyboard that declares none inverts nothing.
 
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { declaredCasedKeys, type KeyboardIR } from "@keyboard-studio/contracts";
 import { COMPONENT_ORDER, tableVKey, type ModifierSet } from "../classify/keystrokes.js";
 import type { LdmlBaseLayout } from "../types.js";
 
@@ -34,35 +34,8 @@ export function baseCasedKeys(base: LdmlBaseLayout): Set<string> {
  * characters of the derived caps layers; see baseFill.)
  */
 export function casedKeys(ir: KeyboardIR, _base?: LdmlBaseLayout): Set<string> {
-  const store = ir.stores.find((s) => s.isSystem && /^&?casedkeys$/i.test(s.name));
-  if (store === undefined) return new Set<string>();
-  const out = new Set<string>();
-  const names: (string | "..")[] = [];
-  for (const it of store.items) {
-    if (it.kind === "vkey") names.push(it.name);
-    else if (it.kind === "raw") {
-      const text = it.text.trim();
-      if (text === "..") names.push("..");
-      else {
-        const m = /([KTU]_[A-Za-z0-9_]+)\s*\]?$/.exec(text);
-        if (m) names.push(m[1] as string);
-      }
-    }
-  }
-  names.forEach((n, i) => {
-    if (n === "..") return;
-    out.add(tableVKey(n));
-    // `[K_A] .. [K_Z]`: every key between two single-character key names.
-    if (names[i + 1] === "..") {
-      const to = names[i + 2];
-      const a = /^K_([A-Za-z0-9])$/.exec(n)?.[1];
-      const b = to === undefined ? undefined : /^K_([A-Za-z0-9])$/.exec(to)?.[1];
-      if (a !== undefined && b !== undefined) {
-        for (let c = a.toUpperCase().charCodeAt(0); c <= b.toUpperCase().charCodeAt(0); c++) out.add(`K_${String.fromCharCode(c)}`);
-      }
-    }
-  });
-  return out;
+  const declared = declaredCasedKeys(ir);
+  return new Set<string>([...(declared ?? [])].map(tableVKey));
 }
 
 function toggleShift(components: readonly string[]): string[] {
