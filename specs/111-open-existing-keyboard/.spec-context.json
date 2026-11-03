@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Open an existing keyboard",
+  "branch": "111-open-existing-keyboard",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-03T21:34:25.607Z"
+    }
+  ],
+  "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a"
+}
