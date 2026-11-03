@@ -11,6 +11,9 @@
 // exact sha); the report judges that sha and nothing else.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import {
   ACCENT,
   BG_CARD,
@@ -42,29 +45,41 @@ import {
 type RepoChoice = "ks" | "km";
 type KindChoice = "repo" | "prs";
 
-const REPOS: Array<{ id: RepoChoice; label: string; blurb: string }> = [
+const REPOS: Array<{ id: RepoChoice; label: string; blurb: MessageDescriptor }> = [
   {
     id: "ks",
     label: "keyboard-studio/keyboards",
-    blurb: "Curated studio submissions",
+    blurb: msg({
+      id: "review.picker.repoKs.blurb",
+      message: "Curated studio submissions",
+    }),
   },
   {
     id: "km",
     label: "keymanapp/keyboards",
-    blurb: "The upstream Keyman library",
+    blurb: msg({
+      id: "review.picker.repoKm.blurb",
+      message: "The upstream Keyman library",
+    }),
   },
 ];
 
-const KINDS: Array<{ id: KindChoice; label: string; blurb: string }> = [
+// NB: KINDS carries no blurb — the cards render a per-repo blurb
+// ("<repo> · default branch" / "<repo> · open pull requests") instead.
+const KINDS: Array<{ id: KindChoice; label: MessageDescriptor }> = [
   {
     id: "repo",
-    label: "Published keyboards",
-    blurb: "The default branch, as published",
+    label: msg({
+      id: "review.picker.kindRepo.label",
+      message: "Published keyboards",
+    }),
   },
   {
     id: "prs",
-    label: "Pull requests",
-    blurb: "Proposed additions & fixes, judged at the PR head",
+    label: msg({
+      id: "review.picker.kindPrs.label",
+      message: "Pull requests",
+    }),
   },
 ];
 
@@ -161,6 +176,7 @@ export function ReviewPicker({
    */
   autoRunSingle?: boolean;
 }) {
+  const { t } = useLingui();
   const [repo, setRepo] = useState<RepoChoice | null>(initialRepo ?? null);
   const [kind, setKind] = useState<KindChoice | null>(initialKind ?? null);
   const [query, setQuery] = useState("");
@@ -294,9 +310,11 @@ export function ReviewPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Q1 — repository */}
-      <section aria-label="Which repository">
+      <section
+        aria-label={t({ id: "review.picker.whichRepo.ariaLabel", message: "Which repository" })}
+      >
         <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>
-          1. Which repository?
+          <Trans id="review.picker.whichRepo.heading">1. Which repository?</Trans>
         </h3>
         <div
           style={{
@@ -312,7 +330,7 @@ export function ReviewPicker({
               onClick={() => pickRepo(r.id)}
               title={r.label}
               titleMono
-              blurb={r.blurb}
+              blurb={t(r.blurb)}
             />
           ))}
         </div>
@@ -320,9 +338,16 @@ export function ReviewPicker({
 
       {/* Q2 — pulls or published */}
       {repo && (
-        <section aria-label="Pull requests or published keyboards">
+        <section
+          aria-label={t({
+            id: "review.picker.prOrPublished.ariaLabel",
+            message: "Pull requests or published keyboards",
+          })}
+        >
           <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>
-            2. Pull requests or published keyboards?
+            <Trans id="review.picker.prOrPublished.heading">
+              2. Pull requests or published keyboards?
+            </Trans>
           </h3>
           <div
             style={{
@@ -336,11 +361,17 @@ export function ReviewPicker({
                 key={k.id}
                 selected={kind === k.id}
                 onClick={() => pickKind(k.id)}
-                title={k.label}
+                title={t(k.label)}
                 blurb={
                   k.id === "repo"
-                    ? `${repoLabel} · default branch`
-                    : `${repoLabel} · open pull requests`
+                    ? t({
+                        id: "review.picker.kindRepo.blurbForRepo",
+                        message: `${repoLabel} · default branch`,
+                      })
+                    : t({
+                        id: "review.picker.kindPrs.blurbForRepo",
+                        message: `${repoLabel} · open pull requests`,
+                      })
                 }
               />
             ))}
@@ -350,30 +381,44 @@ export function ReviewPicker({
 
       {/* Q3a — published keyboards */}
       {repo && kind === "repo" && (
-        <section aria-label="Pick a keyboard">
-          <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>3. Pick a keyboard</h3>
+        <section
+          aria-label={t({ id: "review.picker.pickKeyboard.ariaLabel", message: "Pick a keyboard" })}
+        >
+          <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>
+            <Trans id="review.picker.pickKeyboard.heading">3. Pick a keyboard</Trans>
+          </h3>
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="Search by id, name, or path… (e.g. amharic, cree, nko)"
-            label="Search keyboards"
+            placeholder={t({
+              id: "review.picker.searchKeyboards.placeholder",
+              message: "Search by id, name, or path… (e.g. amharic, cree, nko)",
+            })}
+            label={t({ id: "editor.baseResolution.searchKeyboardsLabel", message: "Search keyboards" })}
           />
           <KeyboardList
             keyboards={listKeyboards}
             selected={selected}
             onSelect={setSelected}
-            emptyText="No keyboards match."
+            emptyText={t({ id: "review.picker.noKeyboardsMatch", message: "No keyboards match." })}
           />
         </section>
       )}
 
       {/* Q3b — PRs, then keyboards changed in the PR */}
       {repo && kind === "prs" && !selectedPr && (
-        <section aria-label="Pick a pull request">
-          <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>3. Pick a pull request</h3>
+        <section
+          aria-label={t({ id: "review.picker.pickPr.ariaLabel", message: "Pick a pull request" })}
+        >
+          <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>
+            <Trans id="review.picker.pickPr.heading">3. Pick a pull request</Trans>
+          </h3>
           <div
             role="group"
-            aria-label="Filter pull requests by state"
+            aria-label={t({
+              id: "review.picker.prStateFilter.ariaLabel",
+              message: "Filter pull requests by state",
+            })}
             style={{ display: "flex", gap: 6, marginBottom: 8 }}
           >
             {(["all", "open", "closed"] as const).map((f) => (
@@ -401,20 +446,40 @@ export function ReviewPicker({
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="Search pull requests by number or title…"
-            label="Search pull requests"
+            placeholder={t({
+              id: "review.picker.searchPrs.placeholder",
+              message: "Search pull requests by number or title…",
+            })}
+            label={t({ id: "review.picker.searchPrs.label", message: "Search pull requests" })}
           />
           <p style={{ fontSize: 11, color: TEXT_DIM, margin: "0 0 8px" }}>
-            {prsLoading && "Loading the live pull request list…"}
-            {!prsLoading && prsLive && "Live from GitHub · refreshed on each visit."}
+            {prsLoading && (
+              <Trans id="review.picker.loadingPrList">Loading the live pull request list…</Trans>
+            )}
+            {!prsLoading && prsLive && (
+              <Trans id="review.picker.prListLive">
+                Live from GitHub · refreshed on each visit.
+              </Trans>
+            )}
             {!prsLoading &&
               !prsLive &&
               prsError &&
-              `Live list unavailable (${prsError}) — showing the cached list from ${index?.generatedAt?.slice(0, 10) ?? "the last index build"}.`}
+              t({
+                id: "review.picker.prListCached",
+                message: `Live list unavailable (${prsError}) — showing the cached list from ${
+                  index?.generatedAt?.slice(0, 10) ??
+                  t({
+                    id: "review.picker.prListCachedFallback",
+                    message: "the last index build",
+                  })
+                }.`,
+              })}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {openPrs.length === 0 && !prsLoading && (
-              <p style={{ fontSize: 13, color: TEXT_DIM }}>No pull requests match.</p>
+              <p style={{ fontSize: 13, color: TEXT_DIM }}>
+                <Trans id="review.picker.noPrsMatch">No pull requests match.</Trans>
+              </p>
             )}
             {openPrs.map((pr) => (
               <button
@@ -454,7 +519,12 @@ export function ReviewPicker({
                 <span style={{ fontSize: 13 }}>{pr.title}</span>
                 <div style={{ fontSize: 11, color: TEXT_DIM, marginTop: 2 }}>
                   head {pr.headSha.slice(0, 7)}
-                  {pr.updatedAt ? ` · updated ${pr.updatedAt.slice(0, 10)}` : ""}
+                  {pr.updatedAt
+                    ? t({
+                        id: "review.picker.prUpdated",
+                        message: ` · updated ${pr.updatedAt.slice(0, 10)}`,
+                      })
+                    : ""}
                 </div>
               </button>
             ))}
@@ -463,7 +533,12 @@ export function ReviewPicker({
       )}
 
       {repo && kind === "prs" && selectedPr && (
-        <section aria-label="Keyboards changed in this pull request">
+        <section
+          aria-label={t({
+            id: "review.picker.prKeyboards.ariaLabel",
+            message: "Keyboards changed in this pull request",
+          })}
+        >
           <button
             type="button"
             onClick={() => {
@@ -481,7 +556,7 @@ export function ReviewPicker({
               marginBottom: 6,
             }}
           >
-            ← All pull requests
+            <Trans id="review.picker.allPrs">← All pull requests</Trans>
           </button>
           <h3 style={{ margin: "0 0 4px", fontSize: 13 }}>
             <span style={{ fontFamily: CSS_FONT_MONO, fontWeight: 700 }}>
@@ -490,15 +565,19 @@ export function ReviewPicker({
             {selectedPr.title}
           </h3>
           <p style={{ fontSize: 12, color: TEXT_DIM, margin: "0 0 8px" }}>
-            Only the keyboards this PR changes:
+            <Trans id="review.picker.onlyPrKeyboards">Only the keyboards this PR changes:</Trans>
           </p>
           {prKeyboardsError && (
             <p style={{ fontSize: 13, color: CSS_WARNING_TEXT }}>
-              Couldn&apos;t list this PR&apos;s keyboards: {prKeyboardsError}
+              <Trans id="review.picker.prKeyboardsError">
+                Couldn&apos;t list this PR&apos;s keyboards: {prKeyboardsError}
+              </Trans>
             </p>
           )}
           {prKeyboards === null && !prKeyboardsError && (
-            <p style={{ fontSize: 13, color: TEXT_DIM }}>Reading the PR&apos;s file list…</p>
+            <p style={{ fontSize: 13, color: TEXT_DIM }}>
+              <Trans id="review.picker.readingPrFiles">Reading the PR&apos;s file list…</Trans>
+            </p>
           )}
           {prKeyboards !== null && prKeyboards.length > 1 && (
             <div
@@ -513,10 +592,14 @@ export function ReviewPicker({
               }}
             >
               <strong style={{ color: CSS_WARNING_TEXT }}>
-                ⚠ This PR touches {prKeyboards.length} keyboards.
+                <Trans id="review.picker.multiKeyboardPr">
+                  ⚠ This PR touches {prKeyboards.length} keyboards.
+                </Trans>
               </strong>{" "}
-              Review each one separately — a multi-keyboard PR deserves a
-              closer look.
+              <Trans id="review.picker.multiKeyboardPrNote">
+                Review each one separately — a multi-keyboard PR deserves a
+                closer look.
+              </Trans>
             </div>
           )}
           {prKeyboards !== null && (
@@ -524,21 +607,26 @@ export function ReviewPicker({
               keyboards={prKeyboards}
               selected={selected}
               onSelect={setSelected}
-              emptyText="This PR touches no keyboard folders."
+              emptyText={t({
+                id: "review.picker.prNoKeyboardFolders",
+                message: "This PR touches no keyboard folders.",
+              })}
             />
           )}
         </section>
       )}
 
       <p style={{ fontSize: 12, color: TEXT_DIM, margin: 0 }}>
-        No uploads, no pasted URLs, no keyman.com downloads, no studio projects.
-        If it isn&apos;t in one of these four places, it can&apos;t be checked here.
+        <Trans id="review.picker.sourceLimits">
+          No uploads, no pasted URLs, no keyman.com downloads, no studio projects.
+          If it isn&apos;t in one of these four places, it can&apos;t be checked here.
+        </Trans>
       </p>
 
       {/* Pinned snapshot + run */}
       {target && (
         <section
-          aria-label="Pinned snapshot"
+          aria-label={t({ id: "review.picker.snapshot.ariaLabel", message: "Pinned snapshot" })}
           style={{
             background: BG_CARD,
             border: `1px solid ${BORDER}`,
@@ -547,7 +635,9 @@ export function ReviewPicker({
           }}
         >
           <h3 style={{ margin: "0 0 8px", fontSize: 13 }}>
-            Pinned snapshot — the check is reproducible
+            <Trans id="review.picker.snapshotHeading">
+              Pinned snapshot — the check is reproducible
+            </Trans>
           </h3>
           <div
             style={{
@@ -563,8 +653,10 @@ export function ReviewPicker({
             {reviewTargetLabel(target)}
           </div>
           <p style={{ fontSize: 12, color: TEXT_DIM }}>
-            The battery runs against this exact commit. If the repo or PR moves on,
-            re-run for a fresh report — old reports stay pinned to their commit.
+            <Trans id="review.picker.snapshotNote">
+              The battery runs against this exact commit. If the repo or PR moves on,
+              re-run for a fresh report — old reports stay pinned to their commit.
+            </Trans>
           </p>
           <button
             type="button"
@@ -581,7 +673,7 @@ export function ReviewPicker({
               fontFamily: FONT,
             }}
           >
-            Run health check
+            <Trans id="review.picker.runHealthCheck">Run health check</Trans>
           </button>
         </section>
       )}

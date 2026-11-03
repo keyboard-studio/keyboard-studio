@@ -5,7 +5,7 @@
 // no logic of its own, so it can never drift from the selector. The primary
 // pass is a first-match-wins waterfall; the secondary passes always run.
 
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   PRIMARY_RULES,
   SECONDARY_RULES,
@@ -75,6 +75,7 @@ export interface StrategyTreeViewProps {
 }
 
 export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
+  const { t } = useLingui();
   return (
     <div style={{ fontFamily: SANS, color: COLORS.gray.text, maxWidth: 920 }}>
       <p style={{ fontSize: 13, color: COLORS.gray.textDim, margin: "0 0 16px" }}>
@@ -201,7 +202,9 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                 whiteSpace: "nowrap",
               }}
             >
-              {sr.id === "S-11-wrapper" ? "S-11 wrapper" : `Rule ${sr.id}`}
+              {sr.id === "S-11-wrapper"
+                ? "S-11 wrapper"
+                : t({ id: "dashboard.strategyTree.ruleBadge", message: `Rule ${sr.id}` })}
             </span>
             <code
               style={{
@@ -231,7 +234,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
           <code style={{ fontFamily: MONO }}>{"if()"}</code>-guarded form preserved as raw fragments — and{" "}
           <code style={{ fontFamily: MONO }}>{'markInputOrder="postfix"'}</code> is seeded onto{" "}
           <code style={{ fontFamily: MONO }}>{"irAxes"}</code>{" "}
-          (<code style={{ fontFamily: MONO }}>{'source: "import-derived"'}</code> below), so rule
+          (<code style={{ fontFamily: MONO }}>{'source: "import-derived"' /* eslint-disable-line lingui/no-unlocalized-strings -- IR axis-fill code fragment, shown verbatim */}</code> below), so rule
           3a now fires live for such a starting point, including the shipping{" "}
           <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> keyboard’s guarded postfix rules. No survey phase elicits
           it end-to-end yet — that half remains deferred.

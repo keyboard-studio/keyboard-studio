@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
-import type { KvksIR, KeyboardIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { OskEditor } from "./OskEditor.tsx";
 
 // Mock the working copy store.

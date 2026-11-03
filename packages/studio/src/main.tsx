@@ -1,6 +1,7 @@
 import './index.css';
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
+import { Trans } from "@lingui/react/macro";
 import { AppRoot } from "./AppRoot.tsx";
 import { StudioShell } from "./StudioShell.tsx";
 import { OAuthCallbackScreen } from "./components/OAuthCallbackScreen.tsx";
@@ -158,7 +159,7 @@ async function mountApp(): Promise<void> {
           <Suspense
             fallback={
               <div role="status" aria-live="polite">
-                Loading decisions demo
+                <Trans id="app.decisionsDemo.loading">Loading decisions demo</Trans>
               </div>
             }
           >

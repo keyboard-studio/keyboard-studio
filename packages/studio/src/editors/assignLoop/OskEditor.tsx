@@ -17,6 +17,8 @@
 
 import { useMemo, useState, lazy, Suspense } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
+import type { I18n, MessageDescriptor } from "@lingui/core";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
@@ -70,20 +72,31 @@ function withLabel(kvks: KvksIR, shift: string, vkey: string, label: string): Kv
   };
 }
 
-/** Shift-code display names for the layer switcher. */
-function shiftDisplayName(
-  shift: string,
-  t: (m: { id?: string; message: string }) => string,
-): string {
-  if (shift === "")
-    return t({ id: "editor.assignLoop.osk.layerDefault", message: "Default" });
+/**
+ * Shift-code display names for the layer switcher.
+ *
+ * Module-level msg() descriptors (resolved via i18n) because the Lingui
+ * extractor cannot follow a `t` passed as a function parameter — the old
+ * t({id, message}) calls here were invisible to `messages:extract` and the
+ * drift lint flagged the four ids as removed.
+ */
+const SHIFT_DISPLAY_MSGS = {
+  layerDefault: msg({
+    id: "editor.assignLoop.osk.layerDefault",
+    message: "Default",
+  }),
+  modShift: msg({ id: "editor.assignLoop.osk.modShift", message: "Shift" }),
+  modCtrl: msg({ id: "editor.assignLoop.osk.modCtrl", message: "Ctrl" }),
+  modAlt: msg({ id: "editor.assignLoop.osk.modAlt", message: "Alt" }),
+} as const satisfies Record<string, MessageDescriptor>;
+
+function shiftDisplayName(shift: string, i18n: I18n): string {
+  if (shift === "") return i18n._(SHIFT_DISPLAY_MSGS.layerDefault);
   const parts: string[] = [];
   if (shift.includes("S"))
-    parts.push(t({ id: "editor.assignLoop.osk.modShift", message: "Shift" }));
-  if (shift.includes("C"))
-    parts.push(t({ id: "editor.assignLoop.osk.modCtrl", message: "Ctrl" }));
-  if (shift.includes("A"))
-    parts.push(t({ id: "editor.assignLoop.osk.modAlt", message: "Alt" }));
+    parts.push(i18n._(SHIFT_DISPLAY_MSGS.modShift));
+  if (shift.includes("C")) parts.push(i18n._(SHIFT_DISPLAY_MSGS.modCtrl));
+  if (shift.includes("A")) parts.push(i18n._(SHIFT_DISPLAY_MSGS.modAlt));
   return parts.length > 0 ? parts.join("+") : shift;
 }
 
@@ -106,7 +119,7 @@ const DANGER_BG = "var(--app-danger-bg)";
 // ---------------------------------------------------------------------------
 
 export function OskEditor({ onComplete, onBack }: EditorStepProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const kbdname = useWorkingCopyStore((s) => s.ir?.header.name ?? "keyboard");
 
@@ -216,6 +229,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     if (key?.chars) {
       setError(
         t({
+          id: "editor.assignLoop.osk.blankBlockedError",
           message:
             "Cannot blank this key — it has output. Change the label instead.",
         }),
@@ -343,7 +357,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
               cursor: "pointer",
             }}
           >
-            {shiftDisplayName(l.shift, t)}
+            {shiftDisplayName(l.shift, i18n)}
           </button>
         ))}
       </div>

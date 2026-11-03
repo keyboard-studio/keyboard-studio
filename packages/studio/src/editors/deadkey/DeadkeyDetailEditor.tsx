@@ -12,6 +12,8 @@
 // a half-delete.
 
 import { useMemo, useState, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { KeyboardIR, DeadkeyInfo } from "@keyboard-studio/contracts";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import {
@@ -181,6 +183,7 @@ export function DeadkeyDetailEditor({
   onDeleted,
   onClose,
 }: DeadkeyDetailEditorProps) {
+  const { t } = useLingui();
   const info: DeadkeyInfo | undefined = useMemo(
     () =>
       listDeadkeys(ir).find((d) =>
@@ -218,16 +221,22 @@ export function DeadkeyDetailEditor({
     const resolution = resolveKeyPickerSelection(retargetKey, retargetCustomChar);
     const vkey = resolvedVkeyOf(resolution);
     const label =
-      retargetKey === "" ? "(no new trigger chosen)" : (vkey ?? retargetCustomChar);
+      retargetKey === ""
+        ? t({ id: "deadkey.detail.noNewTriggerChosen", message: "(no new trigger chosen)" })
+        : (vkey ?? retargetCustomChar);
     return referenceBases({ key: label, modifiers: [] });
   }, [retargetKey, retargetCustomChar]);
 
   if (info === undefined) {
     return (
       <div style={sectionStyle}>
-        <p style={metaStyle}>This deadkey no longer exists in the working copy.</p>
+        <p style={metaStyle}>
+          <Trans id="deadkey.detail.goneFromWorkingCopy">
+            This deadkey no longer exists in the working copy.
+          </Trans>
+        </p>
         <button type="button" style={btnStyle} onClick={onClose}>
-          Back to inventory
+          <Trans id="deadkey.detail.backToInventory">Back to inventory</Trans>
         </button>
       </div>
     );
@@ -257,7 +266,12 @@ export function DeadkeyDetailEditor({
     // Scalar count, not UTF-16 length — an astral character is one scalar
     // (mirrors the define form's accent validation).
     if (Array.from(newStart).length !== 1 || Array.from(newAccented).length !== 1) {
-      setSectionError("A pair is two single characters: the base letter and its accented form.");
+      setSectionError(
+        t({
+          id: "deadkey.detail.pairMustBeSingleChars",
+          message: "A pair is two single characters: the base letter and its accented form.",
+        }),
+      );
       return;
     }
     try {
@@ -289,7 +303,12 @@ export function DeadkeyDetailEditor({
     if (id === null) return;
     const to = parseIdText(renameIdText);
     if (to === null) {
-      setSectionError("The new id must be a hex number like 3001 (dk(3001) also works).");
+      setSectionError(
+        t({
+          id: "deadkey.detail.renameIdMustBeHex",
+          message: "The new id must be a hex number like 3001 (dk(3001) also works).",
+        }),
+      );
       return;
     }
     const result = renameDeadkey(ir, { from: id, to });
@@ -306,7 +325,13 @@ export function DeadkeyDetailEditor({
         return;
       }
     }
-    setSectionError(`Rename refused: ${committed.conflicts.map((c) => c.message).join(" ")}`);
+    const reasons = committed.conflicts.map((c) => c.message).join(" ");
+    setSectionError(
+      t({
+        id: "deadkey.detail.renameRefused",
+        message: `Rename refused: ${reasons}`,
+      }),
+    );
   };
 
   /** Merge mine into `to`, then delete mine — the shared merge resolution. */
@@ -316,7 +341,11 @@ export function DeadkeyDetailEditor({
       const delResult = deleteDeadkey(merged, { id: from });
       const committed = commitDeadkeyResult(merged, delResult);
       if (!committed.ok) {
-        return `Delete after merge refused: ${committed.conflicts.map((c) => c.message).join(" ")}`;
+        const reasons = committed.conflicts.map((c) => c.message).join(" ");
+        return t({
+          id: "deadkey.detail.deleteAfterMergeRefused",
+          message: `Delete after merge refused: ${reasons}`,
+        });
       }
       commitAndRecord(committed.ir, [
         { kind: "merge-pairs", fromId: from, toId: to },
@@ -355,14 +384,24 @@ export function DeadkeyDetailEditor({
     const resolution = resolveKeyPickerSelection(retargetKey, retargetCustomChar);
     const vkey = resolvedVkeyOf(resolution);
     if (vkey === null) {
-      setSectionError("Pick a trigger key first — choose a suggestion or enter any character.");
+      setSectionError(
+        t({
+          id: "deadkey.detail.pickTriggerFirst",
+          message: "Pick a trigger key first — choose a suggestion or enter any character.",
+        }),
+      );
       return;
     }
     if (id === null) {
       // Named deadkey: rewrite the trigger fragment.
       const name = info.name;
       if (!name) {
-        setSectionError("This deadkey has no name to retarget — it may be an incomplete import.");
+        setSectionError(
+          t({
+            id: "deadkey.detail.noNameToRetarget",
+            message: "This deadkey has no name to retarget — it may be an incomplete import.",
+          }),
+        );
         return;
       }
       // Conflict check: is the new trigger already taken?
@@ -370,11 +409,16 @@ export function DeadkeyDetailEditor({
         (d) => d.triggerKey === vkey && d.id !== null,
       );
       if (occupant) {
+        const trigger = vkey;
+        const deadkey = `dk(${occupant.id !== null ? hex4(occupant.id) : occupant.name ?? "?"})`;
         setDialog({
           kind: "retarget-trigger-in-use",
           conflict: {
             kind: "trigger-in-use",
-            message: `${vkey} already triggers dk(${occupant.id !== null ? hex4(occupant.id) : occupant.name ?? "?"}).`,
+            message: t({
+              id: "deadkey.detail.triggerAlreadyTaken",
+              message: `${trigger} already triggers ${deadkey}.`,
+            }),
             ids: occupant.id !== null ? [occupant.id] : [],
           },
           id,
@@ -400,11 +444,22 @@ export function DeadkeyDetailEditor({
         setRetargetCustomChar("");
         return;
       }
-      setSectionError(`Retarget refused: ${result.error}`);
+      const details = result.error;
+      setSectionError(
+        t({
+          id: "deadkey.detail.retargetRefused",
+          message: `Retarget refused: ${details}`,
+        }),
+      );
       return;
     }
     if (findTriggerRules(ir, id).length === 0) {
-      setSectionError("This deadkey has no trigger rule to move — it may be an incomplete import.");
+      setSectionError(
+        t({
+          id: "deadkey.detail.noTriggerRuleToMove",
+          message: "This deadkey has no trigger rule to move — it may be an incomplete import.",
+        }),
+      );
       return;
     }
     const result = retargetDeadkey(ir, { id, newTriggerKey: vkey });
@@ -422,7 +477,13 @@ export function DeadkeyDetailEditor({
         return;
       }
     }
-    setSectionError(`Retarget refused: ${committed.conflicts.map((c) => c.message).join(" ")}`);
+    const details = committed.conflicts.map((c) => c.message).join(" ");
+    setSectionError(
+      t({
+        id: "deadkey.detail.retargetRefused",
+        message: `Retarget refused: ${details}`,
+      }),
+    );
   };
 
   // -- Delete (atomic; referenced blocks) --------------------------------------
@@ -432,7 +493,12 @@ export function DeadkeyDetailEditor({
       // Named deadkey: remove its raw fragments.
       const name = info.name;
       if (!name) {
-        setSectionError("This deadkey has no name to delete — it may be an incomplete import.");
+        setSectionError(
+          t({
+            id: "deadkey.detail.noNameToDelete",
+            message: "This deadkey has no name to delete — it may be an incomplete import.",
+          }),
+        );
         return;
       }
       const result = deleteNamedDeadkey(ir, name);
@@ -442,14 +508,18 @@ export function DeadkeyDetailEditor({
         return;
       }
       // Referenced: show the blocking dialog with the referrer list.
+      const count = result.referrers.length;
       setDialog({
         kind: "delete-referenced",
         conflict: {
           kind: "referenced",
-          message:
-            `Cannot delete dk(${name}): ${result.referrers.length} ` +
-            `reference(s) outside the deadkey's own rules still touch it. ` +
-            `Repoint or remove them first — never a half-deleted deadkey.`,
+          message: t({
+            id: "deadkey.detail.cannotDeleteReferenced",
+            message: `Cannot delete dk(${name}): ${plural(count, {
+              one: "# reference",
+              other: "# references",
+            })} outside the deadkey's own rules still touch it. Repoint or remove them first — never a half-deleted deadkey.`,
+          }),
           ids: [],
           referrers: result.referrers,
         },
@@ -470,7 +540,13 @@ export function DeadkeyDetailEditor({
         return;
       }
     }
-    setSectionError(`Delete refused: ${committed.conflicts.map((c) => c.message).join(" ")}`);
+    const details = committed.conflicts.map((c) => c.message).join(" ");
+    setSectionError(
+      t({
+        id: "deadkey.detail.deleteRefused",
+        message: `Delete refused: ${details}`,
+      }),
+    );
   };
 
   /** Repoint every listed referrer onto the target, then retry the delete. */
@@ -486,11 +562,21 @@ export function DeadkeyDetailEditor({
     }
     const to = parseIdText(repointTarget);
     if (to === null) {
-      setSectionError("Pick a target deadkey to repoint the referrers to.");
+      setSectionError(
+        t({
+          id: "deadkey.detail.pickRepointTarget",
+          message: "Pick a target deadkey to repoint the referrers to.",
+        }),
+      );
       return;
     }
     if (to === from) {
-      setSectionError("The repoint target must be a different deadkey.");
+      setSectionError(
+        t({
+          id: "deadkey.detail.repointTargetMustDiffer",
+          message: "The repoint target must be a different deadkey.",
+        }),
+      );
       return;
     }
     const referrers = dialog.conflict.referrers ?? [];
@@ -513,8 +599,16 @@ export function DeadkeyDetailEditor({
     }
     const { ir: repointed, unparsed } = withRepointedDeadkeyRefs(working, from, to, referrers);
     if (unparsed.length > 0) {
+      const count = unparsed.length;
+      const details = unparsed.join("; ");
       setSectionError(
-        `Could not repoint ${unparsed.length} referrer(s) — the delete stays blocked: ${unparsed.join("; ")}`,
+        t({
+          id: "deadkey.detail.couldNotRepoint",
+          message: `Could not repoint ${plural(count, {
+            one: "# referrer",
+            other: "# referrers",
+          })} — the delete stays blocked: ${details}`,
+        }),
       );
       return;
     }
@@ -527,7 +621,13 @@ export function DeadkeyDetailEditor({
       if (remaining) {
         setDialog({ kind: "delete-referenced", conflict: remaining, id: from });
       } else {
-        setSectionError(`Delete refused: ${committed.conflicts.map((c) => c.message).join(" ")}`);
+        const details = committed.conflicts.map((c) => c.message).join(" ");
+        setSectionError(
+          t({
+            id: "deadkey.detail.deleteRefused",
+            message: `Delete refused: ${details}`,
+          }),
+        );
       }
       return;
     }
@@ -546,14 +646,25 @@ export function DeadkeyDetailEditor({
 
     if (dialog.kind === "rename-id-in-use") {
       const { from, to } = dialog;
+      const idHex = hex4(to);
       const choices: DeadkeyConflictChoice[] = [
         {
           key: "merge",
-          title: `Merge into dk(${hex4(to)})`,
-          body: "Move this deadkey's pairs into the existing deadkey, then delete this one. Nothing is lost; the two share one id.",
+          title: t({
+            id: "deadkey.detail.mergeIntoTitle",
+            message: `Merge into dk(${idHex})`,
+          }),
+          body: t({
+            id: "deadkey.detail.mergeIntoBody",
+            message:
+              "Move this deadkey's pairs into the existing deadkey, then delete this one. Nothing is lost; the two share one id.",
+          }),
           disabled: !mergePossible,
           disabledNote: !mergePossible
-            ? "One side's rule shape isn't recognized — pair merging is unavailable."
+            ? t({
+                id: "deadkey.detail.mergeUnavailableNote",
+                message: "One side's rule shape isn't recognized — pair merging is unavailable.",
+              })
             : undefined,
           onSelect: () => {
             const err = mergeIntoAndDeleteMine(from, to);
@@ -563,14 +674,20 @@ export function DeadkeyDetailEditor({
         },
         {
           key: "reid",
-          title: "Pick a different id",
-          body: "Go back and edit the proposed id.",
+          title: t({ id: "deadkey.detail.pickDifferentId", message: "Pick a different id" }),
+          body: t({
+            id: "deadkey.detail.pickDifferentIdBody",
+            message: "Go back and edit the proposed id.",
+          }),
           onSelect: () => setDialog(null),
         },
       ];
       return (
         <DeadkeyConflictDialog
-          heading={`dk(${hex4(to)}) is already minted`}
+          heading={t({
+            id: "deadkey.detail.idAlreadyMinted",
+            message: `dk(${idHex}) is already minted`,
+          })}
           detail={dialog.conflict.message}
           choices={choices}
           onCancel={() => setDialog(null)}
@@ -580,19 +697,35 @@ export function DeadkeyDetailEditor({
 
     if (dialog.kind === "retarget-trigger-in-use") {
       const occupantRef =
-        dialog.occupantId !== null ? `dk(${hex4(dialog.occupantId)})` : "the existing deadkey";
+        dialog.occupantId !== null
+          ? `dk(${hex4(dialog.occupantId)})`
+          : t({ id: "deadkey.detail.theExistingDeadkey", message: "the existing deadkey" });
+      const occupant = occupantRef;
       const choices: DeadkeyConflictChoice[] = [
         {
           key: "merge",
-          title: `Merge into ${occupantRef}`,
-          body: "Move this deadkey's pairs into the deadkey already on that trigger, then delete this one. Nothing is lost.",
+          title: t({
+            id: "deadkey.detail.mergeIntoOccupantTitle",
+            message: `Merge into ${occupant}`,
+          }),
+          body: t({
+            id: "deadkey.detail.mergeIntoOccupantBody",
+            message:
+              "Move this deadkey's pairs into the deadkey already on that trigger, then delete this one. Nothing is lost.",
+          }),
           disabled: !mergePossible || dialog.occupantId === null || dialog.id === null,
           disabledNote:
             dialog.id === null
               ? "Named deadkeys can't merge pairs until the FR-004 codec closure lands."
               : dialog.occupantId === null
-                ? "The occupant couldn't be identified."
-                : "One side's rule shape isn't recognized — pair merging is unavailable.",
+                ? t({
+                    id: "deadkey.detail.occupantUnknown",
+                    message: "The occupant couldn't be identified.",
+                  })
+                : t({
+                    id: "deadkey.detail.mergeUnavailableNote",
+                    message: "One side's rule shape isn't recognized — pair merging is unavailable.",
+                  }),
           onSelect: () => {
             if (dialog.occupantId === null || dialog.id === null) return;
             const err = mergeIntoAndDeleteMine(dialog.id, dialog.occupantId);
@@ -602,14 +735,20 @@ export function DeadkeyDetailEditor({
         },
         {
           key: "retrigger",
-          title: "Choose a different trigger",
-          body: "Go back and pick another key.",
+          title: t({ id: "deadkey.detail.chooseDifferentTrigger", message: "Choose a different trigger" }),
+          body: t({
+            id: "deadkey.detail.chooseDifferentTriggerBody",
+            message: "Go back and pick another key.",
+          }),
           onSelect: () => setDialog(null),
         },
       ];
       return (
         <DeadkeyConflictDialog
-          heading="That trigger key is already taken"
+          heading={t({
+            id: "deadkey.detail.triggerTaken",
+            message: "That trigger key is already taken",
+          })}
           detail={dialog.conflict.message}
           choices={choices}
           onCancel={() => setDialog(null)}
@@ -623,10 +762,22 @@ export function DeadkeyDetailEditor({
     const referrers = dialog.conflict.referrers ?? [];
     if (dialog.kind === "delete-repoint") {
       const targetId = parseIdText(repointTarget);
+      const count = referrers.length;
+      const target = targetId === null ? "\u2026" : `dk(${hex4(targetId)})`;
       return (
         <DeadkeyConflictDialog
-          heading={`Repoint ${referrers.length} referrer${referrers.length === 1 ? "" : "s"} onto another deadkey`}
-          detail="Every reference below is rewritten to the target deadkey (pairs are merged first when both sides have recognizable stores), then the delete is retried. The delete stays blocked until every referrer is covered."
+          heading={t({
+            id: "deadkey.detail.repointHeading",
+            message: `Repoint ${plural(count, {
+              one: "# referrer",
+              other: "# referrers",
+            })} onto another deadkey`,
+          })}
+          detail={t({
+            id: "deadkey.detail.repointDetail",
+            message:
+              "Every reference below is rewritten to the target deadkey (pairs are merged first when both sides have recognizable stores), then the delete is retried. The delete stays blocked until every referrer is covered.",
+          })}
           extra={
             <div style={{ margin: "0 0 12px" }}>
               <div style={{ ...rowStyle, margin: "0 0 8px" }}>
@@ -634,9 +785,14 @@ export function DeadkeyDetailEditor({
                   style={{ ...inputStyle, fontFamily: FONT }}
                   value={repointTarget}
                   onChange={(e) => setRepointTarget(e.target.value)}
-                  aria-label="Target deadkey for repointing"
+                  aria-label={t({
+                    id: "deadkey.detail.repointTargetAriaLabel",
+                    message: "Target deadkey for repointing",
+                  })}
                 >
-                  <option value="">Choose a deadkey…</option>
+                  <option value="">
+                    <Trans id="deadkey.detail.chooseADeadkey">Choose a deadkey…</Trans>
+                  </option>
                   {otherDeadkeys.map((d) => (
                     <option key={d.id} value={hex4(d.id!)}>
                       dk({hex4(d.id!)}){d.authorName ? ` “${d.authorName}”` : ""} — {d.pairCount} pairs
@@ -654,16 +810,28 @@ export function DeadkeyDetailEditor({
           choices={[
             {
               key: "repoint-delete",
-              title: `Repoint onto ${targetId === null ? "…" : `dk(${hex4(targetId)})`} and delete`,
-              body: "Rewrite the referrers, retry the delete. Cancel keeps everything as it is.",
+              title: t({
+                id: "deadkey.detail.repointAndDeleteTitle",
+                message: `Repoint onto ${target} and delete`,
+              }),
+              body: t({
+                id: "deadkey.detail.repointAndDeleteBody",
+                message: "Rewrite the referrers, retry the delete. Cancel keeps everything as it is.",
+              }),
               disabled: targetId === null,
-              disabledNote: "Pick a target deadkey above first.",
+              disabledNote: t({
+                id: "deadkey.detail.pickTargetFirstNote",
+                message: "Pick a target deadkey above first.",
+              }),
               onSelect: handleRepointAndDelete,
             },
             {
               key: "back",
-              title: "Back to the referrer list",
-              body: "Return without changing anything.",
+              title: t({ id: "deadkey.detail.backToReferrerList", message: "Back to the referrer list" }),
+              body: t({
+                id: "deadkey.detail.backToReferrerListBody",
+                message: "Return without changing anything.",
+              }),
               onSelect: () =>
                 setDialog({ kind: "delete-referenced", conflict: dialog.conflict, id: dialog.id }),
             },
@@ -674,35 +842,77 @@ export function DeadkeyDetailEditor({
     }
 
     // delete-referenced — BLOCKED. No "delete anyway" exists.
+    const reason = dialog.conflict.message;
     return (
       <DeadkeyConflictDialog
-        heading={`${idLabel} can't be deleted yet`}
-        detail={`${dialog.conflict.message} The deadkey is left untouched — never a half-delete.`}
-        meta={referrers.length > 0 ? undefined : "No referrer details were reported."}
+        heading={t({
+          id: "deadkey.detail.cantDeleteYet",
+          message: `${idLabel} can't be deleted yet`,
+        })}
+        detail={t({
+          id: "deadkey.detail.leftUntouched",
+          message: `${reason} The deadkey is left untouched — never a half-delete.`,
+        })}
+        meta={
+          referrers.length > 0
+            ? undefined
+            : t({
+                id: "deadkey.detail.noReferrerDetails",
+                message: "No referrer details were reported.",
+              })
+        }
         choices={[
           {
             key: "repoint",
-            title: "Repoint the referrers to another deadkey…",
-            body: "Choose a target deadkey; every reference below moves to it (pairs merged first), then the delete is retried.",
+            title: t({
+              id: "deadkey.detail.repointReferrersTitle",
+              message: "Repoint the referrers to another deadkey…",
+            }),
+            body: t({
+              id: "deadkey.detail.repointReferrersBody",
+              message:
+                "Choose a target deadkey; every reference below moves to it (pairs merged first), then the delete is retried.",
+            }),
             disabled: otherDeadkeys.length === 0 || dialog.id === null,
             disabledNote:
               dialog.id === null
                 ? "Repointing named-deadkey referrers needs the FR-004 codec closure — remove them by hand first."
-                : "There is no other deadkey to repoint to.",
+                : t({
+                    id: "deadkey.detail.noOtherDeadkey",
+                    message: "There is no other deadkey to repoint to.",
+                  }),
             onSelect: () => setDialog({ kind: "delete-repoint", conflict: dialog.conflict, id: dialog.id }),
           },
         ]}
         onCancel={() => setDialog(null)}
-        cancelLabel="Cancel (keep the deadkey)"
+        cancelLabel={t({
+          id: "deadkey.detail.cancelKeepDeadkey",
+          message: "Cancel (keep the deadkey)",
+        })}
       />
     );
   })();
+
+  // Labels for the trigger-meta line, hoisted so `lingui extract` sees each
+  // t() call (the extractor misses t() calls nested inside another call's
+  // `values` object).
+  const triggerLabel =
+    info.triggerKey ?? t({ id: "deadkey.detail.noTriggerFound", message: "(none found)" });
+  const originLabel =
+    info.origin === "studio"
+      ? t({ id: "deadkey.detail.originStudio", message: "defined in studio" })
+      : info.origin === "s02-legacy"
+        ? t({ id: "deadkey.detail.originLegacy", message: "legacy codepoint id" })
+        : t({ id: "deadkey.detail.originImported", message: "imported" });
+  const pairCount = info.pairCount;
+  const idStaysLabel =
+    id !== null ? `dk(${hex4(id)})` : t({ id: "deadkey.detail.asIs", message: "as-is" });
 
   return (
     <div>
       <div style={{ ...rowStyle, justifyContent: "space-between" }}>
         <button type="button" style={btnStyle} onClick={onClose}>
-          ← Back to inventory
+          ← <Trans id="deadkey.detail.backToInventory">Back to inventory</Trans>
         </button>
         <span style={{ ...metaStyle, fontFamily: "ui-monospace, monospace", fontSize: 14, color: TEXT_MAIN, fontWeight: 700 }}>
           {idLabel}
@@ -712,32 +922,57 @@ export function DeadkeyDetailEditor({
 
       <div style={sectionStyle}>
         <div style={metaStyle}>
-          Trigger {info.triggerKey ?? "(none found)"} · {info.pairCount} pairs ·{" "}
-          {info.origin === "studio" ? "defined in studio" : info.origin === "s02-legacy" ? "legacy codepoint id" : "imported"}
+          {t({
+            id: "deadkey.detail.triggerMeta",
+            message: `Trigger ${triggerLabel} · ${plural(pairCount, {
+              one: "# pair",
+              other: "# pairs",
+            })} · ${originLabel}`,
+          })}
         </div>
         {!pairsEditable && (
           <div style={{ ...metaStyle, fontStyle: "italic" }}>
-            rule shape not recognized — pair editing unavailable
+            <Trans id="deadkey.detail.ruleShapeUnrecognized">
+              rule shape not recognized — pair editing unavailable
+            </Trans>
           </div>
         )}
       </div>
 
       {/* Pairs */}
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Pairs</h3>
+        <h3 style={sectionTitleStyle}>
+          <Trans id="deadkey.detail.pairsHeading">Pairs</Trans>
+        </h3>
         {pairsEditable && id !== null ? (
           <>
-            {pairs.map((p, i) => (
+            {pairs.map((p, i) => {
+              const base = p.base;
+              const accented = p.accented;
+              return (
               <div key={i} style={rowStyle}>
                 <span style={pairCharStyle}>{p.base}</span>
                 <span style={{ color: TEXT_DIM }}>→</span>
                 <span style={pairCharStyle}>{p.accented}</span>
-                <button type="button" style={btnStyle} onClick={() => handleRemovePair(i)} aria-label={`Remove pair ${p.base} to ${p.accented}`}>
-                  Remove
+                <button
+                  type="button"
+                  style={btnStyle}
+                  onClick={() => handleRemovePair(i)}
+                  aria-label={t({
+                    id: "deadkey.detail.removePairAriaLabel",
+                    message: `Remove pair ${base} to ${accented}`,
+                  })}
+                >
+                  <Trans id="editor.sequences.removeButton">Remove</Trans>
                 </button>
               </div>
-            ))}
-            {pairs.length === 0 && <div style={metaStyle}>No pairs yet.</div>}
+              );
+            })}
+            {pairs.length === 0 && (
+              <div style={metaStyle}>
+                <Trans id="deadkey.detail.noPairsYet">No pairs yet.</Trans>
+              </div>
+            )}
             <div style={rowStyle}>
               <input
                 style={{ ...inputStyle, width: 48 }}
@@ -745,7 +980,7 @@ export function DeadkeyDetailEditor({
                 onChange={(e) => setNewStart(e.target.value)}
                 placeholder="a"
                 maxLength={2}
-                aria-label="Base character"
+                aria-label={t({ id: "deadkey.detail.baseCharAriaLabel", message: "Base character" })}
               />
               <span style={{ color: TEXT_DIM }}>→</span>
               <input
@@ -754,21 +989,30 @@ export function DeadkeyDetailEditor({
                 onChange={(e) => setNewAccented(e.target.value)}
                 placeholder="á"
                 maxLength={2}
-                aria-label="Accented character"
+                aria-label={t({
+                  id: "deadkey.detail.accentedCharAriaLabel",
+                  message: "Accented character",
+                })}
               />
               <button type="button" style={btnStyle} onClick={handleAddPair}>
-                Add pair
+                <Trans id="deadkey.detail.addPair">Add pair</Trans>
               </button>
             </div>
           </>
         ) : (
-          <div style={metaStyle}>rule shape not recognized — pair editing unavailable</div>
+          <div style={metaStyle}>
+            <Trans id="deadkey.detail.ruleShapeUnrecognized">
+              rule shape not recognized — pair editing unavailable
+            </Trans>
+          </div>
         )}
       </div>
 
       {/* Rename */}
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Rename</h3>
+        <h3 style={sectionTitleStyle}>
+          <Trans id="editor.assignLoop.keyGrid.renameDialog.confirm">Rename</Trans>
+        </h3>
         {id !== null ? (
           <>
             <div style={rowStyle}>
@@ -777,10 +1021,10 @@ export function DeadkeyDetailEditor({
                 value={renameIdText}
                 onChange={(e) => setRenameIdText(e.target.value)}
                 placeholder={hex4(id)}
-                aria-label="New numeric id"
+                aria-label={t({ id: "deadkey.detail.newNumericIdAriaLabel", message: "New numeric id" })}
               />
               <button type="button" style={btnStyle} onClick={handleRename}>
-                Rename id
+                <Trans id="deadkey.detail.renameId">Rename id</Trans>
               </button>
             </div>
             <div style={metaStyle}>
@@ -792,10 +1036,13 @@ export function DeadkeyDetailEditor({
                 value={nameText ?? info.authorName ?? ""}
                 onChange={(e) => setNameText(e.target.value)}
                 placeholder="acute"
-                aria-label="Author name (optional)"
+                aria-label={t({
+                  id: "deadkey.detail.authorNameAriaLabel",
+                  message: "Author name (optional)",
+                })}
               />
               <button type="button" style={btnStyle} onClick={handleSaveName}>
-                Save name
+                <Trans id="deadkey.detail.saveName">Save name</Trans>
               </button>
             </div>
             <div style={metaStyle}>
@@ -813,7 +1060,9 @@ export function DeadkeyDetailEditor({
 
       {/* Retarget */}
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Retarget</h3>
+        <h3 style={sectionTitleStyle}>
+          <Trans id="deadkey.detail.retargetHeading">Retarget</Trans>
+        </h3>
         <div style={rowStyle}>
           <KeyPickerField
             value={retargetKey}
@@ -821,40 +1070,58 @@ export function DeadkeyDetailEditor({
             customChar={retargetCustomChar}
             onCustomCharChange={setRetargetCustomChar}
             options={[...DEADKEY_OPTIONS]}
-            selectAriaLabel="New trigger key"
-            customInputAriaLabel="Custom new trigger character"
+            selectAriaLabel={t({ id: "deadkey.detail.newTriggerKeyAriaLabel", message: "New trigger key" })}
+            customInputAriaLabel={t({
+              id: "deadkey.detail.customTriggerCharAriaLabel",
+              message: "Custom new trigger character",
+            })}
           />
           <button type="button" style={btnStyle} onClick={handleRetarget}>
-            Move trigger
+            <Trans id="deadkey.detail.moveTrigger">Move trigger</Trans>
           </button>
         </div>
         <div style={metaStyle}>
-          The id stays {id !== null ? `dk(${hex4(id)})` : "as-is"} — only the trigger key moves.
+          {t({
+            id: "deadkey.detail.idStaysNote",
+            message: `The id stays ${idStaysLabel} — only the trigger key moves.`,
+          })}
         </div>
         <BaseDisclosure hosts={retargetBases} />
       </div>
 
       {/* Delete */}
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Delete</h3>
+        <h3 style={sectionTitleStyle}>
+          <Trans id="profile.myKeyboards.deleteButton">Delete</Trans>
+        </h3>
         <div style={metaStyle}>
-          Removes the whole entity — trigger, fan-out and escape rules, and both fan-out stores. Atomic:
-          if anything outside the deadkey still references it, the delete is blocked and the referrers are
-          listed.
+          <Trans id="deadkey.detail.deleteExplainer">
+            Removes the whole entity — trigger, fan-out and escape rules, and both fan-out stores.
+            Atomic: if anything outside the deadkey still references it, the delete is blocked and the
+            referrers are listed.
+          </Trans>
         </div>
         {id === null ? (
           <>
             <div style={metaStyle}>
-              Named deadkey — deletes its raw fragments. Atomic: if anything outside the deadkey still
-              references it, the delete is blocked and the referrers are listed.
+              <Trans id="deadkey.detail.deleteNamedExplainer">
+                Named deadkey — deletes its raw fragments. Atomic: if anything outside the deadkey still
+                references it, the delete is blocked and the referrers are listed.
+              </Trans>
             </div>
             <button type="button" style={dangerBtnStyle} onClick={handleDelete}>
-              Delete {idLabel}
+              {t({
+                id: "deadkey.detail.deleteDeadkeyButton",
+                message: `Delete ${idLabel}`,
+              })}
             </button>
           </>
         ) : (
           <button type="button" style={dangerBtnStyle} onClick={handleDelete}>
-            Delete {idLabel}
+            {t({
+              id: "deadkey.detail.deleteDeadkeyButton",
+              message: `Delete ${idLabel}`,
+            })}
           </button>
         )}
       </div>

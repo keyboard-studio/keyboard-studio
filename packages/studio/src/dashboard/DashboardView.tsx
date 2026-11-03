@@ -569,7 +569,10 @@ export function FlowMapView({
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
               <h2 style={{ margin: 0, fontSize: 15, color: "var(--app-accent-text)" }}>{manifestSpine.title}</h2>
               <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
-                {manifestSpine.flowId} · {manifestSpine.nodes.length} steps · {manifestSpine.edges.length} edges
+                <Trans id="dashboard.manifestSpine.caption">
+                  {manifestSpine.flowId} · {manifestSpine.nodes.length} steps ·{" "}
+                  {manifestSpine.edges.length} edges
+                </Trans>
               </span>
             </div>
             {/* Spec 053 (FR-023): the walked-path overlay goes ONLY here. The
@@ -610,8 +613,12 @@ export function FlowMapView({
                     <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
                       <h3 style={{ margin: 0, fontSize: 14, color: "var(--app-text-muted)" }}>{title}</h3>
                       <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
-                        drill-down key: {registryKey}
-                        {graph !== null && ` · ${graph.flowId} · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
+                        <Trans id="dashboard.drillDown.keyLabel">drill-down key:</Trans> {registryKey}
+                        {graph !== null &&
+                          t({
+                            id: "dashboard.drillDown.graphStats",
+                            message: ` · ${graph.flowId} · ${graph.nodes.length} questions · ${graph.edges.length} edges`,
+                          })}
                       </span>
                     </div>
                     {error !== null && <ParseErrorBanner error={error} />}
@@ -680,8 +687,12 @@ export function FlowMapView({
                 <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
                   <h3 style={{ margin: 0, fontSize: 14, color: "var(--app-text-muted)" }}>{title}</h3>
                   <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
-                    proposed flow: {id}
-                    {graph !== null && ` · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
+                    <Trans id="dashboard.library.proposedFlowLabel">proposed flow:</Trans> {id}
+                    {graph !== null &&
+                      t({
+                        id: "dashboard.library.graphStats",
+                        message: ` · ${graph.nodes.length} questions · ${graph.edges.length} edges`,
+                      })}
                   </span>
                 </div>
                 {error !== null && <ParseErrorBanner error={error} />}

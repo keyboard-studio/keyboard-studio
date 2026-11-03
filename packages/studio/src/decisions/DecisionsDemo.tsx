@@ -6,6 +6,11 @@
 //
 // Access at: /?demo=decisions
 
+// DEV-ONLY: this file is a spike demo, not product UI — none of its strings
+// are ever shown to end users. Marking them for translation would add ~60
+// dead entries to the message catalog, so unlocalized strings are allowed here.
+/* eslint-disable lingui/no-unlocalized-strings */
+
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { KeyboardIR } from "@keyboard-studio/contracts";

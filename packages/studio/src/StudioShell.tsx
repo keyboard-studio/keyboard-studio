@@ -1392,6 +1392,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
 
   const questionsPaneStyle: CSSProperties = {
+    // eslint-disable-next-line lingui/no-unlocalized-strings -- CSS calc() flex-basis value, not UI copy.
     flexBasis: `calc(${leftPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
     flexShrink: 0,
     flexGrow: 0,
@@ -1510,6 +1511,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     width: "100%",
   };
   const previewPaneStyle: CSSProperties = {
+    // eslint-disable-next-line lingui/no-unlocalized-strings -- CSS calc() flex-basis value, not UI copy.
     flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
     flexGrow: 1,
     flexShrink: 0,
@@ -1600,7 +1602,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       {/* Left pane: survey questions (StepHost renders pane content) */}
       {
         <SurveyQuestionsPane
-          label="Survey questions"
+          label={t({ id: "shell.surveyQuestionsPaneLabel", message: "Survey questions" })}
           style={
             isNarrow
               ? {

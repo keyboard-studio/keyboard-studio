@@ -26,6 +26,8 @@
 // @see specs/074-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
+import type { I18n, MessageDescriptor } from "@lingui/core";
 import { canonicalizeCombo } from "@keyboard-studio/engine";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
 import { keyLabelOrRaw } from "../../lib/keyLabel.ts";
@@ -56,7 +58,7 @@ export function CasePairProposalBanner({
   onConfirm,
   onDismiss,
 }: CasePairProposalBannerProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
 
   return (
     <ProposalBanner
@@ -116,7 +118,7 @@ export function CasePairProposalBanner({
               })
             : t({
                 id: "editor.assignLoop.companion.confirmAriaLabel",
-                message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
+                message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(i18n, proposal)}`,
               })
       }
       onConfirm={onConfirm}
@@ -157,23 +159,39 @@ export function CasePairProposalBanner({
  * indicator is already a resolved display glyph (its case is meaningful and
  * must survive), so it passes through untouched — hence the `K_`-prefix
  * guard, since `keyNameFor`/`vkeyLabel` upper-normalizes its input.
+ *
+ * Descriptors are module-level msg() calls (not t() calls inside the helper)
+ * so `lingui extract` picks them up — the extractor cannot follow the `t`
+ * binding into a helper that receives it as a parameter.
  */
-function confirmTargetLabel(proposal: CasePairProposal): string {
+const CONFIRM_TARGET_MSGS = {
+  physical: msg({ id: "assignLoop.casePair.confirmTarget.physical", message: "the {keyName} key" }),
+  touch: msg({ id: "assignLoop.casePair.confirmTarget.touch", message: "the {keyName} key" }),
+  combo: msg({ id: "assignLoop.casePair.confirmTarget.combo", message: "the {keyName} key" }),
+  raltLayer: msg({ id: "assignLoop.casePair.confirmTarget.raltLayer", message: "the {keyName} key" }),
+} as const;
+
+/** Resolve a module-level msg() descriptor with values (the macro `t` can't take values). */
+function tr(i18n: I18n, descriptor: MessageDescriptor, values?: Record<string, unknown>): string {
+  return i18n._(descriptor.id, values);
+}
+
+function confirmTargetLabel(i18n: I18n, proposal: CasePairProposal): string {
   switch (proposal.mechanism) {
     case "physical":
-      return `the ${keyNameFor(proposal.vkey)} key`;
+      return tr(i18n, CONFIRM_TARGET_MSGS.physical, { keyName: keyNameFor(proposal.vkey) });
     case "touch":
-      return `the ${keyNameFor(proposal.baseKey)} key`;
+      return tr(i18n, CONFIRM_TARGET_MSGS.touch, { keyName: keyNameFor(proposal.baseKey) });
     case "combo": {
       const comboKey =
         proposal.combo.kind === "deadkey"
           ? proposal.combo.triggerKey
           : proposal.combo.indicator;
       const named = comboKey.startsWith("K_") ? keyNameFor(comboKey) : comboKey;
-      return `the ${named} key`;
+      return tr(i18n, CONFIRM_TARGET_MSGS.combo, { keyName: named });
     }
     case "ralt-layer":
-      return `the ${keyNameFor(proposal.vkey)} key`;
+      return tr(i18n, CONFIRM_TARGET_MSGS.raltLayer, { keyName: keyNameFor(proposal.vkey) });
   }
 }
 

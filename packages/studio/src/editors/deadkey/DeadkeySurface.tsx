@@ -133,21 +133,29 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
       <FullStepPage testId="deadkey-step">
         {heading}
         <div style={emptyStyle}>
-          Choose a starting keyboard first — deadkeys are defined against the working copy.
+          <Trans id="deadkey.surface.noStartingKeyboard">
+            Choose a starting keyboard first — deadkeys are defined against the working copy.
+          </Trans>
         </div>
       </FullStepPage>
     );
   }
 
   const tabs: Array<{ key: "inventory" | "define"; label: string }> = [
-    { key: "inventory", label: "Inventory" },
-    { key: "define", label: "Define new deadkey" },
+    {
+      key: "inventory",
+      label: t({ id: "deadkey.surface.tabInventory", message: "Inventory" }),
+    },
+    {
+      key: "define",
+      label: t({ id: "deadkey.surface.tabDefine", message: "Define new deadkey" }),
+    },
   ];
 
   return (
     <FullStepPage testId="deadkey-step">
       {heading}
-      <div style={tabsStyle} role="tablist" aria-label="Deadkey lifecycle">
+      <div style={tabsStyle} role="tablist" aria-label={t({ id: "deadkey.surface.tabsAriaLabel", message: "Deadkey lifecycle" })}>
         {tabs.map((t) => (
           <button
             key={t.key}

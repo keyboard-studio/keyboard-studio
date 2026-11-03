@@ -10,6 +10,7 @@
 // choices mapped by conflict kind.
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { KeyboardIR, DeadkeyInfo } from "@keyboard-studio/contracts";
 import {
   allocateDeadkeyId,
@@ -156,6 +157,7 @@ type ConflictState =
   | { kind: "id-in-use"; conflict: DeadkeyConflict; id: number };
 
 export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, onCancel }: DeadkeyDefineFormProps) {
+  const { t } = useLingui();
   const [triggerKey, setTriggerKey] = useState<string>("");
   const [triggerCustomChar, setTriggerCustomChar] = useState("");
   const [idText, setIdText] = useState(() => hex4(allocateDeadkeyId(ir)));
@@ -210,8 +212,10 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
 
   const triggerLabel =
     triggerKey === CUSTOM_KEY_OPTION_VALUE
-      ? triggerCustomChar || "(custom key)"
-      : triggerKey || "(no trigger chosen)";
+      ? triggerCustomChar ||
+        t({ id: "deadkey.define.customKeyFallback", message: "(custom key)" })
+      : triggerKey ||
+        t({ id: "deadkey.define.noTriggerFallback", message: "(no trigger chosen)" });
 
   const hosts = useMemo(
     () =>
@@ -229,7 +233,12 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
   const handleDefine = () => {
     setFormError(null);
     if (resolvedVkey === null) {
-      setFormError("Pick a trigger key first — choose a suggestion or enter any character.");
+      setFormError(
+        t({
+          id: "deadkey.define.error.pickTrigger",
+          message: "Pick a trigger key first — choose a suggestion or enter any character.",
+        }),
+      );
       return;
     }
     const id = parseIdText(idText);
@@ -238,7 +247,13 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
       return;
     }
     if (Array.from(accentChar).length !== 1) {
-      setFormError("Double-tap emits must be exactly one character — the bare accent the trigger key types twice.");
+      setFormError(
+        t({
+          id: "deadkey.define.error.accentLength",
+          message:
+            "Double-tap emits must be exactly one character — the bare accent the trigger key types twice.",
+        }),
+      );
       return;
     }
     const name = authorName.trim();
@@ -281,8 +296,12 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
       }
     }
     // Unmapped conflict kind — surface loudly, never silently.
+    const detail = committed.conflicts.map((c) => c.message).join(" ");
     setFormError(
-      `Define refused: ${committed.conflicts.map((c) => c.message).join(" ")}`,
+      t({
+        id: "deadkey.define.error.defineRefused",
+        message: `Define refused: ${detail}`,
+      }),
     );
   };
 
@@ -291,34 +310,67 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
     if (conflict.kind === "trigger-in-use") {
       const occupant = conflict.occupant;
       const occupantRef =
-        occupant && occupant.id !== null ? `dk(${hex4(occupant.id)})` : "the existing deadkey";
+        occupant && occupant.id !== null
+          ? `dk(${hex4(occupant.id)})`
+          : t({ id: "deadkey.define.existingDeadkeyRef", message: "the existing deadkey" });
+      const ref = occupantRef;
+      const summaryCount = occupant?.pairCount ?? 0;
+      const summaryTrigger = occupant?.triggerKey ?? "?";
       const choices: DeadkeyConflictChoice[] = [
         {
           key: "adopt",
-          title: `Use ${occupantRef} instead`,
-          body: "It already answers to this trigger. Open its editor and add your pairs there — no second deadkey.",
+          title: t({
+            id: "deadkey.define.choice.useOccupantTitle",
+            message: `Use ${ref} instead`,
+          }),
+          body: t({
+            id: "deadkey.define.choice.useOccupantBody",
+            message:
+              "It already answers to this trigger. Open its editor and add your pairs there — no second deadkey.",
+          }),
           onSelect: () => {
             if (occupant?.id !== undefined && occupant.id !== null) {
               setConflict(null);
               onAdoptExisting(occupant.id);
             }
           },
-          ...(occupant?.id == null ? { disabled: true, disabledNote: "The occupant couldn't be identified." } : {}),
+          ...(occupant?.id == null
+            ? {
+                disabled: true,
+                disabledNote: t({
+                  id: "deadkey.define.choice.occupantUnknown",
+                  message: "The occupant couldn't be identified.",
+                }),
+              }
+            : {}),
         },
         {
           key: "retrigger",
-          title: "Choose a different trigger",
-          body: "Go back and pick another key.",
+          title: t({
+            id: "deadkey.define.choice.retriggerTitle",
+            message: "Choose a different trigger",
+          }),
+          body: t({
+            id: "deadkey.define.choice.retriggerBody",
+            message: "Go back and pick another key.",
+          }),
           onSelect: () => setConflict(null),
         },
       ];
+      const trigger = conflict.triggerLabel;
       return (
         <DeadkeyConflictDialog
-          heading={`${conflict.triggerLabel} already triggers a deadkey`}
+          heading={t({
+            id: "deadkey.define.heading.triggerInUse",
+            message: `${trigger} already triggers a deadkey`,
+          })}
           detail={conflict.conflict.message}
           meta={
             occupant !== undefined && occupant.id !== null
-              ? `${occupantRef} — ${occupant.pairCount} pairs — uses ${occupant.triggerKey ?? "?"} as its trigger.`
+              ? t({
+                  id: "deadkey.define.meta.occupantSummary",
+                  message: `${ref} — ${summaryCount} pairs — uses ${summaryTrigger} as its trigger.`,
+                })
               : undefined
           }
           choices={choices}
@@ -328,11 +380,19 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
     }
     // id-in-use
     const existingId = conflict.id;
+    const id = hex4(existingId);
     const choices: DeadkeyConflictChoice[] = [
       {
         key: "adopt",
-        title: `Use dk(${hex4(existingId)}) instead`,
-        body: "That id is already minted. Open its editor rather than minting a second deadkey on the same id.",
+        title: t({
+          id: "deadkey.define.choice.useExistingIdTitle",
+          message: `Use dk(${id}) instead`,
+        }),
+        body: t({
+          id: "deadkey.define.choice.useExistingIdBody",
+          message:
+            "That id is already minted. Open its editor rather than minting a second deadkey on the same id.",
+        }),
         onSelect: () => {
           setConflict(null);
           onAdoptExisting(existingId);
@@ -340,14 +400,23 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
       },
       {
         key: "reid",
-        title: "Pick a different id",
-        body: "Go back and edit the proposed id.",
+        title: t({
+          id: "deadkey.define.choice.reidTitle",
+          message: "Pick a different id",
+        }),
+        body: t({
+          id: "deadkey.define.choice.reidBody",
+          message: "Go back and edit the proposed id.",
+        }),
         onSelect: () => setConflict(null),
       },
     ];
     return (
       <DeadkeyConflictDialog
-        heading={`dk(${hex4(existingId)}) is already minted`}
+        heading={t({
+          id: "deadkey.define.heading.idMinted",
+          message: `dk(${id}) is already minted`,
+        })}
         detail={conflict.conflict.message}
         choices={choices}
         onCancel={() => setConflict(null)}
@@ -358,28 +427,40 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
   return (
     <div>
       <h2 style={{ fontSize: 16, fontWeight: 700, color: TEXT_MAIN, margin: "0 0 12px", fontFamily: FONT }}>
-        Define new deadkey
+        <Trans id="deadkey.define.heading">Define new deadkey</Trans>
       </h2>
 
       <div style={fieldStyle}>
-        <span style={labelStyle}>Trigger key</span>
+        <span style={labelStyle}>
+          <Trans id="deadkey.define.triggerLabel">Trigger key</Trans>
+        </span>
         <KeyPickerField
           value={triggerKey}
           onChange={setTriggerKey}
           customChar={triggerCustomChar}
           onCustomCharChange={setTriggerCustomChar}
           options={[...DEADKEY_OPTIONS]}
-          selectAriaLabel="Trigger key for the new deadkey"
-          customInputAriaLabel="Custom trigger character"
+          selectAriaLabel={t({
+            id: "deadkey.define.triggerSelectAriaLabel",
+            message: "Trigger key for the new deadkey",
+          })}
+          customInputAriaLabel={t({
+            id: "deadkey.define.customTriggerAriaLabel",
+            message: "Custom trigger character",
+          })}
         />
         <div style={hintStyle}>
-          Corpus-common suggestions first — or pick any key on the keyboard. The id below is{" "}
-          <em>not</em> derived from this choice.
+          <Trans id="deadkey.define.triggerHint">
+            Corpus-common suggestions first — or pick any key on the keyboard. The id below is{" "}
+            <em>not</em> derived from this choice.
+          </Trans>
         </div>
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelStyle} htmlFor="dk-define-id">Deadkey id</label>
+        <label style={labelStyle} htmlFor="dk-define-id">
+          <Trans id="deadkey.define.idLabel">Deadkey id</Trans>
+        </label>
         <input
           id="dk-define-id"
           style={{ ...inputStyle, width: 120 }}
@@ -388,16 +469,20 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
           aria-describedby="dk-define-id-hint"
         />
         <button type="button" style={ghostBtnStyle} onClick={regenerateId}>
-          Regenerate
+          <Trans id="deadkey.define.regenerateButton">Regenerate</Trans>
         </button>
         <div style={hintStyle} id="dk-define-id-hint">
-          Proposed, unique, stable for this deadkey&apos;s life. Editable, but never coupled to the trigger key.
+          <Trans id="deadkey.define.idHint">
+            Proposed, unique, stable for this deadkey&apos;s life. Editable, but never coupled to the trigger key.
+          </Trans>
         </div>
       </div>
 
       <div style={fieldStyle}>
         <label style={labelStyle} htmlFor="dk-define-name">
-          Name <span style={{ fontWeight: 400, color: TEXT_DIM }}>(optional)</span>
+          <Trans id="deadkey.define.nameLabel">
+            Name <span style={{ fontWeight: 400, color: TEXT_DIM }}>(optional)</span>
+          </Trans>
         </label>
         <input
           id="dk-define-name"
@@ -407,12 +492,16 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
           placeholder="acute"
         />
         <div style={hintStyle}>
-          Recorded now, becomes the real id when the FR-004 codec closure lands. You won&apos;t be asked twice.
+          <Trans id="deadkey.define.nameHint">
+            Recorded now, becomes the real id when the FR-004 codec closure lands. You won&apos;t be asked twice.
+          </Trans>
         </div>
       </div>
 
       <div style={fieldStyle}>
-        <label style={labelStyle} htmlFor="dk-define-accent">Double-tap emits</label>
+        <label style={labelStyle} htmlFor="dk-define-accent">
+          <Trans id="deadkey.define.accentLabel">Double-tap emits</Trans>
+        </label>
         <input
           id="dk-define-accent"
           style={{ ...inputStyle, width: 160 }}
@@ -424,20 +513,30 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
           maxLength={2}
         />
         <div style={hintStyle}>
-          Bare accent when the trigger key is pressed twice, so the character stays typable.
+          <Trans id="deadkey.define.accentHint">
+            Bare accent when the trigger key is pressed twice, so the character stays typable.
+          </Trans>
         </div>
       </div>
 
       <BaseDisclosure hosts={hosts} />
 
       <div style={questionStyle}>
-        <p style={questionTextStyle}>Do your typists expect a character on this key?</p>
-        <p style={questionSubStyle}>Only you can answer that. The rows above are the tradeoff, not a verdict.</p>
+        <p style={questionTextStyle}>
+          <Trans id="deadkey.define.question">Do your typists expect a character on this key?</Trans>
+        </p>
+        <p style={questionSubStyle}>
+          <Trans id="deadkey.define.questionSub">
+            Only you can answer that. The rows above are the tradeoff, not a verdict.
+          </Trans>
+        </p>
       </div>
 
       <div style={tryItStyle}>
-        Try it:&nbsp; {triggerLabel} then a → ? &nbsp;&nbsp;·&nbsp;&nbsp; {triggerLabel} then {triggerLabel} →{" "}
-        {accentChar || "?"}
+        <Trans id="deadkey.define.tryItLine">
+          Try it:&nbsp; {triggerLabel} then a → ? &nbsp;&nbsp;·&nbsp;&nbsp; {triggerLabel} then {triggerLabel} →{" "}
+          {accentChar || "?"}
+        </Trans>
       </div>
 
       {formError !== null && (
@@ -446,10 +545,10 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
 
       <div>
         <button type="button" style={defineBtnStyle} onClick={handleDefine}>
-          Define deadkey
+          <Trans id="deadkey.define.defineButton">Define deadkey</Trans>
         </button>
         <button type="button" style={ghostBtnStyle} onClick={onCancel}>
-          Back to inventory
+          <Trans id="deadkey.define.backButton">Back to inventory</Trans>
         </button>
       </div>
 

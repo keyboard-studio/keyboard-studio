@@ -7,6 +7,7 @@
 // criterion row.
 
 import type { CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { FileTreeNode, FileTreeStatus } from "./fileTree.ts";
 import {
   BG_CARD,
@@ -101,14 +102,23 @@ const cardStyle: CSSProperties = {
 };
 
 export function FileTree({ tree }: { tree: FileTreeNode[] }) {
+  const { t } = useLingui();
   if (tree.length === 0) return null;
   return (
-    <section aria-label="File inventory" style={cardStyle} data-testid="file-tree">
-      <h2 style={{ margin: "0 0 8px", fontSize: 14 }}>File inventory</h2>
+    <section
+      aria-label={t({ id: "review.fileTree.inventoryLabel", message: "File inventory" })}
+      style={cardStyle}
+      data-testid="file-tree"
+    >
+      <h2 style={{ margin: "0 0 8px", fontSize: 14 }}>
+        <Trans id="review.fileTree.inventoryLabel">File inventory</Trans>
+      </h2>
       <p style={{ margin: "0 0 8px", fontSize: 12, color: TEXT_DIM }}>
-        Required files green when properly placed, red when missing or
-        misplaced — hover for the issue, click to jump to the criterion.
-        Optional files (.kpj.user, build/) are yellow.
+        <Trans id="review.fileTree.legend">
+          Required files green when properly placed, red when missing or
+          misplaced — hover for the issue, click to jump to the criterion.
+          Optional files (.kpj.user, build/) are yellow.
+        </Trans>
       </p>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {tree.map((node) => (

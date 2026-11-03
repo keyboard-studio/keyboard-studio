@@ -3,8 +3,11 @@
 // their callbacks and the accessible region is labelled (not role="status", which
 // would be an ARIA anti-pattern around interactive controls).
 
+import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { I18nProvider } from "@lingui/react";
+import { i18n } from "@lingui/core";
 import { ResumeDraftBanner } from "./ResumeDraftBanner.tsx";
 import type { DraftMeta } from "../lib/draftPersistence.ts";
 
@@ -19,9 +22,18 @@ function makeMeta(overrides: Partial<DraftMeta> = {}): DraftMeta {
   };
 }
 
+function renderBanner(props: React.ComponentProps<typeof ResumeDraftBanner>) {
+  i18n.activate("en");
+  return render(
+    <I18nProvider i18n={i18n}>
+      <ResumeDraftBanner {...props} />
+    </I18nProvider>,
+  );
+}
+
 describe("ResumeDraftBanner", () => {
   it("exposes a labelled region, not role=status (ARIA-correct for interactive content)", () => {
-    render(<ResumeDraftBanner meta={makeMeta()} onResume={vi.fn()} onDiscard={vi.fn()} />);
+    renderBanner({ meta: makeMeta(), onResume: vi.fn(), onDiscard: vi.fn() });
     const banner = screen.getByTestId("resume-draft-banner");
     expect(banner.getAttribute("role")).toBe("region");
     expect(banner.getAttribute("aria-label")).toBeTruthy();
@@ -31,7 +43,7 @@ describe("ResumeDraftBanner", () => {
   it("Resume fires onResume (and not onDiscard)", () => {
     const onResume = vi.fn();
     const onDiscard = vi.fn();
-    render(<ResumeDraftBanner meta={makeMeta()} onResume={onResume} onDiscard={onDiscard} />);
+    renderBanner({ meta: makeMeta(), onResume: onResume, onDiscard: onDiscard });
 
     fireEvent.click(screen.getByTestId("resume-draft"));
     expect(onResume).toHaveBeenCalledTimes(1);
@@ -41,7 +53,7 @@ describe("ResumeDraftBanner", () => {
   it("Discard fires onDiscard (and not onResume)", () => {
     const onResume = vi.fn();
     const onDiscard = vi.fn();
-    render(<ResumeDraftBanner meta={makeMeta()} onResume={onResume} onDiscard={onDiscard} />);
+    renderBanner({ meta: makeMeta(), onResume: onResume, onDiscard: onDiscard });
 
     fireEvent.click(screen.getByTestId("discard-draft"));
     expect(onDiscard).toHaveBeenCalledTimes(1);
@@ -49,15 +61,13 @@ describe("ResumeDraftBanner", () => {
   });
 
   it("shows the derived keyboard label and the step it was left on", () => {
-    render(<ResumeDraftBanner meta={makeMeta()} onResume={vi.fn()} onDiscard={vi.fn()} />);
+    renderBanner({ meta: makeMeta(), onResume: vi.fn(), onDiscard: vi.fn() });
     expect(screen.getByText(/Restore "Hausa" from your account\?/)).toBeTruthy();
     expect(screen.getByText(/carve step/)).toBeTruthy();
   });
 
   it("falls back to a generic name when the draft has no label", () => {
-    render(
-      <ResumeDraftBanner meta={makeMeta({ label: null })} onResume={vi.fn()} onDiscard={vi.fn()} />,
-    );
+    renderBanner({ meta: makeMeta({ label: null }), onResume: vi.fn(), onDiscard: vi.fn() });
     expect(screen.getByText(/Restore your keyboard from your account\?/)).toBeTruthy();
   });
 });
