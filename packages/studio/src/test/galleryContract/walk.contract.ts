@@ -1,4 +1,4 @@
-// Shared contract: the gallery walks the upstream placement set (issue #2293).
+// Shared contract: the gallery walks the upstream placement set.
 //
 // The walk is observed where the gallery itself publishes it: the shared
 // within-step position model (useStepWalkStore, fed by useCharWalkPosition
@@ -32,7 +32,7 @@ export function describeWalkContract(adapter: GalleryAdapter): void {
       .filter((c): c is string => c !== null);
   }
 
-  describe(`${adapter.name} — placement walk (issue #2293)`, () => {
+  describe(`${adapter.name} — placement walk`, () => {
     it("Bafut own-key: walks bases + the 3 marks, none of the 22 composed forms", async () => {
       adapter.prepareWalk();
       seedBafutSession(bafutWorklist("own-key"));
