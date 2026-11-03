@@ -15,16 +15,22 @@
 // functions that push the prior state — the touch builder's discipline
 // (commit → undo batch), simplified for the OSK's flat key model.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
-  emitKvks,
+  oskContinueResult,
   DESKTOP_GEOMETRY,
 } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
+
+// The Code tab pane. Lazy-loaded so the Monaco bundle never lands in the
+// main chunk (same discipline as TouchCodePane).
+const OskCodePane = lazy(() =>
+  import("./OskCodePane.tsx").then((m) => ({ default: m.OskCodePane })),
+);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,6 +119,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   // Current (edited) KvksIR + undo history.
   const [kvks, setKvks] = useState<KvksIR | null>(baseKvks);
   const [history, setHistory] = useState<KvksIR[]>([]);
+  const [activeTab, setActiveTab] = useState<"visual" | "code">("visual");
   const [activeShift, setActiveShift] = useState<string>("");
   const [selected, setSelected] = useState<SelectedKey | null>(null);
   const [labelDraft, setLabelDraft] = useState<string>("");
@@ -279,6 +286,40 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         })}
       </p>
 
+      {/* Visual / Code tabs */}
+      <div style={{ display: "flex", gap: 8 }} role="tablist" aria-label={t({ id: "editor.assignLoop.osk.viewTabsLabel", message: "Editor view" })}>
+        {(["visual", "code"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: "6px 12px",
+              fontSize: 13,
+              borderRadius: 6,
+              border: `1px solid ${activeTab === tab ? ACCENT : BORDER}`,
+              background: activeTab === tab ? ACCENT_BG : BG_CARD,
+              color: TEXT_MAIN,
+              cursor: "pointer",
+            }}
+          >
+            {tab === "visual"
+              ? t({ id: "editor.assignLoop.osk.tabVisual", message: "Visual" })
+              : t({ id: "editor.assignLoop.osk.tabCode", message: "Code" })}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "code" ? (
+        <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
+          <Suspense fallback={<div style={{ padding: 24, color: TEXT_DIM }}>{t({ id: "editor.assignLoop.osk.code.loading", message: "Loading code editor…" })}</div>}>
+            <OskCodePane kvks={effectiveKvks} onApply={commit} />
+          </Suspense>
+        </div>
+      ) : (
+      <>
       {/* Layer switcher */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="tablist" aria-label={t({ id: "editor.assignLoop.osk.layersLabel", message: "Keyboard layers" })}>
         {layers.map((l) => (
@@ -508,6 +549,8 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
           {t({ id: "editor.assignLoop.osk.include102", message: "Include 102nd key (ISO)" })}
         </label>
       </div>
+      </>
+      )}
 
       {/* Footer: undo + nav */}
       <div
@@ -556,15 +599,11 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         <div style={{ flex: 1 }} />
         <button
           type="button"
+          data-testid="osk-continue"
           onClick={() => {
-            // Emit the customized KvksIR to .kvks XML; the manifest's
-            // working-copy persistence writes it to the VFS.
-            const finalKvks = effectiveKvks;
-            if (finalKvks) {
-              onComplete({ kvksXml: emitKvks(finalKvks) });
-            } else {
-              onComplete(undefined);
-            }
+            // The customized KvksIR emitted to .kvks XML (the lifted
+            // product seam — the headless author calls the same function).
+            onComplete(oskContinueResult(effectiveKvks));
           }}
           style={{
             padding: "10px 24px",
