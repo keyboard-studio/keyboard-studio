@@ -15,6 +15,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -42,14 +46,7 @@
       "rulesBkspHits": [
         "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store.",
         "any(composed) + [K_BKSP] > index(comp-dia, 1)",
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+        "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store."
       ],
       "galleryChars": 0,
       "overwrite": null,
@@ -73,6 +70,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -124,6 +125,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -186,6 +191,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -237,6 +246,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -288,6 +301,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -339,6 +356,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -366,14 +387,7 @@
       "rulesBkspHits": [
         "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store.",
         "any(composed) + [K_BKSP] > index(comp-dia, 1)",
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+        "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store."
       ],
       "galleryChars": 0,
       "overwrite": null,
@@ -397,6 +411,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -448,6 +466,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -475,14 +497,7 @@
       "rulesBkspHits": [
         "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store.",
         "any(composed) + [K_BKSP] > index(comp-dia, 1)",
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+        "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store."
       ],
       "galleryChars": 2,
       "overwrite": null,
@@ -506,6 +521,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -557,6 +576,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -607,6 +630,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -657,6 +684,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -707,6 +738,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -758,6 +793,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -785,14 +824,7 @@
       "rulesBkspHits": [
         "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store.",
         "any(composed) + [K_BKSP] > index(comp-dia, 1)",
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
+        "When a character from the “composed” store precedes Backspace, the rule emits the corresponding character from the “comp-dia” store."
       ],
       "galleryChars": 2,
       "overwrite": null,
@@ -815,6 +847,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -877,6 +913,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -900,19 +940,8 @@
         "previewPresses": 1,
         "previewMatchesAnswer": true
       },
-      "rulesMentionsBackspace": true,
-      "rulesBkspHits": [
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
-      ],
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
       "galleryChars": 23,
       "overwrite": {
         "char": "ŋ",
@@ -946,6 +975,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1003,6 +1036,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1096,6 +1133,10 @@
       "errors": []
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1119,12 +1160,8 @@
         "previewPresses": 2,
         "previewMatchesAnswer": true
       },
-      "rulesMentionsBackspace": true,
-      "rulesBkspHits": [
-        "When a character from the “generated_marks_unwrap_from” store precedes Backspace, the rule emits the corresponding character from the “generated_marks_unwrap_to” store.",
-        "any(generated_marks_unwrap_from) + [K_BKSP] > index(generated_marks_unwrap_to, 1) c generated: stepwise backspace unwrap (marks series)",
-        "When a character from the “generated_marks_unwrap_from” store precedes Backspace, the rule emits the corresponding character from the “generated_marks_unwrap_to” store."
-      ],
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
       "galleryChars": 23,
       "overwrite": {
         "char": "ŋ",
@@ -1157,6 +1194,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1241,6 +1282,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1264,12 +1309,8 @@
         "previewPresses": 2,
         "previewMatchesAnswer": true
       },
-      "rulesMentionsBackspace": true,
-      "rulesBkspHits": [
-        "When a character from the “generated_marks_unwrap_from” store precedes Backspace, the rule emits the corresponding character from the “generated_marks_unwrap_to” store.",
-        "any(generated_marks_unwrap_from) + [K_BKSP] > index(generated_marks_unwrap_to, 1) c generated: stepwise backspace unwrap (marks series)",
-        "When a character from the “generated_marks_unwrap_from” store precedes Backspace, the rule emits the corresponding character from the “generated_marks_unwrap_to” store."
-      ],
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
       "galleryChars": 23,
       "overwrite": {
         "char": "ŋ",
@@ -1345,6 +1386,10 @@
       "errors": []
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1368,19 +1413,8 @@
         "previewPresses": 1,
         "previewMatchesAnswer": true
       },
-      "rulesMentionsBackspace": true,
-      "rulesBkspHits": [
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
-      ],
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
       "galleryChars": 23,
       "overwrite": {
         "char": "ŋ",
@@ -1414,6 +1448,10 @@
       "furthest": "not-attempted"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1498,6 +1536,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1521,19 +1563,8 @@
         "previewPresses": 1,
         "previewMatchesAnswer": true
       },
-      "rulesMentionsBackspace": true,
-      "rulesBkspHits": [
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
-      ],
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
       "galleryChars": 14,
       "overwrite": {
         "char": "ŋ",
@@ -1578,6 +1609,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1667,6 +1702,10 @@
       "errors": []
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1751,6 +1790,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1835,6 +1878,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1904,6 +1951,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1972,6 +2023,10 @@
       ]
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",
@@ -1995,19 +2050,8 @@
         "previewPresses": 1,
         "previewMatchesAnswer": true
       },
-      "rulesMentionsBackspace": true,
-      "rulesBkspHits": [
-        "U+0041 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0041 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+0302 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0045 U+030C + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0300 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)",
-        "U+0049 U+0301 + [K_BKSP] > nul c generated: whole-stack backspace (marks series)"
-      ],
+      "rulesMentionsBackspace": false,
+      "rulesBkspHits": [],
       "galleryChars": 14,
       "overwrite": {
         "char": "ŋ",
@@ -2040,6 +2084,10 @@
       "furthest": "mechanisms-stuck-at-attachment"
     },
     "round3": {
+      "status": "NOT-ATTEMPTED",
+      "furthest": "not-attempted"
+    },
+    "round4": {
       "status": "PASS",
       "reason": "",
       "furthest": "mechanisms-complete",

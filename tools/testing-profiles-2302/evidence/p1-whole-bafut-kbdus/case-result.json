@@ -17,7 +17,7 @@
   },
   "round": 4,
   "build": "7c411dad (origin/main, modern tree incl. PRs #2312..#2452; GuardStation removed per #2374 ruling)",
-  "startedAt": "2026-11-03T18:11:39.282Z",
+  "startedAt": "2026-11-03T19:15:11.263Z",
   "phases": {
     "1": {
       "phase": 1,
@@ -400,5 +400,5 @@
       "reachedTouchSeed": true
     }
   },
-  "finishedAt": "2026-11-03T18:16:29.104Z"
+  "finishedAt": "2026-11-03T19:19:39.798Z"
 }

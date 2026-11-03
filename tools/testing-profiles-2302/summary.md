@@ -58,3 +58,25 @@ Environment losses, disclosed: two service restarts killed the dev server and th
 **FINAL reconciled counts (32 cells): PASS 32 · FAIL 0 · BLOCKED 0 · NOT-ATTEMPTED 0.** Round-3 counts are identical: PASS 32 of 32.
 
 Keyboard package .zip files for these runs live on the throwaway branch `km/2302-walk-zips` under `tools/testing-profiles-2302/zips/` (index: `zips/INDEX.md` on that branch).
+
+## ROUND 4 — 2026-11-03, vs origin/main `7c411dad` (modern tree: #2449 touch-builder, #2447, PR #2388 #2374 guard removal, #2321 walk-instrument sync)
+
+Method unchanged: Playwright CLI, fresh named session per case, serial lanes; dev server from fresh worktree ks-2302-walk4 @ 7c411dad. All 32 cases walked; results.md gains round-4 columns, round-3 records preserved under `round3/`.
+
+**FINAL reconciled counts (32 cells): PASS 32 · FAIL 0 · BLOCKED 0 · NOT-ATTEMPTED 0.**
+
+Product deltas vs round 3, all as expected from merged work:
+- **GuardStation is gone** (PR #2388, the #2374 binding ruling): the marks series now runs attachment → treatment → output-form → stacking (context-tolerance transient where it fires). No `guard-station` rendered in any of the 32 walks; the harness's guard branch stayed inert and needed no changes.
+- **Per-mark 'at the start of a line' boxes** now sit in the attachment section (same ruling): copy reads "Leave 'at the start of a line' unticked and this mark is blocked after a space at line start". The walk left them unticked (swallow default) in all 32 cases.
+- **Backspace axis intact**: question rendered 32/32, proposal followed composition 32/32 (NFD→peel, NFC→whole-stack), recorded answer stuck 32/32 including all 16 off-diagonal overrides, preview matched the answer 32/32.
+- **#2300 in the wild**: the ŋ→K_X overwrite displacement banner fired in 16 cases; 104 gallery characters carried weighted rationale lines.
+
+Issues encountered (all environment or harness; zero product defects):
+1. **Missing Chromium for the CLI** (environment): the VM's `~/.cache` had been wiped since October, so `@playwright/cli` had no browser (it wanted build 1252; only 1228 remained). `install-browser` failed twice — cdn.playwright.dev dropped the 194 MB download near 90%. Fixed by fetching the headless-shell zip directly with curl (resume+retry) and extracting it to the expected `chromium_headless_shell-1252` path. Lesson: `~/.cache` is ephemeral; budget a browser install after any VM replacement.
+2. **Transient EPERM write denials** (environment, ~19:21–19:55): `writeFileSync`/`npm exec` intermittently failed with `EPERM: operation not permitted` in minutes-long bursts while shell writes to the same paths succeeded — no immutable flags, no quota issue, writes fine from fresh execs between bursts. It killed 7 lane-C cases at startup and stalled the retry loop for ~30 min. No root cause established (not path-, process- or user-specific in any reproducible way). Handled with a retry wrapper (`harness/run-lane4r.sh`: per-case retry with 60 s backoff until `case-result.json` exists clean); no case evidence was lost.
+3. **/tmp wiped + dev server died mid-run** (environment): the tmpfs was remounted empty around 19:50, taking all lane logs; the vite dev server died with it. Workspace, browser install, and committed evidence were untouched. Server restarted; lane logs now also mirrored under `~/workspace/keyboard-studio-notes/2302-walk/`.
+4. **Studio `tsc -b` OOM** (environment/toolchain): `pnpm -r build`'s studio step crashed with SIGABRT under the default Node heap (masked at first by piping through `tail`, which swallowed pnpm's exit code). With `NODE_OPTIONS=--max-old-space-size=8192`, `tsc -b` passes clean (exit 0) — no type errors on the modern tree. Lesson: never pipe a build through `tail` when you need its exit code.
+5. **One flaky punctuation click** (harness flake, not product): `p4-whole-ewondo-kbdfr`'s first attempt timed out 30 s on `punctuation-done` stuck at "scrolling" with the button visible/enabled/stable. Re-ran the case once: completed clean, zero errors. Recorded here as a single-attempt flake.
+6. **Results-builder bug** (harness, mine): `build-results4.mjs` omitted `round3: r3` on the attempted-case push → TypeError on `r.round3.status`. Fixed; builder now emits all four round columns.
+
+One lane-runner stall of note: the sequential `/tmp/r4-all.sh` loop died after lane C (7 cases lost to issue 2, no lane-C commit, lane D never started) — the retry wrapper's lane E re-ran all 15 remaining cells clean.

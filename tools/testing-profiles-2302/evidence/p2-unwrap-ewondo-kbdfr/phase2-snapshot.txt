@@ -1,7 +1,7 @@
 ### Page
 - Page URL: http://localhost:5273/
 - Page Title: Keyboard Studio
-- Console: 32 errors, 6 warnings
+- Console: 29 errors, 6 warnings
 ### Snapshot
 ```yaml
 - generic [ref=f1e3]:
@@ -117,4 +117,4 @@
     - status
 ```
 ### Events
-- New console entries: .playwright-cli/console-2026-11-03T18-02-34-218Z.log#L106-L112
+- New console entries: .playwright-cli/console-2026-11-03T20-47-11-540Z.log#L103-L109

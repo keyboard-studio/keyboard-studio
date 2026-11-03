@@ -109,7 +109,7 @@ for (const c of cases) {
   else { status = "PASS"; if (bk.previewMatchesAnswer === null) reason = "preview not observable (no preview pair)"; }
   rows.push({
     id: c.id, profile: c.profile, backspace: c.backspace, base: c.base, lang: c.lang,
-    round1: r1, round2: r2,
+    round1: r1, round2: r2, round3: r3,
     round4: { status, reason, ...ev },
   });
 }

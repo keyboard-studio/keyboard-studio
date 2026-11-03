@@ -1,7 +1,7 @@
 ### Page
 - Page URL: http://localhost:5273/
 - Page Title: Keyboard Studio
-- Console: 32 errors, 6 warnings
+- Console: 30 errors, 6 warnings
 ### Snapshot
 ```yaml
 - generic [ref=f1e3]:
