@@ -398,7 +398,7 @@
   "editor.assignLoop.html.code.warnings": "{count, plural, one {# avertissement} other {# avertissements}}",
   "editor.assignLoop.html.continue": "Continuer",
   "editor.assignLoop.html.description": "Rédigez la documentation utilisateur de votre clavier (welcome.htm). C'est le manuel utilisateur complet — les résumés et versions web sont générés automatiquement à partir de celui-ci.",
-  "editor.assignLoop.html.editorLabel": "Markdown",
+  "editor.assignLoop.html.editorLabel": "HTML",
   "editor.assignLoop.html.preview.empty": "Rien à prévisualiser pour l'instant — rédigez de la documentation à gauche.",
   "editor.assignLoop.html.preview.label": "Aperçu",
   "editor.assignLoop.html.previewMode.edit": "Modifier",

@@ -1,8 +1,8 @@
 /**
- * HtmlCodePane — lazy-loaded Monaco editor for the HTML/Markdown editor step.
+ * HtmlCodePane — lazy-loaded Monaco editor for the HTML editor step.
  *
- * A Monaco editor over the keyboard's `welcome.htm` documentation file,
- * which is Markdown despite its extension. Follows the CssCodePane pattern:
+ * A Monaco editor over the keyboard's `welcome.htm` documentation file
+ * (HTML). Follows the CssCodePane pattern:
  * - Lazy-loaded so Monaco never lands in the main chunk
  * - Debounced lint via htmlCodeLint.ts
  * - Dirty tracking: text !== lastApplied
@@ -26,10 +26,10 @@ function monacoSeverity(
 }
 
 interface HtmlCodePaneProps {
-  /** Initial Markdown text (from working copy or empty). */
+  /** Initial HTML text (from working copy or empty). */
   initialText: string;
-  /** Called with the Markdown text when the user clicks Apply. */
-  onApply: (markdown: string) => void;
+  /** Called with the HTML text when the user clicks Apply. */
+  onApply: (html: string) => void;
   /** Whether Apply is currently disabled (e.g., lint errors). */
   applyDisabled?: boolean;
 }
@@ -116,7 +116,7 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled }: HtmlCodePa
       <div style={{ flex: 1, minHeight: 200, border: "1px solid var(--app-border)", borderRadius: 6, overflow: "hidden" }}>
         <Editor
           height="100%"
-          defaultLanguage="markdown"
+          defaultLanguage="html"
           value={text}
           onChange={(value) => setText(value ?? "")}
           onMount={handleMount}

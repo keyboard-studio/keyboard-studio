@@ -398,7 +398,7 @@
   "editor.assignLoop.html.code.warnings": "{count, plural, one {# warning} other {# warnings}}",
   "editor.assignLoop.html.continue": "Continue",
   "editor.assignLoop.html.description": "Write the user documentation for your keyboard (welcome.htm). This is the full user manual — summaries and web versions are generated from it automatically.",
-  "editor.assignLoop.html.editorLabel": "Markdown",
+  "editor.assignLoop.html.editorLabel": "HTML",
   "editor.assignLoop.html.preview.empty": "Nothing to preview yet — write some documentation on the left.",
   "editor.assignLoop.html.preview.label": "Preview",
   "editor.assignLoop.html.previewMode.edit": "Edit",

@@ -1,14 +1,16 @@
 /**
- * htmlCodeLint — Markdown validation for the HTML/Markdown editor step.
+ * htmlCodeLint — HTML validation for the HTML editor step.
  *
- * The `welcome.htm` file is Markdown despite its extension (verified on
- * keymanapp/keyboards: basic_kbdus, akan, khmer_angkor). This linter
- * provides debounced, pure validation of Markdown text:
- * - Balanced code fences (``` blocks)
- * - Balanced inline code spans (`...`)
- * - Balanced emphasis markers (*, **, _, __) — best-effort
- * - Balanced link/image brackets ([...](...))
- * - Heading level skips (e.g. # then ###) as warnings
+ * The `welcome.htm` file is HTML (verified on keymanapp/keyboards:
+ * akan, basic_kbdus, khmer_angkor — all start with `<!DOCTYPE html>`).
+ * This linter provides debounced, pure validation of HTML text:
+ * - Unclosed tags (error) — tag-stack based
+ * - Mismatched / unexpected closing tags (error)
+ * - Missing `<!DOCTYPE html>` (warning)
+ * - Missing `<html>`, `<head>`, `<body>` structure (warning)
+ *
+ * Comments (`<!-- ... -->`) are skipped; void elements
+ * (br, img, meta, …) and self-closing tags never open the stack.
  *
  * Returns markers with line/column positions for Monaco.
  */
@@ -26,8 +28,32 @@ export interface HtmlCodeMarker {
   severity: "error" | "warning";
 }
 
+/** Elements that never have a closing tag. */
+const VOID_ELEMENTS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+interface OpenTag {
+  name: string;
+  line: number;
+  column: number;
+}
+
 /**
- * Validate Markdown text, returning a list of markers.
+ * Validate HTML text, returning a list of markers.
  * Empty array = valid.
  */
 export function lintHtmlText(text: string): HtmlCodeMarker[] {
@@ -36,113 +62,105 @@ export function lintHtmlText(text: string): HtmlCodeMarker[] {
     return markers;
   }
 
-  const lines = text.split("\n");
+  // Precompute line-start offsets for offset → line/column mapping.
+  const lineStarts: number[] = [0];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\n") lineStarts.push(i + 1);
+  }
+  const toLineCol = (offset: number): [number, number] => {
+    let line = 0;
+    while (line + 1 < lineStarts.length && (lineStarts[line + 1] ?? 0) <= offset) {
+      line++;
+    }
+    return [line + 1, offset - (lineStarts[line] ?? 0) + 1];
+  };
 
-  // --- Code fence balance (``` or ~~~) ---
-  let fenceChar: string | null = null;
-  let fenceLine = 0;
-  let fenceCol = 0;
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li] ?? "";
-    const trimmed = line.trimStart();
-    const fenceMatch = trimmed.match(/^(```+|~~~+)/);
-    if (fenceMatch) {
-      const fence = fenceMatch[1] ?? "";
-      const fenceStart = fence[0] ?? "";
-      if (fenceChar === null) {
-        fenceChar = fenceStart;
-        fenceLine = li + 1;
-        fenceCol = line.indexOf(fence) + 1;
-      } else if (fenceStart === fenceChar) {
-        fenceChar = null;
+  const stack: OpenTag[] = [];
+  const seenTags = new Set<string>();
+  let hasDoctype = false;
+
+  // Tokens: comments, doctype, open/close/self-closing tags.
+  // Attributes may not contain unquoted < or > (best-effort).
+  // Note the `i` flag: tag names and the doctype keyword are case-insensitive.
+  const tokenRe =
+    /<!--[\s\S]*?-->|<!DOCTYPE[^>]*>|<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*?)?\/?>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = tokenRe.exec(text)) !== null) {
+    const token = m[0];
+    const [line, column] = toLineCol(m.index);
+
+    // Comments carry no structure.
+    if (token.startsWith("<!--")) continue;
+
+    // Doctype declaration.
+    if (/^<!DOCTYPE/i.test(token)) {
+      hasDoctype = true;
+      continue;
+    }
+
+    const isClose = token.startsWith("</");
+    const nameMatch = /^<\/?([a-zA-Z][a-zA-Z0-9-]*)/.exec(token);
+    if (!nameMatch) continue;
+    const name = (nameMatch[1] ?? "").toLowerCase();
+    seenTags.add(name);
+    const selfClosing = token.endsWith("/>") || VOID_ELEMENTS.has(name);
+
+    if (isClose) {
+      // Find the matching open tag, innermost first.
+      let idx = stack.length - 1;
+      while (idx >= 0 && stack[idx]?.name !== name) idx--;
+      if (idx < 0) {
+        markers.push({
+          line,
+          column,
+          message: `Unexpected closing tag </${name}> with no matching open tag`,
+          severity: "error",
+        });
+      } else {
+        // Tags left open above the match are unclosed.
+        for (let j = stack.length - 1; j > idx; j--) {
+          const unclosed = stack.pop();
+          if (unclosed) {
+            markers.push({
+              line: unclosed.line,
+              column: unclosed.column,
+              message: `Unclosed tag <${unclosed.name}>`,
+              severity: "error",
+            });
+          }
+        }
+        stack.pop(); // the matched open tag
       }
-      // Different fence char inside a fence is content, not a fence
+    } else if (!selfClosing) {
+      stack.push({ name, line, column });
     }
   }
-  if (fenceChar !== null) {
+
+  // Anything still on the stack never closed.
+  for (const open of stack) {
     markers.push({
-      line: fenceLine,
-      column: fenceCol,
-      message: "Unclosed code fence",
+      line: open.line,
+      column: open.column,
+      message: `Unclosed tag <${open.name}>`,
       severity: "error",
     });
   }
 
-  // --- Per-line checks (skip lines inside code fences) ---
-  let inFence = false;
-  let prevHeadingLevel = 0;
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li] ?? "";
-    const trimmed = line.trimStart();
-
-    // Track fence state for per-line skipping
-    if (/^(```+|~~~+)/.test(trimmed)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-
-    // Heading level skip detection (warning)
-    const headingMatch = /^(#{1,6})\s/.exec(trimmed);
-    if (headingMatch) {
-      const level = (headingMatch[1] ?? "").length;
-      if (prevHeadingLevel > 0 && level > prevHeadingLevel + 1) {
-        markers.push({
-          line: li + 1,
-          column: line.indexOf("#") + 1,
-          message: `Heading level skipped (h${prevHeadingLevel} → h${level})`,
-          severity: "warning",
-        });
-      }
-      prevHeadingLevel = level;
-    }
-
-    // Unbalanced inline code spans (odd number of backticks outside fences)
-    // Count backticks not part of a fence (fences handled above)
-    const backtickRuns = line.match(/`+/g) ?? [];
-    let inlineBackticks = 0;
-    for (const run of backtickRuns) {
-      // Single backtick runs are inline code; longer runs on their own line
-      // would have been fences (handled above), so count singles here
-      if (run.length === 1) inlineBackticks++;
-    }
-    if (inlineBackticks % 2 !== 0) {
-      const col = line.indexOf("`") + 1;
+  // Document-structure warnings.
+  if (!hasDoctype) {
+    markers.push({
+      line: 1,
+      column: 1,
+      message: "Missing <!DOCTYPE html> declaration",
+      severity: "warning",
+    });
+  }
+  for (const required of ["html", "head", "body"]) {
+    if (!seenTags.has(required)) {
       markers.push({
-        line: li + 1,
-        column: col,
-        message: "Unbalanced inline code span (odd number of backticks)",
-        severity: "warning",
-      });
-    }
-
-    // Unbalanced link brackets: count [ and ] outside inline code
-    // (best-effort: strip inline code spans first)
-    const noInlineCode = line.replace(/`[^`]*`/g, "");
-    const openBrackets = (noInlineCode.match(/\[/g) ?? []).length;
-    const closeBrackets = (noInlineCode.match(/\]/g) ?? []).length;
-    if (openBrackets > closeBrackets) {
-      markers.push({
-        line: li + 1,
-        column: noInlineCode.indexOf("[") + 1,
-        message: "Unclosed link bracket '['",
-        severity: "warning",
-      });
-    } else if (closeBrackets > openBrackets) {
-      markers.push({
-        line: li + 1,
-        column: noInlineCode.indexOf("]") + 1,
-        message: "Unmatched closing bracket ']'",
-        severity: "warning",
-      });
-    }
-
-    // Image without alt text: ![](...)
-    if (/!\[\]\(/.test(noInlineCode)) {
-      markers.push({
-        line: li + 1,
-        column: noInlineCode.indexOf("![") + 1,
-        message: "Image without alt text",
+        line: 1,
+        column: 1,
+        message: `Missing <${required}> element`,
         severity: "warning",
       });
     }

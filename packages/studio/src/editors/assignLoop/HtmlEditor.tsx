@@ -1,19 +1,19 @@
 /**
  * HtmlEditor — documentation editor step (after Help & Tips, Phase F).
  *
- * Edits the keyboard's `welcome.htm` file — which is Markdown despite its
- * `.htm` extension (verified on keymanapp/keyboards: basic_kbdus, akan,
- * khmer_angkor). This is the full user manual.
+ * Edits the keyboard's `welcome.htm` file — HTML (verified on
+ * keymanapp/keyboards: akan, basic_kbdus, khmer_angkor all start with
+ * `<!DOCTYPE html>`). This is the full user manual.
  *
  * Features:
- * - Monaco editor for Markdown (lazy-loaded)
- * - Live preview: rendered Markdown side-by-side or toggleable
+ * - Monaco editor for HTML (lazy-loaded)
+ * - Live preview: the HTML rendered directly, side-by-side or toggleable
  * - `readme.htm`, `README.md`, and `.php` versions are generated exports
  *   from this source — the output pipeline handles them, not this editor
- * - On Continue: passes { markdown } via onComplete for the output pipeline
+ * - On Continue: passes { html } via onComplete for the output pipeline
  */
 
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 
@@ -21,172 +21,6 @@ import type { EditorStepProps } from "../../steps/types.ts";
 const HtmlCodePane = lazy(() =>
   import("./HtmlCodePane.tsx").then((m) => ({ default: m.HtmlCodePane })),
 );
-
-// ---------------------------------------------------------------------------
-// Lightweight Markdown renderer
-// ---------------------------------------------------------------------------
-// A minimal, safe renderer for the live preview. We avoid pulling in a full
-// Markdown parser (lockfile constraints); this covers the common constructs
-// found in keyboard documentation: headings, paragraphs, bold/italic,
-// lists, links, images, inline code, and fenced code blocks.
-//
-// Security: HTML is escaped BEFORE Markdown transforms are applied, so
-// author-supplied angle brackets can never become live markup.
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function renderInline(text: string): string {
-  // Text is already HTML-escaped by the caller.
-  let out = text;
-  // Images: ![alt](src)
-  out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" style="max-width:100%"/>');
-  // Links: [text](url)
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  // Inline code: `code`
-  out = out.replace(/`([^`]+)`/g, "<code style=\"background:var(--app-surface);padding:1px 4px;border-radius:3px;font-size:0.9em\">$1</code>");
-  // Bold: **text** or __text__
-  out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  out = out.replace(/__([^_]+)__/g, "<strong>$1</strong>");
-  // Italic: *text* or _text_ (careful not to clash with bold)
-  out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
-  out = out.replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
-  return out;
-}
-
-/** Render Markdown to sanitized HTML for preview. */
-export function renderMarkdownPreview(markdown: string): string {
-  const lines = markdown.split("\n");
-  const html: string[] = [];
-  let inFence = false;
-  let fenceContent: string[] = [];
-  let inList = false;
-  let paragraph: string[] = [];
-
-  const flushParagraph = () => {
-    if (paragraph.length > 0) {
-      const text = paragraph.join(" ");
-      html.push(`<p style="margin:0 0 12px;line-height:1.6">${renderInline(escapeHtml(text))}</p>`);
-      paragraph = [];
-    }
-  };
-
-  const flushList = () => {
-    if (inList) {
-      html.push("</ul>");
-      inList = false;
-    }
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine;
-    const trimmed = line.trim();
-
-    // Fenced code blocks
-    if (/^(```+|~~~+)/.test(trimmed)) {
-      if (inFence) {
-        html.push(
-          `<pre style="background:var(--app-surface);padding:12px;border-radius:6px;overflow:auto;font-size:12px"><code>${escapeHtml(fenceContent.join("\n"))}</code></pre>`,
-        );
-        fenceContent = [];
-        inFence = false;
-      } else {
-        flushParagraph();
-        flushList();
-        inFence = true;
-      }
-      continue;
-    }
-    if (inFence) {
-      fenceContent.push(line);
-      continue;
-    }
-
-    // Blank line: flush paragraph and list
-    if (trimmed === "") {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    // Headings
-    const headingMatch = /^(#{1,6})\s+(.*)$/.exec(trimmed);
-    if (headingMatch) {
-      flushParagraph();
-      flushList();
-      const level = (headingMatch[1] ?? "").length;
-      const text = headingMatch[2] ?? "";
-      const size = [20, 18, 16, 14, 13, 12][level - 1] ?? 14;
-      html.push(
-        `<h${level} style="margin:16px 0 8px;font-size:${size}px;color:var(--app-text)">${renderInline(escapeHtml(text))}</h${level}>`,
-      );
-      continue;
-    }
-
-    // Unordered list items
-    const listMatch = /^[-*+]\s+(.*)$/.exec(trimmed);
-    if (listMatch) {
-      flushParagraph();
-      if (!inList) {
-        html.push('<ul style="margin:0 0 12px;padding-left:24px;line-height:1.6">');
-        inList = true;
-      }
-      html.push(`<li>${renderInline(escapeHtml(listMatch[1] ?? ""))}</li>`);
-      continue;
-    }
-
-    // Ordered list items
-    const orderedMatch = /^\d+[.)]\s+(.*)$/.exec(trimmed);
-    if (orderedMatch) {
-      flushParagraph();
-      if (!inList) {
-        html.push('<ol style="margin:0 0 12px;padding-left:24px;line-height:1.6">');
-        inList = true;
-      }
-      html.push(`<li>${renderInline(escapeHtml(orderedMatch[1] ?? ""))}</li>`);
-      continue;
-    }
-
-    // Horizontal rule
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-      flushParagraph();
-      flushList();
-      html.push('<hr style="border:none;border-top:1px solid var(--app-border);margin:16px 0"/>');
-      continue;
-    }
-
-    // Blockquote
-    if (trimmed.startsWith(">")) {
-      flushParagraph();
-      flushList();
-      const quoteText = trimmed.replace(/^>\s?/, "");
-      html.push(
-        `<blockquote style="margin:0 0 12px;padding:8px 12px;border-left:3px solid var(--app-accent);color:var(--app-text-muted)">${renderInline(escapeHtml(quoteText))}</blockquote>`,
-      );
-      continue;
-    }
-
-    // Regular text: accumulate into paragraph
-    // (flush list first — a non-list line ends the list)
-    flushList();
-    paragraph.push(trimmed);
-  }
-
-  flushParagraph();
-  flushList();
-  if (inFence && fenceContent.length > 0) {
-    html.push(
-      `<pre style="background:var(--app-surface);padding:12px;border-radius:6px;overflow:auto;font-size:12px"><code>${escapeHtml(fenceContent.join("\n"))}</code></pre>`,
-    );
-  }
-
-  return html.join("\n");
-}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -197,18 +31,16 @@ type PreviewMode = "edit" | "preview" | "side-by-side";
 export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
   const { t } = useLingui();
 
-  const [markdown, setMarkdown] = useState("");
+  const [html, setHtml] = useState("");
   const [previewMode, setPreviewMode] = useState<PreviewMode>("side-by-side");
 
-  const previewHtml = useMemo(() => renderMarkdownPreview(markdown), [markdown]);
-
-  const handleApply = (newMarkdown: string) => {
-    setMarkdown(newMarkdown);
+  const handleApply = (newHtml: string) => {
+    setHtml(newHtml);
   };
 
   const handleContinue = () => {
     // The output pipeline generates readme.htm, README.md, and .php from this source
-    onComplete({ markdown });
+    onComplete({ html });
   };
 
   return (
@@ -272,11 +104,11 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
           minHeight: 0,
         }}
       >
-        {/* Markdown Editor */}
+        {/* HTML Editor */}
         {(previewMode === "edit" || previewMode === "side-by-side") && (
           <div style={{ display: "flex", flexDirection: "column", minHeight: 300 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--app-text)", marginBottom: 8 }}>
-              {t({ id: "editor.assignLoop.html.editorLabel", message: "Markdown" })}
+              {t({ id: "editor.assignLoop.html.editorLabel", message: "HTML" })}
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <Suspense
@@ -286,7 +118,7 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
                   </div>
                 }
               >
-                <HtmlCodePane initialText={markdown} onApply={handleApply} />
+                <HtmlCodePane initialText={html} onApply={handleApply} />
               </Suspense>
             </div>
           </div>
@@ -307,7 +139,7 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
             <div style={{ fontSize: 12, color: "var(--app-text-muted)", marginBottom: 12 }}>
               {t({ id: "editor.assignLoop.html.preview.label", message: "Preview" })}
             </div>
-            {markdown.trim() === "" ? (
+            {html.trim() === "" ? (
               <div style={{ color: "var(--app-text-muted)", fontSize: 13, fontStyle: "italic" }}>
                 {t({
                   id: "editor.assignLoop.html.preview.empty",
@@ -315,10 +147,9 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
                 })}
               </div>
             ) : (
-              <div
-                style={{ fontSize: 14, color: "var(--app-text)" }}
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
-              />
+              // The file is HTML by definition — render it directly.
+              // This is the author's own document preview, not untrusted content.
+              <div dangerouslySetInnerHTML={{ __html: html }} />
             )}
           </div>
         )}
