@@ -249,7 +249,7 @@ export function PlacementBar(props: {
             background: CARD,
             border: `2px solid ${ACCENT}`,
             borderRadius: 10,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            boxShadow: "var(--app-shadow)",
             opacity: 0.95,
           }}
         >
@@ -364,7 +364,7 @@ export function PlacementModal(props: {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0, 0, 0, 0.45)",
+        background: "var(--app-backdrop-strong)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

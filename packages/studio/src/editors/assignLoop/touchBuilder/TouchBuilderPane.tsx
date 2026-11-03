@@ -1542,7 +1542,7 @@ function SubkeyPanel(props: {
             background: "var(--app-surface)",
             border: `2px solid ${ACCENT}`,
             borderRadius: 8,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            boxShadow: "var(--app-shadow)",
             opacity: 0.95,
           }}
         >
@@ -1665,7 +1665,7 @@ function TemplateDialog(props: {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.35)",
+        background: "var(--app-backdrop)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

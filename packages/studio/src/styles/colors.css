@@ -15,6 +15,11 @@
   --app-surface:          #FFFFFF;
   --app-surface-2:        #F8FAFB;
   --app-overlay:          #FFFFFF;
+  /* Dialog backdrop and shadow (translucent black). Defined here so
+     components use var() instead of hard-coded rgba() literals. */
+  --app-backdrop:         rgba(0,0,0,0.35);
+  --app-backdrop-strong:  rgba(0,0,0,0.45);
+  --app-shadow:           0 8px 24px rgba(0,0,0,0.35);
   /* Hard divider for the solid chrome bars (top nav, journey footer): the
      "black line" where each bar meets the content. Pure black on the light
      theme (21:1); on navy it reads as a dark seam (1.5:1 against the bar
