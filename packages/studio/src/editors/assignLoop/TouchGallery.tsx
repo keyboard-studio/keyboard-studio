@@ -2364,6 +2364,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return out;
   }, [keyGridProgress.unplacedChars, trayReturns]);
 
+  // Already-placed letters (inventory minus unplaced), for the "show placed"
+  // checkbox — dotted in the tray so they can be placed in more than one
+  // location.
+  const placedLetters = useMemo(() => {
+    const unplaced = new Set(keyGridProgress.unplacedChars);
+    return inventory.filter((c) => !unplaced.has(c));
+  }, [inventory, keyGridProgress.unplacedChars]);
+
   // Platform catalog for the key-mode grid's platform tabs (T077 already
   // renders the tablist; this just supplies the catalog from the effective
   // layout for the currently-mounted mode's grid).
@@ -8078,11 +8086,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           <div style={{ flex: "1 1 100%", minWidth: 0 }}>
             <PlacementBar
               letters={trayLetters}
+              placedLetters={placedLetters}
               keycapFont={headerKeycapFont}
               selectedLetter={trayLetter}
               onSelectLetter={setTrayLetter}
               onTouchDragTarget={handleTouchDragTarget}
               onTouchDrop={handleTouchDrop}
+              hideHint={touchEditorMode === "code"}
             />
           </div>
         </>

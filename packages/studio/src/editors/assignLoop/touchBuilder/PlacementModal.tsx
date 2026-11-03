@@ -51,6 +51,8 @@ const TEXT_DIM = "var(--app-text-muted)";
 
 export function PlacementBar(props: {
   letters: readonly string[];
+  /** Already-placed letters, shown dotted when the checkbox is on. */
+  placedLetters: readonly string[];
   keycapFont: string;
   selectedLetter: string | null;
   onSelectLetter: (letter: string | null) => void;
@@ -58,16 +60,21 @@ export function PlacementBar(props: {
   onTouchDragTarget: (target: TrayDropTarget | null) => void;
   /** Drag end: the letter and the hit-tested drop target, if any. */
   onTouchDrop: (letter: string, target: TrayDropTarget | null) => void;
+  /** Hide the drag hint (Code tab: letters are reference-only). */
+  hideHint?: boolean;
 }) {
   const { t } = useLingui();
   const {
     letters,
+    placedLetters,
     keycapFont,
     selectedLetter,
     onSelectLetter,
     onTouchDragTarget,
     onTouchDrop,
+    hideHint = false,
   } = props;
+  const [showPlaced, setShowPlaced] = useState(false);
 
   // Pointer drag for every input type (HTML5 DnD never fires on touch and
   // proved unreliable on desktop, so mouse goes through here too). A
@@ -97,13 +104,38 @@ export function PlacementBar(props: {
         padding: "10px 12px",
       }}
     >
-      <div style={{ fontSize: 11, color: TEXT_DIM, marginBottom: 6 }}>
-        {t({
-          id: "editor.assignLoop.touch.builder.placementBarHint",
-          message: "Drag a letter onto a key — or tap a letter, then tap a key.",
-        })}
-      </div>
-      {letters.length === 0 ? (
+      {!hideHint && (
+        <div style={{ fontSize: 11, color: TEXT_DIM, marginBottom: 6 }}>
+          {t({
+            id: "editor.assignLoop.touch.builder.placementBarHint",
+            message: "Drag a letter onto a key — or tap a letter, then tap a key.",
+          })}
+        </div>
+      )}
+      {placedLetters.length > 0 && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11,
+            color: TEXT_DIM,
+            marginBottom: 6,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showPlaced}
+            onChange={(e) => setShowPlaced(e.target.checked)}
+          />
+          {t({
+            id: "editor.assignLoop.touch.builder.showPlacedLabel",
+            message: "Show already-placed keys (dotted) — drop them to place in another location",
+          })}
+        </label>
+      )}
+      {letters.length === 0 && (!showPlaced || placedLetters.length === 0) ? (
         <div style={{ fontSize: 12, color: TEXT_DIM }}>
           {t({
             id: "editor.assignLoop.touch.builder.placementBarEmpty",
@@ -123,7 +155,7 @@ export function PlacementBar(props: {
             const isSelected = selectedLetter === letter;
             return (
               <button
-                key={letter}
+                key={`unplaced:${letter}`}
                 type="button"
                 aria-pressed={isSelected}
                 {...drag.bindSource(letter)}
@@ -155,6 +187,45 @@ export function PlacementBar(props: {
               </button>
             );
           })}
+          {showPlaced &&
+            placedLetters.map((letter) => {
+              const isSelected = selectedLetter === letter;
+              return (
+                <button
+                  key={`placed:${letter}`}
+                  type="button"
+                  aria-pressed={isSelected}
+                  title={t({
+                    id: "editor.assignLoop.touch.builder.placedLetterTitle",
+                    message: "Already placed — drop on a key to place in another location",
+                  })}
+                  {...drag.bindSource(letter)}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (drag.consumeClick()) return;
+                    onSelectLetter(isSelected ? null : letter);
+                  }}
+                  style={{
+                    flex: "0 0 auto",
+                    minWidth: 40,
+                    minHeight: 40,
+                    padding: "6px 10px",
+                    fontSize: 18,
+                    fontFamily: keycapFont,
+                    color: TEXT_DIM,
+                    background: isSelected ? ACCENT_BG : "transparent",
+                    border: `2px dotted ${isSelected ? ACCENT : BORDER}`,
+                    borderRadius: 8,
+                    cursor: "grab",
+                    touchAction: "pan-x",
+                    userSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
+                >
+                  {letter}
+                </button>
+              );
+            })}
         </div>
       )}
       {/* Drag ghost: follows the finger, above everything, never hit-tested. */}
