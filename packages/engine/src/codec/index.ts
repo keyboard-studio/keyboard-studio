@@ -9,6 +9,7 @@ export type { ParseResult } from "./parse.js";
 export { emit } from "./emit.js";
 
 export { parseKvks } from "./parse-kvks.js";
+export { emitKvks } from "./emit-kvks.js";
 
 export {
   parseTouchLayout,

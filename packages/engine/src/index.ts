@@ -95,12 +95,17 @@ export {
   parse as parseKmn,
   emit as emitKmn,
   parseKvks,
+  emitKvks,
   parseTouchLayout,
   emitTouchLayout,
   TOUCH_LAYOUT_JSON_INDENT,
   OPAQUE_REASONS,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
+
+// OSK (visual keyboard) generation from KeyboardIR.
+export { generateKvksFromIR } from "./osk/generate-kvks.js";
+export { oskContinueResult } from "./osk/complete-osk-step.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
 // The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.
@@ -313,6 +318,8 @@ export {
   SCRIPT_COVERAGE_RANGES,
   isCodePointCovered,
   formatCodePointLabel,
+  DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_WIDTH,
 } from "./layout-chart/index.js";
 export type {
   KeyLegibilityKind,

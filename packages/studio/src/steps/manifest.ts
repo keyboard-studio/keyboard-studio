@@ -52,6 +52,7 @@ import {
   deadkeysStep,
   rulesStep,
   mechanismsStep,
+  oskStep,
   touchSeedSourceStep,
   touchStep,
   helpStep,
@@ -283,6 +284,11 @@ const stepPool: readonly Step[] = [
     ...mechanismsStep,
     lock: "physical",
   } satisfies Step,
+
+  // --- OSK (on-screen keyboard customization) ---
+  // Runs after the Mechanical gallery: the underlying OSK is generated from
+  // the physical layout, and this step lets the author customize key labels.
+  oskStep,
 
   // --- Touch seed source (gated side-trail fork, FR-013) ---
   // Lets the author choose the touch seed while no choice is recorded; both

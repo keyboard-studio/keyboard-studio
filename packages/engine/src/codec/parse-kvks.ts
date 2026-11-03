@@ -72,6 +72,9 @@ export function parseKvks(xml: string): KvksIR {
 
   // Detect <usealtgr/> in header flags.
   const usealtgr = /<usealtgr\s*\/?>/i.test(xml);
+  // Detect <key102/> (ISO 102nd key) and <displayunderlying/> in header flags.
+  const key102 = /<key102\s*\/?>/i.test(xml);
+  const displayUnderlying = /<displayunderlying\s*\/?>/i.test(xml);
 
   // Extract <layer shift="..."> blocks.
   // Match from <layer to the closing </layer>.
@@ -108,5 +111,7 @@ export function parseKvks(xml: string): KvksIR {
   if (kvksVersion) result.kvksVersion = kvksVersion;
   if (kbdname) result.kbdname = kbdname;
   if (fontFamily) result.fontFamily = fontFamily;
+  if (key102) result.key102 = true;
+  if (displayUnderlying) result.displayUnderlying = true;
   return result;
 }
