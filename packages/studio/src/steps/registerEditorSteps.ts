@@ -30,6 +30,7 @@ import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
 import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
+import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -341,6 +342,26 @@ export const helpStep: EditorStep = step({
   component: PhaseFGate,
   specRef: ["§8", "specs/061-help-docs-generation", "specs/080-documentation-completeness"],
   persistence: "answer-store",
+});
+
+// ---------------------------------------------------------------------------
+// HTML/Markdown editor step (after Help, before Package)
+// ---------------------------------------------------------------------------
+
+/**
+ * HTML/Markdown editor step: edits the keyboard's `welcome.htm` documentation
+ * file (Markdown despite the extension). This is the full user manual.
+ *
+ * `readme.htm`, `README.md`, and `.php` versions are generated exports from
+ * this source — the output pipeline handles them, not this editor.
+ */
+export const htmlStep: EditorStep = step({
+  id: "html",
+  title: "Documentation",
+  layout: "full",
+  component: HtmlEditor,
+  specRef: ["specs/html-editor"],
+  persistence: "working-copy",
 });
 
 /**
