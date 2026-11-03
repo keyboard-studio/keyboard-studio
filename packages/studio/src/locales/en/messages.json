@@ -1002,6 +1002,7 @@
   "editor.assignLoop.touch.suggestion.useLongpressAriaLabel": "Use suggested long-press method for {notation} {char}",
   "editor.assignLoop.touch.suggestion.useReplaceAriaLabel": "Use suggested replace method for {notation} {char}",
   "editor.assignLoop.touch.undo.batch": "{0, plural, one {Undo removing # item} other {Undo removing # items}}",
+  "editor.assignLoop.touch.undo.footerAriaLabel": "Undo the last edit",
   "editor.assignLoop.touch.undo.item": "Undo removing {id}",
   "editor.assignLoop.touch.undo.keyEdit": "Undo the {opKind} edit on {id}",
   "editor.assignLoop.touch.undo.keyEditBatch": "{0, plural, one {Undo # touch-layout code edit} other {Undo # touch-layout code edits}}",

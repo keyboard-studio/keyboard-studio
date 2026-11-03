@@ -7475,6 +7475,16 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               message: "Back to mechanisms",
             }),
           },
+          secondary: {
+            label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
+            onClick: undoDelete,
+            testId: "touch-undo-button",
+            ariaLabel: t({
+              id: "editor.assignLoop.touch.undo.footerAriaLabel",
+              message: "Undo the last edit",
+            }),
+            disabled: undoStack.length === 0,
+          },
           forward: {
             label: t({
               id: "editor.assignLoop.touch.keyMode.continueButton",
@@ -7917,23 +7927,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           );
         })}
       </div>
-
-      <button
-        type="button"
-        onClick={undoDelete}
-        disabled={undoStack.length === 0}
-        aria-label={undoAffordanceLabel}
-        title={undoAffordanceLabel}
-        data-testid="touch-undo-button"
-        style={{
-          ...ghostBtn,
-          opacity: undoStack.length === 0 ? 0.5 : 1,
-          cursor: undoStack.length === 0 ? "default" : "pointer",
-          flexShrink: 0,
-        }}
-      >
-        <Trans id="editor.assignLoop.touch.undo.label">Undo</Trans>
-      </button>
 
       {/* T075 (FR-036d) — ONE shared, derived set of progress figures, live in
           both modes. aria-live (not role="status", which the coverage line
