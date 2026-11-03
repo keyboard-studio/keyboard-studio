@@ -43,6 +43,15 @@
 // server — the lane is the authority when a local run cannot complete.
 
 import { test, expect, type Page, type FrameLocator } from "playwright/test";
+
+// ---------------------------------------------------------------------------
+// SKIPPED (km/touch-builder-port): this spec drives the retired KeyGrid "By
+// key" UI (key-grid / assign-panel / remove-key-dialog testids), which the
+// TIKE touch-builder port replaced with TouchBuilderPane. The behavior it
+// covered now has vitest coverage (touchBuilder/*.test.ts*). Rewriting this
+// walk against the TouchBuilderPane UI is a follow-on work item.
+// ---------------------------------------------------------------------------
+test.skip(true, "retired KeyGrid UI — needs a TouchBuilderPane rewrite");
 import { unzipSync } from "fflate";
 import * as fs from "node:fs";
 import * as path from "node:path";

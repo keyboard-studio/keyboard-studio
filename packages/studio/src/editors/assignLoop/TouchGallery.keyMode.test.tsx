@@ -3,7 +3,7 @@
 // Shared module mocks: ../../test/touchGallery/mocks.tsx. Seeders and the
 // lifecycle hooks every suite installs: ../../test/touchGallery/harness.ts.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import { screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, describeUndoTarget } from "./TouchGallery.tsx";
@@ -27,8 +27,28 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) =>
 );
 vi.mock("../../components/OSKFrame.tsx", () => import("../../test/touchGallery/mocks.tsx"));
 vi.mock("../../components/OskModeToggle.tsx", () => import("../../test/touchGallery/mocks.tsx"));
+// The Code tab's Monaco chain cannot load under vitest's module runner:
+// monacoSetup's `?worker` imports are resolved by Vite's worker plugin,
+// which never runs for externalized deps in the test environment (the
+// production build resolves them — vite.config.ts sets worker.format "es"
+// in anticipation). These suites render the real TouchGallery, which
+// lazy-loads the real TouchCodePane, so both the worker wiring and the
+// Editor component are stubbed here; the pane's own suite
+// (touchBuilder/TouchCodePane.test.tsx) mocks @monaco-editor/react
+// directly with a functional stand-in.
+vi.mock("./touchBuilder/monacoSetup.ts", () => ({}));
+vi.mock("@monaco-editor/react", () => ({
+  default: () => null,
+}));
 
 installTouchGalleryHooks();
+
+// The Code tab's pane is React.lazy-loaded; its module graph costs ~1s to
+// transform under vitest even with the Monaco chain stubbed. Warm it once
+// so the tab-switch test asserts the mode swap, not the chunk load.
+beforeAll(async () => {
+  await import("./touchBuilder/TouchCodePane.tsx");
+}, 60000);
 
 // ---------------------------------------------------------------------------
 // spec 063 T072/T073/T075/T076 — the touch step's mode selector, the propose-
@@ -659,6 +679,34 @@ describe("describeUndoTarget — pure structural description of the undo stack's
     expect(describeUndoTarget({ k: "k", seq: 5 }, [])).toBeNull();
   });
 
+  // TIKE touch-builder port, Q2: one Code-tab Apply commits N ops as ONE
+  // undo entry ({k:"kb"}). The tab strip's undo button names the batch
+  // truthfully by its op count.
+  it("describes a 'kb' batch entry by its op count", () => {
+    const ops = [
+      { seq: 0, address: "phone:default:K_A", kind: "set", fields: {} },
+      { seq: 1, address: "phone:default:K_B", kind: "set", fields: {} },
+      { seq: 2, address: "phone:default:K_C", kind: "set", fields: {} },
+    ];
+    expect(describeUndoTarget({ k: "kb", seqs: [0, 1, 2] }, ops)).toEqual({
+      kind: "keyEditBatch",
+      count: 3,
+    });
+  });
+
+  it("describes a single-op 'kb' batch with the singular count", () => {
+    const ops = [{ seq: 4, address: "phone:default:K_A", kind: "set", fields: {} }];
+    expect(describeUndoTarget({ k: "kb", seqs: [4] }, ops)).toEqual({
+      kind: "keyEditBatch",
+      count: 1,
+    });
+  });
+
+  it("returns null for a 'kb' entry with an evicted op", () => {
+    const ops = [{ seq: 9, address: "phone:default:K_A", kind: "set", fields: {} }];
+    expect(describeUndoTarget({ k: "kb", seqs: [9, 10] }, ops)).toBeNull();
+  });
+
   // spec 065 T057 (FR-040): the move op, the four newly-editable `set` fields
   // (hint/width/pad/layer), and the two gesture-edit kinds all commit through
   // the same choke point as suppress/rename above — these four cases confirm
@@ -721,113 +769,3 @@ describe("describeUndoTarget — pure structural description of the undo stack's
   });
 });
 
-describe("TouchGallery — rename of an overlay-minted key id (spec 104 walk 4 regression)", () => {
-  /**
-   * Case B (import-adapt) shape: the shipped layout lives in the start
-   * VFS and `ir.touchLayout` mirrors it — K_A exists there, on the shift
-   * layer only. An AssignPanel-style `set` op then renames K_A to
-   * U_00E6 THROUGH THE OVERLAY, so the key's live id exists only in the
-   * replayed layout. Renaming that key back must still land: the store's
-   * `commitTouchKeyRename` cannot see the minted id in `ir.touchLayout`
-   * and silently no-ops, so `handleRenameConfirm` falls back to the
-   * single-writer overlay chain. Before the fallback, this rename closed
-   * the dialog having renamed nothing.
-   */
-  function seedOverlayMintedKeyFixture() {
-    const shippedLayoutJson = JSON.stringify({
-      phone: {
-        layer: [
-          { id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }] }] },
-          { id: "shift", row: [{ id: 1, key: [{ id: "K_A", text: "A" }] }] },
-        ],
-      },
-    });
-    const vfs = createVirtualFS([
-      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-      {
-        path: "source/basic_kbdus.keyman-touch-layout",
-        content: shippedLayoutJson,
-        isBinary: false,
-      },
-    ]);
-    const ir = {
-      ...makeTestIR([]),
-      touchLayout: {
-        platforms: [
-          {
-            id: "phone",
-            layers: [
-              {
-                id: "default",
-                rows: [{ keys: [{ nodeId: "q1", id: "K_Q", text: "q" }] }],
-              },
-              {
-                id: "shift",
-                rows: [{ keys: [{ nodeId: "a1", id: "K_A", text: "A" }] }],
-              },
-            ],
-          },
-        ],
-        nodeIds: [],
-      },
-    } as ReturnType<typeof makeTestIR>;
-    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
-    useWorkingCopyStore.getState().recordPhase({
-      phase: "B",
-      answers: [],
-      confirmedInventory: ["a"],
-    });
-    useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
-    useDecisionStore.getState().record({
-      id: "touch-seed-source",
-      value: "import-adapt",
-      provenance: "asked",
-      step: "touch_seed_source",
-    });
-    // The assignment that mints the overlay-only id.
-    useWorkingCopyStore.getState().commitKeyEdit({
-      kind: "set",
-      address: "phone:shift:K_A",
-      fields: { id: "U_00E6", text: "æ" },
-    });
-  }
-
-  it("renaming a key whose live id was minted by an overlay edit actually renames it", async () => {
-    seedOverlayMintedKeyFixture();
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("key-layer-selector-option-shift"));
-    });
-
-    const mintedCell = await screen.findByTestId("key-grid-cell-phone:shift:U_00E6");
-    await act(async () => {
-      fireEvent.click(mintedCell);
-    });
-    await act(async () => {
-      fireEvent.contextMenu(mintedCell);
-    });
-    const renameItem = await screen.findByTestId("key-grid-command-rename-key");
-    await act(async () => {
-      fireEvent.click(renameItem);
-    });
-    const field = await screen.findByTestId("rename-dialog-field");
-    await act(async () => {
-      fireEvent.change(field, { target: { value: "K_A" } });
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("rename-dialog-confirm"));
-    });
-
-    // The rename landed: the key answers to its restored id, the minted
-    // id is gone, and the overlay carries the rename op.
-    expect(await screen.findByTestId("key-grid-cell-phone:shift:K_A")).toBeTruthy();
-    expect(screen.queryByTestId("key-grid-cell-phone:shift:U_00E6")).toBeNull();
-    const ops = useWorkingCopyStore.getState().keyEditOverlay.ops;
-    expect(ops.some((op) => op.kind === "rename" && op.toId === "K_A")).toBe(true);
-  });
-});

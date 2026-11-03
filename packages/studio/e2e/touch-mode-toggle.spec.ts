@@ -36,10 +36,6 @@ import {
   enterTouchKeyMode,
 } from "./helpers/touchKeyWalk";
 
-/** The task's own worked example — assigned through AssignPanel's field. */
-const ASSIGNED_NOTATION = "U+025B";
-const ASSIGNED_KEY_ID = "U_025B";
-
 /** Both shared progress figures, as the author reads them. */
 interface ProgressFigures {
   readonly unplaced: string;
@@ -57,78 +53,46 @@ async function readProgressFigures(page: Page): Promise<ProgressFigures> {
   };
 }
 
-async function switchTo(page: Page, mode: "character" | "key"): Promise<void> {
+async function switchTo(
+  page: Page,
+  mode: "character" | "key" | "code",
+): Promise<void> {
   await page.getByTestId(`touch-mode-tab-${mode}`).click();
   const tab = page.getByTestId(`touch-mode-tab-${mode}`);
   await expect(tab).toHaveAttribute("aria-selected", "true");
-  if (mode === "key") {
-    await expect(page.getByTestId("key-grid")).toBeVisible();
-  } else {
-    await expect(page.getByTestId("key-grid")).toBeHidden();
-  }
+  // Exactly one pane is mounted at a time (view swap, not a fork).
+  await expect(page.getByTestId("touch-builder-pane")).toBeVisible({
+    visible: mode === "key",
+  });
+  await expect(page.getByTestId("touch-code-pane")).toBeVisible({
+    visible: mode === "code",
+  });
 }
 
 /**
- * Assign a character to a key through the grid's own keyboard route — the same
- * sequence SC-004 measures, reused here purely to create real by-key state
- * worth losing.
- *
- * The first cell the roving tabindex lands on is not necessarily assignable
- * (a reseeded layout's leading key is typically a frame key, for which
- * AssignPanel offers no character field at all), so this steps right until the
- * field appears rather than assuming a fixed number of arrows. Bounded, and it
- * fails loudly rather than silently doing nothing if no assignable key is
- * reachable — the walk would otherwise "pass" having committed no state, which
- * is the one way this spec could lie.
+ * Do real by-key work through the TouchBuilderPane: select the first canvas
+ * key and edit its keycap text via the toolbar field (commits a `set {text}`
+ * op on blur). Bounded, and fails loudly if no key is reachable — the walk
+ * would otherwise "pass" having committed no state, which is the one way
+ * this spec could lie.
  */
-async function assignCharacterToAKey(page: Page): Promise<void> {
-  // spec 081 moved Continue into the footer's step-nav group, so it is no
-  // longer DOM-adjacent to the grid — Tab from it now lands in the footer's
-  // own project/dot-row content, not the grid. touch-key-assign.spec.ts
-  // (SC-004) already tabs in from "touch-key-mode-find-toggle" for the same
-  // reason (spec 065 inserted the layer selector / add / remove / find-key
-  // commands between Continue and the grid); mirror that known-adjacent
-  // element here instead of the relocated Continue button.
-  await page.getByTestId("touch-key-mode-find-toggle").focus();
-  await page.keyboard.press("Tab");
-  await expect(page.locator('[role="gridcell"]:focus')).toBeVisible();
-
-  const charField = page.getByLabel("Character or code point");
-  const MAX_STEPS = 12;
-  let found = false;
-  for (let step = 0; step < MAX_STEPS; step++) {
-    // Spec 065 split the two keys (see touch-key-assign.spec.ts's SC-004
-    // walk): F2, pressed from grid focus, jumps straight into the
-    // AssignPanel character field; Enter opens the property panel
-    // instead, and once focus is in the panel F2 reaches nothing.
-    // Probing with Enter (this loop's original shape) therefore never
-    // finds an assignable key (#2053).
-    await page.keyboard.press("F2");
-    if (
-      await charField
-        .waitFor({ state: "visible", timeout: 2_000 })
-        .then(() => true)
-        .catch(() => false)
-    ) {
-      found = true;
-      break;
-    }
-    // Not assignable — return focus to the grid and try the next key.
-    await page.keyboard.press("Escape");
-    await page.keyboard.press("ArrowRight");
-  }
-  expect(found, `no assignable key within ${MAX_STEPS} cells of the grid start`).toBe(true);
-
-  await expect(charField).toBeFocused();
-  await charField.fill(ASSIGNED_NOTATION);
-  await expect(page.getByTestId("assign-panel-confirm")).toBeEnabled();
-  await page.keyboard.press("Enter");
-  // The field resets on a successful commit — a real signal the commit landed.
-  await expect(charField).toHaveValue("");
+async function editKeyTextInBuilder(page: Page): Promise<string> {
+  const canvas = page.getByTestId("touch-builder-canvas");
+  await expect(canvas).toBeVisible();
+  const firstKey = canvas.locator('[data-address]').first();
+  await expect(firstKey).toBeVisible();
+  const address = (await firstKey.getAttribute("data-address")) ?? "";
+  expect(address, "canvas key must carry a data-address").not.toBe("");
+  await firstKey.click();
+  const textField = page.getByTestId("touch-builder-field-text");
+  await expect(textField).toBeVisible();
+  await textField.fill("ɛ");
+  await textField.blur();
+  return address;
 }
 
 test.describe("Touch editor mode toggle — no state is lost (spec 063 SC-011)", () => {
-  test("five switches in mixed order preserve the by-key work, and the shared figures agree in both views at every stop", async ({
+  test("switches across all three tabs preserve the by-key work, and the shared figures agree in every view at every stop", async ({
     page,
   }) => {
     await driveToTouchStep(page);
@@ -144,28 +108,24 @@ test.describe("Touch editor mode toggle — no state is lost (spec 063 SC-011)",
       "the shared figures must read the same in both views BEFORE any edit",
     ).toEqual(characterModeBefore);
 
-    // --- Real by-key work: assign ɛ to a key. ---
-    await assignCharacterToAKey(page);
-    // Matched by the id SUFFIX rather than a full `platform:layer:id` address:
-    // which cell `assignCharacterToAKey` landed on depends on the reseeded
-    // layout's shape, and the point of the assertion is that the assigned key
-    // is still THERE — not where it happens to sit.
-    const assignedCell = page.locator(
-      `[data-testid^="key-grid-cell-"][data-testid$=":${ASSIGNED_KEY_ID}"]`,
-    );
-    await expect(assignedCell).toBeVisible();
+    // --- Real by-key work: edit a key's text in the builder. ---
+    const editedAddress = await editKeyTextInBuilder(page);
+    const editedKey = page.locator(`[data-address="${editedAddress}"]`);
+    await expect(editedKey).toContainText("ɛ");
 
     const afterEdit = await readProgressFigures(page);
 
-    // --- Five switches, deliberately ODD and mixed, ending in the mode the
-    //     walk did not start in. At every stop: the figures still agree, and
-    //     the assigned key is still there when the grid is showing. ---
-    const sequence: Array<"character" | "key"> = [
+    // --- Switches across all three tabs, deliberately mixed and ending in
+    //     the code tab (not where the work was done). At every stop: the
+    //     figures still agree, and the edited key is still there whenever
+    //     the builder is showing. ---
+    const sequence: Array<"character" | "key" | "code"> = [
       "character",
+      "code",
       "key",
+      "code",
       "character",
-      "key",
-      "character",
+      "code",
     ];
     for (const [i, mode] of sequence.entries()) {
       await switchTo(page, mode);
@@ -177,22 +137,21 @@ test.describe("Touch editor mode toggle — no state is lost (spec 063 SC-011)",
       ).toEqual(afterEdit);
 
       if (mode === "key") {
-        // The overlay's work is still projected into the grid — nothing was
-        // cleared as a side effect of the mode change (FR-036a/b). This is the
-        // tidy-up someone adds later, so it is asserted every time the grid is
-        // visible, not once at the end.
+        // The overlay's work is still projected into the builder — nothing
+        // was cleared as a side effect of the mode change (FR-036a/b). This
+        // is the tidy-up someone adds later, so it is asserted every time
+        // the builder is visible, not once at the end.
         await expect(
-          assignedCell,
-          `the assigned key vanished after switch ${i + 1}`,
-        ).toBeVisible();
+          editedKey,
+          `the edited key vanished after switch ${i + 1}`,
+        ).toContainText("ɛ");
       }
     }
 
-    // --- Ending in character mode (an odd number of switches from the key
-    //     view where the work was done): switch back one final time and the
+    // --- Ending in the code tab: switch back to key one final time and the
     //     work is still there. ---
     await switchTo(page, "key");
-    await expect(assignedCell).toBeVisible();
+    await expect(editedKey).toContainText("ɛ");
     expect(await readProgressFigures(page)).toEqual(afterEdit);
   });
 });
