@@ -475,7 +475,7 @@ describe("criteria.json schema conformance", () => {
     expect(banded).toBe(records.length);
   });
 
-  it("section-18 DISCUS rows are present, tagged with a valid principle, and banded correctly", () => {
+  it("section-18 rows carry valid principles and bands", () => {
     const validPrinciples = [
       "discoverability",
       "intuition",
@@ -493,6 +493,7 @@ describe("criteria.json schema conformance", () => {
       if (c.principle !== undefined) {
         expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
       }
+      expect(validBands, `${c.id}.band`).toContain(c.band);
     });
     // The auto-checkable heuristics are layer-c-enforce (at least one, no pinned count).
     expect(
