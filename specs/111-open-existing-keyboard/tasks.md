@@ -17,7 +17,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Add the sample-keyboard list for corpus round-trip tests (≥20 ids incl. `sil_cameroon_qwerty`, `basic_kbdus`, touch-enabled and deadkey-heavy keyboards, CRLF files) in `packages/studio/src/test/openSampleKeyboards.ts`, with each id checked against [docs/keyboard-index.md](../../docs/keyboard-index.md). Add phonebook rows for any id not yet in the index.
+- [x] T001 Add the sample-keyboard list for corpus round-trip tests (≥20 ids incl. `sil_cameroon_qwerty`, `basic_kbdus`, touch-enabled and deadkey-heavy keyboards, CRLF files) in `packages/studio/src/test/openSampleKeyboards.ts`, with each id checked against [docs/keyboard-index.md](../../docs/keyboard-index.md). Add phonebook rows for any id not yet in the index.
 
 ---
 

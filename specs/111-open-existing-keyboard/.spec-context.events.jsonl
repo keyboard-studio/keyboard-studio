@@ -1,0 +1,1 @@
+{"step": "implement", "substep": null, "task": "T001", "kind": "complete", "by": "ai", "at": "2026-11-03T22:00:25.783Z", "did": "Sample keyboard list (20 ids) + 9 phonebook rows", "files": ["packages/studio/src/test/openSampleKeyboards.ts", "docs/keyboard-index.md"]}
