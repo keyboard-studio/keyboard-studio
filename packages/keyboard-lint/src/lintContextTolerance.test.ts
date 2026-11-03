@@ -1,25 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { createVirtualFS, type KeyboardIR, type ToleranceReport } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { lintContextTolerance, lintWithContext } from "./index.js";
 
 function makeIR(): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR();
 }
 
 const LOCATION = { file: "test.kmn", line: 3 };

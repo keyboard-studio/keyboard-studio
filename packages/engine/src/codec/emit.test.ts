@@ -11,6 +11,7 @@ import {
   type IRStore,
   type IRComment,
 } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 function makeIR(): KeyboardIR {
   const stores: IRStore[] = [
@@ -46,24 +47,11 @@ function makeIR(): KeyboardIR {
     rules,
     readonly: false,
   };
-  const ir: KeyboardIR = {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
+  return makeTestIR({
+    header: { version: "10.0", targets: ["any"] },
     stores,
     groups: [group],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-  return ir;
+  });
 }
 
 describe("emit", () => {
