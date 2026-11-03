@@ -10,6 +10,7 @@ import {
   selectStepOwnedFindings,
   selectUnmappedFindings,
 } from "./lintToQuestion.ts";
+import { LDML_CODE_COPY } from "./ldmlMessages.ts";
 
 const finding = (code: string, severity: LintFinding["severity"] = "warning"): LintFinding => ({
   code: code as LintCode,
@@ -44,8 +45,8 @@ for (const c of ["HEADER_UNSUPPORTED", "METADATA_PACKAGE_ONLY", "KEYMAN_GAP", "A
 }
 
 describe("LDML routing table", () => {
-  it("covers all 34 codes", () => {
-    expect(Object.keys(ROUTES)).toHaveLength(34);
+  it("covers exactly the codes in the LDML copy table", () => {
+    expect(Object.keys(ROUTES).sort()).toEqual(Object.keys(LDML_CODE_COPY).sort());
   });
 
   it.each(Object.entries(ROUTES))("%s routes per the contract", (code, owner) => {

@@ -81,6 +81,13 @@ export interface ToleranceReport {
    * here rather than dropped.
    */
   compileDiagnostics?: CompilerDiagnostic[];
+  /**
+   * Present when the producer skipped the analysis without inspecting any
+   * rule — e.g. the keyboard exceeded the caller's rule-count budget (#2406).
+   * Every finding is `not-analysed` and the SC-006 invariant still holds, so
+   * consumers render could-not-check rather than a hang or a clean bill.
+   */
+  skipped?: { ruleCount: number; ruleBudget: number };
 }
 
 /**

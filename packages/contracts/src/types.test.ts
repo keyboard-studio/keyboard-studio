@@ -487,14 +487,18 @@ describe("criteria.json schema conformance", () => {
     const section18 = records.filter((c) =>
       c.section.startsWith("18.")
     );
-    // No census assertion: the catalog grows, so a pinned count breaks on
-    // every legitimate addition. What matters is that each row is valid.
+    // Presence only: the catalog grows, so a literal row count is churn.
+    expect(section18.length).toBeGreaterThan(0);
     section18.forEach((c) => {
       if (c.principle !== undefined) {
         expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
       }
       expect(validBands, `${c.id}.band`).toContain(c.band);
     });
+    // The auto-checkable heuristics are layer-c-enforce (at least one, no pinned count).
+    expect(
+      section18.filter((c) => c.band === "layer-c-enforce").length
+    ).toBeGreaterThan(0);
   });
 
   it("every principle-tagged record uses a valid DiscusPrinciple value", () => {

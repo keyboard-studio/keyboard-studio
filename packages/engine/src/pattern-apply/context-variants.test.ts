@@ -14,6 +14,7 @@ import { simulate } from "../simulator/index.js";
 import { computeContextTolerance } from "../validator/context-tolerance.js";
 import {
   proposeContextVariants,
+  collectDecomposableUnits,
   GENERATED_MARKER_PREFIX,
   BACKSPACE_UNWRAP_RULE_PREFIX,
   BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE,
@@ -566,4 +567,30 @@ describe("proposeContextVariants — backspace unwrap on mnemonic layouts", () =
     const { notes } = await proposeContextVariants(ir, report);
     expect(notes).toBeUndefined();
   }, 30_000);
+});
+
+describe("collectDecomposableUnits (#2406)", () => {
+  // The zero-gap path of proposeContextVariants skips the simulation compile
+  // when this set is empty (the compile only feeds addBackspaceUnwrap's
+  // author-bksp pair filter, which has nothing to filter without
+  // decomposable units). These tests pin the gate condition.
+  it("is empty for a keyboard with no decomposable characters", () => {
+    const kmn = [HEADER, "group(main) using keys", "", "+ 'a' > 'b'", ""].join("\n");
+    const { ir } = parse(kmn, "ascii_only");
+    expect(collectDecomposableUnits(ir).size).toBe(0);
+  });
+
+  it("collects precomposed characters from store items and rule outputs", () => {
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) 'à'",
+      "",
+      "any(base) + 'a' > 'é'",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "decomposable");
+    expect(collectDecomposableUnits(ir)).toEqual(new Set(["à", "é"]));
+  });
 });

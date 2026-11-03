@@ -18,11 +18,12 @@
 //      (install-then-disable-family stays disabled).
 
 import { describe, it, expect } from "vitest";
-import { createVirtualFS, type VirtualFS } from "@keyboard-studio/contracts";
+import { type VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import type { IRRule, IRStore, KeyboardIR } from "@keyboard-studio/contracts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
+import { textVfs } from "../test/vfsFixtures.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -43,7 +44,7 @@ function parseStart(): KeyboardIR {
 }
 
 function makeVfs(): VirtualFS {
-  return createVirtualFS([{ path: "source/test_kb.kmn", content: BASE_KMN, isBinary: false }]);
+  return textVfs({ "source/test_kb.kmn": BASE_KMN });
 }
 
 function kmnOf(vfs: VirtualFS): string {

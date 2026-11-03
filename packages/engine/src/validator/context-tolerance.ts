@@ -337,15 +337,39 @@ export function splitRuleAtPlus(
 }
 
 /**
- * True when `storeName` has at least one `deadkey` item alongside its
- * `char` items (FR-010: "a store mixing characters and deadkeys under one
- * reference"). `buildStoreCharIndex` only ever returns a store's `char`
- * items, so any caller resolving candidates through it already drops a
- * mixed store's deadkey members silently — this makes that shape refuse
- * loudly instead.
+ * Names of stores holding at least one `deadkey` item (FR-010: "a store
+ * mixing characters and deadkeys under one reference" — `buildStoreCharIndex`
+ * only ever returns a store's `char` items, so resolving candidates through
+ * it would silently drop a mixed store's deadkey members; the per-rule check
+ * below refuses loudly instead). Precomputed once per analysis so the
+ * per-rule check stays O(1), not O(stores) per rule (#2406).
  */
-function storeHasDeadkeyItem(ir: KeyboardIR, storeName: string): boolean {
-  return ir.stores.some((s) => s.name === storeName && s.items.some((i) => i.kind === 'deadkey'));
+function deadkeyStoreNames(ir: KeyboardIR): Set<string> {
+  const names = new Set<string>();
+  for (const s of ir.stores) {
+    if (s.items.some((i) => i.kind === 'deadkey')) names.add(s.name);
+  }
+  return names;
+}
+
+/** A single character with an alternate canonical form to test. */
+function isDecomposableChar(c: string): boolean {
+  return [...c].length === 1 && c.normalize('NFD') !== c;
+}
+
+/**
+ * Per-store list of characters with an alternate canonical form —
+ * precomputed once per analysis from the resolved store-char index so the
+ * per-rule "does this rule's context have anything to test" filter does not
+ * re-run NFD normalization over every store member for every rule (#2406:
+ * 58k rules × whole-store normalize() was ~60s on vietnamese_telex_legacy).
+ */
+function buildDecomposableCharIndex(storeChars: Map<string, string[]>): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const [name, chars] of storeChars) {
+    index.set(name, chars.filter(isDecomposableChar));
+  }
+  return index;
 }
 
 /**
@@ -395,6 +419,8 @@ function resolveRuleStatically(
   rule: IRRule,
   storeChars: Map<string, string[]>,
   storeAnalysis: ReturnType<typeof analyzeStores>,
+  decomposableChars: Map<string, string[]>,
+  deadkeyStores: Set<string>,
 ): StaticResolution {
   const base = { ruleId: rule.nodeId, location: locationFor(ir, rule) };
 
@@ -457,7 +483,7 @@ function resolveRuleStatically(
   // `char` items, so resolving candidates from it would silently pretend the
   // store's deadkey members do not exist rather than fail loudly.
   if (beforeEl.kind === 'any' || beforeEl.kind === 'notany') {
-    if (storeHasDeadkeyItem(ir, beforeEl.storeRef)) {
+    if (deadkeyStores.has(beforeEl.storeRef)) {
       return {
         finding: {
           ...base,
@@ -469,7 +495,7 @@ function resolveRuleStatically(
   }
   if (keyPart.length === 1 && keyPart[0]!.kind === 'any') {
     const keyStoreRef = (keyPart[0] as { storeRef: string }).storeRef;
-    if (storeHasDeadkeyItem(ir, keyStoreRef)) {
+    if (deadkeyStores.has(keyStoreRef)) {
       return {
         finding: {
           ...base,
@@ -523,9 +549,13 @@ function resolveRuleStatically(
     return { finding: { ...base, status: 'not-analysed', notAnalysedReason: keyResolution.reason } };
   }
 
-  const decomposable = candidateResolution.chars.filter(
-    (c) => [...c].length === 1 && c.normalize('NFD') !== c,
-  );
+  // The precomputed per-store list for an `any()` context is exactly the
+  // filter below applied to this rule's candidate chars — same predicate,
+  // computed once per store instead of once per rule (#2406).
+  const decomposable =
+    beforeEl.kind === 'any'
+      ? (decomposableChars.get(beforeEl.storeRef) ?? [])
+      : candidateResolution.chars.filter(isDecomposableChar);
   if (decomposable.length === 0) {
     // Nothing in this rule's context has an alternate canonical form to test.
     return { finding: { ...base, status: 'tolerant' } };
@@ -587,6 +617,19 @@ function simulatePending(compiled: CompileResult, pending: PendingSimulation): R
   return { ...pending.base, status: 'tolerant' };
 }
 
+/** Options for {@link computeContextTolerance}. */
+export interface ContextToleranceOptions {
+  /**
+   * Skip the analysis when the keyboard has more than this many rules
+   * (groups + raw fragments). The returned report marks every rule
+   * `not-analysed` with the skip reason and carries the `skipped` marker, so
+   * the SC-006 finding-count invariant still holds and callers render
+   * could-not-check instead of hanging (#2406: the full compile+simulate
+   * loop is minutes on 50k+ rule keyboards). Unset means no budget.
+   */
+  maxRules?: number;
+}
+
 /**
  * Run the both-forms simulator comparison over every rule in `ir` and
  * produce a `ToleranceReport`. Rules the codec could not model
@@ -596,13 +639,41 @@ function simulatePending(compiled: CompileResult, pending: PendingSimulation): R
  * statically (trivial, opaque, or pairing-unsafe) never depends on compile
  * success. Asserts the SC-006 invariant itself before returning.
  */
-export async function computeContextTolerance(ir: KeyboardIR): Promise<ToleranceReport> {
-  const storeChars = buildStoreCharIndex(ir);
-  const storeAnalysis = analyzeStores(ir);
+export async function computeContextTolerance(
+  ir: KeyboardIR,
+  opts: ContextToleranceOptions = {},
+): Promise<ToleranceReport> {
   const totalRuleCount = ir.groups.reduce((n, g) => n + g.rules.length, 0) + ir.raw.length;
 
+  if (opts.maxRules !== undefined && totalRuleCount > opts.maxRules) {
+    const reason =
+      `context-tolerance analysis skipped: ${totalRuleCount.toLocaleString('en-US')} rules ` +
+      `exceed the ${opts.maxRules.toLocaleString('en-US')}-rule budget`;
+    return {
+      findings: ir.groups.flatMap((group) =>
+        group.rules.map((rule) => ({
+          ruleId: rule.nodeId,
+          location: locationFor(ir, rule),
+          status: 'not-analysed' as const,
+          notAnalysedReason: reason,
+        })),
+      ),
+      notAnalysedCount: ir.raw.length,
+      skipped: { ruleCount: totalRuleCount, ruleBudget: opts.maxRules },
+    };
+  }
+
+  const storeChars = buildStoreCharIndex(ir);
+  const storeAnalysis = analyzeStores(ir);
+  // Whole-IR indexes computed once so the per-rule static resolution stays
+  // O(rule), never O(rule × stores) or O(rule × store members) (#2406).
+  const decomposableChars = buildDecomposableCharIndex(storeChars);
+  const deadkeyStores = deadkeyStoreNames(ir);
+
   const resolutions = ir.groups.flatMap((group) =>
-    group.rules.map((rule) => resolveRuleStatically(ir, rule, storeChars, storeAnalysis)),
+    group.rules.map((rule) =>
+      resolveRuleStatically(ir, rule, storeChars, storeAnalysis, decomposableChars, deadkeyStores),
+    ),
   );
   const anyPending = resolutions.some((r) => 'pending' in r);
 
