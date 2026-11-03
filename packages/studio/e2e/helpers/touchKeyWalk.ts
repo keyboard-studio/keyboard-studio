@@ -118,11 +118,11 @@ export async function dismissTouchIntro(page: Page): Promise<void> {
   }
 }
 
-/** Switch to By-key mode and wait for the grid. */
+/** Switch to By-key mode and wait for the builder. */
 export async function enterTouchKeyMode(page: Page): Promise<void> {
   await dismissTouchIntro(page);
   await page.getByTestId("touch-mode-tab-key").click();
-  await expect(page.getByTestId("key-grid")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("touch-builder-pane")).toBeVisible({ timeout: 15_000 });
 }
 
 /**

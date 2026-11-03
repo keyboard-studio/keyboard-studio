@@ -196,8 +196,14 @@ function toNumber(v: string | number | undefined): number | undefined {
 export function resolveWireEncoding(
   wire: string | number | undefined,
   value: number,
-): string | number {
-  return wire !== undefined && toNumber(wire) === value ? wire : String(value);
+): string {
+  // Always emit the canonical string form. A numeric wire hint is
+  // non-canonical (the Keyman format uses strings for sp/width/pad);
+  // normalizing it here keeps the Code tab's lint clean.
+  // The `wire` parameter is retained for API compatibility but no longer
+  // preserves numeric encodings.
+  void wire;
+  return String(value);
 }
 
 /**
