@@ -25,6 +25,7 @@
     "codegen-normalization-regressed": "node scripts/codegen-normalization-regressed.mjs",
     "codegen-exemplars": "node --experimental-strip-types scripts/codegen-exemplars.mjs",
     "check-exemplar-staleness": "node scripts/check-exemplar-staleness.mjs",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "prebuild": "pnpm run fetch-langtags && pnpm run codegen-langtags && pnpm run fetch-glottolog && pnpm run codegen-glottolog && pnpm run compile-recognizer-rules && pnpm run codegen-charnames && pnpm run fetch-sldr && pnpm run codegen-exemplars && pnpm run codegen-normalization-regressed && pnpm run codegen-host-layouts && pnpm run codegen-windows-layouts",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @keyboard-studio/engine build && pnpm --parallel --stream --filter @keyboard-studio/engine --filter @keyboard-studio/studio run dev",
