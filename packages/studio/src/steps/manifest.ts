@@ -55,6 +55,7 @@ import {
   oskStep,
   touchSeedSourceStep,
   touchStep,
+  cssStep,
   helpStep,
   packageStep,
 } from "./registerEditorSteps.ts";
@@ -301,6 +302,12 @@ const stepPool: readonly Step[] = [
     ...touchStep,
     lock: "touch",
   } satisfies Step,
+
+  // --- Custom CSS (optional, after Touch) ---
+  // Monaco editor for the keyboard's custom stylesheet (&KMW_EMBEDCSS).
+  // Optional — if empty, no .css file is written. Includes live preview
+  // of both touch layout and desktop OSK with the CSS applied.
+  cssStep,
 
   // --- Help (Phase F: usage tips and credits) ---
   helpStep,
