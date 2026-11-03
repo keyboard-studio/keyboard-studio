@@ -329,8 +329,8 @@ const stepPool: readonly Step[] = [
  * "package" screen, and arrange the step pool in that order. A derived
  * screen with no pool declaration is a hard error. A supplied list may
  * legitimately repeat a pool step (a split question run yields two
- * screens with the same host) — the pool/screen bijection is asserted
- * only for the default build, below.
+ * screens with the same host) — the pool/screen check (`stepsWithoutScreen`)
+ * covers the default build only.
  */
 export function buildManifest(
   modules: readonly QuestionModule[] = decisionModules,
@@ -348,19 +348,28 @@ export function buildManifest(
 }
 
 /**
- * The steps in derived order: the pool arranged by the derived screen
- * order (never listed by hand). A pool/screen mismatch in the LIVE
- * registry is a hard error at module load.
+ * Pool steps with no derived screen: declared, but never reached in the flow.
+ * Checked by manifest.test.ts (not at module load, where one throw would fail
+ * every suite that imports the manifest and name no step).
  */
-export const manifest: readonly Step[] = ((): readonly Step[] => {
-  const built = buildManifest();
-  if (built.length !== stepPool.length) {
-    throw new Error(
-      `[manifest] ${stepPool.length} steps declared but ${built.length} screens derived from the live registry`,
-    );
-  }
-  return built;
-})();
+export function stepsWithoutScreen(modules: readonly QuestionModule[] = decisionModules): string[] {
+  const screens = new Set([...deriveScreens(modules).map((s) => s.id), "package"]);
+  return stepPool.filter((s) => !screens.has(s.id)).map((s) => s.id);
+}
+
+/**
+ * Known gaps: editor steps declared in the pool whose decision module (as
+ * `oskLayout` is for `osk`) is not written yet, so the flow never reaches them.
+ * manifest.test.ts fails if a listed step becomes wired (remove it here) or an
+ * unlisted step has no screen (wire it, or list it with the reason).
+ */
+export const UNWIRED_POOL_STEPS: readonly string[] = ["css", "html"];
+
+/**
+ * The steps in derived order: the pool arranged by the derived screen
+ * order (never listed by hand).
+ */
+export const manifest: readonly Step[] = buildManifest();
 
 /**
  * The derived screens of the live registry, computed once (spec 091).

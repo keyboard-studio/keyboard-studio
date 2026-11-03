@@ -15,7 +15,7 @@
 // Source of truth: specs/012-step-model-manifest/contracts/manifest-reducer.contract.md
 
 import { describe, it, expect } from "vitest";
-import { manifest } from "./manifest.ts";
+import { manifest, stepsWithoutScreen, UNWIRED_POOL_STEPS } from "./manifest.ts";
 import type { Step } from "./types.ts";
 import { assertUniqueIds } from "./types.test.ts";
 import {
@@ -93,6 +93,15 @@ describe("FR-003 — every manifest step id resolves to a registered component",
 // ---------------------------------------------------------------------------
 // M5 — unique ids (precondition for all other assertions)
 // ---------------------------------------------------------------------------
+
+describe("pool steps are all reachable (a declared step needs a derived screen)", () => {
+  it("only the known-unwired steps have no screen", () => {
+    expect(
+      stepsWithoutScreen(),
+      "pool steps with no derived screen: wire a decision module for each, or list it in UNWIRED_POOL_STEPS",
+    ).toEqual([...UNWIRED_POOL_STEPS]);
+  });
+});
 
 describe("M5 — all step ids are unique", () => {
   it("no duplicate ids in manifest", () => {
