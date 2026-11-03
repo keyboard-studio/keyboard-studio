@@ -4,7 +4,7 @@
 // Scans test files for assertions that are never legitimate. No loopholes or
 // label-based escape hatches — enforcement is strict across the entire suite.
 //
-//   TAUTOLOGY (all packages/*/**/*.test.ts):
+//   TAUTOLOGY (all packages/*/**/*.test.ts and *.test.tsx):
 //     A literal `expect(true).toBe(true)` / `expect(false).toBe(false)` /
 //     `expect(1).toBe(1)` style assertion. These are placeholders that fail
 //     the discipline — they prove nothing and should never ship. All instances
@@ -80,9 +80,9 @@ function main() {
   const fail = (file, line, text) => failures.push({ file, line, text });
 
   // Collect all test files in scope.
-  const allTestFiles = walk(
-    path.join(REPO_ROOT, "packages"),
-    ".test.ts"
+  // `.test.tsx` is most of packages/studio, so it must be scanned too.
+  const allTestFiles = [".test.ts", ".test.tsx"].flatMap((ext) =>
+    walk(path.join(REPO_ROOT, "packages"), ext)
   );
 
   for (const file of allTestFiles) {
