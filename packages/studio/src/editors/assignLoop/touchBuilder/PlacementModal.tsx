@@ -19,8 +19,7 @@ import {
 } from "./placementOps.ts";
 import { useTouchDrag } from "./useTouchDrag.ts";
 
-/** Drag MIME type for tray letters. The pane's key onDrop branches on it. */
-export const TRAY_LETTER_MIME = "application/x-ks-tray-letter";
+
 
 /**
  * Hit-test a tray drag point: the board key (data-address) or panel drop
@@ -55,10 +54,9 @@ export function PlacementBar(props: {
   keycapFont: string;
   selectedLetter: string | null;
   onSelectLetter: (letter: string | null) => void;
-  onDragStartLetter: (e: React.DragEvent, letter: string) => void;
-  /** Live drop target during a touch drag (for key/zone highlighting). */
+  /** Live drop target during a drag (for key/zone highlighting). */
   onTouchDragTarget: (target: TrayDropTarget | null) => void;
-  /** Touch drag end: the letter and the hit-tested drop target, if any. */
+  /** Drag end: the letter and the hit-tested drop target, if any. */
   onTouchDrop: (letter: string, target: TrayDropTarget | null) => void;
 }) {
   const { t } = useLingui();
@@ -67,16 +65,16 @@ export function PlacementBar(props: {
     keycapFont,
     selectedLetter,
     onSelectLetter,
-    onDragStartLetter,
     onTouchDragTarget,
     onTouchDrop,
   } = props;
 
-  // Touch drag: HTML5 DnD never fires on touch, so a touch/pen pointer that
-  // moves vertically off the chip becomes a drag immediately — no longpress.
-  // Horizontal moves stand down so the tray keeps scrolling
+  // Pointer drag for every input type (HTML5 DnD never fires on touch and
+  // proved unreliable on desktop, so mouse goes through here too). A
+  // pointer that moves vertically off the chip becomes a drag immediately —
+  // no longpress. Horizontal moves stand down so the tray keeps scrolling
   // (touch-action: pan-x; the browser aborts us via pointercancel). While
-  // dragging, the drop target under the finger is highlight-reported so the
+  // dragging, the drop target under the pointer is highlight-reported so the
   // landing spot is obvious even though the ghost floats above the finger.
   const drag = useTouchDrag<string>({
     directional: true,
@@ -127,10 +125,8 @@ export function PlacementBar(props: {
               <button
                 key={letter}
                 type="button"
-                draggable
                 aria-pressed={isSelected}
                 {...drag.bindSource(letter)}
-                onDragStart={(e) => onDragStartLetter(e, letter)}
                 onContextMenu={(e) => e.preventDefault()}
                 onClick={() => {
                   if (drag.consumeClick()) return;

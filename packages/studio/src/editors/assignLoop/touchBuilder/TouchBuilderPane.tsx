@@ -50,18 +50,13 @@ import {
   builderTemplateSources,
   type BuilderTemplateSource,
 } from "./builderTemplates.ts";
-import {
-  PlacementModal,
-  TRAY_LETTER_MIME,
-} from "./PlacementModal.tsx";
+import { PlacementModal } from "./PlacementModal.tsx";
 import { useTouchDrag } from "./useTouchDrag.ts";
 import type { PlacementChoice } from "./placementOps.ts";
 import {
   buildPanelDropOps,
   buildSubkeyMoveOps,
   parsePanelDropSpec,
-  serializePanelDropSpec,
-  SUBKEY_MIME,
   type PanelDropSpec,
   type SubkeyDragPayload,
 } from "./placementOps.ts";
@@ -326,12 +321,6 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     onTrayReturnsChange((prev) => prev.filter((c) => c !== letter));
     setPlacement(null);
     onSelectTrayLetter(null);
-  };
-
-  const trayLetterFromDrop = (e: React.DragEvent): string | null => {
-    if (!e.dataTransfer.types.includes(TRAY_LETTER_MIME)) return null;
-    const v = e.dataTransfer.getData(TRAY_LETTER_MIME);
-    return v === "" ? null : v;
   };
 
   // Subkey selection is secondary to the main-key selection — reset it
@@ -722,12 +711,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                   onDrop={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const letter = trayLetterFromDrop(e);
-                    if (letter !== null) {
-                      openPlacement(letter, address);
-                    } else {
-                      handleDropOnKey(address);
-                    }
+                    handleDropOnKey(address);
                   }}
                   onDragEnd={() => {
                     dragSrcRef.current = null;
@@ -1180,9 +1164,9 @@ function SubkeyPanel(props: {
   const entries = subKeyEntriesOf(key);
 
   // Subkey drag + drop: chips reorder (longpress/multitap) or move between
-  // flick directions; tray letters drop straight onto the areas. Touch uses
-  // the shared pointer drag (immediate, any direction — chips take
-  // touch-action: none); desktop uses HTML5 DnD with SUBKEY_MIME.
+  // flick directions; tray letters drop straight onto the areas. All pointer
+  // types use the shared pointer drag (immediate, any direction — chips take
+  // touch-action: none).
   const [subHover, setSubHover] = useState<string | null>(null);
   /** Drop-zone highlight: this drag's hover wins, else the header tray drag's. */
   const zoneHover = subHover ?? panelDropHover ?? null;
@@ -1202,50 +1186,6 @@ function SubkeyPanel(props: {
     },
     onDragEnd: () => setSubHover(null),
   });
-
-  const subkeyDragStart =
-    (payload: SubkeyDragPayload): React.DragEventHandler =>
-    (e) => {
-      e.dataTransfer.setData(SUBKEY_MIME, JSON.stringify(payload));
-      e.dataTransfer.effectAllowed = "move";
-    };
-
-  const zoneSpecFromEvent = (e: React.DragEvent): PanelDropSpec | null => {
-    const raw = (e.target as Element).closest?.("[data-panel-drop]")?.getAttribute("data-panel-drop");
-    return parsePanelDropSpec(raw ?? undefined);
-  };
-
-  const zoneDragOver = (e: React.DragEvent): void => {
-    if (
-      e.dataTransfer.types.includes(TRAY_LETTER_MIME) ||
-      e.dataTransfer.types.includes(SUBKEY_MIME)
-    ) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      const spec = zoneSpecFromEvent(e);
-      if (spec !== null) setSubHover(serializePanelDropSpec(spec));
-    }
-  };
-
-  const zoneDrop = (e: React.DragEvent): void => {
-    e.preventDefault();
-    setSubHover(null);
-    const parsed = zoneSpecFromEvent(e);
-    if (parsed === null) return;
-    if (e.dataTransfer.types.includes(SUBKEY_MIME)) {
-      try {
-        const payload = JSON.parse(e.dataTransfer.getData(SUBKEY_MIME)) as SubkeyDragPayload;
-        applyPanelDrop({ type: "subkey", payload }, parsed);
-        return;
-      } catch {
-        /* fall through to the tray letter */
-      }
-    }
-    if (e.dataTransfer.types.includes(TRAY_LETTER_MIME)) {
-      const letter = e.dataTransfer.getData(TRAY_LETTER_MIME);
-      if (letter !== "") applyPanelDrop({ type: "tray", letter }, parsed);
-    }
-  };
 
   const subkeyDragLabel = (payload: SubkeyDragPayload): string => {
     if (payload.kind === "sk") {
@@ -1301,11 +1241,8 @@ function SubkeyPanel(props: {
         type="button"
         data-testid={`touch-builder-subkey-${entry.kind}-${entry.kind === "flick" ? entry.ref.id : entry.key.id}`}
         data-panel-drop={dropSpec ?? undefined}
-        draggable
         aria-pressed={isSelected}
         {...subDrag.bindSource(dragPayload)}
-        onDragStart={subkeyDragStart(dragPayload)}
-        onDragEnd={() => setSubHover(null)}
         onContextMenu={(e) => e.preventDefault()}
         onClick={() => {
           if (subDrag.consumeClick()) return;
@@ -1372,8 +1309,6 @@ function SubkeyPanel(props: {
         onAdd={() => handleAddSubKey("sk")}
         addLabel={t({ id: "editor.assignLoop.touch.builder.addSubkey", message: "Add" })}
         dropSpec="lp"
-        onZoneDragOver={zoneDragOver}
-        onZoneDrop={zoneDrop}
         zoneHover={zoneHover === "lp"}
       >
         {entries.sk.map((e) =>
@@ -1406,8 +1341,6 @@ function SubkeyPanel(props: {
               <div
                 key={direction}
                 data-panel-drop={spec}
-                onDragOver={zoneDragOver}
-                onDrop={zoneDrop}
                 style={{
                   gridRow: pos.row,
                   gridColumn: pos.col,
@@ -1468,8 +1401,6 @@ function SubkeyPanel(props: {
         onAdd={() => handleAddSubKey("multitap")}
         addLabel={t({ id: "editor.assignLoop.touch.builder.addSubkey", message: "Add" })}
         dropSpec="mt"
-        onZoneDragOver={zoneDragOver}
-        onZoneDrop={zoneDrop}
         zoneHover={zoneHover === "mt"}
       >
         {entries.multitap.map((e, i) =>
@@ -1629,11 +1560,9 @@ function SubkeyGroup(props: {
   addLabel?: string;
   /** Drop-zone spec for the chip row (tray letters land, subkey chips reorder). */
   dropSpec?: string;
-  onZoneDragOver?: (e: React.DragEvent) => void;
-  onZoneDrop?: (e: React.DragEvent) => void;
   zoneHover?: boolean;
 }) {
-  const { title, testId, children, onAdd, addLabel, dropSpec, onZoneDragOver, onZoneDrop, zoneHover } =
+  const { title, testId, children, onAdd, addLabel, dropSpec, zoneHover } =
     props;
   return (
     <div style={{ marginBottom: 8 }} data-testid={testId}>
@@ -1649,8 +1578,6 @@ function SubkeyGroup(props: {
       </div>
       <div
         data-panel-drop={dropSpec}
-        onDragOver={onZoneDragOver}
-        onDrop={onZoneDrop}
         style={{
           display: "flex",
           gap: 4,

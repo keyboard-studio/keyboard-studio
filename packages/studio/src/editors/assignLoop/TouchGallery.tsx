@@ -237,7 +237,6 @@ import { TouchBuilderPane } from "./touchBuilder/TouchBuilderPane.tsx";
 import type { BuilderPaneDragApi } from "./touchBuilder/TouchBuilderPane.tsx";
 import {
   PlacementBar,
-  TRAY_LETTER_MIME,
 } from "./touchBuilder/PlacementModal.tsx";
 import { keycapFontFamily } from "./touchBuilder/touchBuilderModel.ts";
 import {
@@ -2364,11 +2363,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     }
     return out;
   }, [keyGridProgress.unplacedChars, trayReturns]);
-
-  const handleTrayDragStart = (e: React.DragEvent, letter: string): void => {
-    e.dataTransfer.setData(TRAY_LETTER_MIME, letter);
-    e.dataTransfer.effectAllowed = "copy";
-  };
 
   // Platform catalog for the key-mode grid's platform tabs (T077 already
   // renders the tablist; this just supplies the catalog from the effective
@@ -8057,7 +8051,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               keycapFont={headerKeycapFont}
               selectedLetter={trayLetter}
               onSelectLetter={setTrayLetter}
-              onDragStartLetter={handleTrayDragStart}
               onTouchDragTarget={handleTouchDragTarget}
               onTouchDrop={handleTouchDrop}
             />

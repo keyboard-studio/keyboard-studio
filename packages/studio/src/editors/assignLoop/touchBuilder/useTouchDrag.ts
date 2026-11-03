@@ -1,12 +1,14 @@
-// useTouchDrag — shared pointer-based drag for touch/pen (HTML5 DnD never
-// fires on touch). Mouse keeps native HTML5 DnD; this hook ignores
-// non-touch/pen pointers entirely.
+// useTouchDrag — pointer-based drag for touch, pen, AND mouse (HTML5 DnD
+// never fires on touch, and proved unreliable on desktop, so all pointer
+// types go through this one path). Mouse keeps its native behavior for
+// anything not bound via bindSource.
 //
-// Behavior: a touch/pen pointer that moves beyond the slop becomes a drag
+// Behavior: a pointer that moves beyond the slop becomes a drag
 // immediately — no longpress. With `directional`, a horizontal-dominant move
 // stands down so a scroll container keeps the gesture (the chip needs
 // `touch-action: pan-x`; the browser aborts us via pointercancel).
-// Otherwise any move beyond slop drags (chip needs `touch-action: none`).
+// Otherwise any move beyond slop drags (chip needs `touch-action: none`
+// for touch).
 //
 // The caller renders the ghost from `ghost` and hit-tests in `onDragMove` /
 // `onDrop`. A drag ends with pointerup, which a click follows —
@@ -57,8 +59,18 @@ export function useTouchDrag<T>(opts: {
 
   const bindSource = (payload: T) => ({
     onPointerDown: (e: React.PointerEvent): void => {
-      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      // Primary button/contact only — right-click never starts a drag.
+      if (e.button !== 0) return;
       if (gestureRef.current !== null) return; // one gesture at a time
+      // Mouse has no implicit pointer capture (touch does): capture so
+      // pointermove keeps firing on the chip after the cursor leaves it.
+      if (e.pointerType === "mouse") {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* capture unsupported — the drag still works while over the chip */
+        }
+      }
       gestureRef.current = {
         payload,
         pointerId: e.pointerId,

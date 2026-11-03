@@ -179,8 +179,7 @@ export function touchGestureIntent(
 // shape as the modal: op sequences the pane commits as one undo batch.
 // ---------------------------------------------------------------------------
 
-/** Drag MIME type for subkey chips (reorder / flick moves). */
-export const SUBKEY_MIME = "application/x-ks-subkey";
+
 
 /** A drop zone inside the subkey panel. */
 export type PanelDropSpec =
