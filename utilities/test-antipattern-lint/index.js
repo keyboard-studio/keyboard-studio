@@ -17,6 +17,10 @@
 //     pinned as a literal array — this smells like a snapshot from a run
 //     that should have been replaced with a real structural assertion.
 //
+//   CATALOG-COUNT (all packages/*/**/*.test.ts):
+//     `expect(ALL_X).toHaveLength(N)` / `expect(sectionNN.length).toBe(N)` -- a
+//     literal size pinned on a growing catalog (see CATALOG_COUNT_RE).
+//
 // Run: `pnpm run test-antipattern-lint`  (== `node utilities/test-antipattern-lint/index.js`)
 // Wired into `pnpm lint` after all other checks. Must stay GREEN.
 //
@@ -73,6 +77,13 @@ const TAUTOLOGY_RE =
 const SURVEY_SNAPSHOT_RE =
   /\.map\s*\(\s*\(?\s*\w+\s*\)?\s*=>\s*\w+\.id\s*\)\)\s*\.toEqual\(\s*\[\s*(['"])/g;
 
+// CATALOG-COUNT: a literal size pinned on a growing catalog -- an `ALL_*`
+// constant or a `section<N>` filter result. The catalog grows, so the number
+// breaks on every legitimate addition and proves nothing. Assert structure
+// (unique ids, non-empty, every entry valid) instead.
+const CATALOG_COUNT_RE =
+  /expect\(\s*(?:ALL_[A-Z0-9_]+|section\d+)\s*\)\.toHaveLength\(\s*\d+\s*\)|expect\(\s*(?:ALL_[A-Z0-9_]+|section\d+)\.length\s*\)\.toBe\(\s*\d+\s*\)/g;
+
 // ---------------------------------------------------------------------------
 // Main lint
 // ---------------------------------------------------------------------------
@@ -106,6 +117,12 @@ function main() {
     for (const match of content.matchAll(TAUTOLOGY_RE)) {
       const lineNum = content.substring(0, match.index).split("\n").length;
       fail(frel, lineNum, `tautology: ${match[0]}`);
+    }
+
+    // ---- Check 3: CATALOG-COUNT ----
+    for (const match of content.matchAll(CATALOG_COUNT_RE)) {
+      const lineNum = content.substring(0, match.index).split("\n").length;
+      fail(frel, lineNum, `catalog-count: literal size on a growing catalog: ${match[0]}`);
     }
 
     // ---- Check 2: SURVEY ORDER-SNAPSHOT ----
