@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "Caps Lock and `&CasedKeys`",
+  "branch": "km/casedkeys-criterion",
+  "currentStep": "plan",
+  "status": "planned",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-03T22:13:37.447Z"
+    }
+  ]
+}
