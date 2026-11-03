@@ -2506,6 +2506,8 @@
   "editor.assignLoop.osk.description": "Customize the visual keyboard: click a key to change its label. Labels are free text and may differ from the key's output for clarity.",
   "editor.assignLoop.osk.layersLabel": "Keyboard layers",
   "editor.assignLoop.osk.keyAriaLabel": "Key {vkey}",
+  "editor.assignLoop.osk.keyAriaLabelLabeled": "Key {vkey}, label {label}",
+  "editor.assignLoop.osk.keyAriaLabelBlank": "Key {vkey}, blank",
   "editor.assignLoop.osk.selectedKeyTitle": "Key {vkey}",
   "editor.assignLoop.osk.outputLabel": "Output: {chars}",
   "editor.assignLoop.osk.displayLabel": "Display label",

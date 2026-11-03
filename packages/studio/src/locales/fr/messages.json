@@ -2506,6 +2506,8 @@
   "editor.assignLoop.osk.description": "Personnalisez le clavier visuel : cliquez sur une touche pour changer son étiquette. Les étiquettes sont en texte libre et peuvent différer de la sortie de la touche pour plus de clarté.",
   "editor.assignLoop.osk.layersLabel": "Couches du clavier",
   "editor.assignLoop.osk.keyAriaLabel": "Touche {vkey}",
+  "editor.assignLoop.osk.keyAriaLabelLabeled": "Touche {vkey}, étiquette {label}",
+  "editor.assignLoop.osk.keyAriaLabelBlank": "Touche {vkey}, vide",
   "editor.assignLoop.osk.selectedKeyTitle": "Touche {vkey}",
   "editor.assignLoop.osk.outputLabel": "Sortie : {chars}",
   "editor.assignLoop.osk.displayLabel": "Étiquette affichée",

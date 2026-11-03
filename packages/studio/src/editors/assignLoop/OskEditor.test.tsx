@@ -4,8 +4,8 @@
 // blank-key validation (empty label + output = error, blocked), undo,
 // and the display-underlying / 102nd-key toggles.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { render } from "../../test/renderWithI18n.tsx";
 import { OskEditor } from "./OskEditor.tsx";
@@ -65,6 +65,10 @@ describe("OskEditor", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders the OSK with layer switcher", () => {
     renderEditor();
     expect(screen.getByText("On-Screen Keyboard")).toBeTruthy();
@@ -74,7 +78,7 @@ describe("OskEditor", () => {
 
   it("selects a key and shows the edit panel", () => {
     renderEditor();
-    const keyA = screen.getByRole("button", { name: /Key K_A/ });
+    const keyA = screen.getAllByRole("button", { name: /^Key K_A/ })[0]!;
     fireEvent.click(keyA);
     expect(screen.getByText("Key K_A")).toBeTruthy();
     expect((screen.getByLabelText("Display label") as HTMLInputElement).value).toBe("a");
@@ -82,7 +86,7 @@ describe("OskEditor", () => {
 
   it("applies a label change", () => {
     renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /Key K_A/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Key K_A/ })[0]!);
     const input = screen.getByLabelText("Display label");
     fireEvent.change(input, { target: { value: "α" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply label" }));
@@ -91,7 +95,7 @@ describe("OskEditor", () => {
 
   it("blocks blanking a key with output", () => {
     renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /Key K_A/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Key K_A/ })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Blank key" }));
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Key K_A, label a/ })).toBeTruthy();
@@ -99,7 +103,7 @@ describe("OskEditor", () => {
 
   it("allows blanking a key with no output", () => {
     renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /Key K_C/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Key K_C/ })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Blank key" }));
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: /Key K_C, blank/ })).toBeTruthy();
@@ -107,7 +111,7 @@ describe("OskEditor", () => {
 
   it("blocks empty label via the text field when key has output", () => {
     renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /Key K_A/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Key K_A/ })[0]!);
     const input = screen.getByLabelText("Display label");
     fireEvent.change(input, { target: { value: "" } });
     expect(screen.getByRole("alert")).toBeTruthy();
@@ -118,7 +122,7 @@ describe("OskEditor", () => {
 
   it("undoes a label change", () => {
     renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: /Key K_A/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Key K_A/ })[0]!);
     fireEvent.change(screen.getByLabelText("Display label"), {
       target: { value: "α" },
     });
@@ -130,8 +134,12 @@ describe("OskEditor", () => {
 
   it("toggles display-underlying and 102nd key", () => {
     renderEditor();
-    const underlying = screen.getByLabelText("Display underlying characters") as HTMLInputElement;
-    const key102 = screen.getByLabelText("Include 102nd key (ISO)") as HTMLInputElement;
+    const underlying = screen.getByRole("checkbox", {
+      name: "Display underlying characters",
+    }) as HTMLInputElement;
+    const key102 = screen.getByRole("checkbox", {
+      name: "Include 102nd key (ISO)",
+    }) as HTMLInputElement;
     expect(underlying.checked).toBe(false);
     expect(key102.checked).toBe(false);
     fireEvent.click(underlying);
@@ -142,7 +150,7 @@ describe("OskEditor", () => {
 
   it("calls onComplete on Continue", () => {
     const { onComplete } = renderEditor();
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByTestId("osk-continue"));
     expect(onComplete).toHaveBeenCalled();
   });
 
