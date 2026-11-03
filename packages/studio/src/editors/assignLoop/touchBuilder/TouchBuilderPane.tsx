@@ -14,7 +14,7 @@
 // kinds. Key-level ops only (Q1): no row/layer structural UI, no
 // per-platform font editing.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useIsNarrow } from "../../../hooks/useViewport.ts";
 import {
@@ -38,6 +38,7 @@ import {
   buildTemplateApplyOps,
   computeBuilderScale,
   defaultBuilderPresentationId,
+  keycapFontFamily,
   mintBuilderKeyId,
   parseBuilderTemplate,
   resolveBuilderKey,
@@ -50,7 +51,6 @@ import {
   type BuilderTemplateSource,
 } from "./builderTemplates.ts";
 import {
-  PlacementBar,
   PlacementModal,
   TRAY_LETTER_MIME,
 } from "./PlacementModal.tsx";
@@ -76,10 +76,12 @@ export interface TouchBuilderPaneProps {
   readonly fontFaceUrl?: string | undefined;
   readonly fontFaceFamily?: string | undefined;
   /**
-   * Unplaced inventory characters (TouchGallery's `keyGridProgress.unplacedChars`)
-   * — the placement bar's tray, plus anything demoted back to it.
+   * Placement-tray state, owned by TouchGallery (the bar lives in the locked
+   * header): the tap-to-place selection and letters demoted back to the tray.
    */
-  readonly unplacedChars?: readonly string[];
+  readonly trayLetter: string | null;
+  readonly onSelectTrayLetter: (letter: string | null) => void;
+  readonly onTrayReturnsChange: (updater: (prev: string[]) => string[]) => void;
 }
 
 interface SubKeySelection {
@@ -136,24 +138,6 @@ function spColor(sp: number | undefined): { bg: string; fg: string; border: stri
   return SP_COLORS[sp ?? 0] ?? SP_COLORS[0]!;
 }
 
-/**
- * Keycap font stack: the touch layout's per-platform configured `font`
- * (Noto / Charis SIL / Andika — TIKE's Keyboard Font dialog) first, then the
- * keyboard's loaded font, then the system UI stack.
- */
-function keycapFontFamily(
-  platformFont: string | undefined,
-  loadedFamily: string | undefined,
-): string {
-  const families: string[] = [];
-  if (platformFont !== undefined && platformFont !== "") families.push(`"${platformFont}"`);
-  if (loadedFamily !== undefined && loadedFamily !== "" && loadedFamily !== platformFont) {
-    families.push(`"${loadedFamily}"`);
-  }
-  families.push("system-ui", "-apple-system", "'Segoe UI'", "sans-serif");
-  return families.join(", ");
-}
-
 export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   const { t } = useLingui();
   const {
@@ -167,7 +151,9 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     commitOp,
     fontFaceUrl,
     fontFaceFamily,
-    unplacedChars,
+    trayLetter,
+    onSelectTrayLetter,
+    onTrayReturnsChange,
   } = props;
 
   // Load the keyboard's font into the document so keycaps render in the real
@@ -215,10 +201,8 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   const [subSel, setSubSel] = useState<SubKeySelection | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [fieldEpoch, setFieldEpoch] = useState(0);
-  // Placement bar state: letters demoted back to the tray, the tap-to-place
-  // selection (touch fallback for drag/drop), and the open modal.
-  const [trayReturns, setTrayReturns] = useState<string[]>([]);
-  const [trayLetter, setTrayLetter] = useState<string | null>(null);
+  // Placement modal state. The tray itself (bar + tap selection + demoted
+  // letters) lives in TouchGallery's locked header — see props.
   const [placement, setPlacement] = useState<{
     letter: string;
     address: string;
@@ -232,20 +216,6 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     xscale: number;
   } | null>(null);
   const dragSrcRef = useRef<string | null>(null);
-
-  // Placement tray: unplaced inventory chars + anything demoted back to it,
-  // deduped, in order.
-  const trayLetters = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const c of [...(unplacedChars ?? []), ...trayReturns]) {
-      if (!seen.has(c)) {
-        seen.add(c);
-        out.push(c);
-      }
-    }
-    return out;
-  }, [unplacedChars, trayReturns]);
 
   const openPlacement = (letter: string, address: string): void => {
     if (layout === null) return;
@@ -264,18 +234,13 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     }
     if (plan.displacedBackToTray !== null) {
       const back = plan.displacedBackToTray;
-      setTrayReturns((prev) => (prev.includes(back) ? prev : [...prev, back]));
+      onTrayReturnsChange((prev) => (prev.includes(back) ? prev : [...prev, back]));
     }
     // The placed letter leaves the tray: coverage recomputes unplacedChars,
     // and a returned-then-placed letter is dropped from trayReturns here.
-    setTrayReturns((prev) => prev.filter((c) => c !== letter));
+    onTrayReturnsChange((prev) => prev.filter((c) => c !== letter));
     setPlacement(null);
-    setTrayLetter(null);
-  };
-
-  const handleTrayDragStart = (e: React.DragEvent, letter: string): void => {
-    e.dataTransfer.setData(TRAY_LETTER_MIME, letter);
-    e.dataTransfer.effectAllowed = "copy";
+    onSelectTrayLetter(null);
   };
 
   const trayLetterFromDrop = (e: React.DragEvent): string | null => {
@@ -566,34 +531,6 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           })}
         </button>
       </div>
-
-      {/* Info bubble: what the builder is for. */}
-      <div
-        role="note"
-        style={{
-          background: "var(--app-accent-bg)",
-          border: "1px solid var(--app-accent)",
-          borderRadius: 8,
-          padding: "10px 12px",
-          fontSize: 13,
-          color: "var(--app-accent-text)",
-        }}
-      >
-        {t({
-          id: "editor.assignLoop.touch.builder.infoBubble",
-          message:
-            "Edit keys directly on the schematic layout below — add, remove, or change what a key produces. Your desktop layout is locked — these apply to phone and tablet only.",
-        })}
-      </div>
-
-      {/* Placement bar: unplaced letters, drag (or tap) onto a key. */}
-      <PlacementBar
-        letters={trayLetters}
-        keycapFont={keycapFont}
-        selectedLetter={trayLetter}
-        onSelectLetter={setTrayLetter}
-        onDragStartLetter={handleTrayDragStart}
-      />
 
       {/* Layer switcher — switching only (Q1: no structural layer ops). */}
       <div

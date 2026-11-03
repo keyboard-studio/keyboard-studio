@@ -48,6 +48,9 @@ function Harness() {
   const [platform, setPlatform] = useState<string | null>("phone");
   const [layer, setLayer] = useState("default");
   const [selected, setSelected] = useState<string | null>(null);
+  // Tray state mirrors TouchGallery (the bar lives in its locked header).
+  const [trayLetter, setTrayLetter] = useState<string | null>(null);
+  const [, setTrayReturns] = useState<string[]>([]);
   return (
     <TouchBuilderPane
       layout={layout}
@@ -57,6 +60,9 @@ function Harness() {
       onSelectLayer={setLayer}
       selectedKeyAddress={selected}
       onSelectKey={setSelected}
+      trayLetter={trayLetter}
+      onSelectTrayLetter={setTrayLetter}
+      onTrayReturnsChange={setTrayReturns}
       commitOp={(op) => {
         recorded.push(op);
         setLayout((prev) => replayKeyEditOverlay(prev, { ops: [op] }).layout);

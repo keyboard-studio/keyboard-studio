@@ -496,3 +496,23 @@ export function editableFieldsOf(key: TouchKeyIR): {
       : {}),
   };
 }
+
+/**
+ * Keycap font stack: the touch layout's per-platform configured `font`
+ * (Noto / Charis SIL / Andika — TIKE's Keyboard Font dialog) first, then the
+ * keyboard's loaded font, then the system UI stack. Shared by the builder
+ * pane and the placement bar in the gallery header so tray chips match the
+ * keycaps.
+ */
+export function keycapFontFamily(
+  platformFont: string | undefined,
+  loadedFamily: string | undefined,
+): string {
+  const families: string[] = [];
+  if (platformFont !== undefined && platformFont !== "") families.push(`"${platformFont}"`);
+  if (loadedFamily !== undefined && loadedFamily !== "" && loadedFamily !== platformFont) {
+    families.push(`"${loadedFamily}"`);
+  }
+  families.push("system-ui", "-apple-system", "'Segoe UI'", "sans-serif");
+  return families.join(", ");
+}

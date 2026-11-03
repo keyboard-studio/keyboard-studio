@@ -235,6 +235,11 @@ const TouchCodePane = lazy(() =>
 // carries no Monaco weight, unlike the code tab above.
 import { TouchBuilderPane } from "./touchBuilder/TouchBuilderPane.tsx";
 import {
+  PlacementBar,
+  TRAY_LETTER_MIME,
+} from "./touchBuilder/PlacementModal.tsx";
+import { keycapFontFamily } from "./touchBuilder/touchBuilderModel.ts";
+import {
   useKeyCommands,
   buildAddKeyAfterOutcome,
   type AddKeyAfterOutcome,
@@ -1685,6 +1690,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Narrow viewports: the KB editor goes edge-to-edge (no left-right page
   // margins) — 2026-11-02.
   const isNarrow = useIsNarrow();
+  // Key-mode header description lives behind a collapsed ⓘ bubble to save
+  // vertical space — 2026-11-02.
+  const [keyModeInfoOpen, setKeyModeInfoOpen] = useState(false);
+  // Placement-tray state: the bar lives in the locked header (stays visible
+  // while the board scrolls), the pane consumes the selection/demotions.
+  const [trayLetter, setTrayLetter] = useState<string | null>(null);
+  const [trayReturns, setTrayReturns] = useState<string[]>([]);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -2297,6 +2309,26 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     }
     return { unplacedChars: uncovered, keysWithNoOutput };
   }, [effectiveKeyModeLayout, keyModeRuleIndex, inventory, keyModeCoverageOptions]);
+
+  // Placement tray for the header bar: unplaced inventory chars + anything
+  // demoted back to it, deduped, in order. Lives in the locked header so it
+  // stays visible while the board scrolls beneath it.
+  const trayLetters = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of [...keyGridProgress.unplacedChars, ...trayReturns]) {
+      if (!seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+      }
+    }
+    return out;
+  }, [keyGridProgress.unplacedChars, trayReturns]);
+
+  const handleTrayDragStart = (e: React.DragEvent, letter: string): void => {
+    e.dataTransfer.setData(TRAY_LETTER_MIME, letter);
+    e.dataTransfer.effectAllowed = "copy";
+  };
 
   // Platform catalog for the key-mode grid's platform tabs (T077 already
   // renders the tablist; this just supplies the catalog from the effective
@@ -4297,6 +4329,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     startKeyboard,
     scaffoldSpec,
     vfsTransform,
+  );
+
+  // Tray chips match the keycaps: per-platform configured font, then the
+  // loaded keyboard font, then the system stack. Declared here (after the
+  // artifact stage) for the header's placement bar.
+  const headerKeycapFont = keycapFontFamily(
+    effectiveKeyModeLayout?.platforms.find((p) => p.id === activeKeyPlatformId)?.font,
+    stage.kind === "ready" ? stage.fontFaceFamily : undefined,
   );
 
   // ---------------------------------------------------------------------------
@@ -7480,7 +7520,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         commitOp={commitKeyEditOp}
         fontFaceUrl={stage.kind === "ready" ? stage.fontFaceUrl : undefined}
         fontFaceFamily={stage.kind === "ready" ? stage.fontFaceFamily : undefined}
-        unplacedChars={keyGridProgress.unplacedChars}
+        trayLetter={trayLetter}
+        onSelectTrayLetter={setTrayLetter}
+        onTrayReturnsChange={setTrayReturns}
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
@@ -7916,21 +7958,64 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           </span>
         </>
       ) : (
-        <span
-          style={{
-            fontSize: 13,
-            color: TEXT_DIM,
-            fontFamily: FONT,
-            flex: "1 1 320px",
-            minWidth: 0,
-          }}
-        >
-          <Trans id="editor.assignLoop.touch.keyMode.headerDescription">
-            Edit keys directly on the schematic layout below — add, remove, or
-            change what a key produces. Your desktop layout is locked — these
-            apply to phone and tablet only.
-          </Trans>
-        </span>
+        <>
+          <button
+            type="button"
+            aria-expanded={keyModeInfoOpen}
+            aria-label={t({
+              id: "editor.assignLoop.touch.keyMode.infoButtonLabel",
+              message: "About the key editor",
+            })}
+            data-testid="touch-key-mode-info"
+            onClick={() => setKeyModeInfoOpen((v) => !v)}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              border: `1px solid ${BORDER}`,
+              background: "transparent",
+              color: TEXT_DIM,
+              fontSize: 13,
+              fontStyle: "italic",
+              fontFamily: "Georgia, serif",
+              lineHeight: 1,
+              cursor: "pointer",
+              flexShrink: 0,
+              padding: 0,
+            }}
+          >
+            i
+          </button>
+          {keyModeInfoOpen && (
+            <span
+              style={{
+                fontSize: 13,
+                color: TEXT_DIM,
+                fontFamily: FONT,
+                flex: "1 1 100%",
+                minWidth: 0,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.keyMode.headerDescription">
+                Edit keys directly on the schematic layout below — add, remove, or
+                change what a key produces. Your desktop layout is locked — these
+                apply to phone and tablet only.
+              </Trans>
+            </span>
+          )}
+          {/* Placement bar: the tray lives in the locked header — in the
+              quoted text's old slot — so it stays visible while the board
+              scrolls beneath it. */}
+          <div style={{ flex: "1 1 100%", minWidth: 0 }}>
+            <PlacementBar
+              letters={trayLetters}
+              keycapFont={headerKeycapFont}
+              selectedLetter={trayLetter}
+              onSelectLetter={setTrayLetter}
+              onDragStartLetter={handleTrayDragStart}
+            />
+          </div>
+        </>
       )}
     </>
   );
