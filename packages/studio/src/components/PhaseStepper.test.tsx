@@ -58,6 +58,7 @@ describe("PhaseStepper", () => {
     ["touch", "e"],
     ["css", "e"],
     ["help", "f"],
+    ["html", "f"],
   ])("activates phase pill %s -> %s", (stepId, letter) => {
     render(<PhaseStepper activeStepId={stepId} />);
     const active = screen.getByTestId(`phase-pill-${letter}`);

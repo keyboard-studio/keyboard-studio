@@ -60,13 +60,14 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   touch: ["osk-layout", "touch-seed-source"],
   css: ["touch-layout"],
   help: ["physical-layout", "touch-layout", "custom-css"],
+  html: ["help-docs"],
 };
 
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the sixteen gallery decisions", () => {
-    expect(SETTLES.size).toBe(16);
+  it("the derived settles set is exactly the seventeen gallery decisions", () => {
+    expect(SETTLES.size).toBe(17);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "carved-layout",
@@ -83,6 +84,7 @@ describe("gallery module coverage (FR-002)", () => {
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "welcome-htm",
       "windows-layout",
     ]);
   });

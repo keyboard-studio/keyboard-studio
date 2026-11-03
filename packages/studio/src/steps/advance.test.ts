@@ -176,8 +176,12 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("css")).toBe("help");
   });
 
-  it("help → done (package is reserved)", () => {
-    expect(nextMainLineStepAfter("help")).toBe("done");
+  it("help → html", () => {
+    expect(nextMainLineStepAfter("help")).toBe("html");
+  });
+
+  it("html → package (package is reserved)", () => {
+    expect(nextMainLineStepAfter("html")).toBe("package");
   });
 });
 
@@ -194,7 +198,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     expect(sequence).toEqual([
       "identity", "layout", "choose_base", "track", "attribution", "project_name", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
@@ -204,7 +208,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
       "identity", "layout", "choose_base", "track", "attribution", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     expect(navigateAtEnd).toBe("output");
@@ -457,18 +461,26 @@ describe("advance: spine hops", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — help → done + navigate:"output"
+// advance — help → html; html → done + navigate:"output"
 // ---------------------------------------------------------------------------
 
-describe("advance: help", () => {
-  it("help → done terminal", () => {
+describe("advance: help (gate open)", () => {
+  it("help → html when the coverage gate is open", () => {
     const { next } = advance("help", undefined, copyCtx);
-    expect(next).toBe("done");
+    expect(next).toBe("html");
   });
 
-  it("help carries navigate:'output'", () => {
+  it("help does not navigate to output directly", () => {
     const { navigate } = advance("help", undefined, copyCtx);
-    expect(navigate).toBe("output");
+    expect(navigate).toBeUndefined();
+  });
+});
+
+describe("advance: html", () => {
+  it("html → done with navigate:'output'", () => {
+    const outcome = advance("html", undefined, copyCtx);
+    expect(outcome.next).toBe("done");
+    expect(outcome.navigate).toBe("output");
   });
 });
 
@@ -484,11 +496,11 @@ describe("advance: help — hard gate (allCharactersImplemented)", () => {
     expect(outcome.navigate).toBeUndefined();
   });
 
-  it("advances to done + navigate:'output' once allCharactersImplemented flips true", () => {
+  it("advances to html once allCharactersImplemented flips true", () => {
     const readyCtx = { ...copyCtx, allCharactersImplemented: true };
     const outcome = advance("help", undefined, readyCtx);
-    expect(outcome.next).toBe("done");
-    expect(outcome.navigate).toBe("output");
+    expect(outcome.next).toBe("html");
+    expect(outcome.navigate).toBeUndefined();
   });
 });
 

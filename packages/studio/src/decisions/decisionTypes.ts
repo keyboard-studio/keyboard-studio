@@ -157,7 +157,8 @@ export type DecisionId =
   | "touch-seed-source"
   | "touch-layout"
   | "custom-css"
-  | "help-docs";
+  | "help-docs"
+  | "welcome-htm";
 
 /**
  * Where a decision's value came from.
@@ -413,4 +414,5 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "touch-layout": [],
   "custom-css": [],
   "help-docs": [],
+  "welcome-htm": [],
 };

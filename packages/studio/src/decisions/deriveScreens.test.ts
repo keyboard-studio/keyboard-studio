@@ -306,6 +306,7 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "touch",
       "css",
       "help",
+      "html",
     ]);
   });
 

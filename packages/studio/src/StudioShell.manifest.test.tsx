@@ -94,6 +94,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "touch",
       "css",
       "help",
+      "html",
       "package",
     ]);
   });

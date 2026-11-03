@@ -244,6 +244,19 @@
     "decisionMutations": [
       "record"
     ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "html",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "record",
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": [
       "output"
     ]

@@ -92,6 +92,7 @@ import { startShipsUsableTouch, touchSeedDrivers } from "./stepDrivers/touchSeed
 import { oskDrivers } from "./stepDrivers/osk.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
 import { customCssDrivers } from "./stepDrivers/customCss.ts";
+import { welcomeHtmDrivers } from "./stepDrivers/welcomeHtm.ts";
 
 export interface AuthorRunOptions {
   /** Eligibility slice for sweeps. Default: no slice filter (US1). */
@@ -124,6 +125,7 @@ const DRIVERS: StepDrivers = {
   ...touchSeedDrivers,
   ...customCssDrivers,
   ...capsDrivers,
+  ...welcomeHtmDrivers,
 };
 
 const TERMINALS = new Set(["done", "unsupported"]);

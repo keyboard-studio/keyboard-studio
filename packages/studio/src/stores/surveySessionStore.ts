@@ -125,6 +125,7 @@ export type ActiveStepId =
   | "touch"
   | "css"
   | "help"
+  | "html"
   | "done"
   | "unsupported";
 
@@ -166,7 +167,7 @@ export type ActiveStepId =
 // ---------------------------------------------------------------------------
 
 const FORWARD_ONLY_GATE_NEXT: Partial<Record<ActiveStepId, ActiveStepId>> = {
-  help: "done",
+  help: "html",
 };
 
 /**

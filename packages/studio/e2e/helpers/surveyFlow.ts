@@ -1101,20 +1101,41 @@ export async function driveHelpPhase(
   await moreDetailNo.check();
   await surveyAdvance(page).click();
 
-  // Advance through remaining optional questions until we reach #output.
-  // Assert Next is enabled before each click: if a future question in this
-  // tail ever becomes required/gated (as il_author_name and pf_more_detail_gate
-  // did above), a disabled Next would make .click() hang on actionability until
-  // the test timeout — the same stale-helper hang this walk was fixed for. The
-  // assertion fails fast instead, naming the question that stalled the walk.
-  for (let guard = 0; guard < 15; guard++) {
-    await expect(surveyAdvance(page)).not.toBeDisabled({ timeout: 15_000 });
-    await surveyAdvance(page).click();
+  await advanceThroughTailToOutput(page);
+}
+
+/** Advance through optional Phase F tail questions, then css/html editor steps, until #output. */
+export async function advanceThroughTailToOutput(page: Page): Promise<void> {
+  for (let guard = 0; guard < 20; guard++) {
     if (/#output$/.test(page.url())) {
       return;
     }
+    const next = surveyAdvance(page);
+    if (await next.isVisible().catch(() => false)) {
+      await expect(next).not.toBeDisabled({ timeout: 15_000 });
+      await next.click();
+      continue;
+    }
+    const editorContinue = page.getByRole("button", { name: "Continue" });
+    if (await editorContinue.isVisible().catch(() => false)) {
+      await editorContinue.click();
+      continue;
+    }
+    throw new Error(
+      `advanceThroughTailToOutput: stuck before #output (url: ${page.url()}) — ` +
+        "no survey-advance or editor Continue visible",
+    );
   }
-  throw new Error("driveHelpPhase: did not reach #output within the expected question count");
+  throw new Error("advanceThroughTailToOutput: did not reach #output within the step budget");
+}
+
+/** Optional custom CSS step (after touch): skip and continue with empty CSS. */
+export async function driveCssEditorStep(page: Page): Promise<void> {
+  const skip = page.getByRole("button", { name: "No custom CSS (skip)" });
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click();
+  }
+  await page.getByRole("button", { name: "Continue" }).click({ timeout: 30_000 });
 }
 
 /**

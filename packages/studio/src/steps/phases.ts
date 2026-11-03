@@ -63,6 +63,7 @@ export type StepId =
   | "touch"
   | "css"
   | "help"
+  | "html"
   | "package";
 
 // ---------------------------------------------------------------------------
@@ -127,7 +128,7 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "F",
     label: msg({ id: "phaseStepper.phase.f", message: "Finalize" }),
-    stepIds: ["help"],
+    stepIds: ["help", "html"],
   },
 ] as const;
 
