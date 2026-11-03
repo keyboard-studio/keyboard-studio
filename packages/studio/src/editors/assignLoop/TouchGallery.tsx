@@ -4382,7 +4382,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           }),
         });
     }
-  }, [undoTargetDescription, i18n]);
+  }, [undoTargetDescription, t]);
 
   // T013/T014 — `handleSwitchTouchEditorMode` (the ONE mode-switch call site,
   // T074) is declared further below, after `currentChar`/`setCurrentChar`
