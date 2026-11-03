@@ -315,7 +315,13 @@ export async function proposeContextVariants(
   };
 
   if (gapRuleIds.size === 0) {
-    return addBackspaceUnwrap(strippedIr, [], {}, await compileStrippedForSimulation());
+    // The compile only feeds addBackspaceUnwrap's author-bksp simulation
+    // check, which needs it solely to filter unwrap pairs — with no
+    // decomposable units there are no pairs and no variants, so compiling is
+    // pure waste (#2406).
+    const compiled =
+      collectDecomposableUnits(strippedIr).size === 0 ? undefined : await compileStrippedForSimulation();
+    return addBackspaceUnwrap(strippedIr, [], {}, compiled);
   }
 
   const storeChars = buildStoreCharIndex(ir);
@@ -602,12 +608,15 @@ function filterUnwrapPairsSkippingAuthorBksp(
   });
 }
 
-function addBackspaceUnwrap(
-  ir: KeyboardIR,
-  existingVariants: ContextVariant[] = [],
-  existingDisclosures: Record<string, VariantDisclosure> = {},
-  compiled?: Awaited<ReturnType<typeof compile>>,
-): ContextVariantsResult {
+/**
+ * Every single character with an alternate canonical form attested in the
+ * keyboard's stores or rule outputs — the units the backspace-unwrap pass
+ * considers. Exported so `proposeContextVariants` can cheaply decide whether
+ * the simulation compile it feeds `addBackspaceUnwrap` can produce anything
+ * at all (#2406: no units means no unwrap variants, so the compile is pure
+ * waste — on a 58k-rule keyboard, ~12s).
+ */
+export function collectDecomposableUnits(ir: KeyboardIR): Set<string> {
   const units = new Set<string>();
   for (const store of ir.stores) {
     for (const item of store.items) {
@@ -623,6 +632,16 @@ function addBackspaceUnwrap(
       }
     }
   }
+  return units;
+}
+
+function addBackspaceUnwrap(
+  ir: KeyboardIR,
+  existingVariants: ContextVariant[] = [],
+  existingDisclosures: Record<string, VariantDisclosure> = {},
+  compiled?: Awaited<ReturnType<typeof compile>>,
+): ContextVariantsResult {
+  const units = collectDecomposableUnits(ir);
 
   const storeChars = buildStoreCharIndex(ir);
   const pairs = filterUnwrapPairsSkippingAuthorBksp(

@@ -702,6 +702,103 @@ function isContiguousSubsequence(needle: readonly string[], haystack: readonly s
 }
 
 /**
+ * Per-target accumulator — the arrays `collectTaintedContributors` builds,
+ * one set per taint target. The shared core (`collectIntoBuckets`) attributes
+ * every match to the buckets whose taint test the produced value satisfies,
+ * so one rule pass serves many targets (#2406: the carve recommendation's
+ * per-character scans were O(chars × rules)).
+ */
+interface ContributorBucket {
+  ruleNodeIds: string[];
+  storeSlotIds: string[];
+  storeSlots: CharContributors['storeSlots'];
+  locations: CharContributors['locations'];
+  blocked: CharContributors['blocked'];
+  ruleDescriptors: ContributorDescriptor[];
+  storeSlotDescriptors: ContributorDescriptor[];
+  blockedDescriptors: ContributorDescriptor[];
+  seenRuleNodeIds: Set<string>;
+  storeSlotIndexById: Map<string, number>;
+  seenLocationNodeIds: Set<string>;
+}
+
+function newContributorBucket(): ContributorBucket {
+  return {
+    ruleNodeIds: [],
+    storeSlotIds: [],
+    storeSlots: [],
+    locations: [],
+    blocked: [],
+    ruleDescriptors: [],
+    storeSlotDescriptors: [],
+    blockedDescriptors: [],
+    seenRuleNodeIds: new Set<string>(),
+    storeSlotIndexById: new Map<string, number>(),
+    seenLocationNodeIds: new Set<string>(),
+  };
+}
+
+/**
+ * How the shared core (`collectIntoBuckets`) matches produced values to
+ * buckets. Set mode (`collectTaintedContributors`) and single-char mode
+ * (`collectCharContributors`) use exactly one bucket with the historical
+ * predicate, so their behaviour is unchanged; the batched mode fans out to
+ * one bucket per target character.
+ */
+interface TaintScope {
+  /** Bucket keys in first-seen order. */
+  bucketKeys: string[];
+  /**
+   * Bucket keys whose taint test `value` satisfies. Semantically
+   * `bucketKeys.filter((k) => testFor(k)(value))`; the batched scope passes
+   * a multi-needle matcher with identical semantics but O(haystack) cost.
+   */
+  matchBuckets(value: string): string[];
+  /** Per-bucket taint predicate (for per-rule filtering over small candidate sets). */
+  testFor(key: string): (value: string) => boolean;
+  /** String-level taint targets for section (b), per bucket. */
+  stringTargetsFor(key: string): ReadonlySet<string>;
+  /** Blocked-reason label: the joined set label, or the single target char. */
+  labelFor(key: string): string;
+}
+
+/**
+ * Multi-needle taint matcher: `matchBuckets(value)` with the exact semantics
+ * of testing every bucket's `buildTaintTest` predicate, but in O(haystack)
+ * instead of O(buckets × haystack). Needles are the buckets' NFD code-point
+ * arrays; single-code-point needles go through a direct map, longer ones
+ * through contiguous-subsequence checks (`isContiguousSubsequence`).
+ */
+function buildBucketMatcher(bucketKeys: string[]): (value: string) => string[] {
+  const single = new Map<string, string[]>();
+  const multi: { cps: string[]; key: string }[] = [];
+  for (const key of bucketKeys) {
+    const cps = Array.from(key.normalize('NFD'));
+    if (cps.length === 0) continue;
+    if (cps.length === 1) {
+      const cp = cps[0]!;
+      const arr = single.get(cp);
+      if (arr !== undefined) arr.push(key);
+      else single.set(cp, [key]);
+    } else {
+      multi.push({ cps, key });
+    }
+  }
+  return (value: string): string[] => {
+    const hay = Array.from(value.normalize('NFD'));
+    const out = new Set<string>();
+    for (const cp of hay) {
+      const ks = single.get(cp);
+      if (ks !== undefined) for (const k of ks) out.add(k);
+    }
+    for (const { cps, key } of multi) {
+      if (isContiguousSubsequence(cps, hay)) out.add(key);
+    }
+    return [...out];
+  };
+}
+
+/**
  * Build the taint predicate for a carved set R (ruling §2).
  *
  * Item `s` is tainted iff ∃ g ∈ R with NFD(g) a contiguous code-point
@@ -764,21 +861,14 @@ function pairedSelectorElements(rule: IRRule): Set<ContextElement> {
  * @returns true when the row must be KEPT (skip nomination).
  */
 function inputSlotKeptByProducerGuard(
-  rule: IRRule,
-  anyEl: ContextElement,
+  alignedStoreNames: readonly string[],
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
   index: number,
   isTainted: (value: string) => boolean,
   producerIndex: ProducerIndex,
 ): boolean {
-  for (const outEl of rule.output) {
-    if ((outEl.kind !== 'index' && outEl.kind !== 'outs') || outEl.storeRef === undefined) continue;
-    const aligned = resolveAlignedAnyElement(rule.context, {
-      kind: outEl.kind,
-      offset: outEl.kind === 'index' ? outEl.offset : 0,
-    });
-    if (aligned !== anyEl) continue;
-    const outItem = storeMap.get(outEl.storeRef)?.items[index];
+  for (const storeName of alignedStoreNames) {
+    const outItem = storeMap.get(storeName)?.items[index];
     if (outItem === undefined || outItem.kind !== 'char') continue;
     if (isTainted(outItem.value)) continue; // output-side taint → prune; not this guard's case
     const producers = producerIndex.get(outItem.value.normalize('NFC')) ?? 0;
@@ -820,13 +910,33 @@ function inputSlotKeptByProducerGuard(
  * a spurious blue "used" row — it is attributed via the output-side branch
  * alone.
  */
-function ruleProducesTainted(
+/**
+ * Taint-independent per-rule production candidates: which index()/outs()
+ * output-store slots the rule can emit (backspace-filtered), before any
+ * taint test. The expensive part (resolving index()/outs() over store items)
+ * runs ONCE per rule; each bucket then intersects this small slot set with
+ * the precomputed per-(store, bucket) taint index (`filterProducedForBucket`).
+ * Split out of `ruleProducesTainted` so the batched core
+ * (`collectIntoBuckets`) does not re-scan store items per target (#2406).
+ */
+interface RuleProducedCandidates {
+  /**
+   * Per output-store name: item indices that passed the backspace filter. A
+   * store referenced by two output elements unions both elements' filtered
+   * indices — matching the old flat itemRaws list's Set semantics.
+   */
+  storeIndices: Map<string, Set<number>>;
+  charVals: string[];
+  wholeOutput: string;
+  onlyCharOutput: boolean;
+}
+
+function ruleProducedCandidates(
   outEls: { kind: string; value?: string; storeRef?: string; offset?: number }[],
-  isTainted: (value: string) => boolean,
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
   context: readonly ContextElement[],
-): Set<string> {
-  const produced = new Set<string>();
+): RuleProducedCandidates {
+  const storeIndices = new Map<string, Set<number>>();
   for (const el of outEls) {
     if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
       const store = storeMap.get(el.storeRef);
@@ -836,33 +946,92 @@ function ruleProducesTainted(
         offset: el.kind === 'index' ? el.offset : 0,
       });
       const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+      let idxSet = storeIndices.get(el.storeRef);
+      if (idxSet === undefined) {
+        idxSet = new Set<number>();
+        storeIndices.set(el.storeRef, idxSet);
+      }
       for (let i = 0; i < store.items.length; i++) {
         const item = store.items[i];
-        if (item === undefined || item.kind !== 'char' || !isTainted(item.value)) continue;
+        if (item === undefined || item.kind !== 'char') continue;
         const baseItem = anyStore?.items[i];
         if (contributorInputHasBackspace(context, baseItem)) continue;
-        produced.add(item.value.normalize('NFC'));
+        idxSet.add(i);
       }
     }
   }
   const charVals = outEls.filter((el) => el.kind === 'char').map((el) => el.value ?? '');
-  if (charVals.length > 0) {
-    const wholeOutput = charVals.join('').normalize('NFC');
+  const wholeOutput = charVals.join('').normalize('NFC');
+  return { storeIndices, charVals, wholeOutput, onlyCharOutput: charVals.length === outEls.length };
+}
+
+/**
+ * The per-bucket half of the old `ruleProducesTainted`: intersect a rule's
+ * precomputed output-store slots (`ruleProducedCandidates`) with the
+ * precomputed per-(store, bucket) taint index. Per (rule, bucket) this walks
+ * only the tainted slots of the referenced stores — never every store item —
+ * which is what keeps the batched pass sublinear in store size (#2406).
+ */
+function filterProducedForBucket(
+  cand: RuleProducedCandidates,
+  key: string,
+  test: (value: string) => boolean,
+  storeTaintedByIndex: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<number, string>>>,
+): Set<string> {
+  const produced = new Set<string>();
+  for (const [storeName, indexSet] of cand.storeIndices) {
+    const tainted = storeTaintedByIndex.get(storeName)?.get(key);
+    if (tainted === undefined) continue;
+    for (const [idx, nfc] of tainted) {
+      if (indexSet.has(idx)) produced.add(nfc);
+    }
+  }
+  if (cand.charVals.length > 0) {
+    const { wholeOutput, onlyCharOutput } = cand;
     // Only add if the whole output is a single tainted char (or fully tainted).
     // A partially-tainted multi-char output doesn't "produce" the tainted part
     // as a separate char for suppression purposes.
-    if ([...wholeOutput].every((cp) => isTainted(cp))) {
-      for (const cp of wholeOutput) {
-        produced.add(cp);
-      }
-    } else if (isTainted(wholeOutput)) {
+    if (onlyCharOutput && [...wholeOutput].every((cp) => test(cp))) {
+      for (const cp of wholeOutput) produced.add(cp);
+    } else if (test(wholeOutput)) {
       // Partially tainted: add the tainted code points.
-      for (const cp of wholeOutput) {
-        if (isTainted(cp)) produced.add(cp);
-      }
+      for (const cp of wholeOutput) if (test(cp)) produced.add(cp);
     }
   }
   return produced;
+}
+
+/**
+ * Section (b)'s string-level taint check, extracted so the shared core and
+ * the per-bucket filter use the same computation: an NFC code point of the
+ * output is covered iff every NFD code point it decomposes to lies within
+ * an occurrence of one of the bucket's target graphemes (ruling §2).
+ */
+function isStringLevelFullyTainted(wholeOutput: string, targets: ReadonlySet<string>): boolean {
+  const nfdOutputCps = [...wholeOutput.normalize('NFD')];
+  const coveredNfd = new Array<boolean>(nfdOutputCps.length).fill(false);
+  for (const g of targets) {
+    const gNfdCps = [...g.normalize('NFD')];
+    if (gNfdCps.length === 0) continue;
+    for (let i = 0; i + gNfdCps.length <= nfdOutputCps.length; i++) {
+      let ok = true;
+      for (let j = 0; j < gNfdCps.length; j++) {
+        if (nfdOutputCps[i + j] !== gNfdCps[j]) { ok = false; break; }
+      }
+      if (ok) for (let j = 0; j < gNfdCps.length; j++) coveredNfd[i + j] = true;
+    }
+  }
+  // Align NFC cps to NFD spans (NFD of an NFC string is the concatenation
+  // of each cp's NFD, in order). An NFC cp is covered iff all its NFD
+  // constituents lie within carved-grapheme occurrences.
+  let nfdIdx = 0;
+  return [...wholeOutput].every((cp) => {
+    const cpNfdLen = [...cp.normalize('NFD')].length;
+    const spanCovered =
+      cpNfdLen > 0 && coveredNfd.slice(nfdIdx, nfdIdx + cpNfdLen).every(Boolean);
+    nfdIdx += cpNfdLen;
+    return spanCovered;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -877,36 +1046,80 @@ function ruleProducesTainted(
  * @param carved The carved set R: NFC-normalized graphemes being removed.
  * @returns      A CharContributors record (see interface above).
  */
-export function collectTaintedContributors(
-  ir: KeyboardIR,
-  carved: ReadonlySet<string>,
-): CharContributors {
-  // Normalize the carved set to NFC so comparisons are canonical.
-  const R = new Set([...carved].map((g) => g.normalize('NFC')));
-  const isTainted = buildTaintTest(R);
-  const carvedDiagnostics = [...R].map((grapheme) => ({
-    grapheme,
-    kind: classifyCarvedGrapheme(grapheme) as 'diacritic' | 'base',
-  }));
-  // Human-readable label for blocked reasons (the carved set, joined).
-  const targetLabel = [...R].join(', ');
-
-  const ruleNodeIds: string[] = [];
-  const storeSlotIds: string[] = [];
-  const storeSlots: CharContributors['storeSlots'] = [];
-  const storeSlotDescriptors: ContributorDescriptor[] = [];
-  const locations: CharContributors['locations'] = [];
-  const blocked: CharContributors['blocked'] = [];
-  const ruleDescriptors: ContributorDescriptor[] = [];
-  const blockedDescriptors: ContributorDescriptor[] = [];
+/**
+ * Shared core behind `collectTaintedContributors`, `collectCharContributors`
+ * and `collectCharContributorsBatched`: one pass over the IR attributing
+ * every match to the buckets whose taint test the produced value satisfies
+ * (`TaintScope`). The rule/store scans run once no matter how many buckets
+ * the scope carries; per-bucket work (descriptor building, per-rule
+ * filtering) is identical to what the single-target callers always did.
+ */
+function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, ContributorBucket> {
+  const buckets = new Map<string, ContributorBucket>();
+  const accFor = (key: string): ContributorBucket => {
+    let acc = buckets.get(key);
+    if (acc === undefined) {
+      acc = newContributorBucket();
+      buckets.set(key, acc);
+    }
+    return acc;
+  };
 
   // Pre-build store map (name → store) for store-output expansion.
   const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
+
+  // Precomputed store-item taint index (#2406): for each store (keyed by
+  // name, as rules reference stores), the char items satisfying each
+  // bucket's taint test, as itemIndex -> { value, buckets }. The per-rule
+  // walk below references the same stores thousands of times (58k rules /
+  // 13 stores on vietnamese_telex_legacy), so matching each item against
+  // every bucket once here — instead of once per referencing rule — is what
+  // makes the batched pass O(stores × items × buckets) rather than O(rules
+  // × stores × items × buckets). Pure function of the item value, so
+  // hoisting is semantics-preserving.
+  const storeTaintIndex = new Map<string, Map<number, { value: string; buckets: string[] }>>();
+  for (const store of ir.stores) {
+    const bySlot = new Map<number, { value: string; buckets: string[] }>();
+    store.items.forEach((item, i) => {
+      if (item.kind !== 'char') return;
+      const buckets = scope.matchBuckets(item.value);
+      if (buckets.length > 0) bySlot.set(i, { value: item.value, buckets });
+    });
+    storeTaintIndex.set(store.name, bySlot);
+  }
+
+  // Per-(store, bucket) taint lookup (#2406): store name -> bucket key ->
+  // itemIndex -> NFC value, for the tainted items only. `filterProducedForBucket`
+  // intersects a rule's output slots with this instead of re-testing every
+  // store item against every bucket per rule.
+  const storeTaintedByIndex = new Map<string, Map<string, Map<number, string>>>();
+  for (const [storeName, bySlot] of storeTaintIndex) {
+    const byKey = new Map<string, Map<number, string>>();
+    for (const [i, { value, buckets }] of bySlot) {
+      const nfc = value.normalize('NFC');
+      for (const key of buckets) {
+        let m = byKey.get(key);
+        if (m === undefined) {
+          m = new Map<number, string>();
+          byKey.set(key, m);
+        }
+        m.set(i, nfc);
+      }
+    }
+    storeTaintedByIndex.set(storeName, byKey);
+  }
 
   // Producer index (base IR) for the §8 contributor guards: "does a kept,
   // still-typeable character remain producible if this nomination is applied?"
   // Computed once — nominations never iterate (ruling §8: no fixpoint).
   const producerIndex = buildProducerIndex(ir);
+
+  // Memoized taint predicates (#2406): the same (bucket, value) pairs are
+  // tested millions of times across rules — 58k rules share 13 stores, so
+  // (Removed: per-(bucket,value) memoization of taint predicates. The
+  // storeTaintIndex above already collapses the repeated store-item tests —
+  // the dominant cost — and the remaining direct predicate calls are few
+  // enough that a 176×values memo table only buys GC pressure (#2406).)
 
   // Pre-pass: map deadkey id -> triggering keystroke display, from every S-02
   // trigger rule (output is exactly one `{kind:"deadkey"}` element) whose
@@ -950,21 +1163,13 @@ export function collectTaintedContributors(
       .map((p) => [p.id, p.title]),
   );
 
-  // Track already-seen locations to avoid duplicates in the locations array.
-  const seenLocationNodeIds = new Set<string>();
-
-  const addLocation = (kind: 'group' | 'pattern' | 'store', label: string, nodeId: string) => {
-    if (!seenLocationNodeIds.has(nodeId)) {
-      seenLocationNodeIds.add(nodeId);
-      locations.push({ kind, label, nodeId });
+  const addLocation = (acc: ContributorBucket, kind: 'group' | 'pattern' | 'store', label: string, nodeId: string) => {
+    // Track already-seen locations to avoid duplicates in the locations array.
+    if (!acc.seenLocationNodeIds.has(nodeId)) {
+      acc.seenLocationNodeIds.add(nodeId);
+      acc.locations.push({ kind, label, nodeId });
     }
   };
-
-  // Track already-added ruleNodeIds / storeSlotIds to avoid duplicates.
-  const seenRuleNodeIds = new Set<string>();
-  // slotId -> its position in `storeSlots`, so a slot first seen on the input
-  // side can be upgraded to "output" without disturbing `storeSlotIds` order.
-  const storeSlotIndexById = new Map<string, number>();
 
   /**
    * Record a matching store slot, keeping `storeSlots` a strict projection of
@@ -972,20 +1177,28 @@ export function collectTaintedContributors(
    * (since the output side is where mark/base are cheaply derivable) its
    * descriptor dominates too.
    */
-  const addStoreSlot = (slotId: string, role: 'input' | 'output', descriptor: ContributorDescriptor) => {
-    const existing = storeSlotIndexById.get(slotId);
+  const addStoreSlot = (
+    acc: ContributorBucket,
+    slotId: string,
+    role: 'input' | 'output',
+    descriptor: ContributorDescriptor,
+  ) => {
+    // Track already-added ruleNodeIds / storeSlotIds to avoid duplicates.
+    // slotId -> its position in `storeSlots`, so a slot first seen on the input
+    // side can be upgraded to "output" without disturbing `storeSlotIds` order.
+    const existing = acc.storeSlotIndexById.get(slotId);
     if (existing !== undefined) {
       if (role === 'output') {
-        const entry = storeSlots[existing];
+        const entry = acc.storeSlots[existing];
         if (entry !== undefined) entry.role = 'output';
-        storeSlotDescriptors[existing] = descriptor;
+        acc.storeSlotDescriptors[existing] = descriptor;
       }
       return;
     }
-    storeSlotIndexById.set(slotId, storeSlots.length);
-    storeSlotIds.push(slotId);
-    storeSlots.push({ slotId, role });
-    storeSlotDescriptors.push(descriptor);
+    acc.storeSlotIndexById.set(slotId, acc.storeSlots.length);
+    acc.storeSlotIds.push(slotId);
+    acc.storeSlots.push({ slotId, role });
+    acc.storeSlotDescriptors.push(descriptor);
   };
 
   // --- 1. Check opaque fragments (RawKmnFragment) ---
@@ -1005,16 +1218,21 @@ export function collectTaintedContributors(
     if (frag.producedOutput === undefined) continue;
     const fragProduced = new Set<string>();
     collectFromElements(frag.producedOutput, storeMap, fragProduced, false);
-    let taintedProduced: string | undefined;
+    // First tainted produced char per bucket — replicates what a
+    // single-target call records for its one target.
+    const firstTaintedByBucket = new Map<string, string>();
     for (const p of fragProduced) {
-      if (isTainted(p)) { taintedProduced = p; break; }
+      for (const key of scope.matchBuckets(p)) {
+        if (!firstTaintedByBucket.has(key)) firstTaintedByBucket.set(key, p);
+      }
     }
-    if (taintedProduced !== undefined) {
-      blocked.push({
+    for (const [key, taintedProduced] of firstTaintedByBucket) {
+      const acc = accFor(key);
+      acc.blocked.push({
         reason: `Opaque fragment (${frag.reason}): cannot surgically remove individual characters`,
         label: frag.reason,
       });
-      blockedDescriptors.push({
+      acc.blockedDescriptors.push({
         kind: 'blocked',
         producedChar: taintedProduced,
         producedRole: 'produced',
@@ -1026,17 +1244,21 @@ export function collectTaintedContributors(
   // Record where a contributing rule lives (its owning pattern, else its group)
   // so the confirm dialog can name the place.
   const addRuleLocation = (
+    acc: ContributorBucket,
     r: { ownedByPattern?: string | undefined },
     group: { name: string; nodeId: string },
   ) => {
     if (r.ownedByPattern !== undefined) {
-      addLocation('pattern', patternById.get(r.ownedByPattern) ?? r.ownedByPattern, r.ownedByPattern);
+      addLocation(acc, 'pattern', patternById.get(r.ownedByPattern) ?? r.ownedByPattern, r.ownedByPattern);
     } else {
-      addLocation('group', group.name, group.nodeId);
+      addLocation(acc, 'group', group.name, group.nodeId);
     }
   };
 
   // --- 2. Walk all groups → all rules ---
+  // Taint-independent per-rule work (trigger/backspace/deadkey classification,
+  // production candidates) runs ONCE per rule; only the taint tests fan out
+  // per bucket (#2406).
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       // Skip S-02 trigger rules (output is exactly one deadkey element) — deleting
@@ -1079,6 +1301,27 @@ export function collectTaintedContributors(
 
       const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
+      // Per-rule alignment precompute (#2406): for each any() context element,
+      // the output store names aligned to it. `inputSlotKeptByProducerGuard`
+      // used to re-resolve this (with a context.filter allocation) per
+      // (rule, slot, bucket) — millions of times on large keyboards.
+      const alignedOutputStoresByAnyEl = new Map<object, string[]>();
+      for (const el of rule.context) {
+        if (el.kind !== 'any') continue;
+        const names: string[] = [];
+        for (const outEl of outEls) {
+          if ((outEl.kind !== 'index' && outEl.kind !== 'outs') || outEl.storeRef === undefined) {
+            continue;
+          }
+          const aligned = resolveAlignedAnyElement(rule.context, {
+            kind: outEl.kind,
+            offset: outEl.kind === 'index' ? outEl.offset : 0,
+          });
+          if (aligned === el) names.push(outEl.storeRef);
+        }
+        alignedOutputStoresByAnyEl.set(el, names);
+      }
+
       // Literal context taint (ruling §3): KMN contexts are flat conjunctions —
       // one unmatchable literal kills the rule. A tainted `char` context element
       // can't occur once R is carved, so the whole rule is nominated. No
@@ -1091,31 +1334,47 @@ export function collectTaintedContributors(
       // method, and its context literal is the deconstruction target, not a
       // match condition that kills the rule.
       if (!isBackspaceCorrectionRule) {
+        // Per bucket, only the FIRST tainted literal is nominated — replicates
+        // the single-target `break` for each bucket independently.
+        const contextHandled = new Set<string>();
         for (const el of rule.context) {
-          if (el.kind === 'char' && isTainted(el.value)) {
-            if (!seenRuleNodeIds.has(rule.nodeId)) {
-              seenRuleNodeIds.add(rule.nodeId);
-              ruleNodeIds.push(rule.nodeId);
-              ruleDescriptors.push({
+          if (el.kind !== 'char') continue;
+          for (const key of scope.matchBuckets(el.value)) {
+            if (contextHandled.has(key)) continue;
+            contextHandled.add(key);
+            const acc = accFor(key);
+            if (!acc.seenRuleNodeIds.has(rule.nodeId)) {
+              acc.seenRuleNodeIds.add(rule.nodeId);
+              acc.ruleNodeIds.push(rule.nodeId);
+              acc.ruleDescriptors.push({
                 kind: 'keystroke',
                 producedChar: el.value.normalize('NFC'),
                 producedRole: 'used',
               });
             }
-            addRuleLocation(rule, group);
-            break;
+            addRuleLocation(acc, rule, group);
           }
         }
       }
 
       // Does THIS rule produce tainted chars on its own output side (store or
-      // literal)? Computed once, ahead of §0, so §0 can gate its "used"
-      // emission per-character — see `ruleProducesTainted`'s doc comment. A
+      // literal)? Candidates computed once per rule; each bucket filters them
+      // with its own taint predicate ahead of §0, so §0 can gate its "used"
+      // emission per-character — see `filterProducedForBucket`'s doc comment. A
       // rule that produces a tainted char is GREEN for that char regardless of
       // whether the same char also appears on that rule's input side; only a
       // char NOT produced on the output side gets to tag an input-side
       // occurrence "used".
-      const ruleProducedTaintedChars = ruleProducesTainted(outEls, isTainted, storeMap, rule.context);
+      const producedCandidates = ruleProducedCandidates(outEls, storeMap, rule.context);
+      const producedForBucketCache = new Map<string, Set<string>>();
+      const producedForBucket = (key: string): Set<string> => {
+        let s = producedForBucketCache.get(key);
+        if (s === undefined) {
+          s = filterProducedForBucket(producedCandidates, key, scope.testFor(key), storeTaintedByIndex);
+          producedForBucketCache.set(key, s);
+        }
+        return s;
+      };
 
       // Deadkey fan-out selector set (ruling §3): pairing-resolved any()
       // elements feeding an index()/outs() output — the selector side is NEVER
@@ -1139,46 +1398,58 @@ export function collectTaintedContributors(
         if (skipSelectorElements?.has(el)) continue;
         const inputStore = storeMap.get(el.storeRef);
         if (inputStore === undefined || inputStore.isSystem) continue;
-        let inputMatched = false;
-        for (let i = 0; i < inputStore.items.length; i++) {
-          const item = inputStore.items[i];
-          if (item === undefined || item.kind !== 'char' || !isTainted(item.value)) continue;
-          const itemChar = item.value.normalize('NFC');
-          // Per-char suppression: if the output side produces this specific
-          // char, the input occurrence is not a separate "used" contributor.
-          if (ruleProducedTaintedChars.has(itemChar)) continue;
-          // Cased-pair input-side guard (ruling §3): backspace-correction
-          // rules drop deconstruction rows unconditionally; otherwise prune
-          // an input-tainted row only when a paired kept output remains
-          // producible elsewhere.
-          if (
-            !isBackspaceCorrectionRule &&
-            inputSlotKeptByProducerGuard(rule, el, storeMap, i, isTainted, producerIndex)
-          ) {
-            continue;
+        const inputMatchedBuckets = new Set<string>();
+        // Tainted items via the precomputed store index (#2406) — the same
+        // stores are referenced by thousands of rules, so per-item bucket
+        // matching runs once per store, not once per rule.
+        for (const [i, { value, buckets }] of storeTaintIndex.get(inputStore.name) ?? []) {
+          const itemChar = value.normalize('NFC');
+          for (const key of buckets) {
+            const test = scope.testFor(key);
+            // Per-char suppression: if the output side produces this specific
+            // char, the input occurrence is not a separate "used" contributor.
+            if (producedForBucket(key).has(itemChar)) continue;
+            // Cased-pair input-side guard (ruling §3): backspace-correction
+            // rules drop deconstruction rows unconditionally; otherwise prune
+            // an input-tainted row only when a paired kept output remains
+            // producible elsewhere.
+            if (
+              !isBackspaceCorrectionRule &&
+              inputSlotKeptByProducerGuard(
+                alignedOutputStoresByAnyEl.get(el) ?? [],
+                storeMap,
+                i,
+                test,
+                producerIndex,
+              )
+            ) {
+              continue;
+            }
+            const acc = accFor(key);
+            // The input side alone doesn't cheaply resolve a deadkey's
+            // mark/base (that requires the OUTPUT-side alignment below), so
+            // this descriptor deliberately leaves mark/base/storeDisplayName
+            // absent when it's a deadkey-context rule — the studio's
+            // fallback template covers it. A non-deadkey input match still
+            // gets a `storeDisplayName`, same as an output-side match.
+            addStoreSlot(
+              acc,
+              makeSlotId(inputStore.nodeId, i),
+              'input',
+              isDeadkeyRule
+                ? { kind: 'deadkey', producedChar: itemChar, producedRole: 'used' }
+                : {
+                    kind: 'store-slot',
+                    producedChar: itemChar,
+                    producedRole: 'used',
+                    ...storeDisplayNameField(inputStore.name),
+                  },
+            );
+            addLocation(acc, 'store', inputStore.name, inputStore.nodeId);
+            inputMatchedBuckets.add(key);
           }
-          // The input side alone doesn't cheaply resolve a deadkey's
-          // mark/base (that requires the OUTPUT-side alignment below), so
-          // this descriptor deliberately leaves mark/base/storeDisplayName
-          // absent when it's a deadkey-context rule — the studio's
-          // fallback template covers it. A non-deadkey input match still
-          // gets a `storeDisplayName`, same as an output-side match.
-          addStoreSlot(
-            makeSlotId(inputStore.nodeId, i),
-            'input',
-            isDeadkeyRule
-              ? { kind: 'deadkey', producedChar: itemChar, producedRole: 'used' }
-              : {
-                  kind: 'store-slot',
-                  producedChar: itemChar,
-                  producedRole: 'used',
-                  ...storeDisplayNameField(inputStore.name),
-                },
-          );
-          addLocation('store', inputStore.name, inputStore.nodeId);
-          inputMatched = true;
         }
-        if (inputMatched) addRuleLocation(rule, group);
+        for (const key of inputMatchedBuckets) addRuleLocation(accFor(key), rule, group);
       }
 
       // (a) Store-produced tainted char — the character is emitted through an
@@ -1188,36 +1459,59 @@ export function collectTaintedContributors(
       //     store), NEVER the whole rule — the rule produces the entire
       //     store's worth of characters, so deleting it would remove them all.
       //     Deconstruction pairs nominate on EITHER side's taint (ruling §3).
-      let storeMatched = false;
+      // Buckets whose store side matched on this rule — each skips the
+      // literal-output branch below for its own bucket, replicating the
+      // single-target `continue`.
+      const storeMatchedBuckets = new Set<string>();
       for (const el of outEls) {
         if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
           const store = storeMap.get(el.storeRef);
           if (store === undefined || store.isSystem) continue;
+          // Hoisted per output element (#2406): the aligned any() element and
+          // its store depend on the rule+element, not the slot — only the
+          // aligned ITEM (baseItem below) is per-slot.
+          const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
+          const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+          const outTaint = storeTaintIndex.get(store.name);
+          const inTaint = anyStore !== undefined ? storeTaintIndex.get(anyStore.name) : undefined;
           for (let i = 0; i < store.items.length; i++) {
             const item = store.items[i];
             if (item === undefined || item.kind !== 'char') continue;
-            // Resolve the SAME aligned any()-consumed item buildOutputSlotDescriptor
-            // would derive `base`/`inputKeystroke` from, ONCE, so the backspace
-            // check and the descriptor build can never disagree about which
-            // item is "the input" for this slot (per-slot: a DIFFERENT slot
-            // index on the same store/rule can align to a different, non-
-            // backspace item, so this can't be decided once for the whole rule).
-            const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
-            const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+            const value = item.value;
+            // Buckets tainted by the output item or (for deconstruction
+            // rules) by the aligned input item — both via the precomputed
+            // index's point lookups (#2406). Every char item is visited, not
+            // just tainted ones: a deconstruction pair nominates on EITHER
+            // side's taint (ruling §3).
+            const outBuckets = outTaint?.get(i)?.buckets;
             const baseItem = anyStore?.items[i];
-            const baseTainted = baseItem !== undefined && baseItem.kind === 'char' && isTainted(baseItem.value);
-            const itemTainted = isTainted(item.value);
-            // For backspace-correction (deconstruction) rules, nominate the
-            // output slot if EITHER side is tainted (ruling §3: prune both
-            // aligned stores if either text side is tainted). The (0) loop
-            // nominates the input side; the pairing graph in
-            // applyStoreSlotRemovals coordinates the lockstep drop. For
-            // NON-deconstruction rules, only the output item's own taint
-            // nominates the output slot — an input-tainted aligned item must
-            // not pull an untainted output slot along (the "surgical unit is
-            // the slot" contract the tests assert).
-            if (!itemTainted && !(baseTainted && isBackspaceCorrectionRule)) continue;
-            const itemChar = item.value.normalize('NFC');
+            const inBuckets =
+              baseItem !== undefined && baseItem.kind === 'char'
+                ? inTaint?.get(i)?.buckets
+                : undefined;
+            if (
+              (outBuckets === undefined || outBuckets.length === 0) &&
+              (inBuckets === undefined || inBuckets.length === 0)
+            ) {
+              continue;
+            }
+            const taintedKeys = new Set<string>([...(outBuckets ?? []), ...(inBuckets ?? [])]);
+            for (const key of taintedKeys) {
+              const test = scope.testFor(key);
+              const baseTainted = baseItem !== undefined && baseItem.kind === 'char' && test(baseItem.value);
+              const itemTainted = test(value);
+              // For backspace-correction (deconstruction) rules, nominate the
+              // output slot if EITHER side is tainted (ruling §3: prune both
+              // aligned stores if either text side is tainted). The (0) loop
+              // nominates the input side; the pairing graph in
+              // applyStoreSlotRemovals coordinates the lockstep drop. For
+              // NON-deconstruction rules, only the output item's own taint
+              // nominates the output slot — an input-tainted aligned item must
+              // not pull an untainted output slot along (the "surgical unit is
+              // the slot" contract the tests assert).
+              if (!itemTainted && !(baseTainted && isBackspaceCorrectionRule)) continue;
+              const itemChar = value.normalize('NFC');
+              const acc = accFor(key);
 
               // Reached only by pressing backspace — either the rule's context
               // carries K_BKSP directly, or this slot's ALIGNED input item
@@ -1228,13 +1522,13 @@ export function collectTaintedContributors(
               // `isBackspaceCorrectionRule` comment above for the worked
               // sil_cameroon_qwerty case.
               if (contributorInputHasBackspace(rule.context, baseItem)) {
-                addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
+                addStoreSlot(acc, makeSlotId(store.nodeId, i), 'input', {
                   kind: 'store-slot',
                   producedChar: itemChar,
                   producedRole: 'used',
                   ...storeDisplayNameField(store.name),
                 });
-                addLocation('store', store.name, store.nodeId);
+                addLocation(acc, 'store', store.name, store.nodeId);
                 // Deliberately does NOT set `storeMatched`: that flag drives
                 // `addRuleLocation` + the `continue` that suppresses the
                 // literal-output branch below, both of which are producer-side
@@ -1243,6 +1537,7 @@ export function collectTaintedContributors(
               }
 
               addStoreSlot(
+                acc,
                 makeSlotId(store.nodeId, i),
                 'output',
                 buildOutputSlotDescriptor(
@@ -1257,24 +1552,15 @@ export function collectTaintedContributors(
                   baseItem,
                 ),
               );
-              addLocation('store', store.name, store.nodeId);
-              storeMatched = true;
+              addLocation(acc, 'store', store.name, store.nodeId);
+              storeMatchedBuckets.add(key);
             }
           }
         }
-      if (storeMatched) {
-        addRuleLocation(rule, group);
-        continue;
       }
-
-      // A correction rule never reaches the whole-rule / `blocked` branches
-      // below — unchanged from before this rule stopped being skipped
-      // outright. Its surgical unit is the slot (handled above): the rule
-      // itself serves every OTHER character in its deconstruction table, so
-      // deleting it would strip backspace behaviour from all of them, and a
-      // multi-char literal output reached only by backspace is not a producer
-      // this character can be "blocked" on.
-      if (isBackspaceCorrectionRule) continue;
+      for (const key of storeMatchedBuckets) {
+        addRuleLocation(accFor(key), rule, group);
+      }
 
       // (b) Literal output — tainted literal chars written out directly as one
       //     or more `char` elements (base+combining runs NFC-compose to one
@@ -1283,109 +1569,99 @@ export function collectTaintedContributors(
       //     output char remains producible elsewhere (producer guard, ruling
       //     §8 — a kept, still-typeable character must never lose a production
       //     method); otherwise the existing `blocked` classification.
+      //     Per bucket: a bucket whose store side already matched skips this
+      //     branch (replicating the single-target `continue`), as does every
+      //     bucket on a backspace-correction rule.
       const charVals = outEls.filter((el) => el.kind === 'char').map((el) => el.value ?? '');
-      if (charVals.length === 0) continue;
-      const onlyCharOutput = charVals.length === outEls.length;
-      const wholeOutput = charVals.join('').normalize('NFC');
-      // Fully-tainted: every code point in the output is tainted (per-cp), OR
-      // the output string is fully covered by carved-grapheme occurrences
-      // (string-level taint for multi-char carved graphemes, ruling §2 — e.g.
-      // carving the string 'GHG' taints the whole output 'GHG' even though
-      // the individual cps 'G'/'H' are not tainted by 'GHG' alone).
-      const nfdOutputCps = [...wholeOutput.normalize('NFD')];
-      const coveredNfd = new Array<boolean>(nfdOutputCps.length).fill(false);
-      for (const g of R) {
-        const gNfdCps = [...g.normalize('NFD')];
-        if (gNfdCps.length === 0) continue;
-        for (let i = 0; i + gNfdCps.length <= nfdOutputCps.length; i++) {
-          let ok = true;
-          for (let j = 0; j < gNfdCps.length; j++) {
-            if (nfdOutputCps[i + j] !== gNfdCps[j]) { ok = false; break; }
+      if (charVals.length !== 0) {
+        const onlyCharOutput = charVals.length === outEls.length;
+        const wholeOutput = charVals.join('').normalize('NFC');
+        for (const key of scope.bucketKeys) {
+          if (storeMatchedBuckets.has(key)) {
+            addRuleLocation(accFor(key), rule, group);
+            continue;
           }
-          if (ok) for (let j = 0; j < gNfdCps.length; j++) coveredNfd[i + j] = true;
-        }
-      }
-      // Align NFC cps to NFD spans (NFD of an NFC string is the concatenation
-      // of each cp's NFD, in order). An NFC cp is covered iff all its NFD
-      // constituents lie within carved-grapheme occurrences.
-      let nfdIdx = 0;
-      const isStringLevelFullyTainted = [...wholeOutput].every((cp) => {
-        const cpNfdLen = [...cp.normalize('NFD')].length;
-        const spanCovered =
-          cpNfdLen > 0 && coveredNfd.slice(nfdIdx, nfdIdx + cpNfdLen).every(Boolean);
-        nfdIdx += cpNfdLen;
-        return spanCovered;
-      });
-      const isFullyTaintedOutput =
-        onlyCharOutput &&
-        ([...wholeOutput].every((cp) => isTainted(cp)) || isStringLevelFullyTainted);
+          if (isBackspaceCorrectionRule) continue;
+          const test = scope.testFor(key);
+          const acc = accFor(key);
+          // Fully-tainted: every code point in the output is tainted (per-cp), OR
+          // the output string is fully covered by carved-grapheme occurrences
+          // (string-level taint for multi-char carved graphemes, ruling §2 — e.g.
+          // carving the string 'GHG' taints the whole output 'GHG' even though
+          // the individual cps 'G'/'H' are not tainted by 'GHG' alone).
+          const isFullyTaintedOutput =
+            onlyCharOutput &&
+            ([...wholeOutput].every((cp) => test(cp)) ||
+              isStringLevelFullyTainted(wholeOutput, scope.stringTargetsFor(key)));
 
-      if (isFullyTaintedOutput) {
-        // The rule's entire output is tainted → whole-rule delete.
-        if (!seenRuleNodeIds.has(rule.nodeId)) {
-          seenRuleNodeIds.add(rule.nodeId);
-          ruleNodeIds.push(rule.nodeId);
-          const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
-          // No aligned store slot for a plain literal-output rule — an
-          // any()/index() context element (rare here) always falls back
-          // (both slotIndex and alignedAnyElement are absent).
-          const inputSequence = buildContextInputSequence(
-            rule.context,
-            storeMap,
-            triggerKeystrokeByDeadkeyId,
-            undefined,
-            undefined,
-          );
-          ruleDescriptors.push({
-            kind: 'keystroke',
-            producedChar: wholeOutput,
-            producedRole: 'produced',
-            ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
-            ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
-          });
-        }
-        addRuleLocation(rule, group);
-      } else if (isTainted(wholeOutput)) {
-        // Partially-tainted literal output: the tainted part can't be split
-        // out surgically (literals aren't partially rewritable). Delete the
-        // whole rule iff no kept output char is stranded; else blocked.
-        // The producerIndex counts this rule itself, so >= 2 means another
-        // producer exists besides this rule.
-        const keptCodePoints = [...new Set(Array.from(wholeOutput))].filter((cp) => !isTainted(cp));
-        const strandFree = keptCodePoints.every((cp) => (producerIndex.get(cp) ?? 0) >= 2);
-        if (strandFree) {
-          if (!seenRuleNodeIds.has(rule.nodeId)) {
-            seenRuleNodeIds.add(rule.nodeId);
-            ruleNodeIds.push(rule.nodeId);
-            const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
-            const inputSequence = buildContextInputSequence(
-              rule.context,
-              storeMap,
-              triggerKeystrokeByDeadkeyId,
-              undefined,
-              undefined,
-            );
-            ruleDescriptors.push({
-              kind: 'keystroke',
-              producedChar: wholeOutput,
-              producedRole: 'produced',
-              ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
-              ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
-            });
+          if (isFullyTaintedOutput) {
+            // The rule's entire output is tainted → whole-rule delete.
+            if (!acc.seenRuleNodeIds.has(rule.nodeId)) {
+              acc.seenRuleNodeIds.add(rule.nodeId);
+              acc.ruleNodeIds.push(rule.nodeId);
+              const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
+              // No aligned store slot for a plain literal-output rule — an
+              // any()/index() context element (rare here) always falls back
+              // (both slotIndex and alignedAnyElement are absent).
+              const inputSequence = buildContextInputSequence(
+                rule.context,
+                storeMap,
+                triggerKeystrokeByDeadkeyId,
+                undefined,
+                undefined,
+              );
+              acc.ruleDescriptors.push({
+                kind: 'keystroke',
+                producedChar: wholeOutput,
+                producedRole: 'produced',
+                ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
+                ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
+              });
+            }
+            addRuleLocation(acc, rule, group);
+          } else if (test(wholeOutput)) {
+            // Partially-tainted literal output: the tainted part can't be split
+            // out surgically (literals aren't partially rewritable). Delete the
+            // whole rule iff no kept output char is stranded; else blocked.
+            // The producerIndex counts this rule itself, so >= 2 means another
+            // producer exists besides this rule.
+            const keptCodePoints = [...new Set(Array.from(wholeOutput))].filter((cp) => !test(cp));
+            const strandFree = keptCodePoints.every((cp) => (producerIndex.get(cp) ?? 0) >= 2);
+            if (strandFree) {
+              if (!acc.seenRuleNodeIds.has(rule.nodeId)) {
+                acc.seenRuleNodeIds.add(rule.nodeId);
+                acc.ruleNodeIds.push(rule.nodeId);
+                const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
+                const inputSequence = buildContextInputSequence(
+                  rule.context,
+                  storeMap,
+                  triggerKeystrokeByDeadkeyId,
+                  undefined,
+                  undefined,
+                );
+                acc.ruleDescriptors.push({
+                  kind: 'keystroke',
+                  producedChar: wholeOutput,
+                  producedRole: 'produced',
+                  ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
+                  ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
+                });
+              }
+              addRuleLocation(acc, rule, group);
+            } else {
+              // A kept char in this output has no other producer → genuinely blocked.
+              acc.blocked.push({
+                reason: `produces "${wholeOutput}" — "${scope.labelFor(key)}" can't be removed without affecting the rest of that output`,
+                label: `${group.name} / ${rule.nodeId}`,
+              });
+              acc.blockedDescriptors.push({
+                kind: 'blocked',
+                producedChar: wholeOutput,
+                producedRole: 'produced',
+                blockedReasonCode: 'multi-char-output',
+              });
+            }
           }
-          addRuleLocation(rule, group);
-        } else {
-          // A kept char in this output has no other producer → genuinely blocked.
-          blocked.push({
-            reason: `produces "${wholeOutput}" — "${targetLabel}" can't be removed without affecting the rest of that output`,
-            label: `${group.name} / ${rule.nodeId}`,
-          });
-          blockedDescriptors.push({
-            kind: 'blocked',
-            producedChar: wholeOutput,
-            producedRole: 'produced',
-            blockedReasonCode: 'multi-char-output',
-          });
         }
       }
     }
@@ -1404,18 +1680,21 @@ export function collectTaintedContributors(
         if (el.kind !== 'notany') continue;
         const store = storeMap.get(el.storeRef);
         if (store === undefined || store.isSystem) continue;
-        let matched = false;
-        store.items.forEach((item, i) => {
-          if (item.kind !== 'char' || !isTainted(item.value)) return;
-          addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
-            kind: 'store-slot',
-            producedChar: item.value.normalize('NFC'),
-            producedRole: 'used',
-            ...storeDisplayNameField(store.name),
-          });
-          matched = true;
-        });
-        if (matched) addLocation('store', store.name, store.nodeId);
+        const matchedBuckets = new Set<string>();
+        // Tainted items via the precomputed store index (#2406).
+        for (const [i, { value, buckets }] of storeTaintIndex.get(store.name) ?? []) {
+          for (const key of buckets) {
+            const acc = accFor(key);
+            addStoreSlot(acc, makeSlotId(store.nodeId, i), 'input', {
+              kind: 'store-slot',
+              producedChar: value.normalize('NFC'),
+              producedRole: 'used',
+              ...storeDisplayNameField(store.name),
+            });
+            matchedBuckets.add(key);
+          }
+        }
+        for (const key of matchedBuckets) addLocation(accFor(key), 'store', store.name, store.nodeId);
       }
     }
   }
@@ -1428,9 +1707,12 @@ export function collectTaintedContributors(
   // a nominated char slot (a store with surviving non-char rows still has
   // rows, and a rule with literal char output was handled by the (b) loop).
   // Single pass on the base IR — no fixpoint (ruling §8).
-  {
+  //
+  // Per bucket: each bucket nominates its own slots, so each gets its own
+  // no-rows-left pass over a snapshot of the buckets section 2 produced.
+  for (const [bucketKey, acc] of [...buckets]) {
     const nominatedSlotByStore = new Map<string, Set<number>>();
-    for (const slotId of storeSlotIds) {
+    for (const slotId of acc.storeSlotIds) {
       const hashIdx = slotId.lastIndexOf('#');
       if (hashIdx < 0) continue;
       const storeNodeId = slotId.slice(0, hashIdx);
@@ -1446,7 +1728,7 @@ export function collectTaintedContributors(
     for (const group of ir.groups) {
       for (const rule of group.rules) {
         if (isTriggerRule(rule)) continue;
-        if (seenRuleNodeIds.has(rule.nodeId)) continue;
+        if (acc.seenRuleNodeIds.has(rule.nodeId)) continue;
         if (rule.output.some((el) => el.kind === 'char')) continue;
         const outStores: KeyboardIR['stores'][number][] = [];
         for (const el of rule.output) {
@@ -1464,14 +1746,14 @@ export function collectTaintedContributors(
             }),
         );
         if (noRowsLeft) {
-          seenRuleNodeIds.add(rule.nodeId);
-          ruleNodeIds.push(rule.nodeId);
-          ruleDescriptors.push({
+          acc.seenRuleNodeIds.add(rule.nodeId);
+          acc.ruleNodeIds.push(rule.nodeId);
+          acc.ruleDescriptors.push({
             kind: 'keystroke',
-            producedChar: targetLabel,
+            producedChar: scope.labelFor(bucketKey),
             producedRole: 'produced',
           });
-          addRuleLocation(rule, group);
+          addRuleLocation(acc, rule, group);
         }
       }
     }
@@ -1516,36 +1798,91 @@ export function collectTaintedContributors(
     }
   }
 
+  // Per bucket: each bucket sweeps unreferenced stores for its own target.
+  // `referencedStoreNames` above is taint-independent, computed once.
   for (const store of ir.stores) {
     // Ruling §4: skip system stores via `store.isSystem` — the codec strips
     // the `&` prefix and flags `isSystem` separately, so a name-prefix check
     // here would be dead code.
     if (store.isSystem) continue;
     if (referencedStoreNames.has(store.name)) continue;
-    let matched = false;
-    store.items.forEach((item, i) => {
-      if (item.kind !== 'char' || !isTainted(item.value)) return;
-      addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
-        kind: 'store-slot',
-        producedChar: item.value.normalize('NFC'),
-        producedRole: 'used',
-        ...storeDisplayNameField(store.name),
-      });
-      matched = true;
-    });
-    if (matched) addLocation('store', store.name, store.nodeId);
+    const matchedBuckets = new Set<string>();
+    // Tainted items via the precomputed store index (#2406).
+    for (const [i, { value, buckets }] of storeTaintIndex.get(store.name) ?? []) {
+      for (const key of buckets) {
+        const acc = accFor(key);
+        addStoreSlot(acc, makeSlotId(store.nodeId, i), 'input', {
+          kind: 'store-slot',
+          producedChar: value.normalize('NFC'),
+          producedRole: 'used',
+          ...storeDisplayNameField(store.name),
+        });
+        matchedBuckets.add(key);
+      }
+    }
+    for (const key of matchedBuckets) addLocation(accFor(key), 'store', store.name, store.nodeId);
   }
 
+  return buckets;
+}
+
+/**
+ * Assemble one `CharContributors` record from a bucket.
+ */
+function bucketToRecord(
+  acc: ContributorBucket,
+  targetChar: string,
+  carvedDiagnostics: { grapheme: string; kind: 'diacritic' | 'base' }[],
+): CharContributors {
   return {
-    targetChar: targetLabel,
+    targetChar,
     carvedDiagnostics,
-    ruleNodeIds,
-    storeSlotIds,
-    storeSlots,
-    locations,
-    blocked,
-    descriptors: [...ruleDescriptors, ...storeSlotDescriptors, ...blockedDescriptors],
+    ruleNodeIds: acc.ruleNodeIds,
+    storeSlotIds: acc.storeSlotIds,
+    storeSlots: acc.storeSlots,
+    locations: acc.locations,
+    blocked: acc.blocked,
+    descriptors: [...acc.ruleDescriptors, ...acc.storeSlotDescriptors, ...acc.blockedDescriptors],
   };
+}
+
+/**
+ * The set-mode scope: one bucket whose taint test is the historical
+ * `buildTaintTest(R)` predicate, so `collectTaintedContributors` runs the
+ * exact same matching logic as before the batched core existed.
+ */
+function setTaintScope(
+  R: ReadonlySet<string>,
+  targetLabel: string,
+  carvedDiagnostics: CharContributors['carvedDiagnostics'],
+): { scope: TaintScope; targetLabel: string; carvedDiagnostics: CharContributors['carvedDiagnostics'] } {
+  const isTainted = buildTaintTest(R);
+  const scope: TaintScope = {
+    bucketKeys: ['__set__'],
+    matchBuckets: (value: string) => (isTainted(value) ? ['__set__'] : []),
+    testFor: () => isTainted,
+    stringTargetsFor: () => R,
+    labelFor: () => targetLabel,
+  };
+  return { scope, targetLabel, carvedDiagnostics };
+}
+
+export function collectTaintedContributors(
+  ir: KeyboardIR,
+  carved: ReadonlySet<string>,
+): CharContributors {
+  // Normalize the carved set to NFC so comparisons are canonical.
+  const R = new Set([...carved].map((g) => g.normalize('NFC')));
+  const carvedDiagnostics = [...R].map((grapheme) => ({
+    grapheme,
+    kind: classifyCarvedGrapheme(grapheme) as 'diacritic' | 'base',
+  }));
+  // Human-readable label for blocked reasons (the carved set, joined).
+  const targetLabel = [...R].join(', ');
+  const { scope } = setTaintScope(R, targetLabel, carvedDiagnostics);
+  const buckets = collectIntoBuckets(ir, scope);
+  const acc = buckets.get('__set__') ?? newContributorBucket();
+  return bucketToRecord(acc, targetLabel, carvedDiagnostics);
 }
 
 /**
@@ -1560,6 +1897,59 @@ export function collectTaintedContributors(
  */
 export function collectCharContributors(ir: KeyboardIR, targetChar: string): CharContributors {
   return collectTaintedContributors(ir, new Set([targetChar]));
+}
+
+/**
+ * Batched per-character contributor collection (#2406): one rule pass for
+ * many target characters, returning one `CharContributors` record per
+ * target (keyed by NFC form). Each record is identical to what
+ * {@link collectCharContributors} returns for that character alone — the
+ * shared core attributes every match to exactly the buckets whose taint
+ * test the produced value satisfies — but the rule/store scans run once
+ * instead of once per character.
+ */
+export function collectCharContributorsBatched(
+  ir: KeyboardIR,
+  targetChars: ReadonlySet<string>,
+): Map<string, CharContributors> {
+  // Normalize targets to NFC so comparisons are canonical (mirrors
+  // collectTaintedContributors' R normalization).
+  const keys = [...new Set([...targetChars].map((c) => c.normalize('NFC')))];
+  const tests = new Map<string, (value: string) => boolean>();
+  const testFor = (key: string): ((value: string) => boolean) => {
+    let t = tests.get(key);
+    if (t === undefined) {
+      t = buildTaintTest(new Set([key]));
+      tests.set(key, t);
+    }
+    return t;
+  };
+  const stringTargets = new Map<string, ReadonlySet<string>>();
+  const stringTargetsFor = (key: string): ReadonlySet<string> => {
+    let s = stringTargets.get(key);
+    if (s === undefined) {
+      s = new Set([key]);
+      stringTargets.set(key, s);
+    }
+    return s;
+  };
+  const matchBuckets = buildBucketMatcher(keys);
+  const scope: TaintScope = {
+    bucketKeys: keys,
+    matchBuckets,
+    testFor,
+    stringTargetsFor,
+    labelFor: (key) => key,
+  };
+  const buckets = collectIntoBuckets(ir, scope);
+  const out = new Map<string, CharContributors>();
+  for (const key of keys) {
+    const acc = buckets.get(key) ?? newContributorBucket();
+    out.set(key, bucketToRecord(acc, key, [
+      { grapheme: key, kind: classifyCarvedGrapheme(key) as 'diacritic' | 'base' },
+    ]));
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

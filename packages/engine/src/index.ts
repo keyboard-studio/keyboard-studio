@@ -965,6 +965,7 @@ export {
   parseSlotId,
   makeSlotId,
   collectCharContributors,
+  collectCharContributorsBatched,
   collectTaintedContributors,
   sliceContributorDescriptors,
   collectCompositionMethod,
