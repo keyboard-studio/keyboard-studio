@@ -77,18 +77,35 @@ const BORDER = "var(--app-border)";
 const BG_CARD = "var(--app-surface)";
 const BG_CANVAS = "var(--app-surface-2)";
 const ACCENT = "var(--app-accent)";
-// Pinned dark ink for text sitting ON light keycaps.
-const KEYCAP_TEXT = "#1a1a2e";
-// Pinned dim for text sitting ON light keycaps: the theme token would go
-// light-on-light under navy. Keycaps are fixed light content, readable in
-// both themes by construction.
-const KEYCAP_DIM = "#5a5a6e";
 const SP_COLORS: Record<number, { bg: string; fg: string; border: string }> = {
-  0: { bg: "#ffffff", fg: KEYCAP_TEXT, border: BORDER },
-  1: { bg: "#e8f0fe", fg: "#1a3a6b", border: "#9db9e8" },
-  2: { bg: "#d4e4fc", fg: "#14305e", border: "#7ba3e0" },
-  8: { bg: "#fff4e0", fg: "#7a4a00", border: "#e8c87a" },
-  9: { bg: "#fafafa", fg: KEYCAP_DIM, border: "#c9c9d4" },
+  // Keycap colors follow the theme via semantic tokens (2026-11-02).
+  // sp semantics: 0 normal, 1 special, 2 special-active, 8 deadkey, 9 blank,
+  // 10 spacer.
+  0: {
+    bg: "var(--app-surface)",
+    fg: "var(--app-text)",
+    border: "var(--app-border-strong)",
+  },
+  1: {
+    bg: "var(--app-accent-bg)",
+    fg: "var(--app-accent-text)",
+    border: "var(--app-accent)",
+  },
+  2: {
+    bg: "var(--app-accent)",
+    fg: "var(--app-text-on-accent)",
+    border: "var(--app-accent)",
+  },
+  8: {
+    bg: "var(--app-warning-bg)",
+    fg: "var(--app-warning-text)",
+    border: "var(--app-warning-border)",
+  },
+  9: {
+    bg: "var(--app-surface-2)",
+    fg: "var(--app-text-muted)",
+    border: "var(--app-border)",
+  },
   10: { bg: "transparent", fg: "transparent", border: "transparent" },
 };
 
