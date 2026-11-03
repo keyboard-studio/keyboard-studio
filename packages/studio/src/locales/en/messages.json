@@ -1473,7 +1473,6 @@
   "metadata.tryHint.silDevanagariPhonetic.intro": "Romanised phonetic input for Devanagari.",
   "metadata.tryHint.silEuroLatin.intro": "Diacritics via a leading punctuation deadkey.",
   "metadata.tryTyping.heading": "Try typing",
-  "N1tVWG": "Cannot blank this key — it has output. Change the label instead.",
   "nav.ariaLabel": "Studio navigation",
   "nav.compare": "Compare",
   "nav.criteria": "Criteria",
