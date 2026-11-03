@@ -61,6 +61,7 @@ export type StepId =
   | "osk"
   | "touch_seed_source"
   | "touch"
+  | "css"
   | "help"
   | "package";
 
@@ -121,7 +122,7 @@ export const PHASES: readonly PhaseDef[] = [
     // rules (spec 082): the before/after rule demo + rule list/builder sits
     // between carve and mechanisms — it shows what the working copy's rules
     // do before the author assigns mechanisms.
-    stepIds: ["rules", "mechanisms", "osk", "touch_seed_source", "touch"],
+    stepIds: ["rules", "mechanisms", "osk", "touch_seed_source", "touch", "css"],
   },
   {
     letter: "F",

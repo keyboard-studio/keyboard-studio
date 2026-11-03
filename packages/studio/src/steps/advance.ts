@@ -48,6 +48,7 @@ type ActiveStepId =
   | "osk"
   | "touch_seed_source"
   | "touch"
+  | "css"
   | "help"
   | "done"
   | "unsupported";
@@ -331,7 +332,10 @@ export function advance(
       return { next: "touch" };
 
     case "touch":
-      return { next: nextMainLineStepAfter("touch") }; // help
+      return { next: nextMainLineStepAfter("touch") }; // css
+
+    case "css":
+      return { next: nextMainLineStepAfter("css") }; // help
 
     case "help":
       // Hard gate (the Phase F hard gate): stay on "help" — no navigate signal — until every
