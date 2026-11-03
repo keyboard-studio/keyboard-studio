@@ -174,7 +174,15 @@ jobs:
         with:
           ref: ${{ inputs.checkout_ref || github.ref }}
 
+      - name: Restore pinned corpus cache
+        id: corpus-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../keyboards
+          key: keyboards-corpus-${{ env.KEYBOARDS_CORPUS_SHA }}
+
       - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: keyboard-studio/keyboards
@@ -188,7 +196,9 @@ jobs:
       - name: Place corpus at ../keyboards
         run: |
           corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
-          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          if [ -d "$GITHUB_WORKSPACE/.keyboards" ]; then
+            mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          fi
           echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
 
       - name: Set up pnpm
@@ -264,7 +274,15 @@ jobs:
       # keyboard-studio/keyboards fork so CI tests one known corpus rather
       # than whatever master is today. Bump KEYBOARDS_CORPUS_SHA deliberately
       # (and re-run the corpus tests locally against it) when the fork moves.
+      - name: Restore pinned corpus cache
+        id: corpus-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../keyboards
+          key: keyboards-corpus-${{ env.KEYBOARDS_CORPUS_SHA }}
+
       - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: keyboard-studio/keyboards
@@ -285,7 +303,9 @@ jobs:
       - name: Place corpus at ../keyboards
         run: |
           corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
-          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          if [ -d "$GITHUB_WORKSPACE/.keyboards" ]; then
+            mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          fi
           echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
 
       - name: Set up pnpm
@@ -842,6 +862,8 @@ jobs:
   e2e-mobile:
     name: e2e mobile (Playwright, non-blocking)
     needs: changes
+    # Skip entirely when the diff cannot affect it (fails open on non-PR events).
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 60
@@ -956,6 +978,8 @@ jobs:
   e2e-golden:
     name: e2e golden-walk (Playwright, non-blocking)
     needs: changes
+    # Skip entirely when the diff cannot affect it (fails open on non-PR events).
+    if: needs.changes.outputs.golden == 'true'
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 60
