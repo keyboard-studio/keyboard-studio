@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "pnpm --filter @keyboard-studio/contracts --filter @keyboard-studio/engine --filter @keymanapp/keyboard-lint run build",
     "build": "tsc -b && vite build",
+    "verify:prod-bundle": "node scripts/verify-prod-bundle-no-demo.mjs",
     "postbuild": "node scripts/build-keyboards-index.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -16,7 +17,9 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "coverage:report": "vitest run src/dashboard/journeyCoverage.report.test.ts --mode coverage-report"
+    "coverage:report": "vitest run src/test/journeyCoverage.report.test.ts --mode coverage-report",
+    "measure:sc004": "vitest run --config vitest.measure.config.ts",
+    "fixtures:decision-points": "tsx --import ../../utilities/i18n-content-extract/registerMacroShim.ts scripts/genDecisionPoints.ts"
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",
@@ -44,6 +47,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "babel-plugin-macros": "^3.1.0",
     "fflate": "^0.8.3",
     "jsdom": "^26.0.0",
     "playwright": "^1.61.1",
