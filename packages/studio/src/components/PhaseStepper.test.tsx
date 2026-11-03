@@ -56,6 +56,7 @@ describe("PhaseStepper", () => {
     ["mechanisms", "e"],
     ["touch_seed_source", "e"],
     ["touch", "e"],
+    ["css", "e"],
     ["help", "f"],
   ])("activates phase pill %s -> %s", (stepId, letter) => {
     render(<PhaseStepper activeStepId={stepId} />);

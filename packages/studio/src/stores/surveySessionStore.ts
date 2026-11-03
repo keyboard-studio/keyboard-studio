@@ -123,6 +123,7 @@ export type ActiveStepId =
   | "osk"
   | "touch_seed_source"
   | "touch"
+  | "css"
   | "help"
   | "done"
   | "unsupported";
