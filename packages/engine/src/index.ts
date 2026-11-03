@@ -317,6 +317,8 @@ export {
   SCRIPT_COVERAGE_RANGES,
   isCodePointCovered,
   formatCodePointLabel,
+  DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_WIDTH,
 } from "./layout-chart/index.js";
 export type {
   KeyLegibilityKind,

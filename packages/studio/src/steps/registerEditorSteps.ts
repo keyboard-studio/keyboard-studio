@@ -28,6 +28,7 @@ import { DeadkeyAdapter } from "../editors/adapters/deadkeyAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
+import { OskEditor } from "../editors/assignLoop/OskEditor.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -230,6 +231,24 @@ export const mechanismsStep: EditorStep = step({
 });
 
 /**
+ * OSK step: OskEditor (on-screen keyboard customization).
+ * Runs after the Mechanical gallery (mechanisms): the underlying OSK is
+ * generated from the physical layout (generateKvksFromIR), and this step
+ * lets the author customize key labels (free text), blank keys, and toggle
+ * display-underlying / 102nd-key.
+ * Matthew's rulings 2026-11-03: empty label + output = error (blocked);
+ * deadkey labels are free text, never raw dk(...).
+ */
+export const oskStep: EditorStep = step({
+  id: "osk",
+  title: "On-Screen Keyboard",
+  layout: "full",
+  component: OskEditor,
+  specRef: ["specs/osk-editor"],
+  persistence: "working-copy",
+});
+
+/**
  * Touch seed source step: side-trail fork for choosing touch surface seed.
  * Gated side trail (declared screen gate, registry.ts); rejoins at the touch carve+add step (FR-013).
  * Renders TouchSeedSourceHost (T014, spec 035 contracts/seed-source-fork.md;
@@ -272,7 +291,7 @@ export const touchStep: EditorStep = step({
   component: AddTouchAdapter,
   surface: "touch",
   writes: [...TOUCH_WRITES],
-  specRef: ["§8", "specs/035-mobile-touch-derivation"],
+  specRef: ["specs/035-mobile-touch-derivation"],
   persistence: "working-copy",
 });
 
