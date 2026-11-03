@@ -73,6 +73,7 @@ import { checkStrayScratchFiles } from "./checks/criteria/check-scratch-files.js
 import { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
 import { checkDeprecatedNumericFormats } from "./checks/criteria/check-numeric-formats.js";
 import { checkCapsNcapsConsistent } from "./checks/criteria/check-caps-ncaps.js";
+import { checkCasedKeysDeclared } from "./checks/criteria/check-cased-keys.js";
 import { checkDeprecatedHeaders } from "./checks/criteria/check-deprecated-headers.js";
 import { checkTouchRequiredKeys } from "./checks/criteria/check-touch-required-keys.js";
 import { checkFilenameConvention } from "./checks/criteria/check-filename-convention.js";
@@ -467,6 +468,9 @@ export function runCriteriaChecks(
 
     // 7.26 — CAPS/NCAPS handling consistent per referenced key.
     collect(checkCapsNcapsConsistent(keyboardIR, keyboardId));
+
+    // 7.28 — a cased-script keyboard declares store(&CasedKeys).
+    collect(checkCasedKeysDeclared(keyboardIR, keyboardId));
 
     // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
     // Runs whenever the .kmn IR exists. An undeclared <Targets> list

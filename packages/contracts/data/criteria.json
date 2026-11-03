@@ -1398,6 +1398,13 @@
     "lintRuleId": "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE"
   },
   {
+    "id": "7.28-cased-script-declares-casedkeys",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "A keyboard that produces cased letters (Latin, Cyrillic, Greek, …) declares `store(&CasedKeys)` so Caps Lock shifts its letter keys, instead of relying on per-key CAPS/NCAPS rules or ignoring Caps Lock. Mnemonic layouts are exempt (`&CasedKeys` is not supported with `&MNEMONICLAYOUT`)",
+    "lintRuleId": "KM_LINT_CASEDKEYS_MISSING"
+  },
+  {
     "id": "18.14-touch-layers-carry-bksp-enter",
     "section": "18. Design heuristics (DISCUS)",
     "band": "layer-c-enforce",

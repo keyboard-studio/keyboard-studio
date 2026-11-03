@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-11-03T17:44:22.997Z",
- "catalogSize": 202,
+ "generatedAt": "2026-11-03T20:57:12.299Z",
+ "catalogSize": 203,
  "byBand": {
-  "layer-c-enforce": 118,
+  "layer-c-enforce": 119,
   "scaffolder-bake": 40,
   "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 111,
+ "implementedCount": 112,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -2555,6 +2555,21 @@
    "precertified": false,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-deprecated-headers.ts"
+   ]
+  },
+  {
+   "id": "7.28-cased-script-declares-casedkeys",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "A keyboard that produces cased letters (Latin, Cyrillic, Greek, …) declares `store(&CasedKeys)` so Caps Lock shifts its letter keys, instead of relying on per-key CAPS/NCAPS rules or ignoring Caps Lock. Mnemonic layouts are exempt (`&CasedKeys` is not supported with `&MNEMONICLAYOUT`)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_CASEDKEYS_MISSING"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-cased-keys.ts"
    ]
   },
   {
