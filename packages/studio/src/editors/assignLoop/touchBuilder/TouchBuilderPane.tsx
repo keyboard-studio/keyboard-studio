@@ -718,6 +718,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           fieldEpoch={fieldEpoch}
           onInvalid={() => setFieldEpoch((n) => n + 1)}
           commitOp={commitOp}
+          keycapFont={keycapFont}
         />
       )}
 
@@ -800,9 +801,11 @@ function KeyToolbar(props: {
   fieldEpoch: number;
   onInvalid: () => void;
   commitOp: (op: PendingKeyEditOperation) => boolean;
+  /** Keycap typeface (platform configured font → loaded keyboard font → system). */
+  keycapFont: string;
 }) {
   const { t } = useLingui();
-  const { address, targetKey: key, layerIds, layerOverrideOptions, fieldEpoch, onInvalid, commitOp } = props;
+  const { address, targetKey: key, layerIds, layerOverrideOptions, fieldEpoch, onInvalid, commitOp, keycapFont } = props;
   const set = (fields: Extract<PendingKeyEditOperation, { kind: "set" }>["fields"]): void => {
     commitOp({ address, kind: "set", fields });
   };
@@ -838,6 +841,7 @@ function KeyToolbar(props: {
           testId="touch-builder-field-text"
           inputKey={inputKey("text")}
           defaultValue={key.text ?? ""}
+          glyphFont={keycapFont}
           onCommit={(v) => set({ text: v })}
         />
         <LabeledInput
@@ -845,6 +849,7 @@ function KeyToolbar(props: {
           testId="touch-builder-field-hint"
           inputKey={inputKey("hint")}
           defaultValue={key.hint ?? ""}
+          glyphFont={keycapFont}
           onCommit={(v) => set({ hint: v })}
         />
         <LabeledInput
@@ -953,9 +958,11 @@ function LabeledInput(props: {
   inputKey: string;
   defaultValue: string;
   inputMode?: "numeric" | "text";
+  /** When set, the input accepts glyphs and renders in this typeface. */
+  glyphFont?: string;
   onCommit: (value: string) => void;
 }) {
-  const { label, testId, inputKey, defaultValue, inputMode, onCommit } = props;
+  const { label, testId, inputKey, defaultValue, inputMode, glyphFont, onCommit } = props;
   return (
     <label style={fieldStyle}>
       <span style={labelStyle}>{label}</span>
@@ -973,7 +980,7 @@ function LabeledInput(props: {
             (e.target as HTMLInputElement).blur();
           }
         }}
-        style={inputStyle}
+        style={glyphFont !== undefined ? { ...inputStyle, fontFamily: glyphFont } : inputStyle}
       />
     </label>
   );
@@ -1192,6 +1199,7 @@ function SubkeyPanel(props: {
               testId="touch-builder-subkey-field-text"
               inputKey={`${address}:sub:${selectedEntry.kind}:${selectedEntry.ref.id}:text:${fieldEpoch}`}
               defaultValue={selectedEntry.key.text ?? ""}
+              glyphFont={keycapFont}
               onCommit={(v) =>
                 commitOp({ address, kind: "setSubKey", sub: selectedEntry.ref, fields: { text: v } })
               }
