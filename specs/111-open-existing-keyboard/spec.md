@@ -49,6 +49,8 @@ An author opens the Cameroon QWERTY keyboard to fix one rule. They make the edit
 3. **Given** an opened keyboard with a hand-written README, welcome page and help page, **When** the author submits, **Then** those files are carried unchanged unless the author accepted a suggested fix for them.
 4. **Given** an opened keyboard, **When** the author submits, **Then** HISTORY.md gains one new "Updated" entry above the existing history and never an "Adapted from" line naming the keyboard itself.
 5. **Given** an opened keyboard, **When** the author edits its language list (add, remove, reorder), **Then** the package reflects exactly that list.
+6. **Given** a multilingual keyboard, **When** it opens, **Then** the expected characters are the union of its languages' exemplar characters, and any it can't type are listed as pre-existing findings with "add character" fixes.
+7. **Given** an opened keyboard, **When** the author adds a language whose exemplars include characters the keyboard can't type, **Then** those characters appear as new findings.
 
 ---
 
@@ -201,6 +203,7 @@ The help step asks only about documentation that is missing or fails a criterion
 - **FR-016**: The remove tool and the feature galleries MUST be optional on Open, reachable from the menu and from findings, and MUST change only the parts they concern (FR-008).
 - **FR-017**: The on-screen keyboard and touch editors MUST edit the existing files and MUST offer generation only when the file is missing.
 - **FR-018**: The character inventory on Open MUST come from what the keyboard produces. A text sample, if given, is used only to report missing characters.
+- **FR-018a**: The expected characters on Open MUST be the union of the standard character exemplars of every language in the keyboard's language list, where exemplar data exists. Expected characters the keyboard can't produce are reported as findings, each with a suggested fix to add the character. The view states how many listed languages had exemplar data. Adding a language to the list re-runs this check, and the characters it adds count as new findings.
 
 **Checks, suggestions and the gate**
 
