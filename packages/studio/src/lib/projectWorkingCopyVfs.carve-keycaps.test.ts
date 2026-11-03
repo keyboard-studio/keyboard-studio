@@ -30,6 +30,7 @@ import { charStore, irGroup, makeTestIR } from "@keyboard-studio/contracts/fixtu
 import type { IRGroup, IRRule, IRStore, MechanismAssignment, StoreItem } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
+import { textVfs } from "../test/vfsFixtures.ts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -97,11 +98,11 @@ const TOUCH_LAYOUT = JSON.stringify({
 });
 
 function makeVfs(keyboardId: string) {
-  return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
-    { path: `source/${keyboardId}.kvks`, content: KVKS, isBinary: false },
-    { path: `source/${keyboardId}.keyman-touch-layout`, content: TOUCH_LAYOUT, isBinary: false },
-  ]);
+  return textVfs({
+    [`source/${keyboardId}.kmn`]: "c stub\n",
+    [`source/${keyboardId}.kvks`]: KVKS,
+    [`source/${keyboardId}.keyman-touch-layout`]: TOUCH_LAYOUT,
+  });
 }
 
 /**

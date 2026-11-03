@@ -46,6 +46,7 @@ import type {
   MechanismAssignment,
   VirtualFS,
 } from "@keyboard-studio/contracts";
+import { textVfs } from "../test-support/vfs.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -107,10 +108,10 @@ function makeVfs(
   entries: { path: string; content: string }[],
   kmnContent = "c test keyboard\n",
 ): VirtualFS {
-  return createVirtualFS([
-    { path: "source/test.kmn", content: kmnContent, isBinary: false },
-    ...entries.map((e) => ({ ...e, isBinary: false })),
-  ]);
+  return textVfs({
+    "source/test.kmn": kmnContent,
+    ...Object.fromEntries(entries.map((e) => [e.path, e.content])),
+  });
 }
 
 const KVKS_BASE = `<visualkeyboard>

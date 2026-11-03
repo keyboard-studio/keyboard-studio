@@ -15,6 +15,7 @@ import { parse } from "../codec/parse.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
 import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
+import { textVfs } from "../test-support/vfs.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -38,9 +39,7 @@ function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
 }
 
 function makeVfs(kmnContent = "c original\n") {
-  return createVirtualFS([
-    { path: "source/test.kmn", content: kmnContent, isBinary: false },
-  ]);
+  return textVfs({ "source/test.kmn": kmnContent });
 }
 
 // ---------------------------------------------------------------------------
