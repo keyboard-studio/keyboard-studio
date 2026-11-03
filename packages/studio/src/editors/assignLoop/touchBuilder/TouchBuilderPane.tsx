@@ -406,7 +406,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   }
 
   const layerIds = platform.layers.map((l) => l.id);
-  const layerOverrideOptions = Array.from(
+  const _layerOverrideOptions = Array.from(
     new Set([...layerIds, ...MINIMAL_MODIFIER_COMBOS]),
   );
 
@@ -535,7 +535,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   };
 
   const selectedKey = selectedOnActiveLayer?.key;
-  const selectedSubKeyEntry: BuilderSubKeyEntry | undefined =
+  const _selectedSubKeyEntry: BuilderSubKeyEntry | undefined =
     selectedKey !== undefined && subSel !== null
       ? subKeyEntriesOf(selectedKey)[subSel.kind].find((e) =>
           e.kind === "flick" ? e.ref.id === subSel.id : e.key.id === subSel.id,
@@ -632,6 +632,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
 
       {/* Key canvas — TIKE geometry: 100 units/row, default width 100,
           keyMargin 15 gap, widest row sets the scale. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- background click deselects; keyboard users use Escape on the selected key */}
       <div
         data-testid="touch-builder-canvas"
         role="group"
@@ -849,7 +850,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           address={selectedKeyAddress!}
           targetKey={selectedKey}
           layerIds={layerIds}
-          layerOverrideOptions={layerOverrideOptions}
+          layerOverrideOptions={_layerOverrideOptions}
           fieldEpoch={fieldEpoch}
           onInvalid={() => setFieldEpoch((n) => n + 1)}
           commitOp={commitOp}
@@ -863,7 +864,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           address={selectedKeyAddress!}
           targetKey={selectedKey}
           layerIds={layerIds}
-          layerOverrideOptions={layerOverrideOptions}
+          layerOverrideOptions={_layerOverrideOptions}
           selection={subSel}
           onSelect={setSubSel}
           fieldEpoch={fieldEpoch}
@@ -1157,7 +1158,7 @@ function SubkeyPanel(props: {
 }) {
   const { t } = useLingui();
   const {
-    address, targetKey: key, layerIds, layerOverrideOptions,
+    address, targetKey: key, layerIds, layerOverrideOptions: _layerOverrideOptions,
     selection, onSelect, fieldEpoch, onInvalid, commitOp, layout, keycapFont,
     applyPanelDrop, panelDropHover,
   } = props;
@@ -1652,6 +1653,7 @@ function TemplateDialog(props: {
   };
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop click closes; Escape handled by the dialog's focus trap
     <div
       role="dialog"
       aria-modal="true"
@@ -1670,8 +1672,12 @@ function TemplateDialog(props: {
         zIndex: 100,
       }}
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
     >
       <div
+        role="presentation"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: BG_CARD,
@@ -1693,6 +1699,7 @@ function TemplateDialog(props: {
           {sources.map((source) => (
             <label
               key={source.id}
+              aria-label={templateName(source.id)}
               style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer", fontSize: 13, color: TEXT_MAIN }}
             >
               <input
