@@ -1,30 +1,11 @@
 // Engine package — implementation in issues #14–#19, #64.
 // Issue #16 lands the kmcmplib WASM oracle wrapper.
 
-export {
-  runLexicalChecks,
-  runReferenceChecks,
-  runAllChecks,
-} from "./validator/index.js";
-
-// Layer A′ import-fidelity checks (I1–I6). Deliberately NOT part of the
-// runAllChecks path above: they run once at import time, outside the 300 ms
-// debounce cycle (see validator/index-import-fidelity.ts). The studio's live
-// import path invokes both stages when it parses a base keyboard.
-export {
-  runImportFidelityParseChecks,
-  runImportFidelityEmitChecksSync,
-  runImportFidelityRoundTripCheck,
-  ROUND_TRIP_DIVERGENCE_CODE,
-} from "./validator/index-import-fidelity.js";
-export type {
-  RoundTripDeps,
-  RoundTripSourceFile,
-} from "./validator/index-import-fidelity.js";
+export { runLexicalChecks, runReferenceChecks, runAllChecks } from "./validator/index.js";
 
 // Issue #20 — base-browser GitHub API client.
-export { createStartBrowser } from "./start-browser/index.js";
-export type { StartBrowserConfig } from "./start-browser/index.js";
+export { createBaseBrowser } from "./base-browser/index.js";
+export type { BaseBrowserConfig } from "./base-browser/index.js";
 
 // Issue #16 — WASM oracle public surface.
 export {
@@ -34,26 +15,22 @@ export {
 } from "./validator/oracle.js";
 export { OracleLoadError } from "./validator/OracleLoadError.js";
 export type { OracleLoadReason } from "./validator/OracleLoadError.js";
-export type { GroupName, LintOptions } from "./validator/types.js";
+export type {
+  GroupName,
+  LintOptions,
+} from "./validator/types.js";
 export { ALL_GROUPS, TS_GROUPS, WASM_GROUPS } from "./validator/types.js";
 export type {
   WasmOracleHandle,
   RawWasmFinding,
 } from "./validator/wasmLoader.js";
 export { loadWasmOracle } from "./validator/wasmLoader.js";
-export {
-  CODE_MAP,
-  translatePassthrough,
-  translateWasmFinding,
-} from "./validator/codeMap.js";
+export { CODE_MAP, translatePassthrough, translateWasmFinding } from "./validator/codeMap.js";
 export type { CodeMapEntry } from "./validator/codeMap.js";
 
 // Issue #17 — Compiler service public surface (in-browser kmcmplib WASM).
 export { compile, init, isReady, compilerService } from "./compiler/index.js";
-export {
-  stripDanglingAssetStores,
-  dropUnbackedBitmapStore,
-} from "./compiler/stripDanglingAssetStores.js";
+export { stripDanglingAssetStores, dropUnbackedBitmapStore } from "./compiler/stripDanglingAssetStores.js";
 export { parseKmnHeaderStores } from "./compiler/parseKmnHeaderStores.js";
 export type { KmnHeaderStore } from "./compiler/parseKmnHeaderStores.js";
 export { parseKpjFlags } from "./compiler/parseKpjFlags.js";
@@ -67,28 +44,15 @@ export type {
   FetchKeyboardSourceResult,
   KpsFontEntry,
   KpsStylesheetEntry,
-  StartDocCssText,
 } from "./loader/fetchKeyboardSourceToVfs.js";
 
 // Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).
-export {
-  createOutputService,
-  toZip,
-  serializeToZip,
-  createGitHubOutputService,
-} from "./output/index.js";
-export type {
-  GitHubOutputConfig,
-  GitHubFetchFn,
-  ToZipOptions,
-} from "./output/index.js";
+export { createOutputService, toZip, serializeToZip, createGitHubOutputService } from "./output/index.js";
+export type { GitHubOutputConfig, GitHubFetchFn, ToZipOptions } from "./output/index.js";
 
 // Option B (org-mediated PR) output service.
 export { createManagedPROutputService } from "./output/index.js";
-export type {
-  ManagedPRFetchFn,
-  ManagedPROutputConfig,
-} from "./output/index.js";
+export type { ManagedPRFetchFn, ManagedPROutputConfig } from "./output/index.js";
 
 // Issue #233 — KeyboardIR codec public surface.
 export {
@@ -105,34 +69,21 @@ export type { ParseResult, OpaqueReason } from "./codec/index.js";
 
 // OSK (visual keyboard) generation from KeyboardIR.
 export { generateKvksFromIR } from "./osk/generate-kvks.js";
-export { oskContinueResult } from "./osk/complete-osk-step.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
 // The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.
 export { computeSha256Hex } from "./codec/index.js";
 
 // Issue #239 — .kmn.imported sidecar + import-attribution.
-export {
-  addSidecar,
-  isSidecarPath,
-  buildImportAttributionBlock,
-} from "./output/index.js";
+export { addSidecar, isSidecarPath, buildImportAttributionBlock } from "./output/index.js";
 export type { ImportAttributionInput } from "./output/index.js";
 
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
-// The one place the output release version is decided (spec 094).
-export { resolvePublishVersion, resolveTestBuildVersion } from "./output/index.js";
-export type { OutputVersionMode, TestBuildVersionResult } from "./output/index.js";
 // Installable package (.kmp) — the primary download (spec §12). `buildKmp`
 // lazily imports @keymanapp/kmc-package on first call, so naming it here does
 // not pull jszip/marked into a consumer's entry chunk.
-export {
-  buildKmp,
-  initKmpCompiler,
-  isKmpCompilerReady,
-  ensurePackageFiles,
-} from "./output/index.js";
+export { buildKmp, initKmpCompiler, isKmpCompilerReady, ensurePackageFiles } from "./output/index.js";
 export type {
   BuildKmpResult,
   BuildKmpOptions,
@@ -180,31 +131,18 @@ export type {
 export {
   applyContextToleranceOverlay,
   buildContextToleranceOverlay,
-  buildNormalizationStepOverlay,
-  isNormalizationStepBatch,
-  NORMALIZATION_STEP_SITE_ID,
-  overlayHasNormalizationStep,
   presentContextToleranceSites,
   removeContextToleranceOverlay,
 } from "./pattern-apply/context-tolerance-overlay.js";
 export type {
   ContextToleranceOverlay,
   ContextToleranceOverlayBatch,
-  ContextToleranceRulesBatch,
-  NormalizationStepBatch,
   ContextToleranceOverlayResult,
 } from "./pattern-apply/context-tolerance-overlay.js";
 
 // Issue #234 — pattern recognizer public surface.
-export {
-  recognizePatterns,
-  classifyRemovalCapabilities,
-} from "./recognizer/index.js";
-export type {
-  RecognizerRule,
-  MatchResult,
-  RecognizeResult,
-} from "./recognizer/index.js";
+export { recognizePatterns, classifyRemovalCapabilities } from "./recognizer/index.js";
+export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.js";
 
 // spec 059 — the single package-descriptor writer. Both authoring tracks reach
@@ -216,8 +154,6 @@ export {
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
-  kpsMemberRef,
-  normaliseKpsFontEntries,
   // spec 080 FR-002 — the welcome page's folder-convention member reference.
   WELCOME_PAGE_KPS_REF,
   welcomeFolderKpsRef,
@@ -225,7 +161,6 @@ export {
 export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
-  KpsFontDescriptorEntry,
 } from "./package-descriptor/index.js";
 
 // spec 065 — help-docs rendering. The one implementation both the output
@@ -244,36 +179,8 @@ export {
   // `<img src>` extractor the projection diffs carried images against.
   renderWelcomeLayoutSection,
   extractWelcomeImageRefs,
-  README_HTM_ADDS_CAP,
 } from "./shared/helpDocsRender.js";
-export type {
-  DocSection,
-  GeneratedDocSlots,
-  HelpDocsRenderInput,
-} from "./shared/helpDocsRender.js";
-// spec 110 — the facts README.md and readme.htm are both rendered from.
-export { extractReadmeDescription } from "./shared/readmeFacts.js";
-export type {
-  ReadmeCharacterGroup,
-  ReadmeCharacterKind,
-  ReadmeComposition,
-  ReadmeFacts,
-  ReadmeLanguage,
-  ReadmeTypingRow,
-} from "./shared/readmeFacts.js";
-
-// spec 102 — documentation forms: the renderer, the slot vocabulary, the
-// per-file escapers and the markers around Track 2's generated sections.
-export { renderDocForm, parseDocForm, DocFormParseError } from "./shared/renderDocForm.js";
-export {
-  DOC_SLOT_IDS,
-  DOC_GENERATED_START,
-  DOC_GENERATED_END,
-  stripGeneratedBlocks,
-  escapeDocHtml,
-  escapeDocMarkdown,
-} from "./shared/docSlots.js";
-export type { DocSlotModel, DocSlotId } from "./shared/docSlots.js";
+export type { DocSection, HelpDocsRenderInput } from "./shared/helpDocsRender.js";
 
 // spec 080 FR-022 — the one derivation of each documentation member's source
 // tier + placeholder state (research R5); the Output checklist and the
@@ -289,19 +196,10 @@ export type { DeriveDocMemberStatesInput } from "./shared/deriveDocMemberStates.
 
 // spec 080 FR-010..012 — the HISTORY proposal built from the decision record
 // and the one HISTORY.md renderer both tracks write through (research R6).
-export {
-  buildHistoryProposal,
-  historyEntryHeading,
-} from "./decision-audit/index.js";
+export { buildHistoryProposal, historyEntryHeading } from "./decision-audit/index.js";
 export type { HistoryProposalSeed } from "./decision-audit/index.js";
-export {
-  renderHistoryMd,
-  HISTORY_INITIAL_RELEASE_BULLET,
-  adaptedFromBullet,
-  createdFromBullet,
-  splitHistoryPreamble,
-} from "./shared/renderHistoryMd.js";
-export type { HistoryLineage, RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
+export { renderHistoryMd, HISTORY_INITIAL_RELEASE_BULLET, adaptedFromBullet, splitHistoryPreamble } from "./shared/renderHistoryMd.js";
+export type { RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
 
 // spec 080 FR-013..016 — deterministic SVG layout charts (research R1/R2).
 export {
@@ -318,38 +216,12 @@ export {
   SCRIPT_COVERAGE_RANGES,
   isCodePointCovered,
   formatCodePointLabel,
-  DESKTOP_GEOMETRY,
-  DESKTOP_GEOMETRY_WIDTH,
 } from "./layout-chart/index.js";
-export type {
-  KeyLegibilityKind,
-  KeyLegibilityResult,
-  ScriptCoverageRange,
-} from "./layout-chart/index.js";
+export type { KeyLegibilityKind, KeyLegibilityResult, ScriptCoverageRange } from "./layout-chart/index.js";
 
 // spec 080 FR-008/FR-009 — base documentation classification (research R4).
-export {
-  classifyStartDocumentation,
-  extractUsableBaseDescription,
-} from "./start-browser/index.js";
-
-// spec 084 Batch 1 — .kps metadata extraction for the criteria assembly
-// (the studio parses the judged .kps with these and hands the facts to
-// keyboard-lint via contracts' CriteriaLintInput; keyboard-lint itself
-// must not import the engine).
-export {
-  parseKps,
-  parseKpsFiles,
-  parseKpsFontRefs,
-  parseKpsPackageDetails,
-} from "./start-browser/kps-parser.js";
-export type {
-  KpsMetadata,
-  KpsFileEntry,
-  KpsFontRefs,
-  KpsPackageDetails,
-} from "./start-browser/kps-parser.js";
-export type { StartBrowserServiceWithDocProfile } from "./start-browser/index.js";
+export { classifyBaseDocumentation, extractUsableBaseDescription } from "./base-browser/index.js";
+export type { BaseBrowserServiceWithDocProfile } from "./base-browser/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export {
@@ -378,18 +250,10 @@ export {
   touchLayerForChar,
 } from "./pattern-apply/touchLayer.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
-export type {
-  ScaffoldIROptions,
-  ScaffoldIRIdentity,
-} from "./scaffolder/scaffold-ir.js";
+export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
 // Issue #21 — Pattern-library loader.
-export {
-  loadPatterns,
-  getPatterns,
-  getById,
-  toPattern,
-} from "./pattern-library/index.js";
+export { loadPatterns, getPatterns, getById, toPattern } from "./pattern-library/index.js";
 export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
 
 // toPattern/rankPatterns have no node:fs/node:path dependency (unlike
@@ -418,8 +282,6 @@ export { defaultFillAxes } from "./strategy-selector/default-fill.js";
 export type { DefaultFillResult } from "./strategy-selector/default-fill.js";
 // §7.2 rule 3a — base-derived A3a detection on the Track 2 import path.
 export { detectMarkInputOrderFromImport } from "./strategy-selector/import-mark-order.js";
-// §7.2 rule 8 — derived A7a (remap posture) detection from target identity + base IR.
-export { deriveRemapPosture } from "./strategy-selector/derive-remap-posture.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
@@ -429,40 +291,19 @@ export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 // Internal helpers (buildLinguistPrompt, parseLinguistJson, cldrCrossCheck,
 // parseUnicodeSet, loadExemplars, SCRIPT_BLOCKS) are NOT re-exported here;
 // tests import them directly from the module file.
-export {
-  createCharacterDiscoveryService,
-  isBidiControlCodePoint,
-} from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export { createCharacterDiscoveryService, isBidiControlCodePoint } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export type {
-  CldrLoader,
-  CldrFullLoader,
-  ExemplarResult,
-} from "./character-discovery/cldr.js";
+export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-discovery/cldr.js";
 // The live-CLDR fetch path. NOT the authoring path since spec 044 — authoring
 // reads the committed offline CLDR+SLDR index via sourceExemplars below. These
 // stay exported unchanged as the opt-in live-refresh route and the injection
 // seam every existing test uses.
-export {
-  createFetchCldrLoader,
-  createFetchCldrFullLoader,
-  compareCldrVersions,
-  latestStableCldrVersion,
-  LEGACY_FETCH_CLDR_VERSION,
-} from "./character-discovery/cldr.js";
-// Opt-in live refresh of exemplar data (#1367): author-initiated only,
-// version-guarded, installed inside the single sourcing path above.
-export {
-  refreshExemplars,
-  pinnedCldrRelease,
-} from "./character-discovery/exemplarRefresh.js";
-export type { ExemplarRefreshResult } from "./character-discovery/exemplarRefresh.js";
+export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-discovery/cldr.js";
 // The single exemplar-sourcing path (spec 044 FR-015): offline, deterministic,
 // version-pinned, covering both CLDR and SLDR with per-character attribution.
 export {
   loadExemplarSource,
   sourceExemplars,
-  sourceExemplarsBoth,
   exemplarLocaleCandidates,
   isGatedTag,
   charactersInTier,
@@ -470,45 +311,30 @@ export {
 export type {
   ExemplarTier,
   ExemplarSource,
-  TextSampleSource,
   ExemplarConfidence,
   SourcedCharacter,
   SourcedInventory,
-  ExemplarInventory,
 } from "./character-discovery/exemplarTypes.js";
 // Phase B high-confidence missing-character suggestions, now CLDR+SLDR-grounded.
-export {
-  suggestMissingCharacters,
-  neededCharsForLanguage,
-  isCharCoveredForLocale,
-} from "./character-discovery/suggestMissing.js";
-export type {
-  MissingCharSuggestions,
-  CharNormalizationForm,
-} from "./character-discovery/suggestMissing.js";
+export { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./character-discovery/suggestMissing.js";
+export type { MissingCharSuggestions, CharNormalizationForm } from "./character-discovery/suggestMissing.js";
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
-export { caseCounterpart, confirmedCaseCounterpart } from "./character-discovery/casePair.js";
+export { caseCounterpart } from "./character-discovery/casePair.js";
 // Pre-carve "keep these for convenience?" candidates: basic-Latin letters the
 // base produces that the orthography does not use (loanwords / email / URLs).
-export {
-  surplusBasicLatinCandidates,
-  candidateChars,
-} from "./character-discovery/convenienceChars.js";
-export type {
-  ConvenienceCandidate,
-  SurplusBasicLatinArgs,
-} from "./character-discovery/convenienceChars.js";
+export { surplusBasicLatinCandidates, candidateChars } from "./character-discovery/convenienceChars.js";
+export type { ConvenienceCandidate, SurplusBasicLatinArgs } from "./character-discovery/convenienceChars.js";
 // Punctuation defaults (spec 075): the CLDR-tier + base-produced proposal the
 // punctuation step seeds on arrival, and the fixed basic-ASCII floor that
 // stands in for base output when opaque fragments make it unknowable.
 export {
   ASCII_PUNCTUATION_FLOOR,
-  startPunctuationCoverage,
+  basePunctuationCoverage,
   buildPunctuationProposal,
 } from "./character-discovery/punctuationProposal.js";
 export type {
-  StartPunctuationCoverage,
+  BasePunctuationCoverage,
   CldrAbsentReason,
   PunctuationProposalInput,
   PunctuationProposal,
@@ -516,17 +342,8 @@ export type {
 // Phase B tiered/browsable character-map candidate builder (right pane).
 // Reuses the cldr.ts exemplar-loading path; CHARACTER_MAP_BLOCKS is a
 // SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
-export {
-  buildCharacterMap,
-  CHARACTER_MAP_BLOCKS,
-  isCombiningMarkChar,
-  isPrivateUseCodePoint,
-} from "./character-discovery/characterMap.js";
-export type {
-  CharacterMapTier,
-  CharacterMapCell,
-  CharacterMapGroup,
-} from "./character-discovery/characterMap.js";
+export { buildCharacterMap, CHARACTER_MAP_BLOCKS, isCombiningMarkChar, isPrivateUseCodePoint } from "./character-discovery/characterMap.js";
+export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./character-discovery/characterMap.js";
 // Whole-grapheme decomposition for the three-store confirmed alphabet (spec 071):
 // one base + ordered combining marks; null for PUA / plain letters / digraphs.
 export { decomposeGrapheme } from "./character-discovery/decompose.js";
@@ -534,125 +351,34 @@ export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
 // spec 047 — pure Unicode General-Category classifier for the inventory breakdown.
 export { glyphCategory } from "./character-discovery/glyphCategory.js";
 export type { GlyphCategory } from "./character-discovery/glyphCategory.js";
-// Per-character Unicode facts for the character map's
-// hover/focus info popover. Pure + dependency-free: the pinned table is
-// injected by the caller (dynamically imported in the studio) so this adds
-// nothing to any bundle statically.
-export { describeCharacter } from "./character-discovery/describeCharacter.js";
-export type {
-  CharacterDescription,
-  DescribedCodePoint,
-  UnicodeCharacterLookups,
-} from "./character-discovery/describeCharacter.js";
 
 // Marks question series (spec 071): pure engine functions behind the S0-S5
 // stations — the shared posture table is the single source the facet, the S4
 // proposal, the unwrap stores, and the blocking rules all read.
-export {
-  nfcPostureOfInventory,
-  aggregateInventoryPosture,
-} from "./marks/nfc-posture-of-inventory.js";
-export type {
-  PosturePair,
-  InventoryPosture,
-} from "./marks/nfc-posture-of-inventory.js";
-export {
-  groupMarkClasses,
-  attestedBasesOf,
-  attestedLetterCount,
-  buildAttestationFold,
-  marksLackingPairingEvidence,
-  ATTACHMENT_SIMILARITY_THRESHOLD,
-} from "./marks/mark-classes.js";
-export type { AttestationCaseFold, MarkClass } from "./marks/mark-classes.js";
-export {
-  proposeAttachments,
-  deriveCaseCounterparts,
-} from "./marks/attachment-proposals.js";
-export type { ProposeAttachmentsOptions } from "./marks/attachment-proposals.js";
-export type {
-  AttachmentProposal,
-  ProposedAttachmentState,
-} from "./marks/attachment-proposals.js";
-export {
-  resolveOutputFormProposal,
-  resolveBackspaceProposal,
-  nativeBackspaceBehaviour,
-  hasDecidablePairs,
-  normalizationFormForOutputForm,
-  outputStringForStack,
-  outputFormString,
-} from "./marks/output-form-policy.js";
-export type {
-  BackspaceBehaviour,
-  BackspaceProposal,
-  OutputForm,
-  OutputFormProposal,
-} from "./marks/output-form-policy.js";
+export { nfcPostureOfInventory, aggregateInventoryPosture } from "./marks/nfc-posture-of-inventory.js";
+export type { PosturePair, InventoryPosture } from "./marks/nfc-posture-of-inventory.js";
+export { groupMarkClasses, attestedBasesOf, ATTACHMENT_SIMILARITY_THRESHOLD } from "./marks/mark-classes.js";
+export type { MarkClass } from "./marks/mark-classes.js";
+export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-proposals.js";
+export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
+export { resolveOutputFormProposal, hasDecidablePairs, normalizationFormForOutputForm } from "./marks/output-form-policy.js";
+export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
 // The S2 answer (spec 052): treatment + promotion + input order, replacing the
 // single "own letter of the alphabet" enum. See specs/052-marks-treatment-question.
-export {
-  treatmentFor,
-  makeMarkTreatmentAnswer,
-  pruneMarkOverrides,
-  dominantTreatment,
-  isClassMixed,
-} from "./marks/treatment.js";
-export type {
-  MarkTreatment,
-  MarkTreatmentAnswer,
-  PromotedComposedCharacter,
-} from "./marks/treatment.js";
-export {
-  promotableCharacters,
-  expandCaseCounterpartPromotions,
-  prunePromotions,
-} from "./marks/promotion.js";
-export {
-  computeMarkTreatmentPrefills,
-  detectStartMarkMechanism,
-  unaffordableReasonFor,
-  PRODUCTIVITY_SPREAD_THRESHOLD,
-} from "./marks/treatment-prefill.js";
-export type {
-  MarkTreatmentPrefill,
-  MarkTreatmentPrefillOptions,
-  KeyBudgetSignal,
-  StartMarkMechanism,
-} from "./marks/treatment-prefill.js";
-export {
-  deriveMarksComputedAxes,
-  surfaceStrategyDisagreement,
-} from "./marks/strategy-reconcile.js";
-export type {
-  MarksComputedAxes,
-  MarksReconcileInputs,
-  DisagreementInputs,
-} from "./marks/strategy-reconcile.js";
-export {
-  buildPlacementWorklist,
-  verifyWorklistCoverage,
-} from "./marks/worklist.js";
+export { treatmentFor, makeMarkTreatmentAnswer, pruneMarkOverrides, dominantTreatment, isClassMixed } from "./marks/treatment.js";
+export type { MarkTreatment, MarkTreatmentAnswer, PromotedComposedCharacter } from "./marks/treatment.js";
+export { promotableCharacters, expandCaseCounterpartPromotions, prunePromotions } from "./marks/promotion.js";
+export { computeMarkTreatmentPrefills, detectBaseMarkMechanism, unaffordableReasonFor, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/treatment-prefill.js";
+export type { MarkTreatmentPrefill, MarkTreatmentPrefillOptions, KeyBudgetSignal, BaseMarkMechanism } from "./marks/treatment-prefill.js";
+export { deriveMarksComputedAxes, surfaceStrategyDisagreement } from "./marks/strategy-reconcile.js";
+export type { MarksComputedAxes, MarksReconcileInputs, DisagreementInputs } from "./marks/strategy-reconcile.js";
+export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
 export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";
 export { deriveCarveNeededSet } from "./marks/carve-needed-set.js";
-export type {
-  CarveNeededSet,
-  DeriveCarveNeededSetArgs,
-} from "./marks/carve-needed-set.js";
-export {
-  applyMarkGuards,
-  MARKS_GUARD_GROUP,
-  MARKS_ALLOWED_STORE_PREFIX,
-  MARKS_UNWRAP_FROM_STORE,
-  MARKS_UNWRAP_TO_STORE,
-  MARKS_WHOLESTACK_RULE_PREFIX,
-} from "./pattern-apply/mark-guards.js";
+export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-needed-set.js";
+export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
-// Issue #2374: the per-mark "start of line" sentinel lives on the attachment
-// row; the worklist builder reads it into `bareMarkAllowed`. Re-exported so
-// the survey layer uses this exact value instead of redefining it.
-export { ATTACHMENT_START_OF_LINE } from "./marks/worklist.js";
 
 // spec 065 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
 // sanctioned door to the inherit-first proposer and the keycap judgement.
@@ -661,28 +387,6 @@ export {
   proposeKeycap,
   isKeycapRelated,
   isCombiningMark,
-} from "./pattern-apply/index.js";
-
-// spec 104 — severance transplant, its FR-029 re-link mirror, and the
-// edit-path wiring (T011/T027/T012).
-export {
-  severTouchKey,
-  relinkTouchKey,
-  applyKeyEditsWithSeverance,
-  SEVERANCE_LINE_DESCRIPTOR_ID,
-  SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID,
-} from "./pattern-apply/index.js";
-export type {
-  SeverTouchKeyRequest,
-  SeverTouchKeyResult,
-  RelinkTouchKeyMeta,
-  RelinkTouchKeyResult,
-  ApplyKeyEditsWithSeveranceOptions,
-  ApplyKeyEditsWithSeveranceResult,
-  SeveranceApplied,
-  SeveranceRefused,
-  RelinkApplied,
-  SeveranceNotice,
 } from "./pattern-apply/index.js";
 export type {
   TouchKeyIdProposalRequest,
@@ -723,20 +427,14 @@ export type {
 // rather than re-deriving platform/layer/row traversal a third time
 // (contracts/key-edit-overlay.md §5).
 export { resolveKeyAddress } from "./pattern-apply/index.js";
-export type {
-  AddressableLayoutLike,
-  ResolvedKeyLocation,
-} from "./pattern-apply/index.js";
+export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply/index.js";
 
 // spec 063 T060 — re-derivation resilience (FR-033b): `resolveSubKeyEntry`
 // resolves a setSubKey/removeSubKey's sub-entry against a layout the same
 // way `resolveKeyAddress` resolves the main key; `declaredOperationOutput`
 // answers the cheap, layout-free half of "what character did this operation
 // carry" for the three op kinds that author `output` directly.
-export {
-  resolveSubKeyEntry,
-  declaredOperationOutput,
-} from "./pattern-apply/index.js";
+export { resolveSubKeyEntry, declaredOperationOutput } from "./pattern-apply/index.js";
 
 // spec 063 T095/T097 — the `suppress` compound derivation (FR-029b). The
 // studio must never hand-build a `{ sp, id }` suppression: `sp` governs
@@ -749,10 +447,7 @@ export {
 // `applySuppressSemantics` is exported beside it so a studio-side preview can
 // derive the same result the appliers will, including its rejection of any
 // id outside RESERVED_SENTINEL_KEY_IDS.
-export {
-  proposeSuppressFields,
-  applySuppressSemantics,
-} from "./pattern-apply/index.js";
+export { proposeSuppressFields, applySuppressSemantics } from "./pattern-apply/index.js";
 export type {
   SuppressShapeChoice,
   SuppressKeyOp,
@@ -764,10 +459,7 @@ export type {
 // overlay into an *effective* layout to project from (the key grid's view
 // model, the preview's live-layout override). Case A's applier is exported
 // beside it because replay is a thin wrapper over that loop.
-export {
-  applyKeyEditsToLayout,
-  replayKeyEditOverlay,
-} from "./pattern-apply/index.js";
+export { applyKeyEditsToLayout, replayKeyEditOverlay } from "./pattern-apply/index.js";
 export type {
   ApplyKeyEditsToLayoutResult,
   ReplayKeyEditOverlayResult,
@@ -902,7 +594,6 @@ export type {
 } from "./pattern-apply/index.js";
 export {
   ensureTouchKeyRule,
-  insertBlockBeforeTerminalRules,
   planGuardSynthesis,
   applyGuardSynthesis,
   checkOpaqueGate,
@@ -941,114 +632,8 @@ export type {
 } from "./pattern-apply/index.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export {
-  substituteSlots,
-  applyAssignments,
-  applyAssignmentsToVfs,
-  DEADKEY_PATTERNS,
-  OUTPUT_FORM_SEAM_PATTERN_IDS,
-  applyOutputFormSeam,
-  applyCarveToVfs,
-  carveFilterIr,
-  deriveCarvedIr,
-  partitionCarveItemIds,
-  applyKeycapLabelsToVfs,
-  applyCarveKeycapRemovalsToVfs,
-  collectCarvedKeycapTexts,
-  scanRemovedTouchKeyIds,
-  removedTouchKeyRuleIds,
-  resolveRenderableMechanisms,
-  applyTouchAssignments,
-  applyTouchAssignmentsToRawJson,
-  applyDesktopModifications,
-  applyDesktopModificationsToRawJson,
-  propagateDesktopLayersToTouch,
-  applyStoreSlotRemovals,
-  classifyStoreSlotEdit,
-  describeStorePairing,
-  analyzeStores,
-  storeRoleOf,
-  buildProducerIndex,
-  parseSlotId,
-  makeSlotId,
-  collectCharContributors,
-  collectCharContributorsBatched,
-  collectTaintedContributors,
-  sliceContributorDescriptors,
-  collectCompositionMethod,
-  isMnemonicLayout,
-  keyHasCapsHandling,
-  buildShiftRuleLines,
-  buildStartRuleLines,
-  buildCasePairRuleLines,
-  planShiftAssignment,
-  MODIFIER_EXCLUSIONS,
-  canonicalizeCombo,
-  comboToKeySpec,
-  parseKeySpec,
-  comboToTouchLayerId,
-  comboToKvksShiftToken,
-  kvksShiftTokenToLayerId,
-  kvksShiftTokenToHelpLayerId,
-  collectModifierTokensInUse,
-  collectLayerCombosInUse,
-  buildComboKeyMap,
-  addableTouchLayerTokens,
-  optionsForTouchLayerSlot,
-  isPlusSeparator,
-  touchKeyAddress,
-  touchSubKeyAddress,
-  touchFlickAddress,
-  PLATFORM_MAX_KEYS_PER_ROW,
-  platformMaxKeysPerRow,
-  countInteractiveRowKeys,
-  computeRowMetrics,
-  DEFAULT_KEY_WIDTH_PCT,
-  DEFAULT_KEY_PAD_PCT,
-  enumerateTouchMethodsForChar,
-  applyTouchKeycapRemovalsToLayout,
-  applyTouchKeycapRemovalsToRawJson,
-  applyTouchKeycapRemovalsToVfs,
-  buildSessionProducedSet,
-  findOe2SoleSourceGlyphs,
-  findSessionOe2SoleSourceGlyphs,
-  isOe2VkeyName,
-} from "./pattern-apply/index.js";
-export type {
-  SubstituteResult,
-  ApplyAssignmentsResult,
-  OutputFormOptions,
-  EmitUnit,
-  ApplyTouchAssignmentsResult,
-  ApplyTouchAssignmentsToRawJsonResult,
-  DesktopModifications,
-  ApplyDesktopModificationsResult,
-  ApplyDesktopModificationsToRawJsonResult,
-  PropagateDesktopLayersToTouchResult,
-  ApplyCarveToVfsOpts,
-  ApplyCarveToVfsResult,
-  CarvePipelineOpts,
-  CarvePipelineInput,
-  CarvePipelineResult,
-  CarveKeycapRemovalInput,
-  StoreSlotRemovalResult,
-  CascadedSlotRemoval,
-  StoreSlotEditMode,
-  StoreSlotBlockReason,
-  StorePairingDescription,
-  StoreAnalysis,
-  StoreRole,
-  ProducerIndex,
-  CharContributors,
-  ContributorDescriptor,
-  SlicedContributorDescriptors,
-  ShiftAssignmentPlan,
-  ModifierToken,
-  TouchMethodDescriptor,
-  ApplyTouchKeycapRemovalsResult,
-  ApplyTouchKeycapRemovalsToRawJsonResult,
-  KeyEditOverlay,
-} from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, sliceContributorDescriptors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, kvksShiftTokenToLayerId, kvksShiftTokenToHelpLayerId, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, PLATFORM_MAX_KEYS_PER_ROW, platformMaxKeysPerRow, countInteractiveRowKeys, computeRowMetrics, DEFAULT_KEY_WIDTH_PCT, DEFAULT_KEY_PAD_PCT, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs, buildSessionProducedSet } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, SlicedContributorDescriptors, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult, KeyEditOverlay } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on
 // the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.
@@ -1103,10 +688,7 @@ export type {
 } from "./facet-transform/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
-export {
-  producedGlyphs,
-  collectFromOutput,
-} from "./inventory/producedGlyphs.js";
+export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";
 export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
 
 // Inventory diff (spec §8): needed-vs-produced coverage delta.
@@ -1114,7 +696,7 @@ export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
 // First production caller: the studio's punctuation step (spec 075 FR-011)
 // shows the missing-side count of the chosen punctuation before Done.
 // `hasUnaccountedOpaqueFragment` is the shared "is the base's output fully
-// known?" predicate the delta and `startPunctuationCoverage` both derive from.
+// known?" predicate the delta and `basePunctuationCoverage` both derive from.
 export {
   computeInventoryDelta,
   hasUnaccountedOpaqueFragment,
@@ -1133,81 +715,5 @@ export {
   clearFacetOverride,
   scriptOf,
   scriptExtensionsOf,
-  outputScriptProfile,
-  CONFIDENT_SCRIPT_SHARE,
 } from "./facets/index.js";
-export type { OutputScriptProfile } from "./facets/index.js";
 export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";
-
-// Deadkey lifecycle mutations (spec 083, issue #1849 — Phase 2): IR-to-IR
-// define / rename / delete / retarget with explicit (never silent) conflicts.
-export {
-  defineDeadkey,
-  renameDeadkey,
-  deleteDeadkey,
-  retargetDeadkey,
-} from "./deadkey-lifecycle/index.js";
-export type {
-  DeadkeyConflict,
-  DeadkeyConflictKind,
-  DeadkeyMutationResult,
-  DefineDeadkeyOptions,
-  DeleteDeadkeyOptions,
-  RenameDeadkeyOptions,
-  RetargetDeadkeyOptions,
-} from "./deadkey-lifecycle/index.js";
-export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
-export type { RgbaImage } from "./icon/icoEncoder.js";
-export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
-
-// LDML keyboard export (spec 108). The barrel exposes the public API only; it
-// exposes no test tooling (`ldml-export/__testing__` is never re-exported).
-export type {
-  CompatibilityItem,
-  LdmlBaseLayout,
-  LdmlBaseLayoutId,
-  LdmlBaseLayoutLayerName,
-  LdmlBaseLayoutSource,
-  LdmlClassification,
-  LdmlClassifyInput,
-  LdmlCode,
-  LdmlExportInput,
-  LdmlExportMetadata,
-  LdmlExportResult,
-  LdmlPackageBinaryFile,
-  LdmlPackageFiles,
-  LdmlProfileId,
-  LdmlSeverity,
-  LdmlSide,
-  LdmlStatus,
-  LdmlVKey,
-  RowId,
-} from "./ldml-export/index.js";
-
-export {
-  buildLdmlExport,
-  buildLdmlInBrowser,
-  buildLdmlKmp,
-  classifyForLdml,
-  compareToKeymanGaps,
-  compileLdmlInBrowser,
-  initLdmlCompiler,
-  listLdmlProfiles,
-  renderCompileReport,
-  renderReport,
-  resolveLdmlProfile,
-} from "./ldml-export/index.js";
-export type {
-  BuildLdmlKmpOptions,
-  BuildLdmlKmpResult,
-  ExpectedKeymanError,
-  KeymanBuildResult,
-  KeymanCompileResult,
-  KeymanGapComparison,
-  KeymanMessage,
-} from "./ldml-export/index.js";
-export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
-
-// Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
-export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
-export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";

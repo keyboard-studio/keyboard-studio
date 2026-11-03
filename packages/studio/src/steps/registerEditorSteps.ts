@@ -29,6 +29,7 @@ import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import { OskEditor } from "../editors/assignLoop/OskEditor.tsx";
+import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -292,6 +293,26 @@ export const touchStep: EditorStep = step({
   surface: "touch",
   writes: [...TOUCH_WRITES],
   specRef: ["specs/035-mobile-touch-derivation"],
+  persistence: "working-copy",
+});
+
+// ---------------------------------------------------------------------------
+// CSS editor step (optional, after Touch)
+// ---------------------------------------------------------------------------
+
+/**
+ * CSS editor step: custom stylesheet for the keyboard (`&KMW_EMBEDCSS`).
+ * Optional — the user can skip it. If CSS is provided, it's written to
+ * `source/<keyboardId>.css` in the VFS; if empty, no file is written.
+ * Includes a live preview showing the CSS applied to both the touch layout
+ * and the desktop OSK (CSS affects mostly touch, but possibly desktop too).
+ */
+export const cssStep: EditorStep = step({
+  id: "css",
+  title: "Custom CSS",
+  layout: "full",
+  component: CssEditor,
+  specRef: ["specs/css-editor"],
   persistence: "working-copy",
 });
 
