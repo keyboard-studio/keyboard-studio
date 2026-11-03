@@ -120,8 +120,8 @@ Files: `packages/studio/src/editors/fallback/FallbackPolicySection.tsx` and its 
 
 ## Phase 6: Polish
 
-- [ ] **T026** Update the phonebook row for any new keyboard cited, and the spec 076 AS-BUILT cross-reference to FR-005 shipping · docs/keyboard-index.md, specs/076-rule-behaviours/AS-BUILT.md
-- [ ] **T027** Validate against the Success Criteria: run `pnpm lint`, the contracts, engine and studio suites, and the Playwright walk (SC-001 to SC-007; SC-005 deferred as noted in Phase 3)
+- [x] **T026** Update the phonebook row for any new keyboard cited, and the spec 076 AS-BUILT cross-reference to FR-005 shipping · docs/keyboard-index.md, specs/076-rule-behaviours/AS-BUILT.md
+- [x] **T027** Validate against the Success Criteria: run `pnpm lint`, the contracts, engine and studio suites, and the Playwright walk (SC-001 to SC-007; SC-005 deferred as noted in Phase 3)
 
 ## Dependencies & Execution Order
 

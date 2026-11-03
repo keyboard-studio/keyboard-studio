@@ -44,8 +44,9 @@ Only User Story 6 (carved key combinations) of the 6-story spec; tasks.md was re
 
 ## Follow-ups and open issues
 - Remaining behaviours: FR-001, FR-005..FR-017 (new spec needed). FR-005 (`swallowUndefined`)
-  and the fallback surface are taken by [spec 109](../109-base-keyboard-fallback/spec.md); the
-  others still need a spec.
+  and the fallback surface are shipped by [spec 109](../109-base-keyboard-fallback/spec.md), which
+  also makes `fallbackPolicy` per class (letters, digits, punctuation) and replaces the stub
+  enumeration with one positional enumerator; the others still need a spec.
 - Stale links: `docs/tooling.md:163` cites FR-023 by number only (fine); `specs/082`, `specs/007` cite spec 076 as prose.
 - Code cites `spec 076 FRxxx` in comments and resolves to this stub.
 

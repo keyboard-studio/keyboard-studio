@@ -3,7 +3,7 @@
   "specName": "Base-keyboard fallback",
   "branch": "109-base-keyboard-fallback",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -267,6 +267,29 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-02T21:12:59.954Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-02T21:16:43.195Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T05:23:20.086Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T05:23:20.224Z"
     }
   ],
   "telemetryInstanceId": "ee5e0dea-8a72-4033-b2da-cc75fdcc9801",
@@ -297,7 +320,7 @@
       "summary": "27 tasks in 6 phases: foundational policy, data, enumerator, compile, surface, polish"
     },
     "implement": {
-      "summary": "Phase 2: 186 catalog layouts carry character data"
+      "summary": "spec 109 polish: 076 cross-reference updated, gates validated"
     }
   },
   "approach": "Generate char data for all catalog layouts, add a shared positional enumerator, split FallbackPolicy per class with a confirmed flag, compile swallowUndefined as one store plus nul rule via mutate(), rebuild the surface.",
@@ -441,7 +464,7 @@
       ]
     }
   },
-  "currentTask": "T025",
+  "currentTask": "T027",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -637,6 +660,17 @@
       "files": [
         "packages/studio/e2e/fallback-policy.spec.ts"
       ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Phonebook already has all cited keyboards; 076 AS-BUILT now says FR-005 shipped by spec 109",
+      "files": [
+        "specs/076-rule-behaviours/AS-BUILT.md"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "typecheck, lint, contracts/engine suites green; studio suite green except 30s load timeouts, which pass in isolation with a longer timeout; Playwright walk passes"
     }
   },
   "verified": [
@@ -663,6 +697,16 @@
       "exitCode": 0,
       "durationSeconds": 24.6,
       "result": "packages/engine typecheck: Done · packages/studio typecheck$ tsc --noEmit · packages/studio typecheck: Done"
+    },
+    {
+      "what": "typecheck+lint",
+      "command": "pnpm typecheck && pnpm lint",
+      "result": "pass"
+    },
+    {
+      "what": "playwright fallback-policy walk",
+      "command": "playwright test e2e/fallback-policy.spec.ts",
+      "result": "1 passed"
     }
   ],
   "concerns": [
@@ -676,6 +720,10 @@
     },
     {
       "note": "nul rules leave a cell unknown rather than recording produces-nothing; leak logic shows such keys as unknown",
+      "step": "implement"
+    },
+    {
+      "note": "Full pnpm -r test run: 31 studio tests timed out at the 30s default on first-import transform (machine load); the 13 affected files pass 114/114 with --testTimeout=200000. SC-005 deferred per Phase 3.",
       "step": "implement"
     }
   ],
