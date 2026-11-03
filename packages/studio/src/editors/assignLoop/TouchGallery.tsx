@@ -7474,6 +7474,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         selectedKeyAddress={selectedKeyAddress}
         onSelectKey={setSelectedKeyAddress}
         commitOp={commitKeyEditOp}
+        fontFaceUrl={stage.kind === "ready" ? stage.fontFaceUrl : undefined}
+        fontFaceFamily={stage.kind === "ready" ? stage.fontFaceFamily : undefined}
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit

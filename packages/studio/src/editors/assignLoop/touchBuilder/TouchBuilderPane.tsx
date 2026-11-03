@@ -59,6 +59,13 @@ export interface TouchBuilderPaneProps {
   readonly onSelectKey: (address: string | null) => void;
   /** The bare-op commit entry point (`commitKeyEditOp`). */
   readonly commitOp: (op: PendingKeyEditOperation) => boolean;
+  /**
+   * The keyboard's font as a blob URL + CSS family (from the artifact
+   * stage). Injected as a FontFace so keycaps render in the real typeface
+   * instead of the UI font.
+   */
+  readonly fontFaceUrl?: string | undefined;
+  readonly fontFaceFamily?: string | undefined;
 }
 
 interface SubKeySelection {
@@ -127,6 +134,24 @@ const FLICK_GRID: Record<FlickDirection, { row: number; col: number }> = {
   se: { row: 3, col: 3 },
 };
 
+/**
+ * Keycap font stack: the touch layout's per-platform configured `font`
+ * (Noto / Charis SIL / Andika — TIKE's Keyboard Font dialog) first, then the
+ * keyboard's loaded font, then the system UI stack.
+ */
+function keycapFontFamily(
+  platformFont: string | undefined,
+  loadedFamily: string | undefined,
+): string {
+  const families: string[] = [];
+  if (platformFont !== undefined && platformFont !== "") families.push(`"${platformFont}"`);
+  if (loadedFamily !== undefined && loadedFamily !== "" && loadedFamily !== platformFont) {
+    families.push(`"${loadedFamily}"`);
+  }
+  families.push("system-ui", "-apple-system", "'Segoe UI'", "sans-serif");
+  return families.join(", ");
+}
+
 export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   const { t } = useLingui();
   const {
@@ -138,7 +163,43 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     selectedKeyAddress,
     onSelectKey,
     commitOp,
+    fontFaceUrl,
+    fontFaceFamily,
   } = props;
+
+  // Load the keyboard's font into the document so keycaps render in the real
+  // typeface. TIKE rendered keycaps in the platform's configured font; the
+  // port was using the UI font, which shows tofu for scripts the UI font
+  // lacks (the reported "weird font artifacts").
+  useEffect(() => {
+    if (fontFaceUrl === undefined || fontFaceFamily === undefined) return;
+    if (typeof FontFace === "undefined" || typeof document === "undefined") return;
+    const fonts = (document as Document).fonts;
+    if (!fonts) return;
+    let cancelled = false;
+    let loaded: FontFace | null = null;
+    const face = new FontFace(fontFaceFamily, `url(${fontFaceUrl})`);
+    face.load().then(
+      (f) => {
+        if (cancelled) return;
+        loaded = f;
+        fonts.add(f);
+      },
+      () => {
+        /* keep the system fallback stack */
+      },
+    );
+    return () => {
+      cancelled = true;
+      if (loaded !== null) fonts.delete(loaded);
+    };
+  }, [fontFaceUrl, fontFaceFamily]);
+
+  // Keycap typeface: the touch layout's per-platform configured `font`
+  // (TIKE's Keyboard Font dialog), then the loaded keyboard font, then the
+  // system stack. UI chrome keeps using FONT.
+  const activePlatformFont = layout?.platforms.find((p) => p.id === activePlatformId)?.font;
+  const keycapFont = keycapFontFamily(activePlatformFont, fontFaceFamily);
 
   // Per-platform presentation memory (TIKE `lastPresentations`).
   const [presentations, setPresentations] = useState<Record<string, string>>({});
@@ -562,6 +623,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                     style={{
                       fontSize: 15,
                       fontWeight: 600,
+                      fontFamily: keycapFont,
                       maxWidth: "100%",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -672,6 +734,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           onInvalid={() => setFieldEpoch((n) => n + 1)}
           commitOp={commitOp}
           layout={layout}
+          keycapFont={keycapFont}
         />
       )}
 
@@ -931,11 +994,13 @@ function SubkeyPanel(props: {
   onInvalid: () => void;
   commitOp: (op: PendingKeyEditOperation) => boolean;
   layout: TouchLayoutIR;
+  /** Keycap typeface (platform configured font → loaded keyboard font → system). */
+  keycapFont: string;
 }) {
   const { t } = useLingui();
   const {
     address, targetKey: key, layerIds, layerOverrideOptions,
-    selection, onSelect, fieldEpoch, onInvalid, commitOp, layout,
+    selection, onSelect, fieldEpoch, onInvalid, commitOp, layout, keycapFont,
   } = props;
   const entries = subKeyEntriesOf(key);
 
@@ -986,6 +1051,7 @@ function SubkeyPanel(props: {
           borderColor: isSelected ? ACCENT : BORDER,
           background: isSelected ? "var(--app-accent-bg)" : "transparent",
           minWidth: 44,
+          fontFamily: keycapFont,
         }}
       >
         {label}
@@ -1096,7 +1162,7 @@ function SubkeyPanel(props: {
               minHeight: 24,
               fontSize: 12,
               color: TEXT_DIM,
-              fontFamily: FONT,
+              fontFamily: keycapFont,
             }}
           >
             {key.text || key.id}
