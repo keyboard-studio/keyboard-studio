@@ -23,6 +23,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import type { KeyEditOperation } from "@keyboard-studio/engine";
+import { textVfs } from "../test/vfsFixtures.ts";
 
 // `touchKeyAddress` itself is not imported here (a static top-level value
 // import of the mocked "@keyboard-studio/engine" module would force the
@@ -98,9 +99,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 function makeVfs() {
-  return createVirtualFS([
-    { path: "source/test_kb.kmn", content: "c test\n", isBinary: false },
-  ]);
+  return textVfs({ "source/test_kb.kmn": "c test\n" });
 }
 
 function makePhysicalAssignment(patternId: string): MechanismAssignment {

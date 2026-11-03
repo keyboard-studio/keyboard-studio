@@ -2,13 +2,11 @@
 // header stores after a carve re-emit onto a renamed (scaffolded) VFS.
 
 import { describe, it, expect } from "vitest";
-import { createVirtualFS } from "@keyboard-studio/contracts";
 import { reconcileSiblingAssetPaths } from "./reconcileSiblingAssetPaths.js";
+import { textVfs } from "../test-support/vfs.js";
 
 function makeVfs(paths: string[]) {
-  return createVirtualFS(
-    paths.map((path) => ({ path, content: "x", isBinary: false })),
-  );
+  return textVfs(Object.fromEntries(paths.map((path) => [path, "x"])));
 }
 
 const KMN = `store(&VERSION) '10.0'
