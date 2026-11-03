@@ -470,7 +470,9 @@ export function runCriteriaChecks(
     collect(checkCapsNcapsConsistent(keyboardIR, keyboardId));
 
     // 7.28 — a cased-script keyboard declares store(&CasedKeys).
-    collect(checkCasedKeysDeclared(keyboardIR, keyboardId));
+    collect(
+      checkCasedKeysDeclared(keyboardIR, keyboardId, input.kpsLanguages[0]),
+    );
 
     // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
     // Runs whenever the .kmn IR exists. An undeclared <Targets> list

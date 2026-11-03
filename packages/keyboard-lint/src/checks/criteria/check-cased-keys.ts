@@ -11,7 +11,12 @@
 // are exempt — kmc rejects &CasedKeys alongside &MNEMONICLAYOUT.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
+import {
+  buildProducedSet,
+  casedKeySet,
+  declaredCasedKeys,
+  keyPlaneOutputs,
+} from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -37,9 +42,38 @@ function systemStoreValue(ir: KeyboardIR, name: string): string | undefined {
 export function checkCasedKeysDeclared(
   ir: KeyboardIR,
   keyboardId: string,
+  bcp47?: string,
 ): CheckResult {
   if (systemStoreValue(ir, "CASEDKEYS") !== undefined) {
-    return checkPassed("KM_LINT_CASEDKEYS_MISSING", ["store(&CasedKeys) is declared."]);
+    const declared = declaredCasedKeys(ir) ?? new Set<string>();
+    const wanted = casedKeySet(ir, {
+      floor: [],
+      ...(bcp47 !== undefined ? { bcp47 } : {}),
+    });
+    const outputs = keyPlaneOutputs(ir);
+    const missing = wanted.keys.filter((k) => !declared.has(k));
+    if (missing.length === 0) {
+      return checkPassed("KM_LINT_CASEDKEYS_MISSING", ["store(&CasedKeys) is declared."]);
+    }
+    const pairOf = (vkey: string): string => {
+      const planes = outputs.get(vkey) ?? {};
+      const [lo, hi] =
+        planes.base !== undefined && planes.shift !== undefined
+          ? [planes.base, planes.shift]
+          : [planes.ralt, planes["shift-ralt"]];
+      return lo !== undefined && hi !== undefined ? `[${vkey}] (${lo}/${hi})` : `[${vkey}]`;
+    };
+    const info = wanted.conflicts.map(
+      (c) => `not added: ${c.plane} output on ${c.vkey} is ${c.unshifted}/${c.shifted}`,
+    );
+    return checkFailed("KM_LINT_CASEDKEYS_MISSING", [
+      criteriaFinding({
+        code: "KM_LINT_CASEDKEYS_MISSING",
+        file: kmnPath(keyboardId),
+        message: `store(&CasedKeys) misses keys with a case pair: ${missing.map(pairOf).join(", ")}.${info.length > 0 ? ` (${info.join("; ")})` : ""}`,
+        hint: "Add the missing keys to store(&CasedKeys) so Caps Lock shifts them too.",
+      }),
+    ]);
   }
   if (/^['"]?1['"]?$/.test(systemStoreValue(ir, "MNEMONICLAYOUT") ?? "")) {
     return checkPassed("KM_LINT_CASEDKEYS_MISSING", [

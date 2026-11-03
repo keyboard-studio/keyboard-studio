@@ -121,10 +121,50 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-03T22:51:38.679Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:57:08.776Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:57:08.971Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:57:09.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T23:00:37.441Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T23:00:37.790Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T012",
+  "currentTask": "T017",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -217,6 +257,40 @@
       "files": [
         "packages/contracts/src/ir/casedKeys.ts",
         "packages/engine/src/caps"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "merged origin/main cleanly, built, 5 studio test files pass (60 tests)"
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "failing then passing cases for incomplete CasedKeys",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-cased-keys.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "7.28 compares declared set against derived set; bcp47 param",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-cased-keys.ts",
+        "packages/keyboard-lint/src/criteriaChecks.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "opt-in 7.28 corpus sweep (placed in studio: needs engine parse + lint check)",
+      "files": [
+        "packages/studio/src/test/casedKeys.corpus.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "7.28 description wording (content review), battery regenerated",
+      "files": [
+        "packages/contracts/data/criteria.json",
+        "packages/studio/src/review/battery.generated.json"
       ]
     }
   },

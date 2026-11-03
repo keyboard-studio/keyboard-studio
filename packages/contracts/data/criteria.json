@@ -1401,7 +1401,7 @@
     "id": "7.28-cased-script-declares-casedkeys",
     "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
     "band": "layer-c-enforce",
-    "description": "A keyboard that produces cased letters (Latin, Cyrillic, Greek, …) declares `store(&CasedKeys)` so Caps Lock shifts its letter keys, instead of relying on per-key CAPS/NCAPS rules or ignoring Caps Lock. Mnemonic layouts are exempt (`&CasedKeys` is not supported with `&MNEMONICLAYOUT`)",
+    "description": "A keyboard that produces cased letters (Latin, Cyrillic, Greek, …) declares `store(&CasedKeys)` covering every key with a case pair, so Caps Lock shifts its letter keys, instead of relying on per-key CAPS/NCAPS rules or ignoring Caps Lock. Mnemonic layouts are exempt (`&CasedKeys` is not supported with `&MNEMONICLAYOUT`)",
     "lintRuleId": "KM_LINT_CASEDKEYS_MISSING"
   },
   {
