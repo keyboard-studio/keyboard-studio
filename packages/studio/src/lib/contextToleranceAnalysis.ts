@@ -58,6 +58,16 @@ export interface ContextToleranceAnalysisOptions {
 }
 
 /**
+ * Rule-count budget for the context-tolerance analysis (#2406). Above this
+ * the full compile+simulate loop is minutes per keyboard state, so the
+ * analysis is skipped and the state records `failed` (rendered as
+ * could-not-check, never as clean). Matches the spec 107 sweep's `too-large`
+ * line (`MAX_SWEEP_RULE_COUNT`) — one shared notion of "too large to analyse
+ * fully" across the repo.
+ */
+export const CONTEXT_TOLERANCE_MAX_RULES = 2000;
+
+/**
  * Run the analysis on `ir`. Resolves `null` when `isCurrent()` turns false
  * between steps. Throws on an engine error; the caller records `failed`.
  */
@@ -71,7 +81,16 @@ export async function analyseContextTolerance(
   if (!isCurrent()) return null;
 
   const analysedIr = applied === null ? ir : engine.removeContextToleranceOverlay(ir, applied.overlay);
-  const report = await engine.computeContextTolerance(analysedIr);
+  const report = await engine.computeContextTolerance(analysedIr, { maxRules: CONTEXT_TOLERANCE_MAX_RULES });
+  if (report.skipped !== undefined) {
+    // Over budget: the engine marked every rule not-analysed without
+    // inspecting any. Surface as a failed run (could-not-check) rather than
+    // a 58k-row all-not-analysed report.
+    throw new Error(
+      `context-tolerance analysis skipped: keyboard has ${report.skipped.ruleCount.toLocaleString('en-US')} rules, ` +
+        `over the ${report.skipped.ruleBudget.toLocaleString('en-US')}-rule budget`,
+    );
+  }
   if (!isCurrent()) return null;
 
   const classification = Object.fromEntries(

@@ -12,7 +12,7 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import { buildProducedSet, resolveEffectiveScript } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar, makeSlotId } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributorsBatched, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar, makeSlotId } from '@keyboard-studio/engine';
 import type { ProducerIndex } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, ContributorDescriptor, CharNormalizationForm } from '@keyboard-studio/engine';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
@@ -2204,9 +2204,11 @@ function isDeadBySlotDrops(
 
 /**
  * Merge multiple already-computed `CharContributors` records (each from an
- * independent `collectCharContributors(ir, ch)` call) into one — used by the
- * case-pair fold below (FR-014) so a folded survivor row's `contributors`
- * cascade EVERY case-group member's producers, not just the survivor's own.
+ * independent per-character collection — a `collectCharContributors(ir, ch)`
+ * call or one record of a `collectCharContributorsBatched` result) into one
+ * — used by the case-pair fold below (FR-014) so a folded survivor row's
+ * `contributors` cascade EVERY case-group member's producers, not just the
+ * survivor's own.
  *
  * Without this, `cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds, chars)`
  * on a folded row (e.g. the `a`+`A` pair, survivor `a`) only removed the
@@ -2471,6 +2473,10 @@ export function recommendedRemovalChars(args: {
 
   const results: RecommendedRemovalChar[] = [];
 
+  // Cheap per-char filters first; the surviving candidates share ONE batched
+  // contributor pass (#2406: per-character scans were O(chars × rules) —
+  // ~1s/char on a 58k-rule keyboard).
+  const uncovered: { ch: string; crossScriptLatin: boolean }[] = [];
   for (const ch of candidateChars) {
     if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
     if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
@@ -2478,9 +2484,17 @@ export function recommendedRemovalChars(args: {
     // longer excluded here — it flows through the same guards below as any
     // other candidate and, if it survives, is tagged `reason:
     // 'cross-script-latin'` rather than dropped (see the push below).
-    const crossScriptLatin = isBasicLatinCrossScriptFallthrough(ch, bcp47);
+    uncovered.push({ ch, crossScriptLatin: isBasicLatinCrossScriptFallthrough(ch, bcp47) });
+  }
+  // Keyed by NFC, mirroring collectCharContributors' own normalization.
+  const contributorsByChar = collectCharContributorsBatched(
+    ir,
+    new Set(uncovered.map((u) => u.ch)),
+  );
 
-    const contributors = collectCharContributors(ir, ch);
+  for (const { ch, crossScriptLatin } of uncovered) {
+    const contributors = contributorsByChar.get(ch.normalize('NFC'));
+    if (contributors === undefined) continue; // cannot happen: the batched map covers every uncovered char
 
     // Any blocked producer (opaque fragment, multi-char/partial literal run)
     // shields immediately; so does finding NO producer at all (unrecognized

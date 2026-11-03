@@ -295,3 +295,42 @@ describe("computeContextTolerance — web-only compile errors from the forced ta
     expect(vkeyRule?.failingKeystrokes).toBeUndefined();
   }, 30_000);
 });
+
+describe("computeContextTolerance — maxRules budget skip (#2406)", () => {
+  const SKIP_KMN = [
+    HEADER,
+    "group(main) using keys",
+    "",
+    "store(base) U+00E0",
+    "",
+    "any(base) + 'a' > 'x'",
+    "+ 'b' > 'y'",
+    "",
+  ].join("\n");
+
+  it("skips over budget: every finding not-analysed with the skip reason, SC-006 invariant holds", async () => {
+    const { ir } = parse(SKIP_KMN, "skip_fixture");
+    const ruleCount = ir.groups.reduce((n, g) => n + g.rules.length, 0) + ir.raw.length;
+    expect(ruleCount).toBeGreaterThan(1);
+
+    const report = await computeContextTolerance(ir, { maxRules: 1 });
+
+    expect(report.skipped).toEqual({ ruleCount, ruleBudget: 1 });
+    expect(report.findings).toHaveLength(ir.groups.reduce((n, g) => n + g.rules.length, 0));
+    for (const f of report.findings) {
+      expect(f.status).toBe("not-analysed");
+      expect(f.notAnalysedReason).toContain("exceed the 1-rule budget");
+    }
+    // SC-006: every rule is accounted for exactly once.
+    expect(report.findings.length + report.notAnalysedCount).toBe(ruleCount);
+  }, 30_000);
+
+  it("runs the analysis normally at or under budget", async () => {
+    const { ir } = parse(SKIP_KMN, "skip_fixture_ok");
+    const report = await computeContextTolerance(ir, { maxRules: 100 });
+    expect(report.skipped).toBeUndefined();
+    expect(report.findings.length + report.notAnalysedCount).toBe(
+      ir.groups.reduce((n, g) => n + g.rules.length, 0) + ir.raw.length,
+    );
+  }, 30_000);
+});
