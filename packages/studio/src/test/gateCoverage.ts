@@ -185,6 +185,13 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "2.6-new-version-strictly-greater", code: "KM_LINT_VERSION_NOT_INCREMENTED", criteria: "New version is strictly greater than the previously deployed version", why: "keyboard version is not a DecisionId" },
   { id: "6.3b-welcome-htm-exists", code: "KM_LINT_WELCOME_HTM_ABSENT", criteria: "`welcome.htm` exists in `source/` (flat or the `source/welcome/` folder convention).", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "6.6b-welcome-htm-lang-attribute", code: "KM_LINT_WELCOME_LANG_MISMATCH", criteria: "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag (an English page may declare lang=\"en\").", why: "submission hygiene the criteria page judges; no DecisionId" },
+  // Criteria consistency batch (#2456): new Layer C checks whose consumer is
+  // the criteria resolver, not a DecisionId.
+  { id: "1.15-filenames-follow-convention", code: "KM_LINT_FILENAME_CONVENTION", criteria: "All files in the keyboard folder follow the filename convention: lowercase extensions, and names containing only alphanumerics, `-`, `_`, `+`, `.`.", why: "repository file hygiene; no DecisionId" },
+  { id: "7.25-no-deprecated-numeric-formats", code: "KM_LINT_DEPRECATED_NUMERIC_FORMAT", criteria: "All character literals in the .kmn use U+NNNN notation; deprecated decimal/octal/hex formats do not appear.", why: "source syntax hygiene; no DecisionId" },
+  { id: "7.26-caps-ncaps-consistent-per-key", code: "KM_LINT_CAPS_NCAPS_INCONSISTENT", criteria: "Every rule referencing a given key is consistent in CAPS/NCAPS handling.", why: "rule modifier hygiene; no DecisionId" },
+  { id: "7.27-no-deprecated-headers-or-unused-stores", code: "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE", criteria: "No deprecated header statements or system stores remain; unused stores are removed.", why: "source syntax hygiene; no DecisionId" },
+  { id: "18.14-touch-layers-carry-bksp-enter", code: "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS", criteria: "Every touch layer includes the required control keys (K_LOPT, K_BKSP, K_ENTER).", why: "touch layout structure; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {
