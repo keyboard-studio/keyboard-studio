@@ -4,7 +4,7 @@
 // Scans test files for assertions that are never legitimate. No loopholes or
 // label-based escape hatches — enforcement is strict across the entire suite.
 //
-//   TAUTOLOGY (all packages/*/**/*.test.ts):
+//   TAUTOLOGY (all packages/*/**/*.test.ts and *.test.tsx):
 //     A literal `expect(true).toBe(true)` / `expect(false).toBe(false)` /
 //     `expect(1).toBe(1)` style assertion. These are placeholders that fail
 //     the discipline — they prove nothing and should never ship. All instances
@@ -26,6 +26,8 @@ const { readFileSync, readdirSync, existsSync, statSync } = require("node:fs");
 const path = require("node:path");
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
+
+const OVERSIZE_LINES = 1500;
 
 const rel = (abs) => path.relative(REPO_ROOT, abs);
 
@@ -78,11 +80,12 @@ const SURVEY_SNAPSHOT_RE =
 function main() {
   const failures = []; // { file, line, text }
   const fail = (file, line, text) => failures.push({ file, line, text });
+  const oversize = []; // advisory only: { file, lines }
 
   // Collect all test files in scope.
-  const allTestFiles = walk(
-    path.join(REPO_ROOT, "packages"),
-    ".test.ts"
+  // `.test.tsx` is most of packages/studio, so it must be scanned too.
+  const allTestFiles = [".test.ts", ".test.tsx"].flatMap((ext) =>
+    walk(path.join(REPO_ROOT, "packages"), ext)
   );
 
   for (const file of allTestFiles) {
@@ -96,6 +99,7 @@ function main() {
     }
 
     const lines = content.split("\n");
+    if (lines.length > OVERSIZE_LINES) oversize.push({ file: frel, lines: lines.length });
 
     // ---- Check 1: TAUTOLOGY ----
     // Flag all tautologies. No label-based exemptions or loopholes.
@@ -129,6 +133,15 @@ function main() {
   console.log(
     `test-antipattern-lint: scanned ${allTestFiles.length} test files`
   );
+  // Advisory: very large test files hide exploration-era sprawl. Never fails the
+  // run; split by behaviour when touching one (km-testing test-delta audit).
+  if (oversize.length > 0) {
+    oversize.sort((a, b) => b.lines - a.lines);
+    console.log(
+      `[WARN] test-antipattern-lint: ${oversize.length} test file(s) over ${OVERSIZE_LINES} lines (advisory); largest:`
+    );
+    for (const o of oversize.slice(0, 5)) console.log(`  [WARN] ${o.file}  ${o.lines} lines`);
+  }
   if (failures.length === 0) {
     console.log("[OK] test-antipattern-lint: all checks passed");
   } else {

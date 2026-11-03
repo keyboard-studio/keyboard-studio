@@ -88,6 +88,17 @@ When this agent writes tests:
 4. **Is the test deterministic?** No relying on `Date.now()`, network ordering, file-system iteration order, etc.
 5. **Does it run in CI?** Local-only tests don't gate.
 
+## Pre-PR test-delta audit
+
+Run at cycle close, before `km-archivist` opens the PR, whenever the diff adds or changes `*.test.*`. It keeps exploration-era tests out of the shipped suite. Report each item; propose deletions, don't silently make them.
+
+1. **Scratch tests.** Delete tests that only drove development: debug probes, one-off repros already covered elsewhere, tests with zero assertions.
+2. **Fold task-scoped tests.** A test named for a spec/task/phase (`spec 089 SC-001: ...`, `T0300`, `*.sc002.test.ts`) belongs in the feature's real test file under a behaviour name; move the spec ID to a describe label or comment.
+3. **Justify each new test.** Each maps to a requirement (FR/SC) or a bug it would catch. If it only restates the implementation or a static constant (list length of a fixed table, a copy string mirrored from the source), drop it.
+4. **Reuse helpers.** Before adding a local `makeVfs`/`makeIr`/`makeStore`/`mockFetch`, use the shared builder; don't add a 13th copy.
+5. **Skips.** Any `.skip`/`.todo` carries an issue link, or goes.
+6. **Size.** A test file near 1,500 lines gets split by behaviour, not extended.
+
 ## Report template (for test-suite reviews / additions)
 
 ```markdown

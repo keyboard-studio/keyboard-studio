@@ -96,6 +96,7 @@ Vague prompts produce vague reports. Name the artifact.
 
 - At cycle 1, open the branch (or confirm an existing branch if continuing prior work). State the branch name in the dispatch_plan's `branch:` field.
 - All specialist commits during the cycle target that branch.
+- If the diff adds or changes `*.test.*`, dispatch `km-testing` for its **Pre-PR test-delta audit** before the archivist's final commit, so scratch and task-scoped tests are pruned before the PR.
 - `km-archivist` opens a PR against `main` at cycle close (after final approval), with `closes #N` if there's an associated issue.
 - **Direct-to-main is permitted only when the user explicitly authorizes it** for the specific commit. Implicit authorization (just running `/km-lead`) is not enough; the user must say "commit direct to main" (or equivalent) for that specific commit. If unsure, branch and ask.
 
