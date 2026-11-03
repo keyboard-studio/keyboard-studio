@@ -67,18 +67,28 @@ interface SubKeySelection {
 }
 
 const FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif";
-const TEXT_MAIN = "#1a1a2e";
-const TEXT_DIM = "#5a5a6e";
-const BORDER = "#d4d4e0";
-const BG_CARD = "#ffffff";
-const BG_CANVAS = "#f4f4f8";
-const ACCENT = "#2b6cb0";
+// Theme-aware chrome via the semantic --app-* tokens (styles/colors.css):
+// light values in :root, navy overrides under [data-theme="navy"].
+// (2026-11-02: was hard-coded light-only — illegible button text on navy,
+// the default theme.)
+const TEXT_MAIN = "var(--app-text)";
+const TEXT_DIM = "var(--app-text-muted)";
+const BORDER = "var(--app-border)";
+const BG_CARD = "var(--app-surface)";
+const BG_CANVAS = "var(--app-surface-2)";
+const ACCENT = "var(--app-accent)";
+// Pinned dark ink for text sitting ON light keycaps.
+const KEYCAP_TEXT = "#1a1a2e";
+// Pinned dim for text sitting ON light keycaps: the theme token would go
+// light-on-light under navy. Keycaps are fixed light content, readable in
+// both themes by construction.
+const KEYCAP_DIM = "#5a5a6e";
 const SP_COLORS: Record<number, { bg: string; fg: string; border: string }> = {
-  0: { bg: "#ffffff", fg: TEXT_MAIN, border: BORDER },
+  0: { bg: "#ffffff", fg: KEYCAP_TEXT, border: BORDER },
   1: { bg: "#e8f0fe", fg: "#1a3a6b", border: "#9db9e8" },
   2: { bg: "#d4e4fc", fg: "#14305e", border: "#7ba3e0" },
   8: { bg: "#fff4e0", fg: "#7a4a00", border: "#e8c87a" },
-  9: { bg: "#fafafa", fg: TEXT_DIM, border: "#c9c9d4" },
+  9: { bg: "#fafafa", fg: KEYCAP_DIM, border: "#c9c9d4" },
   10: { bg: "transparent", fg: "transparent", border: "transparent" },
 };
 
@@ -944,7 +954,7 @@ function SubkeyPanel(props: {
         style={{
           ...ghostBtn,
           borderColor: isSelected ? ACCENT : BORDER,
-          background: isSelected ? "#e8f0fe" : "transparent",
+          background: isSelected ? "var(--app-accent-bg)" : "transparent",
           minWidth: 44,
         }}
       >
@@ -1346,8 +1356,8 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   padding: "6px 12px",
   borderRadius: 6,
   border: `1px solid ${active ? ACCENT : BORDER}`,
-  background: active ? "#e8f0fe" : "transparent",
-  color: active ? "#1a3a6b" : TEXT_MAIN,
+  background: active ? "var(--app-accent-bg)" : "transparent",
+  color: active ? "var(--app-accent-text)" : TEXT_MAIN,
   cursor: "pointer",
   fontWeight: active ? 600 : 400,
 });
@@ -1367,7 +1377,7 @@ const primaryBtn: React.CSSProperties = {
   ...ghostBtn,
   background: ACCENT,
   borderColor: ACCENT,
-  color: "#ffffff",
+  color: "var(--app-text-on-accent)",
   fontWeight: 600,
 };
 
