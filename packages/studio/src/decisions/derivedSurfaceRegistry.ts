@@ -448,6 +448,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   markGalleryIntroSeen: { kind: "action", class: "EPHEMERAL" },
   commitKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },
   undoKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },
+  commitKeyEditBatch: { kind: "action", class: "EDITOR-AUTHORED" },
+  undoKeyEditBatch: { kind: "action", class: "EDITOR-AUTHORED" },
   commitDeadkeyOp: { kind: "action", class: "EDITOR-AUTHORED" },
   commitTouchKeyRename: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchEditorMode: { kind: "action", class: "EPHEMERAL" },

@@ -475,11 +475,20 @@ describe("TouchGallery — either mode completes the step (T120, FR-036e)", () =
 });
 
 describe("TouchGallery — undo affordance states what it will undo (T076, FR-036g)", () => {
+  /** Undo lives in the key/code footers (spec 081); character mode has no undo control. */
+  async function showTouchUndoFooter() {
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+    });
+  }
+
   it("reads 'Nothing to undo' and is disabled when the shared stack is empty", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
+
+    await showTouchUndoFooter();
 
     const undoBtn = screen.getByTestId(
       "touch-undo-button",
@@ -500,6 +509,8 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
         .deleteTouchKey("phone:default:K_A");
     });
 
+    await showTouchUndoFooter();
+
     await waitFor(() => {
       const undoBtn = screen.getByTestId(
         "touch-undo-button",
@@ -518,6 +529,7 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
     await act(async () => {
       useWorkingCopyStore.getState().deleteTouchKey("phone:default:K_A");
     });
+    await showTouchUndoFooter();
     await waitFor(() => {
       expect(
         screen.getByTestId("touch-undo-button").getAttribute("aria-label"),
@@ -557,6 +569,8 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
     await waitFor(() => {
       expect(useWorkingCopyStore.getState().undoStack).toHaveLength(1);
     });
+
+    await showTouchUndoFooter();
 
     await act(async () => {
       fireEvent.click(screen.getByTestId("touch-undo-button"));
