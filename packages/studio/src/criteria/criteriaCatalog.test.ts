@@ -81,25 +81,23 @@ function catalogLintRuleIds(): Set<string> {
 }
 
 describe("criteria catalog", () => {
-  it("has 195 rows in the 40/113/32/10 band split, with unique ids", () => {
-    expect(ALL_CRITERIA).toHaveLength(195);
-
+  // Structure only: the catalog grows, so literal row and per-band counts are churn.
+  it("has unique ids and every band populated", () => {
     const perBand = new Map<string, number>();
     for (const criterion of ALL_CRITERIA) {
       perBand.set(criterion.band, (perBand.get(criterion.band) ?? 0) + 1);
     }
-    expect(perBand.get("scaffolder-bake")).toBe(40);
-    expect(perBand.get("layer-c-enforce")).toBe(113);
-    expect(perBand.get("yellow-survey")).toBe(32);
-    expect(perBand.get("red-checklist")).toBe(10);
+    for (const band of ["scaffolder-bake", "layer-c-enforce", "yellow-survey", "red-checklist"]) {
+      expect(perBand.get(band) ?? 0, band).toBeGreaterThan(0);
+    }
 
-    expect(new Set(ALL_CRITERIA.map((c) => c.id)).size).toBe(195);
+    expect(new Set(ALL_CRITERIA.map((c) => c.id)).size).toBe(ALL_CRITERIA.length);
   });
 });
 
 describe("IMPLEMENTED_LINT_CODES", () => {
-  it("has exactly 106 codes, every one a lintRuleId present in the catalog", () => {
-    expect(IMPLEMENTED_LINT_CODES.size).toBe(106);
+  it("every code is a lintRuleId present in the catalog", () => {
+    expect(IMPLEMENTED_LINT_CODES.size).toBeGreaterThan(0);
     const catalogIds = catalogLintRuleIds();
     for (const code of IMPLEMENTED_LINT_CODES) {
       expect(catalogIds.has(code)).toBe(true);

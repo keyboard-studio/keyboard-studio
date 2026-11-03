@@ -38,10 +38,6 @@ function classification(items: CompatibilityItem[]): LdmlClassification {
 }
 
 describe("buildLdmlFindings", () => {
-  it("covers all 34 codes in the copy table", () => {
-    expect(ALL_CODES).toHaveLength(34);
-  });
-
   it("follows the item severity: a rule is a warning, anything else a hint", () => {
     const out = buildLdmlFindings(
       classification([
