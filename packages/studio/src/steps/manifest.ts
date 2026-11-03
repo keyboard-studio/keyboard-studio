@@ -57,6 +57,7 @@ import {
   touchStep,
   cssStep,
   helpStep,
+  htmlStep,
   packageStep,
 } from "./registerEditorSteps.ts";
 
@@ -311,6 +312,11 @@ const stepPool: readonly Step[] = [
 
   // --- Help (Phase F: usage tips and credits) ---
   helpStep,
+
+  // --- Documentation (welcome.htm, Markdown) ---
+  // Monaco editor for the keyboard's user manual. readme.htm, README.md,
+  // and .php versions are generated exports from this source.
+  htmlStep,
 
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
