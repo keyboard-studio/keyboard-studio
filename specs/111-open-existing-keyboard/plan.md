@@ -66,7 +66,7 @@ Around them, mostly reuse:
 | X Defaults are proposals | PASS | Carried values are the keyboard's own content, not proposals. Every studio change on Open is a suggested fix needing acceptance. Switching repositories is a starting-point switch that keeps decisions. |
 | XI Done means integrated | PASS (planned) | Each phase ends with its surface reachable from the Open entry. Upgrade pairs depend on criterion 7.28 merging (owner: whoever lands the `km/casedkeys-criterion` branch; trigger: its merge). |
 
-**Gate result**: proceed, **conditional on owner approval of the Article II/III amendment** before Phase 1 merges. Re-checked after Phase 1 design: no new violations. The splice contract and data model stay inside the amended articles.
+**Gate result**: proceed. The Article II/III amendment was **approved by the owner on 2026-11-03**; it lands in the Phase 1 PR (Governance). Re-checked after Phase 1 design: no new violations. The splice contract and data model stay inside the amended articles.
 
 ## Personal Data Check (Constitution Article XII, spec 100)
 
@@ -124,9 +124,10 @@ spec.md, specs/110-readme-template/spec.md, docs/workflow-model.md  # amendments
 
 | Phase | Story | Delivers | Depends on |
 |---|---|---|---|
-| 1 | US1 (P1) | Open entry and gates; `.kps` in the VFS and patched; language list; no doc regeneration; "Updated" HISTORY; `&KEYBOARDVERSION` insert; old-draft restore; constitution amendment | owner approval of the amendment |
+| 0 | Foundational | `spliceKmn` + projection (engine), shared types, mode helper | none |
+| 1 | US1 (P1) | Open entry and gates; projection wired into output; `.kps` in the VFS and patched; language list; no doc regeneration; "Updated" HISTORY; `&KEYBOARDVERSION` insert; old-draft restore; constitution amendment | 0 |
 | 2 | US2 (P1) | Baseline, finding keys, pre-existing/new marks, review notes, ratchet gate (incl. 18.6), PR blocks | 1 |
-| 3 | US3 (P2) | `spliceKmn` + projection; code views on file text; starting-point replacement; consent before re-emit | 1 |
+| 3 | US3 (P2) | Code views on file text; starting-point replacement; consent before re-emit | 1 |
 | 4 | US4 (P2) | Repository choice through `/review-proxy`, SourceRef, curated-copy warning | 1 |
 | 5 | US5 (P2) + FR-018a | Consistency suggestions; exemplar-union expected inventory | 2, 3 |
 | 6 | US6 (P3) | Upgrade pairs (cased keys first) | 2, 3, criterion 7.28 merged |
