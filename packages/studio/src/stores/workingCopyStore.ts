@@ -258,12 +258,14 @@ export interface CommitTouchKeyRenameOutcome {
 /**
  * The touch step's mode selector (FR-036…FR-036g): `"character"` is the
  * per-character assignment walk (the existing TouchGallery flow); `"key"` is
- * the key-grid editor this feature adds. A view toggle, not a fork — neither
- * mode's in-progress state is cleared by switching (FR-036b). `"character"`
- * is the default per FR-036; the propose-on-entry logic that can route a
- * fresh working copy straight into `"key"` mode is a later task (T073).
+ * the key-grid editor this feature adds; `"code"` is the touch-layout JSON
+ * code editor (TIKE touch-builder port, Phase 0+). A view toggle, not a
+ * fork — no mode's in-progress state is cleared by switching (FR-036b).
+ * `"character"` is the default per FR-036; the propose-on-entry logic that
+ * can route a fresh working copy straight into `"key"` mode is a later task
+ * (T073).
  */
-export type TouchEditorMode = "character" | "key";
+export type TouchEditorMode = "character" | "key" | "code";
 
 /**
  * The context-tolerance analysis for the working copy (spec 078). Recomputed
@@ -1609,7 +1611,7 @@ function freshInstantiationTail() {
     keyEditOverlay: { ops: [] },
     deadkeyOverlay: { ops: [] },
     // Annotated, not inferred: without it the literal widens to string and
-    // the spread no longer matches TouchEditorMode ("character" | "key").
+    // the spread no longer matches TouchEditorMode ("character" | "key" | "code").
     touchEditorMode: "character" as TouchEditorMode,
     staleSteps: new Set<string>(),
     // A new working copy has no default-fill provenance yet (#890) — the

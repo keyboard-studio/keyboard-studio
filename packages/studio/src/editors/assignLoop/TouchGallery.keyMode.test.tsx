@@ -92,7 +92,7 @@ function seedKeyModeFixture(opts: {
 }
 
 describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)", () => {
-  it("renders a tablist with two tabs, 'By character' selected by default", async () => {
+  it("renders a tablist with three tabs, 'By character' selected by default", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
@@ -102,10 +102,44 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     expect(tablist.getAttribute("role")).toBe("tablist");
     const charTab = screen.getByTestId("touch-mode-tab-character");
     const keyTab = screen.getByTestId("touch-mode-tab-key");
+    const codeTab = screen.getByTestId("touch-mode-tab-code");
     expect(charTab.getAttribute("role")).toBe("tab");
     expect(keyTab.getAttribute("role")).toBe("tab");
+    expect(codeTab.getAttribute("role")).toBe("tab");
     expect(charTab.getAttribute("aria-selected")).toBe("true");
     expect(keyTab.getAttribute("aria-selected")).toBe("false");
+    expect(codeTab.getAttribute("aria-selected")).toBe("false");
+    expect(codeTab.textContent).toBe("Code");
+  });
+
+  it("clicking the 'Code' tab mounts the code pane full-width with no preview; clicking back returns to the character walk", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-code"));
+    });
+
+    // The code pane mounts (Phase 0 stub; Phase 2 wires in Monaco). The
+    // pane is React.lazy-loaded, so wait for the chunk to resolve.
+    await waitFor(() => {
+      expect(screen.getByTestId("touch-code-pane")).toBeTruthy();
+    });
+    expect(
+      screen.getByTestId("touch-mode-tab-code").getAttribute("aria-selected"),
+    ).toBe("true");
+    // Full-width editor surface: no live preview, no character walk.
+    expect(screen.queryByText(/for testing/i)).toBeNull();
+    expect(screen.queryByText("Touch mapping")).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-character"));
+    });
+    expect(screen.getByText("Touch mapping")).toBeTruthy();
+    expect(screen.queryByTestId("touch-code-pane")).toBeNull();
+    expect(screen.getByText("Touch preview")).toBeTruthy();
   });
 
   it("clicking the 'By key' tab switches to the editable schematic grid, labelled 'for editing', with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
@@ -167,7 +201,21 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     ).toBe("true");
     expect(screen.getByTestId("touch-key-mode-back")).toBeTruthy();
 
-    // End/Home wrap correctly too — Home from the key tab returns to character.
+    // ArrowRight from the key tab advances to the code tab (three-tab strip).
+    await act(async () => {
+      fireEvent.keyDown(screen.getByTestId("touch-mode-tabs"), {
+        key: "ArrowRight",
+      });
+    });
+    expect(
+      screen.getByTestId("touch-mode-tab-code").getAttribute("aria-selected"),
+    ).toBe("true");
+    // Lazy-loaded pane — wait for the chunk.
+    await waitFor(() => {
+      expect(screen.getByTestId("touch-code-pane")).toBeTruthy();
+    });
+
+    // End/Home wrap correctly too — Home from the code tab returns to character.
     await act(async () => {
       fireEvent.keyDown(screen.getByTestId("touch-mode-tabs"), {
         key: "Home",
@@ -204,10 +252,14 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
       fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
     });
     await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-code"));
+    });
+    await act(async () => {
       fireEvent.click(screen.getByTestId("touch-mode-tab-character"));
     });
 
-    // The character-mode draft survived the round trip untouched.
+    // The character-mode draft survived the round trip through both editor
+    // tabs untouched (FR-036a/b extended to the code tab).
     expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries).toHaveLength(1);
   });
 });

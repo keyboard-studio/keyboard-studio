@@ -881,6 +881,7 @@
   "editor.assignLoop.touch.method.replace.summary": "Faire qu'une touche saisisse directement {currentCharDisplay} sur le clavier tactile.",
   "editor.assignLoop.touch.method.replace.title": "Remplacer une touche",
   "editor.assignLoop.touch.mode.characterTab": "Par caractère",
+  "editor.assignLoop.touch.mode.codeTab": "Code",
   "editor.assignLoop.touch.mode.keyTab": "Par clé",
   "editor.assignLoop.touch.modeTabsAriaLabel": "Mode d'édition tactile",
   "editor.assignLoop.touch.multitap.addLayerAriaLabel": "Ajouter une autre couche tactile pour le multi-appui",

@@ -881,6 +881,7 @@
   "editor.assignLoop.touch.method.replace.summary": "Make a key type {currentCharDisplay} directly on the touch keyboard.",
   "editor.assignLoop.touch.method.replace.title": "Replace a key",
   "editor.assignLoop.touch.mode.characterTab": "By character",
+  "editor.assignLoop.touch.mode.codeTab": "Code",
   "editor.assignLoop.touch.mode.keyTab": "By key",
   "editor.assignLoop.touch.modeTabsAriaLabel": "Touch editing view",
   "editor.assignLoop.touch.multitap.addLayerAriaLabel": "Add another touch layer for multitap",

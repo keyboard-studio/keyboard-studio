@@ -67,6 +67,8 @@ import {
   useCallback,
   useId,
   useRef,
+  lazy,
+  Suspense,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
@@ -220,6 +222,14 @@ import {
   type KeyEditRejectionNotice,
 } from "./keyGrid/useKeyEditGuards.ts";
 import { LayerSelector } from "./keyGrid/LayerSelector.tsx";
+// TIKE touch-builder port (slice-spec): the "Code" tab pane. Phase 0 lands
+// it as a stub; Phase 2 wires in the Monaco editor. Lazy-loaded so the
+// Monaco bundle never lands in the main chunk.
+const TouchCodePane = lazy(() =>
+  import("./touchBuilder/TouchCodePane.tsx").then((m) => ({
+    default: m.TouchCodePane,
+  })),
+);
 import {
   useKeyCommands,
   buildAddKeyAfterOutcome,
@@ -4488,9 +4498,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // ---------------------------------------------------------------------------
   const handleSwitchTouchEditorMode = useCallback(
     (mode: TouchEditorMode) => {
-      if (mode === "key" && touchEditorMode === "character") {
-        // character -> by-key: select and reveal the producing (or
+      if (
+        (mode === "key" || mode === "code") &&
+        touchEditorMode === "character"
+      ) {
+        // character -> by-key/code: select and reveal the producing (or
         // candidate) key(s) for the character the walk is currently on.
+        // The code pane reveals the selected key's JSON region on mount,
+        // so routing through the key carry gives it a target.
         if (currentChar !== null && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined) {
           const carry = modeContextCarry.carryFromCharacter(currentChar);
           if (carry.primary !== undefined) {
@@ -7840,18 +7855,28 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // T072: a view swap, not a fork — touchEditorMode selects which mode's
   // pane content renders; neither mode's in-progress state is touched by
-  // the swap itself (FR-036a/b).
+  // the swap itself (FR-036a/b). The "code" tab (TIKE touch-builder port)
+  // joins the swap in Phase 0 as a stub pane; Phase 2 implements it.
   const leftContent =
-    touchEditorMode === "key" ? keyModeContent : characterModeContent;
+    touchEditorMode === "key" ? (
+      keyModeContent
+    ) : touchEditorMode === "code" ? (
+      <Suspense fallback={null}>
+        <TouchCodePane />
+      </Suspense>
+    ) : (
+      characterModeContent
+    );
 
   // ---------------------------------------------------------------------------
   // Two-pane layout (via the shared AssignLoopShell)
   // ---------------------------------------------------------------------------
 
-  // T072 (FR-035): the mode selector as an APG tabs pattern — two tabs, one
-  // surface. Automatic activation (Left/Right/Home/End move AND select,
-  // wrapping) mirrors KeyGrid.tsx's own platform-tablist pattern (T077) —
-  // the one existing tabs precedent in this codebase.
+  // T072 (FR-035): the mode selector as an APG tabs pattern — three tabs,
+  // one surface (the "Code" tab joined in the TIKE touch-builder port).
+  // Automatic activation (Left/Right/Home/End move AND select, wrapping)
+  // mirrors KeyGrid.tsx's own platform-tablist pattern (T077) — the one
+  // existing tabs precedent in this codebase.
   const touchModeTabs: ReadonlyArray<{ id: TouchEditorMode; label: string }> =
     [
       {
@@ -7866,6 +7891,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         label: t({
           id: "editor.assignLoop.touch.mode.keyTab",
           message: "By key",
+        }),
+      },
+      {
+        id: "code",
+        label: t({
+          id: "editor.assignLoop.touch.mode.codeTab",
+          message: "Code",
         }),
       },
     ];
@@ -8154,15 +8186,17 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         leftContent={leftContent}
         // Spec 065 T037 (FR-024): key mode passes NO right pane, so the grid
         // takes the full width instead of sitting in 45% beside a preview it
-        // does not use. Character mode is unchanged — the live OSK preview is
-        // the whole point of that mode, and its heading id
-        // (`editor.assignLoop.touch.previewHeading`) is untouched.
+        // does not use. The code tab (TIKE touch-builder port) is likewise an
+        // editor surface and takes the full width. Character mode is
+        // unchanged — the live OSK preview is the whole point of that mode,
+        // and its heading id (`editor.assignLoop.touch.previewHeading`) is
+        // untouched.
         //
         // Spread rather than a `? … : undefined` value, because
         // `AssignLoopShell` distinguishes an OMITTED `rightContent` (collapse
         // the split) from an explicitly-passed `undefined`/`null` (render an
         // empty right pane) — see its own prop doc.
-        {...(touchEditorMode === "key"
+        {...(touchEditorMode === "key" || touchEditorMode === "code"
           ? {}
           : {
               rightContent: (
