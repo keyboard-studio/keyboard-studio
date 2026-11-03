@@ -7726,6 +7726,43 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       keyModeContent
     ) : touchEditorMode === "code" ? (
       <Suspense fallback={null}>
+        {/* Back/Undo/Continue live in the footer (spec 081) — the code tab
+            publishes the same nav as the key tab. */}
+        <PublishStepNav
+          spec={{
+            back: {
+              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+              onClick: onBack,
+              testId: "touch-code-back",
+              ariaLabel: t({
+                id: "editor.assignLoop.touch.keyMode.backAriaLabel",
+                message: "Back to mechanisms",
+              }),
+            },
+            secondary: {
+              label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
+              onClick: undoDelete,
+              testId: "touch-undo-button",
+              ariaLabel: t({
+                id: "editor.assignLoop.touch.undo.footerAriaLabel",
+                message: "Undo the last edit",
+              }),
+              disabled: undoStack.length === 0,
+            },
+            forward: {
+              label: t({
+                id: "editor.assignLoop.touch.keyMode.continueButton",
+                message: "Continue",
+              }),
+              onClick: handleContinue,
+              testId: "touch-code-continue",
+              disabled: unaccountedTouchChars.length > 0,
+              ...(unaccountedTouchMessage !== null
+                ? { ariaDescribedBy: unaccountedTouchHintId }
+                : {}),
+            },
+          }}
+        />
         <TouchCodePane layout={effectiveKeyModeLayout} />
       </Suspense>
     ) : (
