@@ -14,7 +14,7 @@
 // kinds. Key-level ops only (Q1): no row/layer structural UI, no
 // per-platform font editing.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useIsNarrow } from "../../../hooks/useViewport.ts";
 import {
@@ -32,6 +32,7 @@ import {
   BUILDER_MIN_KEY_WIDTH,
   BUILDER_PRESENTATIONS,
   BUILDER_ROW_HEIGHT,
+  FLICK_GRID,
   type FlickDirection,
   builderPresentationById,
   buildTemplateApplyOps,
@@ -48,6 +49,13 @@ import {
   builderTemplateSources,
   type BuilderTemplateSource,
 } from "./builderTemplates.ts";
+import {
+  PlacementBar,
+  PlacementModal,
+  TRAY_LETTER_MIME,
+} from "./PlacementModal.tsx";
+import type { PlacementChoice } from "./placementOps.ts";
+import { buildPlacementOps } from "./placementOps.ts";
 
 export interface TouchBuilderPaneProps {
   /** The shared `effectiveKeyModeLayout` selector — read, never copied. */
@@ -67,6 +75,11 @@ export interface TouchBuilderPaneProps {
    */
   readonly fontFaceUrl?: string | undefined;
   readonly fontFaceFamily?: string | undefined;
+  /**
+   * Unplaced inventory characters (TouchGallery's `keyGridProgress.unplacedChars`)
+   * — the placement bar's tray, plus anything demoted back to it.
+   */
+  readonly unplacedChars?: readonly string[];
 }
 
 interface SubKeySelection {
@@ -123,18 +136,6 @@ function spColor(sp: number | undefined): { bg: string; fg: string; border: stri
   return SP_COLORS[sp ?? 0] ?? SP_COLORS[0]!;
 }
 
-/** Flick compass slot positions in the 3x3 square (row/col, 1-based). */
-const FLICK_GRID: Record<FlickDirection, { row: number; col: number }> = {
-  nw: { row: 1, col: 1 },
-  n: { row: 1, col: 2 },
-  ne: { row: 1, col: 3 },
-  w: { row: 2, col: 1 },
-  e: { row: 2, col: 3 },
-  sw: { row: 3, col: 1 },
-  s: { row: 3, col: 2 },
-  se: { row: 3, col: 3 },
-};
-
 /**
  * Keycap font stack: the touch layout's per-platform configured `font`
  * (Noto / Charis SIL / Andika — TIKE's Keyboard Font dialog) first, then the
@@ -166,6 +167,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     commitOp,
     fontFaceUrl,
     fontFaceFamily,
+    unplacedChars,
   } = props;
 
   // Load the keyboard's font into the document so keycaps render in the real
@@ -213,6 +215,15 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   const [subSel, setSubSel] = useState<SubKeySelection | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [fieldEpoch, setFieldEpoch] = useState(0);
+  // Placement bar state: letters demoted back to the tray, the tap-to-place
+  // selection (touch fallback for drag/drop), and the open modal.
+  const [trayReturns, setTrayReturns] = useState<string[]>([]);
+  const [trayLetter, setTrayLetter] = useState<string | null>(null);
+  const [placement, setPlacement] = useState<{
+    letter: string;
+    address: string;
+    key: TouchKeyIR;
+  } | null>(null);
   const [resizeDrag, setResizeDrag] = useState<{
     address: string;
     startClientX: number;
@@ -221,6 +232,57 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     xscale: number;
   } | null>(null);
   const dragSrcRef = useRef<string | null>(null);
+
+  // Placement tray: unplaced inventory chars + anything demoted back to it,
+  // deduped, in order.
+  const trayLetters = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of [...(unplacedChars ?? []), ...trayReturns]) {
+      if (!seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+      }
+    }
+    return out;
+  }, [unplacedChars, trayReturns]);
+
+  const openPlacement = (letter: string, address: string): void => {
+    if (layout === null) return;
+    const resolved = resolveBuilderKey(layout, address);
+    if (resolved === undefined) return;
+    setPlacement({ letter, address, key: resolved.key });
+  };
+
+  const handlePlacementConfirm = (choice: PlacementChoice): void => {
+    if (placement === null || layout === null) return;
+    const { letter, address, key } = placement;
+    const plan = buildPlacementOps(address, key, letter, choice, mintBuilderKeyId(layout));
+    // One undo batch via sequential commits (slice-spec §4).
+    for (const op of plan.ops) {
+      if (!commitOp(op)) break;
+    }
+    if (plan.displacedBackToTray !== null) {
+      const back = plan.displacedBackToTray;
+      setTrayReturns((prev) => (prev.includes(back) ? prev : [...prev, back]));
+    }
+    // The placed letter leaves the tray: coverage recomputes unplacedChars,
+    // and a returned-then-placed letter is dropped from trayReturns here.
+    setTrayReturns((prev) => prev.filter((c) => c !== letter));
+    setPlacement(null);
+    setTrayLetter(null);
+  };
+
+  const handleTrayDragStart = (e: React.DragEvent, letter: string): void => {
+    e.dataTransfer.setData(TRAY_LETTER_MIME, letter);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const trayLetterFromDrop = (e: React.DragEvent): string | null => {
+    if (!e.dataTransfer.types.includes(TRAY_LETTER_MIME)) return null;
+    const v = e.dataTransfer.getData(TRAY_LETTER_MIME);
+    return v === "" ? null : v;
+  };
 
   // Subkey selection is secondary to the main-key selection — reset it
   // whenever the main selection changes (never a parallel scheme).
@@ -505,6 +567,34 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
         </button>
       </div>
 
+      {/* Info bubble: what the builder is for. */}
+      <div
+        role="note"
+        style={{
+          background: "var(--app-accent-bg)",
+          border: "1px solid var(--app-accent)",
+          borderRadius: 8,
+          padding: "10px 12px",
+          fontSize: 13,
+          color: "var(--app-accent-text)",
+        }}
+      >
+        {t({
+          id: "editor.assignLoop.touch.builder.infoBubble",
+          message:
+            "Edit keys directly on the schematic layout below — add, remove, or change what a key produces. Your desktop layout is locked — these apply to phone and tablet only.",
+        })}
+      </div>
+
+      {/* Placement bar: unplaced letters, drag (or tap) onto a key. */}
+      <PlacementBar
+        letters={trayLetters}
+        keycapFont={keycapFont}
+        selectedLetter={trayLetter}
+        onSelectLetter={setTrayLetter}
+        onDragStartLetter={handleTrayDragStart}
+      />
+
       {/* Layer switcher — switching only (Q1: no structural layer ops). */}
       <div
         role="tablist"
@@ -570,7 +660,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                   draggable
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSelectKey(address);
+                    if (trayLetter !== null) {
+                      openPlacement(trayLetter, address);
+                    } else {
+                      onSelectKey(address);
+                    }
                   }}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
@@ -603,7 +697,12 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                   onDrop={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleDropOnKey(address);
+                    const letter = trayLetterFromDrop(e);
+                    if (letter !== null) {
+                      openPlacement(letter, address);
+                    } else {
+                      handleDropOnKey(address);
+                    }
                   }}
                   onDragEnd={() => {
                     dragSrcRef.current = null;
@@ -809,6 +908,16 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
         <TemplateDialog
           onClose={() => setTemplateOpen(false)}
           onApply={handleApplyTemplate}
+        />
+      )}
+
+      {placement !== null && (
+        <PlacementModal
+          letter={placement.letter}
+          targetKey={placement.key}
+          keycapFont={keycapFont}
+          onClose={() => setPlacement(null)}
+          onConfirm={handlePlacementConfirm}
         />
       )}
     </div>

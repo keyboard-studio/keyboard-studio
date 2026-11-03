@@ -7480,6 +7480,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         commitOp={commitKeyEditOp}
         fontFaceUrl={stage.kind === "ready" ? stage.fontFaceUrl : undefined}
         fontFaceFamily={stage.kind === "ready" ? stage.fontFaceFamily : undefined}
+        unplacedChars={keyGridProgress.unplacedChars}
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit

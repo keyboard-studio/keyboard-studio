@@ -233,6 +233,18 @@ export const FLICK_DIRECTIONS: readonly FlickDirection[] = [
   "nw",
 ];
 
+/** Flick compass slot positions in the 3x3 square (row/col, 1-based). */
+export const FLICK_GRID: Record<FlickDirection, { row: number; col: number }> = {
+  nw: { row: 1, col: 1 },
+  n: { row: 1, col: 2 },
+  ne: { row: 1, col: 3 },
+  w: { row: 2, col: 1 },
+  e: { row: 2, col: 3 },
+  sw: { row: 3, col: 1 },
+  s: { row: 3, col: 2 },
+  se: { row: 3, col: 3 },
+};
+
 export interface BuilderSubKeyEntry {
   readonly kind: BuilderSubKeyKind;
   /** For flicks, the direction; for sk/multitap, the subkey id. */
