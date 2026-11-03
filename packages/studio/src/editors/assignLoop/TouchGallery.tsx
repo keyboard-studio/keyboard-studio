@@ -4330,6 +4330,60 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [undoStack, keyEditOverlay],
   );
 
+  // T076 (FR-036g): the undo affordance names what it is about to undo —
+  // never a bare "Undo" once the stack is non-empty — since after a mode
+  // switch the next undo may target the OTHER mode's work (a 't' touch-
+  // method deletion made in character mode vs. a 'k' key edit made in key
+  // mode). Each branch is its own literal `t({id, message})` call (not a
+  // dynamically-assembled template) so Lingui's static extractor sees every
+  // variant.
+  const undoAffordanceLabel = useMemo((): string => {
+    if (undoTargetDescription === null) {
+      return t({
+        id: "editor.assignLoop.touch.undo.nothingToUndo",
+        message: "Nothing to undo",
+      });
+    }
+    switch (undoTargetDescription.kind) {
+      case "node":
+        return t({
+          id: "editor.assignLoop.touch.undo.node",
+          message: `Undo removing ${{ id: undoTargetDescription.id }}`,
+        });
+      case "item":
+        return t({
+          id: "editor.assignLoop.touch.undo.item",
+          message: `Undo removing ${{ id: undoTargetDescription.id }}`,
+        });
+      case "batch":
+        return t({
+          id: "editor.assignLoop.touch.undo.batch",
+          message: plural(undoTargetDescription.count, {
+            one: "Undo removing # item",
+            other: "Undo removing # items",
+          }),
+        });
+      case "touchKey":
+        return t({
+          id: "editor.assignLoop.touch.undo.touchKey",
+          message: `Undo deleting the touch method on ${{ id: undoTargetDescription.keyId }}`,
+        });
+      case "keyEdit":
+        return t({
+          id: "editor.assignLoop.touch.undo.keyEdit",
+          message: `Undo the ${{ opKind: undoTargetDescription.opKind }} edit on ${{ id: undoTargetDescription.keyId }}`,
+        });
+      case "keyEditBatch":
+        return t({
+          id: "editor.assignLoop.touch.undo.keyEditBatch",
+          message: plural(undoTargetDescription.count, {
+            one: "Undo # touch-layout code edit",
+            other: "Undo # touch-layout code edits",
+          }),
+        });
+    }
+  }, [undoTargetDescription, t]);
+
   // T013/T014 — `handleSwitchTouchEditorMode` (the ONE mode-switch call site,
   // T074) is declared further below, after `currentChar`/`setCurrentChar`
   // exist — `useModeContextCarry` (FR-036c) needs both halves of the
@@ -7480,10 +7534,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
             onClick: undoDelete,
             testId: "touch-undo-button",
-            ariaLabel: t({
-              id: "editor.assignLoop.touch.undo.footerAriaLabel",
-              message: "Undo the last edit",
-            }),
+            ariaLabel: undoAffordanceLabel,
             disabled: undoStack.length === 0,
           },
           forward: {
@@ -7744,10 +7795,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
               onClick: undoDelete,
               testId: "touch-undo-button",
-              ariaLabel: t({
-                id: "editor.assignLoop.touch.undo.footerAriaLabel",
-                message: "Undo the last edit",
-              }),
+              ariaLabel: undoAffordanceLabel,
               disabled: undoStack.length === 0,
             },
             forward: {
@@ -7837,64 +7885,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     handleSwitchTouchEditorMode(next.id);
     modeTabRefs.current.get(next.id)?.focus();
   };
-
-  // T076 (FR-036g): the undo affordance names what it is about to undo —
-  // never a bare "Undo" once the stack is non-empty — since after a mode
-  // switch the next undo may target the OTHER mode's work (a 't' touch-
-  // method deletion made in character mode vs. a 'k' key edit made in key
-  // mode). Each branch is its own literal `t({id, message})` call (not a
-  // dynamically-assembled template) so Lingui's static extractor sees every
-  // variant.
-  let _undoAffordanceLabel: string = t({
-    id: "editor.assignLoop.touch.undo.nothingToUndo",
-    message: "Nothing to undo",
-  });
-  if (undoTargetDescription !== null) {
-    switch (undoTargetDescription.kind) {
-      case "node":
-        _undoAffordanceLabel = t({
-          id: "editor.assignLoop.touch.undo.node",
-          message: `Undo removing ${{ id: undoTargetDescription.id }}`,
-        });
-        break;
-      case "item":
-        _undoAffordanceLabel = t({
-          id: "editor.assignLoop.touch.undo.item",
-          message: `Undo removing ${{ id: undoTargetDescription.id }}`,
-        });
-        break;
-      case "batch":
-        _undoAffordanceLabel = t({
-          id: "editor.assignLoop.touch.undo.batch",
-          message: plural(undoTargetDescription.count, {
-            one: "Undo removing # item",
-            other: "Undo removing # items",
-          }),
-        });
-        break;
-      case "touchKey":
-        _undoAffordanceLabel = t({
-          id: "editor.assignLoop.touch.undo.touchKey",
-          message: `Undo deleting the touch method on ${{ id: undoTargetDescription.keyId }}`,
-        });
-        break;
-      case "keyEdit":
-        _undoAffordanceLabel = t({
-          id: "editor.assignLoop.touch.undo.keyEdit",
-          message: `Undo the ${{ opKind: undoTargetDescription.opKind }} edit on ${{ id: undoTargetDescription.keyId }}`,
-        });
-        break;
-      case "keyEditBatch":
-        _undoAffordanceLabel = t({
-          id: "editor.assignLoop.touch.undo.keyEditBatch",
-          message: plural(undoTargetDescription.count, {
-            one: "Undo # touch-layout code edit",
-            other: "Undo # touch-layout code edits",
-          }),
-        });
-        break;
-    }
-  }
 
   // T075 (FR-036d): ONE shared set of progress figures, both derived from
   // keyGridProgress above — never two independently maintained counters.
