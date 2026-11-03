@@ -4,7 +4,7 @@
   "branch": "095-keyboard-docs-templates",
   "selectedAt": "2026-10-15T01:28:08.352Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -338,6 +338,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-15T03:03:53.706Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-03T03:38:11.861Z"
     }
   ],
   "telemetryInstanceId": "8782d5f1-b6c3-42a7-aac0-44a5387009cf",
@@ -948,7 +955,7 @@
       "command": "pnpm --filter @keyboard-studio/studio exec tsc --noEmit -p .",
       "source": "derived",
       "exitCode": 0,
-      "durationSeconds": 16.0,
+      "durationSeconds": 16,
       "result": "no output"
     },
     {
