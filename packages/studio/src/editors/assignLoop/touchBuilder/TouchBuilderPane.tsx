@@ -31,7 +31,7 @@ import {
   BUILDER_MIN_KEY_WIDTH,
   BUILDER_PRESENTATIONS,
   BUILDER_ROW_HEIGHT,
-  FLICK_DIRECTIONS,
+  type FlickDirection,
   builderPresentationById,
   buildTemplateApplyOps,
   computeBuilderScale,
@@ -114,6 +114,18 @@ const MINIMAL_MODIFIER_COMBOS = ["default", "shift", "rightalt", "rightalt-shift
 function spColor(sp: number | undefined): { bg: string; fg: string; border: string } {
   return SP_COLORS[sp ?? 0] ?? SP_COLORS[0]!;
 }
+
+/** Flick compass slot positions in the 3x3 square (row/col, 1-based). */
+const FLICK_GRID: Record<FlickDirection, { row: number; col: number }> = {
+  nw: { row: 1, col: 1 },
+  n: { row: 1, col: 2 },
+  ne: { row: 1, col: 3 },
+  w: { row: 2, col: 1 },
+  e: { row: 2, col: 3 },
+  sw: { row: 3, col: 1 },
+  s: { row: 3, col: 2 },
+  se: { row: 3, col: 3 },
+};
 
 export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   const { t } = useLingui();
@@ -1022,7 +1034,7 @@ function SubkeyPanel(props: {
         {entries.sk.map((e) => renderChip(e, e.key.text || e.key.id))}
       </SubkeyGroup>
 
-      {/* Flick compass — one slot per direction (TIKE placeholder-per-direction). */}
+      {/* Flick compass — 3x3 square (TIKE placeholder-per-direction). */}
       <SubkeyGroup
         title={t({
           id: "editor.assignLoop.touch.builder.flickSection",
@@ -1030,11 +1042,30 @@ function SubkeyPanel(props: {
         })}
         testId="touch-builder-subkeys-flick"
       >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, auto)", gap: 4 }}>
-          {FLICK_DIRECTIONS.map((direction) => {
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, auto)",
+            gap: 4,
+            justifyContent: "start",
+            alignItems: "center",
+          }}
+        >
+          {(Object.keys(FLICK_GRID) as FlickDirection[]).map((direction) => {
             const entry = entries.flick.find((e) => e.ref.id === direction);
+            const pos = FLICK_GRID[direction];
             return (
-              <div key={direction} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <div
+                key={direction}
+                style={{
+                  gridRow: pos.row,
+                  gridColumn: pos.col,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
                 <span style={{ fontSize: 9, color: TEXT_DIM, fontFamily: FONT }}>{direction}</span>
                 {entry !== undefined ? (
                   renderChip(entry, entry.key.text || entry.key.id)
@@ -1052,6 +1083,24 @@ function SubkeyPanel(props: {
               </div>
             );
           })}
+          {/* Center: the key being flicked from. */}
+          <div
+            aria-hidden="true"
+            style={{
+              gridRow: 2,
+              gridColumn: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 32,
+              minHeight: 24,
+              fontSize: 12,
+              color: TEXT_DIM,
+              fontFamily: FONT,
+            }}
+          >
+            {key.text || key.id}
+          </div>
         </div>
       </SubkeyGroup>
 
