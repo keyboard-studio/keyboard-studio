@@ -40,11 +40,59 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-03T22:00:25.783Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:01:32.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:02:42.587Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:03:31.683Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:04:01.213Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:04:11.440Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:04:11.671Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T001",
+  "currentTask": "T006",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -52,6 +100,52 @@
       "files": [
         "packages/studio/src/test/openSampleKeyboards.ts",
         "docs/keyboard-index.md"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added isOpenMode helper and test",
+      "files": [
+        "packages/studio/src/lib/openMode.ts",
+        "packages/studio/src/lib/openMode.test.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added SourceRef, FindingKey, ReviewNote types and export",
+      "files": [
+        "packages/contracts/src/openKeyboard.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "spliceKmn contract tests: no-op, delete/replace/insert (fixture + basic_kbdfr corpus), continued rule, ineligible node id, CRLF",
+      "files": [
+        "packages/engine/src/pattern-apply/spliceKmn.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "carveViaSplice now delegates to spliceKmn with delete-only edits (LF kept)",
+      "files": [
+        "packages/engine/src/pattern-apply/carveViaSplice.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Exported emitRule and emitStore from codec and engine barrels",
+      "files": [
+        "packages/engine/src/codec/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Implemented diffIrToKmnEdits, spliceKmn, projectKmnText per kmn-projection contract",
+      "files": [
+        "packages/engine/src/pattern-apply/spliceKmn.ts",
+        "packages/engine/src/index.ts"
       ]
     }
   },
@@ -63,11 +157,20 @@
       "exitCode": 0,
       "durationSeconds": 13.1,
       "result": "no output"
+    },
+    {
+      "what": "engine 4946, contracts 1047, keyboard-lint 547 vitest; studio openMode test; pnpm typecheck",
+      "command": "pnpm -r test; pnpm typecheck",
+      "result": "pass"
     }
   ],
   "concerns": [
     {
       "note": "pnpm lint exits 1 on 3 pre-existing errors (generate-kvks.test.ts, OskEditor.test.tsx), unchanged by this phase",
+      "step": "implement"
+    },
+    {
+      "note": "Branch is behind main: pnpm lint has 3 errors in untouched files (generate-kvks.test.ts, OskEditor.test.tsx) and ~100 studio tests fail with [manifest] 20 steps vs 19 screens, reproduced on clean HEAD. Merge main to clear.",
       "step": "implement"
     }
   ],

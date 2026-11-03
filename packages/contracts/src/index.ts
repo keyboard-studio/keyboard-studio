@@ -31,6 +31,7 @@ export * from "./keyBudget";
 export * from "./keyboardIdentity";
 export * from "./linguistInventory";
 export * from "./lintFinding";
+export * from "./openKeyboard";
 export * from "./pattern";
 export * from "./patternMatch";
 export * from "./removalCapability";

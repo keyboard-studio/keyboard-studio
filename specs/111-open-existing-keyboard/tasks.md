@@ -25,12 +25,12 @@
 
 **Purpose**: the splice projection and shared types every story uses.
 
-- [ ] T002 [P] Export `emitRule` and `emitStore` from `packages/engine/src/codec/index.ts` and the engine barrel `packages/engine/src/index.ts`
-- [ ] T003 [P] Add `SourceRef`, `FindingKey` and `ReviewNote` types (additive, no Pattern change) to `packages/contracts/src/openKeyboard.ts`, exported from `packages/contracts/src/index.ts` (fields per [data-model.md](data-model.md))
-- [ ] T004 [P] Add `isOpenMode(mode)` (`mode === "adapt-existing"`) in `packages/studio/src/lib/openMode.ts`. Every Open-only branch below uses it.
-- [ ] T005 Write the contract tests from [contracts/kmn-projection.md](contracts/kmn-projection.md#tests-must-exist-before-the-studio-uses-it) in `packages/engine/src/pattern-apply/spliceKmn.test.ts`: no-op identical; delete/replace/insert on corpus files touch only their lines; a continued (`\`) rule replaced whole; an ineligible edit returns `ok:false` with the node id; CRLF stays CRLF
-- [ ] T006 Implement `diffIrToKmnEdits`, `spliceKmn` and `projectKmnText` in `packages/engine/src/pattern-apply/spliceKmn.ts` per the contract. Spans come from `sourceLine` + `joinContinuations` (`packages/engine/src/codec/continuation.ts`). Export them from `packages/engine/src/index.ts`.
-- [ ] T007 Re-implement `carveViaSplice` as `spliceKmn` with delete edits only in `packages/engine/src/pattern-apply/carveViaSplice.ts`, keeping its LF behaviour for Copy. Its existing tests must pass unchanged.
+- [x] T002 [P] Export `emitRule` and `emitStore` from `packages/engine/src/codec/index.ts` and the engine barrel `packages/engine/src/index.ts`
+- [x] T003 [P] Add `SourceRef`, `FindingKey` and `ReviewNote` types (additive, no Pattern change) to `packages/contracts/src/openKeyboard.ts`, exported from `packages/contracts/src/index.ts` (fields per [data-model.md](data-model.md))
+- [x] T004 [P] Add `isOpenMode(mode)` (`mode === "adapt-existing"`) in `packages/studio/src/lib/openMode.ts`. Every Open-only branch below uses it.
+- [x] T005 Write the contract tests from [contracts/kmn-projection.md](contracts/kmn-projection.md#tests-must-exist-before-the-studio-uses-it) in `packages/engine/src/pattern-apply/spliceKmn.test.ts`: no-op identical; delete/replace/insert on corpus files touch only their lines; a continued (`\`) rule replaced whole; an ineligible edit returns `ok:false` with the node id; CRLF stays CRLF
+- [x] T006 Implement `diffIrToKmnEdits`, `spliceKmn` and `projectKmnText` in `packages/engine/src/pattern-apply/spliceKmn.ts` per the contract. Spans come from `sourceLine` + `joinContinuations` (`packages/engine/src/codec/continuation.ts`). Export them from `packages/engine/src/index.ts`.
+- [x] T007 Re-implement `carveViaSplice` as `spliceKmn` with delete edits only in `packages/engine/src/pattern-apply/carveViaSplice.ts`, keeping its LF behaviour for Copy. Its existing tests must pass unchanged.
 
 **Checkpoint**: engine tests green (`pnpm --filter ./packages/engine exec vitest run`).
 
