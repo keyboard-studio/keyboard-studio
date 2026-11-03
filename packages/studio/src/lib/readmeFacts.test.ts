@@ -91,6 +91,23 @@ describe("typing rows", () => {
     expect(facts.literalRows).toEqual([{ keys: "' then '", output: "'" }]);
   });
 
+  it("names the space bar instead of leaving a blank keystroke", () => {
+    const ir = parseKmn(
+      [
+        "store(&NAME) 'sp'",
+        "begin Unicode > use(main)",
+        "group(main) using keys",
+        "store(diaBase) ' '",
+        "store(diaOut) U+00A8",
+        "+ [K_QUOTE] > dk(1)",
+        "dk(1) + any(diaBase) > index(diaOut, 2)",
+        "",
+      ].join("\n"),
+      "sp",
+    ).ir;
+    expect(buildReadmeFacts(input(null, { ir })).typingRows).toEqual([{ keys: "' then Space", output: "¨" }]);
+  });
+
   it("invents no row for a dead key the keyboard gives no way to type", () => {
     expect(buildReadmeFacts(input(DEADKEY_RIGHT_ALT_FIXTURE)).literalRows).toEqual([]);
   });

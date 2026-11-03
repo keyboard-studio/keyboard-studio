@@ -60,17 +60,19 @@ type TypingMethod = "rightAlt" | "sequence" | "touch" | "direct";
 const METHOD_ORDER: readonly TypingMethod[] = ["rightAlt", "sequence", "touch", "direct"];
 
 interface Candidate extends ReadmeTypingRow {
+  /** The keystrokes before joining, so a dead key is read from its first step, not by re-splitting `keys`. */
+  steps: readonly string[];
   method: TypingMethod;
   group: CharGroup;
 }
 
 const PHRASES = DOC_FORMS.readmePhrases;
 
-const METHOD_PHRASE: Readonly<Record<TypingMethod, string>> = {
+/** The design note names the ways in beyond a plain key press; a key of its own needs no note. */
+const NOTED_METHOD_PHRASE: Readonly<Partial<Record<TypingMethod, string>>> = {
   rightAlt: PHRASES.methodRightAlt,
   sequence: PHRASES.methodSequence,
   touch: PHRASES.methodTouch,
-  direct: PHRASES.methodDirect,
 };
 
 const USE_CASE_PHRASE: Readonly<Record<string, string>> = {
@@ -85,6 +87,15 @@ const LAYOUT_FAMILY_LABEL: Readonly<Partial<Record<LayoutFamilyValue, string>>> 
   azerty: "AZERTY",
 };
 
+/** A keystroke label as a reader sees it: the space bar is named, never left as blank space. */
+function stepLabel(step: string): string {
+  return step === " " ? "Space" : step;
+}
+
+function keysOf(steps: readonly string[]): string {
+  return steps.map(stepLabel).join(" then ");
+}
+
 function methodOfSteps(steps: readonly string[]): TypingMethod {
   if (steps.length > 1) return "sequence";
   return steps[0]!.includes("AltGr") ? "rightAlt" : "direct";
@@ -95,7 +106,7 @@ function desktopCandidates(ir: KeyboardIR, extras: readonly string[]): Candidate
   for (const ch of extras) {
     const steps = shortestKeySteps(ir, ch);
     if (steps === undefined) continue;
-    rows.push({ keys: steps.join(" then "), output: displayChar(ch), method: methodOfSteps(steps), group: groupOf(ch.codePointAt(0)!) });
+    rows.push({ keys: keysOf(steps), steps, output: displayChar(ch), method: methodOfSteps(steps), group: groupOf(ch.codePointAt(0)!) });
   }
   return rows;
 }
@@ -108,7 +119,7 @@ function touchCandidates(layout: TouchLayoutIR | null): Candidate[] {
   const add = (keys: string, text: string) => {
     if (text === "" || [...text].every(isBaseCharacter) || seen.has(text)) return;
     seen.add(text);
-    rows.push({ keys, output: displayChar(text), method: "touch", group: groupOf(text.codePointAt(0)!) });
+    rows.push({ keys, steps: [keys], output: displayChar(text), method: "touch", group: groupOf(text.codePointAt(0)!) });
   };
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
@@ -148,13 +159,13 @@ function literalRows(ir: KeyboardIR, candidates: readonly Candidate[]): ReadmeTy
   const triggers = new Set<string>();
   for (const c of candidates) {
     if (c.method !== "sequence") continue;
-    const first = c.keys.split(" then ")[0]!;
-    if ([...first].length === 1) triggers.add(first);
+    const first = c.steps[0]!;
+    if ([...first].length === 1 && first !== " ") triggers.add(first);
   }
   const rows: ReadmeTypingRow[] = [];
   for (const trigger of [...triggers].sort(compareCodePoints)) {
     const steps = shortestKeySteps(ir, trigger);
-    if (steps !== undefined && steps.length > 1) rows.push({ keys: steps.join(" then "), output: trigger });
+    if (steps !== undefined && steps.length > 1) rows.push({ keys: keysOf(steps), output: trigger });
   }
   return rows;
 }
@@ -181,13 +192,14 @@ function characterGroupsOf(extras: readonly string[]): ReadmeCharacterGroup[] {
   return GROUP_ORDER.filter((g) => groups.has(g)).map((g) => ({ kind: g, label: GROUP_LABEL[g], chars: groups.get(g)! }));
 }
 
-/** "Letters: Right Alt, key sequences. Marks: Right Alt." over the groups that have rows. */
+/** "Letters: Right Alt, key sequences. Marks: Right Alt." over the groups typed some way beyond a plain key press. */
 function methodsNote(candidates: readonly Candidate[]): string | undefined {
   const parts = GROUP_ORDER.flatMap((g) => {
-    const methods = METHOD_ORDER.filter((m) => candidates.some((c) => c.group === g && c.method === m));
-    return methods.length > 0
-      ? [fillDocPhrase(PHRASES.noteMethods, { group: GROUP_LABEL[g], methods: methods.map((m) => METHOD_PHRASE[m]).join(", ") })]
-      : [];
+    const methods = METHOD_ORDER.flatMap((m) => {
+      const phrase = NOTED_METHOD_PHRASE[m];
+      return phrase !== undefined && candidates.some((c) => c.group === g && c.method === m) ? [phrase] : [];
+    });
+    return methods.length > 0 ? [fillDocPhrase(PHRASES.noteMethods, { group: GROUP_LABEL[g], methods: methods.join(", ") })] : [];
   });
   return parts.length > 0 ? parts.join(" ") : undefined;
 }

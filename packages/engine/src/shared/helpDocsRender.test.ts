@@ -1050,7 +1050,7 @@ describe("README.md and readme.htm from ReadmeFacts (spec 110)", () => {
         "",
         "A keyboard for everyday Hausa writing.",
         "",
-        "For typing Hausa (Harshen Hausa, `ha-Latn-NG`) in the Latin script. Based on US English, for a QWERTY base keyboard.",
+        "For typing Hausa (Harshen Hausa, `ha-Latn-NG`) in the Latin script. Based on US English (QWERTY layout).",
         "",
         "Suited to: everyday texting and messaging.",
         "",
@@ -1141,7 +1141,7 @@ describe("README.md and readme.htm from ReadmeFacts (spec 110)", () => {
   it("readme.htm is the brief install-time page: no table, links, platforms, use case or design notes", () => {
     const htm = renderReadmeHtm(hausa());
     expect(htm).toContain("<h1>Hausa Latin</h1>");
-    expect(htm).toContain("<p>For typing Hausa (Harshen Hausa, ha-Latn-NG) in the Latin script. Based on US English, for a QWERTY base keyboard.</p>");
+    expect(htm).toContain("<p>For typing Hausa (Harshen Hausa, ha-Latn-NG) in the Latin script. Based on US English (QWERTY layout).</p>");
     expect(htm).toContain("<p>Adds: ɓ ɗ ƙ ◌̀</p>");
     expect(htm).toContain("empty boxes");
     expect(htm).toContain("see the welcome page for how to type each character");

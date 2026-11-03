@@ -35,7 +35,6 @@ export type DocReadmePhraseId =
   | "methodRightAlt"
   | "methodSequence"
   | "methodTouch"
-  | "methodDirect"
   | "noteMarksPrefix"
   | "noteMarksPostfix"
   | "noteTouchFromDesktop"
@@ -104,7 +103,6 @@ export const DocFormsSchema = z
         methodRightAlt: z.string().min(1),
         methodSequence: z.string().min(1),
         methodTouch: z.string().min(1),
-        methodDirect: z.string().min(1),
         noteMarksPrefix: z.string().min(1),
         noteMarksPostfix: z.string().min(1),
         noteTouchFromDesktop: z.string().min(1),
