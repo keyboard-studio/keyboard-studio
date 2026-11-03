@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { useIsNarrow } from "../../../hooks/useViewport.ts";
 import {
   createKeyOccurrenceCounter,
   touchKeyAddress,
@@ -201,6 +202,12 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   const activePlatformFont = layout?.platforms.find((p) => p.id === activePlatformId)?.font;
   const keycapFont = keycapFontFamily(activePlatformFont, fontFaceFamily);
 
+  // Narrow viewports skip the default inter-key margin — only an explicitly
+  // set `pad` still separates keys (2026-11-02). Vertical rhythm is untouched.
+  const isNarrow = useIsNarrow();
+  const padUnits = (key: TouchKeyIR): number =>
+    isNarrow ? (key.pad ?? 0) : (key.pad ?? BUILDER_KEY_MARGIN);
+
   // Per-platform presentation memory (TIKE `lastPresentations`).
   const [presentations, setPresentations] = useState<Record<string, string>>({});
   const [subSel, setSubSel] = useState<SubKeySelection | null>(null);
@@ -259,7 +266,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
       keys: row.map(({ key }) => ({
         id: key.id,
         width: key.width ?? BUILDER_DEFAULT_KEY_WIDTH,
-        pad: key.pad ?? BUILDER_KEY_MARGIN,
+        pad: padUnits(key),
       })),
     })),
     presentation,
@@ -587,7 +594,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                     flex: "0 0 auto",
                     width: `${widthPx}px`,
                     height: `${BUILDER_ROW_HEIGHT * scale.yscale}px`,
-                    marginLeft: `${(key.pad ?? BUILDER_KEY_MARGIN) * scale.xscale}px`,
+                    marginLeft: `${padUnits(key) * scale.xscale}px`,
                     marginTop: `${BUILDER_KEY_MARGIN * scale.yscale}px`,
                     background: isSpacer ? "transparent" : colors.bg,
                     color: colors.fg,
