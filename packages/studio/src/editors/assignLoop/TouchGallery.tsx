@@ -234,11 +234,16 @@ const TouchCodePane = lazy(() =>
 // replacing the "By key" tab's old grid/inspector surface. Eager — it
 // carries no Monaco weight, unlike the code tab above.
 import { TouchBuilderPane } from "./touchBuilder/TouchBuilderPane.tsx";
+import type { BuilderPaneDragApi } from "./touchBuilder/TouchBuilderPane.tsx";
 import {
   PlacementBar,
   TRAY_LETTER_MIME,
 } from "./touchBuilder/PlacementModal.tsx";
 import { keycapFontFamily } from "./touchBuilder/touchBuilderModel.ts";
+import {
+  serializePanelDropSpec,
+  type TrayDropTarget,
+} from "./touchBuilder/placementOps.ts";
 import {
   useKeyCommands,
   buildAddKeyAfterOutcome,
@@ -1697,20 +1702,39 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // while the board scrolls), the pane consumes the selection/demotions.
   const [trayLetter, setTrayLetter] = useState<string | null>(null);
   const [trayReturns, setTrayReturns] = useState<string[]>([]);
-  // The pane owns the placement modal, so it registers its opener here for
-  // the header's touch drag (which starts outside the pane).
-  const placementOpenerRef = useRef<((letter: string, address: string) => void) | null>(null);
+  // The pane owns the placement modal + op planning, so it registers its drag
+  // API here for the header's drags (which start outside the pane).
+  const dragApiRef = useRef<BuilderPaneDragApi | null>(null);
 
   // Key highlighted under the finger during a header touch drag.
   const [dropHoverAddress, setDropHoverAddress] = useState<string | null>(null);
+  // Panel drop zone highlighted under the finger (serialized spec).
+  const [panelDropHover, setPanelDropHover] = useState<string | null>(null);
+
+  const handleTouchDragTarget = (target: TrayDropTarget | null): void => {
+    if (target === null) {
+      setDropHoverAddress(null);
+      setPanelDropHover(null);
+    } else if (target.kind === "key") {
+      setDropHoverAddress(target.address);
+      setPanelDropHover(null);
+    } else {
+      setDropHoverAddress(null);
+      setPanelDropHover(serializePanelDropSpec(target.spec));
+    }
+  };
 
   // Touch drag end: the bar hit-tested the drop point already.
-  const handleTouchDrop = (letter: string, address: string | null): void => {
-    if (address !== null) {
-      placementOpenerRef.current?.(letter, address);
-    } else {
+  const handleTouchDrop = (letter: string, target: TrayDropTarget | null): void => {
+    setDropHoverAddress(null);
+    setPanelDropHover(null);
+    if (target === null) {
       // Dropped on empty space — stand down the tap selection.
       setTrayLetter(null);
+    } else if (target.kind === "key") {
+      dragApiRef.current?.openPlacement(letter, target.address);
+    } else {
+      dragApiRef.current?.dropTrayOnPanel(letter, target.spec);
     }
   };
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
@@ -7539,9 +7563,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         trayLetter={trayLetter}
         onSelectTrayLetter={setTrayLetter}
         onTrayReturnsChange={setTrayReturns}
-        onRegisterPlacementOpener={(open) => {
-          placementOpenerRef.current = open;
+        onRegisterDragApi={(api) => {
+          dragApiRef.current = api;
         }}
+        panelDropHover={panelDropHover}
         dropHoverAddress={dropHoverAddress}
       />
 
@@ -8033,7 +8058,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               selectedLetter={trayLetter}
               onSelectLetter={setTrayLetter}
               onDragStartLetter={handleTrayDragStart}
-              onTouchDragTarget={setDropHoverAddress}
+              onTouchDragTarget={handleTouchDragTarget}
               onTouchDrop={handleTouchDrop}
             />
           </div>

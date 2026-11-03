@@ -2,9 +2,13 @@
 import { describe, expect, it } from "vitest";
 import type { TouchKeyIR } from "@keyboard-studio/contracts";
 import {
+  buildPanelDropOps,
   buildPlacementOps,
+  buildSubkeyMoveOps,
   isPreservableText,
+  parsePanelDropSpec,
   placementOccupant,
+  serializePanelDropSpec,
   touchGestureIntent,
 } from "./placementOps.ts";
 
@@ -210,5 +214,195 @@ describe("touchGestureIntent", () => {
   });
   it("breaks exact ties toward drag", () => {
     expect(touchGestureIntent(20, 20)).toBe("drag");
+  });
+});
+
+describe("parsePanelDropSpec", () => {
+  it("round-trips specs through serialize", () => {
+    const specs = [
+      { area: "lp" },
+      { area: "lp", beforeId: "T_1" },
+      { area: "flick", direction: "ne" },
+      { area: "mt" },
+      { area: "mt", index: 1 },
+    ] as const;
+    for (const s of specs) {
+      expect(parsePanelDropSpec(serializePanelDropSpec(s))).toEqual(s);
+    }
+  });
+  it("rejects malformed specs", () => {
+    expect(parsePanelDropSpec(null)).toBeNull();
+    expect(parsePanelDropSpec("")).toBeNull();
+    expect(parsePanelDropSpec("bogus")).toBeNull();
+    expect(parsePanelDropSpec("flick:up")).toBeNull();
+    expect(parsePanelDropSpec("mt:x")).toBeNull();
+  });
+});
+
+function subkeyKey(): TouchKeyIR {
+  return key({
+    sk: [
+      { id: "T_1", text: "a", sp: 0 },
+      { id: "T_2", text: "b", sp: 0 },
+    ],
+    flick: { n: { id: "n", text: "x", sp: 0 } },
+    multitap: [{ id: "T_m1", text: "c", sp: 0 }],
+  } as Partial<TouchKeyIR>);
+}
+
+describe("buildPanelDropOps", () => {
+  it("appends a tray letter to longpress without displacing", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "lp" }, "T_new");
+    expect(plan.ops).toHaveLength(1);
+    expect(plan.ops[0]).toMatchObject({
+      kind: "setSubKey",
+      sub: { kind: "sk", id: "T_new" },
+      fields: { text: "z" },
+    });
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("sets an empty flick direction directly", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "flick", direction: "ne" }, "T_new");
+    expect(plan.ops).toHaveLength(1);
+    expect(plan.ops[0]).toMatchObject({
+      kind: "setSubKey",
+      sub: { kind: "flick", id: "ne" },
+      fields: { text: "z" },
+    });
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("replaces an occupied flick and sends the glyph back to the tray", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "flick", direction: "n" }, "T_new");
+    expect(plan.ops).toHaveLength(1);
+    expect(plan.ops[0]).toMatchObject({
+      kind: "setSubKey",
+      sub: { kind: "flick", id: "n" },
+      fields: { text: "z" },
+    });
+    expect(plan.displacedBackToTray).toBe("x");
+  });
+  it("appends multitap while a tap is free", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "mt" }, "T_new");
+    expect(plan.ops).toHaveLength(1);
+    expect(plan.ops[0]).toMatchObject({
+      kind: "setSubKey",
+      sub: { kind: "multitap", id: "T_new" },
+    });
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("replaces the 3x entry when multitap is full", () => {
+    const k = subkeyKey();
+    k.multitap = [
+      { id: "T_m1", text: "c", sp: 0 },
+      { id: "T_m2", text: "d", sp: 0 },
+    ];
+    const plan = buildPanelDropOps(ADDR, k, "z", { area: "mt" }, "T_new");
+    expect(plan.displacedBackToTray).toBe("d");
+    const texts = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { text: string } }).fields.text);
+    expect(texts).toEqual(["c", "z"]);
+  });
+  it("replaces a specific multitap index", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "mt", index: 0 }, "T_new");
+    expect(plan.displacedBackToTray).toBe("c");
+    const texts = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { text: string } }).fields.text);
+    expect(texts).toEqual(["z"]);
+  });
+});
+
+describe("buildSubkeyMoveOps", () => {
+  it("reorders a longpress before another", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "sk", id: "T_2" },
+      { area: "lp", beforeId: "T_1" },
+    );
+    const order = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { id: string } }).fields.id);
+    expect(order).toEqual(["T_2", "T_1"]);
+    expect(plan.ops.filter((o) => o.kind === "removeSubKey")).toHaveLength(2);
+  });
+  it("moves a longpress to the end on area drop", () => {
+    const plan = buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_1" }, { area: "lp" });
+    const order = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { id: string } }).fields.id);
+    expect(order).toEqual(["T_2", "T_1"]);
+  });
+  it("moves a flick to an empty direction", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "flick", direction: "n" },
+      { area: "flick", direction: "ne" },
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "flick", id: "n" } },
+      { kind: "setSubKey", sub: { kind: "flick", id: "ne" }, fields: { text: "x" } },
+    ]);
+  });
+  it("swaps flicks when the target direction is occupied", () => {
+    const k = subkeyKey();
+    k.flick = { n: { id: "n", text: "x", sp: 0 }, ne: { id: "ne", text: "y", sp: 0 } };
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      k,
+      { kind: "flick", direction: "n" },
+      { area: "flick", direction: "ne" },
+    );
+    const sets = plan.ops.filter((o) => o.kind === "setSubKey");
+    expect(sets).toMatchObject([
+      { sub: { kind: "flick", id: "ne" }, fields: { text: "x" } },
+      { sub: { kind: "flick", id: "n" }, fields: { text: "y" } },
+    ]);
+  });
+  it("reorders multitap entries", () => {
+    const k = subkeyKey();
+    k.multitap = [
+      { id: "T_m1", text: "c", sp: 0 },
+      { id: "T_m2", text: "d", sp: 0 },
+    ];
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      k,
+      { kind: "multitap", index: 1 },
+      { area: "mt", index: 0 },
+    );
+    const order = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { id: string } }).fields.id);
+    expect(order).toEqual(["T_m2", "T_m1"]);
+  });
+  it("ignores cross-kind drops", () => {
+    expect(
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_1" }, { area: "flick", direction: "n" }).ops,
+    ).toHaveLength(0);
+    expect(
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "flick", direction: "n" }, { area: "lp" }).ops,
+    ).toHaveLength(0);
+    expect(
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "multitap", index: 0 }, { area: "lp" }).ops,
+    ).toHaveLength(0);
+  });
+});
+
+describe("buildPanelDropOps longpress insert", () => {
+  it("inserts before the chipped longpress on a chip drop", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "lp", beforeId: "T_1" }, "T_new");
+    const order = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { id: string } }).fields.id);
+    expect(order).toEqual(["T_new", "T_1", "T_2"]);
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("appends when beforeId is unknown", () => {
+    const plan = buildPanelDropOps(ADDR, subkeyKey(), "z", { area: "lp", beforeId: "nope" }, "T_new");
+    expect(plan.ops).toHaveLength(1);
+    expect(plan.ops[0]).toMatchObject({ kind: "setSubKey", sub: { kind: "sk", id: "T_new" } });
   });
 });

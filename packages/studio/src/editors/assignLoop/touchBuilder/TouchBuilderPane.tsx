@@ -54,7 +54,17 @@ import {
   PlacementModal,
   TRAY_LETTER_MIME,
 } from "./PlacementModal.tsx";
+import { useTouchDrag } from "./useTouchDrag.ts";
 import type { PlacementChoice } from "./placementOps.ts";
+import {
+  buildPanelDropOps,
+  buildSubkeyMoveOps,
+  parsePanelDropSpec,
+  serializePanelDropSpec,
+  SUBKEY_MIME,
+  type PanelDropSpec,
+  type SubkeyDragPayload,
+} from "./placementOps.ts";
 import { buildPlacementOps } from "./placementOps.ts";
 
 export interface TouchBuilderPaneProps {
@@ -83,17 +93,34 @@ export interface TouchBuilderPaneProps {
   readonly onSelectTrayLetter: (letter: string | null) => void;
   readonly onTrayReturnsChange: (updater: (prev: string[]) => string[]) => void;
   /**
-   * Lets TouchGallery's touch drag (originating in the locked header) drop a
-   * letter onto a key: the pane owns the modal + op planning, so it
-   * registers its opener here.
+   * The pane owns the placement modal + op planning, so it registers a drag
+   * API for TouchGallery's header drags (which start outside the pane):
+   * dropping a tray letter on a board key opens the modal; dropping one on
+   * a subkey-panel area places it directly.
    */
-  readonly onRegisterPlacementOpener?: (open: (letter: string, address: string) => void) => void;
+  readonly onRegisterDragApi?: (api: BuilderPaneDragApi) => void;
+  /**
+   * Serialized panel drop spec under the finger during a header touch drag,
+   * for drop-zone highlighting. Null when no drag is in flight.
+   */
+  readonly panelDropHover?: string | null;
   /**
    * Address of the key under the finger during a header touch drag, for
    * drop-target highlighting. Undefined when no drag is in flight.
    */
   readonly dropHoverAddress?: string | null;
 }
+
+/** Drag operations the builder pane exposes to TouchGallery. */
+export interface BuilderPaneDragApi {
+  readonly openPlacement: (letter: string, address: string) => void;
+  readonly dropTrayOnPanel: (letter: string, spec: PanelDropSpec) => void;
+}
+
+/** What can be dropped onto a subkey-panel area: a tray letter or a subkey chip. */
+export type SubkeyDropSource =
+  | { type: "tray"; letter: string }
+  | { type: "subkey"; payload: SubkeyDragPayload };
 
 interface SubKeySelection {
   readonly kind: BuilderSubKeyKind;
@@ -165,7 +192,8 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     trayLetter,
     onSelectTrayLetter,
     onTrayReturnsChange,
-    onRegisterPlacementOpener,
+    onRegisterDragApi,
+    panelDropHover,
     dropHoverAddress,
   } = props;
 
@@ -237,14 +265,49 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     setPlacement({ letter, address, key: resolved.key });
   };
 
-  // The gallery's touch drag starts in the locked header, outside this pane
-  // — register the opener so a drop can land here. Ref-indirected so the
-  // registered closure never goes stale across renders.
-  const openPlacementRef = useRef(openPlacement);
-  openPlacementRef.current = openPlacement;
+  // A tray letter or dragged subkey dropped onto a subkey-panel area of the
+  // SELECTED key. Tray letters place directly (no modal): longpress appends,
+  // flick upserts its direction (displaced glyph back to the tray, never
+  // silently demoted), multitap fills 2x then 3x, replacing 3x when full.
+  // Subkey chips reorder (longpress/multitap) or move between flick
+  // directions (swap when occupied). One undo batch via sequential commits.
+  const applyPanelDrop = (source: SubkeyDropSource, spec: PanelDropSpec): void => {
+    if (layout === null || selectedKeyAddress === null) return;
+    const resolved = resolveBuilderKey(layout, selectedKeyAddress);
+    if (resolved === undefined) return;
+    const plan =
+      source.type === "tray"
+        ? buildPanelDropOps(selectedKeyAddress, resolved.key, source.letter, spec, mintBuilderKeyId(layout))
+        : buildSubkeyMoveOps(selectedKeyAddress, resolved.key, source.payload, spec);
+    if (plan.ops.length === 0) return;
+    for (const op of plan.ops) {
+      if (!commitOp(op)) break;
+    }
+    if (plan.displacedBackToTray !== null) {
+      const back = plan.displacedBackToTray;
+      onTrayReturnsChange((prev) => (prev.includes(back) ? prev : [...prev, back]));
+    }
+    if (source.type === "tray") {
+      // The placed letter leaves the tray.
+      onTrayReturnsChange((prev) => prev.filter((c) => c !== source.letter));
+      onSelectTrayLetter(null);
+    }
+  };
+
+  const dropTrayOnPanel = (letter: string, spec: PanelDropSpec): void =>
+    applyPanelDrop({ type: "tray", letter }, spec);
+
+  // The gallery's drags start in the locked header, outside this pane —
+  // register the drag API so drops can land here. Ref-indirected so the
+  // registered closures never go stale across renders.
+  const dragApiRef = useRef<BuilderPaneDragApi | null>(null);
+  dragApiRef.current = { openPlacement, dropTrayOnPanel };
   useEffect(() => {
-    onRegisterPlacementOpener?.((letter, address) => openPlacementRef.current(letter, address));
-  }, [onRegisterPlacementOpener]);
+    onRegisterDragApi?.({
+      openPlacement: (letter, address) => dragApiRef.current?.openPlacement(letter, address),
+      dropTrayOnPanel: (letter, spec) => dragApiRef.current?.dropTrayOnPanel(letter, spec),
+    });
+  }, [onRegisterDragApi]);
 
   const handlePlacementConfirm = (choice: PlacementChoice): void => {
     if (placement === null || layout === null) return;
@@ -824,6 +887,8 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           commitOp={commitOp}
           layout={layout}
           keycapFont={keycapFont}
+          applyPanelDrop={applyPanelDrop}
+          panelDropHover={panelDropHover}
         />
       )}
 
@@ -1101,13 +1166,99 @@ function SubkeyPanel(props: {
   layout: TouchLayoutIR;
   /** Keycap typeface (platform configured font → loaded keyboard font → system). */
   keycapFont: string;
+  /** Drop a tray letter or dragged subkey onto a panel area. */
+  applyPanelDrop: (source: SubkeyDropSource, spec: PanelDropSpec) => void;
+  /** Serialized panel spec under the finger during a header tray drag. */
+  panelDropHover?: string | null | undefined;
 }) {
   const { t } = useLingui();
   const {
     address, targetKey: key, layerIds, layerOverrideOptions,
     selection, onSelect, fieldEpoch, onInvalid, commitOp, layout, keycapFont,
+    applyPanelDrop, panelDropHover,
   } = props;
   const entries = subKeyEntriesOf(key);
+
+  // Subkey drag + drop: chips reorder (longpress/multitap) or move between
+  // flick directions; tray letters drop straight onto the areas. Touch uses
+  // the shared pointer drag (immediate, any direction — chips take
+  // touch-action: none); desktop uses HTML5 DnD with SUBKEY_MIME.
+  const [subHover, setSubHover] = useState<string | null>(null);
+  /** Drop-zone highlight: this drag's hover wins, else the header tray drag's. */
+  const zoneHover = subHover ?? panelDropHover ?? null;
+  const zoneOutline = (spec: string): React.CSSProperties =>
+    zoneHover === spec ? { outline: `2px solid ${ACCENT}`, outlineOffset: 1 } : {};
+
+  const subDrag = useTouchDrag<SubkeyDragPayload>({
+    directional: false,
+    onDragMove: (_payload, x, y) => {
+      const zone = document.elementFromPoint(x, y)?.closest("[data-panel-drop]");
+      setSubHover(zone?.getAttribute("data-panel-drop") ?? null);
+    },
+    onDrop: (payload, x, y) => {
+      const zone = document.elementFromPoint(x, y)?.closest("[data-panel-drop]");
+      const spec = parsePanelDropSpec(zone?.getAttribute("data-panel-drop"));
+      if (spec !== null) applyPanelDrop({ type: "subkey", payload }, spec);
+    },
+    onDragEnd: () => setSubHover(null),
+  });
+
+  const subkeyDragStart =
+    (payload: SubkeyDragPayload): React.DragEventHandler =>
+    (e) => {
+      e.dataTransfer.setData(SUBKEY_MIME, JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = "move";
+    };
+
+  const zoneSpecFromEvent = (e: React.DragEvent): PanelDropSpec | null => {
+    const raw = (e.target as Element).closest?.("[data-panel-drop]")?.getAttribute("data-panel-drop");
+    return parsePanelDropSpec(raw ?? undefined);
+  };
+
+  const zoneDragOver = (e: React.DragEvent): void => {
+    if (
+      e.dataTransfer.types.includes(TRAY_LETTER_MIME) ||
+      e.dataTransfer.types.includes(SUBKEY_MIME)
+    ) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const spec = zoneSpecFromEvent(e);
+      if (spec !== null) setSubHover(serializePanelDropSpec(spec));
+    }
+  };
+
+  const zoneDrop = (e: React.DragEvent): void => {
+    e.preventDefault();
+    setSubHover(null);
+    const parsed = zoneSpecFromEvent(e);
+    if (parsed === null) return;
+    if (e.dataTransfer.types.includes(SUBKEY_MIME)) {
+      try {
+        const payload = JSON.parse(e.dataTransfer.getData(SUBKEY_MIME)) as SubkeyDragPayload;
+        applyPanelDrop({ type: "subkey", payload }, parsed);
+        return;
+      } catch {
+        /* fall through to the tray letter */
+      }
+    }
+    if (e.dataTransfer.types.includes(TRAY_LETTER_MIME)) {
+      const letter = e.dataTransfer.getData(TRAY_LETTER_MIME);
+      if (letter !== "") applyPanelDrop({ type: "tray", letter }, parsed);
+    }
+  };
+
+  const subkeyDragLabel = (payload: SubkeyDragPayload): string => {
+    if (payload.kind === "sk") {
+      const e = entries.sk.find((en) => en.key.id === payload.id);
+      return e?.key.text || e?.key.id || payload.id;
+    }
+    if (payload.kind === "flick") {
+      const e = entries.flick.find((en) => en.ref.id === payload.direction);
+      return e?.key.text || payload.direction;
+    }
+    const e = entries.multitap[payload.index];
+    return e?.key.text || e?.key.id || `#${payload.index + 1}`;
+  };
 
   const handleAddSubKey = (kind: BuilderSubKeyKind, flickDirection?: string): void => {
     // TIKE appends new subkeys with `T_new_N` ids; `setSubKey` is an upsert
@@ -1134,7 +1285,12 @@ function SubkeyPanel(props: {
     }
   };
 
-  const renderChip = (entry: BuilderSubKeyEntry, label: string): React.ReactNode => {
+  const renderChip = (
+    entry: BuilderSubKeyEntry,
+    label: string,
+    dragPayload: SubkeyDragPayload,
+    dropSpec: string | null,
+  ): React.ReactNode => {
     const isSelected =
       selection !== null &&
       selection.kind === entry.kind &&
@@ -1144,19 +1300,33 @@ function SubkeyPanel(props: {
         key={`${entry.kind}:${entry.kind === "flick" ? entry.ref.id : entry.key.id}`}
         type="button"
         data-testid={`touch-builder-subkey-${entry.kind}-${entry.kind === "flick" ? entry.ref.id : entry.key.id}`}
+        data-panel-drop={dropSpec ?? undefined}
+        draggable
         aria-pressed={isSelected}
-        onClick={() =>
+        {...subDrag.bindSource(dragPayload)}
+        onDragStart={subkeyDragStart(dragPayload)}
+        onDragEnd={() => setSubHover(null)}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={() => {
+          if (subDrag.consumeClick()) return;
           onSelect({
             kind: entry.kind,
             id: entry.kind === "flick" ? entry.ref.id : entry.key.id,
-          })
-        }
+          });
+        }}
         style={{
           ...ghostBtn,
           borderColor: isSelected ? ACCENT : BORDER,
           background: isSelected ? "var(--app-accent-bg)" : "transparent",
           minWidth: 44,
           fontFamily: keycapFont,
+          cursor: "grab",
+          touchAction: "none",
+          userSelect: "none",
+          WebkitTouchCallout: "none",
+          ...(dropSpec !== null && zoneHover === dropSpec
+            ? { outline: `2px solid ${ACCENT}`, outlineOffset: 1 }
+            : {}),
         }}
       >
         {label}
@@ -1192,7 +1362,7 @@ function SubkeyPanel(props: {
       })}
       style={sectionStyle}
     >
-      {/* Longpress group */}
+      {/* Longpress group — chips reorder via drag; tray letters append. */}
       <SubkeyGroup
         title={t({
           id: "editor.assignLoop.touch.builder.longpressSection",
@@ -1201,8 +1371,14 @@ function SubkeyPanel(props: {
         testId="touch-builder-subkeys-sk"
         onAdd={() => handleAddSubKey("sk")}
         addLabel={t({ id: "editor.assignLoop.touch.builder.addSubkey", message: "Add" })}
+        dropSpec="lp"
+        onZoneDragOver={zoneDragOver}
+        onZoneDrop={zoneDrop}
+        zoneHover={zoneHover === "lp"}
       >
-        {entries.sk.map((e) => renderChip(e, e.key.text || e.key.id))}
+        {entries.sk.map((e) =>
+          renderChip(e, e.key.text || e.key.id, { kind: "sk", id: e.key.id }, `lp:${e.key.id}`),
+        )}
       </SubkeyGroup>
 
       {/* Flick compass — 3x3 square (TIKE placeholder-per-direction). */}
@@ -1225,9 +1401,13 @@ function SubkeyPanel(props: {
           {(Object.keys(FLICK_GRID) as FlickDirection[]).map((direction) => {
             const entry = entries.flick.find((e) => e.ref.id === direction);
             const pos = FLICK_GRID[direction];
+            const spec = `flick:${direction}`;
             return (
               <div
                 key={direction}
+                data-panel-drop={spec}
+                onDragOver={zoneDragOver}
+                onDrop={zoneDrop}
                 style={{
                   gridRow: pos.row,
                   gridColumn: pos.col,
@@ -1235,11 +1415,14 @@ function SubkeyPanel(props: {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 2,
+                  padding: 2,
+                  borderRadius: 6,
+                  ...zoneOutline(spec),
                 }}
               >
                 <span style={{ fontSize: 9, color: TEXT_DIM, fontFamily: FONT }}>{direction}</span>
                 {entry !== undefined ? (
-                  renderChip(entry, entry.key.text || entry.key.id)
+                  renderChip(entry, entry.key.text || entry.key.id, { kind: "flick", direction }, spec)
                 ) : (
                   <button
                     type="button"
@@ -1275,7 +1458,7 @@ function SubkeyPanel(props: {
         </div>
       </SubkeyGroup>
 
-      {/* Multitap group */}
+      {/* Multitap group — chips reorder via drag; tray letters fill 2x/3x. */}
       <SubkeyGroup
         title={t({
           id: "editor.assignLoop.touch.builder.multitapSection",
@@ -1284,8 +1467,14 @@ function SubkeyPanel(props: {
         testId="touch-builder-subkeys-multitap"
         onAdd={() => handleAddSubKey("multitap")}
         addLabel={t({ id: "editor.assignLoop.touch.builder.addSubkey", message: "Add" })}
+        dropSpec="mt"
+        onZoneDragOver={zoneDragOver}
+        onZoneDrop={zoneDrop}
+        zoneHover={zoneHover === "mt"}
       >
-        {entries.multitap.map((e) => renderChip(e, e.key.text || e.key.id))}
+        {entries.multitap.map((e, i) =>
+          renderChip(e, e.key.text || e.key.id, { kind: "multitap", index: i }, `mt:${i}`),
+        )}
       </SubkeyGroup>
 
       {/* Selected subkey fields */}
@@ -1399,6 +1588,35 @@ function SubkeyPanel(props: {
           </div>
         </div>
       )}
+      {/* Touch-drag ghost for subkey chips. */}
+      {subDrag.ghost !== null && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: subDrag.ghost.x - 22,
+            top: subDrag.ghost.y - 72,
+            zIndex: 2000,
+            pointerEvents: "none",
+            minWidth: 44,
+            minHeight: 32,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "4px 8px",
+            fontSize: 14,
+            fontFamily: keycapFont,
+            color: TEXT_MAIN,
+            background: "var(--app-surface)",
+            border: `2px solid ${ACCENT}`,
+            borderRadius: 8,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            opacity: 0.95,
+          }}
+        >
+          {subkeyDragLabel(subDrag.ghost.payload)}
+        </div>
+      )}
     </section>
   );
 }
@@ -1409,8 +1627,14 @@ function SubkeyGroup(props: {
   children: React.ReactNode;
   onAdd?: () => void;
   addLabel?: string;
+  /** Drop-zone spec for the chip row (tray letters land, subkey chips reorder). */
+  dropSpec?: string;
+  onZoneDragOver?: (e: React.DragEvent) => void;
+  onZoneDrop?: (e: React.DragEvent) => void;
+  zoneHover?: boolean;
 }) {
-  const { title, testId, children, onAdd, addLabel } = props;
+  const { title, testId, children, onAdd, addLabel, dropSpec, onZoneDragOver, onZoneDrop, zoneHover } =
+    props;
   return (
     <div style={{ marginBottom: 8 }} data-testid={testId}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -1423,7 +1647,21 @@ function SubkeyGroup(props: {
           </button>
         )}
       </div>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{children}</div>
+      <div
+        data-panel-drop={dropSpec}
+        onDragOver={onZoneDragOver}
+        onDrop={onZoneDrop}
+        style={{
+          display: "flex",
+          gap: 4,
+          flexWrap: "wrap",
+          padding: 2,
+          borderRadius: 6,
+          ...(zoneHover === true ? { outline: `2px solid ${ACCENT}`, outlineOffset: 1 } : {}),
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

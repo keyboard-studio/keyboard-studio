@@ -7,28 +7,36 @@
 // key tapped. The modal asks what the drop means: surface / longpress /
 // flick (direction) / multitap (2x/3x). Replacing an occupied surface/flick
 // slot offers "demote to longpress" or "send back to the placement list".
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { TouchKeyIR } from "@keyboard-studio/contracts";
 import { FLICK_GRID, type FlickDirection } from "./touchBuilderModel.ts";
 import {
+  parsePanelDropSpec,
   placementOccupant,
-  touchGestureIntent,
   type PlacementChoice,
+  type TrayDropTarget,
 } from "./placementOps.ts";
+import { useTouchDrag } from "./useTouchDrag.ts";
 
 /** Drag MIME type for tray letters. The pane's key onDrop branches on it. */
 export const TRAY_LETTER_MIME = "application/x-ks-tray-letter";
 
 /**
- * Hit-test a touch-drag point against the board: the key (data-address)
- * under the point, or null over empty space. The ghost has
- * pointer-events: none so it never wins the hit test.
+ * Hit-test a tray drag point: the board key (data-address) or panel drop
+ * zone (data-panel-drop) under the point, or null over empty space. The
+ * ghost has pointer-events: none so it never wins the hit test.
  */
-function dropAddressAt(clientX: number, clientY: number): string | null {
-  const target = document.elementFromPoint(clientX, clientY);
-  const address = target?.closest("[data-address]")?.getAttribute("data-address");
-  return address === null || address === undefined || address === "" ? null : address;
+function dropTargetAt(clientX: number, clientY: number): TrayDropTarget | null {
+  const zone = document.elementFromPoint(clientX, clientY)?.closest("[data-panel-drop],[data-address]");
+  if (zone === null || zone === undefined) return null;
+  const panelRaw = zone.getAttribute("data-panel-drop");
+  if (panelRaw !== null) {
+    const spec = parsePanelDropSpec(panelRaw);
+    return spec === null ? null : { kind: "panel", spec };
+  }
+  const address = zone.getAttribute("data-address");
+  return address === null || address === "" ? null : { kind: "key", address };
 }
 
 const CARD = "var(--app-surface)";
@@ -48,10 +56,10 @@ export function PlacementBar(props: {
   selectedLetter: string | null;
   onSelectLetter: (letter: string | null) => void;
   onDragStartLetter: (e: React.DragEvent, letter: string) => void;
-  /** Live drop target during a touch drag (for key highlighting). */
-  onTouchDragTarget: (address: string | null) => void;
+  /** Live drop target during a touch drag (for key/zone highlighting). */
+  onTouchDragTarget: (target: TrayDropTarget | null) => void;
   /** Touch drag end: the letter and the hit-tested drop target, if any. */
-  onTouchDrop: (letter: string, address: string | null) => void;
+  onTouchDrop: (letter: string, target: TrayDropTarget | null) => void;
 }) {
   const { t } = useLingui();
   const {
@@ -64,86 +72,19 @@ export function PlacementBar(props: {
     onTouchDrop,
   } = props;
 
-  // Touch drag state machine (mouse keeps native HTML5 DnD). A touch/pen
-  // pointer that moves vertically off the chip becomes a drag immediately —
-  // no longpress. Horizontal moves stand down so the tray keeps scrolling
+  // Touch drag: HTML5 DnD never fires on touch, so a touch/pen pointer that
+  // moves vertically off the chip becomes a drag immediately — no longpress.
+  // Horizontal moves stand down so the tray keeps scrolling
   // (touch-action: pan-x; the browser aborts us via pointercancel). While
-  // dragging, the key under the finger is highlight-reported so the drop
-  // target is obvious even though the ghost floats above the finger.
-  const gestureRef = useRef<{
-    letter: string;
-    pointerId: number;
-    startX: number;
-    startY: number;
-    dragging: boolean;
-  } | null>(null);
-  const hoverRef = useRef<string | null>(null);
-  const [ghost, setGhost] = useState<{ letter: string; x: number; y: number } | null>(null);
-  // A drag ends with pointerup, which a click follows — swallow that click
-  // so the drop doesn't also toggle the tap selection.
-  const suppressClickRef = useRef(false);
-
-  const reportHover = (address: string | null): void => {
-    if (hoverRef.current !== address) {
-      hoverRef.current = address;
-      onTouchDragTarget(address);
-    }
-  };
-
-  const endGesture = (): void => {
-    gestureRef.current = null;
-    setGhost(null);
-    reportHover(null);
-  };
-
-  const handlePointerDown = (e: React.PointerEvent, letter: string): void => {
-    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
-    if (gestureRef.current !== null) return; // one gesture at a time
-    gestureRef.current = {
-      letter,
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      dragging: false,
-    };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent): void => {
-    const g = gestureRef.current;
-    if (g === null || e.pointerId !== g.pointerId) return;
-    if (g.dragging) {
-      setGhost({ letter: g.letter, x: e.clientX, y: e.clientY });
-      reportHover(dropAddressAt(e.clientX, e.clientY));
-      return;
-    }
-    const intent = touchGestureIntent(e.clientX - g.startX, e.clientY - g.startY);
-    if (intent === "undecided") return;
-    if (intent === "scroll") {
-      gestureRef.current = null;
-      return;
-    }
-    g.dragging = true;
-    try {
-      navigator.vibrate?.(15);
-    } catch {
-      /* haptics unsupported — the ghost is feedback enough */
-    }
-    setGhost({ letter: g.letter, x: e.clientX, y: e.clientY });
-  };
-
-  const handlePointerUp = (e: React.PointerEvent): void => {
-    const g = gestureRef.current;
-    if (g === null || e.pointerId !== g.pointerId) return;
-    if (g.dragging) {
-      suppressClickRef.current = true;
-      onTouchDrop(g.letter, dropAddressAt(e.clientX, e.clientY));
-    }
-    endGesture();
-  };
-
-  const handlePointerCancel = (e: React.PointerEvent): void => {
-    if (gestureRef.current?.pointerId === e.pointerId) endGesture();
-  };
+  // dragging, the drop target under the finger is highlight-reported so the
+  // landing spot is obvious even though the ghost floats above the finger.
+  const drag = useTouchDrag<string>({
+    directional: true,
+    onDragMove: (_letter, x, y) => onTouchDragTarget(dropTargetAt(x, y)),
+    onDrop: (letter, x, y) => onTouchDrop(letter, dropTargetAt(x, y)),
+    onDragEnd: () => onTouchDragTarget(null),
+  });
+  const { ghost } = drag;
 
   return (
     <section
@@ -188,17 +129,11 @@ export function PlacementBar(props: {
                 type="button"
                 draggable
                 aria-pressed={isSelected}
+                {...drag.bindSource(letter)}
                 onDragStart={(e) => onDragStartLetter(e, letter)}
-                onPointerDown={(e) => handlePointerDown(e, letter)}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
                 onContextMenu={(e) => e.preventDefault()}
                 onClick={() => {
-                  if (suppressClickRef.current) {
-                    suppressClickRef.current = false;
-                    return;
-                  }
+                  if (drag.consumeClick()) return;
                   onSelectLetter(isSelected ? null : letter);
                 }}
                 style={{
@@ -251,7 +186,7 @@ export function PlacementBar(props: {
             opacity: 0.95,
           }}
         >
-          {ghost.letter}
+          {ghost.payload}
         </div>
       )}
     </section>
