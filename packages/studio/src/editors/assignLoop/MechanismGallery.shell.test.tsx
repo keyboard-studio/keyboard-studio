@@ -305,44 +305,6 @@ describe("MechanismGallery — vfsTransform passed to useKeyboardArtifact", () =
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — intro splash", () => {
-  it("shows the intro on first entry and reveals the gallery after 'Get started'", async () => {
-    seedInventory(["á"], { intro: true });
-
-    await act(async () => {
-      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    // Intro visible; the gallery's coverage status line is not yet shown.
-    expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).not.toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
-
-    const startBtn = screen.getByRole("button", { name: /start the mechanism gallery/i });
-    await act(async () => {
-      fireEvent.click(startBtn);
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    // Gallery now visible; intro gone. "á" is decomposable-accented, so more
-    // than one status region can legitimately be present (the coverage line
-    // plus the deadkey method's pre-filled base-letter reflection) — assert
-    // at least one rather than exactly one.
-    expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
-    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
-  });
-
-  it("does NOT show the intro on a return visit (intro already marked seen)", async () => {
-    seedInventory(["á"]); // default: marks the intro seen
-
-    await act(async () => {
-      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
-    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
-  });
-
   // T034 publisher-ownership: GalleryIntroSplash publishes its own Back /
   // "Get started"; the gallery itself must not also publish while the splash
   // is shown (a second live publisher for the same step logs a

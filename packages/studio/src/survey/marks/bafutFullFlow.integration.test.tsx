@@ -68,7 +68,7 @@ import {
 } from "../../lib/draftPersistence.ts";
 
 // ---------------------------------------------------------------------------
-// Gallery-side mocks (same as MechanismGallery.placementWalk.test.tsx).
+// Gallery-side mocks (same as MechanismGallery.contract.test.tsx).
 // ---------------------------------------------------------------------------
 
 vi.mock("../../hooks/useKeyboardArtifact.ts", async () => {
