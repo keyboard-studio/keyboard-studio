@@ -636,6 +636,10 @@ export interface KvksIR {
     }>;
   }>;
   usealtgr: boolean;
+  /** Include the 102nd (ISO extra) key. Maps to `<key102/>` in the .kvks flags. */
+  key102?: boolean;
+  /** Show the underlying physical layout's key labels. Maps to `<displayunderlying/>`. */
+  displayUnderlying?: boolean;
   /**
    * Map from shift-state+vkey to IR node reference, as an entry array for JSON
    * round-trip compatibility (spec §11).
