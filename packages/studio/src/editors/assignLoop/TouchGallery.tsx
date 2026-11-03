@@ -1701,12 +1701,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // the header's touch drag (which starts outside the pane).
   const placementOpenerRef = useRef<((letter: string, address: string) => void) | null>(null);
 
-  // Touch drag end: hit-test the drop point against the board's keys
-  // (data-address) and open the placement modal on a hit.
-  const handleTouchDrop = (letter: string, clientX: number, clientY: number): void => {
-    const target = document.elementFromPoint(clientX, clientY);
-    const address = target?.closest("[data-address]")?.getAttribute("data-address");
-    if (address !== undefined && address !== null && address !== "") {
+  // Key highlighted under the finger during a header touch drag.
+  const [dropHoverAddress, setDropHoverAddress] = useState<string | null>(null);
+
+  // Touch drag end: the bar hit-tested the drop point already.
+  const handleTouchDrop = (letter: string, address: string | null): void => {
+    if (address !== null) {
       placementOpenerRef.current?.(letter, address);
     } else {
       // Dropped on empty space — stand down the tap selection.
@@ -7542,6 +7542,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         onRegisterPlacementOpener={(open) => {
           placementOpenerRef.current = open;
         }}
+        dropHoverAddress={dropHoverAddress}
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
@@ -8032,6 +8033,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               selectedLetter={trayLetter}
               onSelectLetter={setTrayLetter}
               onDragStartLetter={handleTrayDragStart}
+              onTouchDragTarget={setDropHoverAddress}
               onTouchDrop={handleTouchDrop}
             />
           </div>

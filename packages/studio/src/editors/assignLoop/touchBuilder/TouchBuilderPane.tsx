@@ -88,6 +88,11 @@ export interface TouchBuilderPaneProps {
    * registers its opener here.
    */
   readonly onRegisterPlacementOpener?: (open: (letter: string, address: string) => void) => void;
+  /**
+   * Address of the key under the finger during a header touch drag, for
+   * drop-target highlighting. Undefined when no drag is in flight.
+   */
+  readonly dropHoverAddress?: string | null;
 }
 
 interface SubKeySelection {
@@ -161,6 +166,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     onSelectTrayLetter,
     onTrayReturnsChange,
     onRegisterPlacementOpener,
+    dropHoverAddress,
   } = props;
 
   // Load the keyboard's font into the document so keycaps render in the real
@@ -601,6 +607,9 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                   ? resizeDrag.previewWidthUnits
                   : (key.width ?? BUILDER_DEFAULT_KEY_WIDTH) + (stretchUnits.get(address) ?? 0);
               const widthPx = Math.max(8, widthUnits * scale.xscale);
+              // Touch-drag drop target: the key under the finger lights up so
+              // the landing spot is obvious while the ghost floats above.
+              const isDropTarget = dropHoverAddress === address;
               return (
                 <div
                   key={address}
@@ -680,7 +689,8 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                     justifyContent: "center",
                     cursor: "pointer",
                     opacity: isSpacer ? 0.45 : 1,
-                    outline: "none",
+                    outline: isDropTarget ? `3px solid ${ACCENT}` : "none",
+                    outlineOffset: isDropTarget ? 1 : 0,
                     fontFamily: FONT,
                     overflow: "hidden",
                   }}
