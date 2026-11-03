@@ -132,7 +132,9 @@ const EXPECTED_SPINE_ORDER = [
   "mechanisms",
   "osk",
   "touch",
+  "css",
   "help",
+  "html",
   "package",
 ] as const;
 
@@ -200,8 +202,12 @@ describe("M2 — spine order matches FR-012", () => {
     assertStepOrder(spine, "convenience", "carve");
   });
 
-  it("'help' appears before 'package' on the spine", () => {
-    assertStepOrder(spineSteps(manifest), "help", "package");
+  it("'css' and 'html' sit between touch and package on the spine", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "touch", "css");
+    assertStepOrder(spine, "css", "help");
+    assertStepOrder(spine, "help", "html");
+    assertStepOrder(spine, "html", "package");
   });
 
   it("'project_name' is NOT a spine step (it is the copy-track CYOA fork)", () => {
@@ -365,15 +371,25 @@ describe("Off-spine step inventory", () => {
 // needs the two-pane shell's persistent right-pane OSKFrame suppressed, or
 // two live OSKs co-mount).
 //
-// Exactly {carve, deadkeys, rules, mechanisms, touch, touch_seed_source}
+// Exactly {carve, deadkeys, rules, mechanisms, touch, touch_seed_source, css, html}
 // must declare layout:"full". All other steps must have layout:"pane" or
 // omit the field (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "touch_seed_source"] as const;
+const FULL_LAYOUT_IDS = [
+  "carve",
+  "deadkeys",
+  "rules",
+  "mechanisms",
+  "osk",
+  "touch",
+  "touch_seed_source",
+  "css",
+  "html",
+] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly seven steps declare layout:'full'", () => {
+  it("exactly nine steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());

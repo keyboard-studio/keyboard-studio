@@ -355,6 +355,7 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
         <div style={{ flex: 1 }} />
         <button
           type="button"
+          data-testid="css-continue"
           onClick={handleContinue}
           style={{
             padding: "10px 24px",

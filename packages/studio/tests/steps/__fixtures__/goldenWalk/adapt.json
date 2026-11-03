@@ -217,6 +217,19 @@
     "navigateTo": []
   },
   {
+    "stepId": "css",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "record",
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
+    "navigateTo": []
+  },
+  {
     "stepId": "help",
     "applyStepCompletion": [
       "help"
@@ -228,6 +241,19 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [
+      "record"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "html",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "record",
+      "advance"
+    ],
+    "workingCopyMutations": [],
     "decisionMutations": [
       "record"
     ],

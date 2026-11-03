@@ -40,7 +40,9 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   osk: "on-screen keyboard",
   touch_seed_source: "touch starting point",
   touch: "touch layout",
+  css: "custom CSS",
   help: "help & docs",
+  html: "documentation",
   done: "the final step",
   unsupported: "an unsupported script",
 };

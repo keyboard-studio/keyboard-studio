@@ -113,6 +113,54 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
 );
+vi.mock("../../src/editors/assignLoop/CssEditor.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    CssEditor: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { css: string }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "css-back", onClick: onBack, testId: "css-back" } }
+          : {}),
+        forward: {
+          label: "css-continue",
+          onClick: () => onComplete({ css: "" }),
+          testId: "css-continue",
+        },
+      });
+      return <div data-testid="stage-css" />;
+    },
+  };
+});
+vi.mock("../../src/editors/assignLoop/HtmlEditor.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    HtmlEditor: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { html: string }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "html-back", onClick: onBack, testId: "html-back" } }
+          : {}),
+        forward: {
+          label: "html-continue",
+          onClick: () => onComplete({ html: "" }),
+          testId: "html-continue",
+        },
+      });
+      return <div data-testid="stage-html" />;
+    },
+  };
+});
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
   import("../../src/test/studioShellMocks/UnsupportedScriptStub.tsx"),
 );
@@ -513,7 +561,9 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "mechanisms", testId: "mechanisms-continue" },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
+    { stepId: "css", testId: "css-continue", async: true },
     { stepId: "help", testId: "survey-advance", async: true },
+    { stepId: "html", testId: "html-continue", async: true },
   ]);
 }
 
@@ -550,7 +600,9 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "mechanisms", testId: "mechanisms-continue" },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
+    { stepId: "css", testId: "css-continue", async: true },
     { stepId: "help", testId: "survey-advance", async: true },
+    { stepId: "html", testId: "html-continue", async: true },
   ]);
 }
 
