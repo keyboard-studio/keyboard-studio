@@ -126,3 +126,14 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   charts for copy keyboards with welcome images) added nine
   `source/welcome/ks-layout-*.svg` entries and updated `welcome.htm` img refs.
   Verify mode passes against it locally.
+
+## 2026-11-03 — README.md / source/readme.htm refreshed (spec 110)
+
+Spec 110 changed what README.md and readme.htm say (a characters and
+keystrokes summary, design notes, a brief install-time readme.htm). CI on
+PR #2448 reported exactly those two entries differing from the baseline.
+They were re-captured with the capture command above against corpus
+`435f82d6` (the CI pin) and spliced into this zip; every other entry is
+byte-identical to the previous baseline. A whole local capture is not
+committed because a Windows checkout with `core.autocrlf=true` gives
+`test.kvks` / `test.kpj` CRLF line endings that CI never produces.

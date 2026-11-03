@@ -79,6 +79,8 @@ Each of the six documentation files (README, short package readme, welcome page,
 
 ### User Story 4 - Adaptations keep the original's documentation (Priority: P3)
 
+> *Amended by [spec 110](../110-readme-template/spec.md):* this no longer applies to `README.md`. An adaptation's README is regenerated, keeping only the inherited description. The welcome and help pages are unchanged.
+
 When the author adapts a keyboard (Track 2), the original's written welcome and help text is kept as the starting point, and the generated sections are added after it. If the original's documentation already has its own typing table, the generated typing guide is left out so the page does not show two. Producing the documentation again replaces only the generated part.
 
 **Why this priority**: Adaptations are variants; the original's prose is mostly still true and is often the best-written part. It is lower priority because Copy (the more common first-keyboard path) does not need it.
@@ -141,7 +143,7 @@ When the author adapts a keyboard (Track 2), the original's written welcome and 
 - **FR-026**: The forms MUST place the version only in the history file and the copyright year only in the licence file, and MUST draw the copyright holder from one source for every file.
 - **FR-027**: Every value inserted into a web-page form MUST be escaped so the page stays well-formed; values inserted into Markdown forms MUST be escaped for Markdown.
 - **FR-028**: The project's checks MUST fail when a form references an unknown blank or does not parse, naming the form and the problem.
-- **FR-029**: The README form MUST hold the description, links (homepage and the keyboard's help-site page) and supported platforms; it MUST NOT include the typing guide. The package readme page MUST hold the description and a pointer to the help page.
+- **FR-029**: The README form MUST hold the description, links (homepage and the keyboard's help-site page) and supported platforms; it MUST NOT include the typing guide. The package readme page MUST hold the description and a pointer to the help page. *Amended by [spec 110](../110-readme-template/spec.md):* README.md now carries a short characters-and-keystrokes summary and design notes, and readme.htm a brief install-time page; both are rendered from one set of facts.
 - **FR-030**: With no documentation answers, the forms MUST still produce complete documents from identity and derived content, replacing today's one-line placeholders.
 - **FR-031**: Existing author answers (description, usage tips, credits, contact, the optional extra sections, the documentation language) MUST keep their current meaning and appear in the forms; no saved answer may be lost.
 

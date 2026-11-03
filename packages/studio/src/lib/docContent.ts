@@ -58,9 +58,9 @@ export function parseTouchLayoutOrNull(json: string | null): TouchLayoutIR | nul
 /** Above this many rows the typing guide becomes a grouped summary. */
 export const TYPING_GUIDE_SUMMARY_THRESHOLD = 200;
 
-type CharGroup = "letters" | "marks" | "punctuation" | "digits" | "other";
-const GROUP_ORDER: readonly CharGroup[] = ["letters", "marks", "punctuation", "digits", "other"];
-const GROUP_LABEL: Readonly<Record<CharGroup, string>> = {
+export type CharGroup = "letters" | "marks" | "punctuation" | "digits" | "other";
+export const GROUP_ORDER: readonly CharGroup[] = ["letters", "marks", "punctuation", "digits", "other"];
+export const GROUP_LABEL: Readonly<Record<CharGroup, string>> = {
   letters: "Letters",
   marks: "Marks",
   punctuation: "Punctuation and symbols",
@@ -69,7 +69,7 @@ const GROUP_LABEL: Readonly<Record<CharGroup, string>> = {
 };
 
 /** Code-point order, not UTF-16 unit order, so astral characters sort where Unicode puts them. */
-function compareCodePoints(a: string, b: string): number {
+export function compareCodePoints(a: string, b: string): number {
   const ac = [...a];
   const bc = [...b];
   for (let i = 0; i < Math.min(ac.length, bc.length); i++) {
@@ -83,7 +83,7 @@ function codePointLabel(cp: number): string {
   return `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
-function groupOf(cp: number): CharGroup {
+export function groupOf(cp: number): CharGroup {
   const cat = getCategory(cp) ?? "";
   if (cat.startsWith("L")) return "letters";
   if (cat.startsWith("M")) return "marks";
@@ -105,12 +105,12 @@ function nameLabel(ch: string): string {
 }
 
 // simplified: base = printable ASCII; when another base layout is declared, derive the set from it.
-function isBaseCharacter(ch: string): boolean {
+export function isBaseCharacter(ch: string): boolean {
   const cp = ch.codePointAt(0)!;
   return cp >= 0x20 && cp <= 0x7e;
 }
 
-function producedChars(ir: KeyboardIR): string[] {
+export function producedChars(ir: KeyboardIR): string[] {
   return [...buildProducedSet(ir)].sort(compareCodePoints);
 }
 
@@ -122,6 +122,12 @@ interface GuideRow {
 
 /** The fewest-step way to type `ch`. A producer with only a trigger floor counts as one step; ties go to the joined label in code-point order. */
 function shortestKeys(ir: KeyboardIR, ch: string): string {
+  const parts = shortestKeySteps(ir, ch);
+  return parts === undefined ? "" : parts.map((p) => `<kbd>${escapeDocHtml(p)}</kbd>`).join(" then ");
+}
+
+/** {@link shortestKeys} as plain keystroke labels ("AltGr + n"), or undefined when no faithful path exists. Shared with the README facts. */
+export function shortestKeySteps(ir: KeyboardIR, ch: string): string[] | undefined {
   let best: { steps: number; label: string; parts: string[] } | undefined;
   for (const producer of charProducers(ir, ch)) {
     const parts = producer.steps.length > 0 ? producer.steps : producer.triggerFloor !== undefined ? [producer.triggerFloor] : [];
@@ -135,7 +141,7 @@ function shortestKeys(ir: KeyboardIR, ch: string): string {
       best = { steps: parts.length, label, parts };
     }
   }
-  return best === undefined ? "" : best.parts.map((p) => `<kbd>${escapeDocHtml(p)}</kbd>`).join(" then ");
+  return best?.parts;
 }
 
 function guideRows(ir: KeyboardIR): GuideRow[] {

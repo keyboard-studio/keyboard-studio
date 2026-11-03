@@ -6,6 +6,7 @@
 
 ## What shipped
 - Every produced package carries six documentation members: `README.md`, `HISTORY.md`, `LICENSE.md`, `source/readme.htm`, `source/welcome/welcome.htm`, `source/help/<id>.php`. Regenerated on every production.
+  - **Amended by [spec 110](../110-readme-template/spec.md):** an adaptation's `README.md` is now regenerated too. Only the inherited description is kept, and only when the author has not written one. FR-006's README clause no longer holds; the welcome and help pages are unchanged.
 - Welcome page uses the corpus folder convention, with its images listed in the descriptor; a fresh help page starts with the standard help-site header.
 - Base documentation is classified none, minimal or full at base selection, and the help-docs description question adapts to it.
 - A proposed first HISTORY entry from the recorded changes, with a confirm, edit or dismiss surface.
