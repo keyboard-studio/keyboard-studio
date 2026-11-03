@@ -261,14 +261,33 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     );
   })();
 
-  const scale = computeBuilderScale(
-    rowViews.map((row) => ({
-      keys: row.map(({ key }) => ({
-        id: key.id,
-        width: key.width ?? BUILDER_DEFAULT_KEY_WIDTH,
-        pad: padUnits(key),
-      })),
+  // Row geometry for the scaler. On narrow viewports the last key of shorter
+  // rows stretches so every row matches the widest — like a real mobile
+  // keyboard (2026-11-02).
+  const geomRows: { id: string; width: number; pad: number }[][] = rowViews.map((row) =>
+    row.map(({ key }) => ({
+      id: key.id,
+      width: key.width ?? BUILDER_DEFAULT_KEY_WIDTH,
+      pad: padUnits(key),
     })),
+  );
+  const stretchUnits = new Map<string, number>();
+  if (isNarrow) {
+    const rowWidths = geomRows.map((keys) => keys.reduce((sum, k) => sum + k.width + k.pad, 0));
+    const maxWidth = Math.max(0, ...rowWidths);
+    rowViews.forEach((row, i) => {
+      const deficit = maxWidth - (rowWidths[i] ?? 0);
+      const lastEntry = row[row.length - 1];
+      const lastGeom = geomRows[i]?.[geomRows[i].length - 1];
+      if (deficit > 0 && lastEntry !== undefined && lastGeom !== undefined) {
+        lastGeom.width += deficit;
+        stretchUnits.set(lastEntry.address, deficit);
+      }
+    });
+  }
+
+  const scale = computeBuilderScale(
+    geomRows.map((keys) => ({ keys })),
     presentation,
   );
 
@@ -537,7 +556,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
               const widthUnits =
                 resizeDrag !== null && resizeDrag.address === address
                   ? resizeDrag.previewWidthUnits
-                  : (key.width ?? BUILDER_DEFAULT_KEY_WIDTH);
+                  : (key.width ?? BUILDER_DEFAULT_KEY_WIDTH) + (stretchUnits.get(address) ?? 0);
               const widthPx = Math.max(8, widthUnits * scale.xscale);
               return (
                 <div
