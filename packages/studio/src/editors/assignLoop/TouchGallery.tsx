@@ -196,23 +196,20 @@ import {
   type KeyGridViewModel,
 } from "./keyGrid/keyGridViewModel.ts";
 import {
-  KeyGrid,
   type KeyGridPlatformTab,
   type KeyGridProvenance,
 } from "./keyGrid/KeyGrid.tsx";
 import { useGridNav } from "./keyGrid/useGridNav.ts";
 import { type TouchKeySpValue } from "./keyGrid/KeyInspector.tsx";
 import {
-  KeyPropertyPanel,
   type KeyPropertyFieldChange,
 } from "./keyGrid/KeyPropertyPanel.tsx";
 import {
   buildKeyIdentityViewModel,
   type KeyIdentityViewModel,
 } from "./keyGrid/keyIdentityViewModel.ts";
-import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
+import { type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
 import {
-  GesturePanel,
   type GestureKind,
   type GestureSelection,
 } from "./keyGrid/GesturePanel.tsx";
@@ -221,7 +218,6 @@ import {
   type KeyEditInvalidationWarning,
   type KeyEditRejectionNotice,
 } from "./keyGrid/useKeyEditGuards.ts";
-import { LayerSelector } from "./keyGrid/LayerSelector.tsx";
 // TIKE touch-builder port (slice-spec): the "Code" tab pane. Phase 0 lands
 // it as a stub; Phase 2 wires in the Monaco editor. Lazy-loaded so the
 // Monaco bundle never lands in the main chunk.
@@ -249,15 +245,12 @@ import {
   type AddKeyAfterOutcome,
   type KeyGridCommandMenuAnchor,
 } from "./keyGrid/useKeyCommands.ts";
-import { KeyGridCommandMenu } from "./keyGrid/KeyGridCommandMenu.tsx";
 import {
-  RemoveKeyDialog,
   computeProposedRemoveOutcome,
   type RemoveKeyDialogConfirmResult,
 } from "./keyGrid/RemoveKeyDialog.tsx";
-import { RenameDialog, type RenameDialogConfirmResult } from "./keyGrid/RenameDialog.tsx";
+import { type RenameDialogConfirmResult } from "./keyGrid/RenameDialog.tsx";
 import {
-  FamilyApplyDialog,
   enumerateFamilyApplyTargets,
   isFamilyApplicableOp,
   type FamilyApplyOp,
@@ -1889,7 +1882,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // start-of-word case. The keyboard's own outputs
   // are still "the keyboard's own repertoire" (no hardcoded ASCII set);
   // planGuardSynthesis drops the letters.
-  const guardRepertoire = useMemo(
+  const _guardRepertoire = useMemo(
     () => (ir === null ? inventory : nfcDedup(inventory, summarizeInventory(ir).chars)),
     [ir, inventory],
   );
@@ -2452,7 +2445,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // whose address does not parse (the `"rule"`-scope orphan check, which
   // names no platform/layer at all — see `TouchKeyFindingScope`'s own doc)
   // is silently excluded from the rollup rather than crashing it.
-  const keyLayerFindingCounts = useMemo<ReadonlyMap<string, number>>(() => {
+  const _keyLayerFindingCounts = useMemo<ReadonlyMap<string, number>>(() => {
     const counts = new Map<string, number>();
     for (const finding of keyModeDiagnostics.findings) {
       const parts = parseTouchKeyAddress(finding.address);
@@ -2551,7 +2544,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // decide which move buttons can act (FR-020: absent, never disabled). Derived
   // here rather than in the panel because the panel sees one cell and the
   // answer depends on the whole layer.
-  const selectedKeyPosition = useMemo(() => {
+  const _selectedKeyPosition = useMemo(() => {
     if (keyModeViewModel === undefined || selectedKeyAddress === null) return undefined;
     for (let rowIndex = 0; rowIndex < keyModeViewModel.rows.length; rowIndex++) {
       const row = keyModeViewModel.rows[rowIndex]!;
@@ -2573,7 +2566,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // again. Built from the SAME effective layout and rule index the grid
   // renders from, and the spine records in the store — never a second
   // source, and no production logic outside the contracts resolver.
-  const selectedKeyIdentity = useMemo<KeyIdentityViewModel | undefined>(() => {
+  const _selectedKeyIdentity = useMemo<KeyIdentityViewModel | undefined>(() => {
     if (
       ir === null ||
       effectiveKeyModeLayout === null ||
@@ -3196,7 +3189,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Spec 104 T016: a commit that renames a `K_`-family key is an identity
   // change (see the state block above). Creation (no base keyboard) keeps
   // the plain path — there is no inherited link to sever.
-  const handleAssignPanelCommit = (result: AssignPanelCommitResult): void => {
+  const _handleAssignPanelCommit = (result: AssignPanelCommitResult): void => {
       setSeveranceNotice(null);
       setSeveranceRefusedNotice(false);
       const parts =
@@ -3402,7 +3395,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   }, [pendingIdentityChoice, selectedKeyAddress]);
 
   /** The transient severance notices (details column live region). */
-  const renderSeveranceNotices = (): React.ReactNode => {
+  const _renderSeveranceNotices = (): React.ReactNode => {
     const physicalKeyLabel = severanceNotice?.values.physicalKeyLabel ?? "";
     return (
       <>
@@ -3449,7 +3442,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
    * refusal collapses the choice to keep vs flag (FR-016), with the
    * refusing binding shown.
    */
-  const renderIdentityChoice = (): React.ReactNode => {
+  const _renderIdentityChoice = (): React.ReactNode => {
     const pending = pendingIdentityChoice;
     if (pending === null) return null;
     const physicalKeyLabel = pending.physicalKeyLabel ?? "";
@@ -3626,7 +3619,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   /** The `(+)` hover wedge's pointer route (`KeyGrid`'s required `onAddKeyAfter` prop) — computes the SAME outcome Insert does (`buildAddKeyAfterOutcome`) and routes it through the SAME `handleAddKeyOutcome`, never a second path. */
-  const handleAddKeyAfterCell = useCallback(
+  const _handleAddKeyAfterCell = useCallback(
     (cell: KeyGridCellViewModel) => {
       if (effectiveKeyModeLayout === null) return;
       handleAddKeyOutcome(buildAddKeyAfterOutcome(cell, effectiveKeyModeLayout));
@@ -3638,7 +3631,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // `useKeyCommands`'s own keyboard route both open the SAME menu, anchored
   // where the pointer route supplies (see `KeyGridCommandMenu.tsx`'s own
   // "Positioning" section for why a keyboard invocation supplies none).
-  const [commandMenuState, setCommandMenuState] = useState<{
+  const [_commandMenuState, setCommandMenuState] = useState<{
     readonly cell: KeyGridCellViewModel;
     readonly anchor?: KeyGridCommandMenuAnchor;
   } | null>(null);
@@ -3650,14 +3643,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // `useRef` object is stable across a component's whole lifetime regardless
   // of where in the body it is declared.
   const keyModeDetailContainerRef = useRef<HTMLDivElement | null>(null);
-  const [renameDialogTarget, setRenameDialogTarget] = useState<KeyGridCellViewModel | null>(null);
-  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const [familyApplyState, setFamilyApplyState] = useState<{
+  const [_renameDialogTarget, setRenameDialogTarget] = useState<KeyGridCellViewModel | null>(null);
+  const [_removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [_familyApplyState, setFamilyApplyState] = useState<{
     readonly op: FamilyApplyOp;
     readonly familyLayerIds: readonly string[];
   } | null>(null);
   const [findPanelOpen, setFindPanelOpen] = useState(false);
-  const [repointNextlayerPrompt, setRepointNextlayerPrompt] = useState<{
+  const [_repointNextlayerPrompt, setRepointNextlayerPrompt] = useState<{
     readonly address: string;
     readonly candidates: readonly string[];
   } | null>(null);
@@ -3758,7 +3751,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     ];
   }, [selectedKeyCell, openRenameDialog, handleOpenRemoveDialog, t]);
 
-  const commandMenuCommands = useMemo(
+  const _commandMenuCommands = useMemo(
     () => [...keyCommands.commands, ...extraCommandMenuCommands],
     [keyCommands.commands, extraCommandMenuCommands],
   );
@@ -3806,7 +3799,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // it must HOLD and reach the emitted artifact (issue #1530 complaint #2,
   // spec 065 AS1). Commits a `set` op carrying the chosen `sp` through the
   // shared chain.
-  const handleSpChange = useCallback(
+  const _handleSpChange = useCallback(
     (sp: TouchKeySpValue) => {
       if (selectedKeyCell === null) return;
       commitKeyEditOp({ address: selectedKeyCell.address, kind: "set", fields: { sp } });
@@ -3823,7 +3816,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // couples id and output (changing the id clears a stale `output` unless the
   // patch supplies a new one), and `rename` is the kind that states that intent.
   // Every other field is a plain `set`.
-  const handleKeyFieldChange = useCallback(
+  const _handleKeyFieldChange = useCallback(
     (change: KeyPropertyFieldChange) => {
       if (selectedKeyCell === null) return;
       const { address } = selectedKeyCell;
@@ -3844,7 +3837,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // Spec 065 T036 — `onMove`. The panel only renders a direction whose move can
   // act, so this never emits a boundary no-op (FR-020).
-  const handleKeyMove = useCallback(
+  const _handleKeyMove = useCallback(
     (direction: "left" | "right" | "up" | "down") => {
       if (selectedKeyCell === null) return;
       commitKeyEditOp({ address: selectedKeyCell.address, kind: "move", direction });
@@ -3862,7 +3855,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // second write path for the two modes to drift apart on.
   // ---------------------------------------------------------------------
 
-  const [selectedGesture, setSelectedGesture] = useState<GestureSelection | null>(null);
+  const [_selectedGesture, setSelectedGesture] = useState<GestureSelection | null>(null);
 
   const gestureSubRef = useCallback(
     (selection: GestureSelection) => ({
@@ -3875,7 +3868,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [],
   );
 
-  const handleAddGesture = useCallback(
+  const _handleAddGesture = useCallback(
     (kind: GestureKind, id: string) => {
       if (selectedKeyCell === null) return;
       commitKeyEditOp({
@@ -3892,7 +3885,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [selectedKeyCell, commitKeyEditOp, gestureSubRef],
   );
 
-  const handleEditGesture = useCallback(
+  const _handleEditGesture = useCallback(
     (selection: GestureSelection, fields: { text?: string; output?: string }) => {
       if (selectedKeyCell === null) return;
       commitKeyEditOp({
@@ -3905,7 +3898,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [selectedKeyCell, commitKeyEditOp, gestureSubRef],
   );
 
-  const handleRemoveGesture = useCallback(
+  const _handleRemoveGesture = useCallback(
     (selection: GestureSelection) => {
       if (selectedKeyCell === null) return;
       commitKeyEditOp({
@@ -3925,7 +3918,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // one op commits it through `commitKeyEditOp`; a kind that needs the author
   // to pick something (a character, an id) routes to the surface that can
   // (AssignPanel / RenameDialog), per this task's own briefing.
-  const handleApplyFix = useCallback(
+  const _handleApplyFix = useCallback(
     (fix: TouchKeyFix, _finding: TouchKeyFinding) => {
       switch (fix.kind) {
         case "addRule": {
@@ -4038,7 +4031,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // T013 — RemoveKeyDialog's proposal (FR-029g), from the row `selectedKeyCell`
   // belongs to (`selectedKeyRow`, T015) — recomputed per selection/layer, not
   // hand-forged.
-  const removeKeyProposal = useMemo(() => {
+  const _removeKeyProposal = useMemo(() => {
     if (selectedKeyRow === undefined || activeKeyPlatformId === null) return undefined;
     return computeProposedRemoveOutcome({
       platform: activeKeyPlatformId,
@@ -4048,7 +4041,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     });
   }, [selectedKeyRow, activeKeyPlatformId, activeKeyLayerId, i18n]);
 
-  const handleRemoveKeyConfirm = useCallback(
+  const _handleRemoveKeyConfirm = useCallback(
     (result: RemoveKeyDialogConfirmResult) => {
       setRemoveDialogOpen(false);
       commitKeyEditOp(result.op);
@@ -4057,7 +4050,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [commitKeyEditOp],
   );
 
-  const handleRemoveKeyCancel = useCallback(() => {
+  const _handleRemoveKeyCancel = useCallback(() => {
     setRemoveDialogOpen(false);
     dialogInvokerRef.current?.focus();
   }, []);
@@ -4076,7 +4069,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // edit and so exists only in the replayed layout — falls back to
   // `commitKeyEditOp` below; before that fallback, confirming such a rename
   // closed the dialog having renamed nothing at all.
-  const handleRenameConfirm = useCallback(
+  const _handleRenameConfirm = useCallback(
     (result: RenameDialogConfirmResult) => {
       const rejections = checkKeyEditRejectionNotices(result.op);
       const unwaived = rejections.filter(
@@ -4183,7 +4176,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // returned — never re-derived independently. The decision the engine
   // minted is appended to the spine records (FR-016: recorded, never
   // automatic — this handler runs only from the author's confirm).
-  const handleRelinkKey = useCallback(
+  const _handleRelinkKey = useCallback(
     (record: TransplantRecord) => {
       const store = useWorkingCopyStore.getState();
       const base = store.ir;
@@ -4222,12 +4215,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [effectiveKeyModeLayout, keyModeProvenance, selectedKeyAddress],
   );
 
-  const handleRenameCancel = useCallback(() => {
+  const _handleRenameCancel = useCallback(() => {
     setRenameDialogTarget(null);
     dialogInvokerRef.current?.focus();
   }, []);
 
-  const handleFamilyApplyConfirm = useCallback(
+  const _handleFamilyApplyConfirm = useCallback(
     (ops: readonly FamilyApplyOp[]) => {
       setFamilyApplyState(null);
       // `FamilyApplyOp` is `Omit<KeyEditOperation, "seq">` (FamilyApplyDialog.tsx)
@@ -4244,7 +4237,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [commitKeyEditOp],
   );
 
-  const handleFamilyApplyCancel = useCallback(() => {
+  const _handleFamilyApplyCancel = useCallback(() => {
     setFamilyApplyState(null);
     dialogInvokerRef.current?.focus();
   }, []);
@@ -4272,7 +4265,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // instead of it. `keyModeDetailContainerRef` itself is declared earlier
   // (alongside `dialogInvokerRef`) because `focusAssignPanelCharacterField`
   // needs it too.
-  const handleKeyModeGridKeyDown = useCallback(
+  const _handleKeyModeGridKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
       // useGridNav owns navigation (arrows/Home/End); composed ALONGSIDE
       // (never in place of) useKeyCommands' own command keys (Insert /
@@ -4317,7 +4310,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // to the selected cell — one handler at the container level (rather than
   // one per child) so it covers AssignPanel too, which (being store-free, see
   // its own module doc) exposes no `onEscape` prop of its own.
-  const handleKeyModeDetailEscape = useCallback(
+  const _handleKeyModeDetailEscape = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
       if (e.key !== "Escape" || selectedKeyAddress === null) return;
       const container = keyModeDetailContainerRef.current;
@@ -5637,7 +5630,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
    * Rides the existing render cycle as a `useMemo` — no timer, no store read
    * beyond what is already subscribed (D3, FR-039).
    */
-  const selectedKeyIdProposal = useMemo<TouchKeyIdProposal | undefined>(() => {
+  const _selectedKeyIdProposal = useMemo<TouchKeyIdProposal | undefined>(() => {
     if (selectedKeyCell === null || keyModeRuleIndex === undefined) return undefined;
     const chars = selectedKeyCell.producedChars[0] ?? "";
     if (chars.length === 0) return undefined;
@@ -6599,7 +6592,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     selectedKeyAddress !== null
       ? identityDecisionForAddress(touchKeyIdentity, selectedKeyAddress)
       : undefined;
-  const selectedIdentityNote =
+  const _selectedIdentityNote =
     selectedIdentityDecision === undefined
       ? undefined
       : selectedIdentityDecision.action === "severed"
@@ -7852,26 +7845,26 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // mode). Each branch is its own literal `t({id, message})` call (not a
   // dynamically-assembled template) so Lingui's static extractor sees every
   // variant.
-  let undoAffordanceLabel: string = t({
+  let _undoAffordanceLabel: string = t({
     id: "editor.assignLoop.touch.undo.nothingToUndo",
     message: "Nothing to undo",
   });
   if (undoTargetDescription !== null) {
     switch (undoTargetDescription.kind) {
       case "node":
-        undoAffordanceLabel = t({
+        _undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.node",
           message: `Undo removing ${{ id: undoTargetDescription.id }}`,
         });
         break;
       case "item":
-        undoAffordanceLabel = t({
+        _undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.item",
           message: `Undo removing ${{ id: undoTargetDescription.id }}`,
         });
         break;
       case "batch":
-        undoAffordanceLabel = t({
+        _undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.batch",
           message: plural(undoTargetDescription.count, {
             one: "Undo removing # item",
@@ -7880,19 +7873,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         });
         break;
       case "touchKey":
-        undoAffordanceLabel = t({
+        _undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.touchKey",
           message: `Undo deleting the touch method on ${{ id: undoTargetDescription.keyId }}`,
         });
         break;
       case "keyEdit":
-        undoAffordanceLabel = t({
+        _undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.keyEdit",
           message: `Undo the ${{ opKind: undoTargetDescription.opKind }} edit on ${{ id: undoTargetDescription.keyId }}`,
         });
         break;
       case "keyEditBatch":
-        undoAffordanceLabel = t({
+        _undoAffordanceLabel = t({
           id: "editor.assignLoop.touch.undo.keyEditBatch",
           message: plural(undoTargetDescription.count, {
             one: "Undo # touch-layout code edit",
