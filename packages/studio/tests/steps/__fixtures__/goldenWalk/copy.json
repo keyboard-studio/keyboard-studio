@@ -204,6 +204,16 @@
     "navigateTo": []
   },
   {
+    "stepId": "osk",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "touch_seed_source",
     "applyStepCompletion": [],
     "storeMutations": [
@@ -224,8 +234,7 @@
       "advance"
     ],
     "workingCopyMutations": [
-      "setTouchLayoutJson",
-      "setHistoryEntryState"
+      "setTouchLayoutJson"
     ],
     "decisionMutations": [
       "record"
@@ -236,13 +245,12 @@
     "stepId": "css",
     "applyStepCompletion": [],
     "storeMutations": [
-      "record",
       "advance"
     ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
+    "workingCopyMutations": [
+      "setHistoryEntryState"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -266,13 +274,10 @@
     "stepId": "html",
     "applyStepCompletion": [],
     "storeMutations": [
-      "record",
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
+    "decisionMutations": [],
     "navigateTo": [
       "output"
     ]
