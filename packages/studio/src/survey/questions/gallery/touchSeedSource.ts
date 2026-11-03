@@ -31,7 +31,7 @@ const touchSeedSource: GalleryModule<TouchSeedSourceValue> = {
   definition,
   provides: ["touch-seed-source"],
   screen: "touch_seed_source",
-  requires: ["physical-layout"],
+  requires: ["osk-layout"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the
   // module real IR writes updates decisionIRPaths in the same change

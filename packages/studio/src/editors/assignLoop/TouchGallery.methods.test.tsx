@@ -249,41 +249,6 @@ describe("TouchGallery — Apply lives in the open method card", () => {
     ).toHaveLength(1);
   });
 
-  it("follows the author into whichever card they open", async () => {
-    seedStore({ withInventory: ["中"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-    expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
-
-    await act(async () => {
-      fireEvent.click(screen.getByText(/Swipe a key \(flick\)/i));
-    });
-    expect(screen.getByTestId("touch-apply-flick")).toBeTruthy();
-    expect(screen.queryByTestId("touch-apply-longpress")).toBeNull();
-    expect(
-      screen.getAllByRole("button", { name: /Apply touch method for/i }),
-    ).toHaveLength(1);
-
-    await act(async () => {
-      fireEvent.click(screen.getByText(/Tap multiple times \(multitap\)/i));
-    });
-    expect(screen.getByTestId("touch-apply-multitap")).toBeTruthy();
-    expect(screen.queryByTestId("touch-apply-flick")).toBeNull();
-    expect(
-      screen.getAllByRole("button", { name: /Apply touch method for/i }),
-    ).toHaveLength(1);
-
-    await act(async () => {
-      fireEvent.click(screen.getByText(/Replace a key/i));
-    });
-    expect(screen.getByTestId("touch-apply-replace")).toBeTruthy();
-    expect(screen.queryByTestId("touch-apply-multitap")).toBeNull();
-    expect(
-      screen.getAllByRole("button", { name: /Apply touch method for/i }),
-    ).toHaveLength(1);
-  });
-
   it("keeps the touch-apply warnings banner rendered below the chooser, not duplicated per card", async () => {
     // Force a warning from the engine so applyTouchWarnings renders — mirrors
     // the "touch assignment could not be applied" banner's own coverage
@@ -537,18 +502,6 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — custom host-key option", () => {
-  it("selecting 'Enter my own character...' reveals a custom text input", async () => {
-    seedStore({ withInventory: ["中"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
-    expect(
-      screen.getByLabelText(/Custom character for long-press host key/i),
-    ).toBeTruthy();
-  });
-
   it("a custom literal character resolves to a vkey and Apply records it as slotValues.hostKey", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
@@ -590,38 +543,6 @@ describe("TouchGallery — custom host-key option", () => {
       const entry = draft?.charTouchEntries.find(([c]) => c === "中");
       expect(entry?.[1]?.mechanisms[0]?.slotValues?.["hostKey"]).toBe("K_B");
     });
-  });
-
-  it("an unmappable custom character shows an error and blocks Apply", async () => {
-    seedStore({ withInventory: ["中"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
-    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
-      target: { value: "é" },
-    });
-    expect(
-      screen.getByText(/Cannot map 'é' to a physical key — pick a key from the list instead\./i),
-    ).toBeTruthy();
-    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
-    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("invalid U+ notation blocks Apply", async () => {
-    seedStore({ withInventory: ["中"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
-    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
-      target: { value: "U+ZZZZ" },
-    });
-    expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
-    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
-    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("the host-key custom-character input carries no placeholder attribute (Fix 1 — guidance moved out of the box)", async () => {

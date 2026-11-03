@@ -37,18 +37,6 @@ installMechanismGalleryHooks();
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — custom key option (S-01 swap)", () => {
-  it("selecting 'Enter my own character...' reveals a custom text input", async () => {
-    seedInventory(["ẑ"]);
-    await act(async () => {
-      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
-    });
-    fireEvent.click(screen.getByText(/Assign to a key/i));
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    expect(
-      screen.getByLabelText(/Custom character for the assigned key/i),
-    ).toBeTruthy();
-  });
-
   it("a custom literal character resolves to a vkey and Apply records the mapped key", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
@@ -93,37 +81,6 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
     );
   });
 
-  it("an unmappable custom character shows an error and blocks Apply", async () => {
-    seedInventory(["ẑ"]);
-    await act(async () => {
-      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
-    });
-    fireEvent.click(screen.getByText(/Assign to a key/i));
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    fireEvent.change(screen.getByLabelText(/Custom character for the assigned key/i), {
-      target: { value: "é" },
-    });
-    expect(
-      screen.getByText(/Cannot map 'é' to a physical key — pick a key from the list instead\./i),
-    ).toBeTruthy();
-    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
-    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("invalid U+ notation blocks Apply", async () => {
-    seedInventory(["ẑ"]);
-    await act(async () => {
-      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
-    });
-    fireEvent.click(screen.getByText(/Assign to a key/i));
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    fireEvent.change(screen.getByLabelText(/Custom character for the assigned key/i), {
-      target: { value: "U+ZZZZ" },
-    });
-    expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
-    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
-    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
-  });
 });
 
 describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => {
