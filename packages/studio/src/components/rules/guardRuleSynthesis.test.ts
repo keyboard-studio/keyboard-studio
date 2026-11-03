@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import {
   synthesizeMissingGuardRules,
   targetGroupForSynthesis,
@@ -26,17 +27,11 @@ function diablockRule(nodeId: string, vkey: string): IRRule {
 }
 
 function makeIr(rules: IRRule[]): KeyboardIR {
-  return {
+  return makeTestIR({
     origin: "synthesized",
-    header: { keyboardId: "t", name: "t", bcp47: [], copyright: "", version: "1.0", targets: [], storeDirectives: [] },
-    stores: [],
-    groups: [
-      { nodeId: "g1", name: "main", usingKeys: true, rules, readonly: false },
-    ],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
+    header: { keyboardId: "t", name: "t" },
+    groups: [{ nodeId: "g1", name: "main", usingKeys: true, rules, readonly: false }],
+  });
 }
 
 const GROUP: MissingGuardGroup = {
