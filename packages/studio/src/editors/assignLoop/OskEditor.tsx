@@ -17,6 +17,7 @@
 
 import { useMemo, useState, lazy, Suspense } from "react";
 import { useLingui } from "@lingui/react/macro";
+import type { I18n } from "@lingui/core";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
@@ -71,19 +72,12 @@ function withLabel(kvks: KvksIR, shift: string, vkey: string, label: string): Kv
 }
 
 /** Shift-code display names for the layer switcher. */
-function shiftDisplayName(
-  shift: string,
-  t: (m: { id?: string; message: string }) => string,
-): string {
-  if (shift === "")
-    return t({ id: "editor.assignLoop.osk.layerDefault", message: "Default" });
+function shiftDisplayName(shift: string, i18n: I18n): string {
+  if (shift === "") return i18n._("editor.assignLoop.osk.layerDefault");
   const parts: string[] = [];
-  if (shift.includes("S"))
-    parts.push(t({ id: "editor.assignLoop.osk.modShift", message: "Shift" }));
-  if (shift.includes("C"))
-    parts.push(t({ id: "editor.assignLoop.osk.modCtrl", message: "Ctrl" }));
-  if (shift.includes("A"))
-    parts.push(t({ id: "editor.assignLoop.osk.modAlt", message: "Alt" }));
+  if (shift.includes("S")) parts.push(i18n._("editor.assignLoop.osk.modShift"));
+  if (shift.includes("C")) parts.push(i18n._("editor.assignLoop.osk.modCtrl"));
+  if (shift.includes("A")) parts.push(i18n._("editor.assignLoop.osk.modAlt"));
   return parts.length > 0 ? parts.join("+") : shift;
 }
 
@@ -216,8 +210,8 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     if (key?.chars) {
       setError(
         t({
-          message:
-            "Cannot blank this key — it has output. Change the label instead.",
+          id: "editor.assignLoop.osk.blankBlockedError",
+          message: "Cannot blank this key — it has output. Change the label instead.",
         }),
       );
       return;
@@ -343,7 +337,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
               cursor: "pointer",
             }}
           >
-            {shiftDisplayName(l.shift, t)}
+            {shiftDisplayName(l.shift, i18n)}
           </button>
         ))}
       </div>
