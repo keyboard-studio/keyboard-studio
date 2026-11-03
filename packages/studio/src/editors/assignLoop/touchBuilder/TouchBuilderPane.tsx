@@ -82,6 +82,12 @@ export interface TouchBuilderPaneProps {
   readonly trayLetter: string | null;
   readonly onSelectTrayLetter: (letter: string | null) => void;
   readonly onTrayReturnsChange: (updater: (prev: string[]) => string[]) => void;
+  /**
+   * Lets TouchGallery's touch drag (originating in the locked header) drop a
+   * letter onto a key: the pane owns the modal + op planning, so it
+   * registers its opener here.
+   */
+  readonly onRegisterPlacementOpener?: (open: (letter: string, address: string) => void) => void;
 }
 
 interface SubKeySelection {
@@ -154,6 +160,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     trayLetter,
     onSelectTrayLetter,
     onTrayReturnsChange,
+    onRegisterPlacementOpener,
   } = props;
 
   // Load the keyboard's font into the document so keycaps render in the real
@@ -223,6 +230,15 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     if (resolved === undefined) return;
     setPlacement({ letter, address, key: resolved.key });
   };
+
+  // The gallery's touch drag starts in the locked header, outside this pane
+  // — register the opener so a drop can land here. Ref-indirected so the
+  // registered closure never goes stale across renders.
+  const openPlacementRef = useRef(openPlacement);
+  openPlacementRef.current = openPlacement;
+  useEffect(() => {
+    onRegisterPlacementOpener?.((letter, address) => openPlacementRef.current(letter, address));
+  }, [onRegisterPlacementOpener]);
 
   const handlePlacementConfirm = (choice: PlacementChoice): void => {
     if (placement === null || layout === null) return;

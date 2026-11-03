@@ -1697,6 +1697,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // while the board scrolls), the pane consumes the selection/demotions.
   const [trayLetter, setTrayLetter] = useState<string | null>(null);
   const [trayReturns, setTrayReturns] = useState<string[]>([]);
+  // The pane owns the placement modal, so it registers its opener here for
+  // the header's touch drag (which starts outside the pane).
+  const placementOpenerRef = useRef<((letter: string, address: string) => void) | null>(null);
+
+  // Touch drag end: hit-test the drop point against the board's keys
+  // (data-address) and open the placement modal on a hit.
+  const handleTouchDrop = (letter: string, clientX: number, clientY: number): void => {
+    const target = document.elementFromPoint(clientX, clientY);
+    const address = target?.closest("[data-address]")?.getAttribute("data-address");
+    if (address !== undefined && address !== null && address !== "") {
+      placementOpenerRef.current?.(letter, address);
+    } else {
+      // Dropped on empty space — stand down the tap selection.
+      setTrayLetter(null);
+    }
+  };
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -7523,6 +7539,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         trayLetter={trayLetter}
         onSelectTrayLetter={setTrayLetter}
         onTrayReturnsChange={setTrayReturns}
+        onRegisterPlacementOpener={(open) => {
+          placementOpenerRef.current = open;
+        }}
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
@@ -8013,6 +8032,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               selectedLetter={trayLetter}
               onSelectLetter={setTrayLetter}
               onDragStartLetter={handleTrayDragStart}
+              onTouchDrop={handleTouchDrop}
             />
           </div>
         </>

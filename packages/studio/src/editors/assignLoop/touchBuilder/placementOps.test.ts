@@ -5,6 +5,7 @@ import {
   buildPlacementOps,
   isPreservableText,
   placementOccupant,
+  touchGestureIntent,
 } from "./placementOps.ts";
 
 const ADDR = "phone:default:K_A#0";
@@ -190,5 +191,24 @@ describe("placementOccupant", () => {
     ).toBe("z");
     expect(placementOccupant(key(), { slot: "surface", displaced: null })).toBeNull();
     expect(placementOccupant(key({ text: "a" }), { slot: "longpress" })).toBeNull();
+  });
+});
+
+describe("touchGestureIntent", () => {
+  it("is undecided inside the slop (a tap in the making)", () => {
+    expect(touchGestureIntent(0, 0)).toBe("undecided");
+    expect(touchGestureIntent(6, 6)).toBe("undecided");
+    expect(touchGestureIntent(-9, 0)).toBe("undecided");
+  });
+  it("calls a vertical-dominant move a drag (no longpress needed)", () => {
+    expect(touchGestureIntent(2, -40)).toBe("drag");
+    expect(touchGestureIntent(-3, 25)).toBe("drag");
+  });
+  it("calls a horizontal-dominant move a scroll (tray keeps it)", () => {
+    expect(touchGestureIntent(40, 2)).toBe("scroll");
+    expect(touchGestureIntent(-30, -5)).toBe("scroll");
+  });
+  it("breaks exact ties toward drag", () => {
+    expect(touchGestureIntent(20, 20)).toBe("drag");
   });
 });

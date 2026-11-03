@@ -154,3 +154,21 @@ export function buildPlacementOps(
   }
   return { ops, displacedBackToTray };
 }
+
+/** Touch-drag disambiguation for a tray chip (HTML5 DnD never fires on touch). */
+export type TouchGestureIntent = "undecided" | "scroll" | "drag";
+
+/**
+ * Classify a touch pointer's displacement from its down point. Below the
+ * slop the gesture is undecided (a tap in the making); beyond it, the
+ * dominant axis wins — horizontal means the tray scrolls (the browser keeps
+ * the gesture), vertical means a drag starts immediately, no longpress.
+ */
+export function touchGestureIntent(
+  dx: number,
+  dy: number,
+  slop = 10,
+): TouchGestureIntent {
+  if (Math.hypot(dx, dy) < slop) return "undecided";
+  return Math.abs(dx) > Math.abs(dy) ? "scroll" : "drag";
+}

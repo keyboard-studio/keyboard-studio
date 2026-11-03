@@ -1,15 +1,21 @@
 // PlacementBar + PlacementModal — the placement paradigm's UI.
 //
-// The placement bar is the tray of unplaced letters below the builder header;
-// a letter is dragged (or tapped, on touch) onto a key, and the modal asks
-// what the drop means: surface / longpress / flick (direction) / multitap
-// (2x/3x). Replacing an occupied surface/flick slot offers "demote to
-// longpress" or "send back to the placement list".
-import { useState } from "react";
+// The placement bar is the tray of unplaced letters in the locked header; a
+// letter is dragged onto a key — HTML5 DnD on desktop, an immediate
+// pointer-based drag on touch (no longpress: a vertical move off the chip
+// starts the drag, a horizontal move scrolls the tray) — or tapped, then a
+// key tapped. The modal asks what the drop means: surface / longpress /
+// flick (direction) / multitap (2x/3x). Replacing an occupied surface/flick
+// slot offers "demote to longpress" or "send back to the placement list".
+import { useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { TouchKeyIR } from "@keyboard-studio/contracts";
 import { FLICK_GRID, type FlickDirection } from "./touchBuilderModel.ts";
-import { placementOccupant, type PlacementChoice } from "./placementOps.ts";
+import {
+  placementOccupant,
+  touchGestureIntent,
+  type PlacementChoice,
+} from "./placementOps.ts";
 
 /** Drag MIME type for tray letters. The pane's key onDrop branches on it. */
 export const TRAY_LETTER_MIME = "application/x-ks-tray-letter";
@@ -31,9 +37,88 @@ export function PlacementBar(props: {
   selectedLetter: string | null;
   onSelectLetter: (letter: string | null) => void;
   onDragStartLetter: (e: React.DragEvent, letter: string) => void;
+  /** Touch drag end: the drop point in client coordinates for hit-testing. */
+  onTouchDrop: (letter: string, clientX: number, clientY: number) => void;
 }) {
   const { t } = useLingui();
-  const { letters, keycapFont, selectedLetter, onSelectLetter, onDragStartLetter } = props;
+  const {
+    letters,
+    keycapFont,
+    selectedLetter,
+    onSelectLetter,
+    onDragStartLetter,
+    onTouchDrop,
+  } = props;
+
+  // Touch drag state machine (mouse keeps native HTML5 DnD). A touch/pen
+  // pointer that moves vertically off the chip becomes a drag immediately —
+  // no longpress. Horizontal moves stand down so the tray keeps scrolling
+  // (touch-action: pan-x; the browser aborts us via pointercancel).
+  const gestureRef = useRef<{
+    letter: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    dragging: boolean;
+  } | null>(null);
+  const [ghost, setGhost] = useState<{ letter: string; x: number; y: number } | null>(null);
+  // A drag ends with pointerup, which a click follows — swallow that click
+  // so the drop doesn't also toggle the tap selection.
+  const suppressClickRef = useRef(false);
+
+  const endGesture = (): void => {
+    gestureRef.current = null;
+    setGhost(null);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, letter: string): void => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    if (gestureRef.current !== null) return; // one gesture at a time
+    gestureRef.current = {
+      letter,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      dragging: false,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent): void => {
+    const g = gestureRef.current;
+    if (g === null || e.pointerId !== g.pointerId) return;
+    if (g.dragging) {
+      setGhost({ letter: g.letter, x: e.clientX, y: e.clientY });
+      return;
+    }
+    const intent = touchGestureIntent(e.clientX - g.startX, e.clientY - g.startY);
+    if (intent === "undecided") return;
+    if (intent === "scroll") {
+      gestureRef.current = null;
+      return;
+    }
+    g.dragging = true;
+    try {
+      navigator.vibrate?.(15);
+    } catch {
+      /* haptics unsupported — the ghost is feedback enough */
+    }
+    setGhost({ letter: g.letter, x: e.clientX, y: e.clientY });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent): void => {
+    const g = gestureRef.current;
+    if (g === null || e.pointerId !== g.pointerId) return;
+    if (g.dragging) {
+      suppressClickRef.current = true;
+      onTouchDrop(g.letter, e.clientX, e.clientY);
+    }
+    endGesture();
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent): void => {
+    if (gestureRef.current?.pointerId === e.pointerId) endGesture();
+  };
+
   return (
     <section
       aria-label={t({
@@ -78,7 +163,18 @@ export function PlacementBar(props: {
                 draggable
                 aria-pressed={isSelected}
                 onDragStart={(e) => onDragStartLetter(e, letter)}
-                onClick={() => onSelectLetter(isSelected ? null : letter)}
+                onPointerDown={(e) => handlePointerDown(e, letter)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                onContextMenu={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (suppressClickRef.current) {
+                    suppressClickRef.current = false;
+                    return;
+                  }
+                  onSelectLetter(isSelected ? null : letter);
+                }}
                 style={{
                   flex: "0 0 auto",
                   minWidth: 40,
@@ -91,12 +187,45 @@ export function PlacementBar(props: {
                   border: `1px solid ${isSelected ? ACCENT : BORDER}`,
                   borderRadius: 8,
                   cursor: "grab",
+                  // Vertical moves become our drag; horizontal moves scroll
+                  // the tray. Also kills callouts/selection on long holds.
+                  touchAction: "pan-x",
+                  userSelect: "none",
+                  WebkitTouchCallout: "none",
                 }}
               >
                 {letter}
               </button>
             );
           })}
+        </div>
+      )}
+      {/* Drag ghost: follows the finger, above everything, never hit-tested. */}
+      {ghost !== null && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: ghost.x - 22,
+            top: ghost.y - 72,
+            zIndex: 2000,
+            pointerEvents: "none",
+            minWidth: 44,
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 20,
+            fontFamily: keycapFont,
+            color: TEXT_MAIN,
+            background: CARD,
+            border: `2px solid ${ACCENT}`,
+            borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            opacity: 0.95,
+          }}
+        >
+          {ghost.letter}
         </div>
       )}
     </section>
