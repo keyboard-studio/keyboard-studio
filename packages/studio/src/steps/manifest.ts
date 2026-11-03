@@ -461,7 +461,7 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, deadkeys, rules, mechanisms, touch, touch_seed_source}
+  // EXACTLY {carve, deadkeys, rules, mechanisms, osk, touch, touch_seed_source}
   // must declare layout:"full"; all others must be "pane" or omit layout. A
   // mismatched layout would silently change the chrome. touch_seed_source
   // joined this set in the P0 fix for the panel's inline live OSK preview
@@ -471,7 +471,7 @@ export function validateManifestShape(): void {
   // its own Back/Continue nav renders inside.
   // rules joined in spec 082: the demo pane + rule builder need the full
   // width, same as the carve and mechanisms galleries it sits between.
-  const FULL_LAYOUT_IDS = new Set(["carve", "deadkeys", "rules", "mechanisms", "touch", "touch_seed_source"]);
+  const FULL_LAYOUT_IDS = new Set(["carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "touch_seed_source"]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {

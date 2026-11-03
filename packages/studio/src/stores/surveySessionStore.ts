@@ -120,6 +120,7 @@ export type ActiveStepId =
   | "invisibles"
   | "convenience"
   | "mechanisms"
+  | "osk"
   | "touch_seed_source"
   | "touch"
   | "help"

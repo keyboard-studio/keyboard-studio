@@ -916,7 +916,16 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  * see that helper's doc comment) so a genuine render/recompute delay between
  * characters is never misread as "the gallery already completed".
  */
+export async function driveOskEditor(page: Page): Promise<void> {
+  const oskContinue = page.getByTestId("osk-continue");
+  if (await waitVisible(oskContinue, 30_000)) {
+    await oskContinue.click();
+  }
+}
+
 export async function driveTouchGallery(page: Page): Promise<void> {
+  await driveOskEditor(page);
+
   const seedConfirm = page.getByTestId("seed-source-confirm");
   const startButton = page.getByRole("button", { name: "Start the touch gallery" });
   const continueButton = page.getByTestId("touch-continue");

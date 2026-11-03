@@ -28,7 +28,7 @@ import { DeadkeyAdapter } from "../editors/adapters/deadkeyAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
-import { OskEditor } from "../editors/assignLoop/OskEditor.tsx";
+import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -243,7 +243,7 @@ export const oskStep: EditorStep = step({
   id: "osk",
   title: "On-Screen Keyboard",
   layout: "full",
-  component: OskEditor,
+  component: OskEditorAdapter,
   specRef: ["specs/osk-editor"],
   persistence: "working-copy",
 });

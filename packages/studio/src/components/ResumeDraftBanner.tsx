@@ -37,6 +37,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   deadkeys: "deadkeys",
   rules: "rules",
   mechanisms: "mechanisms",
+  osk: "on-screen keyboard",
   touch_seed_source: "touch starting point",
   touch: "touch layout",
   help: "help & docs",

@@ -75,7 +75,8 @@ import {
   nonAlphabetConfirmedInventory,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
-import { selectStrategy, deriveCarveNeededSet } from "@keyboard-studio/engine";
+import { selectStrategy, deriveCarveNeededSet, generateKvksFromIR, oskContinueResult } from "@keyboard-studio/engine";
+import { completeOskStep } from "../lib/oskStepCompletion.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -783,6 +784,17 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           // reducer to lib/assignLoopCompletion.ts — the same effects
           // AddPhysicalAdapter fires on the live path (D-090-38).
           applyPhysicalCompletionEffects();
+          result = undefined;
+          break;
+        }
+
+        case "osk": {
+          // Mirror OskEditorAdapter: record osk-layout from generated kvks.
+          const ir = useWorkingCopyStore.getState().ir;
+          if (ir !== null) {
+            const kvks = generateKvksFromIR(ir, ir.header.name ?? "keyboard");
+            completeOskStep(oskContinueResult(kvks));
+          }
           result = undefined;
           break;
         }

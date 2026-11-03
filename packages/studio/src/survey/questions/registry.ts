@@ -36,6 +36,7 @@ import carvedLayoutModule from "./gallery/carvedLayout.ts";
 import deadkeysDefinedModule from "./gallery/deadkeysDefined.ts";
 import ruleSetModule from "./gallery/ruleSet.ts";
 import physicalLayoutModule from "./gallery/physicalLayout.ts";
+import oskLayoutModule from "./gallery/oskLayout.ts";
 import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
 import touchLayoutModule from "./gallery/touchLayout.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
@@ -110,6 +111,7 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   deadkeysDefinedModule,
   ruleSetModule,
   physicalLayoutModule,
+  oskLayoutModule,
   touchSeedSourceModule,
   touchLayoutModule,
   helpDocsModule,
