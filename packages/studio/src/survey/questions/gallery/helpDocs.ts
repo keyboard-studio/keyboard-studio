@@ -62,7 +62,7 @@ const helpDocs: GalleryModule<HelpDocsValue> = {
   definition,
   provides: ["help-docs"],
   screen: "help",
-  requires: ["physical-layout", "touch-layout"],
+  requires: ["physical-layout", "touch-layout", "custom-css"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the
   // module real IR writes updates decisionIRPaths in the same change

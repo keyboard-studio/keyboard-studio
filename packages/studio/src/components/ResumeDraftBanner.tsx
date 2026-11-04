@@ -45,7 +45,9 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], MessageDescriptor> = {
   osk: msg({ id: "resumeDraft.steps.osk", message: "on-screen keyboard" }),
   touch_seed_source: msg({ id: "resumeDraft.steps.touchSeedSource", message: "touch starting point" }),
   touch: msg({ id: "resumeDraft.steps.touch", message: "touch layout" }),
+  css: msg({ id: "editor.assignLoop.css.title", message: "Custom CSS" }),
   help: msg({ id: "resumeDraft.steps.help", message: "help & docs" }),
+  html: msg({ id: "editor.assignLoop.html.title", message: "Documentation" }),
   done: msg({ id: "resumeDraft.steps.done", message: "the final step" }),
   unsupported: msg({ id: "resumeDraft.steps.unsupported", message: "an unsupported script" }),
 };

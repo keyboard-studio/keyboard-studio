@@ -840,6 +840,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "css": {
+          // Optional embed CSS — corpus fixtures carry none; advance with empty css.
+          result = { css: "" };
+          break;
+        }
+
+        case "html": {
+          // welcome.htm editor — fixtures carry none; advance with empty source.
+          result = { html: "" };
+          break;
+        }
+
         case "help": {
           const answers = answerMapFromGroup(group, "help");
           const walked = walkFlowFromAnswers(STEP_FLOW_IDS["help"]!, surveyContext, answers);

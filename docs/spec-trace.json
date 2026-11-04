@@ -1148,6 +1148,54 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/106-consistent-keyboard-output": {
+      "title": "Feature Specification: Consistent keyboard output from base + decisions + carve",
+      "hash": "sha256:19598cba3d1181b4",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/107-headless-scripted-author": {
+      "title": "Feature Specification: Headless scripted author for decision walks",
+      "hash": "sha256:b3005594391a6dbb",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/110-readme-template": {
+      "title": "Feature Specification: README template driven by authoring choices",
+      "hash": "sha256:e84ef2e58271aae6",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/css-editor": {
+      "title": "Feature Specification: CSS editor step",
+      "hash": "sha256:7c1831e3e80f347f",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/html-editor": {
+      "title": "Feature Specification: HTML editor step",
+      "hash": "sha256:07f105927dcf0953",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/osk-editor": {
+      "title": "Feature Specification: OSK editor step",
+      "hash": "sha256:cb99e2149a18c715",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }
