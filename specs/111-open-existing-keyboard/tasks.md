@@ -92,12 +92,12 @@
 
 **Independent Test**: edit a comment in the `.kmn` view, apply, and check that the output diff is that line only; then make a decision change and check that the edit survives replay.
 
-- [ ] T031 [US3] Add `replaceStartingPointFromText(path, text)` to `packages/studio/src/stores/workingCopyStore.ts`: write the VFS text, re-parse, and set `startIr` in one update (data-model invariant), then trigger replay (`packages/studio/src/decisions/rebuildWorkingCopy.ts` reseeds on a new `startIr`). Test that a later decision change does not clobber the edit.
-- [ ] T032 [P] [US3] On Open, show the VFS `.kmn` text and apply via T031 in `packages/studio/src/editors/assignLoop/KmnCodePane.tsx`. Treat a formatting-only change as a change. Parse errors block Apply (FR-015).
-- [ ] T033 [P] [US3] Same for `.kvks` in `packages/studio/src/editors/assignLoop/OskCodePane.tsx`
-- [ ] T034 [P] [US3] Same for the touch layout in `packages/studio/src/editors/assignLoop/touchBuilder/TouchCodePane.tsx`, bypassing the structural-edit refusal on Open (research R7)
-- [ ] T035 [US3] On Open, have the OSK and touch editors edit the existing files and offer generation only when the file is missing, in `packages/studio/src/editors/assignLoop/OskEditor.tsx` and the `touch_seed_source` gate in `packages/studio/src/survey/questions/registry.ts`
-- [ ] T036 [US3] Consent dialog for a full re-emit (T016's `ok:false` path), naming the file, in `packages/studio/src/components/ReformatConsentDialog.tsx` (accessible per [docs/accessibility.md](../../docs/accessibility.md))
+- [x] T031 [US3] Add `replaceStartingPointFromText(path, text)` to `packages/studio/src/stores/workingCopyStore.ts`: write the VFS text, re-parse, and set `startIr` in one update (data-model invariant), then trigger replay (`packages/studio/src/decisions/rebuildWorkingCopy.ts` reseeds on a new `startIr`). Test that a later decision change does not clobber the edit.
+- [x] T032 [P] [US3] On Open, show the VFS `.kmn` text and apply via T031 in `packages/studio/src/editors/assignLoop/KmnCodePane.tsx`. Treat a formatting-only change as a change. Parse errors block Apply (FR-015).
+- [x] T033 [P] [US3] Same for `.kvks` in `packages/studio/src/editors/assignLoop/OskCodePane.tsx`
+- [x] T034 [P] [US3] Same for the touch layout in `packages/studio/src/editors/assignLoop/touchBuilder/TouchCodePane.tsx`, bypassing the structural-edit refusal on Open (research R7)
+- [x] T035 [US3] On Open, have the OSK and touch editors edit the existing files and offer generation only when the file is missing, in `packages/studio/src/editors/assignLoop/OskEditor.tsx` and the `touch_seed_source` gate in `packages/studio/src/survey/questions/registry.ts`
+- [x] T036 [US3] Consent dialog for a full re-emit (T016's `ok:false` path), naming the file, in `packages/studio/src/components/ReformatConsentDialog.tsx` (accessible per [docs/accessibility.md](../../docs/accessibility.md))
 
 **Checkpoint**: manual walk step 2 of [quickstart.md §5](quickstart.md). Commit and push.
 
