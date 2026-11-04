@@ -963,7 +963,7 @@
   "editor.assignLoop.osk.selectedKeyTitle": "Key {vkey}",
   "editor.assignLoop.osk.tabCode": "Code",
   "editor.assignLoop.osk.tabVisual": "Visual",
-  "editor.assignLoop.osk.title": "On-Screen Keyboard",
+  "editor.assignLoop.osk.title": "OnScreen Keyboard Label Editors",
   "editor.assignLoop.osk.undo": "Undo",
   "editor.assignLoop.osk.viewTabsLabel": "Editor view",
   "editor.assignLoop.patternLoadError": "Pattern load error — preview transform may be incomplete.",

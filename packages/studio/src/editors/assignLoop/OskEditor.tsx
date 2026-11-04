@@ -158,13 +158,19 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         <div style={{ padding: 24, color: TEXT_DIM }}>
           {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
         </div>
-        {/* Footer with Continue so the step can be skipped when no Kvks is available. */}
+        {/* Footer with Continue so the step can be skipped when no Kvks is available.
+            Pinned to the bottom bar (sticky) so nav stays reachable. */}
         <div
           style={{
             display: "flex",
             gap: 8,
-            padding: 16,
+            margin: "auto -24px -24px",
+            padding: "16px 24px",
             borderTop: `1px solid ${BORDER}`,
+            background: BG_CANVAS,
+            position: "sticky",
+            bottom: 0,
+            zIndex: 10,
           }}
         >
           {onBack && (
@@ -342,7 +348,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       }}
     >
       <h1 style={{ margin: 0, fontSize: 20, color: TEXT_MAIN }}>
-        {t({ id: "editor.assignLoop.osk.title", message: "On-Screen Keyboard" })}
+        {t({ id: "editor.assignLoop.osk.title", message: "OnScreen Keyboard Label Editors" })}
       </h1>
       <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
         {t({
@@ -619,14 +625,19 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       </>
       )}
 
-      {/* Footer: undo + nav */}
+      {/* Bottom bar: nav pinned to the viewport bottom (sticky) so Back /
+          Continue stay reachable while the key grid scrolls. */}
       <div
         style={{
           display: "flex",
           gap: 8,
-          marginTop: "auto",
-          paddingTop: 16,
+          margin: "auto -24px -24px",
+          padding: "16px 24px",
           borderTop: `1px solid ${BORDER}`,
+          background: BG_CANVAS,
+          position: "sticky",
+          bottom: 0,
+          zIndex: 10,
         }}
       >
         {onBack && (
