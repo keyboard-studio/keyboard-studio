@@ -139,7 +139,7 @@ studio typecheck. One commit per phase, pushed to `km/casedkeys-criterion`
 - [x] T049 [P] Update spec 111's tasks on branch `111-open-existing-keyboard` (`specs/111-open-existing-keyboard/tasks.md` T044/T045): the upgrade pair calls `upgradeToCasedKeys` and offers only when `compareCapsBehaviour` isn't `differs`; T045 reuses `packages/engine/src/caps/__fixtures__/upstream_basic_kbdus/`. Commit on that branch, or leave a PR comment if the branch is someone else's active work.
 - [x] T050 Run `node utilities/spec-trace check` and acknowledge the intended drift from T048.
 - [x] T051 Run the full quickstart ([quickstart.md](quickstart.md)) end to end, then `pnpm lint` and `pnpm build`; fix what fails.
-- [ ] T052 Open the PR against `main` with km-archivist (`feat(criteria): cased keys — criterion 7.28, Copy decision, Open fixer, touch caps`), reconciling linked issues with the `issue-closure` skill; the PR body lists the content-review items (7.28 description, 18.16 row, decision strings) and the spec 111 hand-off.
+- [x] T052 Open the PR against `main` with km-archivist (`feat(criteria): cased keys — criterion 7.28, Copy decision, Open fixer, touch caps`), reconciling linked issues with the `issue-closure` skill; the PR body lists the content-review items (7.28 description, 18.16 row, decision strings) and the spec 111 hand-off.
 
 ---
 

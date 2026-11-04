@@ -1,9 +1,9 @@
 {
-  "workflow": "speckit",
+  "workflow": "companion",
   "specName": "Caps Lock and `&CasedKeys`",
   "branch": "km/casedkeys-criterion",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "plan",
@@ -417,10 +417,25 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T20:12:47.897Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T20:29:34.456Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T20:29:34.877Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T051",
+  "currentTask": "T052",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -809,6 +824,13 @@
       "files": [
         "none"
       ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Opened PR #2513 against main via km-archivist; no linked tracking issue",
+      "files": [
+        "specs/112-cased-keys"
+      ]
     }
   },
   "verified": [
@@ -840,6 +862,21 @@
       "exitCode": 0,
       "durationSeconds": 16.7,
       "result": "[BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-casedkeys\\packages\\engine\\dist\\langtags\\generated\\tagsets.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-casedkeys\\packages\\engine\\dist\\langtags\\generated\\index.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-casedkeys\\packages\\contracts\\dist\\unicode\\unicodeData.generated.js as it exceeds the max of 500KB."
+    },
+    {
+      "what": "km-lead post-implement review cycle 1 (km-qc PASS 83, km-synthesis CHANGES no P0, km-keyman APPROVE, km-frontend CHANGES 1 P1)",
+      "command": "review",
+      "result": "no P0; P1s fixed in cycle 2 (d9605fd9)"
+    },
+    {
+      "what": "full gate before review",
+      "command": "pnpm build; pnpm typecheck; pnpm lint; pnpm -r test",
+      "result": "all exit 0: contracts 1073, engine 4947, keyboard-lint 564, studio 11127 passed"
+    },
+    {
+      "what": "post-fix targeted tests",
+      "command": "studio assignLoop/projectWorkingCopyVfs/caps (1566), engine caps+scaffolder (346), corpus caps sweep 168/86/82",
+      "result": "pass"
     }
   ],
   "concerns": [
@@ -850,11 +887,23 @@
     {
       "note": "compareCapsBehaviour compiles via buildToleranceCompileVfs (context-tolerance path); not confirmed identical to the download path buildKmpForDownload",
       "step": "implement"
+    },
+    {
+      "note": "Follow-up: check-cased-keys does not flag a key already listed in &CasedKeys that has a non-case pair on another plane (km-keyman P2)",
+      "step": "implement"
+    },
+    {
+      "note": "Follow-up: CAPS/NCAPS predicate and CASEDKEYS store lookup still duplicated in older code and keyboard-lint (check-caps-ncaps, placement/filters, scaffoldTouchLayout); capsExpand and check-cased-keys use ad-hoc case tests instead of caseCounterpart (km-synthesis P2)",
+      "step": "implement"
+    },
+    {
+      "note": "Follow-up: [K_A]..[K_Z] range expansion in casedKeys.ts walks char codes across classes; Turkic i pair without bcp47 reads as conflict (km-qc P2)",
+      "step": "implement"
     }
   ],
   "step_summaries": {
     "implement": {
-      "summary": "Phase 2 foundational: shared cased-key derivation and key-scoped caps rewrite"
+      "summary": "Phase 7 polish: spec amendments, spec 111 hand-off, full gate, km-lead review with fixes"
     }
   },
   "decisions": [
@@ -862,7 +911,17 @@
       "decision": "T039: 7.26 already flags leftover CAPS rules on mixed keyboards",
       "why": "KM_LINT_CAPS_NCAPS_INCONSISTENT names K_Q",
       "rejected": "adding a finding to 7.28 pass path"
+    },
+    {
+      "decision": "T_CAPS kept as the touch caps multitap id",
+      "why": "119 corpus touch layouts use T_CAPS vs 3 K_CAPS; lint keys on nextlayer=caps",
+      "rejected": "K_CAPS"
+    },
+    {
+      "decision": "Conflict keys stay shown under the Copy decision",
+      "why": "FR-006 requires them reported there",
+      "rejected": "console-only (km-frontend P2)"
     }
   ],
-  "last_action": "Phase 5 T033-T040 done, pushed 1bbd2cd3/71afac5f"
+  "last_action": "review approved conditionally, fixes pushed d9605fd9; PR next"
 }
