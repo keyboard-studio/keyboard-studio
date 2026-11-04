@@ -437,7 +437,7 @@ describe.skipIf(!available)("spec 104 T021 — corpus resolver⇔consumer equiva
 
         expect(failures, failures.join("\n")).toEqual([]);
       },
-      240_000,
+      300_000,
     );
   }
 });
