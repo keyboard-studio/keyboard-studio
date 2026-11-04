@@ -53,9 +53,10 @@ Mechanical Gallery and use it, not when the component exists.
 3. **Flow placement** — a **third tab in the Mechanical Gallery**: Assign | Code | Layout. No new
    wizard step, no new decision id.
 4. **Edit depth** — **as much as possible, where a useful UI exists** (amended by the 2026-11-04
-   clarifications below). Deadkeys and literal text are confirmed in scope. How far beyond that v1
-   goes rests on the proposed "after …" view (Clarifications, "Proposed UI"), which is pending the
-   product owner's confirmation. Whatever has no useful UI is read-only with a way to see it in code.
+   clarifications below). v1 edits literal text, nothing (`nul`), deadkeys with their combinations
+   (chains included), and literal contextual replacements, through the confirmed "after …" view.
+   Whatever has no useful UI yet (store-based rules, `if()`/`platform()`/options, later-group
+   changes, opaque fragments) is read-only with a way to see it in code.
 5. **Base seeding** — keys the keyboard does not handle show what the **base keyboard** types
    there, marked **base-derived and provisional**. An author edit makes the key hand-set.
 
@@ -78,14 +79,13 @@ Mechanical Gallery and use it, not when the component exists.
   after a deadkey or context, may type literal text of any length.
 - Q: (Raised by the product owner.) Ruling 4 held back on context because it looked hard. → A: The
   eventual goal is editing as much as possible. If a useful UI can be found for more, take it.
-- **Proposed UI (pending product-owner confirmation)** — not a ruling. One "after …" view serves
-  deadkeys and context alike: the author picks what came before (a deadkey, literal text, or
-  both), the grid shows what each key does after it, and an edit says what the context plus the
-  keystroke **becomes**. That makes literal contextual replacements editable (User Story 4) and
-  chained deadkeys followable (a row whose result is a deadkey links to "after" that deadkey).
-  Store-based rules (`any()`/`index()`) stay read-only, with a sketched next frontier
-  (Assumptions). If the product owner redirects this, User Story 4, FR-029–FR-029a, and the
-  chained-deadkey text change with it.
+- Q: Is the proposed "after …" view the UI for that? (One view serves deadkeys and context alike:
+  the author picks what came before — a deadkey, literal text, or both — the grid shows what each
+  key does after it, and an edit says what the context plus the keystroke **becomes**; a row whose
+  result is a deadkey links to "after" that deadkey.) → A: Yes, confirmed. The product owner has
+  wished for this view in Keyman's own on-screen keyboard. Literal contextual replacements
+  (User Story 4) and chained deadkeys are in scope through it; store-based rules
+  (`any()`/`index()`) stay read-only, with a sketched next frontier (Assumptions).
 
 ## The problem
 
