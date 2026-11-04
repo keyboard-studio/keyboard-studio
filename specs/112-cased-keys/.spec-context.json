@@ -329,10 +329,18 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T19:27:19.242Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:29:19.603Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T039",
+  "currentTask": "T040",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -633,6 +641,13 @@
       "did": "mixed.kmn case: 7.26 reports leftover CAPS K_Q rules; no change to 7.28",
       "files": [
         "packages/keyboard-lint/src/checks/criteria/check-caps-ncaps.test.ts"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Gated (tests, typecheck, lint) and committed Phase 5 as 1bbd2cd3",
+      "files": [
+        "specs/112-cased-keys/tasks.md"
       ]
     }
   },

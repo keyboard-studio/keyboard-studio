@@ -109,7 +109,7 @@ studio typecheck. One commit per phase, pushed to `km/casedkeys-criterion`
 - [x] T037 [US3] Add a test that the `upgradeToCasedKeys` output for `upstream_basic_kbdus` compiles with zero warnings (SC-003), in `upgradeToCasedKeys.test.ts`.
 - [x] T038 [P] [US3] Add an opt-in corpus sweep `packages/engine/src/caps/compareCaps.corpus.test.ts` (skips without `../keyboards`): for every corpus keyboard that fails 7.28 and is not mnemonic, run `upgradeToCasedKeys` + `compareCapsBehaviour`; assert that where the verdict isn't `differs`, no row changes except by gaining uppercase (SC-004); print offered / withheld counts.
 - [x] T039 [US3] Mixed keyboards (spec Story 3 scenario 5): add a `mixed.kmn` case to `packages/keyboard-lint/src/checks/criteria/check-caps-ncaps.test.ts` showing 7.26 reports the leftover `[CAPS K_Q]` rules. If 7.26 doesn't flag them (consistent per-key CAPS handling), add a finding to 7.28's pass path instead, listing CAPS rules on keys the store already covers, and record which way it went in the commit.
-- [ ] T040 [US3] Gate and commit `feat(engine): cased-keys upgrade fixer with caps comparison` (spec 112 T033–T039), push.
+- [x] T040 [US3] Gate and commit `feat(engine): cased-keys upgrade fixer with caps comparison` (spec 112 T033–T039), push.
 
 **Checkpoint**: engine-level Story 3 complete; reachable by authors when spec 111 Phase 8 lands (plan, Art. XI follow-up).
 
