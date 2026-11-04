@@ -108,6 +108,7 @@ export type { ParseResult, OpaqueReason } from "./codec/index.js";
 // OSK (visual keyboard) generation from KeyboardIR.
 export { generateKvksFromIR } from "./osk/generate-kvks.js";
 export { oskContinueResult } from "./osk/complete-osk-step.js";
+export type { OskContinueResult } from "./osk/complete-osk-step.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
 // The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.

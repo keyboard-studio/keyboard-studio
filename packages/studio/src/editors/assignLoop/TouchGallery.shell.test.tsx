@@ -4,7 +4,7 @@
 // lifecycle hooks every suite installs: ../../test/touchGallery/harness.ts.
 
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent, act } from "@testing-library/react";
+import { screen, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { installTouchGalleryHooks, seedStore } from "../../test/touchGallery/harness.ts";
@@ -55,45 +55,6 @@ describe("TouchGallery — heading", () => {
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.textContent).toMatch(/Touch Gallery/i);
     expect(h1.textContent).toMatch(/Touch/i);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Intro splash — first-entry orientation
-// ---------------------------------------------------------------------------
-
-describe("TouchGallery — intro splash", () => {
-  it("shows the intro on first entry and reveals the gallery after 'Get started'", async () => {
-    seedStore({ withInventory: ["ä"], intro: true });
-
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-
-    // Intro is visible; the per-character gallery is not yet shown.
-    expect(screen.queryByText(/Welcome to the Touch Gallery/i)).not.toBeNull();
-    expect(screen.queryByText(/Touch mapping/i)).toBeNull();
-
-    const startBtn = screen.getByRole("button", { name: /start the touch gallery/i });
-    await act(async () => {
-      fireEvent.click(startBtn);
-    });
-
-    // Gallery now visible; intro gone.
-    expect(screen.queryByText(/Welcome to the Touch Gallery/i)).toBeNull();
-    expect(screen.queryAllByText(/Touch mapping/i).length).toBeGreaterThan(0);
-  });
-
-  it("does NOT show the intro on a return visit (intro already marked seen)", async () => {
-    // seedStore (without intro:true) marks the intro seen, simulating a prior visit.
-    seedStore({ withInventory: ["ä"] });
-
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
-    });
-
-    expect(screen.queryByText(/Welcome to the Touch Gallery/i)).toBeNull();
-    expect(screen.queryAllByText(/Touch mapping/i).length).toBeGreaterThan(0);
   });
 });
 

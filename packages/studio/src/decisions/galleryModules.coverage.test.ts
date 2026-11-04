@@ -55,30 +55,36 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   deadkeys: ["carved-layout"],
   rules: ["deadkeys-defined", "windows-layout"],
   mechanisms: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
-  touch_seed_source: ["physical-layout"],
-  touch: ["physical-layout", "touch-seed-source"],
-  help: ["physical-layout", "touch-layout"],
+  osk: ["physical-layout"],
+  touch_seed_source: ["osk-layout"],
+  touch: ["osk-layout", "touch-seed-source"],
+  css: ["touch-layout"],
+  help: ["physical-layout", "touch-layout", "custom-css"],
+  html: ["help-docs"],
 };
 
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the fourteen gallery decisions", () => {
-    expect(SETTLES.size).toBe(14);
+  it("the derived settles set is exactly the seventeen gallery decisions", () => {
+    expect(SETTLES.size).toBe(17);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "carved-layout",
       "character-inventory",
+      "custom-css",
       "deadkeys-defined",
       "help-docs",
       "invisibles-inventory",
       "marks-treatment",
+      "osk-layout",
       "physical-layout",
       "punctuation-inventory",
       "retained-convenience-chars",
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "welcome-htm",
       "windows-layout",
     ]);
   });

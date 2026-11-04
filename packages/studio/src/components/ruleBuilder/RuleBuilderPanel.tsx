@@ -52,7 +52,8 @@ import {
   TEXT_MAIN,
 } from "../../ui/theme.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import { summarizeSelection } from "./bundleSummary.ts";
 
 /* RuleFamily is imported from "@keyboard-studio/engine/kmAssist" above. */
@@ -97,6 +98,7 @@ function fmtCodepoint(ch: string): string {
   if (cp > 0xffff) {
     return `'${ch}'`;
   }
+  // eslint-disable-next-line lingui/no-unlocalized-strings -- Unicode codepoint notation (U+00C0), symbolic display, not prose
   return `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
@@ -121,10 +123,12 @@ function fmtContextElement(el: ContextElement): string {
     case "context":
       return `context(${el.offset})`;
     case "index":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
       return `index(${el.storeRef}, ${el.offset})`;
     case "baselayout":
       return el.value ? `baselayout('${el.value}')` : "baselayout";
     case "if":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
       return `if(${el.store} = '${el.value}')`;
     case "raw":
       return el.text;
@@ -146,6 +150,7 @@ function fmtOutputElement(el: OutputElement): string {
     case "context":
       return el.offset === 0 ? "context" : `context(${el.offset})`;
     case "index":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
       return `index(${el.storeRef}, ${el.offset})`;
     case "outs":
       return `outs(${el.storeRef})`;
@@ -263,24 +268,29 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-const SCRIPT_NAMES: Record<string, string> = {
-  Latn: "Latin",
-  Cyrl: "Cyrillic",
-  Arab: "Arabic",
-  Grek: "Greek",
-  Hebr: "Hebrew",
-  Deva: "Devanagari",
-  Thai: "Thai",
-  Armn: "Armenian",
-  Geor: "Georgian",
-  Hans: "Simplified Chinese",
-  Hant: "Traditional Chinese",
-  Jpan: "Japanese",
-  Kore: "Korean",
+// Script names shown in the UI (e.g. the save confirmation), as lazy msg()
+// descriptors resolved per-render; script keys with no entry fall back to
+// the raw key. Reuses the prefill survey's script-option ids where the same
+// script name already exists.
+const SCRIPT_NAMES: Record<string, MessageDescriptor> = {
+  Latn: msg({ id: "survey.prefill.scriptOption.latn", message: "Latin" }),
+  Cyrl: msg({ id: "survey.prefill.scriptOption.cyrl", message: "Cyrillic" }),
+  Arab: msg({ id: "survey.prefill.scriptOption.arab", message: "Arabic" }),
+  Grek: msg({ id: "survey.prefill.scriptOption.grek", message: "Greek" }),
+  Hebr: msg({ id: "survey.prefill.scriptOption.hebr", message: "Hebrew" }),
+  Deva: msg({ id: "survey.prefill.scriptOption.deva", message: "Devanagari" }),
+  Thai: msg({ id: "ruleBuilder.scriptName.thai", message: "Thai" }),
+  Armn: msg({ id: "survey.prefill.scriptOption.armn", message: "Armenian" }),
+  Geor: msg({ id: "survey.prefill.scriptOption.geor", message: "Georgian" }),
+  Hans: msg({ id: "ruleBuilder.scriptName.hans", message: "Simplified Chinese" }),
+  Hant: msg({ id: "ruleBuilder.scriptName.hant", message: "Traditional Chinese" }),
+  Jpan: msg({ id: "ruleBuilder.scriptName.jpan", message: "Japanese" }),
+  Kore: msg({ id: "ruleBuilder.scriptName.kore", message: "Korean" }),
 };
 
-function scriptName(scriptKey: string): string {
-  return SCRIPT_NAMES[scriptKey] ?? scriptKey;
+function scriptName(scriptKey: string, t: ReturnType<typeof useLingui>["t"]): string {
+  const descriptor = SCRIPT_NAMES[scriptKey];
+  return descriptor === undefined ? scriptKey : t(descriptor);
 }
 
 /** A demo pair with its proof state: recorded-from-pane pairs are verified. */
@@ -639,7 +649,7 @@ export function RuleBuilderPanel({
       if (result.ok) {
         setErrors([]);
         onExport(exportPack(result.pack));
-        setSaved({ name: bundleName.trim(), scriptLabel: scriptName(scriptKey!.trim()) });
+        setSaved({ name: bundleName.trim(), scriptLabel: scriptName(scriptKey!.trim(), t) });
         return;
       }
       for (const issue of result.issues) {

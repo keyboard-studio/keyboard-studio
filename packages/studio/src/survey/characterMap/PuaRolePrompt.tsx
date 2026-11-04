@@ -5,6 +5,7 @@
 // this component while it is non-null.
 
 import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { TEXT_DIM, primaryButton } from "../surveyStyles.ts";
 
 export interface PuaRolePromptProps {
@@ -14,17 +15,19 @@ export interface PuaRolePromptProps {
 }
 
 export function PuaRolePrompt({ char, onChooseRole, onCancel }: PuaRolePromptProps) {
+  const { t } = useLingui();
   return (
     <div
       data-testid="pua-role-prompt"
       role="group"
-      aria-label={`Is ${char} a letter or a mark?`}
+      aria-label={t({ id: "survey.puaRole.groupLabel", message: `Is ${char} a letter or a mark?` })}
       style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: TEXT_DIM }}
     >
       <span>
-        {char} ({toUPlusNotation(char)}) is a private-use
-        character, so there is no data to say what it is. Is it a letter of
-        your alphabet, or a mark that attaches to a letter?
+        <Trans id="survey.puaRole.prompt">
+          {char} ({toUPlusNotation(char)}) is a private-use character, so there is no data to say what it
+          is. Is it a letter of your alphabet, or a mark that attaches to a letter?
+        </Trans>
       </span>
       <div style={{ display: "flex", gap: 8 }}>
         <button
@@ -33,7 +36,7 @@ export function PuaRolePrompt({ char, onChooseRole, onCancel }: PuaRolePromptPro
           onClick={() => onChooseRole("letter")}
           style={primaryButton(false)}
         >
-          A letter
+          <Trans id="survey.puaRole.letterButton">A letter</Trans>
         </button>
         <button
           type="button"
@@ -41,10 +44,10 @@ export function PuaRolePrompt({ char, onChooseRole, onCancel }: PuaRolePromptPro
           onClick={() => onChooseRole("mark")}
           style={primaryButton(false)}
         >
-          A mark
+          <Trans id="survey.puaRole.markButton">A mark</Trans>
         </button>
         <button type="button" onClick={onCancel} style={{ fontSize: 12 }}>
-          Cancel
+          <Trans id="survey.puaRole.cancelButton">Cancel</Trans>
         </button>
       </div>
     </div>

@@ -9,6 +9,7 @@
 //   like-for-like token swap, not a new color choice.)
 
 import React from "react";
+import { useLingui } from "@lingui/react/macro";
 import {
   TEXT_MAIN,
   TEXT_DIM,
@@ -158,6 +159,7 @@ export function RadioGroup({
   onChange,
   ariaLabelledby,
 }: RadioGroupProps): React.ReactElement {
+  const { t } = useLingui();
   const resolvedAccent =
     accent ?? (mode === "bool" ? BOOL_ACCENT : LIST_ACCENT);
 
@@ -170,7 +172,7 @@ export function RadioGroup({
           inputId={yesId}
           name={name}
           optValue="true"
-          label="Yes"
+          label={t({ id: "ui.radioGroup.yes", message: "Yes" })}
           checked={value === "true"}
           accentColor={resolvedAccent}
           onChange={onChange}
@@ -179,7 +181,7 @@ export function RadioGroup({
           inputId={noId}
           name={name}
           optValue="false"
-          label="No"
+          label={t({ id: "ui.radioGroup.no", message: "No" })}
           checked={value === "false"}
           accentColor={resolvedAccent}
           onChange={onChange}

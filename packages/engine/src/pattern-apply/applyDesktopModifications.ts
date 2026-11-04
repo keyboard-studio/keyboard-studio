@@ -43,11 +43,12 @@ import {
   findSlotOccupant,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
-  keyMatchesRemovalSet,
+  keyMatchesRemovalSetWithProduction,
   resolvedTextProductions,
   resolveMobilePlatformIndex,
   touchKeyIdFamily,
   type PlacementResolverContext,
+  type RemovalProductionContext,
 } from "./touch-mechanism-shared.js";
 import { DEFAULT_TOUCH_LAYER, touchLayerForChar } from "./touchLayer.js";
 
@@ -95,7 +96,11 @@ export function applyDesktopModifications(
 
   const afterPlacements = applyPlacements(seed, mods.placements, warnings, minter, resolverCtx);
   const removalSet = buildRemovalSet(mods.removals);
-  const finalLayout = removeAcrossLayout(afterPlacements, removalSet);
+  // Spec 104 T009 follow-through: the removal replay must agree with the
+  // preview's step-1.5 carve projection, which matches ruled T_ keys by
+  // resolver production — thread the resolver context through so a T_ key
+  // whose keycap doesn't spell its production is removed here too.
+  const finalLayout = removeAcrossLayout(afterPlacements, removalSet, resolverCtx);
 
   return { layout: finalLayout, warnings };
 }
@@ -109,16 +114,29 @@ export function applyDesktopModifications(
  * carved character. Structural sharing: a row/layer/platform is only
  * replaced when one of its keys actually changed.
  */
-function removeAcrossLayout(layout: TouchLayoutIR, removalSet: ReadonlySet<string>): TouchLayoutIR {
+function removeAcrossLayout(
+  layout: TouchLayoutIR,
+  removalSet: ReadonlySet<string>,
+  resolverCtx?: PlacementResolverContext,
+): TouchLayoutIR {
   let anyPlatformChanged = false;
   const newPlatforms = layout.platforms.map((platform) => {
     let anyLayerChanged = false;
     const newLayers = platform.layers.map((layer) => {
+      // The layer id is the resolver state for every key on this layer
+      // (spec 104 FR-001) — build the per-layer production context once.
+      const productionCtx: RemovalProductionContext | undefined =
+        resolverCtx !== undefined
+          ? {
+              production: { ir: resolverCtx.ir, ruleIndex: resolverCtx.ruleIndex },
+              layerId: layer.id,
+            }
+          : undefined;
       let anyRowChanged = false;
       const newRows = layer.rows.map((row) => {
         let anyKeyChanged = false;
         const newKeys = row.keys.map((key) => {
-          const { key: nextKey, changed } = stripRemovedFromKey(key, removalSet);
+          const { key: nextKey, changed } = stripRemovedFromKey(key, removalSet, productionCtx);
           if (changed) anyKeyChanged = true;
           return nextKey;
         });
@@ -149,30 +167,31 @@ function removeAcrossLayout(layout: TouchLayoutIR, removalSet: ReadonlySet<strin
 function stripRemovedFromKey(
   key: TouchKeyIR,
   removalSet: ReadonlySet<string>,
+  productionCtx?: RemovalProductionContext,
 ): { key: TouchKeyIR; changed: boolean } {
   let sk = key.sk;
   if (sk) {
-    const filtered = sk.filter((s) => !keyMatchesRemovalSet(s, removalSet));
+    const filtered = sk.filter((s) => !keyMatchesRemovalSetWithProduction(s, removalSet, productionCtx));
     if (filtered.length !== sk.length) sk = filtered;
   }
 
   let multitap = key.multitap;
   if (multitap) {
-    const filtered = multitap.filter((m) => !keyMatchesRemovalSet(m, removalSet));
+    const filtered = multitap.filter((m) => !keyMatchesRemovalSetWithProduction(m, removalSet, productionCtx));
     if (filtered.length !== multitap.length) multitap = filtered;
   }
 
   let flick = key.flick;
   if (flick) {
     const entries = Object.entries(flick).filter(
-      ([, v]) => v !== undefined && !keyMatchesRemovalSet(v, removalSet),
+      ([, v]) => v !== undefined && !keyMatchesRemovalSetWithProduction(v, removalSet, productionCtx),
     );
     if (entries.length !== Object.keys(flick).length) {
       flick = Object.fromEntries(entries) as NonNullable<TouchKeyIR["flick"]>;
     }
   }
 
-  const primaryRemoved = keyMatchesRemovalSet(key, removalSet);
+  const primaryRemoved = keyMatchesRemovalSetWithProduction(key, removalSet, productionCtx);
   const gestureEntriesChanged = sk !== key.sk || multitap !== key.multitap || flick !== key.flick;
 
   if (!primaryRemoved && !gestureEntriesChanged) {

@@ -167,8 +167,8 @@ export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
           <code style={{ fontFamily: MONO }}>{"qwerty-qwertz"}</code>. AZERTY is a refinement of the starting layout
           resolved <strong>after</strong> the author picks a starting keyboard, from that keyboard&rsquo;s structural shape (see{" "}
           <code style={{ fontFamily: MONO }}>{"lib/scriptAxes.ts"}</code> —{" "}
-          <code style={{ fontFamily: MONO }}>{"RoutingGroup"}</code>{" "}
-          vs <code style={{ fontFamily: MONO }}>{"ScriptRoutingGroup"}</code>). That is why it has no row here.
+          <code style={{ fontFamily: MONO }}>{"RoutingGroup" /* eslint-disable-line lingui/no-unlocalized-strings -- TypeScript type name, shown verbatim */}</code>{" "}
+          vs <code style={{ fontFamily: MONO }}>{"ScriptRoutingGroup" /* eslint-disable-line lingui/no-unlocalized-strings -- TypeScript type name, shown verbatim */}</code>). That is why it has no row here.
         </Trans>
       </div>
     </div>

@@ -36,9 +36,12 @@ import carvedLayoutModule from "./gallery/carvedLayout.ts";
 import deadkeysDefinedModule from "./gallery/deadkeysDefined.ts";
 import ruleSetModule from "./gallery/ruleSet.ts";
 import physicalLayoutModule from "./gallery/physicalLayout.ts";
+import oskLayoutModule from "./gallery/oskLayout.ts";
 import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
 import touchLayoutModule from "./gallery/touchLayout.ts";
+import customCssModule from "./gallery/customCss.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
+import welcomeHtmModule from "./gallery/welcomeHtm.ts";
 
 import { flowModules, demotedPhaseFModules } from "./flowModules.ts";
 export { flowModules, demotedPhaseFModules };
@@ -110,9 +113,12 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   deadkeysDefinedModule,
   ruleSetModule,
   physicalLayoutModule,
+  oskLayoutModule,
   touchSeedSourceModule,
   touchLayoutModule,
+  customCssModule,
   helpDocsModule,
+  welcomeHtmModule,
 ];
 
 export const galleryModules: readonly QuestionModule[] = galleryModuleList.map(

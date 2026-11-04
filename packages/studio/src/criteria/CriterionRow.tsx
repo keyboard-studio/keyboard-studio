@@ -19,7 +19,7 @@
 // expanded evidence only, for traceability (plan §6).
 
 import { useState } from "react";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
@@ -250,7 +250,7 @@ export function CriterionRow({
         const url = githubBlobUrl(githubLink, file);
         return (
           <>
-            File:{" "}
+            <Trans id="criteria.row.fileLabel">File:</Trans>{" "}
             <a
               href={url}
               target="_blank"

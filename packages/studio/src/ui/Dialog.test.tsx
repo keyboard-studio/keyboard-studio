@@ -1,6 +1,7 @@
 // Dialog — shared modal primitive tests.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { Dialog } from "./Dialog.tsx";
 
 afterEach(() => {

@@ -34,6 +34,16 @@ nothing and written nothing — `messages:extract` appears to succeed while prod
 `i18n-catalog-lint` then misreports every committed catalog as an orphan. The floor is in the
 root [package.json](../package.json) `engines` and [.nvmrc](../.nvmrc).
 
+### Pre-push lint guard
+
+`pnpm install` runs `prepare`, which copies [.githooks/pre-push](../.githooks/pre-push) into the
+clone's git hooks directory ([scripts/install-git-hooks.mjs](../scripts/install-git-hooks.mjs)). A
+push that touches anything beyond `*.md`, `*.txt`, `docs/`, `specs/` and `.specify/` runs
+`pnpm lint` first (about two minutes) and aborts if it fails. It copies one file instead of
+setting `core.hooksPath`, so other tools' hooks keep working, and it never overwrites a
+`pre-push` hook it did not write. Bypass once with `git push --no-verify`; CI stays the backstop.
+Agents hit the same hook, so they must not bypass it.
+
 ### What `pnpm lint` actually runs
 
 ESLint over `packages/*/src`, then in order:

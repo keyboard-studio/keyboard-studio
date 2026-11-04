@@ -25,6 +25,7 @@
     "codegen-normalization-regressed": "node scripts/codegen-normalization-regressed.mjs",
     "codegen-exemplars": "node --experimental-strip-types scripts/codegen-exemplars.mjs",
     "check-exemplar-staleness": "node scripts/check-exemplar-staleness.mjs",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "prebuild": "pnpm run fetch-langtags && pnpm run codegen-langtags && pnpm run fetch-glottolog && pnpm run codegen-glottolog && pnpm run compile-recognizer-rules && pnpm run codegen-charnames && pnpm run fetch-sldr && pnpm run codegen-exemplars && pnpm run codegen-normalization-regressed && pnpm run codegen-host-layouts && pnpm run codegen-windows-layouts",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @keyboard-studio/engine build && pnpm --parallel --stream --filter @keyboard-studio/engine --filter @keyboard-studio/studio run dev",
@@ -64,7 +65,8 @@
     "crowdin:diagnose": "node utilities/crowdin-diagnose/index.js",
     "crowdin:diagnose:selftest": "node utilities/crowdin-diagnose/selftest.js",
     "test:affected": "node scripts/test-affected.mjs",
-    "test:pr": "node scripts/test-pr.mjs"
+    "test:pr": "node scripts/test-pr.mjs",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@crowdin/cli": "^4.14.4",
@@ -76,6 +78,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-lingui": "^0.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
     "prettier": "^3.8.3",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",

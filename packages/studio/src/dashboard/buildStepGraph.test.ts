@@ -432,19 +432,18 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
   // — so a regression in the mechanisms/touch_seed_source/touch wiring fails a
   // test that names the nodes, not just a count.
   //
-  // "mechanisms" is the branch-defining spine step: sequences (S-03) now build
-  // inline in the Mechanism Gallery's method chooser rather than in a
-  // dedicated spine step, so mechanisms sits directly before the off-spine
-  // touch_seed_source fork in manifest order (mechanisms -> [touch_seed_source]
-  // -> touch), and buildManifestStepGraph's fork edges originate from the
-  // spine step immediately preceding a run of off-spine steps.
-  it("mechanisms is branch-defining: spine -> touch (direct), fork -> touch_seed_source, which joins back to touch (spec 035 FR-013/M4)", () => {
+  // "osk" is the branch-defining spine step before the off-spine touch_seed_source
+  // fork (mechanisms -> osk -> [touch_seed_source] -> touch).
+  it("osk is branch-defining: spine -> touch (direct), fork -> touch_seed_source, which joins back to touch (spec 035 FR-013/M4)", () => {
     const fromMechanisms = graph.edges.filter((e) => e.from === "mechanisms");
+    expect(fromMechanisms.find((e) => e.kind === "spine")?.to).toBe("osk");
 
-    const spineEdge = fromMechanisms.find((e) => e.kind === "spine");
+    const fromOsk = graph.edges.filter((e) => e.from === "osk");
+
+    const spineEdge = fromOsk.find((e) => e.kind === "spine");
     expect(spineEdge?.to).toBe("touch");
 
-    const forkEdge = fromMechanisms.find((e) => e.kind === "fork");
+    const forkEdge = fromOsk.find((e) => e.kind === "fork");
     expect(forkEdge?.to).toBe("touch_seed_source");
 
     const seedSourceNode = graph.nodes.find((n) => n.id === "touch_seed_source");

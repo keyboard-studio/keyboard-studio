@@ -288,8 +288,11 @@ export function SurveyRunner({
       const startId = typeof base?.id === "string" ? base.id : undefined;
       if (startId === undefined) return undefined;
       return typeof record.offered === "string"
-        ? `from ${startId}: ${record.offered}`
-        : `from ${startId}`;
+        ? t({
+            id: "survey.runner.provenanceOfferCaption",
+            message: `from ${startId}: ${record.offered}`,
+          })
+        : t({ id: "survey.runner.provenanceSourceCaption", message: `from ${startId}` });
     }
     return undefined;
   }

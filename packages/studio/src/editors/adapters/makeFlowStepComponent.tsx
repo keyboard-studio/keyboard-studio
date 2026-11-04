@@ -258,6 +258,7 @@ export function makeFlowStepComponent<Extracted>(
     );
   }
 
+  // eslint-disable-next-line lingui/no-unlocalized-strings -- React DevTools displayName: developer-facing, never rendered to authors.
   FlowStepComponent.displayName = `FlowStep(${options.flowRef})`;
   return FlowStepComponent;
 }

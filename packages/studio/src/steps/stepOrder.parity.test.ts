@@ -64,9 +64,12 @@ const BASELINE_ORDER = [
   "deadkeys",
   "rules",
   "mechanisms",
+  "osk",
   "touch_seed_source",
   "touch",
+  "css",
   "help",
+  "html",
   "package",
 ] as const;
 
@@ -97,11 +100,14 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["carve", "deadkeys", "spine"],
   ["deadkeys", "rules", "spine"],
   ["rules", "mechanisms", "spine"],
-  ["mechanisms", "touch", "spine"],
-  ["mechanisms", "touch_seed_source", "fork"],
+  ["mechanisms", "osk", "spine"],
+  ["osk", "touch", "spine"],
+  ["osk", "touch_seed_source", "fork"],
   ["touch_seed_source", "touch", "join"],
-  ["touch", "help", "spine"],
-  ["help", "package", "spine"],
+  ["touch", "css", "spine"],
+  ["css", "help", "spine"],
+  ["help", "html", "spine"],
+  ["html", "package", "spine"],
 ];
 
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
@@ -122,9 +128,12 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   deadkeys: ["deadkeys-defined"],
   rules: ["rule-set"],
   mechanisms: ["physical-layout"],
+  osk: ["osk-layout"],
   touch_seed_source: ["touch-seed-source"],
   touch: ["touch-layout"],
+  css: ["custom-css"],
   help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-doc-language-other", "help-doc-language-second", "help-doc-language-second-other", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
+  html: ["welcome-htm"],
   package: [],
 };
 
@@ -296,9 +305,12 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["attribution", "deadkeys"],
       ["attribution", "rules"],
       ["attribution", "mechanisms"],
+      ["attribution", "osk"],
       ["attribution", "touch_seed_source"],
       ["attribution", "touch"],
+      ["attribution", "css"],
       ["attribution", "help"],
+      ["attribution", "html"],
       ["marks", "punctuation"],
       ["marks", "invisibles"],
       ["marks", "convenience"],
