@@ -49,14 +49,37 @@ Mechanical Gallery and use it, not when the component exists.
    but will not edit code). Whether that audience is real remains the product owner's call.
 2. **Paradigm** — **assignment** in v1: select a key, type or pick what it produces. A
    **placement tray** (drag characters from the confirmed inventory onto keys, Touch Builder style)
-   is an optional later phase (User Story 5).
+   is an optional later phase (User Story 7).
 3. **Flow placement** — a **third tab in the Mechanical Gallery**: Assign | Code | Layout. No new
    wizard step, no new decision id.
-4. **Edit depth** — **simple outputs only** in v1: one character, one existing deadkey, or nothing
-   (`nul`). Everything rule-driven, context-dependent, or multi-output is read-only with a way to
-   see it in code.
+4. **Edit depth** — **as much as a useful UI allows** (amended by the 2026-11-04 clarifications
+   below; the product owner's stated goal is editing as much as possible). v1 edits literal text,
+   nothing (`nul`), deadkeys with their combinations, and literal contextual replacements, all
+   through one "after …" view. Rules that use stores (`any()`/`index()`), `if()`/`platform()`/
+   options, chains across groups, or opaque fragments are read-only with a way to see them in code.
 5. **Base seeding** — keys the keyboard does not handle show what the **base keyboard** types
    there, marked **base-derived and provisional**. An author edit makes the key hand-set.
+
+## Clarifications
+
+### Session 2026-11-04
+
+- Q: A key that also completes deadkey combinations (`dk(acute) + [K_E] > 'é'`) matches a rule with
+  context. Should that make it read-only? → A: No. Deadkeys MUST be editable in the grid — MSKLC
+  handles deadkeys in its visual editor, and so must this tab. The gap the tab leaves to code is
+  **contextual replacements** (rules whose context holds characters), not deadkeys.
+- Q: Which modifier layers (and Caps Lock states) can the author edit? → A: Any Keyman modifier
+  combination. Layers the starting-point keyboard already uses are listed; any other combination
+  must be added by the author explicitly.
+- Q: When the author puts a cased letter on a key, what happens to its case partner? → A: The
+  preview proposes the partner on the matching Shift layer of the same key; the author accepts or
+  declines it in the same confirm, and a decline is recorded.
+- Q: MSKLC keys can type a short literal string (a ligature). Editable? → A: Yes. A key, or a row
+  after a deadkey or context, may type literal text of any length.
+- Q: (Raised by the product owner.) Ruling 4 held back on context because it looked hard. → A: The
+  eventual goal is editing as much as possible; where a useful UI exists, edit it. Literal
+  contextual replacements are therefore editable through the same "after …" view as deadkeys
+  (User Story 4). Store-based rules are the next frontier (Assumptions).
 
 ## The problem
 
@@ -79,15 +102,21 @@ The studio now has what TIKE lacked: the KeyboardIR spine, a simulator that answ
 this key produce in this modifier state?", desktop key geometry, and the Code tab as a precedent
 for a second view over one working copy.
 
+The bar is Microsoft's Keyboard Layout Creator (MSKLC): a visual editor that handles characters,
+shift states, and deadkeys with their combination tables, and nothing more. Everything MSKLC can
+express, this tab edits. Beyond MSKLC, `.kmn` adds contextual replacements; the tab edits the
+literal ones through the same "after …" view it uses for deadkeys, and shows the rest honestly with
+a way into the Code tab.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — See what every key really types (Priority: P1)
 
 An author in the Mechanical Gallery opens the Layout tab. They see their keyboard's desktop layout
-as a keyboard picture. They switch between modifier layers (default, Shift, AltGr, and any other
-layer the keyboard uses). Each key shows what it actually produces in that layer, and how the
-studio knows: from the author's own assignment, from the copied keyboard, from the base keyboard
-because the keyboard does not handle that key, or from a rule too complex to show as one character.
+as a keyboard picture. They switch between modifier layers (default, Shift, and every other layer
+the keyboard uses), and can add any other modifier combination as a layer. Each key shows what it
+actually produces in that layer, and how the studio knows: from the author's own assignment, from the copied keyboard, from the base keyboard
+because the keyboard does not handle that key, or from a rule too complex to edit here.
 
 **Why this priority**: This is the honesty rule, and it is the whole difference from TIKE. A
 read-only Layout tab that is always right is already useful: it answers "what does my keyboard do?"
@@ -104,11 +133,15 @@ either matches or is marked read-only with its reason. No keyboard is refused.
    opens the Layout tab, **Then** each key in the default layer shows the character the compiled
    keyboard produces for it, labelled as coming from the copied keyboard.
 2. **Given** a key whose only rule emits a deadkey, **When** the author views it, **Then** the cell
-   shows it as a deadkey (with the deadkey's name and how many combinations it starts), not as a
-   blank.
-3. **Given** a key with a context rule (`'a' + [K_E] > ...`) as well as a plain rule, **When** the
-   author views it, **Then** the cell shows the plain output, is marked "depends on what was typed
-   before", and is read-only, with "view in code".
+   shows it as a deadkey (with its display character and how many combinations it starts), not as
+   a blank.
+3. **Given** a key with a store-based rule (`any(vowel) + [K_E] > index(...)`) as well as a plain
+   rule, **When** the author views it, **Then** the cell shows the plain output as editable, and its
+   detail lists the store-based rule as read-only with "view in code".
+3a. **Given** a key that types `e` and also completes deadkey combinations (`dk(acute) + [K_E]`)
+   or literal contextual replacements (`'a' + [K_E] > 'æ'`),
+   **When** the author views it, **Then** the cell shows `e` as editable, and its detail lists the
+   combinations and replacements it takes part in.
 4. **Given** a key the keyboard does not handle, and two picked base keyboards that type different
    characters there, **When** the author views it, **Then** the cell shows the primary base
    keyboard's character, marked as base keyboard fallback and provisional, and the detail lists
@@ -128,8 +161,8 @@ either matches or is marked read-only with its reason. No keyboard is refused.
 
 ### User Story 2 — Change what a key types (Priority: P1)
 
-The author selects a key whose output is simple and changes it: types a character, picks one of
-the keyboard's existing deadkeys, or sets the key to type nothing. The change goes into the working
+The author selects a key whose output is simple and changes it: types a character, makes it a
+deadkey (User Story 3), or sets the key to type nothing. The change goes into the working
 copy the same way an Assign-tab change does. The Assign and Code tabs show it. The compiled
 keyboard and the simulator reflect it. The key is now marked hand-set.
 
@@ -145,15 +178,20 @@ each change and check that the working copy returns to its earlier state.
 1. **Given** a key that types `q` from the copied keyboard, **When** the author assigns `ŋ` to it in
    the default layer and confirms, **Then** the key types `ŋ`, the cell is marked hand-set, the
    Assign tab lists `ŋ` on that key, and the Code tab shows the rule.
+1a. **Given** the author is assigning `ŋ` to the default layer of a key, **When** the preview
+   appears, **Then** it proposes `Ŋ` on the Shift layer of the same key, showing what that would
+   replace; accepting writes both in one confirm and one undo step, declining writes only `ŋ` and
+   records the decline.
 2. **Given** the author's new character was already typed by another key, **When** they assign it,
    **Then** they are told where it already is and can keep both or move it — the same choice the
    Assign tab offers today, not a silent duplicate or a silent move.
 3. **Given** the assignment displaces a character the keyboard typed on that key, **When** the
    author confirms, **Then** the displaced character is handled as the Assign tab handles
    displacement today (offered elsewhere, or declined on record).
-4. **Given** the keyboard defines deadkeys, **When** the author chooses "deadkey" for a key, **Then**
-   they can pick only a deadkey the keyboard already defines, and see how many combinations it
-   starts.
+4. **Given** a key that completes deadkey combinations, **When** the author changes the character
+   it types, **Then** before confirming they see the combinations it completes and what each still
+   produces (combinations follow the keystroke, not the character), and can go to the deadkey's
+   table to change them. Nothing is rewritten silently.
 5. **Given** a read-only cell, **When** the author tries to edit it, **Then** nothing is written, and
    they are told why and offered "view in code".
 6. **Given** the author made a change in the Layout tab, **When** they undo, **Then** the change is
@@ -164,7 +202,80 @@ each change and check that the working copy returns to its earlier state.
 
 ---
 
-### User Story 3 — See complex keys honestly and jump to their code (Priority: P2)
+### User Story 3 — Make a deadkey and fill its combinations, MSKLC-style (Priority: P1)
+
+The author selects an editable key and makes it a deadkey: a new one, or one the keyboard already
+has. They give it a display character (usually the spacing accent). They open its combination
+table and fill it: for each following keystroke, what it produces — `a` → `á`, `e` → `é`, space →
+`´`. They can switch the grid to "after this deadkey" and see, on every key, what typing that key
+next produces.
+
+**Why this priority**: Deadkeys are how most Latin-script keyboards reach accented letters, and
+MSKLC — the tool this middle audience knows — edits them visually. A layout editor without them
+would push the commonest job back into code. (Clarification Q1.)
+
+**Independent Test**: On a keyboard with no deadkeys, make the key right of `P` an acute deadkey
+with five combinations and a space row. Type each sequence in the simulator; each produces the
+table's result. Then, on a corpus deadkey keyboard, open each deadkey's table; every row matches
+what the compiled keyboard produces.
+
+**Acceptance Scenarios**:
+
+1. **Given** an editable key, **When** the author makes it a new deadkey and confirms, **Then** the
+   deadkey is defined through the studio's deadkey lifecycle (spec 083), including its warning
+   about what that key does on the likely base keyboards, and the cell shows the deadkey.
+2. **Given** a deadkey, **When** the author adds a row "`e` key → `é`", **Then** typing the deadkey
+   then `e` produces `é` in the simulator, and the Code tab shows the combination rule.
+3. **Given** a deadkey with combinations, **When** the author switches the grid to "after this
+   deadkey", **Then** each key shows its combination result, or that the key has no combination
+   and what happens instead (what the compiled keyboard actually does).
+4. **Given** a new deadkey, **When** its table is first opened, **Then** a row for "deadkey then
+   space → the display character" is proposed, not silently added; the author confirms or removes
+   it.
+5. **Given** a combination row whose result is itself a deadkey (a chain), **When** the author
+   views the table, **Then** the row is editable, and following it opens "after" that second
+   deadkey. A row that uses a store is read-only with "view in code"; the other rows stay editable.
+6. **Given** the author changes or removes a row, **When** they undo, **Then** the row returns as it
+   was.
+
+---
+
+### User Story 4 — Edit what a key does after something was typed (Priority: P2)
+
+The author opens the "after …" view and chooses what came before: a deadkey (User Story 3) or
+literal text such as `n` or `a`. The grid shows what each key does after it — from the compiled
+keyboard — and the author edits it the same way: select a key, say what the text before plus this
+keystroke **becomes**. `n` then `g` becomes `ŋ`; `a` then `e` becomes `æ`. The view lists the
+contexts the keyboard already uses, and the author can add a new one.
+
+**Why this priority**: Contextual replacements are what `.kmn` adds beyond MSKLC, and the
+product owner's goal is editing as much as possible. Deadkey combinations and literal replacements
+are the same shape ("after X, key K gives Y"), so one view serves both. P2 because P1 already
+covers the MSKLC bar.
+
+**Independent Test**: On a keyboard with literal replacements (`'n' + [K_G] > 'ŋ'`), open "after
+`n`"; every key with a replacement shows its result and matches the simulator seeded with `n`.
+Add "after `a`, `e` becomes `æ`"; typing `a` `e` in the simulator gives `æ`.
+
+**Acceptance Scenarios**:
+
+1. **Given** the keyboard has literal contextual replacements, **When** the author opens the
+   "after …" view, **Then** it lists every literal context the keyboard uses (and its deadkeys),
+   with how many keys each affects.
+2. **Given** "after `n`" is open, **When** the author sets `g` to become `ŋ` and confirms, **Then**
+   the keyboard gains that replacement, the Code tab shows it, and typing `n` `g` gives `ŋ`.
+3. **Given** a "becomes" value that keeps the text before (`n` then `g` becomes `ng`), **When** the
+   author confirms, **Then** the result is exactly that text; the studio does not guess which part
+   is replaced.
+4. **Given** a context that no key in any listed layer can type, **When** the author adds it,
+   **Then** they are told it cannot be reached by typing on this keyboard before confirming.
+5. **Given** two rules for the same context and keystroke, **When** the author views that key,
+   **Then** the one that fires is shown and editable, and the other is shown as "never fires",
+   read-only, with "view in code".
+
+---
+
+### User Story 5 — See complex keys honestly and jump to their code (Priority: P2)
 
 For a read-only key, the author can open its detail: what it types with nothing typed before, the
 rules that can fire on it, and a "view in code" action that switches to the Code tab at that rule.
@@ -186,7 +297,7 @@ follow "view in code" for each. The Code tab opens at the rule that fires for th
 
 ---
 
-### User Story 4 — Confirm what the base keyboard proposes (Priority: P2)
+### User Story 6 — Confirm what the base keyboard proposes (Priority: P2)
 
 Keys the keyboard does not handle are provisional. The author can see at a glance which keys in a
 layer are still provisional, and confirm them: either key by key (by assigning, US2 scenario 7), or
@@ -211,13 +322,13 @@ letter key; it stops being provisional. Nothing else changes.
 
 ---
 
-### User Story 5 — Place characters from a tray (Priority: P3, optional later phase)
+### User Story 7 — Place characters from a tray (Priority: P3, optional later phase)
 
 The author has a confirmed character inventory. They see the characters not yet on any key in a
 tray beside the keyboard and drag one onto a key (or select both with the keyboard) to assign it.
 This builds a layout from scratch faster than one key at a time.
 
-**Why this priority**: Ruling 2 makes placement optional and later. It is built only after US1–US4
+**Why this priority**: Ruling 2 makes placement optional and later. It is built only after US1–US6
 ship and only if the product owner decides to take it (see Assumptions, "Placement tray gate").
 
 **Independent Test**: With an inventory of five unplaced characters, place all five by tray. Each
@@ -246,8 +357,17 @@ lands as a US2 assignment would; the tray empties.
 - **A key rule written with a character instead of a virtual key** (`+ 'a'`) on a positional
   keyboard: attributed to the key position Keyman uses for it, and treated like the same rule
   written with a virtual key.
+- **A deadkey with no combinations yet**: allowed while authoring; the cell and the Layout tab's
+  summary flag it, because on its own it only swallows the next keystroke's deadkey state.
+- **A deadkey defined in the keyboard but on no key**: listed in the tab's deadkey list so the
+  author can place or delete it (delete goes through spec 083).
+- **A deadkey on more than one key or layer**: one deadkey, one table; every key that emits it
+  shows it.
+- **A combination keyed to a key the author later changes**: the combination still fires on that
+  keystroke; US2 scenario 4 shows this before the change is confirmed.
 - **Output that is one user-perceived character made of several code points** (a base letter plus
-  a combining mark): editable. Output of two or more characters: read-only in v1.
+  a combining mark), or a literal string of several characters (`ng`, an MSKLC ligature): editable
+  when the rule has no context.
 - **Frame keys** (Backspace, Enter, Tab, Escape, Delete, arrows, function keys): shown for
   orientation, never editable, never listed as provisional (matches spec 109 FR-011).
 - **The 102nd key** (between left Shift and Z on ISO keyboards): shown, since some base keyboards
@@ -258,8 +378,14 @@ lands as a US2 assignment would; the tray empties.
   compile errors linked. It never shows cells it cannot back with a compiled keyboard. Editing is
   blocked until the working copy compiles.
 - **The desktop step is locked** (completed): the tab follows the same lock as the Assign tab.
-- **Layers the keyboard does not use** (for example Ctrl+Alt on a keyboard with no Ctrl rules):
-  not listed by default; the author can show them, and their keys show base-keyboard fallback.
+- **Layers the starting-point keyboard does not use** (for example Shift+AltGr on a keyboard with
+  none): not listed; the author adds them explicitly (FR-010a), and their keys show base-keyboard
+  fallback until edited.
+- **An added layer the author leaves empty**: it has no rules, so it does not exist in the
+  keyboard; the tab says so rather than implying it will be saved.
+- **Caps Lock**: a key whose rules do not mention Caps Lock behaves the same with it on or off; the
+  `CAPS` layer shows that honestly. Editing a key in a `CAPS` or `NCAPS` layer makes that key
+  Caps-sensitive, and the preview says so (MSKLC's per-key "Caps Lock affects this key").
 - **A key with a hand-set assignment that the copied keyboard also had**: hand-set wins in the
   label; the copied keyboard's value appears in the detail as "replaced".
 
@@ -275,11 +401,19 @@ lands as a US2 assignment would; the tray empties.
 - **FR-002**: Switching tabs MUST NOT lose state. A change made in any tab is visible in the other
   two the next time they render.
 
-**Showing keys (US1, US3) — the honesty rule**
+**Showing keys (US1, US5) — the honesty rule**
 
 - **FR-010**: The tab MUST render the desktop layout with the studio's existing desktop key
-  geometry, one layer at a time, with a layer selector. It lists by default the default and Shift
-  layers, AltGr, and every other modifier layer the keyboard has a rule for.
+  geometry, one layer at a time, with a layer selector. A layer is any Keyman modifier
+  combination, including Caps Lock states (`CAPS`/`NCAPS`) and left/right Ctrl and Alt where the
+  keyboard distinguishes them. The selector lists the default and Shift layers and every layer the
+  starting-point keyboard or the working copy has a rule for. Every listed layer is editable under
+  the same rules as the default layer.
+- **FR-010a**: The author MUST be able to add any other modifier combination as a layer, explicitly
+  ("Add layer"). The studio never adds a layer on its own. An added layer's keys show base-keyboard
+  fallback (FR-014) until edited. Adding a combination that collides with common system shortcuts
+  (Ctrl or Alt with a letter, without AltGr) MUST show that consequence before the author confirms
+  it.
 - **FR-011**: Every key's displayed output MUST come from the compiled working copy — what the
   keyboard produces for that key and layer with nothing typed before — or, for keys the keyboard
   does not handle, from FR-014. The tab MUST NOT show a stored label it cannot reproduce.
@@ -292,21 +426,31 @@ lands as a US2 assignment would; the tray empties.
     - **Base keyboard fallback** — the keyboard has no rule for this key and layer (agency
       `base-derived`, provisional).
   - **Output** (what it does, and whether it is editable):
-    - **Character** — one user-perceived character. Editable.
-    - **Deadkey** — one deadkey. Editable.
+    - **Text** — one character or a literal string. Editable.
+    - **Deadkey** — one deadkey, with its combination table. Editable.
     - **Types nothing** — `nul`, or a fallback position the compiled keyboard suppresses.
       Editable.
-    - **Depends on what was typed before** — the key also matches one or more context rules.
-      Read-only.
-    - **Complex output** — more than one character, stores, indexes, `if()`, `platform()`,
+    - **Has contextual rows** — the key also takes part in deadkey combinations or literal
+      contextual replacements; they are edited in the "after …" view (FR-029). Not a reason for
+      read-only.
+    - **Complex output** — reorders context, uses stores, indexes, `if()`, `platform()`,
       options, or changed by a later group. Read-only.
     - **Code the studio cannot show here** — the key is touched by an opaque fragment. Read-only.
     - **Frame key** — not editable (no provenance shown).
-- **FR-013**: A key and layer is **simple** (editable) only when all of these hold: exactly one rule
-  in the keyboard's key-processing groups can match it; that rule has no context; its output is one
-  user-perceived character, one deadkey, or `nul`; and what the compiled keyboard actually produces
-  for it with an empty context equals that rule's output. Anything else is read-only. When in
-  doubt, read-only.
+- **FR-013**: Editability is decided per behaviour, not per key, so that as much as possible is
+  editable:
+  - A key's **plain output** (no context) is editable when at most one context-free rule matches
+    the key and layer, its output is literal text, one deadkey, or `nul`, and what the compiled
+    keyboard produces with an empty context equals that rule's output.
+  - Each **contextual row** (a rule whose context is literal text, deadkeys, or both) is editable
+    when its output is literal text, deadkeys, or `nul`, and what the compiled keyboard produces
+    for that context plus that keystroke equals the rule's output.
+  - Anything that uses stores (`any()`, `index()`, `notany()`), `if()`, `platform()`, options,
+    `use()` chains whose later groups change the result, `beep`, or an opaque fragment is a
+    read-only row with its reason. A read-only row never makes the key's other behaviours
+    read-only, unless it changes what the plain output produces (then the plain output is
+    read-only too).
+  When in doubt, read-only.
 - **FR-014**: For a key and layer the keyboard does not handle, the tab MUST use spec 109's
   enumerator of unhandled positions and its base-keyboard data. The cell shows what the compiled
   keyboard does there: "types nothing" when it suppresses the position, otherwise the **primary**
@@ -318,8 +462,8 @@ lands as a US2 assignment would; the tray empties.
 - **FR-015**: Each read-only cell MUST say why in plain words (FR-012's class), and offer **view in
   code**, which switches to the Code tab with the rule that fires for that key in view.
 - **FR-016**: Each cell's detail MUST show: the output with an empty context, the class and its
-  provenance, the number of rules that match the key in this layer, and, if a hand-set value
-  replaced a starting-point value, the replaced value.
+  provenance, the number of rules that match the key in this layer, the deadkey combinations and
+  contextual rows it takes part in (each marked editable or read-only), and, if a hand-set value replaced a starting-point value, the replaced value.
 - **FR-017**: The tab MUST recompute after any working-copy change, using the result of the
   existing validation cycle (decision D3). It MUST NOT add its own compile or debounce timer.
 - **FR-018**: A keyboard the codec can parse MUST NOT be refused. A mnemonic keyboard renders
@@ -329,8 +473,17 @@ lands as a US2 assignment would; the tray empties.
 **Changing keys (US2)**
 
 - **FR-020**: For an editable key and layer, the author MUST be able to set its output to: one
-  character (typed, or picked from the confirmed inventory), one deadkey the keyboard already
-  defines, or nothing. The change is proposed, previewed, and written only on an explicit confirm.
+  character or literal string (typed, or picked from the confirmed inventory), a deadkey (new or
+  existing, FR-027), or nothing. The change is proposed, previewed, and written only on an explicit confirm. When the
+  key completes deadkey combinations, the preview lists them and what each still produces.
+- **FR-020a**: When the new character is a cased letter, the preview MUST propose its case partner
+  (Unicode simple case mapping) on the same key in the paired layer — the Shift layer for a
+  default-layer edit, the unshifted layer for a Shift-layer edit, and likewise for any other layer
+  with and without Shift. Where the keyboard distinguishes Caps Lock on that key, the proposal
+  also covers the matching Caps Lock layers. The proposal shows what it would replace there. The author accepts or
+  declines it in the same confirm; both outcomes are recorded, and a declined partner is not
+  proposed again for that key and layer. If the partner layer's key is read-only, the proposal
+  says so and is not offered. Nothing is written to the partner layer without acceptance (Art X).
 - **FR-021**: A confirmed change MUST:
   - be recorded with the Mechanical Gallery's `physical-layout` decision, so that the decision
     carries it at step completion and the Assign tab shows it where its own model can represent it
@@ -339,17 +492,17 @@ lands as a US2 assignment would; the tray empties.
   - use no text-level path — not the `kmnFragment` injection path (spec 082 FR-015), and not a
     parse of edited `.kmn` text.
   The Assign tab's assignment set is keyed by character, so it cannot by itself hold "this key types
-  nothing" or "this key emits deadkey dk(x)". How those two edits are recorded is plan-phase
-  research (Assumptions); this requirement fixes only the constraints above.
+  nothing", "this key emits deadkey dk(x)", or a contextual row. How those edits are
+  recorded is plan-phase research (Assumptions); this requirement fixes only the constraints above.
 - **FR-022**: A change whose character another key already types, or which displaces a character
   this key typed, MUST go through the same duplicate and displacement choices the Assign tab
   offers. The Layout tab MUST NOT resolve them silently.
 - **FR-023**: A changed key MUST show as hand-set. Assigning to a provisional key the same character
   the base keyboard types there makes the keyboard handle it, and the key becomes hand-set.
-- **FR-024**: Every Layout-tab change MUST be undoable, one confirmed change per undo step, through
-  the working copy's existing undo stack (the one deletions and touch key edits already use). This
-  is new work: the Assign tab has no undo for assignments today. Undoing restores the working copy
-  to its state before the change.
+- **FR-024**: Every Layout-tab change MUST be undoable, one confirmed change per undo step (a change
+  with an accepted case partner is one step), through the working copy's existing undo stack (the
+  one deletions and touch key edits already use). This is new work: the Assign tab has no undo for
+  assignments today. Undoing restores the working copy to its state before the change.
 - **FR-025**: Edits MUST be refused with an explanation, and nothing written, when: the cell is
   read-only; the working copy does not compile; or the step is locked.
 - **FR-026**: The Layout tab's write surface MUST be registered in the derived-surface registry
@@ -358,7 +511,36 @@ lands as a US2 assignment would; the tray empties.
   record-only today and replay has no fold for it, so this spec does not claim replay reproduces
   Layout-tab edits.
 
-**Provisional keys (US4)**
+**Deadkeys and contexts (US3, US4) — the MSKLC bar and beyond**
+
+- **FR-027**: The author MUST be able to make an editable key and layer a deadkey: an existing one,
+  or a new one. Defining, renaming, retargeting, and deleting a deadkey MUST go through the studio's
+  deadkey lifecycle (spec 083), including its disclosure of what the trigger key does on the likely
+  base keyboards. The Layout tab is a surface onto that lifecycle, not a second implementation.
+- **FR-028**: Each deadkey MUST have a **display character** (shown on its key, usually the spacing
+  form of the accent) and a **combination table** the author can edit in the tab: each row is a
+  following keystroke (shown as the key, its layer, and the character that key types) and its
+  result — literal text, or nothing. The author can add, change, and remove rows.
+  For a new deadkey, a row "space → display character" is proposed for the author to confirm
+  (Art X), not added silently.
+- **FR-029**: The grid MUST offer an **after …** view. The author chooses what came before — a
+  deadkey, literal text, or literal text ending in a deadkey — from the list of contexts the
+  keyboard uses, or enters a new one. Every key then shows what typing it after that context
+  produces, from the compiled keyboard (simulated with that context): its row's result, or, for a
+  key with no row, what actually happens instead. A row whose result is a deadkey links to "after"
+  that deadkey, so chains are followed and edited the same way. Rows FR-013 makes read-only
+  (stores, `if()`, `platform()`, options, later-group changes, opaque fragments) are shown with
+  their reason and "view in code"; the rest stay editable.
+- **FR-029a**: In the "after …" view, an edit sets what the context plus the keystroke
+  **becomes**: literal text, optionally with deadkeys. The studio writes exactly that — it does not
+  guess which part of the context is kept. A new context that no listed layer can type MUST be
+  flagged before confirm. Two rules for the same context and keystroke show the one that fires as
+  editable and the other as "never fires", read-only.
+- **FR-029b**: Combination and contextual-row edits follow FR-021 (recorded with `physical-layout`,
+  through `mutate()`, no text path), FR-024 (one undo step per confirmed row change), and FR-025
+  (refused when the working copy does not compile or the step is locked).
+
+**Provisional keys (US6)**
 
 - **FR-030**: Provisional keys MUST be visually distinct and announced as provisional to assistive
   technology. Each layer MUST show how many provisional keys it has.
@@ -375,7 +557,7 @@ lands as a US2 assignment would; the tray empties.
 - **FR-041**: Every user-facing string MUST go through the studio's localization (spec 046 message
   ids). Cell-class labels and read-only explanations are Content-team copy.
 
-**Placement tray (US5) — optional later phase**
+**Placement tray (US7) — optional later phase**
 
 - **FR-050**: *(Phase 3, gated — see Assumptions.)* The tab MAY offer a tray of confirmed inventory
   characters that no key types yet. Placing a character on an editable key MUST be identical in
@@ -391,7 +573,13 @@ lands as a US2 assignment would; the tray empties.
   which fired with an empty context, and whether the compiled output matches the rule's own
   output. Derived from the working copy on every recompute. Never stored.
 - **Assignment** — the Mechanical Gallery's existing record of what an author put where. A Layout
-  edit creates or changes one. No new record type.
+  character edit creates or changes one.
+- **Deadkey** — spec 083's deadkey entity: a stable id, a name, the keys and layers that emit it,
+  and a display character.
+- **Contextual row** — one "after …" rule: the context (a deadkey, literal text, or both), the
+  following keystroke (key and layer), and what they become. A deadkey's combination table is the
+  set of rows whose context is that deadkey. Read from and written to the IR's rules; never a second
+  copy.
 - **Base-keyboard position** — spec 109's unhandled position joined with each picked base
   keyboard's character there. Read, not owned.
 
@@ -415,43 +603,63 @@ lands as a US2 assignment would; the tray empties.
   under two minutes, and in no more than three interactions per key (select, enter, confirm).
 - **SC-006 (provenance)**: Every provisional key in the test set is shown as provisional, and no key
   the author assigned is shown as provisional.
+- **SC-007 (deadkeys)**: On every deadkey keyboard in the corpus test set, every editable
+  combination row matches what the compiled keyboard produces for that sequence — zero mismatches.
+  An author can define a new deadkey with five combinations and a space row in under three
+  minutes, without opening the Code tab.
+- **SC-008 (MSKLC parity)**: Every layout MSKLC can express (characters and ligatures per shift
+  state, deadkeys with combination tables) can be built in the Layout tab without the Code tab.
+- **SC-009 (edit as much as possible)**: For every corpus keyboard whose rules use no stores,
+  `if()`, `platform()`, options, or opaque fragments, 100% of its rules are editable in the Layout
+  tab. For the rest, the plan reports the share of rules editable per keyboard as a baseline for the
+  store-based next frontier.
 
 ## Assumptions
 
 - **Middle audience is real** (ruling 1). The tab does not replace the Assign tab's guided
   character-first flow; it is the key-first view of the same assignments.
-- **"Simple" is conservative on purpose.** FR-013 makes many keys on complex keyboards read-only.
-  That is the honesty rule working, not a defect. Rule-chain editing is out of scope for v1
-  (ruling 4).
-- **One character** means one user-perceived character (grapheme cluster). Multi-character literal
-  output is read-only in v1 because TIKE trap 4 is exactly that case.
-- **Deadkeys**: v1 assigns only deadkeys the keyboard already defines. Creating a deadkey and its
-  combinations stays in the guided gallery and the Code tab.
-- **Spec 109 dependency.** FR-014 and US4 need spec 109's enumerator (FR-040), its base-keyboard
+- **As much as possible, honestly.** FR-013 decides editability per behaviour so that one hard
+  rule does not lock a whole key. What stays read-only is what has no useful grid UI yet, not what
+  looked hard on paper.
+- **Next frontier: store-based rows** (`any()`/`index()` — "after any vowel, this key gives the
+  matching accented vowel"). Sketch: a row whose context is a named character class, and whose
+  result is a parallel list, shown as a two-column mapping in the "after …" view. Owner: product
+  owner with the Engine team. Trigger: once User Story 4 ships, decide go or no-go on a follow-up
+  spec; if no decision is recorded by this spec's retirement pass, this note is deleted, not rolled
+  forward (Art XI).
+- **Text** means literal characters with no context: one character or a string (MSKLC ligatures,
+  clarification Q4). TIKE trap 4 is answered by refusing what is not literal — reorder, stores,
+  context — not by limiting length.
+- **Deadkeys** are in scope at and beyond MSKLC depth: chained deadkeys (a combination whose result
+  is another deadkey) are edited by following the chain in the "after …" view.
+- **Spec 083 dependency.** FR-027 relies on spec 083's deadkey lifecycle (define with any trigger
+  key, rename, retarget, delete). Where a lifecycle operation has not shipped when this spec is
+  implemented, the plan MUST either build it as spec 083 specifies it or record the gap with an
+  owner and trigger (Art XI) — never a Layout-tab-only deadkey path.
+- **Spec 109 dependency.** FR-014 and US6 need spec 109's enumerator (FR-040), its base-keyboard
   data (FR-030), and its `swallowUndefined` compile (FR-010) before a "Do nothing" class can show
   as "types nothing" on never-defined keys. Until the enumerator and data ship, unhandled keys show
-  "base keyboard fallback — character not yet available" rather than a guessed character. US1–US3
+  "base keyboard fallback — character not yet available" rather than a guessed character. US1–US5
   for handled keys do not wait for 109.
-- **Deadkey combinations make keys read-only.** Under FR-013 a key that also takes part in a
-  deadkey combination (`dk(a) + [K_E] > ...`) matches a context rule, so it is read-only. On many
-  European-style keyboards that covers the vowels. Whether deadkey-only context should stay
-  read-only is an open question for `/speckit-clarify`; this spec keeps ruling 4 as given.
 - **Placement tray gate** (Art XI: owner and trigger). Owner: the product owner. Trigger: when
-  US1–US4 have shipped, the product owner decides go or no-go on US5. If no-go, or if no decision
-  is recorded by this spec's retirement pass, FR-050 and US5 are removed from the spec rather than
+  US1–US6 have shipped, the product owner decides go or no-go on US7. If no-go, or if no decision
+  is recorded by this spec's retirement pass, FR-050 and US7 are removed from the spec rather than
   rolled forward.
 - **Plan-phase research** (not decided here): how a character edit reaches the IR through
-  `mutate()` for a direct key mapping; how a "types nothing" or deadkey edit is recorded with the
-  `physical-layout` decision, given the assignment set is keyed by character; how FR-013's attribution is computed from the IR and the
-  simulator's fired-rule tracking; how "view in code" finds the rule's line in the Code tab's text.
+  `mutate()` for a direct key mapping; how "types nothing", deadkey, and combination-row edits are
+  recorded with the `physical-layout` decision, given the assignment set is keyed by character;
+  how FR-013's attribution is computed from the IR and the simulator's fired-rule tracking; how
+  the deadkey display character is stored; how "view in code" finds the rule's line in the Code
+  tab's text.
 - **Vocabulary.** "Desktop layout" is the layout being edited; "base keyboard" is the OS layout
   Keyman falls back to; "starting point" is the copied keyboard or the current release
   ([glossary](../../docs/design-notes/keyboard-vocabulary-glossary.md)).
 
 ## Out of scope
 
-- Editing context rules, rule chains, stores, `if()`/`platform()`/options, or opaque fragments.
-- Creating deadkeys or authoring deadkey combinations across keys.
+- Editing store-based rules (`any()`/`index()`/`notany()`), `if()`/`platform()`/options,
+  `use()` chains whose later groups change results, or opaque fragments (read-only
+  in v1; store-based rows are the next frontier).
 - Editing mnemonic keyboards.
 - The touch layout (Touch Builder owns it) and on-screen-keyboard labels and images (the OSK editor
   owns them).
