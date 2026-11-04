@@ -1,0 +1,16 @@
+# Pre-push gate: the full lint suite must pass before code leaves this machine.
+# CI is the fallback, not the verification step — don't mark a PR ready until
+# this is green. Bypass only for emergencies: git push --no-verify
+
+# pnpm isn't always on PATH inside hook environments (GUI clients, agent VMs),
+# so check its documented install locations before giving up.
+if ! command -v pnpm >/dev/null 2>&1; then
+  for d in "$HOME/.local/share/pnpm" "$HOME/Library/pnpm"; do
+    if [ -x "$d/pnpm" ]; then
+      PATH="$d:$PATH"
+      break
+    fi
+  done
+fi
+
+pnpm lint
