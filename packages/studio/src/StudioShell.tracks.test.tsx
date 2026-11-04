@@ -20,6 +20,8 @@ vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/oskAdapter.tsx"));
+vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
+vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
@@ -102,7 +104,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 
-  it("the chooser's own Back reaches mechanisms (the step genuinely visited immediately before touch_seed_source)", async () => {
+  it("the chooser's own Back reaches osk (the step genuinely visited immediately before touch_seed_source)", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -113,12 +115,11 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     fireEvent.click(screen.getByTestId("touch-back"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
-    // The chooser's own Back (not TouchGallery's) pops the walked-history —
-    // which reaches "mechanisms" (the step genuinely visited immediately
-    // before touch_seed_source now that sequences build inline there).
+    // The chooser's own Back pops walked history to the osk step (mechanisms →
+    // osk → touch_seed_source).
     fireEvent.click(screen.getByTestId("seed-source-back"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-seed-source")).toBeNull();
   });
 
