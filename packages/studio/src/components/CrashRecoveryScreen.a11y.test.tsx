@@ -167,3 +167,26 @@ describe("recovery screen vs notice", () => {
     sentinel.remove();
   });
 });
+
+// ---------------------------------------------------------------------------
+// The "a report has been sent" claim tracks the real send status
+// ---------------------------------------------------------------------------
+
+describe("CrashRecoveryScreen — send status wording", () => {
+  it("does not claim a report was sent before it has been", () => {
+    render(<CrashRecoveryScreen status="sending" />);
+    expect(screen.queryByText(/A report has been sent/)).toBeNull();
+    expect(screen.getByText(/Sending a report/)).toBeTruthy();
+  });
+
+  it("says so when the send failed, instead of claiming it succeeded", () => {
+    render(<CrashRecoveryScreen status="failed" />);
+    expect(screen.queryByText(/A report has been sent/)).toBeNull();
+    expect(screen.getByText(/could not be sent/)).toBeTruthy();
+  });
+
+  it("claims a sent report only once the send succeeded", () => {
+    render(<CrashRecoveryScreen status="sent" />);
+    expect(screen.getByText(/A report has been sent/)).toBeTruthy();
+  });
+});
