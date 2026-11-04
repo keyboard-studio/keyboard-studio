@@ -47,7 +47,6 @@ import touchLayoutModule from "./gallery/touchLayout.ts";
 import customCssModule from "./gallery/customCss.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
 import welcomeHtmModule from "./gallery/welcomeHtm.ts";
-import htmlModule from "./gallery/html.ts";
 import iconModule from "./gallery/icon.ts";
 
 import { flowModules, demotedPhaseFModules } from "./flowModules.ts";
@@ -130,7 +129,6 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   customCssModule,
   helpDocsModule,
   welcomeHtmModule,
-  htmlModule,
   iconModule,
 ];
 

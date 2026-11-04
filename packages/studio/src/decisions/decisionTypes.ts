@@ -165,7 +165,6 @@ export type DecisionId =
   | "custom-css"
   | "help-docs"
   | "welcome-htm"
-  | "html"
   | "icon";
 
 /**
@@ -442,6 +441,5 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "custom-css": [],
   "help-docs": [],
   "welcome-htm": [],
-  "html": [],
   "icon": [],
 };

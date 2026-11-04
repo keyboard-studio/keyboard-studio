@@ -22,7 +22,7 @@ const icon: GalleryModule<IconValue> = {
   definition,
   provides: ["icon"],
   screen: "icon",
-  requires: ["html"],
+  requires: ["welcome-htm"],
   inputs: [],
   writes: [],
   apply: () => ({}),
