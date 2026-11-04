@@ -75,7 +75,8 @@ import {
   nonAlphabetConfirmedInventory,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
-import { selectStrategy, deriveCarveNeededSet } from "@keyboard-studio/engine";
+import { selectStrategy, deriveCarveNeededSet, generateKvksFromIR, oskContinueResult } from "@keyboard-studio/engine";
+import { completeOskStep } from "../lib/oskStepCompletion.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -787,6 +788,17 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "osk": {
+          // Mirror OskEditorAdapter: record osk-layout from generated kvks.
+          const ir = useWorkingCopyStore.getState().ir;
+          if (ir !== null) {
+            const kvks = generateKvksFromIR(ir, ir.header.name ?? "keyboard");
+            completeOskStep(oskContinueResult(kvks));
+          }
+          result = undefined;
+          break;
+        }
+
         case "touch_seed_source": {
           const answers = answerMapFromGroup(group, "touch_seed_source");
           const v = answers.get("touch_seed_source");
@@ -825,6 +837,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           // touch with no edits after choosing reseed.
           applyTouchCompletionEffects(touchResult);
           result = undefined;
+          break;
+        }
+
+        case "css": {
+          // Optional embed CSS — corpus fixtures carry none; advance with empty css.
+          result = { css: "" };
+          break;
+        }
+
+        case "html": {
+          // welcome.htm editor — fixtures carry none; advance with empty source.
+          result = { html: "" };
           break;
         }
 

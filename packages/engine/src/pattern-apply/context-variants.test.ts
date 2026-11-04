@@ -14,6 +14,7 @@ import { simulate } from "../simulator/index.js";
 import { computeContextTolerance } from "../validator/context-tolerance.js";
 import {
   proposeContextVariants,
+  collectDecomposableUnits,
   GENERATED_MARKER_PREFIX,
   BACKSPACE_UNWRAP_RULE_PREFIX,
   BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE,
@@ -421,6 +422,21 @@ describe("addBackspaceUnwrap (spec 062 US4, FR-014)", () => {
     expect(twice.variants).toEqual(once.variants);
   }, 30_000);
 
+  it("skips backspace unwrap for a unit the author already deletes with plain [K_BKSP] (el_dinka class)", async () => {
+    const kmn = [
+      BKSP_HEADER,
+      "store(dia) U+00E4 U+00EB",
+      "group(main) using keys",
+      "",
+      "any(dia) + [K_BKSP] > nul",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "bksp_author_nul");
+    const report = await computeContextTolerance(ir);
+    const { variants } = await proposeContextVariants(ir, report);
+    expect(variants.some((v) => v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX))).toBe(false);
+  }, 30_000);
+
   it("generates no backspace-unwrap variant when no composed multi-mark unit is attested", async () => {
     const kmn = [BKSP_HEADER, "group(main) using keys", "", "+ 'a' > 'a'", ""].join("\n");
     const { ir } = parse(kmn, "bksp_no_units");
@@ -551,4 +567,30 @@ describe("proposeContextVariants — backspace unwrap on mnemonic layouts", () =
     const { notes } = await proposeContextVariants(ir, report);
     expect(notes).toBeUndefined();
   }, 30_000);
+});
+
+describe("collectDecomposableUnits (#2406)", () => {
+  // The zero-gap path of proposeContextVariants skips the simulation compile
+  // when this set is empty (the compile only feeds addBackspaceUnwrap's
+  // author-bksp pair filter, which has nothing to filter without
+  // decomposable units). These tests pin the gate condition.
+  it("is empty for a keyboard with no decomposable characters", () => {
+    const kmn = [HEADER, "group(main) using keys", "", "+ 'a' > 'b'", ""].join("\n");
+    const { ir } = parse(kmn, "ascii_only");
+    expect(collectDecomposableUnits(ir).size).toBe(0);
+  });
+
+  it("collects precomposed characters from store items and rule outputs", () => {
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) 'à'",
+      "",
+      "any(base) + 'a' > 'é'",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "decomposable");
+    expect(collectDecomposableUnits(ir)).toEqual(new Set(["à", "é"]));
+  });
 });

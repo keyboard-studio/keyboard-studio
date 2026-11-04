@@ -95,12 +95,18 @@ export {
   parse as parseKmn,
   emit as emitKmn,
   parseKvks,
+  emitKvks,
   parseTouchLayout,
   emitTouchLayout,
   TOUCH_LAYOUT_JSON_INDENT,
   OPAQUE_REASONS,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
+
+// OSK (visual keyboard) generation from KeyboardIR.
+export { generateKvksFromIR } from "./osk/generate-kvks.js";
+export { oskContinueResult } from "./osk/complete-osk-step.js";
+export type { OskContinueResult } from "./osk/complete-osk-step.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
 // The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.
@@ -239,12 +245,23 @@ export {
   // `<img src>` extractor the projection diffs carried images against.
   renderWelcomeLayoutSection,
   extractWelcomeImageRefs,
+  README_HTM_ADDS_CAP,
 } from "./shared/helpDocsRender.js";
 export type {
   DocSection,
   GeneratedDocSlots,
   HelpDocsRenderInput,
 } from "./shared/helpDocsRender.js";
+// spec 110 — the facts README.md and readme.htm are both rendered from.
+export { extractReadmeDescription } from "./shared/readmeFacts.js";
+export type {
+  ReadmeCharacterGroup,
+  ReadmeCharacterKind,
+  ReadmeComposition,
+  ReadmeFacts,
+  ReadmeLanguage,
+  ReadmeTypingRow,
+} from "./shared/readmeFacts.js";
 
 // spec 102 — documentation forms: the renderer, the slot vocabulary, the
 // per-file escapers and the markers around Track 2's generated sections.
@@ -302,6 +319,8 @@ export {
   SCRIPT_COVERAGE_RANGES,
   isCodePointCovered,
   formatCodePointLabel,
+  DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_WIDTH,
 } from "./layout-chart/index.js";
 export type {
   KeyLegibilityKind,
@@ -954,6 +973,7 @@ export {
   parseSlotId,
   makeSlotId,
   collectCharContributors,
+  collectCharContributorsBatched,
   collectTaintedContributors,
   sliceContributorDescriptors,
   collectCompositionMethod,
@@ -1140,3 +1160,55 @@ export type {
 export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
 export type { RgbaImage } from "./icon/icoEncoder.js";
 export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
+
+// LDML keyboard export (spec 108). The barrel exposes the public API only; it
+// exposes no test tooling (`ldml-export/__testing__` is never re-exported).
+export type {
+  CompatibilityItem,
+  LdmlBaseLayout,
+  LdmlBaseLayoutId,
+  LdmlBaseLayoutLayerName,
+  LdmlBaseLayoutSource,
+  LdmlClassification,
+  LdmlClassifyInput,
+  LdmlCode,
+  LdmlExportInput,
+  LdmlExportMetadata,
+  LdmlExportResult,
+  LdmlPackageBinaryFile,
+  LdmlPackageFiles,
+  LdmlProfileId,
+  LdmlSeverity,
+  LdmlSide,
+  LdmlStatus,
+  LdmlVKey,
+  RowId,
+} from "./ldml-export/index.js";
+
+export {
+  buildLdmlExport,
+  buildLdmlInBrowser,
+  buildLdmlKmp,
+  classifyForLdml,
+  compareToKeymanGaps,
+  compileLdmlInBrowser,
+  initLdmlCompiler,
+  listLdmlProfiles,
+  renderCompileReport,
+  renderReport,
+  resolveLdmlProfile,
+} from "./ldml-export/index.js";
+export type {
+  BuildLdmlKmpOptions,
+  BuildLdmlKmpResult,
+  ExpectedKeymanError,
+  KeymanBuildResult,
+  KeymanCompileResult,
+  KeymanGapComparison,
+  KeymanMessage,
+} from "./ldml-export/index.js";
+export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
+
+// Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
+export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
+export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";

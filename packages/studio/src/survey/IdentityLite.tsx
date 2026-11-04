@@ -21,6 +21,7 @@ import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 
 // Scripts gated out of v1 (spec §9). When the target is one of these the flow
 // ends on the "not supported" notice and the slice should not proceed.
+// eslint-disable-next-line lingui/no-unlocalized-strings -- ISO 15924 script subtags: technical identifiers, never author copy.
 const UNSUPPORTED_SCRIPTS = new Set(["Ethi", "Hani", "Hang"]);
 
 // `IdentityLiteResult` lives in its own type-only leaf module so the

@@ -38,6 +38,7 @@ import {
 import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import { selectWorkToDo, type WorkItem, type NotAskedGateInput, type FlaggedAnswerInput } from "../steps/workToDo.ts";
 import { buildStepWarningCounts } from "../lint/lintToQuestion.ts";
+import { routeStepIdsOf, useRouteStepIds } from "../lib/routeStepIds.ts";
 import type { StepId } from "../steps/answerTypes.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { lowercaseBaseView } from "../survey/charNormUtils.ts";
@@ -79,9 +80,10 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
   // badge counts derive from the same mapped findings the inline question
   // chips render, so a step's badge and its in-page flags cannot disagree.
   const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const route = useRouteStepIds();
   const stepWarningCounts = useMemo(
-    () => buildStepWarningCounts(validatorFindings),
-    [validatorFindings],
+    () => buildStepWarningCounts(validatorFindings, route),
+    [validatorFindings, route],
   );
 
   const marksFlagged = useMemo<readonly FlaggedAnswerInput[]>(() => {
@@ -321,6 +323,6 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
     notAsked,
     // #2145: per-step warning counts are a pure read of the published
     // findings — same source as the live hook, so the snapshot agrees.
-    warnings: buildStepWarningCounts(workingCopy.validatorFindings),
+    warnings: buildStepWarningCounts(workingCopy.validatorFindings, routeStepIdsOf(getDecisionSnapshot())),
   });
 }

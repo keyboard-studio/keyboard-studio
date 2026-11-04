@@ -48,6 +48,8 @@
     "baseWelcomeImagesDropped": false,
     "historyEntryState": null,
     "chartPreference": null,
+    "ldmlProfile": null,
+    "ldmlBaseLayout": null,
     "baseDocProfile": null,
     "baselineDocFindings": null,
     "ir": {

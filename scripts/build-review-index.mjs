@@ -139,6 +139,7 @@ async function listOpenPrs(owner, repo) {
         title: (pr.title ?? "").slice(0, 200),
         headSha: pr.head?.sha ?? "unknown",
         updatedAt: pr.updated_at ?? null,
+        state: "open", // this endpoint only lists open PRs; the live SPA list carries state
       });
     }
     if (batch.length < 100) break;

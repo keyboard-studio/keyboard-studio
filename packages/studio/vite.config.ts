@@ -27,6 +27,9 @@ export default defineConfig({
   },
   // The /review judge worker is a module worker that lazy-loads langtags;
   // code-splitting needs ES worker output (the default IIFE cannot split).
+  // The touch step's Code tab (TIKE touch-builder port) also loads Monaco
+  // editor workers via `?worker` imports (see touchBuilder/monacoSetup.ts) —
+  // same ES-worker requirement, no CDN workers.
   worker: { format: "es" },
   plugins: [
     // The Lingui macro transform runs via Babel; @vitejs/plugin-react only

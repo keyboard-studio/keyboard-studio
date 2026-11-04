@@ -34,6 +34,15 @@
 //   cd packages/studio && npx playwright test touch-key-assign.spec.ts
 
 import { test, expect, type Page, type FrameLocator } from "playwright/test";
+
+// ---------------------------------------------------------------------------
+// SKIPPED (km/touch-builder-port): this spec drives the retired KeyGrid "By
+// key" UI (key-grid / assign-panel / remove-key-dialog testids), which the
+// TIKE touch-builder port replaced with TouchBuilderPane. The behavior it
+// covered now has vitest coverage (touchBuilder/*.test.ts*). Rewriting this
+// walk against the TouchBuilderPane UI is a follow-on work item.
+// ---------------------------------------------------------------------------
+test.skip(true, "retired KeyGrid UI — needs a TouchBuilderPane rewrite");
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,

@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-10-31T20:20:03.430Z",
- "catalogSize": 188,
+ "generatedAt": "2026-11-03T17:44:22.997Z",
+ "catalogSize": 202,
  "byBand": {
-  "layer-c-enforce": 106,
+  "layer-c-enforce": 118,
   "scaffolder-bake": 40,
-  "yellow-survey": 32,
+  "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 99,
+ "implementedCount": 111,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -301,6 +301,21 @@
    ]
   },
   {
+   "id": "1.14-kpj-file-exists",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "A `.kpj` project file exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPJ_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "2.1-version-bumped-if-package-changed",
    "band": "layer-c-enforce",
    "section": "2. Version bumping",
@@ -516,6 +531,21 @@
    ]
   },
   {
+   "id": "4.0-license-md-exists",
+   "band": "layer-c-enforce",
+   "section": "4. `LICENSE.md` (copyright)",
+   "description": "A `LICENSE.md` exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_LICENSE_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "4.1-copyright-present-with-year",
    "band": "scaffolder-bake",
    "section": "4. `LICENSE.md` (copyright)",
@@ -643,6 +673,21 @@
     "kind": "surveyQuestionId",
     "id": "copyright-year-range-starts-at-original"
    }
+  },
+  {
+   "id": "5.0-readme-md-exists",
+   "band": "layer-c-enforce",
+   "section": "5. `README.md`",
+   "description": "A `README.md` exists at the keyboard root.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_README_MD_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "5.1-readme-good-header",
@@ -893,6 +938,36 @@
     "kind": "surveyQuestionId",
     "id": "welcome-htm-not-political"
    }
+  },
+  {
+   "id": "7.0-kvks-file-exists",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "A `.kvks` on-screen keyboard file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KVKS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
+   "id": "7.0-ico-file-exists",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "An `.ico` icon file exists for the keyboard.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_ICO_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "7.1-kmn-version-matches-history",
@@ -1199,6 +1274,21 @@
    "implemented": true,
    "precertified": false,
    "checkFiles": []
+  },
+  {
+   "id": "8.0-kps-file-exists",
+   "band": "layer-c-enforce",
+   "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+   "description": "A `.kps` package file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_KPS_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
   },
   {
    "id": "8.1-kps-includes-kmx",
@@ -2205,6 +2295,21 @@
    }
   },
   {
+   "id": "18.0-touch-layout-exists",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "A `.keyman-touch-layout` touch layout file exists in `source/`.",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_LAYOUT_ABSENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-file-inventory.ts"
+   ]
+  },
+  {
    "id": "18.1-longpress-within-limit",
    "band": "layer-c-enforce",
    "section": "18. Design heuristics (DISCUS)",
@@ -2405,6 +2510,101 @@
    "precertified": false,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-repo-context.ts"
+   ]
+  },
+  {
+   "id": "7.25-no-deprecated-numeric-formats",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "All character literals in the `.kmn` use `U+NNNN` notation; deprecated decimal/octal/hex formats (`d###`, `###`, `x###`) do not appear (removed in Keyman 20)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DEPRECATED_NUMERIC_FORMAT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-numeric-formats.ts"
+   ]
+  },
+  {
+   "id": "7.26-caps-ncaps-consistent-per-key",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "Every rule referencing a given key is consistent in CAPS/NCAPS handling: if any rule for the key tests CAPS or NCAPS, no rule for that key omits the modifier",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_CAPS_NCAPS_INCONSISTENT"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-caps-ncaps.ts"
+   ]
+  },
+  {
+   "id": "7.27-no-deprecated-headers-or-unused-stores",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "No deprecated header statements or system stores remain (modern store equivalents used); stores declared but never referenced are removed",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-deprecated-headers.ts"
+   ]
+  },
+  {
+   "id": "18.14-touch-layers-carry-bksp-enter",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Every touch layer (including shift/RALT/alt variants) includes the required control keys (`K_LOPT`, `K_BKSP`, `K_ENTER`); standard control keys use canonical `K_` IDs, not touch-only `T_` IDs",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-touch-required-keys.ts"
+   ]
+  },
+  {
+   "id": "18.15-touch-desktop-output-parity",
+   "band": "yellow-survey",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Every character produced by the touch layout is produced identically by the desktop rules and vice versa (judgment call; compare compiled behavior)",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "touch-desktop-output-parity"
+   }
+  },
+  {
+   "id": "12.7-bcp47-tags-minimal-registered",
+   "band": "yellow-survey",
+   "section": "12. Language tagging (BCP47)",
+   "description": "Each language tag is the minimal registered BCP 47 tag for the language/script (no dead, collective, or redundant subtags); every tag resolves in the current langtags registry",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "bcp47-tags-minimal-registered"
+   }
+  },
+  {
+   "id": "1.15-filenames-follow-convention",
+   "band": "layer-c-enforce",
+   "section": "1. Repository hygiene",
+   "description": "All files in the keyboard folder follow the filename convention: lowercase extensions, and names containing only alphanumerics, `-`, `_`, `+`, `.`",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_FILENAME_CONVENTION"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-filename-convention.ts"
    ]
   }
  ]

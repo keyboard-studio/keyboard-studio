@@ -176,7 +176,7 @@ describe("CriteriaPage — header and rows agree", () => {
     expect(statuses.slice(0, -1)).not.toContain("not-applicable");
   });
 
-  it("over the real catalog: 188 rows, header counts sum to the rows", () => {
+  it("over the real catalog: 202 rows, header counts sum to the rows", () => {
     const result = resolveCriteria({
       criteria: ALL_CRITERIA,
       mode: "authored",
@@ -186,18 +186,15 @@ describe("CriteriaPage — header and rows agree", () => {
     });
     render(<CriteriaPage result={result} mode="authored" />);
 
-    expect(screen.getAllByTestId("criteria-row")).toHaveLength(188);
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(202);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
-      // 133 = the pre-KPJ-pair 91 plus 1.10b/2.7 (Matthew's 2026-10-14
-      // ruling) plus the /review Group A2 file-inventory twins' 7 checks
-      // plus the .kps-listing twins' 10 plus the .kps-metadata twins' 5
-      // plus the text-content twins' 12 plus the repo-context twins' 5
-      // plus the Group C extraneous-files check: with no findings
-      // supplied, each implemented layer-c row resolves Met.
-      "133 of 188 criteria resolved",
+      // 140 on main plus the 5 consistency-batch checks (1.15/7.25/
+      // 7.26/7.27/18.14): with no findings supplied, each implemented
+      // layer-c row resolves Met.
+      "145 of 202 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
-    expect(counted).toBe(188);
+    expect(counted).toBe(202);
   });
 });
 
@@ -547,7 +544,7 @@ describe("CriteriaPage — identifiers guard", () => {
     assertClean("collapsed");
 
     for (const row of screen.getAllByTestId("criteria-row")) expandRow(row);
-    expect(screen.getAllByTestId("criteria-row-evidence")).toHaveLength(188);
+    expect(screen.getAllByTestId("criteria-row-evidence")).toHaveLength(202);
     assertClean("expanded");
 
     // Sanity: the exception is real — at least one implemented check's id

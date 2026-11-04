@@ -45,9 +45,12 @@ type ActiveStepId =
   | "invisibles"
   | "convenience"
   | "mechanisms"
+  | "osk"
   | "touch_seed_source"
   | "touch"
+  | "css"
   | "help"
+  | "html"
   | "done"
   | "unsupported";
 
@@ -317,15 +320,10 @@ export function advance(
       return { next: nextMainLineStepAfter("rules") }; // mechanisms
 
     case "mechanisms":
-      // Spec 035 R4/R12: route into the off-spine seed-source fork — but only
-      // when no valid choice is recorded yet. A remembered choice goes
-      // straight to "touch" so back-and-forth over mechanisms doesn't re-ask.
-      // nextMainLineStepAfter("mechanisms") would skip the off-spine
-      // touch_seed_source step entirely, so the fork check happens here
-      // explicitly rather than delegating to nextMainLineStepAfter. (S-03
-      // sequences now build inline in the Mechanism Gallery's method
-      // chooser — there is no separate "sequences" step to route through
-      // first; this fork check used to live on that step's completion.)
+      return { next: "osk" };
+
+    case "osk":
+      // Same touch-seed fork as the former post-mechanisms hop (spec 035 R4/R12).
       return stepApplies(stepById("touch_seed_source"), ctx)
         ? { next: "touch_seed_source" }
         : { next: "touch" };
@@ -335,17 +333,18 @@ export function advance(
       return { next: "touch" };
 
     case "touch":
-      return { next: nextMainLineStepAfter("touch") }; // help
+      return { next: nextMainLineStepAfter("touch") }; // css
+
+    case "css":
+      return { next: nextMainLineStepAfter("css") }; // help
 
     case "help":
-      // Hard gate (the Phase F hard gate): stay on "help" — no navigate signal — until every
-      // inventory character has an implementation. Unlike the gallery leave-
-      // warnings (the gallery leave-warning), there is no "come back later" escape here; the
-      // host surfaces WHY via the helpStep wrapper (PhaseFGate), never a
-      // silently-dead button.
       return ctx.allCharactersImplemented
-        ? { next: "done", navigate: "output" }
+        ? { next: nextMainLineStepAfter("help") } // html
         : { next: "help" };
+
+    case "html":
+      return { next: "done", navigate: "output" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).
     case "done":

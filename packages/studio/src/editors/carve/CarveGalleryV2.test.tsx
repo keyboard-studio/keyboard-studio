@@ -49,6 +49,16 @@ vi.mock('@keyboard-studio/engine', async () => {
   return {
     ...actual,
     collectCharContributors: collectCharContributorsMock,
+    // recommendedRemovalChars now batches via collectCharContributorsBatched
+    // (#2406). The batched mock delegates per character to the same
+    // per-char mock, keyed by NFC — exactly the real function's contract.
+    collectCharContributorsBatched: (ir: KeyboardIR, chars: ReadonlySet<string>) => {
+      const m = new Map<string, ReturnType<typeof collectCharContributorsMock>>();
+      for (const ch of chars) {
+        m.set(ch.normalize('NFC'), collectCharContributorsMock(ir, ch));
+      }
+      return m;
+    },
   };
 });
 

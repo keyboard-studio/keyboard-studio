@@ -8,6 +8,7 @@
 // submitted without a click).
 
 import type { CSSProperties, ReactNode } from "react";
+import { useLingui } from "@lingui/react/macro";
 import {
   BG_CARD,
   BG_PAGE,
@@ -146,8 +147,11 @@ export function DeadkeyConflictDialog({
   extra,
   choices,
   onCancel,
-  cancelLabel = "Cancel",
+  cancelLabel,
 }: DeadkeyConflictDialogProps) {
+  const { t } = useLingui();
+  const cancelText =
+    cancelLabel ?? t({ id: "deadkey.conflict.cancel", message: "Cancel" });
   return (
     <div style={overlayStyle}>
       <div
@@ -182,7 +186,7 @@ export function DeadkeyConflictDialog({
         </div>
         <div style={cancelRowStyle}>
           <button type="button" style={cancelBtnStyle} onClick={onCancel}>
-            {cancelLabel}
+            {cancelText}
           </button>
         </div>
       </div>

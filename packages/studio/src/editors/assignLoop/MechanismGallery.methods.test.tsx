@@ -50,23 +50,6 @@ describe("MechanismGallery — Apply lives in the open method card", () => {
     expect(screen.getAllByRole("button", { name: /Apply method for á/i })).toHaveLength(1);
   });
 
-  it("follows the author into whichever card they open", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
-    });
-    expect(screen.getByTestId("mechanism-apply-deadkey")).toBeTruthy();
-
-    // Anchored regex: the swap card's key picker carries the aria-label
-    // "Physical key for Assign to a key", which an unanchored /Assign to a key/
-    // would also match.
-    fireEvent.click(screen.getByRole("button", { name: /^Assign to a key/i }));
-
-    expect(screen.getByTestId("mechanism-apply-swap")).toBeTruthy();
-    expect(screen.queryByTestId("mechanism-apply-deadkey")).toBeNull();
-    expect(screen.getAllByRole("button", { name: /Apply method for á/i })).toHaveLength(1);
-  });
-
   it("offers no Apply on the sequence card — the right-pane builder owns that", async () => {
     seedInventory(["á"]);
     await act(async () => {

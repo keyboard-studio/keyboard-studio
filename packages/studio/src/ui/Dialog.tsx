@@ -43,6 +43,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { useLingui } from "@lingui/react/macro";
 import { BG_CARD, BORDER, FONT, TEXT_DIM } from "./theme.ts";
 import { useModalFocus } from "../hooks/useModalFocus.ts";
 import {
@@ -154,6 +155,7 @@ export function Dialog({
   anchor,
 }: DialogProps) {
   const dialogRef = useRef<HTMLFormElement | HTMLDivElement | null>(null);
+  const { t } = useLingui();
   const reduced = usePrefersReducedMotion();
 
   // `visible` keeps the frame mounted through the exit flight; the
@@ -328,7 +330,7 @@ export function Dialog({
   const closeButton = showCloseButton ? (
     <button
       type="button"
-      aria-label={closeLabel ?? "Close"}
+      aria-label={closeLabel ?? t({ id: "ui.dialog.closeLabel", message: "Close" })}
       onClick={onCancel}
       style={{
         position: "absolute",

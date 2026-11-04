@@ -94,6 +94,7 @@ import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
+import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
@@ -1210,12 +1211,15 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // owned by the mechanisms step via the lintToQuestion mapping for its
   // code, so it chips and badges there rather than rendering here.
   const oe2Findings = useOe2SoleSourceFindings();
+  // The LDML export's A/N warnings and hints ride the same array on the same terms (spec 108):
+  // a memoised synchronous hook over the published preview projection. They never gate an output.
+  const ldmlFindings = useLdmlFindings();
   const findings = useMemo(
     () =>
-      documentationFindings.length === 0 && oe2Findings.length === 0
+      documentationFindings.length === 0 && oe2Findings.length === 0 && ldmlFindings.length === 0
         ? validatorFindingsOnly
-        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings],
-    [validatorFindingsOnly, documentationFindings, oe2Findings],
+        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings, ...ldmlFindings],
+    [validatorFindingsOnly, documentationFindings, oe2Findings, ldmlFindings],
   );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
@@ -1388,6 +1392,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
 
   const questionsPaneStyle: CSSProperties = {
+    // eslint-disable-next-line lingui/no-unlocalized-strings -- CSS calc() flex-basis value, not UI copy.
     flexBasis: `calc(${leftPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
     flexShrink: 0,
     flexGrow: 0,
@@ -1506,6 +1511,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     width: "100%",
   };
   const previewPaneStyle: CSSProperties = {
+    // eslint-disable-next-line lingui/no-unlocalized-strings -- CSS calc() flex-basis value, not UI copy.
     flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
     flexGrow: 1,
     flexShrink: 0,
@@ -1596,7 +1602,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       {/* Left pane: survey questions (StepHost renders pane content) */}
       {
         <SurveyQuestionsPane
-          label="Survey questions"
+          label={t({ id: "shell.surveyQuestionsPaneLabel", message: "Survey questions" })}
           style={
             isNarrow
               ? {

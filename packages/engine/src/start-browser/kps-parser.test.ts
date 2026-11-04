@@ -54,6 +54,22 @@ const NO_SCRIPT_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </Keyboards>
 </Package>`;
 
+const TELUGU_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="nlci_telugu_winscript"/>
+    <Version value="1.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Languages>
+        <Language ID="te" Name="Telugu"/>
+      </Languages>
+      <Targets>windows</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>`;
+
 const TAG_CONTENT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <Package>
   <Keyboards>
@@ -116,6 +132,29 @@ describe("parseKps", () => {
 
   it("normalises script subtag to Title case", () => {
     const xml = BASIC_XML.replace('ID="en-Latn"', 'ID="en-lAtN"');
+    expect(parseKps(xml).script).toBe("Latn");
+  });
+
+  it("derives Telu from langtags likely-subtags when the tag has no script subtag", () => {
+    // Issue #2405: nlci_telugu_winscript declares <Language ID="te"> and its
+    // script must come out Telu (te → te-Telu-IN), not the Latn default.
+    expect(parseKps(TELUGU_XML).script).toBe("Telu");
+  });
+
+  it("keeps en at Latn via langtags likely-subtags when the tag has no script subtag", () => {
+    // en → en-Latn-US, so the likely-subtags path yields Latn here too.
+    expect(parseKps(NO_SCRIPT_XML).script).toBe("Latn");
+  });
+
+  it("falls back to Latn only when langtags has no entry for the tag", () => {
+    const xml = NO_SCRIPT_XML.replace('ID="en"', 'ID="xx"');
+    expect(parseKps(xml).script).toBe("Latn");
+  });
+
+  it("an explicit script subtag still wins over langtags likely-subtags", () => {
+    // The author-declared script is deliberate; likely-subtags is only the
+    // fallback for tags that carry no script subtag.
+    const xml = TELUGU_XML.replace('ID="te"', 'ID="te-Latn"');
     expect(parseKps(xml).script).toBe("Latn");
   });
 

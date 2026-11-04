@@ -58,8 +58,11 @@ import type {
   ContextToleranceOverlay,
   KeyEditOperation,
   KeyEditOverlay,
+  LdmlProfileId,
   StartDocCssText,
 } from "@keyboard-studio/engine";
+import type { PreviewProjection } from "../lib/previewProjection.ts";
+import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import type {
   ContextVariantsResult,
@@ -203,13 +206,28 @@ export function bindManifest(m: readonly Step[]): void {
  *           out of `undoStack` by `seq`, so a caller that bypasses
  *           `undoDelete` never leaves an orphaned entry pointing at a
  *           removed op.
+ * 'kb'    — a BATCH of key-level touch layout edits committed atomically via
+ *           commitKeyEditBatch (TIKE touch-builder port, Code tab — Q2 ruling:
+ *           one Apply = one undo step). Carries the committed ops' `seqs` in
+ *           commit order. `undoDelete`'s branch verifies the seqs match the
+ *           TAIL of `keyEditOverlay.ops` in order, then pops all N — the same
+ *           LIFO lock-step the 'k' branch documents, generalized: a 'kb'
+ *           entry still in `undoStack` is, in relative order, the current
+ *           tail run of `keyEditOverlay.ops`, because commits always append
+ *           and undos always pop from the tail. `undoKeyEditBatch` is the
+ *           direct-removal counterpart (mirrors `undoKeyEdit`): it removes
+ *           the most recently committed batch's ops by `seq` and filters the
+ *           matching 'kb' entry out of `undoStack`, so a caller that bypasses
+ *           `undoDelete` never leaves an orphaned entry pointing at removed
+ *           ops.
  */
 export type UndoEntry =
   | { k: "n"; id: string }
   | { k: "i"; id: string }
   | { k: "t"; id: string }
   | { k: "batch"; nodeIds: string[]; itemIds: string[]; chars: string[] }
-  | { k: "k"; seq: number };
+  | { k: "k"; seq: number }
+  | { k: "kb"; seqs: number[] };
 
 // ---------------------------------------------------------------------------
 // Key edit overlay (spec 063) — the ordered op log for the touch key grid,
@@ -255,12 +273,14 @@ export interface CommitTouchKeyRenameOutcome {
 /**
  * The touch step's mode selector (FR-036…FR-036g): `"character"` is the
  * per-character assignment walk (the existing TouchGallery flow); `"key"` is
- * the key-grid editor this feature adds. A view toggle, not a fork — neither
- * mode's in-progress state is cleared by switching (FR-036b). `"character"`
- * is the default per FR-036; the propose-on-entry logic that can route a
- * fresh working copy straight into `"key"` mode is a later task (T073).
+ * the key-grid editor this feature adds; `"code"` is the touch-layout JSON
+ * code editor (TIKE touch-builder port, Phase 0+). A view toggle, not a
+ * fork — no mode's in-progress state is cleared by switching (FR-036b).
+ * `"character"` is the default per FR-036; the propose-on-entry logic that
+ * can route a fresh working copy straight into `"key"` mode is a later task
+ * (T073).
  */
-export type TouchEditorMode = "character" | "key";
+export type TouchEditorMode = "character" | "key" | "code";
 
 /**
  * The context-tolerance analysis for the working copy (spec 078). Recomputed
@@ -578,6 +598,23 @@ export interface WorkingCopyState {
    * AFTER this slice was seeded still gets the right default. Persisted.
    */
   chartPreference: ChartPreference | null;
+  /**
+   * The LDML target profile the author picked for the LDML download (spec 108
+   * FR-027). Null means "not chosen": the newest profile applies at read time.
+   * Persisted; never reaches the `.kmp`, `.zip` or pull-request paths.
+   */
+  ldmlProfile: LdmlProfileId | null;
+  /**
+   * The author's override of the LDML export's base keyboard (spec 108 FR-027).
+   * Null means "use the resolved default". Persisted.
+   */
+  ldmlBaseLayout: LdmlBaseLayoutChoice | null;
+  /**
+   * The last successfully parsed preview projection (spec 108 T054): the parsed IR plus the
+   * touch-layout and `.kvks` text the same compile run read. The LDML findings view classifies
+   * from this. Ephemeral: never persisted, cleared on a base change.
+   */
+  previewProjection: PreviewProjection | null;
   /**
    * The author's recorded answers to the deterministic documentation-fix
    * proposals for an adaptation's inherited welcome/help pages (issue
@@ -1112,6 +1149,33 @@ export interface WorkingCopyState {
    */
   undoKeyEdit: () => void;
   /**
+   * Commit a batch of key-level touch layout edits as ONE undo step (TIKE
+   * touch-builder port, Code tab — Q2 ruling: one Apply = one undo step).
+   * Appends every op to `keyEditOverlay.ops` with consecutive `seq`s (the
+   * current op count, then +1 per op — the commit order) and pushes a single
+   * `'kb'` {@link UndoEntry} (`{ k: 'kb', seqs }`) onto the shared
+   * chronological `undoStack`. A no-op for an empty array (no ops, no entry).
+   *
+   * The ops array stays append-only and every commit assigns seqs in order,
+   * so the entry's seqs always name a contiguous tail run of
+   * `keyEditOverlay.ops` — which is what `undoDelete`'s `'kb'` branch
+   * verifies before popping.
+   */
+  commitKeyEditBatch: (ops: PendingKeyEditOperation[]) => void;
+  /**
+   * Remove the most recently committed key-edit batch (the highest `seq`s).
+   * No-op when no `'kb'` entry is on the stack.
+   *
+   * The direct-removal counterpart to `undoDelete`'s `'kb'` branch — mirrors
+   * `undoKeyEdit`: removes the batch's ops from `keyEditOverlay.ops` by
+   * `seq` AND filters the matching `'kb'` entry out of `undoStack`, so a
+   * caller using this action directly (bypassing `undoDelete`) never leaves
+   * an orphaned undo entry pointing at removed ops. Ops committed after the
+   * batch (higher seqs) are untouched; seqs are stable identifiers, so the
+   * remaining entries' tail correspondence is preserved.
+   */
+  undoKeyEditBatch: () => void;
+  /**
    * Commit a deadkey lifecycle mutation: appends `op` to
    * `deadkeyOverlay.ops`, in commit order. The caller is the Deadkeys step
    * component that just committed the same mutation to the working IR via
@@ -1305,6 +1369,15 @@ export interface WorkingCopyState {
 
   /** Record the author's keep-base-images / regenerate choice (spec 079 FR-015). */
   setChartPreference: (preference: ChartPreference | null) => void;
+
+  /** Record the LDML export profile choice (spec 108 FR-027). */
+  setLdmlProfile: (profile: LdmlProfileId | null) => void;
+
+  /** Publish the preview projection the LDML findings read (spec 108). Null clears. */
+  setPreviewProjection: (projection: PreviewProjection | null) => void;
+
+  /** Record the LDML export base-keyboard override (spec 108 FR-027). */
+  setLdmlBaseLayout: (layout: LdmlBaseLayoutChoice | null) => void;
 
   /** Record the author's documentation-fix proposal answers (issue #1908). Whole-value replace; null clears (undo). */
   setDocFixProposals: (proposals: DocFixProposals | null) => void;
@@ -1580,7 +1653,7 @@ function freshInstantiationTail() {
     keyEditOverlay: { ops: [] },
     deadkeyOverlay: { ops: [] },
     // Annotated, not inferred: without it the literal widens to string and
-    // the spread no longer matches TouchEditorMode ("character" | "key").
+    // the spread no longer matches TouchEditorMode ("character" | "key" | "code").
     touchEditorMode: "character" as TouchEditorMode,
     staleSteps: new Set<string>(),
     // A new working copy has no default-fill provenance yet (#890) — the
@@ -1722,6 +1795,9 @@ export type WorkingCopyData = Omit<
   | "setStartWelcomeConvention"
   | "setHistoryEntryState"
   | "setChartPreference"
+  | "setLdmlProfile"
+  | "setLdmlBaseLayout"
+  | "setPreviewProjection"
   | "setDocFixProposals"
   | "setTouchKeyIdentity"
   | "setStartDocProfile"
@@ -1738,6 +1814,8 @@ export type WorkingCopyData = Omit<
   | "setAxisFills"
   | "commitKeyEdit"
   | "undoKeyEdit"
+  | "commitKeyEditBatch"
+  | "undoKeyEditBatch"
   | "commitDeadkeyOp"
   | "commitTouchKeyRename"
   | "setTouchEditorMode"
@@ -1768,6 +1846,9 @@ const INITIAL_STATE: WorkingCopyData = {
   startWelcomeImagesDropped: false,
   historyEntryState: null,
   chartPreference: null,
+  ldmlProfile: null,
+  ldmlBaseLayout: null,
+  previewProjection: null,
   docFixProposals: null,
   touchKeyIdentity: null,
   startDocProfile: null,
@@ -1902,6 +1983,26 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         // entry kinds have been pushed after it.
         return {
           keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -1) },
+          undoStack: s.undoStack.slice(0, -1),
+        };
+      } else if (last.k === "kb") {
+        // Batch key-edit entry (TIKE touch-builder port, Code tab — Q2
+        // ruling: one Apply = one undo step): the entry's seqs were appended
+        // contiguously by one commitKeyEditBatch call, so they name the tail
+        // run of keyEditOverlay.ops in order. Verify before popping — the
+        // same LIFO lock-step the 'k' branch documents, generalized to N
+        // ops. A mismatch is unreachable through the store's own actions
+        // (every action that removes ops also removes the entries that
+        // reference them); refusing to pop beats silently corrupting the
+        // overlay.
+        const n = last.seqs.length;
+        if (n === 0) return s;
+        const tail = s.keyEditOverlay.ops.slice(-n);
+        const matches =
+          tail.length === n && tail.every((op, i) => op.seq === last.seqs[i]);
+        if (!matches) return s;
+        return {
+          keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -n) },
           undoStack: s.undoStack.slice(0, -1),
         };
       } else {
@@ -2208,6 +2309,44 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       };
     }),
 
+  commitKeyEditBatch: (ops) =>
+    set((s) => {
+      // An empty Apply is not an undo step: no ops, no entry.
+      if (ops.length === 0) return s;
+      const base = s.keyEditOverlay.ops.length;
+      const committed = ops.map(
+        (op, i) => ({ ...op, seq: base + i }) as KeyEditOperation,
+      );
+      const undoEntry: UndoEntry = {
+        k: "kb",
+        seqs: committed.map((o) => o.seq),
+      };
+      return {
+        keyEditOverlay: { ops: [...s.keyEditOverlay.ops, ...committed] },
+        undoStack: [...s.undoStack, undoEntry],
+      };
+    }),
+
+  undoKeyEditBatch: () =>
+    set((s) => {
+      // Most-recently-committed batch: the LAST 'kb' entry on the stack.
+      // Filter by seq (not by position): ops committed after the batch keep
+      // their higher seqs, and every remaining entry's tail correspondence
+      // is untouched.
+      let idx = s.undoStack.length - 1;
+      while (idx >= 0 && s.undoStack[idx]!.k !== "kb") idx--;
+      if (idx < 0) return s;
+      const entry = s.undoStack[idx]!;
+      if (entry.k !== "kb") return s;
+      const seqs = new Set(entry.seqs);
+      return {
+        keyEditOverlay: {
+          ops: s.keyEditOverlay.ops.filter((o) => !seqs.has(o.seq)),
+        },
+        undoStack: s.undoStack.filter((_, i) => i !== idx),
+      };
+    }),
+
   // Deadkey lifecycle overlay (spec 083) — append-only within a session.
   // The Deadkeys step calls this as a sibling of its setWorkingIR commit.
   commitDeadkeyOp: (op) =>
@@ -2379,6 +2518,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // choice falls back to the FR-015 default.
       historyEntryState: null,
       chartPreference: null,
+      ldmlProfile: null,
+      ldmlBaseLayout: null,
+      previewProjection: null,
       docFixProposals: null,
       touchKeyIdentity: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
@@ -2437,6 +2579,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // See instantiateFromStart: documentation decisions are per working copy.
       historyEntryState: null,
       chartPreference: null,
+      ldmlProfile: null,
+      ldmlBaseLayout: null,
+      previewProjection: null,
       docFixProposals: null,
       touchKeyIdentity: null,
       baselineDocFindings: null,
@@ -2515,6 +2660,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setHistoryEntryState: (state) => set({ historyEntryState: state }),
 
   setChartPreference: (preference) => set({ chartPreference: preference }),
+
+  setLdmlProfile: (profile) => set({ ldmlProfile: profile }),
+
+  setLdmlBaseLayout: (layout) => set({ ldmlBaseLayout: layout }),
+
+  setPreviewProjection: (projection) => set({ previewProjection: projection }),
 
   setDocFixProposals: (proposals) => set({ docFixProposals: proposals }),
 

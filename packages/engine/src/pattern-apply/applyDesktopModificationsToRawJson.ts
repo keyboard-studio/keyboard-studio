@@ -88,10 +88,11 @@ import {
   findSlotOccupant,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
-  keyMatchesRemovalSet,
+  keyMatchesRemovalSetWithProduction,
   resolvedTextProductions,
   touchKeyIdFamily,
   type PlacementResolverContext,
+  type RemovalProductionContext,
 } from "./touch-mechanism-shared.js";
 import type { RawKey, RawLayer, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
 import type { DesktopModifications } from "./applyDesktopModifications.js";
@@ -143,7 +144,10 @@ export function applyDesktopModificationsToRawJson(
   // placements — indexed by the seed's original key id — could no longer find.
   applyPlacementsToRawLayout(layout, mods.placements, warnings, resolverCtx);
   const removalSet = buildRemovalSet(mods.removals);
-  removeAcrossRawLayout(layout, removalSet);
+  // Spec 104 T009 follow-through (mirrors the IR twin): the removal replay
+  // must agree with the preview's step-1.5 carve projection, which matches
+  // ruled T_ keys by resolver production.
+  removeAcrossRawLayout(layout, removalSet, resolverCtx);
 
   return { json: JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT), warnings };
 }
@@ -152,7 +156,11 @@ export function applyDesktopModificationsToRawJson(
 // Pass 1 — removals (every platform / layer / row / key)
 // ---------------------------------------------------------------------------
 
-function removeAcrossRawLayout(layout: RawTouchLayout, removalSet: ReadonlySet<string>): void {
+function removeAcrossRawLayout(
+  layout: RawTouchLayout,
+  removalSet: ReadonlySet<string>,
+  resolverCtx?: PlacementResolverContext,
+): void {
   for (const pName of Object.keys(layout)) {
     const platform = layout[pName];
     if (!platform || typeof platform !== "object") continue;
@@ -161,10 +169,19 @@ function removeAcrossRawLayout(layout: RawTouchLayout, removalSet: ReadonlySet<s
 
     for (const layer of p.layer) {
       if (!Array.isArray(layer.row)) continue;
+      // The layer id is the resolver state for every key on this layer
+      // (spec 104 FR-001) — build the per-layer production context once.
+      const productionCtx: RemovalProductionContext | undefined =
+        resolverCtx !== undefined && typeof layer.id === "string"
+          ? {
+              production: { ir: resolverCtx.ir, ruleIndex: resolverCtx.ruleIndex },
+              layerId: layer.id,
+            }
+          : undefined;
       for (const row of layer.row) {
         if (!Array.isArray(row.key)) continue;
         for (const key of row.key) {
-          stripRemovedFromRawKey(key, removalSet);
+          stripRemovedFromRawKey(key, removalSet, productionCtx);
         }
       }
     }
@@ -172,23 +189,27 @@ function removeAcrossRawLayout(layout: RawTouchLayout, removalSet: ReadonlySet<s
 }
 
 /** Mutate `key` in place, dropping carved gesture entries / primary production. */
-function stripRemovedFromRawKey(key: RawKey, removalSet: ReadonlySet<string>): void {
+function stripRemovedFromRawKey(
+  key: RawKey,
+  removalSet: ReadonlySet<string>,
+  productionCtx?: RemovalProductionContext,
+): void {
   if (Array.isArray(key.sk)) {
-    key.sk = key.sk.filter((s) => !keyMatchesRemovalSet(s, removalSet));
+    key.sk = key.sk.filter((s) => !keyMatchesRemovalSetWithProduction(s, removalSet, productionCtx));
   }
   if (Array.isArray(key.multitap)) {
-    key.multitap = key.multitap.filter((m) => !keyMatchesRemovalSet(m, removalSet));
+    key.multitap = key.multitap.filter((m) => !keyMatchesRemovalSetWithProduction(m, removalSet, productionCtx));
   }
   if (key.flick && typeof key.flick === "object") {
     for (const direction of Object.keys(key.flick)) {
       const sub = key.flick[direction];
-      if (sub && keyMatchesRemovalSet(sub, removalSet)) {
+      if (sub && keyMatchesRemovalSetWithProduction(sub, removalSet, productionCtx)) {
         delete key.flick[direction];
       }
     }
   }
 
-  if (keyMatchesRemovalSet(key, removalSet)) {
+  if (keyMatchesRemovalSetWithProduction(key, removalSet, productionCtx)) {
     // Never delete the key object — row geometry/widths stay stable (R9).
     // The emptied-key spelling is shared with the IR twin (BLANK_KEY_ID /
     // BLANK_KEY_SP in touch-mechanism-shared.ts), which carries the full

@@ -20,3 +20,6 @@
 # the approval dialog"), so workflow scripts must stay LF even on
 # core.autocrlf=true Windows checkouts.
 .claude/workflows/** text eol=lf
+
+# Git hooks are run by sh; CRLF would break the shebang line.
+.githooks/* text eol=lf

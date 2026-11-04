@@ -47,7 +47,7 @@ const VALUE: TouchLayoutValue = { ops: [OP], deletedTouchKeyIds: ["K_Q"] };
 describe("touchLayout module contract", () => {
   it("provides touch-layout, requires physical-layout + touch-seed-source, writes nothing", () => {
     expect(touchLayout.provides).toEqual(["touch-layout"]);
-    expect(touchLayout.requires).toEqual(["physical-layout", "touch-seed-source"]);
+    expect(touchLayout.requires).toEqual(["osk-layout", "touch-seed-source"]);
     expect(touchLayout.writes).toEqual([]);
     expect(touchLayout.renderer).toBe(TouchDecisionRenderer);
     expect(touchLayout.extract).toBeUndefined();

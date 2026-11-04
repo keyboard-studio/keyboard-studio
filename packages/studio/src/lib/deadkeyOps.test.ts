@@ -16,6 +16,7 @@ import { createVirtualFS, listDeadkeys } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import { applyDeadkeyOpsToVfs, type DeadkeyOperation } from "./deadkeyOps.ts";
+import { textVfs } from "../test/vfsFixtures.ts";
 
 const KEYBOARD_ID = "deadkey_overlay_test";
 
@@ -30,9 +31,7 @@ group(main) using keys
 
 /** A VFS holding exactly the base .kmn at source/<id>.kmn. */
 function makeVfs(kmn: string = BASE_KMN): VirtualFS {
-  return createVirtualFS([
-    { path: `source/${KEYBOARD_ID}.kmn`, content: kmn, isBinary: false },
-  ]);
+  return textVfs({ [`source/${KEYBOARD_ID}.kmn`]: kmn });
 }
 
 /** Read back the projected .kmn and list its deadkeys. */

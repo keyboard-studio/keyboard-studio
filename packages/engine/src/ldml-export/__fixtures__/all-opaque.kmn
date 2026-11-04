@@ -1,0 +1,14 @@
+c every rule is opaque
+store(&KEYBOARDVERSION) '1.0'
+store(&NAME) 'Opaque'
+store(&TARGETS) 'any'
+store(opt) '0'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > set(opt = '1')
++ [K_B] > reset(opt)
+if(opt <> '1') + [K_C] > 'c'
++ [K_D] > call(other)

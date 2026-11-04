@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { applyIdentityStubMutation } from "./index.js";
+import { textVfs } from "../test-support/vfs.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const KEYBOARDS_ROOT = resolve(__dirname, "../../../../../keyboards");
@@ -30,9 +31,7 @@ const FIXTURE_KMN = [
 const KEYBOARD_ID = "test_kb";
 
 function makeVfs(): VirtualFS {
-  return createVirtualFS([
-    { path: `source/${KEYBOARD_ID}.kmn`, content: FIXTURE_KMN, isBinary: false },
-  ]);
+  return textVfs({ [`source/${KEYBOARD_ID}.kmn`]: FIXTURE_KMN });
 }
 
 function getText(vfs: VirtualFS): string {

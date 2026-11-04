@@ -52,9 +52,9 @@ function loadFr019LintRuleIds(): string[] {
 describe("documentation check bijection (spec 080 SC-007 / FR-019)", () => {
   const lintRuleIds = loadFr019LintRuleIds();
 
-  it("criteria.json carries exactly the thirteen FR-019 rows this test knows about", () => {
-    expect(lintRuleIds).toHaveLength(13);
-    expect(new Set(lintRuleIds).size).toBe(13);
+  it("criteria.json carries one distinct lint rule id per FR-019 row this test knows about", () => {
+    expect(lintRuleIds).toHaveLength(FR_019_ROW_IDS.length);
+    expect(new Set(lintRuleIds).size).toBe(FR_019_ROW_IDS.length);
   });
 
   it("the shared clean fixture produces zero documentation findings", () => {

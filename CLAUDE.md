@@ -55,6 +55,11 @@ the facet index, adaptation catalogs, both i18n tiers, test antipatterns). Run `
 after touching any `.claude/**/km-*` file — every drift class it catches has shipped before.
 Full list: [docs/tooling.md](docs/tooling.md#what-pnpm-lint-actually-runs).
 
+A `pre-push` hook (installed by `pnpm install`) runs `pnpm lint` before any code push; never
+`--no-verify` it. Run the full `pnpm lint` yourself before marking a PR ready — a green subset
+(one linter, the touched tests) has missed failures before. See
+[docs/tooling.md](docs/tooling.md#pre-push-lint-guard).
+
 ## Repository status
 
 Day-1 contract is locked; the engine and studio are built out. `contracts` is the dependency

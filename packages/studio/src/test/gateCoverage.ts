@@ -145,6 +145,13 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "1.1-no-files-outside-keyboard-folder", code: "KM_LINT_FILES_OUTSIDE_FOLDER", criteria: "No files modified outside the keyboard's own folder", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "19.2b-import-attribution-in-history-md", code: "KM_LINT_HISTORY_ATTRIBUTION_BAD", criteria: "HISTORY.md contains the 'Adapted from' entry.", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "3.1b-history-file-exists", code: "KM_LINT_HISTORY_MD_ABSENT", criteria: "A `HISTORY.md` exists at the keyboard root.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "4.0-license-md-exists", code: "KM_LINT_LICENSE_MD_ABSENT", criteria: "A `LICENSE.md` exists at the keyboard root.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "5.0-readme-md-exists", code: "KM_LINT_README_MD_ABSENT", criteria: "A `README.md` exists at the keyboard root.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "1.10a-kpj-exists", code: "KM_LINT_KPJ_ABSENT", criteria: "A `.kpj` project file exists at the keyboard root.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "8.0-kps-exists", code: "KM_LINT_KPS_ABSENT", criteria: "A `.kps` package file exists in source/.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "18.0-touch-layout-exists", code: "KM_LINT_TOUCH_LAYOUT_ABSENT", criteria: "A `.keyman-touch-layout` touch layout file exists in source/.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "7.15-kvks-exists", code: "KM_LINT_KVKS_ABSENT", criteria: "A `.kvks` on-screen keyboard file exists in source/.", why: "submission hygiene the criteria page judges; no DecisionId" },
+  { id: "7.8-ico-exists", code: "KM_LINT_ICO_ABSENT", criteria: "An `.ico` icon file exists for the keyboard.", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "1.7b-no-keyboard-info-file", code: "KM_LINT_KEYBOARD_INFO_PRESENT", criteria: "No `keyboard.info` file is present in the keyboard folder.", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "1.11b-no-kpj-user-committed", code: "KM_LINT_KPJ_USER_PRESENT", criteria: "No `.kpj.user` file is committed.", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "10.9b-kps-description-nonempty", code: "KM_LINT_KPS_DESCRIPTION_EMPTY", criteria: "The .kps description is present and non-empty.", why: "submission hygiene the criteria page judges; no DecisionId" },
@@ -178,6 +185,13 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "2.6-new-version-strictly-greater", code: "KM_LINT_VERSION_NOT_INCREMENTED", criteria: "New version is strictly greater than the previously deployed version", why: "keyboard version is not a DecisionId" },
   { id: "6.3b-welcome-htm-exists", code: "KM_LINT_WELCOME_HTM_ABSENT", criteria: "`welcome.htm` exists in `source/` (flat or the `source/welcome/` folder convention).", why: "submission hygiene the criteria page judges; no DecisionId" },
   { id: "6.6b-welcome-htm-lang-attribute", code: "KM_LINT_WELCOME_LANG_MISMATCH", criteria: "The welcome.htm <html lang> attribute matches the keyboard's primary BCP47 tag (an English page may declare lang=\"en\").", why: "submission hygiene the criteria page judges; no DecisionId" },
+  // Criteria consistency batch (#2456): new Layer C checks whose consumer is
+  // the criteria resolver, not a DecisionId.
+  { id: "1.15-filenames-follow-convention", code: "KM_LINT_FILENAME_CONVENTION", criteria: "All files in the keyboard folder follow the filename convention: lowercase extensions, and names containing only alphanumerics, `-`, `_`, `+`, `.`.", why: "repository file hygiene; no DecisionId" },
+  { id: "7.25-no-deprecated-numeric-formats", code: "KM_LINT_DEPRECATED_NUMERIC_FORMAT", criteria: "All character literals in the .kmn use U+NNNN notation; deprecated decimal/octal/hex formats do not appear.", why: "source syntax hygiene; no DecisionId" },
+  { id: "7.26-caps-ncaps-consistent-per-key", code: "KM_LINT_CAPS_NCAPS_INCONSISTENT", criteria: "Every rule referencing a given key is consistent in CAPS/NCAPS handling.", why: "rule modifier hygiene; no DecisionId" },
+  { id: "7.27-no-deprecated-headers-or-unused-stores", code: "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE", criteria: "No deprecated header statements or system stores remain; unused stores are removed.", why: "source syntax hygiene; no DecisionId" },
+  { id: "18.14-touch-layers-carry-bksp-enter", code: "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS", criteria: "Every touch layer includes the required control keys (K_LOPT, K_BKSP, K_ENTER).", why: "touch layout structure; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

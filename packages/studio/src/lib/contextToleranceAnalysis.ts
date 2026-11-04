@@ -58,6 +58,16 @@ export interface ContextToleranceAnalysisOptions {
 }
 
 /**
+ * Rule-count budget for the context-tolerance analysis (#2406). Above this
+ * the full compile+simulate loop is minutes per keyboard state, so the
+ * analysis is skipped and the state records `failed` (rendered as
+ * could-not-check, never as clean). Matches the spec 107 sweep's `too-large`
+ * line (`MAX_SWEEP_RULE_COUNT`) — one shared notion of "too large to analyse
+ * fully" across the repo.
+ */
+export const CONTEXT_TOLERANCE_MAX_RULES = 2000;
+
+/**
  * Run the analysis on `ir`. Resolves `null` when `isCurrent()` turns false
  * between steps. Throws on an engine error; the caller records `failed`.
  */
@@ -71,7 +81,16 @@ export async function analyseContextTolerance(
   if (!isCurrent()) return null;
 
   const analysedIr = applied === null ? ir : engine.removeContextToleranceOverlay(ir, applied.overlay);
-  const report = await engine.computeContextTolerance(analysedIr);
+  const report = await engine.computeContextTolerance(analysedIr, { maxRules: CONTEXT_TOLERANCE_MAX_RULES });
+  if (report.skipped !== undefined) {
+    // Over budget: the engine marked every rule not-analysed without
+    // inspecting any. Surface as a failed run (could-not-check) rather than
+    // a 58k-row all-not-analysed report.
+    throw new Error(
+      `context-tolerance analysis skipped: keyboard has ${report.skipped.ruleCount.toLocaleString('en-US')} rules, ` +
+        `over the ${report.skipped.ruleBudget.toLocaleString('en-US')}-rule budget`,
+    );
+  }
   if (!isCurrent()) return null;
 
   const classification = Object.fromEntries(
@@ -83,14 +102,12 @@ export async function analyseContextTolerance(
 
   // Spec 086: the normalization step is the default proposal for gap findings.
   let step: NormalizationStep | null = null;
-  let stepCacheKey = "";
   let fallbackReason: NormalizationRefusalReason | "verification-regressed" | undefined;
   let proposeVariants = true;
   if (gapRuleIds.size > 0) {
     const lookup = await getOrProposeNormalizationStep(analysedIr, options.normalizationSnapshot);
     if (!isCurrent()) return null;
     if (lookup.stored !== null) options.onNormalizationStored?.(lookup.stored);
-    stepCacheKey = lookup.cacheKey;
     if (lookup.result.kind === "step") {
       let verdict: NormalizationVerification = "unknown";
       if (options.verificationLookup !== undefined) {
@@ -126,7 +143,16 @@ export async function analyseContextTolerance(
   if (step !== null) {
     fixableRuleIds = [engine.NORMALIZATION_STEP_SITE_ID];
     siteKeys = { [engine.NORMALIZATION_STEP_SITE_ID]: engine.NORMALIZATION_STEP_SITE_ID };
-    fingerprint = `${engine.NORMALIZATION_STEP_SITE_ID}|${stepCacheKey}`;
+    // Issue #2395: the decision fingerprint covers only what the acceptance
+    // depends on — the gap rules the step fixes and the step's own content —
+    // so later steps that change unrelated IR (carve, caps, assignments, the
+    // touch seed) no longer invalidate the decision. The whole-source cache
+    // key stays the authoring cache's business: the generated maps genuinely
+    // depend on the whole source.
+    fingerprint =
+      `${engine.NORMALIZATION_STEP_SITE_ID}` +
+      `|${engine.toleranceFingerprint(analysedIr, [...gapRuleIds])}` +
+      `|${engine.normalizationStepFingerprint(step)}`;
     fixedSites = new Set(applied === null ? [] : engine.presentContextToleranceSites(ir, applied.overlay));
     // The step covers every gap: once it is really in the keyboard, none is a gap.
     if (fixedSites.has(engine.NORMALIZATION_STEP_SITE_ID)) {

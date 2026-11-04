@@ -89,7 +89,9 @@
       "Bash(bash .specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks)",
       "Bash(docker exec *)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Bash(cd \"D:/Github/_Projects/_KM\" && ls; ls keyboard-studio/packages; ls keyboard-studio/packages/engine/src; ls keyboard-studio/packages/engine/src/output; cat keyboard-studio/packages/engine/package.json | head -60)",
+      "Read(//d/Github/_Projects/_KM/**)"
     ],
     "additionalDirectories": [
       "C:\\Temp"

@@ -39,6 +39,10 @@ REPO = Path(__file__).resolve().parent.parent
 COMPANION = REPO / ".specify" / "extensions" / "companion" / "scripts"
 STATUS_SCRIPT = COMPANION / "status-context.py"
 SKILL_PATH = Path(".claude") / "skills" / "speckit-round" / "SKILL.md"
+# Layered onto each round's session with --settings: re-enables the speckit-round
+# skill for the driver even when a local skillOverrides turns it off for
+# interactive sessions.
+ROUND_SETTINGS = Path(__file__).resolve().parent / "speckit_rounds.settings.json"
 
 sys.path.insert(0, str(COMPANION))
 from task_sync import parse_task_markers  # noqa: E402  (companion's own parser)
@@ -145,8 +149,25 @@ def feature_root(feature_dir):
     return feature_worktree(Path(feature_dir)) or REPO
 
 
+def parse_claude_json(stdout):
+    """The result object from `claude -p --output-format json`.
+
+    Older CLIs print the result object alone; newer ones print the whole message
+    list, ending with the `type: "result"` entry. Raises ValueError when there is
+    no result, so callers' existing `except ValueError` paths report it.
+    """
+    out = json.loads(stdout)
+    if isinstance(out, list):
+        out = next((m for m in reversed(out)
+                    if isinstance(m, dict) and m.get("type") == "result"), None)
+    if not isinstance(out, dict):
+        raise ValueError("no result object in claude JSON output")
+    return out
+
+
 def run_claude(claude, prompt, args, root):
-    cmd = [claude, "-p", "--output-format", "json", "--permission-mode", args.permission_mode]
+    cmd = [claude, "-p", "--output-format", "json", "--permission-mode", args.permission_mode,
+           "--settings", str(ROUND_SETTINGS)]
     if args.model:
         cmd += ["--model", args.model]
     if args.max_budget_usd:
@@ -220,7 +241,7 @@ def main():
         print(f"      spec sync: {sync_spec(feature_dir, f'docs(spec): spec {feature_dir.name.split("-")[0]} round {n} -- {label}')}")
 
         try:
-            out = json.loads(proc.stdout)
+            out = parse_claude_json(proc.stdout)
         except ValueError:
             print(f"[FAIL] round {n}: claude exited {proc.returncode} without JSON\n{proc.stderr[-2000:]}")
             return 1

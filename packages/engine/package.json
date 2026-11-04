@@ -59,8 +59,10 @@
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",
+    "@keymanapp/common-types": "19.0.240-alpha",
     "@keymanapp/developer-utils": "19.0.240-alpha",
     "@keymanapp/kmc-kmn": "19.0.240-alpha",
+    "@keymanapp/kmc-ldml": "19.0.240-alpha",
     "@keymanapp/kmc-package": "19.0.240-alpha",
     "buffer": "6.0.3",
     "eventemitter3": "^5.0.4",
@@ -71,6 +73,7 @@
   "devDependencies": {
     "cldr-misc-full": "48.2.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "xmllint-wasm": "5.3.0"
   }
 }

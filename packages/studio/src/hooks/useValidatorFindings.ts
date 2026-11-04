@@ -35,6 +35,7 @@ import {
 } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { buildFindingsByQuestionId } from "../lint/lintToQuestion.ts";
+import { useRouteStepIds } from "../lib/routeStepIds.ts";
 
 /**
  * Returns a stable `Record<string, LintFinding[]>` that maps each survey
@@ -49,9 +50,10 @@ import { buildFindingsByQuestionId } from "../lint/lintToQuestion.ts";
  */
 export function useValidatorFindings(): Record<string, LintFinding[]> {
   const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const route = useRouteStepIds();
   return useMemo(
-    () => buildFindingsByQuestionId(validatorFindings),
-    [validatorFindings],
+    () => buildFindingsByQuestionId(validatorFindings, route),
+    [validatorFindings, route],
   );
 }
 

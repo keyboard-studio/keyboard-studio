@@ -9,7 +9,9 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
-import { Trans, useLingui } from "@lingui/react/macro";
+import { Trans, Plural, useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { partitionRemovalKeys, suggestionFingerprintOf } from '../../survey/carve/carveValue.ts';
 import {
@@ -50,21 +52,21 @@ type GroupBy = 'category' | 'source';
 /** Names the scrollable character-details region (see the aside below). */
 const DETAILS_HEADING_ID = 'carve-details-heading';
 
-const GROUP_HINTS: Record<string, string> = {
-  'basic-letter': 'Plain A-Z letters, typed directly.',
-  'special-letter': 'Extra letters for this script, often reached via AltGr or a special layer.',
-  'accented-letter': 'Letters built from a base letter plus a diacritic mark.',
-  digit: 'Numbers and numerals.',
-  'punctuation-symbol': 'Punctuation, currency, and other symbols.',
-  'direct-key': 'Typed with a single key press.',
-  'deadkey-sequence': 'Typed by pressing a dead key, then a base letter.',
-  store: 'Comes from a list of characters (called a store) rather than a single key.',
-  'advanced-rule': 'Produced by a complex rule that is kept exactly as written — the keystroke can\'t be shown.',
+const GROUP_HINTS: Record<string, MessageDescriptor> = {
+  'basic-letter': msg({ id: "carve.gallery.groupHint.basicLetter", message: 'Plain A-Z letters, typed directly.' }),
+  'special-letter': msg({ id: "carve.gallery.groupHint.specialLetter", message: 'Extra letters for this script, often reached via AltGr or a special layer.' }),
+  'accented-letter': msg({ id: "carve.gallery.groupHint.accentedLetter", message: 'Letters built from a base letter plus a diacritic mark.' }),
+  digit: msg({ id: "carve.gallery.groupHint.digit", message: 'Numbers and numerals.' }),
+  'punctuation-symbol': msg({ id: "carve.gallery.groupHint.punctuationSymbol", message: 'Punctuation, currency, and other symbols.' }),
+  'direct-key': msg({ id: "carve.gallery.groupHint.directKey", message: 'Typed with a single key press.' }),
+  'deadkey-sequence': msg({ id: "carve.gallery.groupHint.deadkeySequence", message: 'Typed by pressing a dead key, then a base letter.' }),
+  store: msg({ id: "carve.gallery.groupHint.store", message: 'Comes from a list of characters (called a store) rather than a single key.' }),
+  'advanced-rule': msg({ id: "carve.gallery.groupHint.advancedRule", message: 'Produced by a complex rule that is kept exactly as written — the keystroke can\'t be shown.' }),
   // spec §8 / #1606. These characters ARE produced, and are still discardable
   // like any other rule-backed character — the set exists so they are not
   // filed under "typed with a single key press" when no desktop key types
   // them at all.
-  'touch-only-key': 'Typed only from the on-screen touch keyboard — no desktop key produces it.',
+  'touch-only-key': msg({ id: "carve.gallery.groupHint.touchOnlyKey", message: 'Typed only from the on-screen touch keyboard — no desktop key produces it.' }),
 };
 
 // Decorative category-distinguishing dots — no --app-* semantic token exists
@@ -170,6 +172,7 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
   const { t } = useLingui();
   const suggestedDiscard = t({ id: "carve.cell.suggestedDiscard", message: "discarded, suggested — click to keep" });
   const markedDiscard = t({ id: "carve.cell.markedDiscard", message: "marked to discard when you continue — click to keep" });
+  const discardedLabel = t({ id: "carve.detailsCard.carvedBadge", message: "discarded" });
   return (
     <button
       type="button"
@@ -180,7 +183,7 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
       aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${
         flag === 'marked'
           ? `, ${markedDiscard}`
-          : flag === 'suggested-discard' ? `, ${suggestedDiscard}` : discarded ? ', discarded' : ''
+          : flag === 'suggested-discard' ? `, ${suggestedDiscard}` : discarded ? `, ${discardedLabel}` : ''
       }`}
       {...(flag === 'marked' ? { title: markedDiscard } : flag === 'suggested-discard' ? { title: suggestedDiscard } : {})}
       style={{
@@ -470,13 +473,13 @@ function HowItsTyped({ cell, showLabel = true }: { cell: CharacterCell; showLabe
 const ways = cell.waysToType.filter((w) => w.steps.length > 0 || w.triggerFloor !== undefined);
 const label = showLabel ? (
   <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
-    How it's typed
+    <Trans id="carve.detailsCard.howTyped">How it's typed</Trans>
   </div>
 ) : null;
 const renderWay = (way: CharacterCell['waysToType'][number]) => (
   way.steps.length > 0
     ? <KeySeq keys={way.steps} joiner="then" />
-    : <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>Typed with {way.triggerFloor}</span>
+    : <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}><Trans id="carve.gallery.typedWith">Typed with {way.triggerFloor}</Trans></span>
 );
 
 if (ways.length === 0) {
@@ -497,7 +500,7 @@ if (ways.length === 0) {
       <>
         {label}
         <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-          Only on the touch keyboard — no desktop key types it
+          <Trans id="carve.gallery.howTyped.touchOnly">Only on the touch keyboard — no desktop key types it</Trans>
         </span>
       </>
     );
@@ -507,7 +510,7 @@ if (ways.length === 0) {
       <>
         {label}
         <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-          This keyboard blocks this combination — nothing types it
+          <Trans id="carve.gallery.howTyped.blocked">This keyboard blocks this combination — nothing types it</Trans>
         </span>
       </>
     );
@@ -517,7 +520,7 @@ if (ways.length === 0) {
     <>
       {label}
       <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-        Produced by a complex rule kept exactly as written — the keystroke can't be shown
+        <Trans id="carve.gallery.howTyped.advancedRule">Produced by a complex rule kept exactly as written — the keystroke can't be shown</Trans>
       </span>
     </>
   );
@@ -542,7 +545,10 @@ if (!showList) {
 return (
   <>
     <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
-      How it's typed · {ways.length} {ways.length === 1 ? 'way' : 'ways'}
+      <Trans id="carve.detailsCard.howTyped">How it's typed</Trans> ·{' '}
+      <Trans id="carve.gallery.wayCount">
+        <Plural value={ways.length} one="# way" other="# ways" />
+      </Trans>
     </div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {ways.map((way, i) => (
@@ -1284,7 +1290,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           }}
         >
           <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-muted)', padding: '0 6px 0 0' }}>
-            Group by
+            <Trans id="carve.gallery.groupBy.legend">Group by</Trans>
           </legend>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'category' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}>
             <input
@@ -1295,7 +1301,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
               checked={groupBy === 'category'}
               onChange={() => setGroupBy('category')}
             />
-            Category
+            <Trans id="survey.characterMapPane.info.category">Category</Trans>
           </label>
           <label
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'source' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}
@@ -1308,7 +1314,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
               checked={groupBy === 'source'}
               onChange={() => setGroupBy('source')}
             />
-            Source
+            <Trans id="carve.gallery.groupBy.source">Source</Trans>
           </label>
         </fieldset>
         <button
@@ -1374,7 +1380,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             <Trans id="carve.details.heading">Character details</Trans>
           </div>
           {selectedCell === undefined ? (
-            <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>No characters to show.</p>
+            <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}><Trans id="carve.detailsCard.empty">No characters to show.</Trans></p>
           ) : (() => {
             const cell = selectedCell;
             const discarded = isCellDiscarded(cell, isItemDeleted);
@@ -1402,7 +1408,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
-                    Comes from
+                    <Trans id="carve.gallery.comesFrom">Comes from</Trans>
                   </div>
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1425,7 +1431,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
-                    In your alphabet
+                    <Trans id="carve.gallery.inAlphabet">In your alphabet</Trans>
                   </div>
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
@@ -1442,7 +1448,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
-                    {cell.inAlpha ? 'Yes' : 'No'}
+                    {cell.inAlpha ? t({ id: "criteria.attest.yes", message: "Yes" }) : t({ id: "criteria.attest.no", message: "No" })}
                   </span>
                 </div>
 
@@ -1517,10 +1523,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           </>
 
           {groups.length === 0 && (
-            <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>No characters to show.</p>
+            <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}><Trans id="carve.detailsCard.empty">No characters to show.</Trans></p>
           )}
           {groups.map((group) => {
             const allDiscarded = group.cells.every((c) => isCellDiscarded(c, isItemDeleted));
+            const hint = GROUP_HINTS[group.key];
             return (
               <section key={group.key} aria-label={group.label}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -1535,11 +1542,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                       border: '1px solid var(--app-border-strong)', borderRadius: 7, padding: '4px 10px',
                     }}
                   >
-                    {allDiscarded ? 'Restore all' : 'Discard all'}
+                    {allDiscarded ? t({ id: "carve.recommended.restoreAll", message: "Restore all" }) : t({ id: "carve.gallery.discardAll", message: "Discard all" })}
                   </button>
                 </div>
                 <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--app-text-subtle)' }}>
-                  {GROUP_HINTS[group.key] ?? ''}
+                  {hint === undefined ? '' : t(hint)}
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
                   {group.cells.map((cell) => {

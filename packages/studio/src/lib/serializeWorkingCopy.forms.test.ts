@@ -23,7 +23,7 @@ const forms = vi.hoisted(() => ({ bodyOverride: null as string | null }));
 vi.mock("@keyboard-studio/contracts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@keyboard-studio/contracts")>();
   const docForms = {
-    mechanisms: actual.DOC_FORMS.mechanisms,
+    ...actual.DOC_FORMS,
     forms: new Proxy(actual.DOC_FORMS.forms, {
       get: (target, key) =>
         key === "body" && forms.bodyOverride !== null ? forms.bodyOverride : Reflect.get(target, key),

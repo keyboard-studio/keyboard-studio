@@ -73,12 +73,10 @@ describe("Pattern", () => {
   });
 
   it("ALL_STRATEGY_IDS exposes every S-01..S-13 id exactly once", () => {
-    expect(ALL_STRATEGY_IDS).toHaveLength(13);
-    expect(new Set(ALL_STRATEGY_IDS).size).toBe(13);
-    const first = ALL_STRATEGY_IDS[0]!;
-    expect(first).toBe("S-01");
-    const last = ALL_STRATEGY_IDS[12]!;
-    expect(last).toBe("S-13");
+    // Contiguous S-01..S-NN with no duplicates; no pinned catalog size.
+    expect(ALL_STRATEGY_IDS).toEqual(
+      ALL_STRATEGY_IDS.map((_, i) => `S-${String(i + 1).padStart(2, "0")}`),
+    );
   });
 
   // (a) non-empty appliesTo array on a constructed Pattern

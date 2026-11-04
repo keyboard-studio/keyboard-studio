@@ -136,6 +136,17 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_HISTORY_MD_ABSENT",
   "KM_LINT_README_HTM_ABSENT",
   "KM_LINT_WELCOME_HTM_ABSENT",
+  // Required-file existence checks (2026-11-02 ruling: README.md,
+  // LICENSE.md, the .kpj, the .kps, the touch layout, the .kvks and the
+  // .ico are required files — absence is a finding, and dependent checks
+  // nest under it via contextMissing).
+  "KM_LINT_KPJ_ABSENT",
+  "KM_LINT_LICENSE_MD_ABSENT",
+  "KM_LINT_README_MD_ABSENT",
+  "KM_LINT_KPS_ABSENT",
+  "KM_LINT_TOUCH_LAYOUT_ABSENT",
+  "KM_LINT_KVKS_ABSENT",
+  "KM_LINT_ICO_ABSENT",
   // Group A2 .kps-listing twins (check-kps-listing): post-hoc checks of
   // the scaffolder-bake package-listing guarantees — 8.1b–8.6b /
   // 8.8b–8.11b. Pure functions of the .kps <File> names.
@@ -194,4 +205,12 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_VERSION_NOT_BUMPED",
   "KM_LINT_SPURIOUS_VERSION_BUMP",
   "KM_LINT_VERSION_NOT_INCREMENTED",
+  // Consistency batch (keyboards#4146 mining, 2026-10-31): the five new
+  // deterministic criteria checks in packages/keyboard-lint/src/checks/
+  // criteria/ — §§7.25/7.26/7.27/18.14/1.15.
+  "KM_LINT_DEPRECATED_NUMERIC_FORMAT",
+  "KM_LINT_CAPS_NCAPS_INCONSISTENT",
+  "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE",
+  "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS",
+  "KM_LINT_FILENAME_CONVENTION",
 ]);

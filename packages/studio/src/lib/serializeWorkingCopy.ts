@@ -30,6 +30,9 @@ import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
+import { buildReadmeFacts } from "./readmeFacts.ts";
+import { readmeFactsInputFrom } from "./readmeFactsInput.ts";
+import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import {
   resolvePublishVersion,
   generateStubs,
@@ -486,13 +489,16 @@ export async function projectWorkingCopyForOutput(
 
   // spec 079 FR-013..FR-015: one deterministic layout chart per (platform,
   // layer), generated from the MODEL (never the on-screen preview) unless the
-  // base ships its own images and the author has not asked to regenerate.
+  // base ships its own images and the author has not asked to regenerate —
+  // on a copy, only when the author explicitly chose to keep them.
   // Computed before the projection so the descriptor's <Files> can list them.
   // Chart names carry the reserved `ks-layout-` prefix, so a base image can
   // never be overwritten; a (theoretical) same-named base image wins.
   const docWarnings: string[] = [];
   const baseShipsImages = carriedImageNames.length > 0;
-  const chartsWanted = effectiveChartPreference(chartPreference, baseShipsImages) === "regenerate" || !baseShipsImages;
+  const isCopyTrack = instantiationMode === "new-from-base";
+  const chartsWanted =
+    effectiveChartPreference(chartPreference, baseShipsImages, isCopyTrack) === "regenerate" || !baseShipsImages;
   const charts = chartsWanted
     ? buildLayoutCharts({
         displayName: identity?.displayName ?? startKeyboard.displayName,
@@ -626,11 +632,30 @@ export async function projectWorkingCopyForOutput(
     keyboardId: resolvedKeyboardId,
     platforms: parseTargetTokens(projectedKmnText),
     generated: docContent.slots,
+    // Spec 110: the README.md / readme.htm facts, from the same IR and the
+    // recorded answers (the same gatherer useDocsPreview uses).
+    readme: buildReadmeFacts(
+      readmeFactsInputFrom({
+        ir: workingIr ?? startIr,
+        touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+        decisions: getDecisionSnapshot(),
+        isAdaptation,
+        startKeyboard,
+        ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
+        ...(identity?.languageName !== undefined ? { languageName: identity.languageName } : {}),
+        carveChars: state.carveChars,
+        fallbackPolicy: state.fallbackPolicy,
+        helpDocs,
+        startVfs,
+        startReadmeMdText,
+      }),
+    ),
     ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
   };
-  // FR-006: an adaptation inherits the base's README description; a copy never
-  // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.
-  clonedVfs.set("README.md", renderReadmeMd(docsInput, isAdaptation ? startReadmeMdText : null), false);
+  // Spec 110 FR-011 (amending spec 080 FR-006): the README is regenerated on
+  // both tracks; an adaptation keeps only the inherited description, carried
+  // on the facts when the author has not written one.
+  clonedVfs.set("README.md", renderReadmeMd(docsInput), false);
   clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
   // spec 079 FR-002: the welcome page lives at the folder-convention path and
   // NOWHERE else — the flat `source/welcome.htm` is never written. A stale flat

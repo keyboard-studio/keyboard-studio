@@ -19,8 +19,8 @@ branch can burn the existing debt down without the count creeping back up.
   surface, and its SVG components pass colors as presentation attributes
   (`fill=`/`stroke=`), where CSS `var()` doesn't substitute; converting
   those needs a separate change, deferred from branch 1.
-- Test files: `*.test.ts(x)`, anything under `__tests__` or `e2e`, and
-  `*.fixture.ts`.
+- Test files: `*.test.ts(x)`, `*.contract.ts(x)`, anything under `__tests__` or
+  `e2e`, and `*.fixture.ts`.
 - Three third-party brand colors that must match the provider's brand
   exactly and so are intentionally not tokenized: `#238636` / `#2ea043`
   (GitHub sign-in button) and `#1a73e8` (Google sign-in button). See

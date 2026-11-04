@@ -96,6 +96,57 @@ describe("source precedence (obligation T4, FR-002/003, SC-001)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// #2396 — an explicit target script constrains the candidate ladder
+// ---------------------------------------------------------------------------
+
+describe("explicit target script (#2396)", () => {
+  it("does not seed a Latin Chechen request from the Cyrillic ce locale", () => {
+    // The studio canonicalises che → ce (buildTargetBcp47), so ce-Latn is the
+    // tag the identity step actually produces for Chechen + Latn.
+    expect(sourceExemplars("ce-Latn")).toBeNull();
+    // The issue's literal tag: che is absent from the index either way.
+    expect(sourceExemplars("che-Latn")).toBeNull();
+  });
+
+  it("leaves the bare Chechen tag seeding Cyrillic", () => {
+    const inv = sourceExemplars("ce");
+    expect(inv).not.toBeNull();
+    expect(inv!.resolvedTag).toBe("ce");
+    expect(charactersInTier(inv!, "main")).toContain("а");
+  });
+
+  it("leaves sr-Latn resolving at the first candidate", () => {
+    const inv = sourceExemplars("sr-Latn");
+    expect(inv).not.toBeNull();
+    expect(inv!.resolvedTag).toBe("sr-Latn");
+  });
+
+  it("resolves an explicitly-Cyrillic Serbian request", () => {
+    const inv = sourceExemplars("sr-Cyrl");
+    expect(inv).not.toBeNull();
+    expect(inv!.resolvedTag).toBe("sr-Cyrl");
+    expect(charactersInTier(inv!, "main")).toContain("а");
+  });
+
+  it("does not seed an Arabic Ewondo request from the Latin ewo locale", () => {
+    expect(sourceExemplars("ewo-Arab")).toBeNull();
+  });
+
+  it("still strips a default script: ewo-Latn resolves through ewo", () => {
+    const inv = sourceExemplars("ewo-Latn");
+    expect(inv).not.toBeNull();
+    expect(inv!.resolvedTag).toBe("ewo");
+  });
+
+  it("applies the script constraint on the union path too", () => {
+    expect(sourceExemplarsBoth("ce-Latn")).toBeNull();
+    const both = sourceExemplarsBoth("sr-Latn");
+    expect(both).not.toBeNull();
+    expect(both!.resolvedTag).toBe("sr-Latn");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Obligation T5 / FR-004, SC-007 — per-character attribution
 // ---------------------------------------------------------------------------
 

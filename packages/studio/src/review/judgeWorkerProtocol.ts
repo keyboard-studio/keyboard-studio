@@ -23,6 +23,7 @@ import type {
   EvidenceModel,
   ResolvedRow,
 } from "../criteria/criteriaTypes.ts";
+import type { FileTreeNode } from "./fileTree.ts";
 import {
   judgeForeignKeyboard,
   type JudgeForeignOptions,
@@ -52,6 +53,8 @@ export interface SerializedCriteriaResult {
   bandCounts: CriteriaResult["bandCounts"];
   total: number;
   resolvedCount: number;
+  /** The folder-tree inventory, built by the foreign judge. */
+  fileTree?: FileTreeNode[];
 }
 
 export type JudgeWorkerOutput =
@@ -93,6 +96,7 @@ export async function runJudgeJob(
         bandCounts: result.bandCounts,
         total: result.total,
         resolvedCount: result.resolvedCount,
+        ...(result.fileTree !== undefined ? { fileTree: result.fileTree } : {}),
       },
     };
   } catch (e) {
@@ -119,5 +123,6 @@ export function rehydrateResult(s: SerializedCriteriaResult): CriteriaResult {
     bandCounts: s.bandCounts,
     total: s.total,
     resolvedCount: s.resolvedCount,
+    ...(s.fileTree !== undefined ? { fileTree: s.fileTree } : {}),
   };
 }

@@ -34,6 +34,16 @@ nothing and written nothing — `messages:extract` appears to succeed while prod
 `i18n-catalog-lint` then misreports every committed catalog as an orphan. The floor is in the
 root [package.json](../package.json) `engines` and [.nvmrc](../.nvmrc).
 
+### Pre-push lint guard
+
+`pnpm install` runs `prepare`, which copies [.githooks/pre-push](../.githooks/pre-push) into the
+clone's git hooks directory ([scripts/install-git-hooks.mjs](../scripts/install-git-hooks.mjs)). A
+push that touches anything beyond `*.md`, `*.txt`, `docs/`, `specs/` and `.specify/` runs
+`pnpm lint` first (about two minutes) and aborts if it fails. It copies one file instead of
+setting `core.hooksPath`, so other tools' hooks keep working, and it never overwrites a
+`pre-push` hook it did not write. Bypass once with `git push --no-verify`; CI stays the backstop.
+Agents hit the same hook, so they must not bypass it.
+
 ### What `pnpm lint` actually runs
 
 ESLint over `packages/*/src`, then in order:
@@ -56,7 +66,9 @@ ESLint over `packages/*/src`, then in order:
 - `pnpm run i18n-catalog-lint` — drift **and** message-id key order of
   `packages/studio/src/locales/*/messages.json` (see Catalog sort order below). Also fails on any
   empty (`""`) target-locale value: a new UI string lands with its French in the same change, or
-  the next Crowdin sync turns the blank into English.
+  the next Crowdin sync turns the blank into English. And fails on a key that appears twice in any
+  locale's raw catalog text, which parsing alone hides (the last copy wins, so a blank original
+  survives under an appended translation).
 - `pnpm run content-i18n-freshness` — tsx-run `utilities/i18n-content-extract/cli.ts --check`;
   freshness of `content/i18n/en/*.json` against a fresh extraction. Single-sources the
   `flowQuestions.json` freshness the plain-JS `content-i18n-lint` can't re-derive from TS-module
@@ -404,6 +416,14 @@ Live and passing:
 - [convenience-loanwords.spec.ts](../packages/studio/e2e/convenience-loanwords.spec.ts) — Bafut
   copy-track walk; the convenience question must offer its loanword-only letters (strict
   `driveConvenienceStep`). Manual/local only, not in the CI `e2e` job
+
+Production-build only (its own config, not part of the dev-server lane):
+
+- [ldml-compile-trial.spec.ts](../packages/studio/e2e/ldml-compile-trial.spec.ts) — spec 108 FR-070
+  trial. Compiles a touch-bearing profile-46 export in the built bundle and compares its message
+  codes with the CI harness. Build first, then run
+  `npx playwright test --config playwright.trial.config.ts` from `packages/studio` (serves `dist/`
+  with `vite preview` on 5274; the default config ignores it).
 
 Skipped, each with an un-skip recipe at the top of its file:
 

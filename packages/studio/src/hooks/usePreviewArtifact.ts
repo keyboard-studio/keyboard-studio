@@ -45,11 +45,13 @@ import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuil
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import {
   buildKmpForDownload,
+  buildLdmlExportForDownload,
   buildSourceZipForDownload,
   buildTestBuildKmp,
   OutputBundleError,
 } from "../lib/buildOutputBundle.ts";
 import { resolveTestBuildVersion } from "@keyboard-studio/engine";
+import { getListLdmlProfiles } from "../lib/services.ts";
 import { changedSectionsSince, useTestingStore } from "../stores/testingStore.ts";
 import type { TestBuild } from "../lib/draftTypes.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
@@ -117,6 +119,13 @@ export interface PreviewArtifact {
    */
   kmpDiagnostics: CompilerDiagnostic[];
   handleDownloadKmp: () => Promise<void>;
+  /**
+   * The LDML keyboard export (spec 108): a separate, third download. Same gates as the other
+   * two; `downloadingLdml` joins the busy state that disables the `.kmp` and `.zip` buttons.
+   */
+  downloadingLdml: boolean;
+  ldmlError: string | null;
+  handleDownloadLdml: () => Promise<void>;
   /**
    * The version the next test build would ship at, or null when none fits
    * below the publish version (spec 094 research R1 — `versionUnsupported`).
@@ -210,6 +219,8 @@ export function usePreviewArtifact(): PreviewArtifact {
   const [buildingKmp, setBuildingKmp] = useState(false);
   const [kmpError, setKmpError] = useState<string | null>(null);
   const [kmpDiagnostics, setKmpDiagnostics] = useState<CompilerDiagnostic[]>([]);
+  const [downloadingLdml, setDownloadingLdml] = useState(false);
+  const [ldmlError, setLdmlError] = useState<string | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   // Set synchronously at entry so a double click cannot start two test builds
   // before the busy state re-renders the button disabled.
@@ -547,6 +558,47 @@ export function usePreviewArtifact(): PreviewArtifact {
     }
   }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, t]);
 
+  // spec 108: the LDML export. Same gates as the .zip and the .kmp, checked on the emission
+  // path itself and not only on the button. Runs once per click; no timer, no live diagnostics.
+  const handleDownloadLdml = useCallback(async () => {
+    if (stage.kind !== "ready") return;
+    if (coverageGate.blocked) {
+      setLdmlError(
+        t({
+          id: "output.artifact.error.coverageBlocked",
+          message: "Finish every inventory character before downloading.",
+        }),
+      );
+      return;
+    }
+    if (emissionBlockReason !== null) {
+      setLdmlError(emissionBlockReason);
+      return;
+    }
+    setDownloadingLdml(true);
+    setLdmlError(null);
+    setDownloadWarnings([]);
+    try {
+      const chosen = useWorkingCopyStore.getState().ldmlProfile;
+      const profileId =
+        chosen ?? (await getListLdmlProfiles())().find((p) => p.isDefault)?.id ?? "46";
+      const result = await buildLdmlExportForDownload(profileId);
+      if (result.warnings.length > 0) {
+        devLog.warn("[studio] LDML export projection warnings:", result.warnings);
+        setDownloadWarnings(result.warnings);
+      }
+      triggerDownload(result.bytes, result.filename, "application/zip");
+    } catch (err: unknown) {
+      setLdmlError(
+        err instanceof Error
+          ? err.message
+          : t({ id: "output.artifact.error.downloadFailed", message: "Download failed" }),
+      );
+    } finally {
+      setDownloadingLdml(false);
+    }
+  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason, t]);
+
   // spec 094: the next test build's version, from the same resolver the
   // publish version comes from. Recomputed as builds are recorded.
   const startIrVersion = useWorkingCopyStore((s) => s.startIr?.header.version);
@@ -658,6 +710,9 @@ export function usePreviewArtifact(): PreviewArtifact {
     kmpError,
     kmpDiagnostics,
     handleDownloadKmp,
+    downloadingLdml,
+    ldmlError,
+    handleDownloadLdml,
     nextTestVersion,
     handleMakeTestBuild,
     coverageGate,

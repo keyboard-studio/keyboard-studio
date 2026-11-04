@@ -11,11 +11,13 @@ import {
   helpPhpStub,
   renderWelcomeLayoutSection,
   extractWelcomeImageRefs,
+  README_HTM_ADDS_CAP,
   type GeneratedDocSlots,
   type HelpDocsRenderInput,
 } from "./helpDocsRender.js";
 import { DOC_PAGE_STYLE, welcomeHtm, readmeHtm } from "./packageDocs.js";
 import { DOC_GENERATED_END, DOC_GENERATED_START } from "./docSlots.js";
+import { extractReadmeDescription, type ReadmeFacts } from "./readmeFacts.js";
 
 const HAUSA_HEADER =
   "<?php\n  $pagename = 'Hausa Basic Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n";
@@ -37,6 +39,41 @@ function baseInput(overrides: Partial<HelpDocsRenderInput> = {}): HelpDocsRender
 function answersWith(overrides: Partial<HelpDocsAnswers> = {}): HelpDocsAnswers {
   return { description: "A keyboard for Piaroa.", usageTips: [], ...overrides };
 }
+
+/** Facts with nothing to report, so each test sets only what it is about. */
+function readmeFacts(overrides: Partial<ReadmeFacts> = {}): ReadmeFacts {
+  return {
+    languages: [],
+    characterGroups: [],
+    removed: [],
+    typingRows: [],
+    literalRows: [],
+    typingRowsOmitted: false,
+    needsFontNote: false,
+    designNotes: [],
+    ...overrides,
+  };
+}
+
+/** The worked example agreed in the spec 110 brainstorm. */
+const HAUSA_FACTS: ReadmeFacts = readmeFacts({
+  languages: [{ name: "Hausa", tag: "ha-Latn-NG", autonym: "Harshen Hausa" }],
+  basedOn: { name: "US English", layoutFamily: "QWERTY" },
+  useCase: "everyday texting and messaging",
+  characterGroups: [
+    { kind: "letters", label: "Letters", chars: ["ɓ", "ɗ", "ƙ"] },
+    { kind: "marks", label: "Marks", chars: ["◌̀"] },
+  ],
+  composition: "mixed",
+  typingRows: [
+    { keys: "AltGr + b", output: "ɓ" },
+    { keys: "; then a", output: "à" },
+  ],
+  literalRows: [{ keys: "; then ;", output: ";" }],
+  typingRowsOmitted: true,
+  needsFontNote: true,
+  designNotes: ["Started from US English."],
+});
 
 describe("helpDocsRender — FR-002 placeholder fallback", () => {
   it("renderReadmeMd falls back to the bare heading when answers is null", () => {
@@ -705,25 +742,19 @@ describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is
     expect(renderHelpPhp(baseInput(), startHelp)).toBe(startHelp);
   });
 
-  it("renderReadmeMd returns the base README verbatim (one trailing newline) when nothing has been authored yet", () => {
-    expect(renderReadmeMd(baseInput(), "# Base\n\nBase description.")).toBe(
-      "# Base\n\nBase description.\n",
-    );
-    expect(renderReadmeMd(baseInput(), "# Base\n\nBase description.\n\n\n")).toBe(
-      "# Base\n\nBase description.\n",
-    );
+  it("renderReadmeMd regenerates the README and uses the inherited description when none is answered (spec 110 FR-011)", () => {
+    const input = baseInput({ platforms: ["windows"], readme: readmeFacts({ fallbackDescription: "Base description." }) });
+    expect(renderReadmeMd(input)).toBe("# Piaroa\n\nBase description.\n\n## Supported Platforms\n- windows\n");
   });
 
-  it("renderReadmeMd appends the tool's sections below the base text once a description is answered, without a second title", () => {
+  it("renderReadmeMd prefers the answered description over the inherited one", () => {
     const input = baseInput({
       answers: answersWith({ description: "New description." }),
-      platforms: ["windows"],
+      readme: readmeFacts({ fallbackDescription: "Base description." }),
     });
-    const rendered = renderReadmeMd(input, "# Base\n\nBase description.");
-    expect(rendered).toBe(
-      "# Base\n\nBase description.\n\nNew description.\n\n## Supported Platforms\n- windows\n",
-    );
-    expect(rendered.match(/^# /gm)).toHaveLength(1);
+    const rendered = renderReadmeMd(input);
+    expect(rendered).toContain("New description.");
+    expect(rendered).not.toContain("Base description.");
   });
 
   it("renderHelpPhp derives the help page from the base welcome page when the base ships no help page", () => {
@@ -998,5 +1029,169 @@ describe("helpDocsRender — inherited fixes (issue #1908)", () => {
     expect(welcome).toContain('<a href="guide.htm">guide</a>');
     // The welcome page keeps its own document chrome.
     expect(welcome).toContain("<title>Cameroon QWERTY</title>");
+  });
+});
+
+describe("README.md and readme.htm from ReadmeFacts (spec 110)", () => {
+  const hausa = (overrides: Partial<HelpDocsRenderInput> = {}) =>
+    baseInput({
+      displayName: "Hausa Latin",
+      keyboardId: "ha_latn",
+      answers: answersWith({ description: "A keyboard for everyday Hausa writing." }),
+      platforms: ["windows", "web"],
+      readme: HAUSA_FACTS,
+      ...overrides,
+    });
+
+  it("renders the agreed README sections, in order", () => {
+    expect(renderReadmeMd(hausa())).toBe(
+      [
+        "# Hausa Latin",
+        "",
+        "A keyboard for everyday Hausa writing.",
+        "",
+        "For typing Hausa (Harshen Hausa, `ha-Latn-NG`) in the Latin script. Based on US English (QWERTY layout).",
+        "",
+        "Suited to: everyday texting and messaging.",
+        "",
+        "## Characters",
+        "",
+        "- Letters: ɓ ɗ ƙ",
+        "- Marks: ◌̀",
+        "",
+        "Accented letters are produced as single characters where Unicode has one, and otherwise as a letter followed by a combining mark.",
+        "",
+        "## How to type",
+        "",
+        "| Keys | Gives |",
+        "|------|-------|",
+        "| AltGr + b | ɓ |",
+        "| ; then a | à |",
+        "| ; then ; | ; |",
+        "",
+        "Full guide with every key: see the welcome page.",
+        "",
+        "## Fonts",
+        "",
+        "Some of these characters need a font that supports them. Without one they may show as empty boxes.",
+        "",
+        "## Design notes",
+        "",
+        "- Started from US English.",
+        "",
+        "## Links",
+        "- Online help: https://help.keyman.com/keyboard/ha_latn",
+        "- Keyman keyboards page: https://keyman.com/keyboards/ha_latn",
+        "",
+        "## Supported Platforms",
+        "- windows",
+        "- web",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("drops every optional section that has nothing to say, with no placeholder text", () => {
+    const readme = renderReadmeMd(baseInput({ readme: readmeFacts() }));
+    expect(readme).toBe("# Piaroa\n");
+  });
+
+  it("uses the author's font note over the generic one, and shows tips and known limitations", () => {
+    const readme = renderReadmeMd(
+      hausa({
+        answers: answersWith({
+          fontGuidance: "Use Andika or Charis SIL.",
+          usageTips: ["Type the tone mark after the vowel."],
+          knownLimitations: "Tone marks are not yet on touch.",
+        }),
+      }),
+    );
+    expect(readme).toContain("## Fonts\n\nUse Andika or Charis SIL.\n");
+    expect(readme).not.toContain("empty boxes");
+    expect(readme).toContain("## Tips\n\n- Type the tone mark after the vowel.\n");
+    expect(readme).toContain("## Known limitations\n\nTone marks are not yet on touch.\n");
+  });
+
+  it("escapes a table cell's pipe and Markdown specials", () => {
+    const readme = renderReadmeMd(
+      baseInput({ readme: readmeFacts({ typingRows: [{ keys: "| then *", output: "ŋ" }] }) }),
+    );
+    expect(readme).toContain(String.raw`| \| then \* | ŋ |`);
+  });
+
+  it("lists every language, with the autonym only on the primary one", () => {
+    const readme = renderReadmeMd(
+      baseInput({
+        readme: readmeFacts({
+          languages: [
+            { name: "Hausa", tag: "ha-Latn-NG", autonym: "Harshen Hausa" },
+            { name: "Fulfulde", tag: "ff-Latn-NG" },
+          ],
+        }),
+      }),
+    );
+    expect(readme).toContain("For typing Hausa (Harshen Hausa, `ha-Latn-NG`) and Fulfulde (`ff-Latn-NG`) in the Latin script.");
+  });
+
+  it("names the copied keyboard on the removed-characters line", () => {
+    const readme = renderReadmeMd(baseInput({ readme: readmeFacts({ basedOn: { name: "French" }, removed: ["œ"] }) }));
+    expect(readme).toContain("- Removed from French: œ");
+  });
+
+  it("readme.htm is the brief install-time page: no table, links, platforms, use case or design notes", () => {
+    const htm = renderReadmeHtm(hausa());
+    expect(htm).toContain("<h1>Hausa Latin</h1>");
+    expect(htm).toContain("<p>For typing Hausa (Harshen Hausa, ha-Latn-NG) in the Latin script. Based on US English (QWERTY layout).</p>");
+    expect(htm).toContain("<p>Adds: ɓ ɗ ƙ ◌̀</p>");
+    expect(htm).toContain("empty boxes");
+    expect(htm).toContain("see the welcome page for how to type each character");
+    for (const absent of ["<table", "Supported Platforms", "keyman.com/keyboards", "Suited to", "Started from", "single characters"]) {
+      expect(htm).not.toContain(absent);
+    }
+  });
+
+  it(`readme.htm cuts the Adds line after ${README_HTM_ADDS_CAP} letters and marks`, () => {
+    const chars = Array.from({ length: README_HTM_ADDS_CAP + 3 }, (_, i) => String.fromCodePoint(0x0250 + i));
+    const htm = renderReadmeHtm(baseInput({ readme: readmeFacts({ characterGroups: [{ kind: "letters", label: "Letters", chars }] }) }));
+    expect(htm).toContain(`${chars[README_HTM_ADDS_CAP - 1]} … and 3 more</p>`);
+    expect(htm).not.toContain(chars[README_HTM_ADDS_CAP]!);
+  });
+
+  it("states the same facts in README.md and readme.htm", () => {
+    const md = renderReadmeMd(hausa());
+    const htm = renderReadmeHtm(hausa());
+    for (const fact of ["Harshen Hausa", "ha-Latn-NG", "Latin script", "Based on US English", "ɓ ɗ ƙ", "empty boxes"]) {
+      expect(md).toContain(fact);
+      expect(htm).toContain(fact);
+    }
+  });
+
+  it("readme.htm without facts is unchanged", () => {
+    expect(renderReadmeHtm(baseInput({ readme: readmeFacts() }))).toBe(readmeHtm("Piaroa"));
+  });
+});
+
+describe("extractReadmeDescription", () => {
+  it("reads an ATX Description section", () => {
+    expect(extractReadmeDescription("# K\n\n## Description\n\nTypes K.\nMore.\n\n## Links\n")).toBe("Types K. More.");
+  });
+
+  it("reads a setext Description section after the copyright and version lines", () => {
+    expect(
+      extractReadmeDescription("K keyboard\n==========\n\n© SIL Global\n\nVersion 1.0\n\nDescription\n-----------\nTypes K.\n\nLinks\n-----\n"),
+    ).toBe("Types K.");
+  });
+
+  it("reads the __DESCRIPTION__ marker style", () => {
+    expect(extractReadmeDescription("K\n=\n\n__DESCRIPTION__\nTypes K.\n")).toBe("Types K.");
+  });
+
+  it("falls back to the first paragraph after the title, skipping copyright and version", () => {
+    expect(extractReadmeDescription("# K\n\nCopyright (C) SIL\n\nVersion 2.0\n\nTypes K.\n")).toBe("Types K.");
+  });
+
+  it("is undefined when there is no description", () => {
+    expect(extractReadmeDescription("# K\n\n## Links\n")).toBeUndefined();
+    expect(extractReadmeDescription("")).toBeUndefined();
   });
 });

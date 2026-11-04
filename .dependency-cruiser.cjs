@@ -202,6 +202,21 @@ module.exports = {
       },
       to:   { path: '^packages/studio/src/test/headlessAuthor/' },
     },
+    {
+      name: 'ldml-testing-not-in-product',
+      comment:
+        'Spec 108: the LDML export test tooling (CLDR schemas, sample fixtures, ' +
+        'harnesses) lives under packages/engine/src/ldml-export/__testing__/. No ' +
+        'file under packages/*/src that is not a test (*.test.ts, excluded from ' +
+        'analysis by options.exclude) and not itself under that directory may ' +
+        'import it, so test tooling never reaches the product graph.',
+      severity: 'error',
+      from: {
+        path: '^packages/[^/]+/src/',
+        pathNot: '/ldml-export/__testing__/',
+      },
+      to:   { path: '/ldml-export/__testing__/' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

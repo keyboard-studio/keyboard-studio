@@ -32,7 +32,7 @@ export const REVIEW_SOURCES: readonly ReviewSource[] = [
     owner: "keyboard-studio",
     repo: "keyboards",
     kind: "prs",
-    blurb: "Open pull requests · proposed additions & fixes",
+    blurb: "Pull requests · proposed additions & fixes",
   },
   {
     id: "km-repo",
@@ -48,7 +48,7 @@ export const REVIEW_SOURCES: readonly ReviewSource[] = [
     owner: "keymanapp",
     repo: "keyboards",
     kind: "prs",
-    blurb: "Open pull requests · upstream proposals",
+    blurb: "Pull requests · upstream proposals",
   },
 ];
 
@@ -67,14 +67,17 @@ export interface ReviewKeyboardEntry {
   tier: "release" | "experimental" | "legacy" | string;
 }
 
-/** One open PR, from the static review index. Per-PR keyboard folders are
- *  resolved live from the PR's file list (PR heads move; a static snapshot
- *  of PR contents would go stale fast). */
+/** One pull request. The list is fetched live from the GitHub API (state=all),
+ *  with the static review index as fallback; `state` distinguishes open from
+ *  closed PRs. Per-PR keyboard folders are resolved live from the PR's file
+ *  list (PR heads move; a static snapshot of PR contents would go stale fast).
+ *  Index-generated entries predate `state` and are treated as open. */
 export interface ReviewPrEntry {
   number: number;
   title: string;
   headSha: string;
   updatedAt: string | null;
+  state: "open" | "closed";
 }
 
 export interface ReviewIndex {

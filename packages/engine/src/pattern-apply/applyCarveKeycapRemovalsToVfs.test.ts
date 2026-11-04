@@ -28,6 +28,7 @@ import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/cont
 import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { parse } from "../codec/parse.js";
 import { makeSlotId } from "./slotId.js";
+import { textVfs } from "../test-support/vfs.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -52,12 +53,12 @@ const KVKS_BASE = `<visualkeyboard>
 </visualkeyboard>`;
 
 function makeVfs(entries: { path: string; content: string }[]) {
-  return createVirtualFS([
+  return textVfs({
     // No &VISUALKEYBOARD/&LAYOUTFILE header stores — assets resolve to the
     // source/test.<ext> fallback paths.
-    { path: "source/test.kmn", content: "c test keyboard\n", isBinary: false },
-    ...entries.map((e) => ({ ...e, isBinary: false })),
-  ]);
+    "source/test.kmn": "c test keyboard\n",
+    ...Object.fromEntries(entries.map((e) => [e.path, e.content])),
+  });
 }
 
 function removalsOf(opts: { slotIds?: string[]; wholeNodeIds?: string[] }) {

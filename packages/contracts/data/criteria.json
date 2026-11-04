@@ -147,6 +147,13 @@
     "lintRuleId": "KM_LINT_STRAY_SCRATCH_FILES"
   },
   {
+    "id": "1.14-kpj-file-exists",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "A `.kpj` project file exists at the keyboard root.",
+    "lintRuleId": "KM_LINT_KPJ_ABSENT"
+  },
+  {
     "id": "2.1-version-bumped-if-package-changed",
     "section": "2. Version bumping",
     "band": "layer-c-enforce",
@@ -252,6 +259,13 @@
     "lintRuleId": "KM_LINT_HISTORY_STALE_FILE_REFS"
   },
   {
+    "id": "4.0-license-md-exists",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "layer-c-enforce",
+    "description": "A `LICENSE.md` exists at the keyboard root.",
+    "lintRuleId": "KM_LINT_LICENSE_MD_ABSENT"
+  },
+  {
     "id": "4.1-copyright-present-with-year",
     "section": "4. `LICENSE.md` (copyright)",
     "band": "scaffolder-bake",
@@ -327,6 +341,13 @@
     "band": "yellow-survey",
     "description": "If a year range is used, it starts at the original year and extends to the current year",
     "surveyQuestionId": "copyright-year-range-starts-at-original"
+  },
+  {
+    "id": "5.0-readme-md-exists",
+    "section": "5. `README.md`",
+    "band": "layer-c-enforce",
+    "description": "A `README.md` exists at the keyboard root.",
+    "lintRuleId": "KM_LINT_README_MD_ABSENT"
   },
   {
     "id": "5.1-readme-good-header",
@@ -474,6 +495,20 @@
     "band": "yellow-survey",
     "description": "`welcome.htm` content is not political or self-promoting",
     "surveyQuestionId": "welcome-htm-not-political"
+  },
+  {
+    "id": "7.0-kvks-file-exists",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "A `.kvks` on-screen keyboard file exists in `source/`.",
+    "lintRuleId": "KM_LINT_KVKS_ABSENT"
+  },
+  {
+    "id": "7.0-ico-file-exists",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "An `.ico` icon file exists for the keyboard.",
+    "lintRuleId": "KM_LINT_ICO_ABSENT"
   },
   {
     "id": "7.1-kmn-version-matches-history",
@@ -635,6 +670,13 @@
     "band": "layer-c-enforce",
     "description": "Keyboard compiles with no errors (build-output context; errors only, not warnings \u2014 see 7.6 for the stricter source-review check)",
     "lintRuleId": "KM_LINT_COMPILE_ERRORS"
+  },
+  {
+    "id": "8.0-kps-file-exists",
+    "section": "8. Package contents (`.kps` \u2192 Packaging tab \u2192 Files)",
+    "band": "layer-c-enforce",
+    "description": "A `.kps` package file exists in `source/`.",
+    "lintRuleId": "KM_LINT_KPS_ABSENT"
   },
   {
     "id": "8.1-kps-includes-kmx",
@@ -1204,6 +1246,13 @@
     "preSubmitChecklistText": "Any issues the TeamCity build caught that local review missed have been fed back to the author."
   },
   {
+    "id": "18.0-touch-layout-exists",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "description": "A `.keyman-touch-layout` touch layout file exists in `source/`.",
+    "lintRuleId": "KM_LINT_TOUCH_LAYOUT_ABSENT"
+  },
+  {
     "id": "18.1-longpress-within-limit",
     "section": "18. Design heuristics (DISCUS)",
     "band": "layer-c-enforce",
@@ -1326,5 +1375,54 @@
     "band": "layer-c-enforce",
     "description": "HISTORY.md contains the 'Adapted from' entry.",
     "lintRuleId": "KM_LINT_HISTORY_ATTRIBUTION_BAD"
+  },
+  {
+    "id": "7.25-no-deprecated-numeric-formats",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "All character literals in the `.kmn` use `U+NNNN` notation; deprecated decimal/octal/hex formats (`d###`, `###`, `x###`) do not appear (removed in Keyman 20)",
+    "lintRuleId": "KM_LINT_DEPRECATED_NUMERIC_FORMAT"
+  },
+  {
+    "id": "7.26-caps-ncaps-consistent-per-key",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "Every rule referencing a given key is consistent in CAPS/NCAPS handling: if any rule for the key tests CAPS or NCAPS, no rule for that key omits the modifier",
+    "lintRuleId": "KM_LINT_CAPS_NCAPS_INCONSISTENT"
+  },
+  {
+    "id": "7.27-no-deprecated-headers-or-unused-stores",
+    "section": "7. Keyboard source (`.kpj` \u2192 Keyboards tab \u2192 `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "No deprecated header statements or system stores remain (modern store equivalents used); stores declared but never referenced are removed",
+    "lintRuleId": "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE"
+  },
+  {
+    "id": "18.14-touch-layers-carry-bksp-enter",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "description": "Every touch layer (including shift/RALT/alt variants) includes the required control keys (`K_LOPT`, `K_BKSP`, `K_ENTER`); standard control keys use canonical `K_` IDs, not touch-only `T_` IDs",
+    "lintRuleId": "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS"
+  },
+  {
+    "id": "18.15-touch-desktop-output-parity",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "yellow-survey",
+    "description": "Every character produced by the touch layout is produced identically by the desktop rules and vice versa (judgment call; compare compiled behavior)",
+    "surveyQuestionId": "touch-desktop-output-parity"
+  },
+  {
+    "id": "12.7-bcp47-tags-minimal-registered",
+    "section": "12. Language tagging (BCP47)",
+    "band": "yellow-survey",
+    "description": "Each language tag is the minimal registered BCP 47 tag for the language/script (no dead, collective, or redundant subtags); every tag resolves in the current langtags registry",
+    "surveyQuestionId": "bcp47-tags-minimal-registered"
+  },
+  {
+    "id": "1.15-filenames-follow-convention",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "All files in the keyboard folder follow the filename convention: lowercase extensions, and names containing only alphanumerics, `-`, `_`, `+`, `.`",
+    "lintRuleId": "KM_LINT_FILENAME_CONVENTION"
   }
 ]

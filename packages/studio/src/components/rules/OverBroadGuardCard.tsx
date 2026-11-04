@@ -16,7 +16,7 @@
 //     disposition so the question may surface again).
 
 import { useState } from "react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { OverBroadGuard } from "./guardAnalysis.ts";
 import { narrowOverBroadGuard, undoNarrow } from "./narrowGuard.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
@@ -25,6 +25,7 @@ import { rulesActions, rulesBody, rulesCode, rulesInsetCard, rulesNote } from ".
 import { secondaryButton } from "../../survey/surveyStyles.ts";
 
 export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
+  const { t } = useLingui();
   const keepOverBroadGuard = useGuardIntentStore((s) => s.keepOverBroadGuard);
   const [narrowedRuleId, setNarrowedRuleId] = useState<string | null>(null);
   const [narrowStale, setNarrowStale] = useState(false);
@@ -55,7 +56,7 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
   return (
     <section
       data-testid={`overbroad-guard-${guard.guardRuleId}`}
-      aria-label="Guard question"
+      aria-label={t({ id: "rules.overBroadGuard.sectionLabel", message: "Guard question" })}
       style={rulesInsetCard}
     >
       <p style={rulesBody}>

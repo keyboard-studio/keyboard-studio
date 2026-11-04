@@ -37,6 +37,7 @@ import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
+import { registerRouteProvider } from "../decisions/routeProvider.ts";
 import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
 import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
@@ -51,9 +52,12 @@ import {
   deadkeysStep,
   rulesStep,
   mechanismsStep,
+  oskStep,
   touchSeedSourceStep,
   touchStep,
+  cssStep,
   helpStep,
+  htmlStep,
   packageStep,
 } from "./registerEditorSteps.ts";
 
@@ -283,6 +287,11 @@ const stepPool: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
+  // --- OSK (on-screen keyboard customization) ---
+  // Runs after the Mechanical gallery: the underlying OSK is generated from
+  // the physical layout, and this step lets the author customize key labels.
+  oskStep,
+
   // --- Touch seed source (gated side-trail fork, FR-013) ---
   // Lets the author choose the touch seed while no choice is recorded; both
   // branches converge on the same touch carve/add shell.
@@ -295,8 +304,19 @@ const stepPool: readonly Step[] = [
     lock: "touch",
   } satisfies Step,
 
+  // --- Custom CSS (optional, after Touch) ---
+  // Monaco editor for the keyboard's custom stylesheet (&KMW_EMBEDCSS).
+  // Optional — if empty, no .css file is written. Includes live preview
+  // of both touch layout and desktop OSK with the CSS applied.
+  cssStep,
+
   // --- Help (Phase F: usage tips and credits) ---
   helpStep,
+
+  // --- Documentation (welcome.htm, Markdown) ---
+  // Monaco editor for the keyboard's user manual. readme.htm, README.md,
+  // and .php versions are generated exports from this source.
+  htmlStep,
 
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
@@ -366,6 +386,26 @@ export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolea
     ),
   );
 
+// The author's current route for the lint fallback (spec 108 FR-015): a screen is on the route
+// while its derived gate passes, and a screen with no gate always is. Registered here, not
+// imported by the consumers, because they sit upstream of this module's evaluation.
+registerRouteProvider((decisions) => {
+  const route = new Set<string>();
+  for (const { id } of derivedScreens) {
+    const gate = screenGates.get(id);
+    let on = true;
+    if (gate !== undefined) {
+      try {
+        on = gate(decisions);
+      } catch {
+        on = true;
+      }
+    }
+    if (on) route.add(id);
+  }
+  return route;
+});
+
 /**
  * Derived screen trails by screen id (spine membership + join target),
  * including the ruled terminal "package" screen (ungated spine). The
@@ -434,8 +474,9 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, deadkeys, rules, mechanisms, touch, touch_seed_source}
-  // must declare layout:"full"; all others must be "pane" or omit layout. A
+  // EXACTLY {carve, deadkeys, rules, mechanisms, osk, touch, touch_seed_source,
+  // css, html} must declare layout:"full"; all others must be "pane" or omit
+  // layout. A
   // mismatched layout would silently change the chrome. touch_seed_source
   // joined this set in the P0 fix for the panel's inline live OSK preview
   // (spec 035 R4b follow-up) — without full-screen, StudioShell's persistent
@@ -444,12 +485,22 @@ export function validateManifestShape(): void {
   // its own Back/Continue nav renders inside.
   // rules joined in spec 082: the demo pane + rule builder need the full
   // width, same as the carve and mechanisms galleries it sits between.
-  const FULL_LAYOUT_IDS = new Set(["carve", "deadkeys", "rules", "mechanisms", "touch", "touch_seed_source"]);
+  const FULL_LAYOUT_IDS = new Set([
+    "carve",
+    "deadkeys",
+    "rules",
+    "mechanisms",
+    "osk",
+    "touch",
+    "touch_seed_source",
+    "css",
+    "html",
+  ]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source/css/html may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

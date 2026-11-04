@@ -38,7 +38,7 @@ interface JourneyCase {
   visitsOnce?: readonly string[];
   /** The step the replay ends on. */
   lastStep?: string;
-  /** The replay's last edge is help->done. */
+  /** The replay's last edge is html->done (help and html editor steps precede output). */
   endsAtDone: boolean;
 }
 
@@ -57,9 +57,11 @@ const JOURNEYS: readonly JourneyCase[] = [
       "deadkeys",
       "mechanisms",
       "touch",
+      "css",
       "help",
+      "html",
     ],
-    lastStep: "help",
+    lastStep: "html",
     endsAtDone: true,
   },
   {
@@ -76,9 +78,11 @@ const JOURNEYS: readonly JourneyCase[] = [
       "deadkeys",
       "mechanisms",
       "touch",
+      "css",
       "help",
+      "html",
     ],
-    lastStep: "help",
+    lastStep: "html",
     endsAtDone: true,
   },
   {
@@ -121,7 +125,7 @@ describe.each(JOURNEYS)("replayJourney — $name", (j) => {
       expect(result.exercisedStepIds.filter((s) => s === id)).toHaveLength(1);
     }
     if (j.lastStep !== undefined) expect(result.exercisedStepIds.at(-1)).toBe(j.lastStep);
-    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe("help->done");
+    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe("html->done");
   });
 });
 

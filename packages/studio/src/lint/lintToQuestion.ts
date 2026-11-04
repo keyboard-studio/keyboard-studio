@@ -40,7 +40,78 @@ const LINT_CODE_TO_QUESTION_IDS: Partial<Record<LintCode, string[]>> = {
   KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE: ["region"],
   KM_LINT_REGION_001_TAG:                 ["region"],
   KM_LINT_ISO_639_5_LANG_CODE:            ["iso_code"],
+
+  // LDML export (spec 108 FR-015): codes owned by a question surface. Routing is by code
+  // alone; the rules-step codes route by step instead (LINT_CODE_TO_STEP_IDS).
+  KM_LINT_LDML_FRAME_KEY:          ["physical-layout"],
+  KM_LINT_LDML_FORM_KEY_MISSING:   ["physical-layout"],
+  KM_LINT_LDML_SHIFT_SIDE:         ["physical-layout"],
+  KM_LINT_LDML_MNEMONIC:           ["physical-layout"],
+  KM_LINT_LDML_CAPS_MODE:          ["physical-layout"],
+  KM_LINT_LDML_MODIFIER:           ["physical-layout"],
+  KM_LINT_LDML_MODIFIER_SIDES:     ["physical-layout"],
+  KM_LINT_LDML_BKSP_NO_CONTEXT:    ["physical-layout"],
+  KM_LINT_LDML_TOUCH_PRESENTATION: ["touch-layout"],
+  KM_LINT_LDML_TOUCH_SPECIAL_KEY:  ["touch-layout"],
+  // The parser sets `readonly` only on NewContext/PostKeystroke groups, so every no-trigger
+  // row is touch layer behaviour.
+  KM_LINT_LDML_NO_KEY_TRIGGER:     ["touch-layout"],
+  KM_LINT_LDML_NO_LOCALE:          ["iso_code"],
 };
+
+/**
+ * Codes owned by a whole step rather than a question (spec 108 FR-015): the `rules` step
+ * has no per-question surface, so it renders its findings as one grouped summary. Consulted
+ * only when a code has no question route.
+ */
+export const LINT_CODE_TO_STEP_IDS: Partial<Record<LintCode, string[]>> = {
+  KM_LINT_LDML_KEY_STORE:              ["rules"],
+  KM_LINT_LDML_NEGATED_CLASS:          ["rules"],
+  KM_LINT_LDML_CONTEXT_START:          ["rules"],
+  KM_LINT_LDML_GROUP_CHAIN_PARTIAL:    ["rules"],
+  KM_LINT_LDML_MATCH_NOMATCH_OUTPUT:   ["rules"],
+  KM_LINT_LDML_CALL:                   ["rules"],
+  KM_LINT_LDML_PLATFORM_CONDITION:     ["rules"],
+  KM_LINT_LDML_OPTION_STATE:           ["rules"],
+  KM_LINT_LDML_BASELAYOUT_CONDITION:   ["rules"],
+  KM_LINT_LDML_LAYER_STATE:            ["rules"],
+  KM_LINT_LDML_NORMALIZATION:          ["rules"],
+  KM_LINT_LDML_OPAQUE:                 ["rules"],
+  KM_LINT_LDML_BEEP:                   ["rules"],
+  KM_LINT_LDML_EXPANSION_LIMIT:        ["rules"],
+  KM_LINT_LDML_NOTANY_MULTI:           ["rules"],
+  KM_LINT_LDML_CAPTURE_LIMIT:          ["rules"],
+  KM_LINT_LDML_UNREACHABLE:            ["rules"],
+};
+
+/** A code the Output page owns outright: no question or step route, listed with the download. */
+const LDML_CODE_PREFIX = "KM_LINT_LDML_";
+
+/**
+ * The steps that own a code: the steps of its question routes, else its step routes. An empty
+ * result means the Output page owns it.
+ */
+function ownerStepsOf(code: LintCode): string[] {
+  const steps = new Set<string>();
+  for (const qid of LINT_CODE_TO_QUESTION_IDS[code] ?? []) {
+    const step = QUESTION_ID_TO_STEP_ID[qid];
+    if (step !== undefined) steps.add(step);
+  }
+  if (steps.size === 0) for (const step of LINT_CODE_TO_STEP_IDS[code] ?? []) steps.add(step);
+  return [...steps];
+}
+
+/**
+ * Route fallback (spec 108 FR-015): a finding whose owning step is not in the author's
+ * current route is treated as unmapped and appears on the Output page. With no route given
+ * every step counts as present, which is the behaviour before routes were consulted.
+ */
+function ownedInRoute(code: LintCode, route: ReadonlySet<string> | undefined): boolean {
+  if (route === undefined) {
+    return LINT_CODE_TO_QUESTION_IDS[code] !== undefined || LINT_CODE_TO_STEP_IDS[code] !== undefined;
+  }
+  return ownerStepsOf(code).some((step) => route.has(step));
+}
 
 /**
  * Distribute a flat findings array into a record keyed by survey question ID.
@@ -50,11 +121,13 @@ const LINT_CODE_TO_QUESTION_IDS: Partial<Record<LintCode, string[]>> = {
  */
 export function buildFindingsByQuestionId(
   findings: LintFinding[],
+  route?: ReadonlySet<string>,
 ): Record<string, LintFinding[]> {
   const result: Record<string, LintFinding[]> = {};
   for (const finding of findings) {
     const questionIds = LINT_CODE_TO_QUESTION_IDS[finding.code];
     if (!questionIds) continue;
+    if (route !== undefined && !ownedInRoute(finding.code, route)) continue;
     for (const qid of questionIds) {
       (result[qid] ??= []).push(finding);
     }
@@ -63,16 +136,29 @@ export function buildFindingsByQuestionId(
 }
 
 /**
- * Findings whose code has no survey-question remediation surface (not present
- * in LINT_CODE_TO_QUESTION_IDS). These won't appear as inline question chips;
- * their owner surface is the Output screen (#2145), where the accumulated
+ * Findings with no surface in the current route: a code with no question or step route, or
+ * one whose owning step is absent from `route`. These won't appear as inline question
+ * chips; their owner surface is the Output screen (#2145), where the accumulated
  * set renders beside the documentation checklist.
  * This is also the natural surface for synthetic infrastructure findings (e.g.
  * KM_WARN_* validator/lint-crash codes) which by definition map to no survey
  * question — the Output surface filters those out (never author-facing).
  */
-export function selectUnmappedFindings(findings: LintFinding[]): LintFinding[] {
-  return findings.filter((f) => !LINT_CODE_TO_QUESTION_IDS[f.code]);
+export function selectUnmappedFindings(
+  findings: LintFinding[],
+  route?: ReadonlySet<string>,
+): LintFinding[] {
+  return findings.filter((f) => !ownedInRoute(f.code, route));
+}
+
+/** The findings a step owns by step route (not by question): the rules step's grouped summary. */
+export function selectStepOwnedFindings(
+  findings: LintFinding[],
+  stepId: string,
+): LintFinding[] {
+  return findings.filter(
+    (f) => !LINT_CODE_TO_QUESTION_IDS[f.code] && (LINT_CODE_TO_STEP_IDS[f.code] ?? []).includes(stepId),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -99,25 +185,31 @@ const QUESTION_ID_TO_STEP_ID: Readonly<Record<string, string>> = {
 
 /**
  * Warning counts per owning step, from the same mapped findings the inline
- * question chips render (`buildFindingsByQuestionId`). A finding whose code
+ * question chips (and the step-owned summaries) render. A finding whose code
  * maps to several questions on the SAME step counts once for that step; a
  * finding mapped to questions on different steps counts once per step.
  * Unmapped findings contribute nothing — they have no step owner (their
- * surface is the Output screen).
+ * surface is the Output screen). A `KM_LINT_LDML_*` code counts once per
+ * step however many findings carry it, hints included, so a step with 300
+ * option-state warnings and 2 call warnings badges 2 (spec 108 FR-018).
  */
 export function buildStepWarningCounts(
   findings: LintFinding[],
+  route?: ReadonlySet<string>,
 ): Record<string, number> {
   const counts: Record<string, number> = {};
+  const ldmlSeen = new Set<string>();
   for (const finding of findings) {
-    const questionIds = LINT_CODE_TO_QUESTION_IDS[finding.code];
-    if (!questionIds) continue;
-    const steps = new Set<string>();
-    for (const qid of questionIds) {
-      const step = QUESTION_ID_TO_STEP_ID[qid];
-      if (step !== undefined) steps.add(step);
+    if (!ownedInRoute(finding.code, route)) continue;
+    const isLdml = finding.code.startsWith(LDML_CODE_PREFIX);
+    for (const step of ownerStepsOf(finding.code)) {
+      if (isLdml) {
+        const key = `${step}|${finding.code}`;
+        if (ldmlSeen.has(key)) continue;
+        ldmlSeen.add(key);
+      }
+      counts[step] = (counts[step] ?? 0) + 1;
     }
-    for (const step of steps) counts[step] = (counts[step] ?? 0) + 1;
   }
   return counts;
 }

@@ -30,6 +30,9 @@
 
 ## Gotchas and limits
 - `skip_untranslated_strings` must stay `false` in `crowdin.yml`: `true` deleted keys (measured). Cost: untranslated strings download as English; the collapse guard catches an all-English catalog.
+- Tier A target values are never `""` on `main`: `messages:extract` writes `""` for each new id, and `i18n-catalog-lint` rejects it, so a new string lands with its French in the same change. Merging uploads it to Crowdin (`crowdin-upload-sources.yml`) and the next download round-trips it; a `""` left on `main` would come back as English. Tier B is the opposite: `""` there means "not yet translated" by design.
+- `i18n-catalog-lint` also fails on a key that appears twice in any Tier A catalog's raw text. Parsing keeps the last copy, which once hid six blank originals under appended French and let the empty-value check pass.
+- A Tier A string turning English in a Crowdin sync PR is a defect, not routine: Crowdin is missing French that `main` has. Re-run `crowdin-upload-sources` with `seed_translations` (it can run from any ref), or restore the French on the sync branch.
 - A new language-only locale needs, in one commit: `lingui.config.ts`, `SUPPORTED_LOCALES`, both `languages_mapping` blocks, and `CONFIGURED_LOCALES` in `utilities/i18n-prune-unconfigured-locales`. Region-qualified locales need no mapping entry.
 - Never hand-sort catalogs: use `pnpm run i18n-catalog-sort`. Do not wrap code ids, test ids, language autonyms.
 - `survey/questions/b/*.ts` is Tier A, not Tier B (D8).

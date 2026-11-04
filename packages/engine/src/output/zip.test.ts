@@ -414,3 +414,20 @@ describe("attribution reaches the delivered zip (spec 064 T027)", () => {
     expect(license).toContain("Permission is hereby granted, free of charge");
   });
 });
+
+describe("toZip determinism options", () => {
+  it("omits NEXT_STEPS.md when nextSteps is false and keeps it by default", async () => {
+    const without = unzipSync(await toZip(makeFixtureFS(), { nextSteps: false }));
+    expect(Object.keys(without)).not.toContain("NEXT_STEPS.md");
+    const withDefault = unzipSync(await toZip(makeFixtureFS()));
+    expect(Object.keys(withDefault)).toContain("NEXT_STEPS.md");
+  });
+
+  it("is byte-identical across a 2-second wait with a fixed mtime", async () => {
+    const opts = { fixedMtime: new Date(1980, 0, 1) };
+    const a = await toZip(makeFixtureFS(), opts);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    const b = await toZip(makeFixtureFS(), opts);
+    expect(Buffer.from(b).equals(Buffer.from(a))).toBe(true);
+  });
+});
