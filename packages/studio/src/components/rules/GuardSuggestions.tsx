@@ -12,7 +12,7 @@
 // Kept over-broad guards and dismissed missing-guard groups never reappear.
 
 import { useMemo } from "react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import {
   guardIntentSignaledForFamily,
@@ -27,6 +27,7 @@ import { OverBroadGuardCard } from "./OverBroadGuardCard.tsx";
 import { rulesSubHeading } from "./rulesStyles.ts";
 
 export function GuardSuggestions() {
+  const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const intent = useGuardIntentStore();
@@ -70,7 +71,7 @@ export function GuardSuggestions() {
   return (
     <section
       data-testid="guard-suggestions"
-      aria-label="Guard suggestions"
+      aria-label={t({ id: "rules.guardSuggestions.sectionLabel", message: "Guard suggestions" })}
       style={{ marginTop: 16 }}
     >
       <h4 style={rulesSubHeading}>

@@ -7,6 +7,8 @@
 // the keyboard — this screen imports no authoring store.
 
 import { useMemo, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
 import {
@@ -71,13 +73,16 @@ export function ReviewReport({
   onRerun: () => void;
   onBack: () => void;
 }) {
+  const { t } = useLingui();
   // Inject the author status into 17.2's details (red-checklist rows show
   // the checklist text; for a PR we can name the author situation).
   const judgedNote = useMemo(
     () =>
-      `Judged from a read-only snapshot of ${reviewTargetLabel(target)} — ` +
-      `the keyboard as published, unmodified.`,
-    [target],
+      t({
+        id: "review.report.judgedNote",
+        message: `Judged from a read-only snapshot of ${reviewTargetLabel(target)} — the keyboard as published, unmodified.`,
+      }),
+    [target, t],
   );
 
   const shareUrl = useMemo(() => {
@@ -90,12 +95,16 @@ export function ReviewReport({
     try {
       await navigator.clipboard.writeText(shareUrl);
     } catch {
-      window.prompt("Copy this report link:", shareUrl);
+      window.prompt(
+        t({ id: "review.report.copyLinkPrompt", message: "Copy this report link:" }),
+        shareUrl,
+      );
     }
   };
 
   const exportJson = () => {
     downloadJson(`health-check-${target.keyboardId}-${target.sha.slice(0, 7)}.json`, {
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- machine-readable tool identifier in the JSON export, not UI copy
       tool: "keyboard-studio health check",
       version: 1,
       target: {
@@ -161,8 +170,14 @@ export function ReviewReport({
   const resultWithAuthor = useMemo(() => {
     if (!authorInfo) return displayResult;
     const authorLine = authorInfo.isFirstPr
-      ? `Author @${authorInfo.login}: first PR to this repo — §17.2 applies.`
-      : `Author @${authorInfo.login}: ${authorInfo.prCount} PRs to this repo (not a first-time contributor).`;
+      ? t({
+          id: "review.report.authorFirstPr",
+          message: `Author @${authorInfo.login}: first PR to this repo — §17.2 applies.`,
+        })
+      : t({
+          id: "review.report.authorReturning",
+          message: `Author @${authorInfo.login}: ${authorInfo.prCount} PRs to this repo (not a first-time contributor).`,
+        });
     return {
       ...displayResult,
       rows: displayResult.rows.map((row) =>
@@ -177,7 +192,7 @@ export function ReviewReport({
           : row,
       ),
     };
-  }, [displayResult, authorInfo]);
+  }, [displayResult, authorInfo, t]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
@@ -195,7 +210,7 @@ export function ReviewReport({
           padding: 0,
         }}
       >
-        ← Pick another keyboard
+        <Trans id="review.report.backToPicker">← Pick another keyboard</Trans>
       </button>
 
       <div
@@ -210,18 +225,20 @@ export function ReviewReport({
           kbstudio.langtech.cloud/review
         </div>
         <h1 style={{ margin: "6px 0 4px", fontSize: 20 }}>
-          Health report:{" "}
+          <Trans id="review.report.heading">Health report:</Trans>{" "}
           <span style={{ fontFamily: CSS_FONT_MONO }}>{target.keyboardId}</span>
         </h1>
         <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
-          {reviewTargetLabel(target)} · judged{" "}
-          {new Date(judgedAt).toLocaleString()} · {result.total} criteria
+          {t({
+            id: "review.report.judgedMeta",
+            message: `${reviewTargetLabel(target)} · judged ${new Date(judgedAt).toLocaleString()} · ${result.total} criteria`,
+          })}
         </p>
       </div>
 
       <div
         role="group"
-        aria-label="Filter results by severity"
+        aria-label={t({ id: "review.report.severityFilter", message: "Filter results by severity" })}
         style={{
           display: "flex",
           gap: 8,
@@ -231,20 +248,33 @@ export function ReviewReport({
       >
         {(
           [
-            { key: "all", label: `All`, color: "var(--app-text)" },
+            {
+              key: "all",
+              label: t({ id: "review.report.filterAll", message: "All" }),
+              color: "var(--app-text)",
+            },
             {
               key: "met",
-              label: `✓ ${severityCounts.met} met`,
+              label: t({
+                id: "review.report.filterMet",
+                message: `✓ ${severityCounts.met} met`,
+              }),
               color: SUCCESS_ACCENT,
             },
             {
               key: "warning",
-              label: `⚠ ${severityCounts.warning} warnings`,
+              label: t({
+                id: "review.report.filterWarnings",
+                message: `⚠ ${severityCounts.warning} warnings`,
+              }),
               color: WARNING,
             },
             {
               key: "error",
-              label: `✖ ${severityCounts.error} errors`,
+              label: t({
+                id: "review.report.filterErrors",
+                message: `✖ ${severityCounts.error} errors`,
+              }),
               color: ERROR_TEXT,
             },
           ] as const
@@ -287,12 +317,15 @@ export function ReviewReport({
           fontSize: 12.5,
         }}
       >
-        <strong>Judged as published.</strong> This keyboard wasn&apos;t built by
-        the studio, so scaffolder-baked criteria can&apos;t be claimed and there
-        are no survey answers or checklist confirmations on file. Those rows
-        resolve honestly — <em>Not yet checkable</em> or{" "}
-        <em>Needs human</em> — never Met. A check that couldn&apos;t run is not
-        a check that passed.
+        <Trans id="review.report.foreignNote">
+          <strong>Judged as published.</strong> This keyboard wasn&apos;t built by
+          the studio, so scaffolder-baked criteria can&apos;t be claimed and there
+          are no survey answers or checklist confirmations on file. Those rows
+          resolve honestly —{" "}
+          <em>{t({ id: "criteria.status.notYetCheckable", message: "Not yet checkable" })}</em>{" "}
+          or <em>{t({ id: "criteria.status.needsHuman", message: "Needs human" })}</em> —
+          never Met. A check that couldn&apos;t run is not a check that passed.
+        </Trans>
       </div>
 
       {authorInfo && target.prNumber !== undefined && (
@@ -307,14 +340,21 @@ export function ReviewReport({
               fontSize: 12.5,
             }}
           >
-            <strong>🌱 First-time contributor.</strong> @{authorInfo.login} has
-            not opened a PR to this repo before — see §17.2 (new-author
-            local pull) in the Build Trigger section below.
+            <Trans id="review.report.firstTimeContributor">
+              <strong>🌱 First-time contributor.</strong> @{authorInfo.login} has
+              not opened a PR to this repo before — see §17.2 (new-author
+              local pull) in the Build Trigger section below.
+            </Trans>
           </div>
         ) : (
           <div style={{ fontSize: 12.5, color: TEXT_DIM }}>
-            PR by @{authorInfo.login} · {authorInfo.prCount} PR
-            {authorInfo.prCount === 1 ? "" : "s"} to this repo
+            {t({
+              id: "review.report.prByline",
+              message: `PR by @${authorInfo.login} · ${plural(authorInfo.prCount, {
+                one: "# PR",
+                other: "# PRs",
+              })} to this repo`,
+            })}
           </div>
         )
       )}
@@ -330,7 +370,9 @@ export function ReviewReport({
             fontSize: 12.5,
           }}
         >
-          <strong>{skipped.length} file(s) skipped</strong> (named, never silent):
+          <Trans id="review.report.skippedHeading">
+            <strong>{skipped.length} file(s) skipped</strong> (named, never silent):
+          </Trans>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {skipped.map((s) => (
               <li key={s.path} style={{ fontFamily: CSS_FONT_MONO, fontSize: 12 }}>
@@ -347,25 +389,27 @@ export function ReviewReport({
           onClick={onRerun}
           style={ghostButton}
         >
-          Re-run
+          <Trans id="review.report.rerun">Re-run</Trans>
         </button>
         <button
           type="button"
           onClick={copyLink}
           style={ghostButton}
         >
-          Copy report link
+          <Trans id="review.report.copyLink">Copy report link</Trans>
         </button>
         <button
           type="button"
           onClick={exportJson}
           style={ghostButton}
         >
-          Download JSON
+          <Trans id="review.report.downloadJson">Download JSON</Trans>
         </button>
         <span style={{ fontSize: 12, color: TEXT_DIM, alignSelf: "center" }}>
-          Reports are read-only and pin their commit — nothing here can stage,
-          adapt, or submit the keyboard.
+          <Trans id="review.report.readOnlyNote">
+            Reports are read-only and pin their commit — nothing here can stage,
+            adapt, or submit the keyboard.
+          </Trans>
         </span>
       </div>
 

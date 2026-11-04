@@ -10,7 +10,7 @@
 // editable group), since those are different facts for the author.
 
 import { useState } from "react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { MissingGuardGroup } from "./guardAnalysis.ts";
 import { groupRules } from "./ruleFamilies.ts";
 import {
@@ -86,6 +86,7 @@ function OutcomeNote({
 }
 
 export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
+  const { t } = useLingui();
   const dismissMissingGroup = useGuardIntentStore((s) => s.dismissMissingGroup);
   const [outcome, setOutcome] = useState<AddAllOutcome | null>(null);
   const groupKey = missingGuardGroupKey(group);
@@ -130,7 +131,7 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
   return (
     <section
       data-testid={`missing-guard-${groupKey}`}
-      aria-label="Missing guard suggestion"
+      aria-label={t({ id: "rules.missingGuard.sectionLabel", message: "Missing guard suggestion" })}
       style={rulesInsetCard}
     >
       <p style={rulesBody}>

@@ -657,6 +657,7 @@ interface AlphabetBreakdownProps {
 }
 
 function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
+  const { t } = useLingui();
   const { bases, marks, attestedStacks, numbers, punctuation, symbols, separators, controls, lastPick } =
     useInventoryDraft("characters");
   const [showUppercase, setShowUppercase] = useState(false);
@@ -691,7 +692,14 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
       <span
         key={glyph}
         title={title}
-        aria-label={`${display} (${title})${justAdded ? " — just added" : ""}`}
+        aria-label={
+          justAdded
+            ? t({
+                id: "survey.phaseB.breakdown.chipJustAddedLabel",
+                message: `${display} (${title}) — just added`,
+              })
+            : t({ id: "survey.phaseB.breakdown.chipLabel", message: `${display} (${title})` })
+        }
         // Breakdown chips are a read-only VIEW (not remove buttons), so no
         // pointer cursor — removal stays on the CharChipEditor pick chips above.
         style={{ ...charChip(false), cursor: "default" }}
@@ -743,13 +751,18 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   );
 
   return (
-    <section aria-label="How your alphabet breaks down" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <h3 style={sectionHeading}>How your alphabet breaks down</h3>
+    <section
+      aria-label={t({ id: "survey.phaseB.breakdown.heading", message: "How your alphabet breaks down" })}
+      style={{ display: "flex", flexDirection: "column", gap: 14 }}
+    >
+      <h3 style={sectionHeading}>
+        <Trans id="survey.phaseB.breakdown.heading">How your alphabet breaks down</Trans>
+      </h3>
       {displayBases.length > 0 &&
         section(
           "alphabet-letters",
-          `Letters (${displayBases.length})`,
-          "Letters that stand on their own.",
+          t({ id: "survey.phaseB.breakdown.lettersTitle", message: `Letters (${displayBases.length})` }),
+          t({ id: "survey.phaseB.breakdown.lettersNote", message: "Letters that stand on their own." }),
           displayBases.flatMap((b) => {
             const u = showUppercase && isCasedBase ? upperCounterpartOf(b, bcp47) : null;
             const cells = [chip(b, b, justAddedBases.has(b))];
@@ -766,8 +779,11 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
       {marks.length > 0 &&
         section(
           "alphabet-marks",
-          `Marks (${marks.length})`,
-          "Accents and other marks that attach to a letter.",
+          t({ id: "survey.phaseB.breakdown.marksTitle", message: `Marks (${marks.length})` }),
+          t({
+            id: "survey.phaseB.breakdown.marksNote",
+            message: "Accents and other marks that attach to a letter.",
+          }),
           // Bare diacritics: raw code-point order, not ICU (spec 047 refinement).
           [...marks].sort(codePointCompare).map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
         )}
@@ -777,8 +793,14 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
       {attestedStacks.length > 0 &&
         section(
           "alphabet-accented",
-          `Accented letters (${attestedStacks.length})`,
-          "Letter-plus-mark combinations your language uses.",
+          t({
+            id: "survey.phaseB.breakdown.accentedTitle",
+            message: `Accented letters (${attestedStacks.length})`,
+          }),
+          t({
+            id: "survey.phaseB.breakdown.accentedNote",
+            message: "Letter-plus-mark combinations your language uses.",
+          }),
           collate(attestedStacks.map(composeStack)).map((composed) =>
             chip(composed, composed, justAddedStack === composed),
           ),
@@ -792,36 +814,51 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
       {numbers.length > 0 &&
         section(
           "alphabet-numbers",
-          `Numbers (${numbers.length})`,
-          "Digits and other numeric characters.",
+          t({ id: "survey.phaseB.breakdown.numbersTitle", message: `Numbers (${numbers.length})` }),
+          t({ id: "survey.phaseB.breakdown.numbersNote", message: "Digits and other numeric characters." }),
           collate(numbers).map((c) => chip(c, c, false)),
         )}
       {punctuation.length > 0 &&
         section(
           "alphabet-punctuation",
-          `Punctuation (${punctuation.length})`,
-          "Punctuation marks.",
+          t({
+            id: "survey.phaseB.breakdown.punctuationTitle",
+            message: `Punctuation (${punctuation.length})`,
+          }),
+          t({ id: "survey.phaseB.breakdown.punctuationNote", message: "Punctuation marks." }),
           collate(punctuation).map((c) => chip(c, c, false)),
         )}
       {symbols.length > 0 &&
         section(
           "alphabet-symbols",
-          `Symbols (${symbols.length})`,
-          "Currency, math, and other symbols.",
+          t({ id: "survey.phaseB.breakdown.symbolsTitle", message: `Symbols (${symbols.length})` }),
+          t({
+            id: "survey.phaseB.breakdown.symbolsNote",
+            message: "Currency, math, and other symbols.",
+          }),
           collate(symbols).map((c) => chip(c, c, false)),
         )}
       {separators.length > 0 &&
         section(
           "alphabet-separators",
-          `Separators (${separators.length})`,
-          "Spaces and other separator characters (kept, not the ordinary space).",
+          t({
+            id: "survey.phaseB.breakdown.separatorsTitle",
+            message: `Separators (${separators.length})`,
+          }),
+          t({
+            id: "survey.phaseB.breakdown.separatorsNote",
+            message: "Spaces and other separator characters (kept, not the ordinary space).",
+          }),
           collate(separators).map((c) => chip(c, displayChar(c), false)),
         )}
       {controls.length > 0 &&
         section(
           "alphabet-controls",
-          `Control/other (${controls.length})`,
-          "Invisible control or format characters that were kept.",
+          t({ id: "survey.phaseB.breakdown.controlsTitle", message: `Control/other (${controls.length})` }),
+          t({
+            id: "survey.phaseB.breakdown.controlsNote",
+            message: "Invisible control or format characters that were kept.",
+          }),
           collate(controls).map((c) => chip(c, displayChar(c), false)),
         )}
     </section>
@@ -988,6 +1025,11 @@ interface BuildListViewProps {
   onBack: () => void;
 }
 
+// Example characters for the "type your alphabet" instruction — exemplar
+// glyphs, not prose.
+// eslint-disable-next-line lingui/no-unlocalized-strings -- example alphabet characters, not prose
+const BUILD_LIST_EXAMPLE_CHARS = "a b c d e ɛ ŋ ɔ …";
+
 function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const { t, i18n } = useLingui();
   const draft = useInventoryDraft("characters");
@@ -1149,7 +1191,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
-          a b c d e ɛ ŋ ɔ …
+          {BUILD_LIST_EXAMPLE_CHARS}
         </p>
       </div>
 

@@ -17,7 +17,8 @@
 
 import { useMemo, useState, lazy, Suspense } from "react";
 import { useLingui } from "@lingui/react/macro";
-import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import type { I18n, MessageDescriptor } from "@lingui/core";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
@@ -71,13 +72,31 @@ function withLabel(kvks: KvksIR, shift: string, vkey: string, label: string): Kv
   };
 }
 
-/** Shift-code display names for the layer switcher. */
+/**
+ * Shift-code display names for the layer switcher.
+ *
+ * Module-level msg() descriptors (resolved via i18n) because the Lingui
+ * extractor cannot follow a `t` passed as a function parameter — the old
+ * t({id, message}) calls here were invisible to `messages:extract` and the
+ * drift lint flagged the four ids as removed.
+ */
+const SHIFT_DISPLAY_MSGS = {
+  layerDefault: msg({
+    id: "editor.assignLoop.osk.layerDefault",
+    message: "Default",
+  }),
+  modShift: msg({ id: "editor.assignLoop.osk.modShift", message: "Shift" }),
+  modCtrl: msg({ id: "editor.assignLoop.osk.modCtrl", message: "Ctrl" }),
+  modAlt: msg({ id: "editor.assignLoop.osk.modAlt", message: "Alt" }),
+} as const satisfies Record<string, MessageDescriptor>;
+
 function shiftDisplayName(shift: string, i18n: I18n): string {
-  if (shift === "") return i18n._("editor.assignLoop.osk.layerDefault");
+  if (shift === "") return i18n._(SHIFT_DISPLAY_MSGS.layerDefault);
   const parts: string[] = [];
-  if (shift.includes("S")) parts.push(i18n._("editor.assignLoop.osk.modShift"));
-  if (shift.includes("C")) parts.push(i18n._("editor.assignLoop.osk.modCtrl"));
-  if (shift.includes("A")) parts.push(i18n._("editor.assignLoop.osk.modAlt"));
+  if (shift.includes("S"))
+    parts.push(i18n._(SHIFT_DISPLAY_MSGS.modShift));
+  if (shift.includes("C")) parts.push(i18n._(SHIFT_DISPLAY_MSGS.modCtrl));
+  if (shift.includes("A")) parts.push(i18n._(SHIFT_DISPLAY_MSGS.modAlt));
   return parts.length > 0 ? parts.join("+") : shift;
 }
 

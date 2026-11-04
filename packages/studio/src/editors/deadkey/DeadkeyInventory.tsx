@@ -16,6 +16,9 @@
 //   does and what it can't do (pair attribution).
 
 import { useMemo, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { msg, plural } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import type { KeyboardIR, DeadkeyInfo } from "@keyboard-studio/contracts";
 import { listDeadkeys, validateDeadkeyLifecycle } from "@keyboard-studio/contracts";
 import {
@@ -156,11 +159,20 @@ const footNoteStyle: CSSProperties = {
   fontFamily: FONT,
 };
 
-const ORIGIN_LABEL: Record<DeadkeyInfo["origin"], string> = {
-  studio: "defined in studio",
-  "s02-legacy": "legacy codepoint id",
-  imported: "imported",
-};
+const ORIGIN_LABEL = {
+  studio: msg({
+    id: "deadkey.inventory.origin.studio",
+    message: "defined in studio",
+  }),
+  "s02-legacy": msg({
+    id: "deadkey.inventory.origin.s02Legacy",
+    message: "legacy codepoint id",
+  }),
+  imported: msg({
+    id: "deadkey.inventory.origin.imported",
+    message: "imported",
+  }),
+} as const satisfies Record<DeadkeyInfo["origin"], MessageDescriptor>;
 
 /** Distinct produced characters, from the deadkey's output-store items. */
 export function producedChars(ir: KeyboardIR, info: DeadkeyInfo): string[] {
@@ -187,6 +199,7 @@ export interface DeadkeyInventoryProps {
 }
 
 export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: DeadkeyInventoryProps) {
+  const { t } = useLingui();
   const deadkeys = useMemo(() => listDeadkeys(ir), [ir]);
   const duplicateFindings = useMemo(
     () => validateDeadkeyLifecycle(ir).filter((f) => f.code === "KM_WARN_DUPLICATE_DEADKEY_ID"),
@@ -196,6 +209,7 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
   // Deadkey overlay recording (spec 083 step 1.8): the duplicate-id repair
   // is an immediate commit, paired with its op so projection can replay it.
   const recordDeadkeyOp = useWorkingCopyStore((s) => s.commitDeadkeyOp);
+  const duplicateCount = duplicateFindings.length;
   const repairDuplicates = () => {
     const repaired = withRepairedDuplicateTriggerIds(ir);
     onCommitRepair(commitDeadkeyEdit(ir, repaired));
@@ -207,30 +221,40 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
     <div>
       <div style={headStyle}>
         <h2 style={titleStyle}>
-          Deadkeys — {deadkeys.length} in this keyboard
+          <Trans id="deadkey.inventory.title">Deadkeys — {deadkeys.length} in this keyboard</Trans>
         </h2>
         <button type="button" style={defineBtnStyle} onClick={onDefine}>
-          Define new deadkey
+          <Trans id="deadkey.inventory.defineButton">Define new deadkey</Trans>
         </button>
       </div>
 
       {duplicateFindings.length > 0 && (
         <div style={repairStyle} role="alert">
-          <b>Shared deadkey id{duplicateFindings.length > 1 ? "s" : ""}.</b>{" "}
+          <b>
+            {t({
+              id: "deadkey.inventory.sharedIdHeading",
+              message: plural(duplicateCount, {
+                one: "Shared deadkey id.",
+                other: "Shared deadkey ids.",
+              }),
+            })}
+          </b>{" "}
           {duplicateFindings.map((f) => f.message).join(" ")}
           <br />
-          Both triggers arm the same deadkey state today, and the keyboard
-          works as-is — repair only if these were meant to be different
-          deadkeys. Repair keeps the first trigger rule on the id and gives
-          every other trigger rule a fresh id with its own empty fan-out
-          stores. Only true trigger rules (one key in, the deadkey out) are
-          re-minted — any other rule outputting the same id is left for you
-          to inspect. Pairs can&apos;t be attributed to one trigger or the
-          other — they stay with the first; add pairs to the repaired
-          deadkeys from their editors.
+          <Trans id="deadkey.inventory.repairExplanation">
+            Both triggers arm the same deadkey state today, and the keyboard
+            works as-is — repair only if these were meant to be different
+            deadkeys. Repair keeps the first trigger rule on the id and gives
+            every other trigger rule a fresh id with its own empty fan-out
+            stores. Only true trigger rules (one key in, the deadkey out) are
+            re-minted — any other rule outputting the same id is left for you
+            to inspect. Pairs can&apos;t be attributed to one trigger or the
+            other — they stay with the first; add pairs to the repaired
+            deadkeys from their editors.
+          </Trans>
           <br />
           <button type="button" style={repairBtnStyle} onClick={repairDuplicates}>
-            Repair: re-assign fresh ids
+            <Trans id="deadkey.inventory.repairButton">Repair: re-assign fresh ids</Trans>
           </button>
         </div>
       )}
@@ -239,6 +263,7 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
         const idLabel = info.id !== null ? `dk(${hex4(info.id)})` : `dk(${info.name ?? "?"})`;
         const pairsEditable = info.baseStore !== null && info.outputStore !== null;
         const produced = producedChars(ir, info);
+        const count = info.pairCount;
         return (
           <div key={idLabel} style={cardStyle}>
             <div>
@@ -246,27 +271,44 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
               {info.authorName !== undefined && (
                 <span style={nameStyle}>&ldquo;{info.authorName}&rdquo;</span>
               )}
-              <span style={tagStyle}>{ORIGIN_LABEL[info.origin]}</span>
+              <span style={tagStyle}>{t(ORIGIN_LABEL[info.origin])}</span>
             </div>
             <div style={metaStyle}>
-              Trigger{" "}
-              <span style={keyChipStyle}>{info.triggerKey ?? "(none found)"}</span>
+              <Trans id="deadkey.inventory.meta.triggerLabel">Trigger</Trans>{" "}
+              <span style={keyChipStyle}>
+                {info.triggerKey ??
+                  t({ id: "deadkey.inventory.meta.noTrigger", message: "(none found)" })}
+              </span>
               {"  "}·{"  "}
-              {info.pairCount} pair{info.pairCount === 1 ? "" : "s"}
+              {t({
+                id: "deadkey.inventory.meta.pairCount",
+                message: plural(count, {
+                  one: "# pair",
+                  other: "# pairs",
+                }),
+              })}
               {produced.length > 0 && (
                 <>
-                  {"  "}·{"  "}produces {produced.slice(0, 8).join(" ")}
+                  {"  "}·{"  "}
+                  <Trans id="deadkey.inventory.meta.produces">produces</Trans>{" "}
+                  {produced.slice(0, 8).join(" ")}
                   {produced.length > 8 ? " …" : ""}
                 </>
               )}
             </div>
             {!pairsEditable && (
-              <div style={noteStyle}>rule shape not recognized — pair editing unavailable</div>
+              <div style={noteStyle}>
+                <Trans id="deadkey.inventory.shapeNote">
+                  rule shape not recognized — pair editing unavailable
+                </Trans>
+              </div>
             )}
             {info.id === null && (
               <div style={noteStyle}>
-                Named deadkey: carried as dk(name) in the IR — delete and retarget only; pair editing and rename
-                are not available for named deadkeys.
+                <Trans id="deadkey.inventory.namedNote">
+                  Named deadkey: carried as dk(name) in the IR — delete and retarget only; pair editing and rename
+                  are not available for named deadkeys.
+                </Trans>
               </div>
             )}
             <div style={actionsStyle}>
@@ -276,7 +318,7 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
                 disabled={!pairsEditable || info.id === null}
                 onClick={() => onEdit(info)}
               >
-                Pairs
+                <Trans id="deadkey.inventory.actionPairs">Pairs</Trans>
               </button>
               <button
                 type="button"
@@ -284,13 +326,13 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
                 disabled={info.id === null}
                 onClick={() => onEdit(info)}
               >
-                Rename
+                <Trans id="deadkey.inventory.actionRename">Rename</Trans>
               </button>
               <button type="button" style={ghostBtnStyle} onClick={() => onEdit(info)}>
-                Retarget
+                <Trans id="deadkey.inventory.actionRetarget">Retarget</Trans>
               </button>
               <button type="button" style={ghostBtnStyle} onClick={() => onEdit(info)}>
-                Delete
+                <Trans id="deadkey.inventory.actionDelete">Delete</Trans>
               </button>
             </div>
           </div>
@@ -299,12 +341,16 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
 
       {deadkeys.length === 0 && (
         <div style={noteStyle}>
-          No deadkeys in this keyboard yet. Define the first one above.
+          <Trans id="deadkey.inventory.emptyNote">
+            No deadkeys in this keyboard yet. Define the first one above.
+          </Trans>
         </div>
       )}
 
       <div style={footNoteStyle}>
-        Every deadkey in the keyboard is listed here — including ones the studio didn&apos;t create.
+        <Trans id="deadkey.inventory.footnote">
+          Every deadkey in the keyboard is listed here — including ones the studio didn&apos;t create.
+        </Trans>
       </div>
     </div>
   );

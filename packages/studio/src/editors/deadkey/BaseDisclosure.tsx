@@ -8,6 +8,7 @@
 // never a verdict), with the honesty caption "best guess, not sight."
 
 import type { CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReferenceBasesResult } from "../../lib/referenceBases/index.ts";
 import {
   BG_CARD,
@@ -66,9 +67,18 @@ export interface BaseDisclosureProps {
 }
 
 export function BaseDisclosure({ hosts }: BaseDisclosureProps) {
+  const { t } = useLingui();
   return (
-    <section style={disclosureStyle} aria-label="What this trigger key does on likely host layouts">
-      <h3 style={headingStyle}>What this trigger key does on likely host layouts</h3>
+    <section
+      style={disclosureStyle}
+      aria-label={t({
+        id: "deadkey.base.disclosureAriaLabel",
+        message: "What this trigger key does on likely host layouts",
+      })}
+    >
+      <h3 style={headingStyle}>
+        <Trans id="deadkey.base.disclosureHeading">What this trigger key does on likely host layouts</Trans>
+      </h3>
       <div>
         {hosts.hosts.map((entry) => (
           <div key={entry.host} style={rowStyle}>
@@ -77,7 +87,11 @@ export function BaseDisclosure({ hosts }: BaseDisclosureProps) {
           </div>
         ))}
       </div>
-      <div style={captionStyle}>Likely hosts for this keyboard — best guess, not sight.</div>
+      <div style={captionStyle}>
+        <Trans id="deadkey.base.disclosureCaption">
+          Likely hosts for this keyboard — best guess, not sight.
+        </Trans>
+      </div>
     </section>
   );
 }
