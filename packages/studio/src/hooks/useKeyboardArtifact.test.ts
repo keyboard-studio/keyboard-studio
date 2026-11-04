@@ -732,6 +732,51 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
       expect(result.current.stage.keyboardId).toBe(baseKb.id);
     }
   });
+
+  it("(d) reapply rebuilds the OSK stylesheet blob URLs from the projected VFS (the CSS step's Apply)", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const made: Blob[] = [];
+    const realCreate = URL.createObjectURL;
+    const realRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = (obj: Blob | MediaSource) => {
+      made.push(obj as Blob);
+      return `blob:css-${made.length}`;
+    };
+    URL.revokeObjectURL = () => undefined;
+    try {
+      const css = ".kmw-key { color: red; }";
+      const cssTransform: VfsTransform = (vfs) => {
+        vfs.set("source/kb.css", css, false);
+        return { warnings: [] };
+      };
+      const { result, rerender } = renderHook(
+        ({ transform }: { transform: VfsTransform | null }) =>
+          useKeyboardArtifact(baseKb, null, transform, null),
+        { initialProps: { transform: noopTransform } },
+      );
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      });
+      expect(result.current.stage.kind).toBe("ready");
+      made.length = 0;
+
+      rerender({ transform: cssTransform });
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      });
+
+      const cssBlobs = made.filter((b) => b.type === "text/css");
+      expect(cssBlobs).toHaveLength(1);
+      expect(cssBlobs[0]?.size).toBe(css.length);
+      if (result.current.stage.kind === "ready") {
+        expect(result.current.stage.keyboardCssUrls).toHaveLength(1);
+      }
+    } finally {
+      URL.createObjectURL = realCreate;
+      URL.revokeObjectURL = realRevoke;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

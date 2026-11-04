@@ -342,6 +342,18 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "inventory-carve-deadkeys.md §A.0: carveTouchKeepInert has no value field (D-090-31) and no live writer — dormant, registered under carve",
     ],
   },
+  {
+    id: "custom-css",
+    label: "Custom CSS step (OSK stylesheet text)",
+    phase: 6,
+    status: "pending",
+    storeActions: ["setCustomCss"],
+    fields: ["customCss"],
+    decisionIds: [],
+    evidence: [
+      "CssEditor's Continue writes the stylesheet text to workingCopyStore.customCss, which projectWorkingCopyVfs step 0b projects into the VFS; no decision module records it yet (NO-DECISION-SOURCE)",
+    ],
+  },
 ];
 
 /**
@@ -406,6 +418,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   desktopLocked: { kind: "field", class: "SURVEY-SLOT" },
   sequenceFlaggedChars: { kind: "field", class: "SURVEY-SLOT" },
   touchLayoutJson: { kind: "field", class: "SURVEY-SLOT" },
+  customCss: { kind: "field", class: "EDITOR-AUTHORED" },
   touchDraft: { kind: "field", class: "EDITOR-AUTHORED" },
   galleryIntrosSeen: { kind: "field", class: "EPHEMERAL" },
   keyEditOverlay: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -446,6 +459,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   lockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   unlockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   setTouchLayoutJson: { kind: "action", class: "SURVEY-SLOT" },
+  setCustomCss: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchDraft: { kind: "action", class: "EDITOR-AUTHORED" },
   markGalleryIntroSeen: { kind: "action", class: "EPHEMERAL" },
   commitKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },

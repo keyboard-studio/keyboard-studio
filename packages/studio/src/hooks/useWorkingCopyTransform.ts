@@ -194,6 +194,13 @@ export interface UseWorkingCopyTransformOptions {
     touchLayoutJson: string | null;
     keyEditOps: readonly KeyEditOperation[];
   };
+
+  /**
+   * The CSS step's in-progress stylesheet, used INSTEAD OF the store's
+   * `customCss` (a string; null = untouched, "" = cleared). Omit to read the
+   * store's committed value. A primitive, so it keys the memo directly.
+   */
+  liveCss?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +229,9 @@ export function useWorkingCopyTransform(
   // the store's own touchLayoutJson field and an empty key-edit overlay. See
   // the option's doc comment (UseWorkingCopyTransformOptions.liveLayoutOverride).
   const liveLayoutOverride = opts?.liveLayoutOverride;
+  const liveCss = opts?.liveCss;
+  const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
+  const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
@@ -519,6 +529,7 @@ export function useWorkingCopyTransform(
             deadkeyOverlay: { ops: deadkeyOps },
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
+            customCss,
           },
           {
             vfs,
@@ -563,5 +574,6 @@ export function useWorkingCopyTransform(
     storeContextToleranceOverlay,
     marksGuardsKey,
     capsHandlingMode,
+    customCss,
   ]);
 }

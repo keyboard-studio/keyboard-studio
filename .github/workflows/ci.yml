@@ -469,6 +469,13 @@ jobs:
       - name: Test (api functions)
         run: npx vitest run --config api/vitest.config.ts
 
+      # /api is also outside `pnpm -r typecheck` for the same reason, and
+      # Vercel's function bundler (ncc) type-checks each function with the
+      # nearest tsconfig — api/tsconfig.json. Check it here so a type error
+      # surfaces in CI instead of as build-log noise on every Vercel deploy.
+      - name: Typecheck (api functions)
+        run: pnpm run typecheck:api
+
       # The i18n-content-extract and content-i18n-lint tools live under
       # utilities/* (outside pnpm-workspace.yaml), so `pnpm -r test` never
       # reaches their vitest suites. Run them explicitly — these are the
