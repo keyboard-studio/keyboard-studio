@@ -320,11 +320,35 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T18:15:12.595Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:02:30.999Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:02:31.295Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:02:31.576Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T036",
+  "currentTask": "T039",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -632,6 +656,29 @@
         "packages/studio/src/components/ManagedPRSubmitPanel.tsx",
         "packages/studio/src/hooks/useReformatConsent.test.tsx",
         "packages/studio/src/lib/buildOutputBundle.reformat.test.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "openSourceChoice resolves both repo copies, newer flag, tests",
+      "files": [
+        "packages/studio/src/lib/openSourceChoice.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Choice UI + curated warning; SourceRef in snapshot",
+      "files": [
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/lib/persistWorkingCopy.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "SourceRef feeds PR source block",
+      "files": [
+        "packages/studio/src/criteria/openPrBlocks.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
       ]
     }
   },

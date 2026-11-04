@@ -40,6 +40,15 @@
 // help-doc-language. No order, trail, lock or edge changes: the new
 // modules chain inside the help screen via their own requires.
 
+//
+// AMENDMENT (spec 111, same rule -- a deliberate decision, not a
+// regeneration): Open adds an "open_languages" side trail (the editable
+// language list, shown on the adapt track only). BASELINE_ORDER gains it
+// after project_name; BASELINE_SIDE_TRAILS gains open_languages ->
+// characters; BASELINE_MEMBERSHIP gains its one decision; the Flow Map
+// gains a fork from attribution and a join back at characters. The Copy
+// walk and every other entry are unchanged.
+
 import { describe, expect, it } from "vitest";
 import { manifest, screenTrails } from "./manifest.ts";
 import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
@@ -55,6 +64,7 @@ const BASELINE_ORDER = [
   "track",
   "attribution",
   "project_name",
+  "open_languages",
   "characters",
   "marks",
   "punctuation",
@@ -76,6 +86,7 @@ const BASELINE_ORDER = [
 /** Side-trail step -> the step it rejoins (the old spine:false + joinTarget). */
 const BASELINE_SIDE_TRAILS: Readonly<Record<string, string>> = {
   project_name: "characters",
+  open_languages: "characters",
   touch_seed_source: "touch",
 };
 
@@ -91,7 +102,9 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["track", "attribution", "spine"],
   ["attribution", "characters", "spine"],
   ["attribution", "project_name", "fork"],
+  ["attribution", "open_languages", "fork"],
   ["project_name", "characters", "join"],
+  ["open_languages", "characters", "join"],
   ["characters", "marks", "spine"],
   ["marks", "punctuation", "spine"],
   ["punctuation", "invisibles", "spine"],
@@ -119,6 +132,7 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   // #1901 amendment: the author trio's membership, moved from identity.
   attribution: ["author-name", "author-email", "copyright-holder"],
   project_name: ["project-display-name", "project-keyboard-id"],
+  open_languages: ["language-list"],
   characters: ["existing-keyboards", "co-installed-keyboards", "discovery-intro", "text-sample", "text-sample-review", "linguist-confirm", "picker-confirm", "standard-letters", "typing-approach", "special-letters-wanted", "special-letters", "special-letters-notes", "latin-digraphs-wanted", "latin-digraphs-list", "punctuation-wanted", "punctuation-list", "digit-set", "char-count", "latin-qwerty-branch", "spare-keys-qwerty", "latin-azerty-branch", "azerty-qz-swap", "spare-keys-azerty", "non-roman-branch", "indic-conjuncts-wanted", "indic-virama", "indic-vowels-separate", "indic-pre-base-vowels", "indic-nukta-wanted", "indic-nukta-detail", "indic-onset-vowels-wanted", "indic-onset-vowels-list", "sea-medials", "sea-stacked-consonants", "rtl-direction-confirm", "rtl-short-vowels", "rtl-special-letters", "syllabic-note", "syllabic-grid", "syllabic-finals-wanted", "syllabic-finals-list", "other-free-entry", "contact-language", "legacy-encoding", "use-case", "additional-methods", "character-inventory"],
   marks: ["marks-treatment"],
   punctuation: ["punctuation-inventory"],
@@ -285,11 +299,14 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //     base-keyboard, track -> attribution via authoring-track) once
     //     il_author_name's target-script edge is a screenRequires like
     //     the others (#1901 reclassification).
+    //   - open_languages (spec 111 amendment) is a gated side trail with only
+    //     the track gate, so it is a tie-break against every other screen.
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
       ["layout", "track"],
       ["layout", "attribution"],
       ["layout", "project_name"],
+      ["layout", "open_languages"],
       ["layout", "characters"],
       ["layout", "marks"],
       ["layout", "punctuation"],
@@ -311,6 +328,22 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["attribution", "css"],
       ["attribution", "help"],
       ["attribution", "html"],
+      ["project_name", "open_languages"],
+      ["open_languages", "characters"],
+      ["open_languages", "marks"],
+      ["open_languages", "punctuation"],
+      ["open_languages", "invisibles"],
+      ["open_languages", "convenience"],
+      ["open_languages", "carve"],
+      ["open_languages", "deadkeys"],
+      ["open_languages", "rules"],
+      ["open_languages", "mechanisms"],
+      ["open_languages", "osk"],
+      ["open_languages", "touch_seed_source"],
+      ["open_languages", "touch"],
+      ["open_languages", "css"],
+      ["open_languages", "help"],
+      ["open_languages", "html"],
       ["marks", "punctuation"],
       ["marks", "invisibles"],
       ["marks", "convenience"],

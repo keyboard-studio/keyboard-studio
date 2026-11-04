@@ -343,11 +343,11 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Off-spine step inventory", () => {
-  it("exactly two derived side-trail steps exist (project_name and touch_seed_source)", () => {
+  it("exactly three derived side-trail steps exist (project_name, touch_seed_source and, from spec 111, open_languages)", () => {
     const offSpine = offSpineSteps(manifest);
-    expect(offSpine).toHaveLength(2);
+    expect(offSpine).toHaveLength(3);
     const ids = offSpine.map((s) => s.id).sort();
-    expect(ids).toEqual(["project_name", "touch_seed_source"]);
+    expect(ids).toEqual(["open_languages", "project_name", "touch_seed_source"]);
   });
 
   it("all derived side-trail steps have a derived join target", () => {

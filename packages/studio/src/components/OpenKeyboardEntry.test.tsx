@@ -2,7 +2,7 @@
 // track, previews the keyboard, and moves on to the walk.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StartKeyboard } from "@keyboard-studio/contracts";
+import type { SourceRef, StartKeyboard } from "@keyboard-studio/contracts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -38,5 +38,18 @@ describe("openExistingKeyboard", () => {
     expect(useSurveySessionStore.getState().localStart?.id).toBe(KB.id);
     expect(navigateTo).toHaveBeenCalledWith("criteria");
     expect(useSurveySessionStore.getState().activeStepId).toBe("attribution");
+    expect(useWorkingCopyStore.getState().startSource).toBeNull();
+  });
+
+  it("stores the chosen SourceRef in the working copy", () => {
+    const source: SourceRef = {
+      owner: "keyboard-studio",
+      repo: "keyboards",
+      commit: "b".repeat(40),
+      path: KB.path,
+      alternative: { owner: "keymanapp", commit: "a".repeat(40), newer: false },
+    };
+    expect(openExistingKeyboard(KB, source)).toBe(true);
+    expect(useWorkingCopyStore.getState().startSource).toEqual(source);
   });
 });

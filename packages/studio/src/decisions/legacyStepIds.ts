@@ -20,7 +20,6 @@ export const LEGACY_STEP_ID_MAP: Readonly<Record<string, string>> = {
   choose_base: "choose_base",
   track: "track",
   project_name: "project_name",
-  open_languages: "open_languages",
   characters: "characters",
   marks: "marks",
   punctuation: "punctuation",

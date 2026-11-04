@@ -109,9 +109,9 @@
 
 **Independent Test**: three keyboards (identical, curated-in-fork, stale-in-fork) behave per spec US4.
 
-- [ ] T037 [US4] Resolve both repos' copies via `/review-proxy/:owner/:repo/:sha/:path*` (passed as `proxyBase` to `fetchKeyboardSourceToVfs`), compare the `.kmn` and `.kps` text, and compute `SourceRef.alternative.newer` from each side's last-change commit date, in `packages/studio/src/lib/openSourceChoice.ts`, with a unit test using a stubbed fetch
-- [ ] T038 [US4] Show both copies when they differ, plus the curated-replacement warning, in `packages/studio/src/components/OpenKeyboardEntry.tsx`. Store `SourceRef` in the working-copy snapshot (`packages/studio/src/lib/persistWorkingCopy.ts`).
-- [ ] T039 [US4] Feed `SourceRef` (repo, short SHA, path, version change, curated note) into the PR source block (T030)
+- [x] T037 [US4] Resolve both repos' copies via `/review-proxy/:owner/:repo/:sha/:path*` (passed as `proxyBase` to `fetchKeyboardSourceToVfs`), compare the `.kmn` and `.kps` text, and compute `SourceRef.alternative.newer` from each side's last-change commit date, in `packages/studio/src/lib/openSourceChoice.ts`, with a unit test using a stubbed fetch
+- [x] T038 [US4] Show both copies when they differ, plus the curated-replacement warning, in `packages/studio/src/components/OpenKeyboardEntry.tsx`. Store `SourceRef` in the working-copy snapshot (`packages/studio/src/lib/persistWorkingCopy.ts`).
+- [x] T039 [US4] Feed `SourceRef` (repo, short SHA, path, version change, curated note) into the PR source block (T030)
 
 **Checkpoint**: commit and push.
 

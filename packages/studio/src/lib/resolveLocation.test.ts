@@ -45,9 +45,11 @@ function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
     traversal: traversal({
       activeStepId: "characters",
       history: ["identity", "choose_base", "track"],
-      selectedTrack: "adapt",
+      // Copy: the identity-first walk these fixtures describe. The adapt track
+      // is Open (spec 111), which hides choose_base and track from the walk.
+      selectedTrack: "copy",
     }),
-    decisions: decisionsForTrack("adapt"),
+    decisions: decisionsForTrack("copy"),
     hasProject: true,
   };
   const merged = { ...base, ...overrides };
@@ -145,7 +147,13 @@ describe("one case per UnreachableReason", () => {
   });
 
   it("skipped-by-track — project_name is not walked on the adapt track", () => {
-    const ctx = ctxWith();
+    const ctx = ctxWith({
+      traversal: traversal({
+        activeStepId: "characters",
+        history: ["identity", "choose_base", "track"],
+        selectedTrack: "adapt",
+      }),
+    });
     const loc: Location = { route: "survey", step: "project_name" };
     const result = resolveLocation(loc, ctx);
     expect(result).toMatchObject({ kind: "degraded", reason: "skipped-by-track" });
@@ -187,7 +195,7 @@ describe("reason precedence", () => {
   it("an unvisited touch seed chooser is beyond-gate", () => {
     const ctx = ctxWith({
       traversal: {
-        ...traversal({ activeStepId: "mechanisms", history: ["identity", "choose_base", "track"], selectedTrack: "adapt" }),
+        ...traversal({ activeStepId: "mechanisms", history: ["identity", "choose_base", "track"], selectedTrack: "copy" }),
         touchSeedSource: null,
       } as TraversalSnapshot,
     });
@@ -203,7 +211,7 @@ describe("reason precedence", () => {
         ...traversal({
           activeStepId: "touch",
           history: ["identity", "choose_base", "track", "mechanisms", "touch_seed_source"],
-          selectedTrack: "adapt",
+          selectedTrack: "copy",
         }),
         touchSeedSource: "import-adapt",
       } as TraversalSnapshot,
@@ -214,7 +222,7 @@ describe("reason precedence", () => {
   it("the chooser is reachable while the author is on it with a remembered choice", () => {
     const ctx = ctxWith({
       traversal: {
-        ...traversal({ activeStepId: "touch_seed_source", history: ["identity", "mechanisms"], selectedTrack: "adapt" }),
+        ...traversal({ activeStepId: "touch_seed_source", history: ["identity", "mechanisms"], selectedTrack: "copy" }),
         touchSeedSource: "import-adapt",
       } as TraversalSnapshot,
     });

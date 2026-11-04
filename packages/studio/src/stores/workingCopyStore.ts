@@ -21,7 +21,7 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import { DEFAULT_FALLBACK_POLICY } from "@keyboard-studio/contracts";
+import { DEFAULT_FALLBACK_POLICY, createVirtualFS } from "@keyboard-studio/contracts";
 import type {
   Attribution,
   AxisFill,
@@ -47,6 +47,7 @@ import type {
   DocFixProposals,
   StartDocumentationProfile,
   RepairProposal,
+  SourceRef,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
@@ -54,6 +55,7 @@ import {
   renameTouchKey,
   deriveFacets,
   parseKpsLanguages,
+  parseKmn,
 } from "@keyboard-studio/engine";
 import type {
   ContextToleranceOverlay,
@@ -358,6 +360,10 @@ export interface AppliedContextTolerance {
  * "New keyboard" in a future header bar) and will be promoted to a contracts
  * field in a future joint session when the output layer needs it.
  */
+export type ReplaceStartingPointResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 export type InstantiationMode = "new-from-base" | "adapt-existing" | null;
 
 // Identity patch lives in a leaf module (see identityPatch.ts); re-exported
@@ -654,6 +660,12 @@ export interface WorkingCopyState {
    * empty array means "computed, nothing found". Persisted.
    */
   baselineDocFindings: LintFinding[] | null;
+  /**
+   * Which repository's copy an opened keyboard came from, and the commit it was
+   * pinned at (spec 111 US4). Null when not opened for update or not yet
+   * resolved. Persisted; feeds the PR source block.
+   */
+  startSource: SourceRef | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -1315,6 +1327,17 @@ export interface WorkingCopyState {
   ) => void;
 
   /**
+   * Open mode (spec 111 FR-009): replace one starting-point file with
+   * author-edited text. The VFS text and, for a `.kmn`, the re-parsed `startIr`
+   * are written in ONE update so the VFS and `startIr` never disagree. A `.kmn`
+   * that does not parse changes nothing and returns `{ ok: false }` (FR-015).
+   * Replay over the new `startIr` is the caller's next step
+   * (`replaceStartingPointAndReplay`); this action never imports the decisions
+   * layer.
+   */
+  replaceStartingPointFromText: (path: string, text: string) => ReplaceStartingPointResult;
+
+  /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
    * the base keyboard identity. Replaces any prior patch (last-wins).
    */
@@ -1392,6 +1415,9 @@ export interface WorkingCopyState {
 
   /** Record the base's own documentation findings at instantiation (spec 079 FR-020). */
   setBaselineDocFindings: (findings: LintFinding[] | null) => void;
+
+  /** Record where an opened keyboard came from (spec 111 US4). */
+  setStartSource: (source: SourceRef | null) => void;
 
   /**
    * Returns true once instantiateFromStart or instantiateFromExisting has been
@@ -1762,6 +1788,7 @@ export type WorkingCopyData = Omit<
   WorkingCopyState,
   // actions are excluded from the data snapshot
   | "setIR"
+  | "replaceStartingPointFromText"
   | "setWorkingIR"
   | "clearIR"
   | "deleteNode"
@@ -1822,6 +1849,7 @@ export type WorkingCopyData = Omit<
   | "setTouchKeyIdentity"
   | "setStartDocProfile"
   | "setBaselineDocFindings"
+  | "setStartSource"
   | "markStale"
   | "clearStale"
   | "setValidatorFindings"
@@ -1873,6 +1901,7 @@ const INITIAL_STATE: WorkingCopyData = {
   touchKeyIdentity: null,
   startDocProfile: null,
   baselineDocFindings: null,
+  startSource: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -2285,6 +2314,33 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (next !== get().irAxes) {
       set(remerge(next, get().phaseResults));
     }
+  },
+
+  replaceStartingPointFromText: (path, text) => {
+    const { startVfs, startKeyboard } = get();
+    if (startVfs === null || startKeyboard === null) {
+      return { ok: false, error: "No keyboard is open." };
+    }
+    let nextIr: KeyboardIR | null = null;
+    if (path.endsWith(".kmn")) {
+      try {
+        nextIr = deriveFacets(parseKmn(text, startKeyboard.id).ir);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+    // A fresh VFS object so subscribers see the change; the file text is the
+    // author's own, verbatim.
+    const nextVfs = createVirtualFS(startVfs.entries());
+    nextVfs.set(path, text, false);
+    set({
+      startVfs: nextVfs,
+      ...(nextIr !== null ? { startIr: nextIr, ir: nextIr } : {}),
+      // The touch layout the projection compares against the file: keep them
+      // identical so the author's text is not re-serialized.
+      ...(path.endsWith(".keyman-touch-layout") ? { touchLayoutJson: text } : {}),
+    });
+    return { ok: true };
   },
 
   lockDesktop: () => set({ desktopLocked: true }),
@@ -2702,6 +2758,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         ? s
         : { baselineDocFindings: findings },
     ),
+
+  setStartSource: (source) => set({ startSource: source }),
 
   isInstantiated: () => get().startKeyboard !== null,
 

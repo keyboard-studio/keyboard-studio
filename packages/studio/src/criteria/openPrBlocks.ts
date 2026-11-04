@@ -45,17 +45,25 @@ export function escapeMarkdown(text: string): string {
     .trim();
 }
 
+/** A SHA is hex only; anything else is dropped so it cannot break the block. */
+function cleanSha(sha: string): string {
+  return sha.replace(/[^0-9a-fA-F]/g, "").slice(0, 7);
+}
+
 export function buildSourceBlock(input: SourceBlockInput): string {
-  const sha = input.shortSha !== undefined ? ` @ \`${input.shortSha}\`` : "";
+  const shortSha = input.shortSha !== undefined ? cleanSha(input.shortSha) : "";
+  const sha = shortSha !== "" ? ` @ \`${shortSha}\`` : "";
   const lines = [
     "### Updated from",
     `- Repository: ${input.owner}/${input.repo}${sha}`,
-    `- Path: \`${input.path}\``,
-    `- Version: ${input.fromVersion} → ${input.toVersion}`,
+    // Inside a code span a backtick cannot be escaped, so it is removed.
+    `- Path: \`${input.path.replace(/[`\r\n]/g, "")}\``,
+    `- Version: ${escapeMarkdown(input.fromVersion)} → ${escapeMarkdown(input.toVersion)}`,
   ];
-  if (input.replacesCuratedSha !== undefined) {
+  const curatedSha = input.replacesCuratedSha !== undefined ? cleanSha(input.replacesCuratedSha) : "";
+  if (curatedSha !== "") {
     lines.push(
-      `- Note: replaces the curated keyboard-studio/keyboards copy (\`${input.replacesCuratedSha}\`).`,
+      `- Note: replaces the curated keyboard-studio/keyboards copy (\`${curatedSha}\`).`,
     );
   } else if (input.replacesCurated === true) {
     lines.push("- Note: replaces the curated keyboard-studio/keyboards copy.");

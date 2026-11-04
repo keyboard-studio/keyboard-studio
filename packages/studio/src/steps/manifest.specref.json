@@ -21,6 +21,9 @@
   "project_name": [
     "§8"
   ],
+  "open_languages": [
+    "specs/111-open-existing-keyboard"
+  ],
   "characters": [
     "§8",
     "specs/027-qu-characters-step"
@@ -56,17 +59,25 @@
     "§8",
     "specs/007-strategy-selection"
   ],
+  "osk": [
+    "specs/osk-editor"
+  ],
   "touch_seed_source": [
     "specs/035-mobile-touch-derivation"
   ],
   "touch": [
-    "§8",
     "specs/035-mobile-touch-derivation"
+  ],
+  "css": [
+    "specs/css-editor"
   ],
   "help": [
     "§8",
     "specs/061-help-docs-generation",
     "specs/080-documentation-completeness"
+  ],
+  "html": [
+    "specs/html-editor"
   ],
   "package": [
     "§16"

@@ -293,6 +293,8 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       // #1901: the author/copyright screen walks after the track choice.
       "attribution",
       "project_name",
+      // spec 111: the Open language list, a gated side trail.
+      "open_languages",
       "characters",
       "marks",
       "punctuation",
@@ -357,7 +359,7 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
 
   it("every other screen is an ungated spine screen", () => {
     for (const s of screens) {
-      if (s.id === "project_name" || s.id === "touch_seed_source") continue;
+      if (s.id === "project_name" || s.id === "touch_seed_source" || s.id === "open_languages") continue;
       expect(s.spine, s.id).toBe(true);
       expect(s.gatedBy, s.id).toBeUndefined();
       expect(s.joinTarget, s.id).toBeUndefined();

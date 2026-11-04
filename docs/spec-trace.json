@@ -1173,6 +1173,14 @@
       "decisions": [],
       "notes": ""
     },
+    "specs/111-open-existing-keyboard": {
+      "title": "Feature Specification: Open an existing keyboard",
+      "hash": "sha256:9bce3b767c961412",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
     "specs/css-editor": {
       "title": "Feature Specification: CSS editor step",
       "hash": "sha256:7c1831e3e80f347f",

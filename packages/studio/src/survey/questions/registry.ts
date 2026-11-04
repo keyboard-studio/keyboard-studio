@@ -232,9 +232,24 @@ export const declaredScreenGates: ReadonlyMap<
   ["open_languages", (d) => d["authoring-track"]?.value === "adapt"],
   [
     "touch_seed_source",
-    (d) => d["touch-seed-source"] === undefined && d["authoring-track"]?.value !== "adapt",
+    // Open (spec 111 FR-009): the keyboard's own touch layout is edited as it
+    // is; generation is offered only when the file is missing.
+    (d) =>
+      d["touch-seed-source"] === undefined &&
+      (d["authoring-track"]?.value !== "adapt" || openedKeyboardLacksTouchLayout(d)),
   ],
 ]);
+
+/**
+ * True when the opened keyboard's catalog entry names no touch platform, so it
+ * has no touch layout of its own to edit. Reads only the recorded
+ * `base-keyboard` decision (gates receive nothing else).
+ */
+function openedKeyboardLacksTouchLayout(d: DecisionSet): boolean {
+  const targets = (d["base-keyboard"]?.value as { targets?: readonly string[] } | undefined)?.targets;
+  if (targets === undefined) return false;
+  return !targets.some((t) => t === "web" || t === "mobile" || t === "tablet");
+}
 
 /**
  * Spec 111 (Open): the screens hidden once the Open entry records

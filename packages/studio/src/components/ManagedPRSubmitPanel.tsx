@@ -56,6 +56,10 @@ import {
 } from "../criteria/openPrBlocks.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { replacesCuratedCopy } from "../lib/openSourceChoice.ts";
+import { useReformatConsent } from "../hooks/useReformatConsent.ts";
+import { ReformatConsentRequiredError } from "../lib/reformatConsentError.ts";
+import { ReformatConsentDialog } from "./ReformatConsentDialog.tsx";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -332,6 +336,8 @@ export function ManagedPRSubmitPanel({
   );
   const prBodyDraft = prBodyEdited ?? generatedBody;
 
+  const reformatConsent = useReformatConsent();
+
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
     setSubmitState({ kind: "submitting" });
@@ -341,7 +347,21 @@ export function ManagedPRSubmitPanel({
 
     try {
       // Project the working copy at submit time — identical to the download path.
-      const projected = await projectWorkingCopyForOutput();
+      // Open (spec 111 FR-009): a file that cannot be updated in place waits
+      // for the author's agreement; declining cancels the submission.
+      const projected = await reformatConsent.guard(async (consented) => {
+        const out = consented
+          ? await projectWorkingCopyForOutput({ consentedReemit: true })
+          : await projectWorkingCopyForOutput();
+        if (out?.reformatRequired !== undefined && !consented) {
+          throw new ReformatConsentRequiredError(out.reformatRequired);
+        }
+        return out;
+      });
+      if (projected === undefined) {
+        setSubmitState({ kind: "idle" });
+        return;
+      }
       if (projected === null) {
         setSubmitState({
           kind: "error",
@@ -382,14 +402,22 @@ export function ManagedPRSubmitPanel({
       if (wc.instantiationMode === "adapt-existing" && wc.startKeyboard !== null) {
         const fromVersion = wc.startIr?.header.version?.trim() || "1.0";
         const toVersion = shippedVersionOf(vfs, keyboardId) ?? fromVersion;
+        // The pinned source (repository, commit, path) comes from the choice made
+        // at Open; a draft that predates it falls back to upstream, no commit.
+        const source = wc.startSource;
         openBlocks.push(
           "",
           buildSourceBlock({
-            owner: "keymanapp",
-            repo: "keyboards",
-            path: wc.startKeyboard.path,
+            owner: source?.owner ?? "keymanapp",
+            repo: source?.repo ?? "keyboards",
+            ...(source !== null ? { shortSha: source.commit.slice(0, 7) } : {}),
+            path: source?.path ?? wc.startKeyboard.path,
             fromVersion,
             toVersion,
+            replacesCuratedSha:
+              source !== null && replacesCuratedCopy(source)
+                ? source.alternative?.commit.slice(0, 7)
+                : undefined,
           }),
         );
         const reviewBlock =
@@ -450,7 +478,7 @@ export function ManagedPRSubmitPanel({
     } finally {
       useTestingStore.getState().setSubmitInFlight(false);
     }
-  }, [submitEnabled, authorName, email, t, i18n, accessToken, prBodyDraft, openRatchet]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken, prBodyDraft, openRatchet, reformatConsent.guard]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -503,6 +531,7 @@ export function ManagedPRSubmitPanel({
       aria-label={t({ id: "output.submit.sectionAriaLabel", message: "Submit to community repository" })}
       style={sectionStyle}
     >
+      <ReformatConsentDialog {...reformatConsent.dialog} />
       <div style={labelStyle}>
         <Trans id="output.submit.sectionLabel">Submit to community repository</Trans>
       </div>

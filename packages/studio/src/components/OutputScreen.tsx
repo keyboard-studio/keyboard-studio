@@ -68,6 +68,7 @@ import { jumpToLocation } from "../lib/jumpToLocation.ts";
 import { unreachableReasonLabel } from "../decisions/progressDots.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
+import { ReformatConsentDialog } from "./ReformatConsentDialog.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { LdmlDownloadPanel } from "./output/LdmlDownloadPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
@@ -1040,6 +1041,7 @@ export function OutputScreen() {
       </section>
 
       {narrow ? detailsPane : null}
+      <ReformatConsentDialog {...artifact.reformatConsent} />
     </div>
   );
 }

@@ -417,6 +417,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     touchKeyIdentity: s.touchKeyIdentity,
     startDocProfile: s.startDocProfile,
     baselineDocFindings: s.baselineDocFindings,
+    startSource: s.startSource,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -592,6 +593,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     touchKeyIdentity: snapshot.touchKeyIdentity ?? null,
     startDocProfile: snapshot.startDocProfile ?? null,
     baselineDocFindings: snapshot.baselineDocFindings ?? null,
+    // Absent from a draft saved before the source choice existed.
+    startSource: snapshot.startSource ?? null,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),

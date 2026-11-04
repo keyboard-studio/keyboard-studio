@@ -19,6 +19,7 @@ const languageList: GalleryModule<LanguageListValue> = {
   definition,
   provides: ["language-list"],
   screen: "open_languages",
+  requires: [],
   // Walks after the attribution trio, which is also what orders it after the track choice.
   screenRequires: ["copyright-holder"],
   inputs: [],

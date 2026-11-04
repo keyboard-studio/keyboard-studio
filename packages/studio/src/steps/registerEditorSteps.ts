@@ -258,7 +258,7 @@ export const oskStep: EditorStep = step({
 export const languageListStep: EditorStep = step({
   id: "open_languages",
   title: "Languages",
-  layout: "full",
+  layout: "pane",
   component: LanguageListHost,
   specRef: "specs/111-open-existing-keyboard",
   persistence: "working-copy",

@@ -45,6 +45,8 @@ function derivedSettles(): Map<DecisionId, string> {
  */
 const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   layout: ["language-code"],
+  // spec 111: the Open language list orders by its screenRequires, not requires.
+  open_languages: [],
   choose_base: ["language-code", "target-script"],
   characters: ["target-script", "authoring-track", "project-keyboard-id"],
   marks: ["character-inventory"],
@@ -66,8 +68,8 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the seventeen gallery decisions", () => {
-    expect(SETTLES.size).toBe(17);
+  it("the derived settles set is exactly the eighteen gallery decisions (spec 111 adds language-list)", () => {
+    expect(SETTLES.size).toBe(18);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "carved-layout",
@@ -76,6 +78,7 @@ describe("gallery module coverage (FR-002)", () => {
       "deadkeys-defined",
       "help-docs",
       "invisibles-inventory",
+      "language-list",
       "marks-treatment",
       "osk-layout",
       "physical-layout",

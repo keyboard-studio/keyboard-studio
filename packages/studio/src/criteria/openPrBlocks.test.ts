@@ -47,6 +47,45 @@ describe("buildSourceBlock", () => {
   });
 });
 
+describe("buildSourceBlock with a pinned source", () => {
+  it("prints the short sha of the chosen copy and the curated copy it replaces", () => {
+    expect(
+      buildSourceBlock({
+        owner: "keymanapp",
+        repo: "keyboards",
+        shortSha: "abcdef1234567890",
+        path: "release/sil/sil_cameroon_qwerty",
+        fromVersion: "6.0.4",
+        toVersion: "6.0.5",
+        replacesCuratedSha: "0123456789abcdef",
+      }),
+    ).toBe(
+      [
+        "### Updated from",
+        "- Repository: keymanapp/keyboards @ `abcdef1`",
+        "- Path: `release/sil/sil_cameroon_qwerty`",
+        "- Version: 6.0.4 → 6.0.5",
+        "- Note: replaces the curated keyboard-studio/keyboards copy (`0123456`).",
+      ].join("\n"),
+    );
+  });
+
+  it("keeps hostile sha, path and version text from breaking the block", () => {
+    const block = buildSourceBlock({
+      owner: "keymanapp",
+      repo: "keyboards",
+      shortSha: "ab`\n### x",
+      path: "release/a`\n### b",
+      fromVersion: "1.0\n### v",
+      toVersion: "2.0",
+    });
+    expect(block.split("\n")).toHaveLength(4);
+    expect(block).toContain("@ `ab`");
+    expect(block).toContain("- Path: `release/a### b`");
+    expect(block).not.toContain("\n###  v");
+  });
+});
+
 describe("buildReviewBlock", () => {
   it("is null with nothing to report", () => {
     expect(buildReviewBlock({ kept: [], inherited: [] })).toBeNull();

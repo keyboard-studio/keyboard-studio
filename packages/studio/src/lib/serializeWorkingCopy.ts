@@ -122,6 +122,12 @@ export interface ProjectWorkingCopyForOutputResult {
    * welcome row without parsing prose.
    */
   missingInheritedImages: string[];
+  /**
+   * Open mode: the `.kmn` files a change could not be placed into precisely.
+   * They were left as they were, awaiting the author's agreement to a full
+   * re-emit (`ReformatConsentDialog`). Absent when there are none.
+   */
+  reformatRequired?: string[];
 }
 
 /**
@@ -146,6 +152,11 @@ export interface ProjectForOutputOptions {
    * overlay, which is how "what if the author had left this blank?" is expressed.
    */
   identityOverride?: Partial<IdentityOverlay>;
+  /**
+   * Open mode: the author agreed to a full re-emit of the files named in an
+   * earlier result's `reformatRequired` (spec 111 FR-009).
+   */
+  consentedReemit?: boolean;
   /**
    * spec 094 (contracts C2): produce test build `number` at `version` — the
    * version replaces the publish version everywhere it ships, and the package
@@ -521,7 +532,11 @@ export async function projectWorkingCopyForOutput(
   // spec 106 FR-005: every store-derived field comes from the same
   // projectionInputFromState the preview uses, so the download carries the
   // fallback policy, disabled families and keep-inert set the OSK compiled.
-  const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs(
+  const {
+    warnings: projectionWarnings,
+    effectiveKeyboardId,
+    reformatRequired,
+  } = projectWorkingCopyVfs(
     projectionInputFromState({ ...state, startIr }, {
       vfs: clonedVfs,
       keyboardId,
@@ -544,6 +559,7 @@ export async function projectWorkingCopyForOutput(
                   identity?.displayName !== undefined && identity.displayName !== startKeyboard.displayName,
                 ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
               },
+              ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
             },
           }
         : {}),
@@ -862,6 +878,7 @@ export async function projectWorkingCopyForOutput(
     version,
     warnings,
     missingInheritedImages,
+    ...(reformatRequired !== undefined ? { reformatRequired } : {}),
   };
 }
 

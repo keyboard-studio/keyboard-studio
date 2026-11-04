@@ -15,6 +15,7 @@ Part I). The "After 079" column is the target this feature must reach.
 | track | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | attribution | new step (#1901: author/copyright questions moved post-track); answers recorded as decisions keyed by question id, as they were under identity | #1901 | `answer-store` | compliant |
 | project_name | non-compliant (D-5) | F-5 | `answer-store` | compliant |
+| open_languages | new step (spec 111, Open only); the author's edited language list is written to the working copy on every change | spec 111 | `working-copy` | compliant |
 | characters | non-compliant: the prefill wipes the alphabet (D-3); the manual path is D-5 | F-3, F-5 | `decision-store` (alphabet) + `answer-store` (sub-screen position, manual-path answers) | compliant |
 | marks | non-compliant: component state only (D-1); stacking discarded; guards not stripped (D-6) | F-1 | `decision-store` (composite) + `answer-store` (per-toggle evidence answers, step-status slot) | compliant |
 | punctuation | compliant for picks and removals; the `alreadyConfirmed` guard ignores evidence (FR-022) | F-3, F-6 | `decision-store` (picks) + `answer-store` (one evidence answer) | compliant |

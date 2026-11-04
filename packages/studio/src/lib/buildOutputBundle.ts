@@ -40,6 +40,8 @@ import {
   getParseTouchLayout,
   getRenderCompileReport,
 } from "./services.ts";
+import { ReformatConsentRequiredError } from "./reformatConsentError.ts";
+export { ReformatConsentRequiredError };
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getLayoutFamilyAnswer, getPickedWindowsLayouts } from "./layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "./ldmlBaseLayout.ts";
@@ -67,6 +69,8 @@ export interface OutputBundle {
   compileDiagnostics: CompilerDiagnostic[];
   /** Projection warnings, plus any doc stub this call had to synthesize. */
   warnings: string[];
+  /** Open mode: `.kmn` files left unchanged pending the author's agreement to a re-emit. */
+  reformatRequired?: string[];
 }
 
 /**
@@ -99,6 +103,11 @@ export class OutputBundleError extends Error {
 export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise<OutputBundle | null> {
   const projected = await projectWorkingCopyForOutput(opts);
   if (projected === null) return null;
+  // Open (spec 111 FR-009): files that could not be updated in place wait for
+  // the author's agreement; nothing is delivered without it.
+  if (projected.reformatRequired !== undefined && opts?.consentedReemit !== true) {
+    throw new ReformatConsentRequiredError(projected.reformatRequired);
+  }
 
   const { vfs, keyboardId, displayName, version } = projected;
   const warnings = [...projected.warnings];
@@ -143,6 +152,9 @@ export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise
     artifacts: { kmx, ...(kvk !== undefined ? { kvk } : {}), ...(js !== undefined ? { js } : {}) },
     compileDiagnostics,
     warnings,
+    ...(projected.reformatRequired !== undefined
+      ? { reformatRequired: projected.reformatRequired }
+      : {}),
   };
 }
 
@@ -168,8 +180,8 @@ export interface DownloadResult {
  * failed — the caller renders those and leaves the source `.zip` available, so a
  * failed package never dead-ends the author.
  */
-export async function buildKmpForDownload(): Promise<DownloadResult | null> {
-  const bundle = await buildOutputBundle();
+export async function buildKmpForDownload(opts?: ProjectForOutputOptions): Promise<DownloadResult | null> {
+  const bundle = await buildOutputBundle(opts);
   if (bundle === null) return null;
   const kmp = await packageBundle(bundle);
   // Deliberately unversioned, matching how Keyman packages are distributed:
@@ -187,8 +199,11 @@ export async function buildKmpForDownload(): Promise<DownloadResult | null> {
  * exactly as {@link buildKmpForDownload} does. The caller records the build only
  * after this resolves (FR-011).
  */
-export async function buildTestBuildKmp(testBuild: { number: number; version: string }): Promise<DownloadResult | null> {
-  const bundle = await buildOutputBundle({ testBuild });
+export async function buildTestBuildKmp(
+  testBuild: { number: number; version: string },
+  opts?: ProjectForOutputOptions,
+): Promise<DownloadResult | null> {
+  const bundle = await buildOutputBundle({ ...opts, testBuild });
   if (bundle === null) return null;
   const kmp = await packageBundle(bundle);
   return {
@@ -226,8 +241,8 @@ async function packageBundle(bundle: OutputBundle): Promise<{ bytes: Uint8Array;
  *
  * The `.kmp` itself is NOT included — it is its own download.
  */
-export async function buildSourceZipForDownload(): Promise<DownloadResult | null> {
-  const bundle = await buildOutputBundle();
+export async function buildSourceZipForDownload(opts?: ProjectForOutputOptions): Promise<DownloadResult | null> {
+  const bundle = await buildOutputBundle(opts);
   if (bundle === null) return null;
 
   const bytes = await zipProjectedVfs(bundle.vfs);
