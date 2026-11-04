@@ -24,9 +24,9 @@
 //     source expression's name, which no runtime function can reproduce;
 //     plural() is only called at render time in this graph, never at
 //     module load, and the extractor never reads plural descriptors.
-//   Trans -> a component that renders nothing. Components are never
-//     rendered by this tool; the stand-in exists so module-level element
-//     creation (`<Trans/>` inside other components' bodies) links.
+//   Trans / Plural -> components that render nothing. Components are never
+//     rendered by this tool; the stand-ins exist so module-level element
+//     creation (`<Trans/>` / `<Plural/>` inside component bodies) links.
 //   useLingui() -> throws. Reaching it means component render code is
 //     executing inside a data-extraction tool, which must fail loudly
 //     rather than silently stub the i18n context.
@@ -49,6 +49,10 @@ export function plural(
 }
 
 export function Trans(): null {
+  return null;
+}
+
+export function Plural(): null {
   return null;
 }
 
