@@ -243,7 +243,7 @@ export const mechanismsStep: EditorStep = step({
  */
 export const oskStep: EditorStep = step({
   id: "osk",
-  title: "On-Screen Keyboard",
+  title: "OnScreen Keyboard Label Editors",
   layout: "full",
   component: OskEditorAdapter,
   specRef: ["specs/osk-editor"],

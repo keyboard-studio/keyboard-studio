@@ -963,7 +963,7 @@
   "editor.assignLoop.osk.selectedKeyTitle": "Touche {vkey}",
   "editor.assignLoop.osk.tabCode": "Code",
   "editor.assignLoop.osk.tabVisual": "Visuel",
-  "editor.assignLoop.osk.title": "Clavier visuel",
+  "editor.assignLoop.osk.title": "Éditeurs d'étiquettes du clavier visuel",
   "editor.assignLoop.osk.undo": "Annuler",
   "editor.assignLoop.osk.viewTabsLabel": "Vue de l'éditeur",
   "editor.assignLoop.patternLoadError": "Erreur de chargement des motifs — l'aperçu de transformation peut être incomplet.",
