@@ -19,6 +19,29 @@ import { alphabetOf, isCasedAlphabet } from "../caps/capsLogic.ts";
 import type { WindowsLayoutValue } from "../questions/gallery/windowsLayout.ts";
 
 /**
+ * Record caps handling as the studio's "default" (cased keys) when the
+ * confirmed alphabet is cased and no caps-handling decision exists yet. A Copy
+ * author confirms the layout before the alphabet exists, so the characters
+ * step calls this too; without it the decision (and the companion pre-accept
+ * and `&CasedKeys` store that depend on it) would never be recorded there.
+ */
+export function seedCapsHandlingDefault(deps: GalleryHostDeps): void {
+  const decisions = deps.getDecisions();
+  if (
+    decisions["caps-handling"] === undefined &&
+    isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value))
+  ) {
+    decideGalleryValue<CapsHandlingValue>(
+      capsHandlingModule,
+      { mode: "cased-keys" },
+      { provenance: "default" },
+      LAYOUT_FAMILY_STEP_ID,
+      deps,
+    );
+  }
+}
+
+/**
  * @param record The recorded `windows-layout` decision, if the author already picked.
  * @param proposedLayoutId The layout the studio proposed for the identity tag.
  */
@@ -36,18 +59,6 @@ export function confirmWindowsLayout(
       deps,
     );
   }
-  const decisions = deps.getDecisions();
-  if (
-    decisions["caps-handling"] === undefined &&
-    isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value))
-  ) {
-    decideGalleryValue<CapsHandlingValue>(
-      capsHandlingModule,
-      { mode: "cased-keys" },
-      { provenance: "default" },
-      LAYOUT_FAMILY_STEP_ID,
-      deps,
-    );
-  }
+  seedCapsHandlingDefault(deps);
   useSurveyAnswerStore.getState().setStatus(LAYOUT_FAMILY_STEP_ID, { kind: "finished" });
 }

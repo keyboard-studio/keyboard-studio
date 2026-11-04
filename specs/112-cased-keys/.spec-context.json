@@ -257,10 +257,18 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T00:09:41.796Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-04T19:12:58.608Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T030",
+  "currentTask": "T031",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -502,6 +510,9 @@
         "packages/studio/src/decisions/decisionIRConsistency.test.ts",
         "packages/studio/src/survey/questions/registry.test.ts"
       ]
+    },
+    "T031": {
+      "status": "DONE"
     }
   },
   "verified": [

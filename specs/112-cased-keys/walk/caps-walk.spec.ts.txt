@@ -1,59 +1,124 @@
-/**
- * Spec 112 T031 manual walk (scripted): copy basic_kbdus for a Bafut alphabet.
- * Throwaway driver, not committed. Screenshots go under specs/112-cased-keys/walk/.
- */
 import { test, expect, type Page } from "playwright/test";
 import { unzipSync } from "fflate";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  driveIdentityLite,
-  pickStartKeyboard,
-  chooseTrackCopy,
-  driveAttributionStep,
-  acceptProjectName,
-  confirmPrefill,
-  buildOneCharacterList,
-  driveDeadkeysStep,
-  driveMechanismsGallery,
-  navigateToOutput,
-  triggerDownload,
-  seedReturningVisitor,
+  driveIdentityLite, pickStartKeyboard, chooseTrackCopy, driveAttributionStep, acceptProjectName,
+  confirmPrefill, driveMarksSeries, drivePunctuationStep, driveInvisiblesStep, driveConvenienceStep, driveDeadkeysStep, selectMenuOption, navigateToOutput,
+  triggerDownload, driveMechanismsGallery, driveTouchGallery, driveHelpPhase, seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
 const OUT = path.resolve(process.cwd(), "../../specs/112-cased-keys/walk");
 const shot = async (page: Page, name: string) => page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
+const log = (s: string) => fs.appendFileSync(path.join(OUT, "run.log"), s + "\n");
 
-test("T031: caps handling walk on a Bafut copy of basic_kbdus", async ({ page }) => {
-  test.setTimeout(900_000);
+test("T031 caps walk", async ({ page }) => {
+  test.setTimeout(400_000);
   await seedReturningVisitor(page);
-  await page.goto("/");
+  await page.goto("/?e2e=1");
   await driveIdentityLite(page, { english: "Bafut", autonym: "Bafut", languageCode: "bfd", script: "Latn" });
   await pickStartKeyboard(page, "basic_kbdus");
   await chooseTrackCopy(page);
   await driveAttributionStep(page, { authorName: "Walk Author" });
   await acceptProjectName(page);
   await confirmPrefill(page);
-  await buildOneCharacterList(page, "ŋ");
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="charlist-continue"]');
+  await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
+  await page.fill('[aria-label="Character to add"]', "ŋ");
+  await page.getByTestId("charlist-add").click();
+  await page.fill('[aria-label="Character to add"]', "Ŋ");
+  await page.getByTestId("charlist-add").click();
+  await page.click('[data-testid="charlist-done"]');
+  const noSample = page.getByRole("button", { name: "Continue without a text sample" });
+  await noSample.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {});
+  if (await noSample.isVisible().catch(() => false)) await noSample.click();
+  await driveMarksSeries(page);
+  await drivePunctuationStep(page);
+  await driveInvisiblesStep(page);
+  await driveConvenienceStep(page);
   await shot(page, "01-after-alphabet");
 
-  // Carve + deadkeys + rules
-  await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId("carve-continue").click();
-  await expect(page.getByTestId("deadkeys-continue")).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId("deadkeys-continue").click();
-  await page.getByTestId("rules-continue").click();
-  await shot(page, "02-mechanisms-start");
-  await driveMechanismsGallery(page, { placements: { "ŋ": { key: "K_BKSLASH" } } });
-  await shot(page, "03-after-mechanisms");
-
-  await navigateToOutput(page);
-  const download = await triggerDownload(page);
-  const zip = fs.readFileSync((await download.path())!);
-  const entries = Object.entries(unzipSync(new Uint8Array(zip)));
-  const kmn = entries.find(([n]) => n.endsWith(".kmn"));
-  expect(kmn).toBeDefined();
-  const text = Buffer.from(kmn![1]).toString("utf8");
+  // Step through until the mechanism gallery or caps decision shows.
+  const capsEl = page.getByTestId("caps-handling");
+  const applyButton = page.getByRole("button", { name: /^Apply method for / });
+  let capsSeen = false, applied = false;
+  for (let i = 0; i < 60 && !applied; i++) {
+    log(`iter ${i} url ${page.url()}`);
+    if (!capsSeen && (await capsEl.isVisible().catch(() => false))) {
+      capsSeen = true;
+      await shot(page, "03-layout-caps");
+      log("CAPS: " + (await capsEl.innerText()));
+      log("ALSO: " + (await page.getByTestId("caps-also-covers").innerText().catch(() => "<none>")));
+      const cont = page.getByTestId("layout-continue");
+      if (await cont.isVisible().catch(() => false)) await cont.click();
+      continue;
+    }
+    if (!applied && (await page.getByRole("button", { name: "Start the mechanism gallery" }).isVisible().catch(() => false))) {
+      await page.getByRole("button", { name: "Start the mechanism gallery" }).click();
+      continue;
+    }
+    if (!applied && (await applyButton.isVisible().catch(() => false))) {
+      const chip = page.getByRole("button", { name: /014B|ŋ/ }).first();
+      log("eng chip count: " + (await page.getByRole("button", { name: /014B|ŋ/ }).count()));
+      await chip.click().catch((e) => log("chip click failed " + e));
+      await page.waitForTimeout(500);
+      const card = page.getByRole("button", { name: /^Assign to a key/ });
+      if ((await card.getAttribute("aria-pressed")) !== "true") await card.click();
+      await selectMenuOption(page, page.getByRole("button", { name: "Physical key for Assign to a key" }), "K_LBRKT");
+      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2500);
+      log("LS: " + (await page.evaluate(() => Object.keys(localStorage).map((k) => k + ":" + ((localStorage.getItem(k) ?? "").includes("caps-handling") ? "HAS-CAPS" : (localStorage.getItem(k) ?? "").length)).join(" | "))));
+      const bn = page.locator('[aria-label="Case-pair companion added"]');
+      const prop = page.locator('[aria-label="Case-pair companion proposal"]');
+      log("BANNER before apply: accepted=" + (await bn.count()) + " proposal=" + (await prop.count()));
+      await applyButton.click({ timeout: 10_000 });
+      await page.waitForTimeout(2000);
+      log("BANNER after apply: accepted=" + (await bn.count()) + " proposal=" + (await prop.count()));
+      if (await bn.count()) { await bn.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {}); log("BANNER text: " + (await bn.first().innerText({ timeout: 5000 }).catch(() => "<none>"))); }
+      else if (await prop.count()) { await prop.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {}); log("PROPOSAL text: " + (await prop.first().innerText({ timeout: 5000 }).catch(() => "<none>"))); }
+      await shot(page, "02-companion-preaccepted");
+      log("DISMISS count: " + (await page.getByRole("button", { name: /^Remove Ŋ from the same key/ }).count()));
+      applied = true;
+      continue;
+    }
+    // generic advance
+    const nexts = ["layout-continue", "mechanisms-continue", "carve-continue", "deadkeys-continue", "rules-continue", "survey-advance"];
+    let clicked = false;
+    for (const id of nexts) {
+      const b = page.getByTestId(id);
+      if (await b.isVisible().catch(() => false)) { if (await b.isEnabled()) { await b.click(); clicked = true; break; } }
+    }
+    if (!clicked) {
+      const fwd = page.getByRole("button", { name: /^(Next character|Continue)$/ });
+      if (await fwd.isVisible().catch(() => false) && await fwd.isEnabled()) { await fwd.click(); clicked = true; }
+    }
+    if (!clicked) await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
+  }
+  log(`applied=${applied}`);
+  const files = await page.evaluate(async () => (await window.__ksE2E__?.snapshotOutputFiles()) ?? null);
+  log("snapshot files: " + (files ? Object.keys(files).join(", ") : "<no hook>"));
+  const kmnPath = Object.keys(files ?? {}).find((n) => n.endsWith(".kmn"));
+  const text = kmnPath ? String((files as Record<string, string>)[kmnPath]) : "";
   fs.writeFileSync(path.join(OUT, "download.kmn.txt"), text);
-  await shot(page, "04-output");
+  log("kmn path " + kmnPath + " has CasedKeys: " + text.includes("&CasedKeys"));
+  await page.getByRole("button", { name: "Code", exact: true }).click({ timeout: 3000 }).catch(() => {});
+  await page.waitForTimeout(1500);
+  await shot(page, "05-output");
+  await page.getByRole("button", { name: "Assign", exact: true }).click({ timeout: 3000 }).catch(() => {});
+  await page.click('a[href="#survey"]', { timeout: 3000 }).catch(() => {});
+  const capsEl0 = page.getByTestId("caps-handling");
+  for (let i = 0; i < 60 && !(await capsEl0.isVisible().catch(() => false)); i++) {
+    const back = page.getByRole("button", { name: /Back/ }).last();
+    await back.click({ timeout: 1500 }).catch(() => {});
+    await page.waitForTimeout(700);
+  }
+  log("caps reached via back: " + (await capsEl0.isVisible().catch(() => false)));
+  if (await capsEl0.isVisible().catch(() => false)) {
+    await shot(page, "03-layout-caps");
+    log("CAPS: " + (await capsEl0.innerText()));
+    log("ALSO: " + (await page.getByTestId("caps-also-covers").innerText().catch(() => "<none>")));
+  }
+  expect(text).toContain("&CasedKeys");
 });
