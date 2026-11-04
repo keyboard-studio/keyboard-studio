@@ -113,7 +113,7 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
 const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
-  layout: ["windows-layout"],
+  layout: ["windows-layout", "caps-handling"],
   choose_base: ["base-keyboard"],
   track: ["authoring-track"],
   // #1901 amendment: the author trio's membership, moved from identity.
@@ -185,7 +185,12 @@ const mustPrecede = (a: string, b: string): boolean => {
   const sb = screenById.get(b);
   if (sa === undefined || sb === undefined) return false;
   const aModules = new Set(sa.moduleIds);
-  return sb.moduleIds.some((id) =>
+  // An intra-step member (spec 112: caps-handling on the layout screen) forms
+  // no ordering edge, as in deriveScreens: only screen owners order a screen.
+  return sb.moduleIds.filter((id) => {
+    const m = byModuleId.get(id);
+    return !(m !== undefined && typeof m.renderer === "function" && m.group !== undefined);
+  }).some((id) =>
     [...requiresReach(id)].some((provider) => aModules.has(provider)),
   );
 };

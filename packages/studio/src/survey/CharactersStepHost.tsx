@@ -15,6 +15,7 @@ import { GalleryHost } from "../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../lib/galleryHostDeps.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import characterInventoryModule from "./questions/gallery/characterInventory.ts";
+import { seedCapsHandlingDefault } from "./layout/confirmWindowsLayout.ts";
 import { Prefill } from "./Prefill.tsx";
 import type { CharactersStepExtras } from "./CharactersStep.tsx";
 
@@ -43,7 +44,12 @@ const CharactersStepHost: ComponentType<EditorStepProps> = ({
       stepId={CHARACTERS_STEP_ID}
       deps={deps}
       stepContext={{
-        onComplete,
+        // Caps handling seeds once the alphabet is known (spec 112): the layout
+        // screen precedes this step on Copy, so it cannot seed it there.
+        onComplete: (result) => {
+          seedCapsHandlingDefault(deps);
+          onComplete(result);
+        },
         ...(onBack !== undefined && { onBack }),
         extras: { Prefill, PhaseB } satisfies CharactersStepExtras,
       }}

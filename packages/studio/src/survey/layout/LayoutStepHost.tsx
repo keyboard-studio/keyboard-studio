@@ -20,12 +20,14 @@ import { proposeWindowsLayout } from "../../lib/windowsLayouts.ts";
 import { LAYOUT_FAMILY_STEP_ID, pickedLayoutIds } from "../../lib/layoutFamily.ts";
 import { confirmWindowsLayout } from "./confirmWindowsLayout.ts";
 import windowsLayoutModule from "../questions/gallery/windowsLayout.ts";
+import capsHandlingModule from "../questions/gallery/capsHandling.ts";
 import type { WindowsLayoutValue } from "../questions/gallery/windowsLayout.ts";
 
 const LayoutStepHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
   const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
   const record = useDecisionStore((s) => s.decisions["windows-layout"]);
+  const capsRecord = useDecisionStore((s) => s.decisions["caps-handling"]);
   const deps = useMemo(buildGalleryHostDeps, []);
 
   const proposal = useMemo(() => proposeWindowsLayout(bcp47), [bcp47]);
@@ -58,8 +60,13 @@ const LayoutStepHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
     },
   });
 
+  // The caps-handling decision (spec 112) shares this screen: it renders
+  // beneath the layout pick and nothing at all for a caseless alphabet.
   return (
-    <GalleryHost module={windowsLayoutModule} record={record} stepId={LAYOUT_FAMILY_STEP_ID} deps={deps} />
+    <>
+      <GalleryHost module={windowsLayoutModule} record={record} stepId={LAYOUT_FAMILY_STEP_ID} deps={deps} />
+      <GalleryHost module={capsHandlingModule} record={capsRecord} stepId={LAYOUT_FAMILY_STEP_ID} deps={deps} />
+    </>
   );
 };
 

@@ -1,13 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
-import {
-  scaffoldIR,
-  resetIdentity,
-  stripCapsRules,
-  ensureCasedKeysStore,
-  removeCapsContextElements,
-} from "./scaffold-ir.js";
+import { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 
 const US_BASE_KMN = `store(&NAME) 'US English'
 store(&COPYRIGHT) 'Copyright © 2020 Acme'
@@ -153,68 +147,7 @@ group(main) using keys
     expect(read("KMW_HELPFILE")).toBe("new_id.htm");
   });
 
-  it("stripCapsRules removes IRRule nodes whose context has a CAPS or NCAPS modifier", () => {
-    const { ir } = parse(US_BASE_KMN, "us_english");
-    const beforeCount = ir.groups[0]!.rules.length;
-    expect(beforeCount).toBe(3);
-    stripCapsRules(ir);
-    const afterRules = ir.groups[0]!.rules;
-    expect(afterRules.length).toBe(1);
-    // Only the [K_C] rule should remain.
-    const remaining = afterRules[0]!;
-    const vkey = remaining.context.find((c) => c.kind === "vkey");
-    expect(vkey?.kind === "vkey" && vkey.name).toBe("K_C");
-  });
-
-  it("removeCapsContextElements strips CAPS/NCAPS from any surviving vkey modifiers", () => {
-    const { ir } = parse(US_BASE_KMN, "us_english");
-    // Build a hand-crafted rule that has CAPS alongside another modifier so stripCapsRules
-    // doesn't remove the whole rule first.
-    ir.groups[0]!.rules.push({
-      nodeId: "rule:test",
-      context: [{ kind: "vkey", name: "K_X", modifiers: ["SHIFT", "CAPS"] }],
-      output: [{ kind: "char", value: "X" }],
-    });
-    // Skip stripCapsRules so the rule survives; run only the element scrubber.
-    removeCapsContextElements(ir);
-    const test = ir.groups[0]!.rules.find((r) => r.nodeId === "rule:test");
-    const vkey = test?.context[0];
-    expect(vkey?.kind === "vkey" && vkey.modifiers).toEqual(["SHIFT"]);
-  });
-
-  it("ensureCasedKeysStore inserts &CasedKeys for qwerty group", () => {
-    const { ir } = parse(US_BASE_KMN, "us_english");
-    ensureCasedKeysStore(ir, "qwerty-qwertz");
-    const cased = ir.stores.find((s) => s.isSystem && s.name === "CasedKeys");
-    expect(cased).toBeDefined();
-  });
-
-  it("ensureCasedKeysStore inserts the AZERTY extended range for azerty group", () => {
-    const { ir } = parse(US_BASE_KMN, "us_english");
-    ensureCasedKeysStore(ir, "azerty");
-    const cased = ir.stores.find((s) => s.isSystem && s.name === "CasedKeys");
-    expect(cased).toBeDefined();
-    // The AZERTY value is preserved as a raw store item.
-    const first = cased!.items[0];
-    expect(first?.kind === "raw" && first.text).toContain("[K_0]..[K_9]");
-  });
-
-  it("ensureCasedKeysStore is a no-op for non-roman group", () => {
-    const { ir } = parse(US_BASE_KMN, "us_english");
-    ensureCasedKeysStore(ir, "non-roman");
-    const cased = ir.stores.find((s) => s.isSystem && s.name === "CasedKeys");
-    expect(cased).toBeUndefined();
-  });
-
-  it("ensureCasedKeysStore does not double-insert when one already exists", () => {
-    const kmn = US_BASE_KMN + "store(&CasedKeys) [K_A]..[K_Z]\n";
-    const { ir } = parse(kmn, "us_english");
-    ensureCasedKeysStore(ir, "qwerty-qwertz");
-    const all = ir.stores.filter((s) => s.isSystem && s.name === "CasedKeys");
-    expect(all.length).toBe(1);
-  });
-
-  it("scaffoldIR end-to-end on US-English fallback: identity reset, no NCAPS/CAPS rules, &CasedKeys present", () => {
+  it("scaffoldIR end-to-end on US-English fallback: identity reset, caps handling left exactly as copied", () => {
     const { ir } = parse(US_BASE_KMN, "us_english");
     const result = scaffoldIR(ir, {
       identity: { keyboardId: "my_us_layout", displayName: "My US Layout" },
@@ -227,28 +160,20 @@ group(main) using keys
     expect(result.header.keyboardId).toBe("my_us_layout");
     expect(result.header.name).toBe("My US Layout");
 
-    // No NCAPS or CAPS context elements anywhere.
-    for (const group of result.groups) {
-      for (const rule of group.rules) {
-        for (const el of rule.context) {
-          if (el.kind === "vkey") {
-            expect(el.modifiers).not.toContain("CAPS");
-            expect(el.modifiers).not.toContain("NCAPS");
-          }
-        }
-      }
-    }
-
-    // &CasedKeys store present.
-    const cased = result.stores.find((s) => s.isSystem && s.name === "CasedKeys");
-    expect(cased).toBeDefined();
-
-    // Round-trip through emit so we exercise the full pipeline.
+    // Caps handling is the studio projection's (spec 112): the CAPS/NCAPS
+    // rules are still there and no &CasedKeys was added.
     const emitted = emit(result);
-    expect(emitted).not.toContain("[CAPS");
-    expect(emitted).not.toContain("[NCAPS");
+    expect(emitted).toContain("[CAPS K_A]");
+    expect(emitted).toContain("[NCAPS K_B]");
+    expect(result.stores.find((s) => s.isSystem && s.name.toUpperCase() === "CASEDKEYS")).toBeUndefined();
     expect(emitted).toContain("store(&NAME) 'My US Layout'");
-    expect(emitted).toMatch(/store\(&CasedKeys\)/);
+  });
+
+  it("scaffoldIR leaves a copied keyboard's own &CasedKeys declaration exactly as it was", () => {
+    const kmn = US_BASE_KMN + "store(&CasedKeys) [K_A]..[K_C]\n";
+    const { ir } = parse(kmn, "us_english");
+    scaffoldIR(ir, { identity: { keyboardId: "k", displayName: "K" }, group: "qwerty-qwertz" });
+    expect(emit(ir)).toMatch(/store\(&CasedKeys\) \[K_A\] \.\. \[K_C\]/);
   });
 });
 

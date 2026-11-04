@@ -59,6 +59,10 @@
 //                         generated; after 2 so they see assignment rules,
 //                         before 2.7 because that step repoints the entry group
 //   2.7 Context tolerance — applyContextToleranceOverlay (spec 078)
+//   2.8 Caps handling  — the recorded caps-handling decision (spec 112): the
+//                         derived &CasedKeys store and the copied keyboard's
+//                         CAPS/NCAPS rules (research R10). After 2.7 so the
+//                         set is derived from the keyboard as the author left it
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
@@ -116,6 +120,10 @@ import {
   applyIdentityToKps,
   applyContextToleranceOverlay,
   applyMarkGuards,
+  replaceCapsRules,
+  syncTouchCapsLayerRaw,
+  writeCasedKeysStore,
+  removeCasedKeysStore,
   removedTouchKeyRuleIds,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
@@ -133,6 +141,8 @@ import { readVfsText } from "./vfsText.ts";
 import { markAttachmentsFromWorklist } from "./markAttachments.ts";
 import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
 import { claimedInputRuleIds } from "./claimedInputs.ts";
+import { deriveCasedKeys } from "./casedKeysDerivation.ts";
+import type { CapsHandlingValue } from "../decisions/decisionTypes.ts";
 
 /** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
 function safeFormViolations(
@@ -153,6 +163,21 @@ import {
   type DerivedRuleAdditions,
 } from "../survey/rules/ruleAdditions.ts";
 import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
+
+/** Every vkey that appears in a rule testing CAPS or NCAPS (step 2.8's `none` mode). */
+function allCapsRuleKeys(ir: KeyboardIR): Set<string> {
+  const keys = new Set<string>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      for (const el of rule.context) {
+        if (el.kind === "vkey" && (el.modifiers.includes("CAPS") || el.modifiers.includes("NCAPS"))) {
+          keys.add(el.name);
+        }
+      }
+    }
+  }
+  return keys;
+}
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
 const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
@@ -334,6 +359,12 @@ export interface ProjectWorkingCopyVfsInput {
    */
   contextToleranceOverlay?: ContextToleranceOverlay | null;
   /**
+   * The recorded caps-handling decision (spec 112), applied by step 2.8.
+   * Absent or `null` when not asked (a caseless alphabet, or no decision
+   * yet): the copied keyboard's caps handling is left exactly as it was.
+   */
+  capsHandling?: CapsHandlingValue | null;
+  /**
    * The rules survey step's additions (spec 082: pack install, guard
    * synthesis, Narrow exceptions), pre-derived by the caller with
    * `deriveRuleAdditions(workingIr, startIr)`. Spliced into the
@@ -463,6 +494,7 @@ export function projectWorkingCopyVfs(
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
+    capsHandling = null,
     ruleAdditions,
   } = input;
 
@@ -1098,6 +1130,59 @@ export function projectWorkingCopyVfs(
         warnings.push(
           `[project-working-copy] context-tolerance projection skipped: ${msg}`,
         );
+      }
+    }
+  }
+
+  // Step 2.8: Caps handling (spec 112, research R10). The caps-handling
+  // decision is the only thing that decides the &CasedKeys store and the
+  // copy's CAPS/NCAPS rules; the scaffolder no longer touches them. The key
+  // set is derived here, from the .kmn as it now stands (assignments
+  // included), so a key assigned later is covered without re-deciding.
+  //   cased-keys     store written, rules rewritten on the set's keys
+  //   explicit-rules rules and any declared store kept as copied; none written
+  //   none           no store, every CAPS/NCAPS rule rewritten
+  // A failure here warns and leaves the .kmn as the earlier steps made it.
+  if (capsHandling !== null) {
+    const kmnPathForCaps = `source/${keyboardId}.kmn`;
+    const kmnTextForCaps = readVfsText(vfs, kmnPathForCaps);
+    if (kmnTextForCaps !== undefined) {
+      try {
+        const parsedForCaps = parseKmn(kmnTextForCaps, keyboardId).ir;
+        const bcp47 = identity?.bcp47 !== undefined && identity.bcp47 !== "" ? identity.bcp47 : undefined;
+        if (capsHandling.mode === "cased-keys") {
+          const set = deriveCasedKeys(parsedForCaps, { ...(bcp47 !== undefined ? { bcp47 } : {}) });
+          writeCasedKeysStore(parsedForCaps, set.keys);
+          replaceCapsRules(parsedForCaps, new Set(set.keys));
+        } else if (capsHandling.mode === "none") {
+          removeCasedKeysStore(parsedForCaps);
+          replaceCapsRules(parsedForCaps, allCapsRuleKeys(parsedForCaps));
+        }
+        // explicit-rules leaves the copy exactly as it was: nothing to emit.
+        if (capsHandling.mode !== "explicit-rules") {
+          vfs.set(kmnPathForCaps, emitKmn(parsedForCaps), false);
+        }
+        // Touch caps: the same decision gives the touch layout its caps layer
+        // (R8). Runs on the projected touch file, after the clean-touch clone
+        // and the assignment propagation, so a letter assigned after
+        // scaffolding is uppercase on caps too.
+        if (capsHandling.mode === "cased-keys") {
+          const touchPathForCaps = findTouchLayoutPath(vfs);
+          const touchEntryForCaps = touchPathForCaps !== undefined ? vfs.get(touchPathForCaps) : undefined;
+          if (
+            touchPathForCaps !== undefined &&
+            touchEntryForCaps !== undefined &&
+            typeof touchEntryForCaps.content === "string"
+          ) {
+            const synced = syncTouchCapsLayerRaw(touchEntryForCaps.content, {
+              ...(bcp47 !== undefined ? { bcp47 } : {}),
+            });
+            if (synced.changed) vfs.set(touchPathForCaps, synced.json, false);
+          }
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] caps handling projection skipped: ${msg}`);
       }
     }
   }

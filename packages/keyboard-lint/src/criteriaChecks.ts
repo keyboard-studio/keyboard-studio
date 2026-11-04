@@ -73,8 +73,10 @@ import { checkStrayScratchFiles } from "./checks/criteria/check-scratch-files.js
 import { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
 import { checkDeprecatedNumericFormats } from "./checks/criteria/check-numeric-formats.js";
 import { checkCapsNcapsConsistent } from "./checks/criteria/check-caps-ncaps.js";
+import { checkCasedKeysDeclared, isMnemonicLayout } from "./checks/criteria/check-cased-keys.js";
 import { checkDeprecatedHeaders } from "./checks/criteria/check-deprecated-headers.js";
 import { checkTouchRequiredKeys } from "./checks/criteria/check-touch-required-keys.js";
+import { checkTouchCapsLayer } from "./checks/criteria/check-touch-caps-layer.js";
 import { checkFilenameConvention } from "./checks/criteria/check-filename-convention.js";
 import {
   checkTargetsAnyAlone,
@@ -271,6 +273,13 @@ export function runCriteriaChecks(
     // 18.14 — every layer carries the required control keys (K_LOPT,
     // K_BKSP, K_ENTER) with canonical K_ IDs.
     collect(checkTouchRequiredKeys(touchLayout, touchLayoutPath(keyboardId)));
+    // 18.16 — a complete touch caps layer reached by double-tapping Shift.
+    collect(
+      checkTouchCapsLayer(touchLayout, touchLayoutPath(keyboardId), {
+        mnemonic: keyboardIR !== undefined && isMnemonicLayout(keyboardIR),
+        ...(input.kpsLanguages[0] !== undefined ? { bcp47: input.kpsLanguages[0] } : {}),
+      }),
+    );
   }
 
   // 8.12 / 9.6 — package font scans over .kps facts + the VFS inventory.
@@ -467,6 +476,11 @@ export function runCriteriaChecks(
 
     // 7.26 — CAPS/NCAPS handling consistent per referenced key.
     collect(checkCapsNcapsConsistent(keyboardIR, keyboardId));
+
+    // 7.28 — a cased-script keyboard declares store(&CasedKeys).
+    collect(
+      checkCasedKeysDeclared(keyboardIR, keyboardId, input.kpsLanguages[0]),
+    );
 
     // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
     // Runs whenever the .kmn IR exists. An undeclared <Targets> list

@@ -147,7 +147,7 @@ tools/testing-profiles-2302/               # on km/2302-walk-zips: gates G1-G7, 
 | 2 | US2 mark guards | `km/106-mark-guards` | 1 |
 | 3 | US3 output form | `km/106-output-form` | 2 |
 | 4 | US4 carve | `km/106-carve-claimed` | 3 |
-| 5 | US5 caps | `km/106-caps-handling` | 3 (case-pair seam) |
+| 5 | US5 caps (moved to [spec 112](../112-cased-keys/spec.md)) | — | — |
 | 6 | US6 tolerance default | `km/106-tolerance-default` | 2, 3, 4 |
 | 7 | US7 clean rules | `km/106-clean-rules` | 3, 4 |
 | 8 | US8 preselect + 32-case walk | `km/106-preselect-walk` | all |

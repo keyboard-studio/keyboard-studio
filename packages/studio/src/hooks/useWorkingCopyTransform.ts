@@ -77,7 +77,7 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
-import { marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
+import { capsHandlingFromDecisions, marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -299,6 +299,12 @@ export function useWorkingCopyTransform(
   // station), so the memo keys on the guard input's content, not the value.
   const marksTreatment = useDecisionStore(
     (s) => s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined,
+  );
+  // spec 112: the caps-handling decision step 2.8 applies. Read through the
+  // same gate the download uses (a caseless alphabet is not asked), keyed on
+  // the mode so an unrelated re-record never rebuilds the projection.
+  const capsHandlingMode = useDecisionStore(
+    (s) => capsHandlingFromDecisions(s.decisions)?.mode ?? null,
   );
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
@@ -533,6 +539,7 @@ export function useWorkingCopyTransform(
             getPattern: (id) => patternMap?.get(id),
             identity: identityArg,
             marksTreatment,
+            capsHandling: capsHandlingMode === null ? undefined : { mode: capsHandlingMode },
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
@@ -566,6 +573,7 @@ export function useWorkingCopyTransform(
     deadkeyOpsKey,
     storeContextToleranceOverlay,
     marksGuardsKey,
+    capsHandlingMode,
     customCss,
   ]);
 }

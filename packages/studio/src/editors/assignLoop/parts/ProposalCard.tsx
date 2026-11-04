@@ -19,12 +19,14 @@ export interface ProposalCardProps {
   message: ReactNode;
   /** The action control(s) — e.g. a confirm/decline pair or a single button. */
   children: ReactNode;
+  /** `status` makes the card a polite live region (for a result the user should hear). */
+  role?: "note" | "status";
 }
 
-export function ProposalCard({ ariaLabel, message, children }: ProposalCardProps) {
+export function ProposalCard({ ariaLabel, message, children, role = "note" }: ProposalCardProps) {
   return (
     <div
-      role="note"
+      role={role}
       aria-label={ariaLabel}
       style={{
         background: GREEN_CHIP_BG,

@@ -63,13 +63,23 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   html: ["help-docs"],
 };
 
+/**
+ * Gallery decisions that sit on another module's screen (spec 112: caps
+ * handling joins the layout screen as an intra-step member). Their requires
+ * are their own, not the screen's baseline.
+ */
+const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]>>> = {
+  "caps-handling": ["character-inventory", "windows-layout"],
+};
+
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the seventeen gallery decisions", () => {
-    expect(SETTLES.size).toBe(17);
+  it("the derived settles set is exactly the eighteen gallery decisions", () => {
+    expect(SETTLES.size).toBe(18);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
+      "caps-handling",
       "carved-layout",
       "character-inventory",
       "custom-css",
@@ -114,7 +124,7 @@ describe("gallery module coverage (FR-002)", () => {
     });
 
     it("declares requires EQUAL to its step's declared requires (the 091 parity)", () => {
-      const stepRequires = BASELINE_STEP_REQUIRES[stepId];
+      const stepRequires = INTRA_STEP_REQUIRES[decisionId] ?? BASELINE_STEP_REQUIRES[stepId];
       expect(stepRequires, `baseline requires recorded for step ${stepId}`).toBeDefined();
       expect([...(mod?.requires ?? [])]).toEqual([...(stepRequires ?? [])]);
     });

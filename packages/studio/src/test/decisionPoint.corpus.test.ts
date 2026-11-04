@@ -115,8 +115,18 @@ const EXPECTED_DIFFS = {
     ...US3_DIFFS,
     /^- \+ \[K_(5|BKQUOTE|COLON|LBRKT|QUOTE|RBRKT|X)\] > U\+[0-9A-F]{4}$/,
   ],
+  // Spec 112: &CasedKeys is derived in projection instead of inherited from the
+  // family list. The walk placed eng on K_X with Shift still typing X, which is
+  // not a case pair, so K_X leaves the set (research R1) and the range becomes
+  // the explicit key list.
+  SPEC112: [
+    ...US3_DIFFS,
+    /^- \+ \[K_(5|BKQUOTE|COLON|LBRKT|QUOTE|RBRKT|X)\] > U\+[0-9A-F]{4}$/,
+    /^- store\(&CasedKeys\) \[K_A\] \.\. \[K_Z\]$/,
+    /^\+ store\(&CasedKeys\) (\[K_[A-Z]\] ?)+$/,
+  ],
 };
-const CURRENT_STORY = "US4" satisfies keyof typeof EXPECTED_DIFFS;
+const CURRENT_STORY = "SPEC112" satisfies keyof typeof EXPECTED_DIFFS;
 
 // The zip may carry the walk harness's `zzq` placeholder assignments; both sides
 // are reduced to the same placeholder before comparing.

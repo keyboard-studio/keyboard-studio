@@ -26,6 +26,7 @@ import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
+import capsHandlingModule from "./gallery/capsHandling.ts";
 import startKeyboardModule from "./gallery/baseKeyboard.ts";
 import characterInventoryModule from "./gallery/characterInventory.ts";
 import marksTreatmentModule from "./gallery/marksTreatment.ts";
@@ -103,6 +104,7 @@ export const reserveOnlyModules: readonly QuestionModule[] = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const galleryModuleList: readonly GalleryModule<any>[] = [
   windowsLayoutModule,
+  capsHandlingModule,
   startKeyboardModule,
   characterInventoryModule,
   marksTreatmentModule,

@@ -16,9 +16,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { MechanismAssignment, OutputForm, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
-import { applyAssignments } from "@keyboard-studio/engine";
+import { applyAssignments, parseKmn } from "@keyboard-studio/engine";
 import { acceptCasePairCompanion, useCasePairCompanion } from "./casePairCompanion.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 
 /** A throwaway base assignment — identity is all the hook needs. */
 function baseAssignment(target: string): MechanismAssignment {
@@ -491,5 +492,68 @@ describe("acceptCasePairCompanion (pure derivation)", () => {
       baseAssignment: baseAssignment("i"),
     };
     expect(acceptCasePairCompanion(input, "")).toEqual(acceptCasePairCompanion(input, undefined));
+  });
+});
+
+describe("useCasePairCompanion — pre-accepted under cased keys (spec 112)", () => {
+  const KMN = [
+    "store(&VERSION) '14.0'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [K_A] > 'a'",
+    "+ [SHIFT K_A] > 'A'",
+    "+ [K_E] > 'e'",
+    "+ [SHIFT K_E] > 'E'",
+    "+ [RALT K_E] > '€'",
+    "+ [SHIFT RALT K_E] > '£'",
+    "",
+  ].join("\n");
+
+  function seed(mode: "cased-keys" | "none" | null, alphabet: string[]) {
+    useDecisionStore.getState().reset();
+    useWorkingCopyStore.getState().setIdentity(null);
+    useWorkingCopyStore.setState({ ir: parseKmn(KMN, "x").ir });
+    useDecisionStore.getState().recordAll([
+      { id: "character-inventory", value: { chars: alphabet }, provenance: "asked" },
+      ...(mode === null
+        ? []
+        : [{ id: "caps-handling" as const, value: { mode }, provenance: "default" as const }]),
+    ]);
+  }
+
+  function propose(vkey: string, char = "ŋ") {
+    const { result } = renderHook(() => useCasePairCompanion());
+    act(() => {
+      result.current.propose({
+        mechanism: "physical",
+        originalChar: char,
+        vkey,
+        capsHandling: false,
+        baseAssignment: baseAssignment(char),
+      });
+    });
+    return result.current.proposal;
+  }
+
+  it("is pre-accepted when the decision is cased-keys and the counterpart is in the alphabet", () => {
+    seed("cased-keys", ["ŋ", "Ŋ"]);
+    expect(propose("K_LBRKT")?.preAccepted).toBe(true);
+  });
+
+  it("is not pre-accepted when the counterpart is not in the alphabet", () => {
+    seed("cased-keys", ["ŋ"]);
+    expect(propose("K_LBRKT")?.preAccepted).toBeUndefined();
+  });
+
+  it("is not pre-accepted under none, explicit rules or no decision", () => {
+    seed("none", ["ŋ", "Ŋ"]);
+    expect(propose("K_LBRKT")?.preAccepted).toBeUndefined();
+    seed(null, ["ŋ", "Ŋ"]);
+    expect(propose("K_LBRKT")?.preAccepted).toBeUndefined();
+  });
+
+  it("is not pre-accepted on a key another layer types a different pair on (R1 conflict)", () => {
+    seed("cased-keys", ["ŋ", "Ŋ"]);
+    expect(propose("K_E")?.preAccepted).toBeUndefined();
   });
 });

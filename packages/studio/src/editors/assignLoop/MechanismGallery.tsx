@@ -139,7 +139,7 @@ import {
   isLoneCombiningMark,
   reflectCharInput,
 } from "../../lib/charInput.ts";
-import { useCasePairCompanion } from "./casePairCompanion.ts";
+import { useCasePairCompanion, type CasePairProposal } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { useDisplacementProposal } from "./useDisplacementProposal.ts";
 import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
@@ -2629,8 +2629,49 @@ export function MechanismGallery({
     [resetMethodState, currentChar, proposeCompanion, sessionAssignments],
   );
 
+  // Spec 112: a pre-accepted companion (the key is a cased key) is recorded
+  // with the placement. The banner stays up; Undo restores the assignments as
+  // they were before the companion went in. `acceptedCompanion` remembers
+  // which proposal was recorded so the effect runs once per proposal.
+  const [acceptedCompanion, setAcceptedCompanion] = useState<{
+    proposal: CasePairProposal;
+    before: MechanismAssignment[];
+    after: MechanismAssignment[];
+  } | null>(null);
+  const acceptedProposalRef = useRef<CasePairProposal | null>(null);
+  useEffect(() => {
+    if (pendingCompanion === null || pendingCompanion.preAccepted !== true) return;
+    if (acceptedProposalRef.current === pendingCompanion) return;
+    const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
+    if (next === null) return;
+    // Marked before the write: the store update re-renders synchronously, ahead
+    // of the state update below, and must not find this proposal unhandled.
+    acceptedProposalRef.current = pendingCompanion;
+    recordAssignments(next);
+    setAcceptedCompanion({ proposal: pendingCompanion, before: sessionAssignments, after: next });
+  }, [pendingCompanion, sessionAssignments, recordAssignments]);
+  const isCompanionAccepted = acceptedCompanion !== null && acceptedCompanion.proposal === pendingCompanion;
+
+  const handleCompanionUndo = useCallback(() => {
+    if (acceptedCompanion === null) return;
+    const { before, after } = acceptedCompanion;
+    const unchanged =
+      sessionAssignments.length === after.length && sessionAssignments.every((a, i) => a === after[i]);
+    // Nothing else moved since: put the assignments back exactly. Otherwise
+    // drop only what the companion added.
+    recordAssignments(unchanged ? before : sessionAssignments.filter((a) => !after.includes(a) || before.includes(a)));
+    setAcceptedCompanion(null);
+    clearCompanion();
+  }, [acceptedCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
+    // Already recorded with the placement: Keep it just closes the banner.
+    if (isCompanionAccepted) {
+      setAcceptedCompanion(null);
+      clearCompanion();
+      return;
+    }
     // The touch mechanism confirms in its own gallery.
     if (pendingCompanion.mechanism === "touch") return;
     // What confirming records — the parallel combo, the RAlt / shift
@@ -2640,7 +2681,7 @@ export function MechanismGallery({
     const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
     if (next !== null) recordAssignments(next);
     clearCompanion();
-  }, [pendingCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+  }, [pendingCompanion, isCompanionAccepted, sessionAssignments, recordAssignments, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // Displacement (demotion) — confirm handler (#2300, gate G3)
@@ -3960,7 +4001,8 @@ export function MechanismGallery({
               <CasePairProposalBanner
                 proposal={pendingCompanion}
                 onConfirm={handleCompanionConfirm}
-                onDismiss={dismissCompanion}
+                onDismiss={isCompanionAccepted ? handleCompanionUndo : dismissCompanion}
+                accepted={isCompanionAccepted}
               />
             )}
 
