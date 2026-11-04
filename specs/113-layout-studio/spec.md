@@ -52,11 +52,10 @@ Mechanical Gallery and use it, not when the component exists.
    is an optional later phase (User Story 7).
 3. **Flow placement** — a **third tab in the Mechanical Gallery**: Assign | Code | Layout. No new
    wizard step, no new decision id.
-4. **Edit depth** — **as much as a useful UI allows** (amended by the 2026-11-04 clarifications
-   below; the product owner's stated goal is editing as much as possible). v1 edits literal text,
-   nothing (`nul`), deadkeys with their combinations, and literal contextual replacements, all
-   through one "after …" view. Rules that use stores (`any()`/`index()`), `if()`/`platform()`/
-   options, chains across groups, or opaque fragments are read-only with a way to see them in code.
+4. **Edit depth** — **as much as possible, where a useful UI exists** (amended by the 2026-11-04
+   clarifications below). Deadkeys and literal text are confirmed in scope. How far beyond that v1
+   goes rests on the proposed "after …" view (Clarifications, "Proposed UI"), which is pending the
+   product owner's confirmation. Whatever has no useful UI is read-only with a way to see it in code.
 5. **Base seeding** — keys the keyboard does not handle show what the **base keyboard** types
    there, marked **base-derived and provisional**. An author edit makes the key hand-set.
 
@@ -67,7 +66,8 @@ Mechanical Gallery and use it, not when the component exists.
 - Q: A key that also completes deadkey combinations (`dk(acute) + [K_E] > 'é'`) matches a rule with
   context. Should that make it read-only? → A: No. Deadkeys MUST be editable in the grid — MSKLC
   handles deadkeys in its visual editor, and so must this tab. The gap the tab leaves to code is
-  **contextual replacements** (rules whose context holds characters), not deadkeys.
+  **contextual replacements** (rules whose context holds characters), not deadkeys. (Narrowed by
+  the last item below.)
 - Q: Which modifier layers (and Caps Lock states) can the author edit? → A: Any Keyman modifier
   combination. Layers the starting-point keyboard already uses are listed; any other combination
   must be added by the author explicitly.
@@ -77,9 +77,15 @@ Mechanical Gallery and use it, not when the component exists.
 - Q: MSKLC keys can type a short literal string (a ligature). Editable? → A: Yes. A key, or a row
   after a deadkey or context, may type literal text of any length.
 - Q: (Raised by the product owner.) Ruling 4 held back on context because it looked hard. → A: The
-  eventual goal is editing as much as possible; where a useful UI exists, edit it. Literal
-  contextual replacements are therefore editable through the same "after …" view as deadkeys
-  (User Story 4). Store-based rules are the next frontier (Assumptions).
+  eventual goal is editing as much as possible. If a useful UI can be found for more, take it.
+- **Proposed UI (pending product-owner confirmation)** — not a ruling. One "after …" view serves
+  deadkeys and context alike: the author picks what came before (a deadkey, literal text, or
+  both), the grid shows what each key does after it, and an edit says what the context plus the
+  keystroke **becomes**. That makes literal contextual replacements editable (User Story 4) and
+  chained deadkeys followable (a row whose result is a deadkey links to "after" that deadkey).
+  Store-based rules (`any()`/`index()`) stay read-only, with a sketched next frontier
+  (Assumptions). If the product owner redirects this, User Story 4, FR-029–FR-029a, and the
+  chained-deadkey text change with it.
 
 ## The problem
 
@@ -430,13 +436,13 @@ lands as a US2 assignment would; the tray empties.
     - **Deadkey** — one deadkey, with its combination table. Editable.
     - **Types nothing** — `nul`, or a fallback position the compiled keyboard suppresses.
       Editable.
-    - **Has contextual rows** — the key also takes part in deadkey combinations or literal
-      contextual replacements; they are edited in the "after …" view (FR-029). Not a reason for
-      read-only.
     - **Complex output** — reorders context, uses stores, indexes, `if()`, `platform()`,
       options, or changed by a later group. Read-only.
     - **Code the studio cannot show here** — the key is touched by an opaque fragment. Read-only.
     - **Frame key** — not editable (no provenance shown).
+  Separately, a cell carries a **has contextual rows** flag when the key also takes part in
+  deadkey combinations or contextual replacements (edited in the "after …" view, FR-029; read-only
+  rows per FR-013). The flag is not an output value and never by itself makes the cell read-only.
 - **FR-013**: Editability is decided per behaviour, not per key, so that as much as possible is
   editable:
   - A key's **plain output** (no context) is editable when at most one context-free rule matches
@@ -603,15 +609,16 @@ lands as a US2 assignment would; the tray empties.
   under two minutes, and in no more than three interactions per key (select, enter, confirm).
 - **SC-006 (provenance)**: Every provisional key in the test set is shown as provisional, and no key
   the author assigned is shown as provisional.
-- **SC-007 (deadkeys)**: On every deadkey keyboard in the corpus test set, every editable
-  combination row matches what the compiled keyboard produces for that sequence — zero mismatches.
+- **SC-007 (deadkeys and context rows)**: On every corpus keyboard with deadkeys or contextual
+  replacements, every editable row (deadkey combination or literal contextual replacement) matches
+  what the compiled keyboard produces for its context plus keystroke — zero mismatches.
   An author can define a new deadkey with five combinations and a space row in under three
   minutes, without opening the Code tab.
 - **SC-008 (MSKLC parity)**: Every layout MSKLC can express (characters and ligatures per shift
   state, deadkeys with combination tables) can be built in the Layout tab without the Code tab.
-- **SC-009 (edit as much as possible)**: For every corpus keyboard whose rules use no stores,
-  `if()`, `platform()`, options, or opaque fragments, 100% of its rules are editable in the Layout
-  tab. For the rest, the plan reports the share of rules editable per keyboard as a baseline for the
+- **SC-009 (edit as much as possible)**: For every positional (non-mnemonic, FR-018) corpus
+  keyboard none of whose rules falls in FR-013's read-only list, 100% of its rules are editable in
+  the Layout tab. For the rest, the plan reports the share of rules editable per keyboard as a baseline for the
   store-based next frontier.
 
 ## Assumptions
@@ -635,7 +642,9 @@ lands as a US2 assignment would; the tray empties.
 - **Spec 083 dependency.** FR-027 relies on spec 083's deadkey lifecycle (define with any trigger
   key, rename, retarget, delete). Where a lifecycle operation has not shipped when this spec is
   implemented, the plan MUST either build it as spec 083 specifies it or record the gap with an
-  owner and trigger (Art XI) — never a Layout-tab-only deadkey path.
+  owner and trigger (Art XI) — never a Layout-tab-only deadkey path. Named deadkeys (`dk(acute)`)
+  are typed IR elements in the codec today, not opaque fragments, so they fall under FR-013's
+  editable rules.
 - **Spec 109 dependency.** FR-014 and US6 need spec 109's enumerator (FR-040), its base-keyboard
   data (FR-030), and its `swallowUndefined` compile (FR-010) before a "Do nothing" class can show
   as "types nothing" on never-defined keys. Until the enumerator and data ship, unhandled keys show
