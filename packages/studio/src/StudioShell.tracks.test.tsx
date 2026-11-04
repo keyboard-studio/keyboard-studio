@@ -49,7 +49,7 @@ import { SurveyView } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { advanceToTrack, completeInvisibles, advanceToMechanisms, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToTrack, completeInvisibles, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks({ warmLazySteps: true });
 

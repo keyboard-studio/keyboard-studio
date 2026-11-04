@@ -44,7 +44,7 @@ import { screen, fireEvent, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import { SurveyView } from "./StudioShell.tsx";
-import { advanceToPrefill, advanceToB, advanceToCarve, completeInvisibles, advanceToDeadkeys, advanceToRules, advanceToMechanisms, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToPrefill, advanceToB, advanceToCarve, completeInvisibles, advanceToDeadkeys, advanceToRules, advanceToMechanisms, advanceToTouchSeedSource, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks();
 
