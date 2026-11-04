@@ -809,3 +809,66 @@ describe("applyDesktopModifications — spec 104 T017 resolver-addressed placeme
     expect(getKey(layout, "U_0031")!.sk).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. Removals — spec 104 T009: ruled T_ keys match by resolver production
+// ---------------------------------------------------------------------------
+
+describe("applyDesktopModifications — removals match ruled T_ keys by production", () => {
+  const RULED_T_KMN = [
+    "store(&VERSION) '10.0'",
+    "store(&NAME) 't009'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [T_0300] > U+0300",
+    "+ [K_Q] > 'q'",
+  ].join("\n");
+
+  it("blanks a ruled T_ key whose keycap text does not spell its production", () => {
+    const seed = makeLayout([
+      makeKey("T_0300", { text: "◌̀", output: undefined }),
+      makeKey("K_Q", { text: "q", output: "q" }),
+    ]);
+    const { layout, warnings } = applyDesktopModifications(
+      seed,
+      { removals: ["\u0300"], placements: [] },
+      resolverCtxFor(RULED_T_KMN),
+    );
+
+    // T_0300 produces U+0300 via its .kmn rule — the carve removes it even
+    // though its keycap text ("◌̀") doesn't match. The key object is kept
+    // as an inert placeholder (R9: geometry stable).
+    const t0300 = phoneDefaultKeys(layout).find((k) => k.id === "T_0300");
+    expect(t0300).toBeUndefined();
+    const blank = phoneDefaultKeys(layout).find((k) => k.id === BLANK_KEY_ID);
+    expect(blank).toBeDefined();
+    expect(blank!.sp).toBe(BLANK_KEY_SP);
+    expect(getKey(layout, "K_Q")!.text).toBe("q");
+    expect(warnings).toEqual([]);
+  });
+
+  it("without a resolver context the legacy behaviour is unchanged (ruled T_ kept)", () => {
+    const seed = makeLayout([
+      makeKey("T_0300", { text: "◌̀", output: undefined }),
+    ]);
+    const { layout } = applyDesktopModifications(seed, {
+      removals: ["\u0300"],
+      placements: [],
+    });
+
+    expect(getKey(layout, "T_0300")).toBeDefined();
+  });
+
+  it("does not blank a T_ key whose production is not carved", () => {
+    const seed = makeLayout([
+      makeKey("T_0300", { text: "◌̀", output: undefined }),
+    ]);
+    const { layout } = applyDesktopModifications(
+      seed,
+      { removals: ["\u0301"], placements: [] },
+      resolverCtxFor(RULED_T_KMN),
+    );
+
+    expect(getKey(layout, "T_0300")).toBeDefined();
+  });
+});
