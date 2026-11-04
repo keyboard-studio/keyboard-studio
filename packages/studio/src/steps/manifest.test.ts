@@ -347,7 +347,7 @@ describe("Off-spine step inventory", () => {
 // needs the two-pane shell's persistent right-pane OSKFrame suppressed, or
 // two live OSKs co-mount).
 //
-// Exactly {carve, deadkeys, rules, mechanisms, touch, touch_seed_source, css, html}
+// Exactly {carve, deadkeys, rules, mechanisms, touch, touch_seed_source, css, html, icon}
 // must declare layout:"full". All other steps must have layout:"pane" or
 // omit the field (implicit "pane").
 // ---------------------------------------------------------------------------
@@ -362,10 +362,11 @@ const FULL_LAYOUT_IDS = [
   "touch_seed_source",
   "css",
   "html",
+  "icon",
 ] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly nine steps declare layout:'full'", () => {
+  it("exactly ten steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());

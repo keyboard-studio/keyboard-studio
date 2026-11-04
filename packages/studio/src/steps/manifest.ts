@@ -516,12 +516,13 @@ export function validateManifestShape(): void {
     "touch_seed_source",
     "css",
     "html",
+    "icon",
   ]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source/css/html may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/osk/touch/touch_seed_source/css/html/icon may be full-screen (spec 024 Stage 0)`,
         );
       }
     }
