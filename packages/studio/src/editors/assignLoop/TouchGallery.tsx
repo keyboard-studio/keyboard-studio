@@ -3046,6 +3046,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         if (parts !== undefined) {
           setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
         }
+      } else if (op.kind === "moveToLayer") {
+        // The moved key keeps its id — follow it to the target layer.
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+        }
       }
 
       if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
