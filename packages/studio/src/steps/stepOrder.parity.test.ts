@@ -212,6 +212,17 @@ const requiresReach = (start: string): Set<string> => {
 };
 
 /**
+ * An intra-step member (spec 112: caps-handling on the layout screen) has a
+ * custom renderer AND a group naming another screen. deriveScreens gives it
+ * no ordering edge — only screen owners order a screen — so ordering
+ * assertions must skip it too.
+ */
+const isIntraStepMember = (id: string): boolean => {
+  const m = byModuleId.get(id);
+  return m !== undefined && typeof m.renderer === "function" && m.group !== undefined;
+};
+
+/**
  * Screen `a` must precede screen `b`: some member of `b` transitively
  * requires a decision a member of `a` provides.
  */
@@ -220,12 +231,7 @@ const mustPrecede = (a: string, b: string): boolean => {
   const sb = screenById.get(b);
   if (sa === undefined || sb === undefined) return false;
   const aModules = new Set(sa.moduleIds);
-  // An intra-step member (spec 112: caps-handling on the layout screen) forms
-  // no ordering edge, as in deriveScreens: only screen owners order a screen.
-  return sb.moduleIds.filter((id) => {
-    const m = byModuleId.get(id);
-    return !(m !== undefined && typeof m.renderer === "function" && m.group !== undefined);
-  }).some((id) =>
+  return sb.moduleIds.filter((id) => !isIntraStepMember(id)).some((id) =>
     [...requiresReach(id)].some((provider) => aModules.has(provider)),
   );
 };
@@ -269,8 +275,7 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
   });
 
   it("derived trails equal the baseline side trails", () => {
-    const sideTrails: Record<string, string> = {};
-    for (const [id, trail] of STEP_TRAILS) {
+    const sideTrails: Record<string, string> = {};    for (const [id, trail] of STEP_TRAILS) {
       if (!trail.spine) {
         expect(trail.joinTarget, `side trail "${id}" must have a join target`).toBeDefined();
         sideTrails[id] = trail.joinTarget as string;
