@@ -138,8 +138,8 @@
 
 **Independent Test**: [quickstart.md §5](quickstart.md) step 4 (upstream `basic_kbdus`).
 
-- [ ] T044 [US6] Add an upgrade-pair registry (criterion lintRuleId → fixer) in `packages/studio/src/criteria/upgradePairs.ts`, with the first pair `KM_LINT_CASEDKEYS_MISSING` → `upgradeToCasedKeys` (spec 112; `packages/engine/src/caps/upgradeToCasedKeys.ts`, exported from `@keyboard-studio/engine`). The fix is offered only when `compareCapsBehaviour` (same module) is not `differs`. The fix is applied as an IR change projected through `projectKmnText`.
-- [ ] T045 [US6] Integration test: the spec 112 fixture `packages/engine/src/caps/__fixtures__/upstream_basic_kbdus/` shows the finding and fix; accepting it passes 7.28, and the `.kmn` diff touches only the `&CasedKeys` store and the removed CAPS rules (SC-007). In `packages/studio/src/criteria/upgradePairs.test.ts`.
+- [x] T044 [US6] Add an upgrade-pair registry (criterion lintRuleId → fixer) in `packages/studio/src/criteria/upgradePairs.ts`, with the first pair `KM_LINT_CASEDKEYS_MISSING` → `upgradeToCasedKeys` (spec 112; `packages/engine/src/caps/upgradeToCasedKeys.ts`, exported from `@keyboard-studio/engine`). The fix is offered only when `compareCapsBehaviour` (same module) is not `differs`. The fix is applied as an IR change projected through `projectKmnText`.
+- [x] T045 [US6] Integration test: the spec 112 fixture `packages/engine/src/caps/__fixtures__/upstream_basic_kbdus/` shows the finding and fix; accepting it passes 7.28, and the `.kmn` diff touches only the `&CasedKeys` store and the removed CAPS rules (SC-007). In `packages/studio/src/criteria/upgradePairs.test.ts`.
 
 **Checkpoint**: commit and push.
 
