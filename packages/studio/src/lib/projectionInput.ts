@@ -56,6 +56,7 @@ export type ProjectionState = Pick<
   | "deadkeyOverlay"
   | "contextToleranceOverlay"
   | "touchLayoutJson"
+  | "customCss"
 > & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
@@ -76,6 +77,8 @@ export interface ProjectionExtras {
     touchLayoutJson: string | null;
     keyEditOps: readonly KeyEditOperation[];
   };
+  /** The CSS step's in-progress text, ahead of the commit that writes the store (undefined = use the store's). */
+  liveCssOverride?: string | null;
 }
 
 /**
@@ -98,7 +101,7 @@ export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
-  const { liveLayoutOverride, marksTreatment, ...callSite } = extras;
+  const { liveLayoutOverride, liveCssOverride, marksTreatment, ...callSite } = extras;
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
@@ -124,6 +127,7 @@ export function projectionInputFromState(
     keyEditOps: liveLayoutOverride?.keyEditOps ?? [],
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
+    customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     ruleAdditions: deriveRuleAdditions(state.ir, state.startIr),

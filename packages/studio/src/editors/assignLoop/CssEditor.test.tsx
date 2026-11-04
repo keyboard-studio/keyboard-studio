@@ -1,35 +1,96 @@
-// CssEditor — the live touch preview must read the working copy's raw touch-layout JSON through the codec, not cast it to the IR.
+// CssEditor — opens on the keyboard's own stylesheet, previews through the shared pane, and records the result in the working copy.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { createVirtualFS } from "@keyboard-studio/contracts";
 import { render } from "../../test/renderWithI18n.tsx";
 import { CssEditor } from "./CssEditor.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
-// Monaco cannot load under vitest (see TouchGallery.keyMode.test.tsx); the preview is what is under test.
-vi.mock("./CssCodePane.tsx", () => ({ CssCodePane: () => null }));
+// Monaco cannot load under vitest; a stub stands in for the pane's contract (initialText in, onApply out).
+vi.mock("./CssCodePane.tsx", () => ({
+  CssCodePane: ({ initialText, onApply }: { initialText: string; onApply: (css: string) => void }) => (
+    <div>
+      <pre data-testid="seed">{initialText}</pre>
+      <button type="button" data-testid="apply-new" onClick={() => onApply(".new { color: blue; }")}>
+        apply
+      </button>
+      <button type="button" data-testid="apply-empty" onClick={() => onApply("")}>
+        apply empty
+      </button>
+    </div>
+  ),
+}));
+// The compile pipeline and the KeymanWeb iframe are not under test here.
+vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
+  useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: () => undefined }),
+}));
+vi.mock("../../components/OSKFrame.tsx", () => ({ OSKFrame: () => <div data-testid="osk-frame" /> }));
+vi.mock("../../components/OskModeToggle.tsx", () => ({ OskModeToggle: () => null }));
 
-// The shape the touch step writes: the raw Keyman touch-layout file, with `layer`/`row`/`key`, not the IR's `platforms`.
-const RAW_TOUCH_LAYOUT = JSON.stringify({
-  phone: {
-    font: "Tahoma",
-    layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }] }] }],
-  },
-});
+const KMN = "store(&NAME) 'T'\nstore(&KMW_EMBEDCSS) 'kb.css'\n\nbegin Unicode > use(main)\ngroup(main) using keys\n";
 
-describe("CssEditor touch preview", () => {
-  beforeEach(() => {
-    useWorkingCopyStore.setState({ ir: null, touchLayoutJson: RAW_TOUCH_LAYOUT });
+function seedStore(customCss: string | null) {
+  const startVfs = createVirtualFS();
+  startVfs.set("source/t.kmn", KMN, false);
+  startVfs.set("source/kb.css", ".kmw-key { color: red; }", false);
+  useWorkingCopyStore.setState({
+    startKeyboard: { id: "t", displayName: "T" } as never,
+    startVfs,
+    customCss,
+  });
+}
+
+describe("CssEditor", () => {
+  beforeEach(() => seedStore(null));
+  afterEach(cleanup);
+
+  it("opens on the keyboard's existing stylesheet instead of a blank editor", async () => {
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    expect((await screen.findByTestId("seed")).textContent).toBe(".kmw-key { color: red; }");
   });
 
-  it("renders the phone layout from raw touch-layout JSON without throwing", () => {
+  it("shows the real preview pane in the right column", () => {
     render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
-    expect(screen.getAllByText("q").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
   });
 
-  it("falls back to the empty notice when the layout does not parse", () => {
-    useWorkingCopyStore.setState({ touchLayoutJson: "not json" });
+  it("leaves the working copy alone when the author applied nothing", () => {
+    const onComplete = vi.fn();
+    render(<CssEditor onComplete={onComplete} onBack={() => undefined} />);
+    fireEvent.click(screen.getByTestId("css-continue"));
+    expect(useWorkingCopyStore.getState().customCss).toBeNull();
+    expect(onComplete).toHaveBeenCalledWith({ css: ".kmw-key { color: red; }" });
+  });
+
+  it("records the applied text on Continue", async () => {
     render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
-    expect(screen.getAllByText("No touch layout available.").length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByTestId("apply-new"));
+    fireEvent.click(screen.getByTestId("css-continue"));
+    expect(useWorkingCopyStore.getState().customCss).toBe(".new { color: blue; }");
+  });
+
+  it("records an empty string when the author applies an emptied editor", async () => {
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("apply-empty"));
+    fireEvent.click(screen.getByTestId("css-continue"));
+    expect(useWorkingCopyStore.getState().customCss).toBe("");
+  });
+
+  it("Discard changes drops this visit's edits and leaves the working copy untouched", async () => {
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    const discard = screen.getByRole("button", { name: "Discard changes" }) as HTMLButtonElement;
+    expect(discard.disabled).toBe(true);
+    fireEvent.click(await screen.findByTestId("apply-new"));
+    expect(discard.disabled).toBe(false);
+    fireEvent.click(discard);
+    fireEvent.click(screen.getByTestId("css-continue"));
+    expect(useWorkingCopyStore.getState().customCss).toBeNull();
+  });
+
+  it("reopens on what the author left here before", async () => {
+    seedStore(".left { top: 1px; }");
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    expect((await screen.findByTestId("seed")).textContent).toBe(".left { top: 1px; }");
   });
 });

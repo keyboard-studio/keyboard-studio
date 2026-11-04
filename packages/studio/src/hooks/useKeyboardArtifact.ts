@@ -1,3 +1,4 @@
+import { isOskStylesheetPath } from "../lib/oskStylesheetPath.ts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
@@ -264,16 +265,7 @@ function buildFontBlobUrl(
   return { url: URL.createObjectURL(blob), family: oskFontEntry.family ?? null };
 }
 
-/**
- * Whether a keyboard stylesheet belongs in the OSK frame. A package's
- * `welcome/` and `help/` folders carry the documentation pages' own CSS
- * (commonly `kb.css`, with bare `body` / `table` rules) — injected into the
- * frame it restyles the preview's scaffold, e.g. padding the keyboard in
- * from the edges. Keyman never applies those sheets to the keyboard.
- */
-export function isOskStylesheetPath(path: string): boolean {
-  return !/(^|[\\/])source[\\/](welcome|help)[\\/]/i.test(path);
-}
+export { isOskStylesheetPath } from "../lib/oskStylesheetPath.ts";
 
 /**
  * Build keyboard CSS blob URLs from stylesheet entries.
