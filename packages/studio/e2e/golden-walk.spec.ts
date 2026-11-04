@@ -86,6 +86,7 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveCssEditorStep,
+  driveHtmlEditorStep,
   driveHelpPhase,
   triggerDownload,
 } from "./helpers/surveyFlow";
@@ -182,6 +183,7 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   await driveTouchGallery(page);
   await driveCssEditorStep(page);
   await driveHelpPhase(page, "Welcome to the keyboard.", "Press a key to start.");
+  await driveHtmlEditorStep(page);
   await page.waitForURL(/#output$/, { timeout: 30_000 });
 
   const download = await triggerDownload(page);
