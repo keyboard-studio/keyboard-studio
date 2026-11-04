@@ -39,6 +39,8 @@ import type {
   ProjectWorkingCopyVfsInput,
 } from "./projectWorkingCopyVfs.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
+import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.ts";
+import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 
@@ -68,6 +70,11 @@ export interface ProjectionExtras {
   identity: IdentityOverlay | null;
   /** The recorded marks-treatment value, or undefined when none is recorded. */
   marksTreatment: MarksTreatmentValue | undefined;
+  /**
+   * The recorded caps-handling decision for step 2.8 (spec 112), already
+   * gated through {@link capsHandlingFromDecisions}; undefined when not asked.
+   */
+  capsHandling: CapsHandlingValue | undefined;
   baseDisplayName?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
@@ -94,11 +101,23 @@ export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): Ma
   };
 }
 
+/**
+ * Step 2.8's input from the decision set: the recorded caps-handling value,
+ * or undefined when it was not asked. A caseless alphabet is never asked, so
+ * a value left over from an earlier alphabet is ignored rather than writing a
+ * store nothing needs.
+ */
+export function capsHandlingFromDecisions(decisions: DecisionSet): CapsHandlingValue | undefined {
+  const value = decisions["caps-handling"]?.value as CapsHandlingValue | undefined;
+  if (value === undefined) return undefined;
+  return isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value)) ? value : undefined;
+}
+
 export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
-  const { liveLayoutOverride, marksTreatment, ...callSite } = extras;
+  const { liveLayoutOverride, marksTreatment, capsHandling, ...callSite } = extras;
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
@@ -126,6 +145,7 @@ export function projectionInputFromState(
     touchLayoutJson,
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
+    capsHandling: capsHandling ?? null,
     ruleAdditions: deriveRuleAdditions(state.ir, state.startIr),
   };
 }

@@ -359,7 +359,8 @@ export {
   generateStubs,
   resolveInheritedHolders,
 } from "./scaffolder/index.js";
-export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
+export { scaffoldIR, resetIdentity, casedKeysFloor } from "./scaffolder/scaffold-ir.js";
+export { detectStartLayoutFamily } from "./placement/filters.js";
 export {
   scaffoldTouchLayout,
   scaffoldTouchLayoutWithDiagnostics,

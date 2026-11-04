@@ -15,8 +15,10 @@ import {
   DECISION_POINTS,
   DECISION_POINT_BASES,
   DECISION_POINT_FIXTURE_DIR,
+  SYNTHETIC_DECISION_POINT_BASES,
   fixtureRelPath,
 } from "../src/test/decisionPointBases.ts";
+import { applySyntheticEdit, seedCapsHandling } from "../src/test/decisionPointSynthetic.ts";
 import { recordToDecisionSet } from "../src/test/recordToDecisionSet.ts";
 
 const studioRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,8 +36,16 @@ for (const b of DECISION_POINT_BASES) {
   for (const point of DECISION_POINTS) {
     const out = resolve(fixtureRoot, fixtureRelPath(b, point));
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, serialize(recordToDecisionSet(record, point)), "utf-8");
+    writeFileSync(out, serialize(seedCapsHandling(recordToDecisionSet(record, point), point)), "utf-8");
     written++;
   }
+}
+// Synthetic copies (spec 112): a recorded walk's decisions with a case put in front of the caps rules.
+for (const b of SYNTHETIC_DECISION_POINT_BASES) {
+  const record = readFileSync(resolve(fixtureRoot, "records", b.recordFile), "utf-8");
+  const out = resolve(fixtureRoot, fixtureRelPath(b, b.point));
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, serialize(applySyntheticEdit(seedCapsHandling(recordToDecisionSet(record, b.point), b.point), b.edit)), "utf-8");
+  written++;
 }
 process.stdout.write(`[OK] wrote ${written} decision-point fixtures under ${DECISION_POINT_FIXTURE_DIR}\n`);

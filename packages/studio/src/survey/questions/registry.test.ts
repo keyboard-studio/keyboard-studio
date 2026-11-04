@@ -30,9 +30,10 @@ describe("questionRegistry", () => {
   // pb_rtl_direction_marks_detail from Phase B: the invisible-characters
   // spine step subsumes them. pf_doc_language_other, pf_doc_language_second
   // and pf_doc_language_second_other add a chosen help-page language and a
-  // second one — #2002, integrated 2026-10-10.)
-  it("has exactly the verified inventory of 131 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(131);
+  // second one — #2002, integrated 2026-10-10. Spec 112 adds the caps-handling
+  // gallery module; the count was already one behind for the OSK layout module.)
+  it("has exactly the verified inventory of 133 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(133);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

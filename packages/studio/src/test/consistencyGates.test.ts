@@ -180,6 +180,41 @@ describe("G5: &CasedKeys iff cased", () => {
     const r = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_B]\n${pair}`), decisions: cased, point: "caps" });
     expect(r.pass).toBe(false);
   });
+  it("passes none and explicit rules when the store is absent; fails none when it is present", async () => {
+    const none = setOf(decision("character-inventory", { chars: ["a", "A"] }), decision("caps-handling", { mode: "none" }));
+    const explicit = setOf(decision("character-inventory", { chars: ["a", "A"] }), decision("caps-handling", { mode: "explicit-rules" }));
+    expect((await gate("G5", { vfs: vfsOf(pair), decisions: none, point: "caps" })).pass).toBe(true);
+    expect((await gate("G5", { vfs: vfsOf(pair), decisions: explicit, point: "caps" })).pass).toBe(true);
+    expect((await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]
+${pair}`), decisions: none, point: "caps" })).pass).toBe(false);
+  });
+  it("reads a non-letter and a store-routed RAlt pair as cased keys", async () => {
+    const eng = setOf(decision("character-inventory", { chars: ["a", "A", "ŋ", "Ŋ"] }));
+    const body = `${pair}+ [K_LBRKT] > 'ŋ'
++ [SHIFT K_LBRKT] > 'Ŋ'
++ [RALT K_N] > 'ŋ'
++ [SHIFT RALT K_N] > 'Ŋ'
+`;
+    const missing = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]
+${body}`), decisions: eng, point: "caps" });
+    expect(missing.pass).toBe(false);
+    expect(missing.detail.join(" ")).toContain("K_LBRKT");
+    expect(missing.detail.join(" ")).toContain("K_N");
+    const covered = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A] [K_LBRKT] [K_N]
+${body}`), decisions: eng, point: "caps" });
+    expect(covered.pass).toBe(true);
+  });
+  it("does not demand a key another plane gives a different pair (R1 conflict)", async () => {
+    const eng = setOf(decision("character-inventory", { chars: ["a", "A", "e", "E"] }));
+    const body = `${pair}+ [K_E] > 'e'
++ [SHIFT K_E] > 'E'
++ [RALT K_E] > '€'
++ [SHIFT RALT K_E] > '£'
+`;
+    const r = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]
+${body}`), decisions: eng, point: "caps" });
+    expect(r.pass).toBe(true);
+  });
   it("fails &CasedKeys on a caseless alphabet", async () => {
     const r = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]\n${pair}`), decisions: caseless, point: "caps" });
     expect(r.pass).toBe(false);

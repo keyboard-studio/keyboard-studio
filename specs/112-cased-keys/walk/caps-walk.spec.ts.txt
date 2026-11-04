@@ -1,0 +1,59 @@
+/**
+ * Spec 112 T031 manual walk (scripted): copy basic_kbdus for a Bafut alphabet.
+ * Throwaway driver, not committed. Screenshots go under specs/112-cased-keys/walk/.
+ */
+import { test, expect, type Page } from "playwright/test";
+import { unzipSync } from "fflate";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import {
+  driveIdentityLite,
+  pickStartKeyboard,
+  chooseTrackCopy,
+  driveAttributionStep,
+  acceptProjectName,
+  confirmPrefill,
+  buildOneCharacterList,
+  driveDeadkeysStep,
+  driveMechanismsGallery,
+  navigateToOutput,
+  triggerDownload,
+  seedReturningVisitor,
+} from "./helpers/surveyFlow";
+
+const OUT = path.resolve(process.cwd(), "../../specs/112-cased-keys/walk");
+const shot = async (page: Page, name: string) => page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
+
+test("T031: caps handling walk on a Bafut copy of basic_kbdus", async ({ page }) => {
+  test.setTimeout(900_000);
+  await seedReturningVisitor(page);
+  await page.goto("/");
+  await driveIdentityLite(page, { english: "Bafut", autonym: "Bafut", languageCode: "bfd", script: "Latn" });
+  await pickStartKeyboard(page, "basic_kbdus");
+  await chooseTrackCopy(page);
+  await driveAttributionStep(page, { authorName: "Walk Author" });
+  await acceptProjectName(page);
+  await confirmPrefill(page);
+  await buildOneCharacterList(page, "ŋ");
+  await shot(page, "01-after-alphabet");
+
+  // Carve + deadkeys + rules
+  await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("carve-continue").click();
+  await expect(page.getByTestId("deadkeys-continue")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("deadkeys-continue").click();
+  await page.getByTestId("rules-continue").click();
+  await shot(page, "02-mechanisms-start");
+  await driveMechanismsGallery(page, { placements: { "ŋ": { key: "K_BKSLASH" } } });
+  await shot(page, "03-after-mechanisms");
+
+  await navigateToOutput(page);
+  const download = await triggerDownload(page);
+  const zip = fs.readFileSync((await download.path())!);
+  const entries = Object.entries(unzipSync(new Uint8Array(zip)));
+  const kmn = entries.find(([n]) => n.endsWith(".kmn"));
+  expect(kmn).toBeDefined();
+  const text = Buffer.from(kmn![1]).toString("utf8");
+  fs.writeFileSync(path.join(OUT, "download.kmn.txt"), text);
+  await shot(page, "04-output");
+});

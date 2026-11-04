@@ -13,6 +13,10 @@ import {
   type DecisionPoint,
 } from "./decisionPointBases.ts";
 import { recordToDecisionSet } from "./recordToDecisionSet.ts";
+import {
+  SYNTHETIC_DECISION_POINT_BASES,
+} from "./decisionPointBases.ts";
+import { applySyntheticEdit, seedCapsHandling } from "./decisionPointSynthetic.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const record = readFileSync(
@@ -103,7 +107,18 @@ describe("the committed decision-point fixtures", () => {
       const root = resolve(here, "../..", DECISION_POINT_FIXTURE_DIR);
       const rec = readFileSync(resolve(root, "records", recordFile), "utf-8");
       const committed = JSON.parse(readFileSync(resolve(root, rel), "utf-8")) as unknown;
-      expect(committed).toEqual(JSON.parse(JSON.stringify(recordToDecisionSet(rec, point))));
+      expect(committed).toEqual(JSON.parse(JSON.stringify(seedCapsHandling(recordToDecisionSet(rec, point), point))));
+    },
+  );
+
+  it.each(SYNTHETIC_DECISION_POINT_BASES.map((b) => [b.profile, b.recordFile, b.edit, b.point, fixtureRelPath(b, b.point)] as const))(
+    "synthetic %s is %s with the %s edit at %s",
+    (_profile, recordFile, edit, point, rel) => {
+      const root = resolve(here, "../..", DECISION_POINT_FIXTURE_DIR);
+      const rec = readFileSync(resolve(root, "records", recordFile), "utf-8");
+      const committed = JSON.parse(readFileSync(resolve(root, rel), "utf-8")) as unknown;
+      const cut = seedCapsHandling(recordToDecisionSet(rec, point), point);
+      expect(committed).toEqual(JSON.parse(JSON.stringify(applySyntheticEdit(cut, edit))));
     },
   );
 });
