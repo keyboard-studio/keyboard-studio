@@ -7,7 +7,8 @@
 // behavior to depend on (the convention from ui/motion.test.ts).
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { screen, cleanup, act } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { useRef } from "react";
 import { Dialog } from "./Dialog.tsx";
 
