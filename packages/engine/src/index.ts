@@ -365,7 +365,8 @@ export {
   generateStubs,
   resolveInheritedHolders,
 } from "./scaffolder/index.js";
-export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
+export { scaffoldIR, resetIdentity, casedKeysFloor } from "./scaffolder/scaffold-ir.js";
+export { detectStartLayoutFamily } from "./placement/filters.js";
 export {
   scaffoldTouchLayout,
   scaffoldTouchLayoutWithDiagnostics,
@@ -1222,3 +1223,5 @@ export type { PositionState, UnhandledPosition } from "./base-fallback/unhandled
 // Spec 111 - position-faithful .kmn text projection.
 export { diffIrToKmnEdits, spliceKmn, projectKmnText } from "./pattern-apply/spliceKmn.js";
 export type { KmnEdit, InsertAnchor, SpliceKmnResult } from "./pattern-apply/spliceKmn.js";
+// Spec 112 - shared cased-key derivation and key-scoped caps rewrite.
+export * from "./caps/index.js";

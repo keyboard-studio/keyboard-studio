@@ -1,0 +1,18 @@
+c Spec 112 fixture. Digits and punctuation only: no cased key, the derived set is empty and no store is written.
+
+store(&VERSION) '14.0'
+store(&NAME) 'caseless'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_1] > '1'
++ [SHIFT K_1] > '!'
++ [K_2] > '2'
++ [SHIFT K_2] > '@'
++ [K_COMMA] > ','
++ [SHIFT K_COMMA] > ';'
++ [K_PERIOD] > '.'
++ [SHIFT K_PERIOD] > ':'

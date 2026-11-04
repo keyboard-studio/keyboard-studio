@@ -74,8 +74,10 @@ export {
 export { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
 export { checkDeprecatedNumericFormats } from "./checks/criteria/check-numeric-formats.js";
 export { checkCapsNcapsConsistent } from "./checks/criteria/check-caps-ncaps.js";
+export { checkCasedKeysDeclared } from "./checks/criteria/check-cased-keys.js";
 export { checkDeprecatedHeaders } from "./checks/criteria/check-deprecated-headers.js";
 export { checkTouchRequiredKeys } from "./checks/criteria/check-touch-required-keys.js";
+export { checkTouchCapsLayer } from "./checks/criteria/check-touch-caps-layer.js";
 export { checkFilenameConvention } from "./checks/criteria/check-filename-convention.js";
 export { checkTouchLayoutFontMismatch } from "./checks/criteria/check-touch-font.js";
 export {

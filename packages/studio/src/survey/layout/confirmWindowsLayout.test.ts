@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { confirmWindowsLayout } from "./confirmWindowsLayout.ts";
+import { confirmWindowsLayout, seedCapsHandlingDefault } from "./confirmWindowsLayout.ts";
 import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -27,5 +27,34 @@ describe("confirmWindowsLayout", () => {
     confirmWindowsLayout(existing, "other", deps);
     expect(useDecisionStore.getState().decisions["windows-layout"]?.value).toEqual(existing?.value);
     expect(useSurveyAnswerStore.getState().steps[LAYOUT_FAMILY_STEP_ID]?.status).toEqual({ kind: "finished" });
+  });
+
+  describe("seedCapsHandlingDefault", () => {
+    const setInventory = (chars: string[]): void => {
+      useDecisionStore.getState().record({
+        id: "character-inventory",
+        value: { chars },
+        provenance: "asked",
+      } as never);
+    };
+
+    it("records cased keys as the default once the alphabet is cased, without a layout visit", () => {
+      setInventory(["a", "A", "ŋ", "Ŋ"]);
+      seedCapsHandlingDefault(buildGalleryHostDeps());
+      const record = useDecisionStore.getState().decisions["caps-handling"];
+      expect(record?.value).toEqual({ mode: "cased-keys" });
+      expect(record?.provenance).toBe("default");
+    });
+
+    it("records nothing for a caseless alphabet, and never overwrites an author answer", () => {
+      setInventory(["က", "ခ"]);
+      seedCapsHandlingDefault(buildGalleryHostDeps());
+      expect(useDecisionStore.getState().decisions["caps-handling"]).toBeUndefined();
+
+      setInventory(["a", "A"]);
+      useDecisionStore.getState().record({ id: "caps-handling", value: { mode: "none" }, provenance: "asked" });
+      seedCapsHandlingDefault(buildGalleryHostDeps());
+      expect(useDecisionStore.getState().decisions["caps-handling"]?.value).toEqual({ mode: "none" });
+    });
   });
 });

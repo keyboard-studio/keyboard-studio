@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-01",
+  "lastUpdated": "2026-11-04",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1200,6 +1200,14 @@
     "specs/osk-editor": {
       "title": "Feature Specification: OSK editor step",
       "hash": "sha256:cb99e2149a18c715",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/112-cased-keys": {
+      "title": "Feature Specification: Caps Lock and `&CasedKeys`",
+      "hash": "sha256:4c6340695c920abe",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

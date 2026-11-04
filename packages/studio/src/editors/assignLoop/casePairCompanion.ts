@@ -25,13 +25,17 @@
 // @see specs/074-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
 // @see specs/074-uppercase-counterpart-suggestion/data-model.md
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   MechanismAssignment,
   MechanismRef,
 } from "@keyboard-studio/contracts";
 import { caseCounterpart, type ModifierToken } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { capsHandlingFromDecisions } from "../../lib/projectionInput.ts";
+import { alphabetOf } from "../../survey/caps/capsLogic.ts";
+import { capsFloorFor, deriveCasedKeys } from "../../lib/casedKeysDerivation.ts";
 import { isOrthographicallyUnicameral } from "../../lib/casePairSuppression.ts";
 import type { TouchLayerId } from "./touchBehavior.ts";
 
@@ -74,6 +78,13 @@ export type CasePairCombo = DeadkeyCombo | SequenceCombo;
 interface CasePairProposalCommon {
   /** The lowercase character whose placement raised this proposal. */
   originalChar: string;
+  /**
+   * Spec 112: the key is covered by the caps-handling decision (cased keys)
+   * and the counterpart is in the alphabet, so the companion is raised
+   * already accepted: the gallery records it with the placement and keeps the
+   * banner up so the author can undo it. Set by the hook, never by a caller.
+   */
+  preAccepted?: boolean;
 }
 
 interface PhysicalProposalParts {
@@ -152,7 +163,7 @@ export type CasePairProposal = CasePairProposalCommon & {
 
 /** What a caller passes to `propose` — the proposal minus everything the hook
  *  derives from `caseCounterpart`. */
-export type CasePairProposalInput = CasePairProposalCommon & {
+export type CasePairProposalInput = Omit<CasePairProposalCommon, "preAccepted"> & {
   /**
    * Optional caller predicate for the "counterpart already placed" edge case
    * (spec §Edge Cases): given the derived counterpart, is it ALREADY produced
@@ -280,14 +291,37 @@ export function useCasePairCompanion(): UseCasePairCompanion {
       ? identityBcp47
       : undefined;
 
+  // Spec 112: under the cased-keys decision, a companion whose key the store
+  // covers is raised already accepted. The conflict list is read from the
+  // working copy as it stands; the pair being placed is a case pair by
+  // construction, so only a key another layer types a different pair on is
+  // left to the author's choice.
+  const ir = useWorkingCopyStore((s) => s.ir);
+  const capsMode = useDecisionStore((s) => capsHandlingFromDecisions(s.decisions)?.mode);
+  const inventory = useDecisionStore((s) => s.decisions["character-inventory"]?.value);
+  const casedGate = useMemo(() => {
+    if (capsMode !== "cased-keys" || ir === null) return null;
+    const conflicted = new Set(
+      deriveCasedKeys(ir, { ...(bcp47 !== undefined ? { bcp47 } : {}), floor: capsFloorFor(ir) }).conflicts.map(
+        (c) => c.vkey,
+      ),
+    );
+    return { alphabet: new Set(alphabetOf(inventory)), conflicted };
+  }, [capsMode, ir, inventory, bcp47]);
+
   const propose = useCallback(
     (input: CasePairProposalInput): boolean => {
       const next = acceptCasePairCompanion(input, bcp47);
       if (next === null) return false;
-      setProposal(next);
+      const covered =
+        casedGate !== null &&
+        (next.mechanism === "physical" || next.mechanism === "ralt-layer") &&
+        casedGate.alphabet.has(next.counterpart) &&
+        !casedGate.conflicted.has(next.vkey);
+      setProposal(covered ? { ...next, preAccepted: true } : next);
       return true;
     },
-    [bcp47],
+    [bcp47, casedGate],
   );
 
   const dismiss = useCallback(() => setProposal(null), []);

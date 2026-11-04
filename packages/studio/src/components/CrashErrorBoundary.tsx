@@ -35,6 +35,7 @@ function RecoveryWithIssueLink() {
   const state = useSyncExternalStore(subscribeCrashSend, getCrashSendSnapshot);
   return (
     <CrashRecoveryScreen
+      status={state.status}
       {...(state.issueUrl !== undefined ? { issueUrl: state.issueUrl } : {})}
     />
   );

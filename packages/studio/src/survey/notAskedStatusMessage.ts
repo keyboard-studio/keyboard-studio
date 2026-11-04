@@ -29,6 +29,10 @@ const REASON_MESSAGE: Record<string, ReturnType<typeof msg>> = {
     id: "survey.convenience.notAsked.reason.noSurplus",
     message: "there are no surplus letters to offer",
   }),
+  "caps-caseless": msg({
+    id: "survey.caps.notAsked.reason.caseless",
+    message: "the alphabet has no uppercase and lowercase pairs",
+  }),
   "convenience-signal-unknown": msg({
     id: "survey.convenience.notAsked.reason.signalUnknown",
     message: "the orthography signal is not yet known",

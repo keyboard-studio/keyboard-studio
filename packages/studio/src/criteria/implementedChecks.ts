@@ -213,4 +213,8 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE",
   "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS",
   "KM_LINT_FILENAME_CONVENTION",
+  // §7.28 — cased-script keyboards declare store(&CasedKeys).
+  "KM_LINT_CASEDKEYS_MISSING",
+  // §18.16 — touch caps layer complete, reached by double-tapping Shift.
+  "KM_LINT_TOUCH_CAPS_LAYER",
 ]);
