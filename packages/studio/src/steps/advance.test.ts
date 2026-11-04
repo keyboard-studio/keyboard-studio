@@ -180,8 +180,8 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("help")).toBe("html");
   });
 
-  it("html → package (package is reserved)", () => {
-    expect(nextMainLineStepAfter("html")).toBe("package");
+  it("html → done (package is reserved terminal)", () => {
+    expect(nextMainLineStepAfter("html")).toBe("done");
   });
 });
 
@@ -268,7 +268,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
     const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
       "identity", "layout", "choose_base", "track", "attribution", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "css", "help", "package",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "css", "help", "html", "package",
     ]);
   });
 });
