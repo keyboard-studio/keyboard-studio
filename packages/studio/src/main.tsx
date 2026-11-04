@@ -1,4 +1,5 @@
 import './index.css';
+import { inject } from "@vercel/analytics";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { AppRoot } from "./AppRoot.tsx";
@@ -60,6 +61,10 @@ installGlobalCrashHandlers({
 // non-default choice exists. Synchronous and side-effecting at module
 // evaluation, same as i18n.ts's own bootstrap immediately below.
 applyTheme(loadSavedTheme() ?? DEFAULT_THEME);
+
+// Vercel Web Analytics. No-op outside a Vercel deployment's /_vercel/insights
+// route, and a failure to load the script never reaches the app.
+inject();
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
