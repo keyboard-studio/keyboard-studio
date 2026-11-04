@@ -800,6 +800,14 @@ export interface WorkingCopyState {
    */
   touchLayoutJson: string | null;
   /**
+   * The keyboard's OSK stylesheet (`&KMW_EMBEDCSS`) as the author left it in
+   * the CSS step. Null = untouched (the start keyboard's own file, if any,
+   * ships as-is); "" = the author cleared it (the file and its store line are
+   * dropped). Projected into the VFS by projectWorkingCopyVfs step 0b, so the
+   * OSK preview and the zip read the same text.
+   */
+  customCss: string | null;
+  /**
    * In-progress Phase E (touch gallery) draft state — persisted across
    * unmount/remount when the user navigates back to Phase C and returns.
    *
@@ -1113,6 +1121,8 @@ export interface WorkingCopyState {
    * and KMW renders its own native default (or the keyboard's shipped file).
    */
   setTouchLayoutJson: (json: string | null) => void;
+  /** Record the CSS step's result (null = untouched, "" = cleared). */
+  setCustomCss: (css: string | null) => void;
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever
@@ -1646,6 +1656,7 @@ function freshInstantiationTail() {
     // settles), so no in-flight value can be lost here.
     sequenceFlaggedChars: [],
     touchLayoutJson: null,
+    customCss: null,
     touchDraft: null,
     galleryIntrosSeen: { mechanism: false, touch: false },
     // Fresh instance, not carried from any preceding working copy — see
@@ -1770,6 +1781,7 @@ export type WorkingCopyData = Omit<
   | "lockDesktop"
   | "unlockDesktop"
   | "setTouchLayoutJson"
+  | "setCustomCss"
   | "setTouchDraft"
   | "markGalleryIntroSeen"
   | "reset"
@@ -1872,6 +1884,7 @@ const INITIAL_STATE: WorkingCopyData = {
   desktopLocked: false,
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
+  customCss: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
   // key edit overlay + touch editor mode (spec 063) — empty log, character
@@ -2272,6 +2285,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   unlockDesktop: () => set({ desktopLocked: false }),
 
   setTouchLayoutJson: (json) => set({ touchLayoutJson: json }),
+
+  setCustomCss: (css) => set({ customCss: css }),
 
   setTouchDraft: (draft) => set({ touchDraft: draft }),
 

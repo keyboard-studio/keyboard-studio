@@ -81,6 +81,7 @@
 // The function mutates `vfs` in-place. Callers that need the original VFS
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
+import { applyCustomCssToVfs } from "./customCss.ts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
@@ -282,6 +283,12 @@ export interface ProjectWorkingCopyVfsInput {
    * (step 4) operate on the Phase E layout rather than the base VFS's layout.
    */
   touchLayoutJson?: string | null;
+  /**
+   * The author's OSK stylesheet from the CSS step, written at step 0b. Omit or
+   * pass `null` to leave the start keyboard's own stylesheet as-is; "" removes
+   * it (and its `&KMW_EMBEDCSS` store line).
+   */
+  customCss?: string | null;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
@@ -452,6 +459,7 @@ export function projectWorkingCopyVfs(
     getPattern,
     identity,
     touchLayoutJson,
+    customCss = null,
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
@@ -474,6 +482,11 @@ export function projectWorkingCopyVfs(
       false,
     );
   }
+
+  // Step 0b: OSK stylesheet — the CSS step's text becomes the keyboard's
+  // `&KMW_EMBEDCSS` file. Before the identity pass so a Track-1 id rename
+  // carries the file and its store line along with the other siblings.
+  warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss));
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //
