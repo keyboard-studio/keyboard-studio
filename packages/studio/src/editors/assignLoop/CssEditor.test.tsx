@@ -21,12 +21,12 @@ vi.mock("./CssCodePane.tsx", () => ({
     </div>
   ),
 }));
-// The compile pipeline and the KeymanWeb iframe are not under test here.
+// The compile pipeline and the preview pane (KeymanWeb iframe) are not under test here.
+const artifact = vi.hoisted(() => ({ stage: { kind: "idle" } as unknown }));
 vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: () => undefined }),
+  useKeyboardArtifact: () => ({ stage: artifact.stage, retry: () => undefined }),
 }));
-vi.mock("../../components/OSKFrame.tsx", () => ({ OSKFrame: () => <div data-testid="osk-frame" /> }));
-vi.mock("../../components/OskModeToggle.tsx", () => ({ OskModeToggle: () => null }));
+vi.mock("./PreviewPane.tsx", () => ({ GalleryPreviewPane: () => <div data-testid="osk-frame" /> }));
 
 const KMN = "store(&NAME) 'T'\nstore(&KMW_EMBEDCSS) 'kb.css'\n\nbegin Unicode > use(main)\ngroup(main) using keys\n";
 
@@ -42,7 +42,10 @@ function seedStore(customCss: string | null) {
 }
 
 describe("CssEditor", () => {
-  beforeEach(() => seedStore(null));
+  beforeEach(() => {
+    artifact.stage = { kind: "idle" };
+    seedStore(null);
+  });
   afterEach(cleanup);
 
   it("opens on the keyboard's existing stylesheet instead of a blank editor", async () => {
@@ -86,6 +89,25 @@ describe("CssEditor", () => {
     fireEvent.click(discard);
     fireEvent.click(screen.getByTestId("css-continue"));
     expect(useWorkingCopyStore.getState().customCss).toBeNull();
+  });
+
+  it("opens on the stylesheet the preview shows when the working copy's start files lack it", async () => {
+    const startVfs = createVirtualFS();
+    startVfs.set("source/t.kmn", "store(&NAME) 'T'\n\nbegin Unicode > use(main)\n", false);
+    useWorkingCopyStore.setState({ startVfs });
+    const previewVfs = createVirtualFS();
+    previewVfs.set("source/t.kmn", KMN, false);
+    previewVfs.set("source/kb.css", ".from-preview { top: 2px; }", false);
+    artifact.stage = { kind: "ready", vfs: previewVfs, keyboardId: "t", scaffoldWarnings: [] };
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    expect((await screen.findByTestId("seed")).textContent).toBe(".from-preview { top: 2px; }");
+  });
+
+  it("waits for the preview before opening the editor blank", () => {
+    useWorkingCopyStore.setState({ startVfs: createVirtualFS() });
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    expect(screen.queryByTestId("seed")).toBeNull();
+    expect(screen.getByText("Loading editor…")).toBeTruthy();
   });
 
   it("reopens on what the author left here before", async () => {

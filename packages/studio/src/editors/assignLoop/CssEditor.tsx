@@ -13,7 +13,7 @@
  *   untouched leaves the start keyboard's stylesheet alone.
  */
 
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
@@ -38,12 +38,11 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   const committedCss = useWorkingCopyStore((s) => s.customCss);
   const setCustomCss = useWorkingCopyStore((s) => s.setCustomCss);
 
-  // What the editor opens on: this step's earlier result, else the start keyboard's own stylesheet.
-  const seedText = useMemo(() => {
-    if (committedCss !== null) return committedCss;
-    if (startVfs === null || startKeyboard === null) return "";
-    return readKeyboardCss(startVfs, startKeyboard.id)?.text ?? "";
-  }, [committedCss, startVfs, startKeyboard]);
+  // The start keyboard's own stylesheet, as the working copy holds it (null when it has none there).
+  const startCssText = useMemo(
+    () => (startVfs === null || startKeyboard === null ? null : (readKeyboardCss(startVfs, startKeyboard.id)?.text ?? null)),
+    [startVfs, startKeyboard],
+  );
 
   // The text the author has applied this visit; null until they apply (or clear) something.
   const [applied, setApplied] = useState<string | null>(null);
@@ -60,6 +59,17 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   const vfsTransform = useWorkingCopyTransform(applied !== null ? { liveCss: applied } : undefined);
   const { stage, retry } = useKeyboardArtifact(startKeyboard, scaffoldSpec, vfsTransform);
 
+  // The preview's own VFS is the other place the stylesheet shows up: whatever styles the preview is what the editor should open
+  // on, even where the working copy's start VFS does not carry the file. Taken once, before any edit of this visit.
+  const [previewCssText, setPreviewCssText] = useState<string | null>(null);
+  useEffect(() => {
+    if (stage.kind !== "ready" || previewCssText !== null || applied !== null) return;
+    setPreviewCssText(readKeyboardCss(stage.vfs, stage.keyboardId)?.text ?? "");
+  }, [stage, previewCssText, applied]);
+
+  // What the editor opens on: this step's earlier result, else the keyboard's own stylesheet. Null while the preview has yet to say.
+  const seedText = committedCss ?? startCssText ?? previewCssText ?? (stage.kind === "error" ? "" : null);
+
   // Back to what the step opened on: the preview and the editor both drop this visit's edits.
   const handleDiscard = () => {
     setApplied(null);
@@ -69,7 +79,7 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   // Clearing the editor and applying it removes the keyboard's stylesheet; an untouched step leaves it as it was.
   const handleContinue = () => {
     if (applied !== null) setCustomCss(applied);
-    onComplete({ css: applied ?? seedText });
+    onComplete({ css: applied ?? seedText ?? "" });
   };
 
   const leftContent = (
@@ -90,11 +100,13 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
             </div>
           }
         >
-          <CssCodePane
-            key={editorGeneration}
-            initialText={seedText}
-            onApply={setApplied}
-          />
+          {seedText === null ? (
+            <div style={{ padding: 16, color: TEXT_DIM, fontSize: 13 }}>
+              {t({ id: "editor.assignLoop.css.code.loading", message: "Loading editor…" })}
+            </div>
+          ) : (
+            <CssCodePane key={editorGeneration} initialText={seedText} onApply={setApplied} />
+          )}
         </Suspense>
       </div>
 
