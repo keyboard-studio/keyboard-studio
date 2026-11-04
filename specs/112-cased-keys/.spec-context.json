@@ -337,10 +337,90 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T19:29:19.603Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:39:00.058Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:39:00.190Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:39:00.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:39:00.528Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:39:00.667Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:39:00.888Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:47:36.677Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:48:34.598Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:48:45.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T20:12:47.897Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T040",
+  "currentTask": "T051",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -648,6 +728,86 @@
       "did": "Gated (tests, typecheck, lint) and committed Phase 5 as 1bbd2cd3",
       "files": [
         "specs/112-cased-keys/tasks.md"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Failing-first tests for 18.16 touch caps layer check",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-touch-caps-layer.test.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "KM_LINT_TOUCH_CAPS_LAYER check, wired and exported; isTouchFrameKey added to contracts",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-touch-caps-layer.ts",
+        "packages/keyboard-lint/src/criteriaChecks.ts",
+        "packages/keyboard-lint/src/index.ts",
+        "packages/contracts/src/ir/casedKeys.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "18.16 criteria row, implementedChecks, gateCoverage, battery regen, en/fr catalogs, count tests",
+      "files": [
+        "packages/contracts/data/criteria.json",
+        "packages/studio/src/criteria/implementedChecks.ts",
+        "packages/studio/src/test/gateCoverage.ts",
+        "packages/studio/src/review/battery.generated.json",
+        "content/i18n/en/criteria.json",
+        "content/i18n/fr/criteria.json"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "syncTouchCapsLayer and syncTouchCapsLayerRaw with tests",
+      "files": [
+        "packages/engine/src/caps/syncTouchCapsLayer.ts",
+        "packages/engine/src/caps/syncTouchCapsLayer.test.ts"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Projection step 2.8 runs touch caps sync on cased-keys",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.caps.test.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "SC-005 corpus test over four Copy bases via scaffold plus projection",
+      "files": [
+        "packages/studio/src/test/casedKeys.touchCaps.corpus.test.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Amended spec.md vocabulary, FR-004, FR-006, Key Entities, Assumptions per R1/R6/R10",
+      "files": [
+        "specs/112-cased-keys/spec.md"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Updated spec 111 T044/T045 text on 111 branch, committed and pushed",
+      "files": [
+        "C:/Github/keyboard-studio/specs/111-open-existing-keyboard/tasks.md"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "spec-trace check; acknowledged specs/112-cased-keys (new-section); 8 other drifts left (not ours)",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "quickstart tests, pnpm build, typecheck, lint all green",
+      "files": [
+        "none"
       ]
     }
   },

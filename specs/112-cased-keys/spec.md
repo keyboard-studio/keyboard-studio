@@ -22,7 +22,7 @@
 ## Vocabulary
 
 - **Cased keyboard**: a keyboard that produces at least one letter with distinct upper- and lower-case forms.
-- **Case pair on a key**: a key whose unshifted and shifted outputs on the same modifier plane (base/Shift, or RAlt/Shift+RAlt) are case counterparts of each other.
+- **Case pair on a key**: a key whose unshifted and shifted outputs on at least one modifier plane (base/Shift, or RAlt/Shift+RAlt) are case counterparts of each other. The key qualifies only if no other used plane carries a different pair that is not a case pair, because `&CasedKeys` lists keys and applies to every plane of a listed key.
 - **Simplification**: replacing per-key CAPS/NCAPS rules with a `&CasedKeys` declaration.
 - **Copy**, **Open**, **copied keyboard**, **starting point**: as in spec 111. Open replaces Adapt.
 
@@ -119,9 +119,9 @@ A cased keyboard's touch layout has a caps layer, reachable by double-tapping Sh
 
 **Copy**
 
-- **FR-004**: A caps-handling decision (cased keys / explicit rules / none) MUST exist on the layout screen, declared through the decision registry. It requires the character inventory and the Windows layout (absorbs 106 FR-050).
+- **FR-004**: A caps-handling decision MUST exist on the layout screen, declared through the decision registry. It requires the character inventory and the Windows layout (absorbs 106 FR-050). It has three modes. Cased keys writes `&CasedKeys` with the derived key set, replaces the copied keyboard's CAPS rules on those keys, and syncs the touch caps layer. Explicit rules writes no store, keeps the copied keyboard's CAPS and NCAPS rules as copied, and does not sync touch; it is offered only when the copied keyboard has CAPS rules. None writes no store and removes the CAPS and NCAPS conditions from every key that has them.
 - **FR-005**: It MUST be proposed only when the confirmed alphabet has a case pair; otherwise it is not asked and resolves to none (absorbs 106 FR-051).
-- **FR-006**: On Copy it MUST default to cased keys. The key set is the layout family's letter keys, plus every key with a case pair on any plane the keyboard uses. The declaration MUST be derived when the keyboard is produced, not inserted silently by the scaffolder (absorbs 106 FR-052).
+- **FR-006**: On Copy it MUST default to cased keys. The key set is the layout family's letter keys, plus every key with a case pair on any plane the keyboard uses, except keys that conflict. A key conflicts when another used plane carries a non-case pair, since Caps would change that plane too. Conflict keys are excluded and reported (shown under the decision on Copy, named in the FR-002 finding on 7.28, withheld by the comparison on Open). Planes where one side is empty are not a conflict. The declaration MUST be derived when the keyboard is produced, not inserted silently by the scaffolder (absorbs 106 FR-052).
 - **FR-007**: The case-pair counterpart placement MUST be pre-accepted (visible, dismissible) when the key is in the cased set and the counterpart is in the alphabet (absorbs 106 FR-054).
 
 **Open (spec 111 upgrade pair)**
@@ -138,7 +138,7 @@ A cased keyboard's touch layout has a caps layer, reachable by double-tapping Sh
 ### Key Entities
 
 - **Caps-handling decision**: mode (cased keys / explicit rules / none) plus the derived key set. Copy only; on Open the keyboard's own declaration is the state.
-- **Cased key set**: keys (with plane) whose outputs form a case pair, plus the layout family's letter keys.
+- **Cased key set**: the keys the store lists. Planes are read only to decide whether a key qualifies. It holds keys with a case pair on some plane and no conflicting plane, plus the layout family's letter keys. Conflict keys are reported separately.
 - **Caps comparison**: per key, outputs under {none, Shift, Caps, Shift+Caps} before and after a change, with the verdict (identical / gains uppercase only / differs).
 
 ## Success Criteria *(mandatory)*
@@ -153,7 +153,7 @@ A cased keyboard's touch layout has a caps layer, reachable by double-tapping Sh
 
 - The code survey for the Copy side is spec 106's [research R7](../106-consistent-keyboard-output/research.md#r7-caps-us5): module shape, the projection step, the `caseCounterpart` seam, and the scaffolder call to remove.
 - Case pairs use the existing language-aware counterpart lookup (`caseCounterpart`). Output comparison uses the existing keyboard simulator, which already models the Caps state.
-- The scaffolder's existing `stripCapsRules`, `removeCapsContextElements` and `ensureCasedKeysStore` are reused. Only the silent insertion on Copy moves into the produced output (FR-006).
+- The scaffolder's old `stripCapsRules` could not be reused. It deleted every CAPS and NCAPS rule whole, which changes letters on a non-US base. The new key-scoped `replaceCapsRules` in `engine/src/caps/` deletes the CAPS rules and drops the NCAPS token from the rest, on the set's keys only. It replaced `stripCapsRules` and `removeCapsContextElements`, which are gone. Caps handling moved out of the scaffolder into the produced output (FR-006).
 - Story 3 needs spec 111's text-patch projection and suggested-fix surface (111 Phases 0–2). Until then, Story 3 is testable at the engine level only.
 - The 7.28 implementation on this branch merges first (Story 1). Its studio tests were green before the rebase onto `5e1fb741`, whose engine build is broken on main (missing `osk/complete-osk-step.js`).
 
