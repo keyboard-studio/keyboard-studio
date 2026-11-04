@@ -656,11 +656,23 @@
       "what": "contracts vitest (1073) and engine caps/ldml-export/scaffolder vitest (640)",
       "command": "pnpm --filter ... exec vitest run",
       "result": "all pass"
+    },
+    {
+      "what": "phase 5 engine caps tests",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run src/caps",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 4.4,
+      "result": "    ../../package.json:28:4: ·       28 â”‚     \"prepare\": \"node scripts/install-git-hooks.mjs\", ·          â•µ     ~~~~~~~~~"
     }
   ],
   "concerns": [
     {
       "note": "pnpm typecheck/lint fail only on osk/* files absent or stale on this branch vs main (complete-osk-step missing, generate-kvks.test any, OskEditor.test unused import); T013 rebase addresses it",
+      "step": "implement"
+    },
+    {
+      "note": "compareCapsBehaviour compiles via buildToleranceCompileVfs (context-tolerance path); not confirmed identical to the download path buildKmpForDownload",
       "step": "implement"
     }
   ],
@@ -668,5 +680,13 @@
     "implement": {
       "summary": "Phase 2 foundational: shared cased-key derivation and key-scoped caps rewrite"
     }
-  }
+  },
+  "decisions": [
+    {
+      "decision": "T039: 7.26 already flags leftover CAPS rules on mixed keyboards",
+      "why": "KM_LINT_CAPS_NCAPS_INCONSISTENT names K_Q",
+      "rejected": "adding a finding to 7.28 pass path"
+    }
+  ],
+  "last_action": "Phase 5 T033-T040 done, pushed 1bbd2cd3/71afac5f"
 }

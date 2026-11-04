@@ -193,6 +193,7 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "7.27-no-deprecated-headers-or-unused-stores", code: "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE", criteria: "No deprecated header statements or system stores remain; unused stores are removed.", why: "source syntax hygiene; no DecisionId" },
   { id: "7.28-cased-script-declares-casedkeys", code: "KM_LINT_CASEDKEYS_MISSING", criteria: "A keyboard that produces cased letters declares store(&CasedKeys); mnemonic layouts are exempt.", why: "rule modifier hygiene; no DecisionId" },
   { id: "18.14-touch-layers-carry-bksp-enter", code: "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS", criteria: "Every touch layer includes the required control keys (K_LOPT, K_BKSP, K_ENTER).", why: "touch layout structure; no DecisionId" },
+  { id: "18.16-touch-caps-layer-complete", code: "KM_LINT_TOUCH_CAPS_LAYER", criteria: "A keyboard that produces cased letters has a touch caps layer reached by double-tapping Shift, carrying every uppercase letter, whose character keys do not switch layers.", why: "touch layout structure; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

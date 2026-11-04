@@ -38,6 +38,11 @@ function systemStoreValue(ir: KeyboardIR, name: string): string | undefined {
     .trim();
 }
 
+/** True when the keyboard declares &MNEMONICLAYOUT = 1. */
+export function isMnemonicLayout(ir: KeyboardIR): boolean {
+  return /^['"]?1['"]?$/.test(systemStoreValue(ir, "MNEMONICLAYOUT") ?? "");
+}
+
 /** 7.28 — a cased-script keyboard declares store(&CasedKeys). */
 export function checkCasedKeysDeclared(
   ir: KeyboardIR,
@@ -75,7 +80,7 @@ export function checkCasedKeysDeclared(
       }),
     ]);
   }
-  if (/^['"]?1['"]?$/.test(systemStoreValue(ir, "MNEMONICLAYOUT") ?? "")) {
+  if (isMnemonicLayout(ir)) {
     return checkPassed("KM_LINT_CASEDKEYS_MISSING", [
       "Mnemonic layout: &CasedKeys does not apply.",
     ]);

@@ -66,6 +66,7 @@
   "content.criteria.18_12-meets-legal-accessibility-requirements.description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale",
   "content.criteria.18_14-touch-layers-carry-bksp-enter.description": "Every touch layer (including shift/RALT/alt variants) includes the required control keys (`K_LOPT`, `K_BKSP`, `K_ENTER`); standard control keys use canonical `K_` IDs, not touch-only `T_` IDs",
   "content.criteria.18_15-touch-desktop-output-parity.description": "Every character produced by the touch layout is produced identically by the desktop rules and vice versa (judgment call; compare compiled behavior)",
+  "content.criteria.18_16-touch-caps-layer-complete.description": "A keyboard that produces cased letters has a touch `caps` layer, reached by double-tapping Shift on `default`, carrying the uppercase of every cased letter on `default`; its character keys do not switch layers",
   "content.criteria.18_2-touch-rows-within-range.description": "Touch layout uses 4-5 rows on phone and 5 rows on tablet",
   "content.criteria.18_3-keys-per-row-within-range.description": "Touch layout uses at most 10 keys per row on phone and 13 on tablet",
   "content.criteria.18_4-control-keys-stable-across-layers.description": "Backspace, Enter, and other control keys do not move or resize across touch layers",

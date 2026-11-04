@@ -176,7 +176,7 @@ describe("CriteriaPage — header and rows agree", () => {
     expect(statuses.slice(0, -1)).not.toContain("not-applicable");
   });
 
-  it("over the real catalog: 203 rows, header counts sum to the rows", () => {
+  it("over the real catalog: 204 rows, header counts sum to the rows", () => {
     const result = resolveCriteria({
       criteria: ALL_CRITERIA,
       mode: "authored",
@@ -186,15 +186,15 @@ describe("CriteriaPage — header and rows agree", () => {
     });
     render(<CriteriaPage result={result} mode="authored" />);
 
-    expect(screen.getAllByTestId("criteria-row")).toHaveLength(203);
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(204);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
       // 140 on main plus the 5 consistency-batch checks (1.15/7.25/
       // 7.26/7.27/18.14) and 7.28: with no findings supplied, each implemented
       // layer-c row resolves Met.
-      "146 of 203 criteria resolved",
+      "147 of 204 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
-    expect(counted).toBe(203);
+    expect(counted).toBe(204);
   });
 });
 
@@ -544,7 +544,7 @@ describe("CriteriaPage — identifiers guard", () => {
     assertClean("collapsed");
 
     for (const row of screen.getAllByTestId("criteria-row")) expandRow(row);
-    expect(screen.getAllByTestId("criteria-row-evidence")).toHaveLength(203);
+    expect(screen.getAllByTestId("criteria-row-evidence")).toHaveLength(204);
     assertClean("expanded");
 
     // Sanity: the exception is real — at least one implemented check's id

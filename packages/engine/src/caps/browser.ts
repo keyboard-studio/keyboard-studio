@@ -20,3 +20,4 @@ export {
   type CapsRow,
   type CapsVerdict,
 } from './compareCaps.js';
+export { syncTouchCapsLayer, syncTouchCapsLayerRaw } from './syncTouchCapsLayer.js';

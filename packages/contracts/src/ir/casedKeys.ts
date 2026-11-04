@@ -336,3 +336,39 @@ export function casedKeysStoreText(keys: readonly string[]): string {
   const items = [...(complete ? ["[K_A]..[K_Z]"] : []), ...rest.map((k) => `[${k === "K_OE2" ? "K_oE2" : k}]`)];
   return items.join(" ");
 }
+
+// ---------------------------------------------------------------------------
+// Touch frame keys (spec 112, research R8)
+// ---------------------------------------------------------------------------
+
+/** Touch key ids that are layout frame (control) keys, never character keys. */
+const TOUCH_FRAME_KEY_IDS: ReadonlySet<string> = new Set([
+  "K_SHIFT",
+  "K_LOPT",
+  "K_ROPT",
+  "K_RALT",
+  "K_LALT",
+  "K_LCONTROL",
+  "K_RCONTROL",
+  "K_CAPS",
+  "K_NUMLOCK",
+  "K_SYMBOLS",
+  "K_BKSP",
+  "K_ENTER",
+  "K_SPACE",
+  "K_TAB",
+  "K_ALT",
+  "K_CONTROL",
+]);
+
+/**
+ * True when a touch key is a frame key: it is allowed to switch layers (Shift
+ * returns to `default`, the symbol/RAlt keys reach their own layers). Every
+ * other key is a character key, which must not switch layer after typing on a
+ * caps layer (FR-003). A key whose text is a `*Glyph*` special label counts as
+ * a frame key too.
+ */
+export function isTouchFrameKey(key: { id: string; text?: string }): boolean {
+  if (TOUCH_FRAME_KEY_IDS.has(key.id.toUpperCase())) return true;
+  return key.text !== undefined && /^\*.+\*$/.test(key.text);
+}

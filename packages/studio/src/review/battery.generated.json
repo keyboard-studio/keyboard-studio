@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-11-03T23:00:33.538Z",
- "catalogSize": 203,
+ "generatedAt": "2026-11-04T19:35:34.578Z",
+ "catalogSize": 204,
  "byBand": {
-  "layer-c-enforce": 119,
+  "layer-c-enforce": 120,
   "scaffolder-bake": 40,
   "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 112,
+ "implementedCount": 113,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -2585,6 +2585,21 @@
    "precertified": false,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-touch-required-keys.ts"
+   ]
+  },
+  {
+   "id": "18.16-touch-caps-layer-complete",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "A keyboard that produces cased letters has a touch `caps` layer, reached by double-tapping Shift on `default`, carrying the uppercase of every cased letter on `default`; its character keys do not switch layers",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_CAPS_LAYER"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-touch-caps-layer.ts"
    ]
   },
   {

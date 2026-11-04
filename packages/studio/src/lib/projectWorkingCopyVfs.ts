@@ -120,6 +120,7 @@ import {
   applyContextToleranceOverlay,
   applyMarkGuards,
   replaceCapsRules,
+  syncTouchCapsLayerRaw,
   writeCasedKeysStore,
   removeCasedKeysStore,
   removedTouchKeyRuleIds,
@@ -1147,6 +1148,24 @@ export function projectWorkingCopyVfs(
         // explicit-rules leaves the copy exactly as it was: nothing to emit.
         if (capsHandling.mode !== "explicit-rules") {
           vfs.set(kmnPathForCaps, emitKmn(parsedForCaps), false);
+        }
+        // Touch caps: the same decision gives the touch layout its caps layer
+        // (R8). Runs on the projected touch file, after the clean-touch clone
+        // and the assignment propagation, so a letter assigned after
+        // scaffolding is uppercase on caps too.
+        if (capsHandling.mode === "cased-keys") {
+          const touchPathForCaps = findTouchLayoutPath(vfs);
+          const touchEntryForCaps = touchPathForCaps !== undefined ? vfs.get(touchPathForCaps) : undefined;
+          if (
+            touchPathForCaps !== undefined &&
+            touchEntryForCaps !== undefined &&
+            typeof touchEntryForCaps.content === "string"
+          ) {
+            const synced = syncTouchCapsLayerRaw(touchEntryForCaps.content, {
+              ...(bcp47 !== undefined ? { bcp47 } : {}),
+            });
+            if (synced.changed) vfs.set(touchPathForCaps, synced.json, false);
+          }
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

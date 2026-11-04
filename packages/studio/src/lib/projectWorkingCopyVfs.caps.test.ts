@@ -128,3 +128,61 @@ describe("projectWorkingCopyVfs step 2.8 - caps handling (spec 112)", () => {
     }
   });
 });
+
+describe("projectWorkingCopyVfs step 2.8 - touch caps layer (spec 112 R8)", () => {
+  const TOUCH_PATH = `source/${KBID}.keyman-touch-layout`;
+  const rawTouch = JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), "../engine/src/caps/__fixtures__/upstream_basic_kbdus/basic_kbdus.keyman-touch-layout"),
+      "utf8",
+    ),
+  ) as { tablet: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string }> }> }> } };
+  // A letter assigned after scaffolding: eng sits on K_LBRKT, lower on default, upper on shift.
+  for (const id of ["default", "shift"]) {
+    const layer = rawTouch.tablet.layer.find((l) => l.id === id)!;
+    for (const row of layer.row) for (const k of row.key) if (k.id === "K_LBRKT") k.text = id === "default" ? "ŋ" : "Ŋ";
+  }
+  const TOUCH = JSON.stringify(rawTouch, null, 2);
+
+  function projectTouch(capsHandling: CapsHandlingValue | null) {
+    const vfs = createVirtualFS();
+    vfs.set(`source/${KBID}.kmn`, ASSIGNED, false);
+    vfs.set(TOUCH_PATH, TOUCH, false);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: KBID,
+      startIr: parseKmn(ASSIGNED, KBID).ir,
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: { bcp47: "en" },
+      capsHandling,
+    });
+    const entry = vfs.get(TOUCH_PATH);
+    const text = typeof entry?.content === "string" ? entry.content : "";
+    return JSON.parse(text) as typeof rawTouch;
+  }
+  const capsKey = (t: typeof rawTouch, id: string) =>
+    t.tablet.layer.find((l) => l.id === "caps")?.row.flatMap((r) => r.key).find((k) => k.id === id);
+
+  it("cased-keys: the assigned letter appears uppercase on caps, with the Shift double-tap", () => {
+    const out = projectTouch({ mode: "cased-keys" });
+    expect(capsKey(out, "K_LBRKT")?.text).toBe("Ŋ");
+    expect(capsKey(out, "K_Q")?.text).toBe("Q");
+    const shift = out.tablet.layer.find((l) => l.id === "default")!.row.flatMap((r) => r.key).find((k) => k.id === "K_SHIFT") as
+      { multitap?: Array<{ nextlayer?: string }> };
+    expect(shift.multitap?.some((m) => m.nextlayer === "caps")).toBe(true);
+  });
+
+  for (const mode of ["explicit-rules", "none"] as const) {
+    it(`${mode}: the touch layout is left alone`, () => {
+      expect(projectTouch({ mode })).toEqual(projectTouch(null));
+    });
+  }
+
+  it("null (not asked): no Shift double-tap is added", () => {
+    const shift = projectTouch(null).tablet.layer.find((l) => l.id === "default")!.row.flatMap((r) => r.key).find((k) => k.id === "K_SHIFT") as
+      { multitap?: unknown };
+    expect(shift.multitap).toBeUndefined();
+  });
+});
