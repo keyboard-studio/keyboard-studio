@@ -33,6 +33,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], MessageDescriptor> = {
   track: msg({ id: "resumeDraft.steps.track", message: "authoring track" }),
   attribution: msg({ id: "resumeDraft.steps.attribution", message: "author & copyright" }),
   project_name: msg({ id: "resumeDraft.steps.projectName", message: "project name" }),
+  open_languages: msg({ id: "resumeDraft.steps.openLanguages", message: "languages" }),
   characters: msg({ id: "resumeDraft.steps.characters", message: "characters" }),
   marks: msg({ id: "resumeDraft.steps.marks", message: "combining marks" }),
   punctuation: msg({ id: "resumeDraft.steps.punctuation", message: "punctuation" }),

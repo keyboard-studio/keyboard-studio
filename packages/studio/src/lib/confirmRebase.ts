@@ -52,6 +52,7 @@ import { useWorkingCopyStore, type IdentityPatch } from "../stores/workingCopySt
 import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
 import { identityLanguagePatch } from "./identityLanguagePatch.ts";
+import { isOpenMode, isOpenedWithDescriptor } from "./openMode.ts";
 
 /**
  * User-facing wording for the rebase confirm dialog — the single source of truth for the string.
@@ -161,7 +162,14 @@ export function confirmRebaseTo(newStartId: string): boolean {
  * Returns undefined when the identity step recorded no language tag, so the
  * copy starts with no overlay exactly as before.
  */
-export function identitySeedFromSession(base: StartKeyboard): IdentityPatch | undefined {
+export function identitySeedFromSession(
+  base: StartKeyboard,
+  mode: "new-from-base" | "adapt-existing" = "new-from-base",
+): IdentityPatch | undefined {
+  // Open (spec 111): the identity steps are not walked and the language list
+  // comes from the keyboard's own descriptor (the store seeds it), so there is
+  // no single-tag seed to compose.
+  if (isOpenMode(mode)) return undefined;
   const result = deriveIdentityResult(getDecisionSnapshot());
   const bcp47 = result?.bcp47.trim() ?? "";
   if (bcp47 === "") return undefined;
@@ -215,7 +223,12 @@ export function instantiateFromExistingWithIdentitySeed(
   base: StartKeyboard,
   opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
 ): void {
-  const identitySeed = identitySeedFromSession(base);
+  // With the keyboard's own descriptor in the VFS this is Open: no single-tag
+  // seed (the store seeds the language list from the descriptor).
+  const identitySeed = identitySeedFromSession(
+    base,
+    isOpenedWithDescriptor("adapt-existing", opts.vfs, base.id) ? "adapt-existing" : "new-from-base",
+  );
   useWorkingCopyStore.getState().instantiateFromExisting(base, {
     ...opts,
     ...(identitySeed !== undefined ? { identitySeed } : {}),

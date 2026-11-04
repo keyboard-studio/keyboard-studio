@@ -31,6 +31,7 @@ import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHo
 import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
 import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
 import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
+import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -247,6 +248,19 @@ export const oskStep: EditorStep = step({
   layout: "full",
   component: OskEditorAdapter,
   specRef: ["specs/osk-editor"],
+  persistence: "working-copy",
+});
+
+/**
+ * Open: the keyboard's editable language list (spec 111). Gated to Open by the
+ * declared screen gate in registry.ts; rejoins at characters.
+ */
+export const languageListStep: EditorStep = step({
+  id: "open_languages",
+  title: "Languages",
+  layout: "full",
+  component: LanguageListHost,
+  specRef: "specs/111-open-existing-keyboard",
   persistence: "working-copy",
 });
 

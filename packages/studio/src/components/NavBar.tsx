@@ -25,6 +25,7 @@ import {
 } from "../ui/useDismissablePopover.ts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { UnfinishedGalleryIndicator } from "./UnfinishedGalleryIndicator.tsx";
+import { OpenToolsMenu } from "./OpenToolsMenu.tsx";
 import { FontSwitcher } from "./FontSwitcher.tsx";
 import { LocaleSwitcher } from "./LocaleSwitcher.tsx";
 import { ThemeSwitcher } from "./ThemeSwitcher.tsx";
@@ -393,6 +394,7 @@ export function NavBar({
                   <Trans id="journeyContents.menuItem">Contents</Trans>
                 </button>
               )}
+              {active !== "welcome" && <OpenToolsMenu />}
               {active !== "welcome" && (
                 <UnfinishedGalleryIndicator
                   desktopCount={unfinishedDesktopCount}
@@ -419,6 +421,7 @@ export function NavBar({
             minHeight: 44,
           }}
         >
+          {active !== "welcome" && <OpenToolsMenu />}
           {active !== "welcome" && (
             <UnfinishedGalleryIndicator
               desktopCount={unfinishedDesktopCount}

@@ -74,13 +74,13 @@
 
 **Independent Test**: [quickstart.md §4](quickstart.md), the gate matrix (SC-005, SC-006).
 
-- [ ] T024 [P] [US2] Gate-matrix unit test (compile error / unconfirmed red / unjustified new failure / justified / pre-existing only, singly and paired) in `packages/studio/src/criteria/openRatchet.test.ts`
-- [ ] T025 [US2] Take the baseline at Open instantiation by running the criteria assembly over the opened working copy (reuse `judgeForeignKeyboard`, `packages/studio/src/criteria/judgeForeign.ts:284`, in its worker). Store `failing: Set<FindingKey>` (key `${lintRuleId}:${file}`) and `unresolvable` in the criteria slice of the draft envelope, generalising `baselineDocFindings` in `packages/studio/src/stores/workingCopyStore.ts`.
-- [ ] T026 [US2] Classify each current finding as pre-existing or new in `packages/studio/src/criteria/openRatchet.ts`, and show the mark on the criteria page rows in `packages/studio/src/criteria/CriteriaPage.tsx`
-- [ ] T027 [US2] Make the criteria page the landing view on Open, with each finding linking to its editor or suggested fix, in `packages/studio/src/StudioShell.tsx` (`#criteria` route) and `packages/studio/src/criteria/CriteriaPage.tsx`
-- [ ] T028 [US2] Review notes: write, edit and remove per new failure, auto-dropped when the key stops failing, stored in the criteria slice (never a decision), in `packages/studio/src/criteria/ReviewNoteEditor.tsx` and `openRatchet.ts`
-- [ ] T029 [US2] Ratchet submit gate: block on compile error, unconfirmed red item, or unjustified new failure; never block on pre-existing failures. Change `packages/studio/src/hooks/useInventoryCoverageGate.ts` (18.6) and the submit gating in `packages/studio/src/components/ManagedPRSubmitPanel.tsx`.
-- [ ] T030 [US2] Append the source block and review block per [contracts/pr-body.md](contracts/pr-body.md) to the body array in `packages/studio/src/components/ManagedPRSubmitPanel.tsx` (~:344-353), with markdown in notes escaped, and a test for the block text
+- [x] T024 [P] [US2] Gate-matrix unit test (compile error / unconfirmed red / unjustified new failure / justified / pre-existing only, singly and paired) in `packages/studio/src/criteria/openRatchet.test.ts`
+- [x] T025 [US2] Take the baseline at Open instantiation by running the criteria assembly over the opened working copy (reuse `judgeForeignKeyboard`, `packages/studio/src/criteria/judgeForeign.ts:284`, in its worker). Store `failing: Set<FindingKey>` (key `${lintRuleId}:${file}`) and `unresolvable` in the criteria slice of the draft envelope, generalising `baselineDocFindings` in `packages/studio/src/stores/workingCopyStore.ts`.
+- [x] T026 [US2] Classify each current finding as pre-existing or new in `packages/studio/src/criteria/openRatchet.ts`, and show the mark on the criteria page rows in `packages/studio/src/criteria/CriteriaPage.tsx`
+- [x] T027 [US2] Make the criteria page the landing view on Open, with each finding linking to its editor or suggested fix, in `packages/studio/src/StudioShell.tsx` (`#criteria` route) and `packages/studio/src/criteria/CriteriaPage.tsx`
+- [x] T028 [US2] Review notes: write, edit and remove per new failure, auto-dropped when the key stops failing, stored in the criteria slice (never a decision), in `packages/studio/src/criteria/ReviewNoteEditor.tsx` and `openRatchet.ts`
+- [x] T029 [US2] Ratchet submit gate: block on compile error, unconfirmed red item, or unjustified new failure; never block on pre-existing failures. Change `packages/studio/src/hooks/useInventoryCoverageGate.ts` (18.6) and the submit gating in `packages/studio/src/components/ManagedPRSubmitPanel.tsx`.
+- [x] T030 [US2] Append the source block and review block per [contracts/pr-body.md](contracts/pr-body.md) to the body array in `packages/studio/src/components/ManagedPRSubmitPanel.tsx` (~:344-353), with markdown in notes escaped, and a test for the block text
 
 **Checkpoint**: T024 green; manual walk step 5 of [quickstart.md §5](quickstart.md). Commit and push.
 

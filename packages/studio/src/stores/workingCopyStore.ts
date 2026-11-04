@@ -53,6 +53,7 @@ import {
   deriveRemapPosture,
   renameTouchKey,
   deriveFacets,
+  parseKpsLanguages,
 } from "@keyboard-studio/engine";
 import type {
   ContextToleranceOverlay,
@@ -61,6 +62,7 @@ import type {
   LdmlProfileId,
   StartDocCssText,
 } from "@keyboard-studio/engine";
+import { readVfsText } from "../lib/vfsText.ts";
 import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
@@ -1555,6 +1557,24 @@ function reconcileRemapPosture(
 }
 
 /**
+ * Open mode (spec 111): the language list the author starts from, read from the
+ * keyboard's own `.kps` in the VFS. Returns `{}` when the descriptor is absent
+ * or lists no language, or when the caller's identity seed already carries a
+ * list, so the identity falls back to what it was before.
+ */
+function openLanguagesFromVfs(
+  vfs: VirtualFS,
+  keyboardId: string,
+  seed: IdentityPatch | undefined,
+): Pick<IdentityPatch, "languages"> {
+  if (seed?.languages !== undefined) return {};
+  const kps = readVfsText(vfs, `source/${keyboardId}.kps`);
+  if (kps === undefined) return {};
+  const languages = parseKpsLanguages(kps).map((l) => ({ tag: l.tag, name: l.name }));
+  return languages.length > 0 ? { languages } : {};
+}
+
+/**
  * Shared three-case resolution for instantiateFromStart / instantiateFromExisting.
  *
  * Three cases, in order:
@@ -2605,6 +2625,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         // when no seed was composed. The seed never carries `keyboardId`,
         // so the preserved id above is never overridden.
         ...(identitySeed ?? {}),
+        // Open (spec 111): the language list comes from the keyboard's own
+        // descriptor, not from the single-tag seed.
+        ...openLanguagesFromVfs(vfs, keyboard.id, identitySeed),
       },
       // Seed the carve working IR from the existing keyboard's IR.
       ir,

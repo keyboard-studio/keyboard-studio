@@ -338,6 +338,8 @@ export function DecisionTrailView({
         return t({ id: "trail.stage.name.track", message: "Authoring track" });
       case "project_name":
         return t({ id: "trail.stage.name.projectName", message: "Project name" });
+      case "open_languages":
+        return t({ id: "trail.stage.name.openLanguages", message: "Keyboard languages" });
       case "characters":
         return t({ id: "trail.stage.name.characters", message: "Character inventory" });
       case "marks":

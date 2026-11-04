@@ -22,7 +22,7 @@ export const definition = {
   help_text:
     "Choose how you want to use this starting keyboard. " +
     "Copy creates an independent new keyboard you can fully rename and own. " +
-    "Adapt lets you modify the existing keyboard keeping its name and ID.",
+    "Open lets you update the existing keyboard in place, keeping its name and ID.",
   required: true,
   options: [
     {
@@ -32,8 +32,8 @@ export const definition = {
     },
     {
       value: "adapt",
-      label: "Adapt — modify this keyboard in place",
-      note: "Keep the keyboard's existing name and ID. Useful for adding a language or fixing a layout.",
+      label: "Open — update this keyboard in place",
+      note: "Keep the keyboard's existing name, ID, languages and documentation. Useful for adding a language or fixing a layout.",
     },
   ],
   // Terminal — the PhaseTrack wrapper handles the copy-vs-adapt fork at the
@@ -50,7 +50,7 @@ export function validate(
     return {
       ok: false,
       code: "required",
-      message: "Please choose either Copy or Adapt to continue.",
+      message: "Please choose either Copy or Open to continue.",
     };
   }
   return { ok: true };

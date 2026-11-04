@@ -71,6 +71,8 @@ export interface ProjectionExtras {
   baseDisplayName?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
+  /** Open mode only (spec 111); see ProjectWorkingCopyVfsInput.openMode. */
+  openMode?: NonNullable<ProjectWorkingCopyVfsInput["openMode"]>;
   /** A live touch layout and its uncommitted-to-JSON key edits (TouchGallery's preview). */
   liveLayoutOverride?: {
     touchLayoutJson: string | null;

@@ -216,11 +216,67 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T17:28:31.765Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:25.828Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.170Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.309Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.445Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.574Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.705Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T021",
+  "currentTask": "T030",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -416,6 +472,62 @@
         "packages/studio/src/components/OpenToolsMenu.tsx",
         "packages/studio/src/components/OpenToolsMenu.test.tsx",
         "packages/studio/src/survey/questions/registry.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Gate-matrix unit test",
+      "files": [
+        "packages/studio/src/criteria/openRatchet.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Baseline at Open via judgeForeignKeyboard stored in criteria slice",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts",
+        "packages/studio/src/stores/criteriaRecordStore.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Pre-existing/new classification and row mark",
+      "files": [
+        "packages/studio/src/criteria/openRatchet.ts",
+        "packages/studio/src/criteria/CriteriaPage.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Criteria page as Open landing view",
+      "files": [
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/criteria/CriteriaPage.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Review note editor with auto-drop",
+      "files": [
+        "packages/studio/src/criteria/ReviewNoteEditor.tsx",
+        "packages/studio/src/hooks/useOpenRatchet.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Ratchet submit gate and coverage gate lift on Open",
+      "files": [
+        "packages/studio/src/hooks/useInventoryCoverageGate.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Source and review PR blocks with escaping and tests",
+      "files": [
+        "packages/studio/src/criteria/openPrBlocks.ts",
+        "packages/studio/src/criteria/openPrBlocks.test.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
       ]
     }
   },

@@ -155,6 +155,7 @@ export type DecisionId =
   | "physical-layout"
   | "osk-layout"
   | "touch-seed-source"
+  | "language-list"
   | "touch-layout"
   | "custom-css"
   | "help-docs"
@@ -411,6 +412,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "physical-layout": [],
   "osk-layout": [],
   "touch-seed-source": [],
+  "language-list": [],
   "touch-layout": [],
   "custom-css": [],
   "help-docs": [],

@@ -58,7 +58,7 @@ function savedTrack() {
 }
 
 const adaptRadio = () =>
-  screen.getByRole("radio", { name: /Adapt — modify this keyboard in place/ }) as HTMLInputElement;
+  screen.getByRole("radio", { name: /Open — update this keyboard in place/ }) as HTMLInputElement;
 const copyRadio = () =>
   screen.getByRole("radio", { name: /Copy — start a new keyboard/ }) as HTMLInputElement;
 

@@ -38,6 +38,7 @@ import ruleSetModule from "./gallery/ruleSet.ts";
 import physicalLayoutModule from "./gallery/physicalLayout.ts";
 import oskLayoutModule from "./gallery/oskLayout.ts";
 import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
+import languageListModule from "./gallery/languageList.ts";
 import touchLayoutModule from "./gallery/touchLayout.ts";
 import customCssModule from "./gallery/customCss.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
@@ -104,6 +105,7 @@ export const reserveOnlyModules: readonly QuestionModule[] = [
 const galleryModuleList: readonly GalleryModule<any>[] = [
   windowsLayoutModule,
   startKeyboardModule,
+  languageListModule,
   characterInventoryModule,
   marksTreatmentModule,
   punctuationInventoryModule,
@@ -173,6 +175,44 @@ export const decisionModules: readonly QuestionModule[] = [
 ];
 
 /**
+ * Screens that do not appear in the walk on Open (spec 111 FR-016, research R6).
+ * The first four are the identity-first steps (the keyboard already exists);
+ * the rest are the remove tool and the feature galleries, which stay reachable
+ * from the menu. Declared here once; the gates below and the advance policy
+ * (steps/advance.ts) both read this set.
+ */
+export const openHiddenScreens: ReadonlySet<string> = new Set([
+  "identity",
+  "layout",
+  "choose_base",
+  "track",
+  "marks",
+  "punctuation",
+  "invisibles",
+  "convenience",
+  "carve",
+  "deadkeys",
+  "rules",
+  "mechanisms",
+  "touch",
+]);
+
+/** The screens a menu entry reaches on Open: the remove tool and the feature galleries. */
+export const openMenuScreens: readonly string[] = [
+  "carve",
+  "marks",
+  "punctuation",
+  "invisibles",
+  "convenience",
+  "deadkeys",
+  "rules",
+  "mechanisms",
+  "touch",
+];
+
+const notOpen = (d: DecisionSet): boolean => d["authoring-track"]?.value !== "adapt";
+
+/**
  * Declared screen gates (spec 091 FR-003, Delta P6): the gates of screens
  * whose visibility is NOT routing-expressible — the project_name fork
  * (manifest-level in StudioShell, never a property of the flow's `next`
@@ -188,8 +228,24 @@ export const declaredScreenGates: ReadonlyMap<
   (decisions: DecisionSet) => boolean
 > = new Map([
   ["project_name", (d) => d["authoring-track"]?.value === "copy"],
-  ["touch_seed_source", (d) => d["touch-seed-source"] === undefined],
+  // Spec 111: the language list is asked on Open only.
+  ["open_languages", (d) => d["authoring-track"]?.value === "adapt"],
+  [
+    "touch_seed_source",
+    (d) => d["touch-seed-source"] === undefined && d["authoring-track"]?.value !== "adapt",
+  ],
 ]);
+
+/**
+ * Spec 111 (Open): the screens hidden once the Open entry records
+ * `authoring-track = "adapt"` (the identity-first screens, the remove tool and
+ * the feature galleries). Kept apart from `declaredScreenGates` on purpose: a
+ * declared gate makes its screen an off-spine side trail, and these screens
+ * stay on the static spine that Copy walks and the Flow Map draws. The manifest
+ * folds these into its `screenGates`, so the walk skips them only on Open.
+ */
+export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
+  new Map([...openHiddenScreens].map((id) => [id, notOpen] as const));
 
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically

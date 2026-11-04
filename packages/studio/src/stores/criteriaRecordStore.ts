@@ -13,6 +13,9 @@
 // or confirmation controls (spec 057 FR-023 isolation).
 
 import { create } from "zustand";
+import type { ReviewNote } from "@keyboard-studio/contracts";
+
+import type { OpenBaseline } from "../criteria/openRatchet.ts";
 
 /** The author's answer to a yellow-band criterion, given on the criteria page. */
 export type AttestationAnswer = "yes" | "no" | "not-applicable";
@@ -64,6 +67,14 @@ export interface CriteriaRecord {
    * the key) still satisfy it; applyCriteriaRecordSnapshot defaults it.
    */
   fontLicenseAttestations?: Record<string, FontLicenseAttestation>;
+  /**
+   * Open mode (spec 111): what was already failing when the keyboard was
+   * opened. Null until taken; never set on Copy. Optional so older drafts
+   * (which lack the key) still satisfy the type.
+   */
+  openBaseline?: OpenBaseline | null;
+  /** Open mode: the author's justification per new failure. Never a decision. */
+  reviewNotes?: ReviewNote[];
 }
 
 /** The empty record: what a project with no attestations or confirmations carries. */
@@ -95,6 +106,14 @@ export interface CriteriaRecordStoreState extends CriteriaRecord {
   ) => void;
   /** Remove one font's license attestation outright. */
   clearFontLicense: (fontName: string) => void;
+  /** Take (or clear) the Open-mode baseline. */
+  setOpenBaseline: (baseline: OpenBaseline | null) => void;
+  /** Write or edit the review note for one new failure. Empty text removes it. */
+  setReviewNote: (note: Omit<ReviewNote, "writtenAt">) => void;
+  /** Remove the review note for one finding key. */
+  removeReviewNote: (key: ReviewNote["key"]) => void;
+  /** Drop notes whose key is no longer failing (auto-drop). */
+  retainReviewNotes: (failingKeys: ReadonlySet<ReviewNote["key"]>) => void;
   /** Start-over / new-project only — wired beside decisionStore's reset. */
   reset: () => void;
 }
@@ -104,6 +123,8 @@ export const useCriteriaRecordStore = create<CriteriaRecordStoreState>()((set) =
   confirmations: {},
   contrastiveAttestation: null,
   fontLicenseAttestations: {},
+  openBaseline: null,
+  reviewNotes: [],
 
   attest: (criterionId, answer) =>
     set((s) => ({
@@ -158,12 +179,40 @@ export const useCriteriaRecordStore = create<CriteriaRecordStoreState>()((set) =
       return { fontLicenseAttestations };
     }),
 
+  setOpenBaseline: (baseline) => set({ openBaseline: baseline }),
+
+  setReviewNote: (note) =>
+    set((s) => {
+      const others = (s.reviewNotes ?? []).filter((n) => n.key !== note.key);
+      if (note.text.trim() === "") return { reviewNotes: others };
+      return {
+        reviewNotes: [...others, { ...note, writtenAt: new Date().toISOString() }],
+      };
+    }),
+
+  removeReviewNote: (key) =>
+    set((s) => {
+      const notes = s.reviewNotes ?? [];
+      return notes.some((n) => n.key === key)
+        ? { reviewNotes: notes.filter((n) => n.key !== key) }
+        : s;
+    }),
+
+  retainReviewNotes: (failingKeys) =>
+    set((s) => {
+      const notes = s.reviewNotes ?? [];
+      const kept = notes.filter((n) => failingKeys.has(n.key));
+      return kept.length === notes.length ? s : { reviewNotes: kept };
+    }),
+
   reset: () =>
     set({
       attestations: {},
       confirmations: {},
       contrastiveAttestation: null,
       fontLicenseAttestations: {},
+      openBaseline: null,
+      reviewNotes: [],
     }),
 }));
 
@@ -174,12 +223,18 @@ export function getCriteriaRecordSnapshot(): CriteriaRecord {
     confirmations,
     contrastiveAttestation,
     fontLicenseAttestations,
+    openBaseline,
+    reviewNotes,
   } = useCriteriaRecordStore.getState();
   return {
     attestations,
     confirmations,
     contrastiveAttestation: contrastiveAttestation ?? null,
     fontLicenseAttestations: fontLicenseAttestations ?? {},
+    // Open-only slices stay out of the snapshot until used, so a Copy draft
+    // keeps the shape it always had.
+    ...(openBaseline != null ? { openBaseline } : {}),
+    ...(reviewNotes != null && reviewNotes.length > 0 ? { reviewNotes } : {}),
   };
 }
 
@@ -192,5 +247,8 @@ export function applyCriteriaRecordSnapshot(snapshot: CriteriaRecord): void {
     contrastiveAttestation: snapshot.contrastiveAttestation ?? null,
     // Drafts written before Batch 5 lack the key entirely.
     fontLicenseAttestations: snapshot.fontLicenseAttestations ?? {},
+    // Drafts written before Open mode lack both keys.
+    openBaseline: snapshot.openBaseline ?? null,
+    reviewNotes: snapshot.reviewNotes ?? [],
   });
 }

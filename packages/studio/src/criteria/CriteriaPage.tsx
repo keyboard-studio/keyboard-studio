@@ -15,6 +15,7 @@
 // are Tier B content, resolved through contentI18n against the live
 // locale; the chrome (title, statuses, controls) is Tier A Lingui.
 
+import { Fragment } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import { resolveContentString } from "../lib/contentI18n.ts";
@@ -28,6 +29,14 @@ import type {
 import { CriteriaSummary } from "./CriteriaSummary.tsx";
 import { CriterionRow } from "./CriterionRow.tsx";
 import type { GithubLink } from "./githubLink.ts";
+import type { ReviewNote } from "@keyboard-studio/contracts";
+import {
+  classifyKey,
+  classifyRow,
+  findingKeysOf,
+  type OpenBaseline,
+} from "./openRatchet.ts";
+import { ReviewNoteEditor } from "./ReviewNoteEditor.tsx";
 
 export interface CriteriaPageProps {
   result: CriteriaResult;
@@ -61,6 +70,20 @@ export interface CriteriaPageProps {
    * the row's status label is color-coded by severity.
    */
   severityMap?: Record<string, "met" | "warning" | "error" | "hidden">;
+  /**
+   * Open mode (spec 111, US2): marks each failing row pre-existing or new
+   * against the baseline taken at open, and offers a review note on each
+   * new failure. Absent on Copy and in foreign mode, so those pages are
+   * unchanged.
+   */
+  openRatchet?: {
+    baseline: OpenBaseline;
+    notes: readonly ReviewNote[];
+    onSaveNote: (key: ReviewNote["key"], criterionId: string, text: string) => void;
+    onRemoveNote: (key: ReviewNote["key"]) => void;
+    /** Takes the author to where the failing row can be fixed. */
+    onOpenEditor?: (criterionId: string) => void;
+  };
 }
 
 const containerStyle: React.CSSProperties = {
@@ -138,6 +161,7 @@ export function CriteriaPage({
   judgedNote,
   githubLink,
   severityMap,
+  openRatchet,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
   const groups = groupBySection([
@@ -191,8 +215,8 @@ export function CriteriaPage({
               </h3>
               <ul style={sectionRowsStyle}>
                 {group.rows.map((row) => (
+                  <Fragment key={row.criterion.id}>
                   <CriterionRow
-                    key={row.criterion.id}
                     row={row}
                     mode={mode}
                     {...(severityMap?.[row.criterion.id] !== undefined
@@ -208,6 +232,10 @@ export function CriteriaPage({
                     {...(onClearFontLicense !== undefined ? { onClearFontLicense } : {})}
                     {...(githubLink !== undefined ? { githubLink } : {})}
                   />
+                  {openRatchet !== undefined && (
+                    <OpenRatchetMark row={row} ratchet={openRatchet} />
+                  )}
+                  </Fragment>
                 ))}
               </ul>
             </li>
@@ -215,5 +243,57 @@ export function CriteriaPage({
         })}
       </ul>
     </div>
+  );
+}
+
+/** The pre-existing / new mark under a failing row, with note editors for new failures. */
+function OpenRatchetMark({
+  row,
+  ratchet,
+}: {
+  row: ResolvedRow;
+  ratchet: NonNullable<CriteriaPageProps["openRatchet"]>;
+}) {
+  const cls = classifyRow(row, ratchet.baseline);
+  if (cls === null) return null;
+  const newKeys =
+    cls === "new"
+      ? findingKeysOf(row).filter((k) => classifyKey(k, ratchet.baseline) === "new")
+      : [];
+  return (
+    <li
+      style={{ listStyle: "none", margin: "0 0 8px", padding: "0 0 0 12px", fontSize: 12 }}
+      data-testid={`criteria-open-mark-${row.criterion.id}`}
+      data-finding-class={cls}
+    >
+      <strong style={{ color: cls === "new" ? "var(--app-danger-text)" : TEXT_DIM }}>
+        {cls === "new" ? (
+          <Trans id="criteria.open.mark.new">New in this update</Trans>
+        ) : (
+          <Trans id="criteria.open.mark.preExisting">Already failing before this update</Trans>
+        )}
+      </strong>
+      {ratchet.onOpenEditor !== undefined && (
+        <>
+          {" "}
+          <button type="button" onClick={() => ratchet.onOpenEditor?.(row.criterion.id)}>
+            <Trans id="criteria.open.goToEditor">Go to the editor</Trans>
+          </button>
+        </>
+      )}
+      {newKeys.map((key) => {
+        const saved = ratchet.notes.find((n) => n.key === key);
+        const file = key.slice(key.indexOf(":") + 1);
+        return (
+          <ReviewNoteEditor
+            key={key}
+            fileLabel={file}
+            text={saved?.text}
+            onSave={(text) => ratchet.onSaveNote(key, row.criterion.id, text)}
+            onRemove={() => ratchet.onRemoveNote(key)}
+          />
+        );
+      })}
+    </li>
   );
 }

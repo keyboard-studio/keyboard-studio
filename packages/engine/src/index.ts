@@ -60,7 +60,7 @@ export { parseKpjFlags } from "./compiler/parseKpjFlags.js";
 export type { CompilerOptions } from "./compiler/parseKpjFlags.js";
 
 // Issue #39 — release-tree source loader (proxy + VFS hydration).
-export { fetchKeyboardSourceToVfs } from "./loader/fetchKeyboardSourceToVfs.js";
+export { fetchKeyboardSourceToVfs, rewriteKpsBuildEntries } from "./loader/fetchKeyboardSourceToVfs.js";
 export type {
   FetchFn,
   FetchKeyboardSourceOptions,
@@ -229,6 +229,8 @@ export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
   KpsFontDescriptorEntry,
+  OpenKpsOptions,
+  KpsLanguageEntry,
 } from "./package-descriptor/index.js";
 
 // spec 065 — help-docs rendering. The one implementation both the output
@@ -342,12 +344,14 @@ export {
 // must not import the engine).
 export {
   parseKps,
+  parseKpsLanguages,
   parseKpsFiles,
   parseKpsFontRefs,
   parseKpsPackageDetails,
 } from "./start-browser/kps-parser.js";
 export type {
   KpsMetadata,
+  KpsLanguage,
   KpsFileEntry,
   KpsFontRefs,
   KpsPackageDetails,

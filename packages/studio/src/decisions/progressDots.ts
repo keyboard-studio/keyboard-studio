@@ -179,7 +179,7 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   identity: msg({ id: "footer.stage.identity", message: "Identity" }),
   layout: msg({ id: "footer.stage.layout", message: "Keyboard layout" }),
   choose_base: msg({ id: "footer.stage.chooseStarting", message: "Choose a starting keyboard" }),
-  track: msg({ id: "footer.stage.track", message: "Copy or adapt" }),
+  track: msg({ id: "footer.stage.track", message: "Copy or open" }),
   attribution: msg({ id: "footer.stage.attribution", message: "Author & copyright" }),
   project_name: msg({ id: "footer.stage.projectName", message: "Project name" }),
   characters: msg({ id: "footer.stage.characters", message: "Characters" }),

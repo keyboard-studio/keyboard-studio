@@ -109,6 +109,7 @@ import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
 import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { OpenKeyboardEntry } from "./components/OpenKeyboardEntry.tsx";
 import { ReviewScreen } from "./review/ReviewScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
@@ -1935,7 +1936,12 @@ function StudioShellContent() {
   let content: ReactNode;
   switch (route) {
     case "welcome":
-      content = <WelcomeScreen />;
+      content = (
+        <>
+          <WelcomeScreen />
+          <OpenKeyboardEntry />
+        </>
+      );
       break;
     case "survey":
       content = (

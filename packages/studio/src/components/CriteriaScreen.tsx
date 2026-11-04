@@ -18,6 +18,8 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
+import { navigateTo } from "../lib/navigate.ts";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -43,6 +45,10 @@ export function CriteriaScreen() {
   const { t } = useLingui();
   const artifact = usePreviewArtifact();
   const result = useAuthoredCriteria(artifact.stage);
+
+  const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
+  const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
+  const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
   const attest = useCriteriaRecordStore((s) => s.attest);
   const clearAttestation = useCriteriaRecordStore((s) => s.clearAttestation);
@@ -100,6 +106,20 @@ export function CriteriaScreen() {
       onClearContrastive={clearContrastiveRegion}
       onAttestFontLicense={attestFontLicense}
       onClearFontLicense={clearFontLicense}
+      {...(ratchet !== null
+        ? {
+            openRatchet: {
+              baseline: ratchet.baseline,
+              notes: ratchet.notes,
+              onSaveNote: (key, criterionId, text) =>
+                setReviewNote({ key, criterionId, text }),
+              onRemoveNote: removeReviewNote,
+              // The walk is where a failing item is edited; per-fix links
+              // arrive with the suggested-fix work.
+              onOpenEditor: () => navigateTo("survey"),
+            },
+          }
+        : {})}
     />
   );
 }

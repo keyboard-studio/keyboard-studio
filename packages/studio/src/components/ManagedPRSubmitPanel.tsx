@@ -48,6 +48,14 @@ import {
 import { useTestingStore } from "../stores/testingStore.ts";
 import { buildDecisionSummaryBlock } from "@keyboard-studio/engine";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
+import type { RatchetGate } from "../criteria/openRatchet.ts";
+import {
+  buildReviewBlock,
+  buildSourceBlock,
+  type ReviewBlockInput,
+} from "../criteria/openPrBlocks.ts";
+import { readVfsText } from "../lib/vfsText.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -190,6 +198,26 @@ export interface ManagedPRSubmitPanelProps {
    * a caller without results gets the "no lint results" body.
    */
   lintResults?: PRBodyLintResults;
+  /**
+   * Open mode (spec 111, US2): the ratchet gate and the review block's
+   * content. Absent on Copy, which then submits exactly as before. The gate
+   * blocks on a compile error, an unconfirmed red item or an unjustified new
+   * failure, and never on a failure the keyboard already had.
+   */
+  openRatchet?: { gate: RatchetGate; review: ReviewBlockInput } | null;
+}
+
+/** The version a projected keyboard ships, read from its `.kmn`. */
+function shippedVersionOf(
+  vfs: Parameters<typeof readVfsText>[0],
+  keyboardId: string,
+): string | undefined {
+  const kmn = readVfsText(vfs, `source/${keyboardId}.kmn`);
+  const match =
+    kmn !== undefined && kmn !== null
+      ? /store\s*\(\s*&KEYBOARDVERSION\s*\)\s*['"]([^'"]*)['"]/i.exec(kmn)
+      : null;
+  return match?.[1];
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +240,7 @@ export function ManagedPRSubmitPanel({
   outputBlockedReason,
   prefill,
   lintResults,
+  openRatchet = null,
 }: ManagedPRSubmitPanelProps) {
   const { t, i18n } = useLingui();
   const nameId = useId();
@@ -273,8 +302,13 @@ export function ManagedPRSubmitPanel({
   const nameValid = isValidDisplayName(authorName);
   const emailValid = isValidEmail(email);
   const formReady = nameValid && emailValid && copyrightChecked;
+  const ratchetBlocked = openRatchet?.gate.blocked === true;
   const submitEnabled =
-    formReady && canSubmit && !outputBlocked && submitState.kind !== "submitting";
+    formReady &&
+    canSubmit &&
+    !outputBlocked &&
+    !ratchetBlocked &&
+    submitState.kind !== "submitting";
 
   // Fallback text for outputBlockedReason — normally the caller (OutputScreen)
   // always passes a localized reason when outputBlocked is true, but the prop
@@ -341,6 +375,28 @@ export function ManagedPRSubmitPanel({
           ? []
           : ["", "---", "", buildDecisionSummaryBlock(decisionRecord)];
 
+      // Open (spec 111): say where the update came from, and what was kept or
+      // inherited. English and unlocalized, like the decision block above.
+      const openBlocks: string[] = [];
+      const wc = useWorkingCopyStore.getState();
+      if (wc.instantiationMode === "adapt-existing" && wc.startKeyboard !== null) {
+        const fromVersion = wc.startIr?.header.version?.trim() || "1.0";
+        const toVersion = shippedVersionOf(vfs, keyboardId) ?? fromVersion;
+        openBlocks.push(
+          "",
+          buildSourceBlock({
+            owner: "keymanapp",
+            repo: "keyboards",
+            path: wc.startKeyboard.path,
+            fromVersion,
+            toVersion,
+          }),
+        );
+        const reviewBlock =
+          openRatchet !== null ? buildReviewBlock(openRatchet.review) : null;
+        if (reviewBlock !== null) openBlocks.push("", reviewBlock);
+      }
+
       const prBody = [
         `## ${displayName}`,
         "",
@@ -351,6 +407,7 @@ export function ManagedPRSubmitPanel({
         "",
         prBodyDraft,
         ...decisionBlock,
+        ...openBlocks,
       ].join("\n");
 
       const prTitle =
@@ -393,7 +450,7 @@ export function ManagedPRSubmitPanel({
     } finally {
       useTestingStore.getState().setSubmitInFlight(false);
     }
-  }, [submitEnabled, authorName, email, t, i18n, accessToken, prBodyDraft]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken, prBodyDraft, openRatchet]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -602,6 +659,37 @@ export function ManagedPRSubmitPanel({
         </Trans>
       </p>
 
+      {/* Open ratchet (spec 111): say what blocks, in plain words. */}
+      {openRatchet !== null && openRatchet.gate.blocked && (
+        <ul
+          data-testid="open-ratchet-blockers"
+          style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--app-danger-text)" }}
+        >
+          {openRatchet.gate.reasons.includes("compile-error") && (
+            <li>
+              <Trans id="output.submit.ratchet.compileError">
+                The keyboard does not compile. Fix the error first.
+              </Trans>
+            </li>
+          )}
+          {openRatchet.gate.reasons.includes("unconfirmed-red") && (
+            <li>
+              <Trans id="output.submit.ratchet.unconfirmedRed">
+                A criterion still needs your confirmation on the criteria page.
+              </Trans>
+            </li>
+          )}
+          {openRatchet.gate.reasons.includes("unjustified-new-failure") && (
+            <li>
+              <Trans id="output.submit.ratchet.newFailure">
+                This update introduced a criteria failure with no reason noted. Fix it
+                or write why it stays, on the criteria page.
+              </Trans>
+            </li>
+          )}
+        </ul>
+      )}
+
       {/* Submit button */}
       <button
         type="button"
@@ -610,7 +698,12 @@ export function ManagedPRSubmitPanel({
           void handleSubmit();
         }}
         aria-label={
-          outputBlocked
+          ratchetBlocked
+            ? t({
+                id: "output.submit.button.ariaRatchetBlocked",
+                message: "Submit unavailable until the criteria review items below are resolved",
+              })
+            : outputBlocked
             ? t({
                 id: "output.submit.button.ariaBlocked",
                 message: `Submit unavailable — ${effectiveBlockedReason}`,

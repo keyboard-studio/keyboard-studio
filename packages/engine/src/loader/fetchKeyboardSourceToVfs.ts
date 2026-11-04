@@ -39,6 +39,32 @@ export interface FetchKeyboardSourceOptions {
   proxyBase?: string;
   /** Override `globalThis.fetch` (used in tests with a mock). */
   fetchImpl?: FetchFn;
+  /**
+   * Open mode (a keyboard opened for update): keep the keyboard's own `.kps`
+   * in the VFS at `source/<id>.kps`, with its `..\build\` `<File>` entries
+   * pointing at the paths the studio's packaging stages (`build/<id>.*`).
+   * Copy never sets it, so its call sites and output are unchanged.
+   */
+  keepKps?: boolean;
+}
+
+/**
+ * Point a `.kps`'s build-output `<File><Name>` entries at the files the
+ * studio's packaging stages: `build/<id>.kmx|kvk|js`, written `..\build\<id>.<ext>`.
+ * An entry already in that form is left byte-identical, as is everything
+ * outside a `<Name>` value (line endings, indentation, comments).
+ */
+export function rewriteKpsBuildEntries(kpsText: string, keyboardId: string): string {
+  return kpsText.replace(
+    /(<Name(?:\s[^>]*)?>)\s*\.\.[\\/]+build[\\/]+([^<\\/]+?)\s*(<\/Name\s*>)/gi,
+    (match, open: string, file: string, close: string) => {
+      const dot = file.lastIndexOf(".");
+      const ext = dot >= 0 ? file.slice(dot).toLowerCase() : "";
+      const staged = ext === ".kmx" || ext === ".kvk" || ext === ".js" ? `${keyboardId}${ext}` : file;
+      const rewritten = `${open}..\\build\\${staged}${close}`;
+      return rewritten === match ? match : rewritten;
+    },
+  );
 }
 
 // KpsFontEntry / KpsStylesheetEntry are defined in @keyboard-studio/contracts
@@ -323,6 +349,11 @@ export async function fetchKeyboardSourceToVfs(
   // descriptor for `<WelcomeFile>` and the `welcome\…` `<Files>` entries.
   const kpsText = kpsResp.ok && kpsResp.text !== undefined ? kpsResp.text : undefined;
   if (kpsText !== undefined) {
+    if (opts?.keepKps === true) {
+      const kpsVfsPath = `source/${startKeyboard.id}.kps`;
+      vfs.set(kpsVfsPath, rewriteKpsBuildEntries(kpsText, startKeyboard.id));
+      filesLoaded.push(kpsVfsPath);
+    }
     const fontRefs = parseKpsFontRefs(kpsText);
     const { oskFonts, fileFonts, stylesheets: cssRefs } = fontRefs;
     /** Raw `.kps` font reference -> the VFS key it was written to. */
@@ -568,6 +599,27 @@ export async function fetchKeyboardSourceToVfs(
     startHistoryMdText = historyResp.text;
   }
 
+  // Open mode: carry the keyboard's documentation files into the VFS at the
+  // paths they were fetched from, so the output carries them unchanged. Copy
+  // keeps them out (the slices below are its only copy of them).
+  if (opts?.keepKps === true) {
+    const carry = (path: string, text: string | undefined): void => {
+      if (text === undefined) return;
+      vfs.set(path, text);
+      filesLoaded.push(path);
+    };
+    carry("LICENSE.md", startLicenseText);
+    carry("README.md", startReadmeMdText);
+    carry("HISTORY.md", startHistoryMdText);
+    if (welcome.pagePath !== undefined) carry(`source/${welcome.pagePath}`, startWelcomeHtmText);
+    for (const img of welcome.images) {
+      vfs.set(`source/${img.path}`, img.bytes, true);
+      filesLoaded.push(`source/${img.path}`);
+    }
+    carry(`source/help/${startKeyboard.id}.php`, startHelpPhpText);
+    for (const css of startDocCssTexts) carry(css.path, css.text);
+  }
+
   return {
     options,
     filesLoaded,
@@ -713,6 +765,8 @@ function isWelcomeImagePath(rel: string): boolean {
 
 interface ResolvedStartWelcome {
   text: string | undefined;
+  /** `source/`-relative path the page was fetched from, when one was found. */
+  pagePath: string | undefined;
   convention: WelcomeConvention;
   images: WelcomeFolderImage[];
   warnings: string[];
@@ -878,5 +932,5 @@ async function resolveStartWelcome(
     }
   }
 
-  return { text, convention, images, warnings };
+  return { text, pagePath, convention, images, warnings };
 }
