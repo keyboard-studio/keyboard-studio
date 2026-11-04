@@ -19,6 +19,7 @@ vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShel
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
+vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/oskAdapter.tsx"));
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
@@ -70,7 +71,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → css → help → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → osk → touch → css → help → html → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
     // track is now a real manifest step (P0 fix); project_name is a derived side trail.
     // attribution (#1901) is spine: every author walks it after the track choice.
     const spineIds = manifest
@@ -91,6 +92,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "deadkeys",
       "rules",
       "mechanisms",
+      "osk",
       "touch",
       "css",
       "help",
@@ -205,16 +207,22 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("rules-continue"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
+    // → osk (spine step between mechanisms and the touch fork)
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
+
+    // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
+    fireEvent.click(screen.getByTestId("osk-continue"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // touch_seed_source → touch (side-trail rejoin hop; mocked TouchGallery stub, stage-E)
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
-    // → help (stage-F)
+    // → css → help (stage-F)
     fireEvent.click(screen.getByTestId("touch-continue"));
+    expect(screen.getByTestId("stage-css")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("css-continue"));
     expect(screen.getByTestId("stage-F")).toBeTruthy();
   });
 

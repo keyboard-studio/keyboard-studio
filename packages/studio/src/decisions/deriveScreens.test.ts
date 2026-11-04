@@ -302,6 +302,7 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "deadkeys",
       "rules",
       "mechanisms",
+      "osk",
       "touch_seed_source",
       "touch",
       "css",

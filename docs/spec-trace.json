@@ -923,6 +923,30 @@
       "decisions": [],
       "notes": ""
     },
+    "specs/css-editor": {
+      "title": "Studio editor step: custom CSS (&KMW_EMBEDCSS)",
+      "hash": "sha256:0000000000000000",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Manifest specRef anchor for the css step; living spec not yet extracted."
+    },
+    "specs/html-editor": {
+      "title": "Studio editor step: welcome.htm documentation editor",
+      "hash": "sha256:0000000000000000",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Manifest specRef anchor for the html step; living spec not yet extracted."
+    },
+    "specs/osk-editor": {
+      "title": "Studio editor step: on-screen keyboard (kvks) customization",
+      "hash": "sha256:0000000000000000",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Manifest specRef anchor for the osk step; living spec not yet extracted."
+    },
     "specs/084-criteria-compliance-page": {
       "title": "Feature Specification: Criteria compliance page — per-keyboard approval-criteria status in the decisions-tab pattern",
       "hash": "sha256:6f2a76b8c8628b70",

@@ -119,16 +119,19 @@ export async function advanceToMechanisms() {
 export async function advanceToTouchSeedSource() {
   await advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-continue"));
+  await screen.findByTestId("stage-osk");
+  fireEvent.click(screen.getByTestId("osk-continue"));
+  await screen.findByTestId("stage-seed-source");
 }
 
 /** Drive from "identity" to "F". */
 export async function advanceToF() {
   await advanceToTouchSeedSource();
-  // touch_seed_source fork (spec 035 R4/R12, no choice recorded yet on a fresh
-  // walk) renders the mocked TouchSeedSourcePanel chooser; confirming it lands
-  // on the real "touch" step (mocked TouchGallery stub, "touch-continue").
   fireEvent.click(screen.getByTestId("seed-source-confirm")); // touch_seed_source -> touch
-  fireEvent.click(screen.getByTestId("touch-continue")); // touch -> F
+  fireEvent.click(screen.getByTestId("touch-continue")); // touch -> css
+  await screen.findByTestId("stage-css");
+  fireEvent.click(screen.getByTestId("css-continue")); // css -> help (stage-F)
+  await screen.findByTestId("stage-F");
 }
 
 /**

@@ -19,6 +19,7 @@ vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShel
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
+vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/oskAdapter.tsx"));
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
@@ -164,8 +165,10 @@ describe("SurveyView — mechanisms → F transition", () => {
     await advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // mechanisms → touch_seed_source fork (spec 035 R4/R12)
+    // mechanisms → osk → touch_seed_source fork (spec 035 R4/R12)
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("osk-continue"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
 
@@ -176,6 +179,8 @@ describe("SurveyView — mechanisms → F transition", () => {
     expect(screen.queryByTestId("stage-seed-source")).toBeNull();
 
     fireEvent.click(screen.getByTestId("touch-continue"));
+    expect(screen.getByTestId("stage-css")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("css-continue"));
 
     expect(screen.getByTestId("stage-F")).toBeTruthy();
     expect(screen.queryByTestId("stage-E")).toBeNull();
@@ -226,7 +231,8 @@ describe("SurveyView — touch_seed_source suppresses the outer OSK pane (P0 fix
     // isn't a false negative from the mock never firing) — confirm it DOES
     // show up on a genuine two-pane ("pane" layout) step, e.g. "characters".
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
-    fireEvent.click(screen.getByTestId("touch-continue")); // touch -> F (pane layout)
+    fireEvent.click(screen.getByTestId("touch-continue")); // touch -> css
+    fireEvent.click(screen.getByTestId("css-continue")); // css -> F (pane layout)
     expect(screen.getByTestId("stage-F")).toBeTruthy();
     expect(screen.getByTestId("osk-frame")).toBeTruthy();
   });

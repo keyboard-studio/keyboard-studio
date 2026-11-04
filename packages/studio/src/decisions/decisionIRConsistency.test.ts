@@ -155,6 +155,9 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "touch-seed-source",
   "touch-layout",
   "help-docs",
+  "osk-layout",
+  "custom-css",
+  "welcome-htm",
 ]);
 
 /** Path segments are strings or objects (e.g. `{ kind: "[]" }`): compare structurally. */
