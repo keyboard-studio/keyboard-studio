@@ -112,7 +112,7 @@ export function CssCodePane({ initialText, onApply, applyDisabled }: CssCodePane
   const warningCount = markers.filter((m) => m.severity === "warning").length;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: "100%", gap: 8 }}>
       <div style={{ flex: 1, minHeight: 200, border: "1px solid var(--app-border)", borderRadius: 6, overflow: "hidden" }}>
         <Editor
           height="100%"

@@ -83,7 +83,7 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   const leftContent = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, minHeight: "100%", boxSizing: "border-box" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, height: "100%", boxSizing: "border-box" }}>
       <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
         {t({
           id: "editor.assignLoop.css.description",
@@ -92,7 +92,8 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
         })}
       </p>
 
-      <div style={{ flex: 1, minHeight: 300 }}>
+      {/* The editor takes every pixel the pane has; a flex column gives Monaco's height:100% a definite box to resolve against. */}
+      <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
         <Suspense
           fallback={
             <div style={{ padding: 16, color: TEXT_DIM, fontSize: 13 }}>
