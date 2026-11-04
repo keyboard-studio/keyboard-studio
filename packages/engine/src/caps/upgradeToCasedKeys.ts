@@ -19,6 +19,7 @@ export function upgradeToCasedKeys(ir: KeyboardIR, opts: { bcp47?: string } = {}
     floor: [],
     ...(opts.bcp47 !== undefined ? { bcp47: opts.bcp47 } : {}),
   });
+  if (set.keys.length === 0) return { ir: out, set, versionRaised: null };
   replaceCapsRules(out, new Set(set.keys));
   const { versionRaised } = writeCasedKeysStore(out, set.keys);
   return { ir: out, set, versionRaised };

@@ -4,7 +4,7 @@
 // demand outside the 300 ms validation cycle) and simulates each key on each
 // used modifier plane under {none, Shift, Caps, Shift+Caps}.
 
-import { caseCounterpart, type IRRule, type KeyboardIR, type SimKeyInput } from "@keyboard-studio/contracts";
+import { caseCounterpart, isCapsModifier, type IRRule, type KeyboardIR, type SimKeyInput } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
@@ -50,10 +50,6 @@ const MOD_MAP: Record<string, SimMod> = {
   SHIFT: "shift", CTRL: "ctrl", ALT: "alt", LCTRL: "lctrl", RCTRL: "rctrl", LALT: "lalt", RALT: "ralt",
 };
 
-function isCapsTest(m: string): boolean {
-  return m === "CAPS" || m === "NCAPS";
-}
-
 /** Keys that test CAPS/NCAPS, and the planes (non-caps, non-shift modifiers) each key is used on. */
 function scanKeys(ir: KeyboardIR, into: { caps: Set<string>; planes: Map<string, Set<string>> }): void {
   for (const g of ir.groups) {
@@ -61,13 +57,13 @@ function scanKeys(ir: KeyboardIR, into: { caps: Set<string>; planes: Map<string,
       for (const el of rule.context) {
         if (el.kind !== "vkey") continue;
         const planeMods = el.modifiers
-          .filter((m) => !isCapsTest(m) && m !== "SHIFT")
+          .filter((m) => !isCapsModifier(m) && m !== "SHIFT")
           .map((m) => m.toUpperCase())
           .sort();
         let set = into.planes.get(el.name);
         if (set === undefined) into.planes.set(el.name, (set = new Set()));
         set.add(planeMods.join("+"));
-        if (el.modifiers.some(isCapsTest)) into.caps.add(el.name);
+        if (el.modifiers.some(isCapsModifier)) into.caps.add(el.name);
       }
     }
   }

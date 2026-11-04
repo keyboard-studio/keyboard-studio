@@ -73,20 +73,24 @@ function syncPlatform(layers: RawLayer[], bcp47: string | undefined): boolean {
       }
       continue;
     }
-    // Key absent from caps: add it at the default key's row and position.
-    (def.row ?? []).some((row, ri) => {
-      const ki = (row.key ?? []).findIndex((k) => k.id === id);
-      const capsRow = caps.row?.[ri];
-      if (ki < 0 || capsRow === undefined) return false;
-      const source = (row.key ?? [])[ki] as RawKey;
-      const fresh = JSON.parse(JSON.stringify(source)) as RawKey;
+    // Key absent from caps: add it at the default key's row and position,
+    // creating the row when the caps layer has fewer rows than default.
+    const rows = def.row ?? [];
+    for (let ri = 0; ri < rows.length; ri++) {
+      const defKeys = rows[ri]?.key ?? [];
+      const ki = defKeys.findIndex((k) => k.id === id);
+      if (ki < 0) continue;
+      const fresh = JSON.parse(JSON.stringify(defKeys[ki])) as RawKey;
       fresh.text = upper;
       delete fresh.nextlayer;
+      caps.row = caps.row ?? [];
+      while (caps.row.length <= ri) caps.row.push({ key: [] });
+      const capsRow = caps.row[ri] as { key?: RawKey[] };
       capsRow.key = capsRow.key ?? [];
       capsRow.key.splice(Math.min(ki, capsRow.key.length), 0, fresh);
       changed = true;
-      return true;
-    });
+      break;
+    }
   }
 
   // 3. Character keys on the caps layer stay on it.
@@ -117,7 +121,13 @@ export function syncTouchCapsLayerRaw(
   rawJson: string,
   opts: { bcp47?: string },
 ): { json: string; changed: boolean } {
-  const layout = JSON.parse(rawJson) as Record<string, unknown>;
+  let layout: Record<string, unknown>;
+  try {
+    layout = JSON.parse(rawJson) as Record<string, unknown>;
+  } catch {
+    return { json: rawJson, changed: false };
+  }
+  if (layout === null || typeof layout !== "object") return { json: rawJson, changed: false };
   let changed = false;
   for (const platform of Object.values(layout)) {
     const layers = (platform as { layer?: unknown } | null)?.layer;

@@ -107,6 +107,27 @@ describe("syncTouchCapsLayerRaw", () => {
   });
 });
 
+describe("syncTouchCapsLayerRaw robustness", () => {
+  it("returns malformed JSON unchanged instead of throwing", () => {
+    const bad = '{"tablet": {"layer": [';
+    expect(syncTouchCapsLayerRaw(bad, { bcp47: "en" })).toEqual({ json: bad, changed: false });
+  });
+
+  it("creates the caps row when a missing key's row is absent from the caps layer", () => {
+    const raw = JSON.parse(fx("touch/caps_missing_letters.keyman-touch-layout")) as Raw;
+    const caps = layerOf(raw, "caps")!;
+    const def = layerOf(raw, "default")!;
+    // Drop caps' last row (and its keys); default keeps its own.
+    caps.row = caps.row.slice(0, 1);
+    expect(def.row.length).toBeGreaterThan(1);
+    const out = JSON.parse(syncTouchCapsLayerRaw(JSON.stringify(raw), { bcp47: "en" }).json) as Raw;
+    const outCaps = keysOf(layerOf(out, "caps"));
+    for (const k of keysOf(def).filter((k) => /^[a-z]$/.test(k.text ?? ""))) {
+      expect(outCaps.find((c) => c.id === k.id)?.text).toBe((k.text ?? "").toUpperCase());
+    }
+  });
+});
+
 describe("syncTouchCapsLayer (IR form)", () => {
   it("gives a complete layout and does not mutate the input", () => {
     const text = fx("touch/caps_missing_letters.keyman-touch-layout");

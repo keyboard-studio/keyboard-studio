@@ -43,4 +43,21 @@ describe("replaceCapsRules", () => {
     replaceCapsRules(ir, AZ);
     expect(emit(ir)).toBe(before);
   });
+
+  it("matches key names case-insensitively (K_oE2 against K_OE2)", () => {
+    const src = [
+      "store(&VERSION) '14.0'",
+      "store(&NAME) 'x'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [NCAPS K_oE2] > 'a'",
+      "+ [CAPS K_oE2] > 'A'",
+      "",
+    ].join("\n");
+    const { ir } = parse(src, "x");
+    replaceCapsRules(ir, new Set(["K_OE2"]));
+    const out = emit(ir);
+    expect(out).not.toMatch(/CAPS/);
+    expect(out.match(/oE2\]/gi)?.length).toBe(1);
+  });
 });

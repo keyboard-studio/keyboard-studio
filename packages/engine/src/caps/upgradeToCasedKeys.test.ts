@@ -75,4 +75,13 @@ describe("upgradeToCasedKeys", () => {
     const result = await compile(vfs, "basic_kbdus");
     expect(result.diagnostics.filter((d) => d.severity !== "info" && d.severity !== "hint")).toEqual([]);
   }, 60_000);
+
+  it("writes no store and raises no version when the derived set is empty", () => {
+    const { ir } = parse(fx("caseless.kmn"), "caseless");
+    const res = upgradeToCasedKeys(ir);
+    expect(res.set.keys).toEqual([]);
+    expect(res.versionRaised).toBeNull();
+    expect(emit(res.ir)).not.toMatch(/&CasedKeys/i);
+    expect(emit(res.ir)).toBe(emit(ir));
+  });
 });

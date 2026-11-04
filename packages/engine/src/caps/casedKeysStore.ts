@@ -17,9 +17,12 @@ function declaredVersion(ir: KeyboardIR): string | null {
     .join("");
 }
 
+/** Absent or empty counts as below; an unparsable value is left alone (never lowered). */
 function isBelowMinimum(declared: string | null): boolean {
-  const major = Number.parseInt((declared ?? "").split(".")[0] ?? "", 10);
-  return Number.isNaN(major) || major < 14;
+  const text = (declared ?? "").trim().replace(/^['"]|['"]$/g, "");
+  if (text === "") return true;
+  const major = Number.parseInt(text.split(".")[0] ?? "", 10);
+  return !Number.isNaN(major) && major < 14;
 }
 
 /** Write or replace store(&CasedKeys); raise &VERSION to 14.0 when lower. */

@@ -145,7 +145,7 @@ describe("MechanismGallery — pre-accepted companion under cased keys (spec 112
   it("records the companion with the placement and keeps the banner visible", async () => {
     await applyTheta();
     expect(physical().map((a) => a.target).sort()).toEqual(["Θ", "θ"]);
-    expect(screen.getByRole("note", { name: /companion added/i })).toBeTruthy();
+    expect(screen.getByRole("status", { name: /companion added/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Remove Θ from the same key/i })).toBeTruthy();
   });
 
@@ -153,14 +153,14 @@ describe("MechanismGallery — pre-accepted companion under cased keys (spec 112
     await applyTheta();
     fireEvent.click(screen.getByRole("button", { name: /Remove Θ from the same key/i }));
     expect(physical().map((a) => a.target)).toEqual(["θ"]);
-    expect(screen.queryByRole("note", { name: /companion added/i })).toBeNull();
+    expect(screen.queryByRole("status", { name: /companion added/i })).toBeNull();
   });
 
   it("Keep it closes the banner and keeps the companion", async () => {
     await applyTheta();
     fireEvent.click(screen.getByRole("button", { name: /Keep Θ on the same key/i }));
     expect(physical()).toHaveLength(2);
-    expect(screen.queryByRole("note", { name: /companion added/i })).toBeNull();
+    expect(screen.queryByRole("status", { name: /companion added/i })).toBeNull();
   });
 });
 

@@ -70,6 +70,8 @@ export function CasePairProposalBanner({
   if (accepted) {
     return (
       <ProposalBanner
+        // Polite live region: the companion was added as a side effect of Apply.
+        role="status"
         ariaLabel={t({
           id: "editor.assignLoop.companion.accepted.ariaLabel",
           message: "Case-pair companion added",

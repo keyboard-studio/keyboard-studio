@@ -133,6 +133,12 @@ export function caseCounterpart(
 
 export type Plane = "base" | "shift" | "ralt" | "shift-ralt";
 
+/** True for the CAPS / NCAPS modifier tokens (any spelling case). */
+export function isCapsModifier(modifier: string): boolean {
+  const m = modifier.toUpperCase();
+  return m === "CAPS" || m === "NCAPS";
+}
+
 function upperVKey(name: string): string {
   return name.trim().toUpperCase();
 }

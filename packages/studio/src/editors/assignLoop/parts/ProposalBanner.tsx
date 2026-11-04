@@ -34,6 +34,8 @@ export interface ProposalBannerProps {
   /** Accessible name for the decline/dismiss button. */
   declineAriaLabel: string;
   onDismiss: () => void;
+  /** Passed to the card; `status` announces the content politely. Default `note`. */
+  role?: "note" | "status";
 }
 
 export function ProposalBanner({
@@ -45,9 +47,10 @@ export function ProposalBanner({
   declineLabel,
   declineAriaLabel,
   onDismiss,
+  role,
 }: ProposalBannerProps) {
   return (
-    <ProposalCard ariaLabel={ariaLabel} message={message}>
+    <ProposalCard ariaLabel={ariaLabel} message={message} {...(role !== undefined ? { role } : {})}>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           type="button"

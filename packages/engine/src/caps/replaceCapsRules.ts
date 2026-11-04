@@ -4,9 +4,15 @@
 
 import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 
+const isCaps = (m: string): boolean => m.toUpperCase() === "CAPS";
+const isNcaps = (m: string): boolean => m.toUpperCase() === "NCAPS";
+
+/** `keys` holds upper-cased names; source spelling (`K_oE2`) may differ. */
+const inKeys = (keys: ReadonlySet<string>, name: string): boolean => keys.has(name.toUpperCase());
+
 function testsCapsOn(rule: IRRule, keys: ReadonlySet<string>): boolean {
   return rule.context.some(
-    (el) => el.kind === "vkey" && keys.has(el.name) && el.modifiers.includes("CAPS"),
+    (el) => el.kind === "vkey" && inKeys(keys, el.name) && el.modifiers.some(isCaps),
   );
 }
 
@@ -17,8 +23,8 @@ export function replaceCapsRules(ir: KeyboardIR, keys: ReadonlySet<string>): voi
     group.rules = group.rules.filter((r) => !testsCapsOn(r, keys));
     for (const rule of group.rules) {
       rule.context = rule.context.map((el) =>
-        el.kind === "vkey" && keys.has(el.name) && el.modifiers.includes("NCAPS")
-          ? { ...el, modifiers: el.modifiers.filter((m) => m !== "NCAPS") }
+        el.kind === "vkey" && inKeys(keys, el.name) && el.modifiers.some(isNcaps)
+          ? { ...el, modifiers: el.modifiers.filter((m) => !isNcaps(m)) }
           : el,
       );
     }

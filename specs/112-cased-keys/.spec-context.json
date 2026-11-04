@@ -824,6 +824,22 @@
       "exitCode": 0,
       "durationSeconds": 4.4,
       "result": "    ../../package.json:28:4: ·       28 â”‚     \"prepare\": \"node scripts/install-git-hooks.mjs\", ·          â•µ     ~~~~~~~~~"
+    },
+    {
+      "what": "caps corpus sweep (SC-004)",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts src/caps/",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 50.3,
+      "result": "      28 â”‚     \"prepare\": \"node scripts/install-git-hooks.mjs\", ·          â•µ     ~~~~~~~~~ · [caps corpus] candidates=168 offered=86 withheld=82 skipped=0"
+    },
+    {
+      "what": "studio cased-keys corpus sweeps (SC-001, SC-005)",
+      "command": "pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts src/test/casedKeys",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 16.7,
+      "result": "[BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-casedkeys\\packages\\engine\\dist\\langtags\\generated\\tagsets.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-casedkeys\\packages\\engine\\dist\\langtags\\generated\\index.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-casedkeys\\packages\\contracts\\dist\\unicode\\unicodeData.generated.js as it exceeds the max of 500KB."
     }
   ],
   "concerns": [

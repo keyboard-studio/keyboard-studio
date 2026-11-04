@@ -50,4 +50,18 @@ describe("casedKeysStore", () => {
     removeCasedKeysStore(ir);
     expect(emit(ir)).not.toMatch(/CasedKeys/i);
   });
+
+  it.each(["'15.0'", '"15.0"', "15.0"])("does not lower a higher version spelled %s", (v) => {
+    const { ir } = parse(kmn("", v), "x");
+    const r = writeCasedKeysStore(ir, ["K_A"]);
+    expect(r.versionRaised).toBeNull();
+    expect(emit(ir)).toContain("15.0");
+  });
+
+  it("leaves an unparsable version untouched", () => {
+    const { ir } = parse(kmn("", "'abc'"), "x");
+    const r = writeCasedKeysStore(ir, ["K_A"]);
+    expect(r.versionRaised).toBeNull();
+    expect(emit(ir)).toContain("'abc'");
+  });
 });
