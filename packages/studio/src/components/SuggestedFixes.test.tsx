@@ -30,6 +30,21 @@ describe("SuggestedFixesPanel", () => {
   });
   afterEach(cleanup);
 
+  it("previews the current and proposed text side by side", () => {
+    useSuggestedFixesStore.getState().offer([
+      {
+        ...fix("d", "Regenerate README.md"),
+        kind: "docs",
+        preview: [{ file: "README.md", before: "OLD TEXT", after: "NEW TEXT" }],
+      },
+    ]);
+    render(<SuggestedFixesPanel onAccept={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Current" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Proposed" })).toBeTruthy();
+    expect(screen.getByText("OLD TEXT")).toBeTruthy();
+    expect(screen.getByText("NEW TEXT")).toBeTruthy();
+  });
+
   it("renders nothing when there is nothing to suggest", () => {
     const { container } = render(<SuggestedFixesPanel onAccept={vi.fn()} />);
     expect(container.textContent).toBe("");

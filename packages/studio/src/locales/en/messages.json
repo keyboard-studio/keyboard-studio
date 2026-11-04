@@ -2323,6 +2323,8 @@
   "suggestedFixes.accept.label": "Accept: {0}",
   "suggestedFixes.heading": "Suggested follow-ups",
   "suggestedFixes.intro": "Nothing changes unless you accept. Skipping a suggestion keeps it from coming back.",
+  "suggestedFixes.preview.current": "Current",
+  "suggestedFixes.preview.proposed": "Proposed",
   "suggestedFixes.skip": "Skip",
   "suggestedFixes.skip.label": "Skip: {0}",
   "survey.caps.alsoCovers": "Also covers these keys:",

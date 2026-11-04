@@ -149,8 +149,8 @@
 
 **Independent Test**: complete docs mean no doc questions; a missing help page means questions for that page only.
 
-- [ ] T046 [US7] On Open, gate Phase F help questions to documents that are missing or failing their criteria, prefilled from existing docs, via question `requires` / screen gates in `packages/studio/src/survey/questions/registry.ts` and `packages/studio/src/lib/phaseFSeeds.ts`. Fix the dead `.kps` read in `proposeProjectUrl`, now that the `.kps` is in the VFS.
-- [ ] T047 [US7] Turn regeneration into a suggested fix: replace only between `ks:generated` markers (`packages/engine/src/shared/docSlots.ts`, `helpDocsRender.ts` `spliceGenerated`), or append a marked block when there are no markers, with a before/after preview, in `packages/studio/src/components/SuggestedFixes.tsx`
+- [x] T046 [US7] On Open, gate Phase F help questions to documents that are missing or failing their criteria, prefilled from existing docs, via question `requires` / screen gates in `packages/studio/src/survey/questions/registry.ts` and `packages/studio/src/lib/phaseFSeeds.ts`. Fix the dead `.kps` read in `proposeProjectUrl`, now that the `.kps` is in the VFS.
+- [x] T047 [US7] Turn regeneration into a suggested fix: replace only between `ks:generated` markers (`packages/engine/src/shared/docSlots.ts`, `helpDocsRender.ts` `spliceGenerated`), or append a marked block when there are no markers, with a before/after preview, in `packages/studio/src/components/SuggestedFixes.tsx`
 
 **Checkpoint**: commit and push.
 

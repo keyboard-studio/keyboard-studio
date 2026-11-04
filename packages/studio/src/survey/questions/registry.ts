@@ -24,6 +24,7 @@
 import type { GalleryModule, QuestionModule } from "../types.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
+import { openHelpStepWanted } from "./openHelpGaps.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
 import capsHandlingModule from "./gallery/capsHandling.ts";
@@ -262,7 +263,12 @@ function openedKeyboardLacksTouchLayout(d: DecisionSet): boolean {
  * folds these into its `screenGates`, so the walk skips them only on Open.
  */
 export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
-  new Map([...openHiddenScreens].map((id) => [id, notOpen] as const));
+  new Map<string, (decisions: DecisionSet) => boolean>([
+    ...[...openHiddenScreens].map((id) => [id, notOpen] as const),
+    // Spec 111 FR-029: on Open the help step is asked only when a help document
+    // is missing or fails its criteria. Copy always asks it.
+    ["help", (d) => notOpen(d) || openHelpStepWanted()],
+  ]);
 
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically

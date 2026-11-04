@@ -49,6 +49,21 @@ const previewStyle: React.CSSProperties = {
   color: TEXT_DIM,
 };
 
+const compareStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: 8,
+};
+
+const compareHeadingStyle: React.CSSProperties = { margin: "4px 0", fontSize: 12 };
+
+const preStyle: React.CSSProperties = { margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" };
+
+/** A DOM id fragment unique to one fix's file preview. */
+function previewId(fixId: string, file: string): string {
+  return `fix-preview-${fixId}-${file}`.replace(/[^A-Za-z0-9_-]/g, "-");
+}
+
 export interface SuggestedFixesProps {
   fixes: readonly SuggestedFix[];
   onAccept: (fix: SuggestedFix) => void;
@@ -104,8 +119,20 @@ export function SuggestedFixes({ fixes, onAccept, onSkip, testId }: SuggestedFix
                 {fix.preview.map((p) => (
                   <details key={p.file}>
                     <summary>{p.file}</summary>
-                    <pre>{p.before}</pre>
-                    <pre>{p.after}</pre>
+                    <div style={compareStyle}>
+                      <section aria-labelledby={`${previewId(fix.id, p.file)}-before`}>
+                        <h4 id={`${previewId(fix.id, p.file)}-before`} style={compareHeadingStyle}>
+                          <Trans id="suggestedFixes.preview.current">Current</Trans>
+                        </h4>
+                        <pre style={preStyle}>{p.before}</pre>
+                      </section>
+                      <section aria-labelledby={`${previewId(fix.id, p.file)}-after`}>
+                        <h4 id={`${previewId(fix.id, p.file)}-after`} style={compareHeadingStyle}>
+                          <Trans id="suggestedFixes.preview.proposed">Proposed</Trans>
+                        </h4>
+                        <pre style={preStyle}>{p.after}</pre>
+                      </section>
+                    </div>
                   </details>
                 ))}
               </div>

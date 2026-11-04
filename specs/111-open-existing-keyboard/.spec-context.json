@@ -376,11 +376,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T19:15:31.087Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T22:50:54.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T22:50:54.607Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T043",
+  "currentTask": "T047",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -751,6 +767,24 @@
         "packages/studio/src/components/CriteriaScreen.tsx",
         "packages/studio/src/StudioShell.tsx"
       ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Open help gate per screen (openScreenGates help), openHelpGaps, phaseFSeeds prefers own .kps + self-closed WebSite",
+      "files": [
+        "packages/studio/src/survey/questions/registry.ts",
+        "packages/studio/src/lib/phaseFSeeds.ts",
+        "packages/studio/src/lib/openHelpGaps.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "replaceGeneratedBlock splice, docRegenerationFix producer + before/after preview, wired in CriteriaScreen",
+      "files": [
+        "packages/engine/src/shared/docSlots.ts",
+        "packages/studio/src/components/SuggestedFixes.tsx",
+        "packages/studio/src/lib/docRegenerationFix.ts"
+      ]
     }
   },
   "verified": [
@@ -783,6 +817,9 @@
     },
     {
       "note": "Phase 8 (T044-T045) blocked: criterion 7.28 / KM_LINT_CASEDKEYS_MISSING not on main (branch km/casedkeys-criterion unmerged, no PR)"
+    },
+    {
+      "note": "T046 gate is per help screen, not per question: any missing/failing help doc asks the whole help step"
     }
   ],
   "last_action": "Phase 1 done (T001)",

@@ -42,7 +42,8 @@ function decodeXmlText(text: string): string {
  */
 export function kpsWebSite(kpsText: string | null | undefined): string | undefined {
   if (kpsText === undefined || kpsText === null) return undefined;
-  const m = /<WebSite\b([^>]*)>([^<]*)<\/WebSite\s*>/i.exec(kpsText);
+  // `<WebSite URL="..">text</WebSite>` or the self-closed `<WebSite URL=".." />`.
+  const m = /<WebSite\b([^>]*?)(?:\/>|>([^<]*)<\/WebSite\s*>)/i.exec(kpsText);
   if (m === null) return undefined;
   const attr = /\bURL\s*=\s*"([^"]*)"/i.exec(m[1] ?? "")?.[1]?.trim() ?? "";
   const value = attr !== "" ? attr : (m[2]?.trim() ?? "");
@@ -58,7 +59,13 @@ export function kpsWebSite(kpsText: string | null | undefined): string | undefin
  */
 export function proposeProjectUrl(ctx: PhaseFSeedContext): string | undefined {
   if (ctx.instantiationMode !== "adapt-existing" || ctx.startVfs === null) return undefined;
-  const kpsPath = ctx.startVfs.list("source/").find((p) => p.toLowerCase().endsWith(".kps"));
+  // The keyboard's own descriptor (it came in with the keyboard on Open), else
+  // the first descriptor under source/.
+  const ownPath = ctx.startKeyboard !== null ? `source/${ctx.startKeyboard.id}.kps` : undefined;
+  const kpsPath =
+    ownPath !== undefined && ctx.startVfs.get(ownPath) !== undefined
+      ? ownPath
+      : ctx.startVfs.list("source/").find((p) => p.toLowerCase().endsWith(".kps"));
   if (kpsPath === undefined) return undefined;
   return kpsWebSite(readVfsText(ctx.startVfs, kpsPath));
 }

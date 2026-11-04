@@ -2323,6 +2323,8 @@
   "suggestedFixes.accept.label": "Accepter : {0}",
   "suggestedFixes.heading": "Suites suggérées",
   "suggestedFixes.intro": "Rien ne change tant que vous n'acceptez pas. Ignorer une suggestion l'empêche de revenir.",
+  "suggestedFixes.preview.current": "Actuel",
+  "suggestedFixes.preview.proposed": "Proposé",
   "suggestedFixes.skip": "Ignorer",
   "suggestedFixes.skip.label": "Ignorer : {0}",
   "survey.caps.alsoCovers": "Couvre aussi ces touches :",

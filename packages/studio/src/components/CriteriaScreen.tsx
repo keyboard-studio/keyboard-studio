@@ -22,6 +22,8 @@ import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { useRouteSuggestedFix } from "../hooks/useRouteSuggestedFix.ts";
 import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
+import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
+import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
 import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
@@ -51,6 +53,7 @@ export function CriteriaScreen() {
 
   const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
   const routeFix = useRouteSuggestedFix();
+  const docFixes = useDocRegenerationFixes();
   const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
   const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
@@ -105,7 +108,9 @@ export function CriteriaScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
     <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
-      <SuggestedFixesPanel extra={missingFixes} onAccept={routeFix} testId="criteria-suggested-fixes" />
+      <SuggestedFixesPanel
+        extra={[...missingFixes, ...docFixes]}
+        onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))} testId="criteria-suggested-fixes" />
     </div>
     <div style={{ flex: 1, minHeight: 0 }}>
     <CriteriaPage

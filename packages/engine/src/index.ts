@@ -275,6 +275,7 @@ export {
   DOC_GENERATED_START,
   DOC_GENERATED_END,
   stripGeneratedBlocks,
+  replaceGeneratedBlock,
   escapeDocHtml,
   escapeDocMarkdown,
 } from "./shared/docSlots.js";
