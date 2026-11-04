@@ -68,9 +68,11 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
     await advanceToF();
     expect(screen.getByTestId("stage-F")).toBeTruthy();
 
-    // Fire PhaseF completion.
+    // help → html → output (navigate fires on html completion, not help)
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-html")).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByTestId("survey-advance"));
+      fireEvent.click(screen.getByTestId("html-continue"));
     });
 
     // navigateTo should have been called with 'output'.
@@ -312,8 +314,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     touchEAssignments.current = [longpressAssignment];
 
     // Navigate through the fork, then fire the TouchGallery complete button.
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
     // The touch_seed_source chooser is shown next (spec 035 R4/R12, no choice
     // recorded on a fresh walk) — NOT the real "touch" step, so
     // applyStepCompletion("touch") has not fired yet.
@@ -345,8 +346,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // setTouchLayoutJson(null) rather than attempting to build a layout.
     touchEAssignments.current = [];
 
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
     // on a fresh walk) lands on the real "touch" step; completing it fires
@@ -380,8 +380,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Empty assignments — no real touch edits were made.
     touchEAssignments.current = [];
 
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
     // on a fresh walk) lands on the real "touch" step; completing it fires
@@ -414,8 +413,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Zero Phase E edits — the row that would emit nothing under import-adapt.
     touchEAssignments.current = [];
 
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // Pick "Reseed from desktop" instead of the default import-adapt button.

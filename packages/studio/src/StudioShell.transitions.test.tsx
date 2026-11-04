@@ -298,11 +298,11 @@ describe("SurveyView — carve → B back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 7: F → E  (Phase E inserted between mechanisms and F)
+// Back-navigation 7: F → css  (css sits between touch and help on the spine)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — F → E back-navigation", () => {
-  it("returns to Phase E (touch gallery, not B) when PhaseF onBack is called", async () => {
+describe("SurveyView — F → css back-navigation", () => {
+  it("returns to css (not B) when PhaseF onBack is called", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -312,7 +312,7 @@ describe("SurveyView — F → E back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("survey-back"));
 
-    expect(screen.getByTestId("stage-E")).toBeTruthy();
+    expect(screen.getByTestId("stage-css")).toBeTruthy();
     expect(screen.queryByTestId("stage-F")).toBeNull();
     // Confirm it did NOT go back to B (the old behavior).
     expect(screen.queryByTestId("stage-B")).toBeNull();
