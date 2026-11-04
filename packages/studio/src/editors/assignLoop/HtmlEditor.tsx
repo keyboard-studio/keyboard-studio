@@ -184,6 +184,7 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
         <div style={{ flex: 1 }} />
         <button
           type="button"
+          data-testid="html-continue"
           onClick={handleContinue}
           style={{
             padding: "10px 24px",

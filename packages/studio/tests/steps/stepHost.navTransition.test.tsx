@@ -39,6 +39,30 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
 );
+vi.mock("../../src/editors/adapters/oskAdapter.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    OskEditorAdapter: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: unknown) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "osk-back", onClick: onBack, testId: "osk-back" } }
+          : {}),
+        forward: {
+          label: "osk-continue",
+          onClick: () => onComplete({ kvks: null }),
+          testId: "osk-continue",
+        },
+      });
+      return <div data-testid="stage-osk" />;
+    },
+  };
+});
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
   import("../../src/test/studioShellMocks/UnsupportedScriptStub.tsx"),
 );
@@ -166,6 +190,7 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["deadkeys-continue"] },
   { testIds: ["rules-continue"] },
   { testIds: ["mechanisms-continue"] },
+  { testIds: ["osk-continue"] },
   { testIds: ["seed-source-confirm"] },
 ];
 

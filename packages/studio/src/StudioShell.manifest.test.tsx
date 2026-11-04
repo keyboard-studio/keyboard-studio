@@ -70,7 +70,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → css → help → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
     // track is now a real manifest step (P0 fix); project_name is a derived side trail.
     // attribution (#1901) is spine: every author walks it after the track choice.
     const spineIds = manifest
@@ -92,7 +92,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "rules",
       "mechanisms",
       "touch",
+      "css",
       "help",
+      "html",
       "package",
     ]);
   });

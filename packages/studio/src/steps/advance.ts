@@ -48,7 +48,9 @@ type ActiveStepId =
   | "osk"
   | "touch_seed_source"
   | "touch"
+  | "css"
   | "help"
+  | "html"
   | "done"
   | "unsupported";
 
@@ -331,17 +333,18 @@ export function advance(
       return { next: "touch" };
 
     case "touch":
-      return { next: nextMainLineStepAfter("touch") }; // help
+      return { next: nextMainLineStepAfter("touch") }; // css
+
+    case "css":
+      return { next: nextMainLineStepAfter("css") }; // help
 
     case "help":
-      // Hard gate (the Phase F hard gate): stay on "help" — no navigate signal — until every
-      // inventory character has an implementation. Unlike the gallery leave-
-      // warnings (the gallery leave-warning), there is no "come back later" escape here; the
-      // host surfaces WHY via the helpStep wrapper (PhaseFGate), never a
-      // silently-dead button.
       return ctx.allCharactersImplemented
-        ? { next: "done", navigate: "output" }
+        ? { next: nextMainLineStepAfter("help") } // html
         : { next: "help" };
+
+    case "html":
+      return { next: "done", navigate: "output" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).
     case "done":

@@ -48,7 +48,7 @@ const fixture = JSON.parse(fixtureText) as DurableDraft;
 const PRE_REORDER_STEP_IDS = [
   "identity", "layout", "choose_base", "track", "project_name", "characters",
   "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys",
-  "rules", "mechanisms", "touch_seed_source", "touch", "help", "package",
+  "rules", "mechanisms", "touch_seed_source", "touch", "css", "help", "html", "package",
 ];
 
 describe("pre-reordering draft loads on the current build", () => {

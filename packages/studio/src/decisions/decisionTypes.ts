@@ -157,7 +157,9 @@ export type DecisionId =
   | "osk-layout"
   | "touch-seed-source"
   | "touch-layout"
-  | "help-docs";
+  | "custom-css"
+  | "help-docs"
+  | "welcome-htm";
 
 /**
  * The `caps-handling` decision value (spec 112): how the copied keyboard
@@ -423,5 +425,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "osk-layout": [],
   "touch-seed-source": [],
   "touch-layout": [],
+  "custom-css": [],
   "help-docs": [],
+  "welcome-htm": [],
 };

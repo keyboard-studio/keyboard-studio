@@ -58,7 +58,9 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   osk: ["physical-layout"],
   touch_seed_source: ["osk-layout"],
   touch: ["osk-layout", "touch-seed-source"],
-  help: ["physical-layout", "touch-layout"],
+  css: ["touch-layout"],
+  help: ["physical-layout", "touch-layout", "custom-css"],
+  html: ["help-docs"],
 };
 
 /**
@@ -73,13 +75,14 @@ const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the sixteen gallery decisions", () => {
-    expect(SETTLES.size).toBe(16);
+  it("the derived settles set is exactly the eighteen gallery decisions", () => {
+    expect(SETTLES.size).toBe(18);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "caps-handling",
       "carved-layout",
       "character-inventory",
+      "custom-css",
       "deadkeys-defined",
       "help-docs",
       "invisibles-inventory",
@@ -91,6 +94,7 @@ describe("gallery module coverage (FR-002)", () => {
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "welcome-htm",
       "windows-layout",
     ]);
   });
