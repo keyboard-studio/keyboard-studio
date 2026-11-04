@@ -16,6 +16,9 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
+vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
+vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -70,7 +73,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → css → help → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → osk → touch → css → help → html → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
     // track is now a real manifest step (P0 fix); project_name is a derived side trail.
     // attribution (#1901) is spine: every author walks it after the track choice.
     const spineIds = manifest
@@ -91,6 +94,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "deadkeys",
       "rules",
       "mechanisms",
+      "osk",
       "touch",
       "css",
       "help",
@@ -133,7 +137,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → osk → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -205,16 +209,24 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("rules-continue"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
+    // → osk (the OSK editor step sits between mechanisms and touch)
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("osk-continue")).toBeTruthy();
+
+    // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
+    fireEvent.click(screen.getByTestId("osk-continue"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // touch_seed_source → touch (side-trail rejoin hop; mocked TouchGallery stub, stage-E)
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
-    // → help (stage-F)
+    // → css (mocked CssEditor stub, stage-css)
     fireEvent.click(screen.getByTestId("touch-continue"));
+    expect(screen.getByTestId("stage-css")).toBeTruthy();
+
+    // → help (stage-F)
+    fireEvent.click(screen.getByTestId("css-continue"));
     expect(screen.getByTestId("stage-F")).toBeTruthy();
   });
 

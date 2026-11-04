@@ -16,6 +16,9 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
+vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
+vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -65,9 +68,15 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
     await advanceToF();
     expect(screen.getByTestId("stage-F")).toBeTruthy();
 
-    // Fire PhaseF completion.
+    // Fire PhaseF completion → html step (mocked HtmlEditor stub).
     await act(async () => {
       fireEvent.click(screen.getByTestId("survey-advance"));
+    });
+    expect(screen.getByTestId("stage-html")).toBeTruthy();
+
+    // Complete the html step → done → navigateTo('output').
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("html-continue"));
     });
 
     // navigateTo should have been called with 'output'.
@@ -101,7 +110,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 
-  it("the chooser's own Back reaches mechanisms (the step genuinely visited immediately before touch_seed_source)", async () => {
+  it("the chooser's own Back reaches osk (the step genuinely visited immediately before touch_seed_source)", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -113,11 +122,11 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // The chooser's own Back (not TouchGallery's) pops the walked-history —
-    // which reaches "mechanisms" (the step genuinely visited immediately
-    // before touch_seed_source now that sequences build inline there).
+    // which reaches "osk" (the step genuinely visited immediately before
+    // touch_seed_source; the osk editor sits between mechanisms and touch).
     fireEvent.click(screen.getByTestId("seed-source-back"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-seed-source")).toBeNull();
   });
 
@@ -310,8 +319,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     touchEAssignments.current = [longpressAssignment];
 
     // Navigate through the fork, then fire the TouchGallery complete button.
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
     // The touch_seed_source chooser is shown next (spec 035 R4/R12, no choice
     // recorded on a fresh walk) — NOT the real "touch" step, so
     // applyStepCompletion("touch") has not fired yet.
@@ -343,8 +351,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // setTouchLayoutJson(null) rather than attempting to build a layout.
     touchEAssignments.current = [];
 
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
     // on a fresh walk) lands on the real "touch" step; completing it fires
@@ -378,8 +385,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Empty assignments — no real touch edits were made.
     touchEAssignments.current = [];
 
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
     // on a fresh walk) lands on the real "touch" step; completing it fires
@@ -412,8 +418,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Zero Phase E edits — the row that would emit nothing under import-adapt.
     touchEAssignments.current = [];
 
-    await advanceToMechanisms();
-    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // Pick "Reseed from desktop" instead of the default import-adapt button.
