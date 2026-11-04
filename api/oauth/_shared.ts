@@ -9,7 +9,6 @@
 // Web-standard Request/Response signature: works on the Vercel Node runtime
 // with no @vercel/node type dependency.
 
-import type { z } from "zod";
 import {
   exchange as exchangeCore,
   refresh as refreshCore,
@@ -98,13 +97,29 @@ export function jsonResponse(
 }
 
 /**
+ * Minimal structural type for the request-body schemas passed to
+ * {@link runTokenHandler}. Declared locally instead of
+ * `import type { z } from "zod"` because these co-located functions live
+ * outside the pnpm workspace, so the bare `"zod"` specifier does not resolve
+ * in the build-time type check of `api/` (TS2307 on every Vercel build) —
+ * while the schema VALUES, imported relatively from
+ * `utilities/oauth-backend` (which does depend on zod), bundle fine.
+ * A zod object schema satisfies this shape structurally.
+ */
+export interface BodySchema<T> {
+  safeParse(
+    raw: unknown,
+  ): { success: true; data: T } | { success: false; error: unknown };
+}
+
+/**
  * Run a POST JSON token endpoint: method guard → config → body validation →
  * core call → status mapping. `configOverride` lets tests inject a stub fetch
  * and credentials; production omits it and reads from env.
  */
 export async function runTokenHandler<T>(
   req: Request,
-  schema: z.ZodType<T>,
+  schema: BodySchema<T>,
   core: (body: T, config: HandlerConfig) => Promise<HandlerResult>,
   configOverride?: HandlerConfig,
 ): Promise<Response> {
