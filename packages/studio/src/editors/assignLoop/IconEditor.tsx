@@ -744,7 +744,7 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
               }}
             />
             {importError && (
-              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#dc2626" }}>
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--app-danger)" }}>
                 {importError}
               </p>
             )}
