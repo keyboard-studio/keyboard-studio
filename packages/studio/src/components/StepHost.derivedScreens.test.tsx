@@ -53,9 +53,12 @@ vi.mock("../steps/registerEditorSteps.ts", () => ({
   deadkeysStep: trivialStep("deadkeys"),
   rulesStep: trivialStep("rules"),
   mechanismsStep: trivialStep("mechanisms"),
+  oskStep: trivialStep("osk"),
   touchSeedSourceStep: trivialStep("touch_seed_source"),
   touchStep: trivialStep("touch"),
+  cssStep: trivialStep("css"),
   helpStep: trivialStep("help"),
+  htmlStep: trivialStep("html"),
   packageStep: trivialStep("package"),
 }));
 
