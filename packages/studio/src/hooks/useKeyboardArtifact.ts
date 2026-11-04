@@ -566,6 +566,26 @@ export function useKeyboardArtifact(
   // Per-keyboard CSS blob URLs. Same lifetime semantics as the font blob URL:
   // rebuilt on every fresh fetch, revoked on teardown / next fetch.
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
+
+  /**
+   * Re-derive the OSK frame's keyboard stylesheet blob URLs from a projected
+   * VFS. `replaceWhenEmpty` also drops the old URLs when the VFS carries no
+   * OSK stylesheet (the author cleared it); the full-run path keeps what the
+   * fetch captured in that case.
+   */
+  const rebuildKeyboardCssBlobUrls = (vfsToRead: VirtualFS, replaceWhenEmpty: boolean): void => {
+    const cssPaths = vfsToRead
+      .list("")
+      .filter((p) => p.endsWith(".css") && isOskStylesheetPath(p));
+    if (cssPaths.length === 0 && !replaceWhenEmpty) return;
+    revokeBlobUrls(prevKeyboardCssBlobUrls);
+    for (const cssPath of cssPaths) {
+      const entry = vfsToRead.get(cssPath);
+      if (entry === undefined || typeof entry.content !== "string") continue;
+      const blob = new Blob([entry.content], { type: "text/css" });
+      prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
+    }
+  };
   const runId = useRef(0);
   // This instance's own in-flight post-ready functional round-trip (I2)
   // token, while its pass is running. The token object IS the module-level
@@ -1334,18 +1354,7 @@ export function useKeyboardArtifact(
         // prevKeyboardCssBlobUrls) hold pre-rename cssText and would otherwise
         // ship the base id's wrapper class — which KMW wraps the runtime
         // keyboard in with the new id, so the rules never match.
-        const cssPaths = currentVfs
-          .list("")
-          .filter((p) => p.endsWith(".css") && isOskStylesheetPath(p));
-        if (cssPaths.length > 0) {
-          revokeBlobUrls(prevKeyboardCssBlobUrls);
-          for (const cssPath of cssPaths) {
-            const entry = currentVfs.get(cssPath);
-            if (entry === undefined || typeof entry.content !== "string") continue;
-            const blob = new Blob([entry.content], { type: "text/css" });
-            prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
-          }
-        }
+        rebuildKeyboardCssBlobUrls(currentVfs, false);
       } catch (err: unknown) {
         if (runId.current !== thisRunId) return;
         const message =
@@ -1448,6 +1457,10 @@ export function useKeyboardArtifact(
         // clean, so a rename that no longer applies (e.g. the author reverted
         // the id) correctly clears back to null here.
         effectiveKeyboardIdRef.current = transformResult.effectiveKeyboardId ?? null;
+        // The projected stylesheet can change on a re-apply (the CSS step's
+        // Apply), and the OSK frame styles from these blob URLs, not from the
+        // compiled .js — so rebuild them from the projected VFS here too.
+        rebuildKeyboardCssBlobUrls(vfsRef.current, true);
       } catch {
         // The transform threw. effectiveKeyboardIdRef was already reset to
         // null above and vfsRef.current is the clean, un-renamed base
