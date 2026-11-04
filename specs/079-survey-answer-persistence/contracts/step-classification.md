@@ -24,9 +24,12 @@ Part I). The "After 079" column is the target this feature must reach.
 | deadkeys | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
 | rules | compliant: the demo pane is a read-only view of the compiled working copy (spec 082 Track A); the step records no answers — Continue carries `undefined` like the galleries | F-10 | `working-copy` | compliant |
 | mechanisms | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
+| osk | believed compliant (working copy); the OSK editor step records `osk-layout` via `completeOskStep` on Continue | F-10 | `working-copy` | compliant |
 | touch_seed_source | believed compliant (session slot `touchSeedSource`) | agent sweep | `working-copy` | compliant — revisit test `TouchSeedSourcePanel.test.tsx` "a NON-default recorded choice survives an unmount/remount with the same evidence" |
 | touch | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
+| css | believed compliant (working copy); the CSS editor step records optional embed CSS on Continue, empty means no file | F-10 | `working-copy` | compliant |
 | help | non-compliant (D-5) | F-5 | `answer-store` | compliant |
+| html | believed compliant (working copy); the HTML editor step records the authored welcome.htm on Continue | F-10 | `working-copy` | compliant |
 | package | no author answers; output step | — | `{ exempt: "Output screen: records no decision; its only state is the chosen download, re-derived on entry." }` | justified-exempt |
 
 Every "verify by revisit test" row is now closed: each names the FR-051 test that passed. A row is closed only when its FR-051 test passes. If the test finds a gap,

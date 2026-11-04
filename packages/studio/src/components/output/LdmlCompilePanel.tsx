@@ -84,7 +84,8 @@ export function LdmlCompilePanel(props: LdmlCompilePanelProps) {
         kmp: result.kmp === undefined ? null : { bytes: result.kmp.bytes, filename: result.kmp.filename },
       });
     } catch (err: unknown) {
-      const reason = err instanceof Error ? err.message : "unknown error";
+      const reason =
+        err instanceof Error ? err.message : t({ id: "output.ldml.unknownError", message: "unknown error" });
       setState({
         kind: "failed",
         message: t({

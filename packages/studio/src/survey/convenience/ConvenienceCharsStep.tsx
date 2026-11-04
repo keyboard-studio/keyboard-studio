@@ -86,6 +86,7 @@ export type { ConvenienceGateResult } from "./convenienceGate.ts";
  * `U+XXXX` for a character — a technical identifier, never translated.
  */
 function codepointLabel(ch: string): string {
+  // eslint-disable-next-line lingui/no-unlocalized-strings -- `U+XXXX` is a technical identifier, never translated (see docstring above).
   return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 

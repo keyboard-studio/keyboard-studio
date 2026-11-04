@@ -110,6 +110,10 @@ function isExcludedFile(frel) {
   if (frel.includes("/survey/questions/")) return true;
   const base = parts[parts.length - 1];
   if (/\.test\.tsx?$/.test(base)) return true;
+  // Shared contract suites (*.contract.ts) are test files too — they carry
+  // GitHub issue references (e.g. `(issue #2293)`) that are indistinguishable
+  // from 3-4 digit hex by regex alone.
+  if (/\.contract\.tsx?$/.test(base)) return true;
   if (/\.fixture\.ts$/.test(base)) return true;
   return false;
 }

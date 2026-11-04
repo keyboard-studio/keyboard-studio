@@ -757,3 +757,53 @@ describe("applyDesktopModificationsToRawJson — spec 104 T017 resolver-addresse
     expect(keys.some((k) => k["id"] === "U_0259")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. Removals — spec 104 T009: ruled T_ keys match by resolver production
+// ---------------------------------------------------------------------------
+
+describe("applyDesktopModificationsToRawJson \u2014 removals match ruled T_ keys by production", () => {
+  const RULED_T_KMN = [
+    "store(&VERSION) '10.0'",
+    "store(&NAME) 't009-raw'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [T_0300] > U+0300",
+    "+ [K_Q] > 'q'",
+  ].join("\n");
+
+  it("neutralizes a ruled T_ key whose keycap text does not spell its production", () => {
+    const json = makePhoneOnlyJson([
+      { id: "T_0300", text: "\u25cc\u0300" },
+      { id: "K_Q", text: "q" },
+    ]);
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(
+      json,
+      { removals: ["\u0300"], placements: [] },
+      resolverCtxFor(RULED_T_KMN),
+    );
+
+    const parsed = JSON.parse(out);
+    const keys = parsed.phone.layer[0].row.flatMap((r) => r.key);
+    // T_0300 produces U+0300 via its .kmn rule \u2014 the carve neutralizes it
+    // even though its keycap text ("\u25cc\u0300") doesn't match.
+    expect(keys.some((k) => k.id === "T_0300")).toBe(false);
+    const blank = keys.find((k) => k.id === BLANK_KEY_ID);
+    expect(blank).toBeDefined();
+    expect(blank.sp).toBe(BLANK_KEY_SP);
+    expect(keys.some((k) => k.id === "K_Q")).toBe(true);
+    expect(warnings).toEqual([]);
+  });
+
+  it("without a resolver context the legacy behaviour is unchanged (ruled T_ kept)", () => {
+    const json = makePhoneOnlyJson([{ id: "T_0300", text: "\u25cc\u0300" }]);
+    const { json: out } = applyDesktopModificationsToRawJson(json, {
+      removals: ["\u0300"],
+      placements: [],
+    });
+
+    const parsed = JSON.parse(out);
+    const keys = parsed.phone.layer[0].row.flatMap((r) => r.key);
+    expect(keys.some((k) => k.id === "T_0300")).toBe(true);
+  });
+});

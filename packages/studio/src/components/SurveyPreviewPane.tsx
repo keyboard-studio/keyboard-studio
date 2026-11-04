@@ -14,7 +14,7 @@
 // desktop text alignment is unchanged).
 
 import type { CSSProperties } from "react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { TEXT_MAIN, FONT } from "../survey/surveyStyles.ts";
@@ -51,6 +51,7 @@ export function SurveyPreviewPane({
   compact = false,
   style,
 }: SurveyPreviewPaneProps) {
+  const { t } = useLingui();
   // Text rows keep an inset (12px compact, 24px desktop); the keyboard
   // itself does not — it spans the pane edge to edge at every width.
   const inset = compact ? "0 12px" : "0 24px";
@@ -61,7 +62,11 @@ export function SurveyPreviewPane({
   const shownOskMode: OskMode = touchAvailable ? oskMode : "desktop";
   return (
     <section
-      aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
+      aria-label={
+        showCharacterMap
+          ? t({ id: "survey.preview.characterMapLabel", message: "Character map" })
+          : t({ id: "survey.preview.keyboardPreviewLabel", message: "Keyboard preview" })
+      }
       style={{
         display: "flex",
         flexDirection: "column",

@@ -1134,9 +1134,41 @@ export async function advanceThroughTailToOutput(page: Page): Promise<void> {
 
 /** Optional custom CSS step (after touch): continue with empty CSS (no .css file). */
 export async function driveCssEditorStep(page: Page): Promise<void> {
+  // The CssEditor renders an optional "No custom CSS (skip)" button and an
+  // unconditional Continue (testid css-continue). Click skip if present, then
+  // continue. Race the testid against the accessible name — the testid is
+  // preferred, but the name works if the testid is missing.
+  const skip = page.getByRole("button", { name: "No custom CSS (skip)" });
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click();
+  }
   const continueBtn = page.getByTestId("css-continue");
-  await continueBtn.waitFor({ state: "visible", timeout: 60_000 });
-  await continueBtn.click({ timeout: 30_000 });
+  const continueByName = page.getByRole("button", { name: "Continue" });
+  // Wait for either locator to be visible.
+  await Promise.race([
+    continueBtn.waitFor({ state: "visible", timeout: 60_000 }),
+    continueByName.waitFor({ state: "visible", timeout: 60_000 }),
+  ]);
+  if (await continueBtn.isVisible().catch(() => false)) {
+    await continueBtn.click({ timeout: 30_000 });
+  } else {
+    await continueByName.click({ timeout: 30_000 });
+  }
+}
+
+/** Optional HTML editor step (after help): skip and continue with empty HTML. */
+export async function driveHtmlEditorStep(page: Page): Promise<void> {
+  const continueBtn = page.getByTestId("html-continue");
+  const continueByName = page.getByRole("button", { name: "Continue" });
+  await Promise.race([
+    continueBtn.waitFor({ state: "visible", timeout: 60_000 }),
+    continueByName.waitFor({ state: "visible", timeout: 60_000 }),
+  ]);
+  if (await continueBtn.isVisible().catch(() => false)) {
+    await continueBtn.click({ timeout: 30_000 });
+  } else {
+    await continueByName.click({ timeout: 30_000 });
+  }
 }
 
 /**

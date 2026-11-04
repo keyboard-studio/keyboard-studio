@@ -183,6 +183,7 @@ export function StartResolutionAdapter({ onComplete, onBack }: EditorStepProps) 
   // `||` not `??`: prefill.script can be "" (no script selected for an
   // unrecognized language), which must also fall back.
   const target: SuggestTarget = {
+    // eslint-disable-next-line lingui/no-unlocalized-strings -- "Latn" is a BCP47 script subtag (technical identifier), never author copy.
     script: identityResult?.prefill.script || "Latn",
     ...(identityResult?.bcp47 ? { bcp47: identityResult.bcp47 } : {}),
   };

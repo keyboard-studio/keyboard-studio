@@ -71,7 +71,7 @@ describe("OskEditor", () => {
 
   it("renders the OSK with layer switcher", () => {
     renderEditor();
-    expect(screen.getByText("On-Screen Keyboard")).toBeTruthy();
+    expect(screen.getByText("OnScreen Keyboard Label Editors")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Default" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Shift" })).toBeTruthy();
   });

@@ -113,11 +113,13 @@ function edgePath(from: Pt, to: Pt): string {
     const y1 = from.y;
     const y2 = to.y + NODE_H;
     const dy = Math.max(28, Math.abs(y2 - y1) * 0.4);
+    // eslint-disable-next-line lingui/no-unlocalized-strings -- SVG path data, not UI copy.
     return `M ${x1} ${y1} C ${x1} ${y1 - dy}, ${x2} ${y2 + dy}, ${x2} ${y2}`;
   }
   const y1 = from.y + NODE_H;
   const y2 = to.y;
   const dy = Math.max(28, Math.abs(y2 - y1) * 0.4);
+  // eslint-disable-next-line lingui/no-unlocalized-strings -- SVG path data, not UI copy.
   return `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
 }
 

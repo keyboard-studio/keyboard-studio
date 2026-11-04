@@ -12,8 +12,8 @@ pnpm --filter @keyboard-studio/engine build
 
 ```sh
 pnpm --filter @keyboard-studio/engine test -- helpDocsRender
-pnpm --filter @keyboard-studio/studio test -- readmeFacts docContent serializeWorkingCopy useDocsPreview
-pnpm --filter @keyboard-studio/keyboard-lint test
+pnpm --filter @keyboard-studio/studio test -- readmeFacts readmeFactsInput docContent serializeWorkingCopy useDocsPreview
+pnpm --filter @keymanapp/keyboard-lint test
 pnpm typecheck && pnpm lint
 ```
 

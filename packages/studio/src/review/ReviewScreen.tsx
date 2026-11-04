@@ -16,6 +16,7 @@
 //                                            index HEAD; auto-runs.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { ACCENT, BG_CARD, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { ReviewPicker } from "./ReviewPicker.tsx";
@@ -124,6 +125,7 @@ async function resolvePrLink(
 }
 
 export function ReviewScreen() {
+  const { t } = useLingui();
   const { index, error: indexError } = useReviewIndex();
   const [phase, setPhase] = useState<Phase>("pick");
   const [target, setTarget] = useState<ReviewTarget | null>(null);
@@ -229,15 +231,34 @@ export function ReviewScreen() {
   const runningDetail = useMemo(() => {
     if (snapshot.kind === "loading") {
       const total = snapshot.total || "…";
-      return `Fetching snapshot — ${snapshot.loaded}/${total} files`;
+      return t({
+        id: "review.screen.fetchingSnapshot",
+        message: `Fetching snapshot — ${snapshot.loaded}/${total} files`,
+      });
     }
-    if (snapshot.kind === "error") return `Snapshot failed: ${snapshot.message}`;
-    if (judge.kind === "judging") return "Running the criteria battery…";
+    if (snapshot.kind === "error")
+      return t({
+        id: "review.screen.snapshotFailed",
+        message: `Snapshot failed: ${snapshot.message}`,
+      });
+    if (judge.kind === "judging")
+      return t({
+        id: "review.screen.runningBattery",
+        message: "Running the criteria battery…",
+      });
     if (judge.kind === "timeout")
-      return "The battery timed out — the snapshot may be adversarial or enormous.";
-    if (judge.kind === "error") return `Battery failed: ${judge.message}`;
-    return "Preparing…";
-  }, [snapshot, judge]);
+      return t({
+        id: "review.screen.batteryTimeout",
+        message:
+          "The battery timed out — the snapshot may be adversarial or enormous.",
+      });
+    if (judge.kind === "error")
+      return t({
+        id: "review.screen.batteryFailed",
+        message: `Battery failed: ${judge.message}`,
+      });
+    return t({ id: "review.screen.preparing", message: "Preparing…" });
+  }, [snapshot, judge, t]);
 
   return (
     <div
@@ -263,23 +284,33 @@ export function ReviewScreen() {
           <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12, opacity: 0.75 }}>
             kbstudio.langtech.cloud/review
           </div>
-          <h1 style={{ margin: "6px 0 4px", fontSize: 20 }}>Keyboard Health Check</h1>
+          <h1 style={{ margin: "6px 0 4px", fontSize: 20 }}>
+            <Trans id="review.screen.title">Keyboard Health Check</Trans>
+          </h1>
           <p style={{ margin: 0, fontSize: 13, opacity: 0.85, maxWidth: 640 }}>
-            Run the studio&apos;s criteria battery against an existing keyboard,
-            exactly as published. Nothing is modified, adapted, or uploaded — the
-            keyboard is judged from a read-only snapshot.
+            <Trans id="review.screen.intro">
+              Run the studio&apos;s criteria battery against an existing keyboard,
+              exactly as published. Nothing is modified, adapted, or uploaded — the
+              keyboard is judged from a read-only snapshot.
+            </Trans>
           </p>
         </div>
 
         {indexError && (
           <p style={{ color: "var(--sil-red-dark)" }}>
-            Couldn&apos;t load the keyboard index: {indexError}
+            {t({
+              id: "review.screen.indexError",
+              message: `Couldn't load the keyboard index: ${indexError}`,
+            })}
           </p>
         )}
 
         {phase === "pick" && resolvingLink && (
           <p style={{ color: TEXT_DIM }}>
-            Opening pull request #{pathLink?.kind === "pr" ? pathLink.prNumber : ""}…
+            {t({
+              id: "review.screen.openingPr",
+              message: `Opening pull request #${pathLink?.kind === "pr" ? pathLink.prNumber : ""}…`,
+            })}
           </p>
         )}
         {phase === "pick" && index && !resolvingLink && (
@@ -297,7 +328,9 @@ export function ReviewScreen() {
           />
         )}
         {phase === "pick" && !index && !indexError && (
-          <p style={{ color: TEXT_DIM }}>Loading the keyboard index…</p>
+          <p style={{ color: TEXT_DIM }}>
+            <Trans id="review.screen.loadingIndex">Loading the keyboard index…</Trans>
+          </p>
         )}
 
         {phase === "running" && target && (
@@ -310,7 +343,7 @@ export function ReviewScreen() {
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
-              Checking{" "}
+              <Trans id="review.screen.checking">Checking{" "}</Trans>
               <span style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>
                 {target.keyboardId}
               </span>
@@ -332,12 +365,14 @@ export function ReviewScreen() {
                   padding: 0,
                 }}
               >
-                ← Back to the picker
+                <Trans id="review.screen.backToPicker">← Back to the picker</Trans>
               </button>
             )}
             <p style={{ fontSize: 12, color: TEXT_DIM, marginBottom: 0 }}>
-              Read-only run — the snapshot is never written to, adapted, or
-              re-scaffolded.
+              <Trans id="review.screen.readOnlyNote">
+                Read-only run — the snapshot is never written to, adapted, or
+                re-scaffolded.
+              </Trans>
             </p>
           </div>
         )}

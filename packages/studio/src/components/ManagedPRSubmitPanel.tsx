@@ -344,6 +344,7 @@ export function ManagedPRSubmitPanel({
       const prBody = [
         `## ${displayName}`,
         "",
+        // eslint-disable-next-line lingui/no-unlocalized-strings -- PR body is deliberately English: the audience is a reviewer reading github.com (see comment above).
         `Keyboard ID: \`${keyboardId}\``,
         "",
         "---",

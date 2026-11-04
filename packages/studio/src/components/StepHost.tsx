@@ -443,6 +443,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
         role="alert"
         style={{ padding: 24, color: ERROR_RED, fontFamily: "monospace", fontSize: 13 }}
       >
+        {/* eslint-disable-next-line lingui/no-unlocalized-strings -- developer-facing diagnostic (names the step id and the file to wire it into), not author copy. */}
         {`[StepHost] unhandled step id: "${String(activeStepId)}" — wire this manifest step into registerEditorSteps.ts`}
       </div>
     );

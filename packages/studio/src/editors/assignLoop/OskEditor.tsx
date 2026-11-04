@@ -17,7 +17,8 @@
 
 import { useMemo, useState, lazy, Suspense } from "react";
 import { useLingui } from "@lingui/react/macro";
-import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import type { I18n, MessageDescriptor } from "@lingui/core";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
@@ -71,13 +72,31 @@ function withLabel(kvks: KvksIR, shift: string, vkey: string, label: string): Kv
   };
 }
 
-/** Shift-code display names for the layer switcher. */
+/**
+ * Shift-code display names for the layer switcher.
+ *
+ * Module-level msg() descriptors (resolved via i18n) because the Lingui
+ * extractor cannot follow a `t` passed as a function parameter — the old
+ * t({id, message}) calls here were invisible to `messages:extract` and the
+ * drift lint flagged the four ids as removed.
+ */
+const SHIFT_DISPLAY_MSGS = {
+  layerDefault: msg({
+    id: "editor.assignLoop.osk.layerDefault",
+    message: "Default",
+  }),
+  modShift: msg({ id: "editor.assignLoop.osk.modShift", message: "Shift" }),
+  modCtrl: msg({ id: "editor.assignLoop.osk.modCtrl", message: "Ctrl" }),
+  modAlt: msg({ id: "editor.assignLoop.osk.modAlt", message: "Alt" }),
+} as const satisfies Record<string, MessageDescriptor>;
+
 function shiftDisplayName(shift: string, i18n: I18n): string {
-  if (shift === "") return i18n._("editor.assignLoop.osk.layerDefault");
+  if (shift === "") return i18n._(SHIFT_DISPLAY_MSGS.layerDefault);
   const parts: string[] = [];
-  if (shift.includes("S")) parts.push(i18n._("editor.assignLoop.osk.modShift"));
-  if (shift.includes("C")) parts.push(i18n._("editor.assignLoop.osk.modCtrl"));
-  if (shift.includes("A")) parts.push(i18n._("editor.assignLoop.osk.modAlt"));
+  if (shift.includes("S"))
+    parts.push(i18n._(SHIFT_DISPLAY_MSGS.modShift));
+  if (shift.includes("C")) parts.push(i18n._(SHIFT_DISPLAY_MSGS.modCtrl));
+  if (shift.includes("A")) parts.push(i18n._(SHIFT_DISPLAY_MSGS.modAlt));
   return parts.length > 0 ? parts.join("+") : shift;
 }
 
@@ -107,7 +126,11 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   // Base KvksIR generated from the IR (the "reset" baseline).
   const baseKvks = useMemo<KvksIR | null>(() => {
     if (!ir) return null;
-    return generateKvksFromIR(ir, kbdname);
+    try {
+      return generateKvksFromIR(ir, kbdname);
+    } catch {
+      return null;
+    }
   }, [ir, kbdname]);
 
   // Current (edited) KvksIR + undo history.
@@ -131,8 +154,63 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
 
   if (!effectiveKvks) {
     return (
-      <div style={{ padding: 24, color: TEXT_DIM }}>
-        {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
+      <div>
+        <div style={{ padding: 24, color: TEXT_DIM }}>
+          {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
+        </div>
+        {/* Footer with Continue so the step can be skipped when no Kvks is available.
+            Pinned to the bottom bar (sticky) so nav stays reachable. */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            margin: "auto -24px -24px",
+            padding: "16px 24px",
+            borderTop: `1px solid ${BORDER}`,
+            background: BG_CANVAS,
+            position: "sticky",
+            bottom: 0,
+            zIndex: 10,
+          }}
+        >
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                padding: "10px 20px",
+                fontSize: 14,
+                borderRadius: 6,
+                border: `1px solid ${BORDER}`,
+                background: BG_CARD,
+                color: TEXT_MAIN,
+                cursor: "pointer",
+              }}
+            >
+              {t({ id: "editor.assignLoop.osk.back", message: "Back" })}
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            data-testid="osk-continue"
+            onClick={() => {
+              onComplete(oskContinueResult(null));
+            }}
+            style={{
+              padding: "10px 24px",
+              fontSize: 14,
+              borderRadius: 6,
+              border: `1px solid ${ACCENT}`,
+              background: ACCENT_BG,
+              color: TEXT_MAIN,
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {t({ id: "editor.assignLoop.osk.continue", message: "Continue" })}
+          </button>
+        </div>
       </div>
     );
   }
@@ -270,7 +348,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       }}
     >
       <h1 style={{ margin: 0, fontSize: 20, color: TEXT_MAIN }}>
-        {t({ id: "editor.assignLoop.osk.title", message: "On-Screen Keyboard" })}
+        {t({ id: "editor.assignLoop.osk.title", message: "OnScreen Keyboard Label Editors" })}
       </h1>
       <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
         {t({
@@ -547,14 +625,19 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       </>
       )}
 
-      {/* Footer: undo + nav */}
+      {/* Bottom bar: nav pinned to the viewport bottom (sticky) so Back /
+          Continue stay reachable while the key grid scrolls. */}
       <div
         style={{
           display: "flex",
           gap: 8,
-          marginTop: "auto",
-          paddingTop: 16,
+          margin: "auto -24px -24px",
+          padding: "16px 24px",
           borderTop: `1px solid ${BORDER}`,
+          background: BG_CANVAS,
+          position: "sticky",
+          bottom: 0,
+          zIndex: 10,
         }}
       >
         {onBack && (

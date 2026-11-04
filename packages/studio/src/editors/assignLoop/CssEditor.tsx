@@ -19,6 +19,7 @@ import { useLingui } from "@lingui/react/macro";
 import { generateKvksFromIR } from "@keyboard-studio/engine";
 import type { KvksIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { parseTouchLayoutOrNull } from "../../lib/docContent.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 
 // Lazy-load the Monaco pane so it never lands in the main chunk.
@@ -166,14 +167,12 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   const [skipped, setSkipped] = useState(false);
 
   // Parse touch layout
-  const touchLayout = useMemo<TouchLayoutIR | null>(() => {
-    if (!touchLayoutJson) return null;
-    try {
-      return JSON.parse(touchLayoutJson) as TouchLayoutIR;
-    } catch {
-      return null;
-    }
-  }, [touchLayoutJson]);
+  // `touchLayoutJson` is the raw Keyman touch-layout file (`{ phone: { layer: [...] } }`),
+  // not the IR; it has no `platforms`, so it must go through the codec.
+  const touchLayout = useMemo<TouchLayoutIR | null>(
+    () => parseTouchLayoutOrNull(touchLayoutJson),
+    [touchLayoutJson],
+  );
 
   // Generate desktop OSK
   const kvks = useMemo<KvksIR | null>(() => {

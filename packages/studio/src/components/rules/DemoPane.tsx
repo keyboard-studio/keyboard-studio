@@ -402,7 +402,11 @@ export function DemoPane(props: DemoPaneProps = {}) {
   );
 
   return (
-    <section aria-label="Rule demo" data-testid="rules-demo-pane" style={rulesSection}>
+    <section
+      aria-label={t({ id: "rules.demo.paneLabel", message: "Rule demo" })}
+      data-testid="rules-demo-pane"
+      style={rulesSection}
+    >
       <h3 style={rulesSectionHeading}>
         <Trans id="rules.demo.heading">Try the rules</Trans>
       </h3>
@@ -560,7 +564,7 @@ export function DemoPane(props: DemoPaneProps = {}) {
                   {rows.map((row) => (
                     <tr key={row.index} data-testid={`rules-demo-row-${row.index}`}>
                       <td style={rulesTd}>
-                        <code style={rulesCode}>{row.typedChar === " " ? "Space" : row.typedChar}</code>{" "}
+                        <code style={rulesCode}>{row.typedChar === " " ? t({ id: "rules.demo.spaceLabel", message: "Space" }) : row.typedChar}</code>{" "}
                         <small>({row.vkeyLabel})</small>
                         {row.deadkeyArmed && (
                           <div>
