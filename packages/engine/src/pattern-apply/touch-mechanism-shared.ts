@@ -308,6 +308,34 @@ export function keyMatchesRemovalSet(
 }
 
 /**
+ * Removal matching for the desktop-modifications replay (the touch seed's
+ * board path): the legacy text/output/U_-id test UNION the spec-104
+ * resolver production.
+ *
+ * The board must agree with the preview's step-1.5 carve projection (spec
+ * 104 T009), which matches by displayed text, output, id, OR resolver
+ * production. The legacy test alone cannot see a ruled `T_` key whose
+ * keycap text doesn't spell its production (`T_0300`, text `"◌̀"`,
+ * produces U+0300 entirely through `.kmn` rules) — the board kept showing
+ * such keys after a carve while the preview removed them. The resolver
+ * alone would drop the template-key text matches the legacy test has
+ * always made, so this is a union, not a replacement.
+ *
+ * When `productionCtx` is undefined the legacy test runs byte-identically.
+ */
+export function keyMatchesRemovalSetWithProduction(
+  candidate: { text?: string; output?: string; id?: string; sp?: number; nextlayer?: string },
+  removalSet: ReadonlySet<string>,
+  productionCtx?: RemovalProductionContext,
+): boolean {
+  if (keyMatchesRemovalSet(candidate, removalSet)) return true;
+  if (productionCtx !== undefined) {
+    return candidateMatchesViaProduction(candidate, removalSet, productionCtx);
+  }
+  return false;
+}
+
+/**
  * The production-resolver inputs a placement replay needs to address keys
  * through spec 104's resolver (FR-003/FR-021): the keyboard the layout
  * belongs to and its spec 063 rule-join index. Optional at every call site
