@@ -20,19 +20,12 @@ import {
 
 describe("questionRegistry", () => {
   // 9 Phase A + 47 Phase B + 27 Phase F + 3 Phase G + 31 Reserve = 117 question
-  // modules, + 14 gallery decision modules (spec 090 T008, research R2: the
-  // gallery group registers in this same registry so decisionIndex resolves
-  // exactly one provider per gallery decision) = 131 total
-  // (re-verified 2026-10-07 at the spec 090 US2 gate; spec 069 FR-002 — update
-  // this count in the same change that adds or removes a questionRegistry
-  // entry. Spec 079 US5 adds pf_history_entry + pf_history_entry_bullets to
-  // Phase F; spec 075 FR-019 retired pb_rtl_direction_marks +
-  // pb_rtl_direction_marks_detail from Phase B: the invisible-characters
-  // spine step subsumes them. pf_doc_language_other, pf_doc_language_second
-  // and pf_doc_language_second_other add a chosen help-page language and a
-  // second one — #2002, integrated 2026-10-10.)
-  it("has exactly the verified inventory of 131 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(131);
+  // modules, + 17 gallery decision modules (spec 090 T008; +custom-css, +help-docs,
+  // +welcome-htm on the css/html editor steps) = 134 total
+  // (re-verified 2026-11-03 — update this count in the same change that adds
+  // or removes a questionRegistry entry.)
+  it("has exactly the verified inventory of 134 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(134);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

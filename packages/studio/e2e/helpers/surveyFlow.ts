@@ -1132,19 +1132,10 @@ export async function advanceThroughTailToOutput(page: Page): Promise<void> {
   throw new Error("advanceThroughTailToOutput: did not reach #output within the step budget");
 }
 
-/** Optional custom CSS step (after touch): skip and continue with empty CSS. */
+/** Optional custom CSS step (after touch): continue with empty CSS (no .css file). */
 export async function driveCssEditorStep(page: Page): Promise<void> {
-  const skip = page.getByRole("button", { name: "No custom CSS (skip)" });
   const continueBtn = page.getByTestId("css-continue");
-
-  await Promise.race([
-    waitVisible(skip, 30_000),
-    waitVisible(continueBtn, 30_000),
-  ]);
-
-  if (await skip.isVisible().catch(() => false)) {
-    await skip.click();
-  }
+  await continueBtn.waitFor({ state: "visible", timeout: 60_000 });
   await continueBtn.click({ timeout: 30_000 });
 }
 
