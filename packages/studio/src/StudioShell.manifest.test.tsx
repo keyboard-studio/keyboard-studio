@@ -73,35 +73,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → osk → touch → css → help → html → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
-    // track is now a real manifest step (P0 fix); project_name is a derived side trail.
-    // attribution (#1901) is spine: every author walks it after the track choice.
-    const spineIds = manifest
-      .filter((s) => STEP_TRAILS.get(s.id)?.spine !== false)
-      .map((s) => s.id);
-    expect(spineIds).toEqual([
-      "identity",
-      "layout",
-      "choose_base",
-      "track",
-      "attribution",
-      "characters",
-      "marks",
-      "punctuation",
-      "invisibles",
-      "convenience",
-      "carve",
-      "deadkeys",
-      "rules",
-      "mechanisms",
-      "osk",
-      "touch",
-      "css",
-      "help",
-      "html",
-      "package",
-    ]);
-  });
+  // The spine order is not pinned here: steps/manifest.test.ts checks the manifest
+  // against the derived screens, the first and last step, and the ordering rules
+  // that matter.
 
   it("project_name is a derived side trail (gated) rejoining at 'characters' (M4b, P0 fix)", () => {
     const projName = manifest.find((s) => s.id === "project_name");
