@@ -44,8 +44,9 @@ Mechanical Gallery and use it, not when the component exists.
 
 ## Rulings (Matthew, 2026-11-04)
 
-1. **Audience** — confirmed: there is a middle audience (authors who outgrow the guided gallery but
-   will not edit code). Spec it.
+1. **Audience** — not asked separately; the request was to spec the feature, so this spec
+   proceeds on the draft's premise of a middle audience (authors who outgrow the guided gallery
+   but will not edit code). Whether that audience is real remains the product owner's call.
 2. **Paradigm** — **assignment** in v1: select a key, type or pick what it produces. A
    **placement tray** (drag characters from the confirmed inventory onto keys, Touch Builder style)
    is an optional later phase (User Story 5).
@@ -113,8 +114,10 @@ either matches or is marked read-only with its reason. No keyboard is refused.
    keyboard's character, marked as base keyboard fallback and provisional, and the detail lists
    what each picked base keyboard types there.
 5. **Given** the author has set the letters class to "Do nothing" in the fallback policy (spec
-   109), **When** they view an unhandled letter position, **Then** the cell shows that the key
-   types nothing, not the base keyboard's character.
+   109), **When** they view an unhandled letter position, **Then** the cell shows what the compiled
+   keyboard actually does there: "types nothing" only once the keyboard really suppresses that
+   position (spec 109 FR-010). Until then the cell shows the base keyboard's character with a note
+   that the policy is not yet in effect for keys the keyboard never defined.
 6. **Given** a key covered by an opaque fragment the codec could not model, **When** the author
    views it, **Then** the cell is marked as code the studio cannot show here, read-only, with "view
    in code".
@@ -280,32 +283,38 @@ lands as a US2 assignment would; the tray empties.
 - **FR-011**: Every key's displayed output MUST come from the compiled working copy — what the
   keyboard produces for that key and layer with nothing typed before — or, for keys the keyboard
   does not handle, from FR-014. The tab MUST NOT show a stored label it cannot reproduce.
-- **FR-012**: Each key in each layer MUST be classified into exactly one of these, and the class
-  shown on the cell:
-  - **Hand-set** — the author's assignment (agency `hand-set`). Editable.
-  - **From the starting point** — a simple rule from the copied keyboard (Track 1) or the current
-    release (Track 2). Editable.
-  - **Deadkey** — a simple rule that emits one deadkey. Editable.
-  - **Types nothing** — a simple rule with `nul` output. Editable.
-  - **Base keyboard fallback** — the keyboard has no rule for this key and layer (agency
-    `base-derived`, provisional). Editable.
-  - **Depends on what was typed before** — the key also matches one or more context rules.
-    Read-only.
-  - **Complex output** — the output is more than one character, uses stores, indexes, `if()`,
-    `platform()`, options, or is changed by a later group. Read-only.
-  - **Code the studio cannot show here** — the key is touched by an opaque fragment. Read-only.
-  - **Frame key** — not editable.
+- **FR-012**: Each key in each layer MUST carry exactly one value on each of two axes, both shown on
+  the cell:
+  - **Provenance** (where the behaviour comes from):
+    - **Hand-set** — the author's own edit (agency `hand-set`).
+    - **From the starting point** — a rule from the copied keyboard (Track 1) or the current
+      release (Track 2).
+    - **Base keyboard fallback** — the keyboard has no rule for this key and layer (agency
+      `base-derived`, provisional).
+  - **Output** (what it does, and whether it is editable):
+    - **Character** — one user-perceived character. Editable.
+    - **Deadkey** — one deadkey. Editable.
+    - **Types nothing** — `nul`, or a fallback position the compiled keyboard suppresses.
+      Editable.
+    - **Depends on what was typed before** — the key also matches one or more context rules.
+      Read-only.
+    - **Complex output** — more than one character, stores, indexes, `if()`, `platform()`,
+      options, or changed by a later group. Read-only.
+    - **Code the studio cannot show here** — the key is touched by an opaque fragment. Read-only.
+    - **Frame key** — not editable (no provenance shown).
 - **FR-013**: A key and layer is **simple** (editable) only when all of these hold: exactly one rule
   in the keyboard's key-processing groups can match it; that rule has no context; its output is one
   user-perceived character, one deadkey, or `nul`; and what the compiled keyboard actually produces
   for it with an empty context equals that rule's output. Anything else is read-only. When in
   doubt, read-only.
 - **FR-014**: For a key and layer the keyboard does not handle, the tab MUST use spec 109's
-  enumerator of unhandled positions and its base-keyboard data. The cell shows the **primary** base
-  keyboard's character, unless the fallback policy for that character's class is a confirmed "Do
-  nothing", in which case it shows that the key types nothing. The detail lists what each picked
-  base keyboard types there. The tab MUST NOT use the simulator's built-in US fallback for these
-  keys, because typists' computers differ.
+  enumerator of unhandled positions and its base-keyboard data. The cell shows what the compiled
+  keyboard does there: "types nothing" when it suppresses the position, otherwise the **primary**
+  base keyboard's character. A class policy of "Do nothing" that the compiled keyboard does not yet
+  enforce for that position (spec 109 FR-010 not shipped) MUST NOT be shown as "types nothing"; the
+  cell shows the base character and says the policy is not yet in effect there. The detail lists
+  what each picked base keyboard types there. The tab MUST NOT use the simulator's built-in US
+  fallback for these keys, because typists' computers differ.
 - **FR-015**: Each read-only cell MUST say why in plain words (FR-012's class), and offer **view in
   code**, which switches to the Code tab with the rule that fires for that key in view.
 - **FR-016**: Each cell's detail MUST show: the output with an empty context, the class and its
@@ -322,23 +331,32 @@ lands as a US2 assignment would; the tray empties.
 - **FR-020**: For an editable key and layer, the author MUST be able to set its output to: one
   character (typed, or picked from the confirmed inventory), one deadkey the keyboard already
   defines, or nothing. The change is proposed, previewed, and written only on an explicit confirm.
-- **FR-021**: A confirmed change MUST be recorded in the Mechanical Gallery's assignment set — the
-  same set the Assign tab writes and the `physical-layout` decision records at step completion — so
-  that the Assign tab, the decision, and replay all see it. It MUST reach the KeyboardIR through
-  the same write path as an equivalent Assign-tab change. It MUST NOT use the `kmnFragment` text
-  injection path (spec 082 FR-015) or any other text-level path.
+- **FR-021**: A confirmed change MUST:
+  - be recorded with the Mechanical Gallery's `physical-layout` decision, so that the decision
+    carries it at step completion and the Assign tab shows it where its own model can represent it
+    (a character placed on a key);
+  - reach the KeyboardIR through the `mutate()` seam (Art IX; the same seam spec 109 FR-013 uses);
+  - use no text-level path — not the `kmnFragment` injection path (spec 082 FR-015), and not a
+    parse of edited `.kmn` text.
+  The Assign tab's assignment set is keyed by character, so it cannot by itself hold "this key types
+  nothing" or "this key emits deadkey dk(x)". How those two edits are recorded is plan-phase
+  research (Assumptions); this requirement fixes only the constraints above.
 - **FR-022**: A change whose character another key already types, or which displaces a character
   this key typed, MUST go through the same duplicate and displacement choices the Assign tab
   offers. The Layout tab MUST NOT resolve them silently.
 - **FR-023**: A changed key MUST show as hand-set. Assigning to a provisional key the same character
   the base keyboard types there makes the keyboard handle it, and the key becomes hand-set.
-- **FR-024**: Every Layout-tab change MUST be undoable with the same undo the Assign tab uses, one
-  confirmed change per undo step. Undoing restores the working copy to its state before the change.
+- **FR-024**: Every Layout-tab change MUST be undoable, one confirmed change per undo step, through
+  the working copy's existing undo stack (the one deletions and touch key edits already use). This
+  is new work: the Assign tab has no undo for assignments today. Undoing restores the working copy
+  to its state before the change.
 - **FR-025**: Edits MUST be refused with an explanation, and nothing written, when: the cell is
   read-only; the working copy does not compile; or the step is locked.
 - **FR-026**: The Layout tab's write surface MUST be registered in the derived-surface registry
   (spec 105 FR-010) in the same change that adds it. An unregistered write surface is a gate
-  failure.
+  failure. It inherits the `physical-layout` surface's status (pending, phase 4): the decision is
+  record-only today and replay has no fold for it, so this spec does not claim replay reproduces
+  Layout-tab edits.
 
 **Provisional keys (US4)**
 
@@ -388,8 +406,9 @@ lands as a US2 assignment would; the tray empties.
 - **SC-002 (no refusals)**: 100% of codec-parseable keyboards in that set open in the Layout tab.
   TIKE refused or misrepresented most of them.
 - **SC-003 (round trip)**: A change made in the Layout tab is visible in the Assign tab, the Code
-  tab, and the simulator's output within one validation cycle, and an undo returns the emitted
-  `.kmn` to exactly its previous text.
+  tab, and the simulator's output within one validation cycle, and an undo returns the working
+  copy's keyboard rules to their previous state (the emitted `.kmn` matches its previous text
+  except for formatting the emitter normalises).
 - **SC-004 (one spine)**: The Layout tab adds no text-level write path and no second validation
   timer. Checked by a test that fails on either.
 - **SC-005 (task speed)**: An author can change five keys across two layers of a simple keyboard in
@@ -408,15 +427,22 @@ lands as a US2 assignment would; the tray empties.
   output is read-only in v1 because TIKE trap 4 is exactly that case.
 - **Deadkeys**: v1 assigns only deadkeys the keyboard already defines. Creating a deadkey and its
   combinations stays in the guided gallery and the Code tab.
-- **Spec 109 dependency.** FR-014 and US4 need spec 109's enumerator (FR-040) and base-keyboard data
-  (FR-030). Until those ship, unhandled keys show "base keyboard fallback — character not yet
-  available" rather than a guessed character. US1–US3 for handled keys do not wait for 109.
+- **Spec 109 dependency.** FR-014 and US4 need spec 109's enumerator (FR-040), its base-keyboard
+  data (FR-030), and its `swallowUndefined` compile (FR-010) before a "Do nothing" class can show
+  as "types nothing" on never-defined keys. Until the enumerator and data ship, unhandled keys show
+  "base keyboard fallback — character not yet available" rather than a guessed character. US1–US3
+  for handled keys do not wait for 109.
+- **Deadkey combinations make keys read-only.** Under FR-013 a key that also takes part in a
+  deadkey combination (`dk(a) + [K_E] > ...`) matches a context rule, so it is read-only. On many
+  European-style keyboards that covers the vowels. Whether deadkey-only context should stay
+  read-only is an open question for `/speckit-clarify`; this spec keeps ruling 4 as given.
 - **Placement tray gate** (Art XI: owner and trigger). Owner: the product owner. Trigger: when
   US1–US4 have shipped, the product owner decides go or no-go on US5. If no-go, or if no decision
   is recorded by this spec's retirement pass, FR-050 and US5 are removed from the spec rather than
   rolled forward.
-- **Plan-phase research** (not decided here): which existing write path an assignment uses to
-  reach the IR for a direct key mapping; how FR-013's attribution is computed from the IR and the
+- **Plan-phase research** (not decided here): how a character edit reaches the IR through
+  `mutate()` for a direct key mapping; how a "types nothing" or deadkey edit is recorded with the
+  `physical-layout` decision, given the assignment set is keyed by character; how FR-013's attribution is computed from the IR and the
   simulator's fired-rule tracking; how "view in code" finds the rule's line in the Code tab's text.
 - **Vocabulary.** "Desktop layout" is the layout being edited; "base keyboard" is the OS layout
   Keyman falls back to; "starting point" is the copied keyboard or the current release
