@@ -780,6 +780,9 @@
     {
       "note": "Apply watcher reads layers from touch layout plus default, not .kvks; desktop-only layer change undetected. 6 StudioShell charmap/tracks tests fail pre-existing (verified with changes stashed).",
       "step": "implement"
+    },
+    {
+      "note": "Phase 8 (T044-T045) blocked: criterion 7.28 / KM_LINT_CASEDKEYS_MISSING not on main (branch km/casedkeys-criterion unmerged, no PR)"
     }
   ],
   "last_action": "Phase 1 done (T001)",
