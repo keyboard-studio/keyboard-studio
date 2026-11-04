@@ -273,10 +273,66 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-04T19:19:22.368Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:17.997Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:18.190Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:18.411Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:18.639Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:18.840Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:19.030Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:27:19.242Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T032",
+  "currentTask": "T039",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -524,6 +580,60 @@
     },
     "T032": {
       "status": "DONE"
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "failing-first tests for upgradeToCasedKeys (line diff, no mutation, no_caps, numrow_caps)",
+      "files": [
+        "packages/engine/src/caps/upgradeToCasedKeys.test.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "upgradeToCasedKeys: clone, empty-floor casedKeySet, replaceCapsRules, writeCasedKeysStore",
+      "files": [
+        "packages/engine/src/caps/upgradeToCasedKeys.ts",
+        "packages/engine/src/caps/index.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "tests for compareCapsBehaviour (identical, gains-uppercase, differs, deadkey follow-ups)",
+      "files": [
+        "packages/engine/src/caps/compareCaps.test.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "compareCapsBehaviour plus lazy engine/caps subpath, studio capsEngine loader, depcruise caps-browser-safe rule",
+      "files": [
+        "packages/engine/src/caps/compareCaps.ts",
+        "packages/engine/src/caps/browser.ts",
+        "packages/engine/package.json",
+        ".dependency-cruiser.cjs",
+        "packages/studio/src/lib/capsEngine.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "SC-003 test: upgraded upstream basic_kbdus compiles with zero warnings",
+      "files": [
+        "packages/engine/src/caps/upgradeToCasedKeys.test.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "opt-in corpus sweep: 168 candidates, 86 offered, 82 withheld, no violations",
+      "files": [
+        "packages/engine/src/caps/compareCaps.corpus.test.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "mixed.kmn case: 7.26 reports leftover CAPS K_Q rules; no change to 7.28",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-caps-ncaps.test.ts"
+      ]
     }
   },
   "verified": [

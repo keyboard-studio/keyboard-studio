@@ -62,4 +62,22 @@ describe("checkCapsNcapsConsistent (7.26)", () => {
     expect(findings).toEqual([]);
     expect(verified[0]).toContain("0 referenced key(s)");
   });
+
+  // Mirrors the engine fixture caps/__fixtures__/mixed.kmn: &CasedKeys covers
+  // K_Q, but the plain and the leftover CAPS rules for it are both still there.
+  it("mixed.kmn: reports leftover [CAPS K_Q] rules next to the plain K_Q rules", () => {
+    const ir = irWithKeys([
+      { name: "K_A", modifiers: [] },
+      { name: "K_A", modifiers: ["SHIFT"] },
+      { name: "K_Q", modifiers: [] },
+      { name: "K_Q", modifiers: ["SHIFT"] },
+      { name: "K_Q", modifiers: ["CAPS"] },
+      { name: "K_Q", modifiers: ["CAPS", "SHIFT"] },
+    ]);
+    const { findings } = checkCapsNcapsConsistent(ir, "mixed");
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.code).toBe("KM_LINT_CAPS_NCAPS_INCONSISTENT");
+    expect(findings[0]!.message).toContain("K_Q");
+    expect(findings[0]!.message).not.toContain("K_A");
+  });
 });
