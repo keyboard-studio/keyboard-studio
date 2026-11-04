@@ -192,11 +192,35 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-03T22:47:50.530Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:28:31.397Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:28:31.569Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:28:31.765Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T023",
+  "currentTask": "T021",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -362,6 +386,36 @@
         "packages/studio/src/decisions/progressDots.ts",
         "packages/studio/src/locales/en/messages.json",
         "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Editable language-list question as a registry gallery module with panel/host/step; en+fr messages",
+      "files": [
+        "packages/studio/src/survey/questions/gallery/languageList.ts",
+        "packages/studio/src/survey/languageList/LanguageListPanel.tsx",
+        "packages/studio/src/survey/languageList/LanguageListHost.tsx",
+        "packages/studio/src/survey/languageList/LanguageListPanel.test.tsx",
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/components/ResumeDraftBanner.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Open screen gates hide identity/layout/choose_base/track on adapt via openScreenGates in registry",
+      "files": [
+        "packages/studio/src/survey/questions/registry.ts",
+        "packages/studio/src/steps/manifest.ts",
+        "packages/studio/src/steps/advance.open.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Carve and feature galleries gated off the Open walk, reachable from the Tools menu",
+      "files": [
+        "packages/studio/src/components/OpenToolsMenu.tsx",
+        "packages/studio/src/components/OpenToolsMenu.test.tsx",
+        "packages/studio/src/survey/questions/registry.ts"
       ]
     }
   },
