@@ -107,7 +107,11 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   // Base KvksIR generated from the IR (the "reset" baseline).
   const baseKvks = useMemo<KvksIR | null>(() => {
     if (!ir) return null;
-    return generateKvksFromIR(ir, kbdname);
+    try {
+      return generateKvksFromIR(ir, kbdname);
+    } catch {
+      return null;
+    }
   }, [ir, kbdname]);
 
   // Current (edited) KvksIR + undo history.
@@ -131,8 +135,57 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
 
   if (!effectiveKvks) {
     return (
-      <div style={{ padding: 24, color: TEXT_DIM }}>
-        {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
+      <div>
+        <div style={{ padding: 24, color: TEXT_DIM }}>
+          {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
+        </div>
+        {/* Footer with Continue so the step can be skipped when no Kvks is available. */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            padding: 16,
+            borderTop: `1px solid ${BORDER}`,
+          }}
+        >
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                padding: "10px 20px",
+                fontSize: 14,
+                borderRadius: 6,
+                border: `1px solid ${BORDER}`,
+                background: BG_CARD,
+                color: TEXT_MAIN,
+                cursor: "pointer",
+              }}
+            >
+              {t({ id: "editor.assignLoop.osk.back", message: "Back" })}
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            data-testid="osk-continue"
+            onClick={() => {
+              onComplete(oskContinueResult(null));
+            }}
+            style={{
+              padding: "10px 24px",
+              fontSize: 14,
+              borderRadius: 6,
+              border: `1px solid ${ACCENT}`,
+              background: ACCENT_BG,
+              color: TEXT_MAIN,
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {t({ id: "editor.assignLoop.osk.continue", message: "Continue" })}
+          </button>
+        </div>
       </div>
     );
   }
