@@ -106,6 +106,7 @@ import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
+import { AfterApplySuggestions } from "./components/AfterApplySuggestions.tsx";
 import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
@@ -2095,6 +2096,10 @@ function StudioShellContent() {
       {route === "survey" && !isNarrow && (
         <PhaseStepper activeStepId={surveyActiveStepId} />
       )}
+      {/* Spec 111 US5: consistency suggestions raised by an applied change.
+          Always mounted (it watches the working copy); the list shows only
+          off the criteria page, which lists them itself. */}
+      <AfterApplySuggestions showPanel={route !== "criteria"} />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns

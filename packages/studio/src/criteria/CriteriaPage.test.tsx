@@ -593,3 +593,18 @@ describe("CriteriaPage — cited text renders as a code block", () => {
     expect(within(row).getByTestId("criteria-row-evidence").querySelector("pre")).toBeNull();
   });
 });
+
+describe("CriteriaPage expected-characters coverage (spec 111 FR-018a)", () => {
+  it("states how many listed languages had exemplar data, only when supplied", () => {
+    const base = resolveCriteria(fixtureInput());
+    const { rerender } = render(<CriteriaPage result={base} mode="authored" />);
+    expect(screen.queryByTestId("criteria-expected-coverage")).toBeNull();
+
+    rerender(
+      <CriteriaPage result={{ ...base, expectedCoverage: { withData: 3, total: 5 } }} mode="authored" />,
+    );
+    expect(screen.getByTestId("criteria-expected-coverage").textContent).toContain(
+      "3 of 5 had exemplar data",
+    );
+  });
+});

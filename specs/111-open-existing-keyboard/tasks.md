@@ -123,10 +123,10 @@
 
 **Independent Test**: [quickstart.md §5](quickstart.md) step 3; open Cameroon QWERTY and check that missing exemplar characters are listed as pre-existing, with the count of languages that had data.
 
-- [ ] T040 [P] [US5] Implement the exemplar union in `packages/studio/src/lib/openExpectedInventory.ts`: `sourceExemplars(tag)` over the `.kps` languages after `loadExemplarSource()`, NFC, union, plus a `{withData, total}` count. Unit test it with a stubbed index.
-- [ ] T041 [US5] Feed the union to the 18.6 inventory-coverage check as its linguist inventory on Open, with missing characters offering an "add character" fix into the mechanisms gallery, in the criteria assembly under `packages/studio/src/criteria/` (ratchet from T029 applies). Re-run when the language list changes (T018).
-- [ ] T042 [P] [US5] Implement the per-Apply delta in `packages/studio/src/lib/consistencySuggestions.ts`: `buildProducedSet` and `computeTouchCoverage` before and after, plus 11.6 layer ids, scoped to what this change added or removed (research R10). Unit test it.
-- [ ] T043 [US5] Suggestion UI (accept / skip, never auto-apply; accepted and declined recorded in the 053 record so they aren't re-offered) in `packages/studio/src/components/SuggestedFixes.tsx`, mounted on the criteria page and after Apply in the code views and galleries
+- [x] T040 [P] [US5] Implement the exemplar union in `packages/studio/src/lib/openExpectedInventory.ts`: `sourceExemplars(tag)` over the `.kps` languages after `loadExemplarSource()`, NFC, union, plus a `{withData, total}` count. Unit test it with a stubbed index.
+- [x] T041 [US5] Feed the union to the 18.6 inventory-coverage check as its linguist inventory on Open, with missing characters offering an "add character" fix into the mechanisms gallery, in the criteria assembly under `packages/studio/src/criteria/` (ratchet from T029 applies). Re-run when the language list changes (T018).
+- [x] T042 [P] [US5] Implement the per-Apply delta in `packages/studio/src/lib/consistencySuggestions.ts`: `buildProducedSet` and `computeTouchCoverage` before and after, plus 11.6 layer ids, scoped to what this change added or removed (research R10). Unit test it.
+- [x] T043 [US5] Suggestion UI (accept / skip, never auto-apply; accepted and declined recorded in the 053 record so they aren't re-offered) in `packages/studio/src/components/SuggestedFixes.tsx`, mounted on the criteria page and after Apply in the code views and galleries
 
 **Checkpoint**: commit and push.
 

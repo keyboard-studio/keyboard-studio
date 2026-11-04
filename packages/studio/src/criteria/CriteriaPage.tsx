@@ -189,6 +189,15 @@ export function CriteriaPage({
         </p>
       )}
 
+      {result.expectedCoverage !== undefined && (
+        <p data-testid="criteria-expected-coverage" style={{ margin: "0 0 8px", fontSize: 13, color: TEXT_DIM }}>
+          <Trans id="criteria.expectedCoverage">
+            Expected characters come from the exemplars of the listed languages:{" "}
+            {result.expectedCoverage.withData} of {result.expectedCoverage.total} had exemplar data.
+          </Trans>
+        </p>
+      )}
+
       <CriteriaSummary result={result} />
 
       <ul style={listStyle}>

@@ -30,6 +30,27 @@ export interface FailingFinding {
 }
 
 /**
+ * 18.6 reports one finding per missing character, all in the same file, so a
+ * bare `${code}:${file}` key would fold a newly added language's characters
+ * into the key an earlier gap already failed under and they could never read
+ * as new (FR-018a). The character joins the key for that rule only.
+ */
+function characterSuffix(code: string, message: string | undefined): string {
+  if (code !== "KM_LINT_INVENTORY_UNCOVERED") return "";
+  const hex = message?.match(/U\+([0-9A-Fa-f]{4,6})/)?.[1];
+  return hex === undefined ? "" : `#U+${hex.toUpperCase()}`;
+}
+
+/** The key of one lint finding: rule id, file, and for 18.6 the character. */
+export function findingKeyOf(
+  code: string,
+  file: string | undefined,
+  message: string | undefined,
+): FindingKey {
+  return `${code}:${file ?? ""}${characterSuffix(code, message)}` as FindingKey;
+}
+
+/**
  * The keys one failing row stands for: one per lint finding (rule id plus the
  * file it names), or a single `${criterionId}:` key when the row carries no
  * lint finding (a compile or assembly verdict).
@@ -41,7 +62,7 @@ export function findingKeysOf(row: ResolvedRow): FindingKey[] {
   if (findings.length === 0) return [`${ruleId}:` as FindingKey];
   const keys = new Set<FindingKey>();
   for (const f of findings) {
-    keys.add(`${f.code}:${f.location?.file ?? ""}` as FindingKey);
+    keys.add(findingKeyOf(f.code, f.location?.file, f.message));
   }
   return [...keys];
 }

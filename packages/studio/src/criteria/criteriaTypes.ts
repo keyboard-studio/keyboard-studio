@@ -336,4 +336,9 @@ export interface CriteriaResult {
    * judge; absent in authored mode.
    */
   fileTree?: import("../review/fileTree.ts").FileTreeNode[];
+  /**
+   * Open mode only (spec 111 FR-018a): how many of the keyboard's listed
+   * languages had exemplar data for the expected-characters check.
+   */
+  expectedCoverage?: { withData: number; total: number };
 }

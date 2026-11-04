@@ -20,6 +20,9 @@ import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { useRouteSuggestedFix } from "../hooks/useRouteSuggestedFix.ts";
+import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
+import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -47,6 +50,7 @@ export function CriteriaScreen() {
   const result = useAuthoredCriteria(artifact.stage);
 
   const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
+  const routeFix = useRouteSuggestedFix();
   const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
   const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
@@ -89,7 +93,21 @@ export function CriteriaScreen() {
   const keyboardLabel =
     artifact.stage.kind === "ready" ? artifact.stage.keyboardId : undefined;
 
+  // "Add character" fixes for expected characters the keyboard cannot type
+  // (criterion 18.6 on Open, FR-018a): one per finding, routed to the
+  // mechanisms gallery. Offers only; nothing is applied here.
+  const missingFixes = ratchet !== null
+    ? missingCharacterFixes(
+        result.rows.flatMap((r) => (r.status === "not-met" ? (r.evidence().findings ?? []) : [])),
+      )
+    : [];
+
   return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
+      <SuggestedFixesPanel extra={missingFixes} onAccept={routeFix} testId="criteria-suggested-fixes" />
+    </div>
+    <div style={{ flex: 1, minHeight: 0 }}>
     <CriteriaPage
       result={result}
       mode="authored"
@@ -121,5 +139,7 @@ export function CriteriaScreen() {
           }
         : {})}
     />
+    </div>
+    </div>
   );
 }

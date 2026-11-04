@@ -344,11 +344,43 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T19:02:31.576Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:07:50.230Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:07:50.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:15:30.898Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:15:31.087Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T039",
+  "currentTask": "T043",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -680,6 +712,45 @@
         "packages/studio/src/criteria/openPrBlocks.ts",
         "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
       ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Exemplar union (NFC, standard tiers) with withData/total/withoutData counts, injected lookup, unit tested",
+      "files": [
+        "packages/studio/src/lib/openExpectedInventory.ts",
+        "packages/studio/src/lib/openExpectedInventory.test.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Per-Apply consistency delta (produced set, touch coverage, 11.6 layers) and suggestionsFromDelta, unit tested",
+      "files": [
+        "packages/studio/src/lib/consistencySuggestions.ts",
+        "packages/studio/src/lib/consistencySuggestions.test.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Open expected-characters inventory (exemplar union) feeds 18.6; per-character ratchet keys; add-character fixes; re-runs on language change; coverage count surfaced",
+      "files": [
+        "packages/studio/src/criteria/buildOpenInventory.ts",
+        "packages/studio/src/criteria/buildOpenInventory.test.ts",
+        "packages/studio/src/criteria/openRatchet.ts",
+        "packages/studio/src/hooks/useCriteriaFindings.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "SuggestedFixes accept/skip UI, dispositions in 053 record, Apply watcher, mounted on criteria page and shell",
+      "files": [
+        "packages/studio/src/components/SuggestedFixes.tsx",
+        "packages/studio/src/components/AfterApplySuggestions.tsx",
+        "packages/studio/src/hooks/useConsistencyOnApply.ts",
+        "packages/studio/src/lib/suggestionDispositions.ts",
+        "packages/studio/src/stores/suggestedFixesStore.ts",
+        "packages/studio/src/components/CriteriaScreen.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
     }
   },
   "verified": [
@@ -705,7 +776,28 @@
     {
       "note": "Branch is behind main: pnpm lint has 3 errors in untouched files (generate-kvks.test.ts, OskEditor.test.tsx) and ~100 studio tests fail with [manifest] 20 steps vs 19 screens, reproduced on clean HEAD. Merge main to clear.",
       "step": "implement"
+    },
+    {
+      "note": "Apply watcher reads layers from touch layout plus default, not .kvks; desktop-only layer change undetected. 6 StudioShell charmap/tracks tests fail pre-existing (verified with changes stashed).",
+      "step": "implement"
     }
   ],
-  "last_action": "Phase 1 done (T001)"
+  "last_action": "Phase 1 done (T001)",
+  "decisions": [
+    {
+      "decision": "18.6 finding key gets #U+XXXX suffix so each missing character is its own key",
+      "why": "a language added later must read as new under the ratchet",
+      "rejected": "rule:file key per data-model R5"
+    },
+    {
+      "decision": "Accepting a suggestion records the decision and routes to the owning editor, never edits",
+      "why": "suggestions are never auto-applied",
+      "rejected": "in-place apply"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Phase 7: exemplar union, 18.6 on Open, per-Apply consistency suggestions UI"
+    }
+  }
 }
