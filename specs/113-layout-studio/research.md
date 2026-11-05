@@ -28,10 +28,16 @@ replayable overlays: carve (:635), the deadkey op log (:888-898), Assign-tab ass
 - Each confirmed edit is one `LayoutOperation` ([contracts/layout-ops.md](contracts/layout-ops.md)).
 - Live: `applyLayoutOp(ir, op)` (pure, engine) → `applyMutatePatch(ir, patch, LAYOUT_WRITES)` →
   `setWorkingIR`.
-- Artifact: the projection replays the log **after** assignments and deadkey ops (so a key-first
-  edit wins over an earlier character-first one on the same key), by parsing the assembled `.kmn`,
-  applying the ops to the IR, and emitting. The projection already re-parses at `:956` for the
-  containment check, so the parse point exists.
+- Artifact: a new projection step **2.2**, after assignments (step 2) and deadkey ops (step 1.8)
+  so a key-first edit wins over an earlier character-first one on the same key, and **before**
+  layer propagation (2.5), mark guards (2.6), and context tolerance (2.7), so those see the edited
+  keyboard. It parses the assembled `.kmn`, applies the ops, and emits — **only when the log is
+  non-empty**, the step 1.7b precedent (`projectWorkingCopyVfs.ts:848-869`), so keyboards with no
+  Layout edits keep a byte-identical artifact. The re-parse at `:954` is deliberately not
+  re-emitted (comment at `:948`: the text artifact must equal the pre-flag path's), which is why
+  the step is gated on a non-empty log rather than always re-emitting.
+- Context tolerance (2.7) replays variants of named rules; a variant whose source rule a layout op
+  removed is skipped with a warning, never left firing.
 - Recorded: `PhysicalLayoutValue` (`studio/src/survey/assignLoop/physicalLayoutValue.ts:19-30`)
   gains optional `layoutOps?: LayoutOperation[]` — the `displacedDeclined` precedent for an
   additive field. `completePhysicalLayoutStep` snapshots the log, as it does the assignments.
@@ -46,11 +52,15 @@ assignment key (`modality/scope/target`, `contracts/src/assignmentMap.ts:83-85`)
 fold), larger than this feature and owned there; the op log is replayable now and becomes that
 fold's input later.
 
-**Side finding (not this spec's scope).** The Code tab's Apply (`KmnCodePane.tsx:195`) calls only
-`setWorkingIR`, with no overlay. By R1 it would not reach the artifact. This is inferred from the
-code, not tested. Owner: Engine team. Trigger: Phase A task T-verify writes a test; if it
-reproduces, file `bug(studio): Code tab Apply never reaches the built keyboard` and fix it outside
-this spec.
+**Side finding — verified (not this spec's scope).** The Code tab's Apply (`KmnCodePane.tsx:195`)
+calls only `setWorkingIR`. The production projection input passes only
+`deriveRuleAdditions(state.ir, state.startIr)` (`lib/projectionInput.ts:129`), which collects only
+rules stamped `rulesStepAdded`; a Code-tab parse stamps nothing. A probe test (2026-11-04: parse
+`+ [K_Q] > 'x'`, Apply an edit to `'y'` plus a new `+ [K_W] > 'z'`, run `projectWorkingCopyVfs`
+with the derived additions) passed with the projected `.kmn` still `'x'` and no `K_W`. So a
+Code-tab Apply changes the live view but not the preview or download. Owner: Engine team.
+Trigger: report to the product owner now; fix under its own `bug(studio)` issue, outside this
+spec. The Layout tab must not copy the Code tab's write path.
 
 ## R2. Recording `nul`, deadkey-on-key, and contextual rows
 
@@ -131,12 +141,22 @@ group header.
 deliberately off the stack (:1185-1189). The stack is persisted in drafts, so IR snapshots are
 out.
 
-**Decision.** New kind `l` (one layout op by seq, mirroring `k`) and `lb` (a batch: an edit plus
-its accepted case partner). Undoing a layout op removes it from the log and rebuilds the live IR
-from `startIr` + overlays (the existing rebuild path in `decisions/rebuildWorkingCopy.ts`).
-Deadkey-table edits made from the Layout tab push a `ld` entry that holds the **inverse**
-`DeadkeyOperation` (add-pair ↔ remove-pair); undo appends the inverse to the deadkey log rather
-than popping it, keeping that log append-only as spec 083 intends.
+**Decision.** Undo is **local**, never a rebuild. A rebuild from `startIr` + overlays would drop
+live-IR edits that sit in no overlay (the Code tab's, above), and `rebuildWorkingCopy` replays the
+decision set, not editor overlays.
+- Each live application of a layout op records what it did: the node ids it inserted and the rules
+  it removed with their positions (`LayoutOpEffect`, data-model). The effect is held in the undo
+  entry only, not in the persisted op.
+- New kinds: `l` (one op by seq, mirroring `k`) and `lb` (an edit plus its accepted case partner).
+  Undo removes the op from the log (so projection replays without it) and applies the inverse
+  effect to the live IR: drop the inserted rules, restore the removed ones at their positions,
+  through `applyMutatePatch`.
+- `clear-key` uses the same effect record: it is an op whose effect restores what the earlier
+  `set-key` replaced.
+- Deadkey-table edits from the Layout tab push `ld`, holding the **inverse** `DeadkeyOperation`
+  (add-pair ↔ remove-pair). Undo appends the inverse, so the deadkey log stays append-only. Spec 083
+  kept its ops off the undo stack because undo was "out of scope for spec 083"
+  (`workingCopyStore.ts:1185-1188`), not because it is unsafe; FR-029b needs it here.
 
 ## R7. Desktop geometry and grid components
 

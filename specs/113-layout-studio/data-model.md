@@ -19,9 +19,13 @@ lives, and its rules.
 
 | Kind | Holds | Undo does |
 |---|---|---|
-| `l` | one layout op `seq` | Remove that op from `layoutOps`; rebuild the live IR from `startIr` + overlays. |
-| `lb` | layout op `seq`s (edit + accepted case partner) | Remove all of them, as one step. |
+| `l` | one layout op `seq` + its `LayoutOpEffect` | Remove that op from `layoutOps`; apply the inverse effect to the live IR (drop inserted rules, restore removed rules at their positions). No rebuild. |
+| `lb` | layout op `seq`s + effects (edit + accepted case partner) | The same for each, as one step. |
 | `ld` | the inverse `DeadkeyOperation` of a Layout-tab table edit | Append the inverse to the deadkey log (the log stays append-only). |
+
+**LayoutOpEffect** (undo entry only, not persisted in the op): `{ insertedNodeIds: string[];
+removed: Array<{ groupNodeId: string; index: number; rule: IRRule }> }`. Recorded when the op is
+applied to the live IR.
 
 ## Derived, never stored
 

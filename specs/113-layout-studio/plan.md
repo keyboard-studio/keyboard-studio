@@ -71,7 +71,7 @@ proposals; spec 105 FR-010 — the new write surface is registered in the same c
 | XI. Done means integrated | Each phase ends mounted in the gallery and reachable. US7 and the store-based next frontier carry owner + trigger in the spec. The Code-tab side finding (R1) carries owner + trigger. | PASS |
 | XII. Personal data | See below. | PASS |
 
-**Post-design re-check (after Phase 1):** unchanged — PASS. The contracts additions are additive,
+**Post-design re-check (after Phase 1 and the advisor review):** unchanged — PASS. The contracts additions are additive,
 and the one spec amendment (R3: spec 083 fan-out tables are editable deadkey tables) widens
 editing without touching a gate.
 
@@ -87,12 +87,12 @@ after PR 1 merges.
 
 | Phase | Stories | Delivers | Gate to close |
 |---|---|---|---|
-| **A. Foundation** | — | ISO-aware desktop geometry export (`K_oE2`, space row, frame flag); `layout-attribution` engine module (static pass, R3 exemption); `simulateEach`; `emitKmn` line map; `LayoutOperation` contract + `applyLayoutOp`; test proving or disproving the Code-tab side finding (R1) | Engine + contracts unit tests; corpus harness skeleton runs |
-| **B. See every key** | US1 | `DesktopKeyGrid` / `DesktopKeyCell` / `desktopGridViewModel` on `useGridNav` (type loosened) and `LayerSelector`; detail panel; base-fallback join; third tab with TouchGallery-grade tab accessibility; stale/not-compiled states; mnemonic read-only | US1 acceptance; SC-001 and SC-002 on corpus; a11y tests |
-| **C. Change keys** | US2 | Edit panel; case-partner proposal (FR-020a); key-first displacement (R9); `layoutOps` slice + persistence + projection replay + decision field; registry entry; undo `l`/`lb`; Assign tab shows layout-owned keys | US2 acceptance; SC-003, SC-004, SC-005; `derivedEquivalence` census; artifact contains the edit |
+| **A. Foundation** | — | ISO-aware desktop geometry export (`K_oE2`, space row, frame flag); `layout-attribution` engine module (static pass, R3 exemption); `simulateEach`; `emitKmn` line map; `ModifierToken` moved to contracts; `LayoutOperation` contract + `applyLayoutOp` (returns its `LayoutOpEffect`) | Engine + contracts unit tests; corpus harness skeleton runs |
+| **B. See every key** | US1 | `DesktopKeyGrid` / `DesktopKeyCell` / `desktopGridViewModel` on `useGridNav` (type loosened) and `LayerSelector`; basic detail panel; read-only reasons + **"view in code"** (`KmnCodePane` `revealNodeId`, using A's line map — US1 s3/s6, US2 s5, US3 s5, FR-015 need it before PR 1); base-fallback join; third tab with TouchGallery-grade tab accessibility; stale/not-compiled states; mnemonic read-only | US1 acceptance; SC-001 and SC-002 on corpus; a11y tests |
+| **C. Change keys** | US2 | Edit panel; case-partner proposal (FR-020a); key-first displacement (R9); `layoutOps` slice + persistence + projection step 2.2 (non-empty log only) + tolerance-variant skip + decision field; registry entry; local undo `l`/`lb` (R6); Assign tab shows layout-owned keys | US2 acceptance; SC-003, SC-004, SC-005; `derivedEquivalence` census; artifact contains the edit |
 | **D. Deadkeys** | US3 | Deadkey on key via the spec 083 lifecycle; display character; tables of both shapes (fan-out and keystroke-keyed); "after this deadkey" view; chains followed; space-row proposal; undo `ld` | US3 acceptance; SC-007 (deadkey half), SC-008 |
 | *PR 1 opens here* | | | |
-| **E. Honesty extras** | US5, US6 | Read-only detail and "view in code" (`revealNodeId`); provisional counts per layer; fallback-policy link | US5, US6 acceptance; SC-006 |
+| **E. Honesty extras** | US5, US6 | Richer read-only detail (all matching rules, counts, replaced values); provisional counts per layer; fallback-policy link | US5, US6 acceptance; SC-006 |
 | **F. Contextual rows** | US4 | Context list; "after …" for literal contexts; "becomes" editor; never-fires detection; `set-row` / `remove-row` | US4 acceptance; SC-007 (context half), SC-009 |
 | G. Tray | US7 | Gated (spec Assumptions) — not planned | — |
 
@@ -161,7 +161,9 @@ the op, geometry, simulator, emit); studio owns state, persistence, projection, 
 | Risk | Mitigation |
 |---|---|
 | Replay order: a layout op and an Assign-tab assignment on the same key | Layout ops replay last and win; the Layout tab warns before overriding an Assign-tab assignment (FR-022), and the Assign tab labels the key "set in the Layout tab". |
-| Rebuild-on-undo cost | Undo rebuilds from `startIr` + overlays through the existing rebuild path; measure in phase C and fall back to replaying only the tail if needed. |
+| Undo losing unrelated live edits | Undo is a local inverse (R6), never a rebuild from `startIr` + overlays, which would drop live-IR edits that live in no overlay. |
+| Re-emitting the artifact changes keyboards that have no Layout edits | Projection step 2.2 runs only when `layoutOps` is non-empty (R1). |
+| Spec 105 direction (working copy purely derived, Option A) vs a new editor-authored slice | Open question for the product owner (see the plan's completion report); the op log is shaped to become the `physical-layout` replay fold later. |
 | `simulateEach` relies on resetting the vendored engine's context between keystrokes | Phase A proves parity with `simulate()` per key on the corpus before anything depends on it. |
 | Spec 083 has no display-character field | Phase A checks; if missing, add it as a lifecycle field (`set-display` op), not a layout op. |
 | Size (~12k lines) | Ship PR 1 at US3; phases E–F follow on a fresh branch. |

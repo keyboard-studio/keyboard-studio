@@ -8,7 +8,9 @@ repo's standard pattern). It is additive and does not touch the locked `Pattern`
 ## Type
 
 ```ts
-/** A desktop layer: a Keyman modifier combination (tokens as in modifierCombos.ts). */
+/** A desktop layer: a Keyman modifier combination. `ModifierToken` moves from
+ *  engine/src/pattern-apply/modifierCombos.ts to contracts (engine re-exports it):
+ *  contracts is the dependency root and cannot import the engine. */
 type LayerCombo = readonly ModifierToken[];          // e.g. [], ["SHIFT"], ["RALT"], ["SHIFT","RALT"], ["NCAPS"]
 
 /** What a key or row produces — literal text, a deadkey, or nothing. */
@@ -67,6 +69,7 @@ the same `(vkey, layer[, context])` win.
 | Where | Call |
 |---|---|
 | Live edit (studio) | `applyMutatePatch(ir, { groups }, LAYOUT_WRITES)` → `setWorkingIR`; `commitLayoutOp(op)` appends to `layoutOps` and pushes undo entry `l`/`lb`. `LAYOUT_WRITES` = the entry group's `rules` path, declared in `studio/src/steps/editorMutate.ts` beside `DEADKEY_WRITES`. |
-| Artifact (studio projection) | `projectWorkingCopyVfs`: after assignments and deadkey ops, parse → `layoutOps.reduce(applyLayoutOp)` → emit. |
+| Artifact (studio projection) | `projectWorkingCopyVfs` step 2.2 — after assignments (2) and deadkey ops (1.8), before layer propagation (2.5), mark guards (2.6), context tolerance (2.7). Only when `layoutOps` is non-empty: parse → `layoutOps.reduce(applyLayoutOp)` → emit. |
+| Undo (studio) | Local inverse from the `LayoutOpEffect` held in the undo entry (inserted node ids; removed rules with positions). No rebuild. |
 | Decision | `PhysicalLayoutValue.layoutOps?: LayoutOperation[]`, snapshotted by `completePhysicalLayoutStep`. |
 | Draft | `layoutOps` slice saved and restored by `persistWorkingCopy.ts`, beside the deadkey op log. |
