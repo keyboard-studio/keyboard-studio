@@ -411,25 +411,28 @@ export async function projectWorkingCopyForOutput(
   // HISTORY.md's top entry heading (spec 079 FR-010); written in step 5c.
   const historyVersion = shippedVersion;
   identityForProjection = { ...identityForProjection, version: shippedVersion };
-  // spec 064 FR-003: a copy's descriptor is generated in the projection
-  // (step 3.6), before generateStubs could write one, so its <Copyright> and
-  // <Author> come through the overlay — from the same inherited-holder
-  // resolution and attribution LICENSE.md is written from below. An
-  // adaptation keeps its own package metadata.
-  if (!isAdaptation) {
-    const { inherited } = resolveInheritedHolders(
-      startLicenseText ?? undefined,
-      startHolderOverride ?? undefined,
-    );
-    identityForProjection = {
-      ...identityForProjection,
-      packageAttribution: packageAttributionFields(
+  // The descriptor's output-only <Info> fields. spec 064 FR-003: a copy's
+  // descriptor is generated in the projection (step 3.6), before
+  // generateStubs could write one, so its <Copyright> and <Author> come
+  // through the overlay — from the same inherited-holder resolution and
+  // attribution LICENSE.md is written from below; an adaptation keeps its own.
+  // <Description> is the author's help-docs description on either track,
+  // the same text README.md and the welcome page open with.
+  const packageDescription = helpDocs?.description.trim() ?? "";
+  const packageAttribution = isAdaptation
+    ? {}
+    : packageAttributionFields(
         attribution ?? undefined,
-        inherited,
+        resolveInheritedHolders(startLicenseText ?? undefined, startHolderOverride ?? undefined).inherited,
         stable ? STABLE_FINGERPRINT_YEAR : undefined,
-      ),
-    };
-  }
+      );
+  identityForProjection = {
+    ...identityForProjection,
+    packageInfo: {
+      ...packageAttribution,
+      ...(packageDescription !== "" ? { description: packageDescription } : {}),
+    },
+  };
   if (isAdaptation) {
     const bumpedVersion = shippedVersion;
 

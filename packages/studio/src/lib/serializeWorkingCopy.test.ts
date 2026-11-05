@@ -318,9 +318,9 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     expect(outputCall["startIr"]).toBe(previewCall["startIr"]);
     // The release version is an output-only overlay (spec 102 FR-009: the
     // shipped version, 1.0 on a Copy), as is the package descriptor's
-    // copyright/author (spec 064 FR-003; the preview builds no package);
+    // <Info> fields (spec 064 FR-003; the preview builds no package);
     // every other identity field is shared.
-    const { version: outputVersion, packageAttribution: _packageAttribution, ...outputIdentity } =
+    const { version: outputVersion, packageInfo: _packageInfo, ...outputIdentity } =
       outputCall["identity"] as Record<string, unknown>;
     expect(outputVersion).toBe("1.0");
     expect(outputIdentity).toEqual(previewCall["identity"]);
