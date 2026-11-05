@@ -20,8 +20,6 @@
 // PhaseProjectName.integration.test.tsx.
 
 import { describe, it, expect } from "vitest";
-import { i18n } from "../../test/renderWithI18n.tsx";
-import { messages as frMessages } from "../../locales/fr/messages.json?lingui";
 import {
   trackOptions,
   phaseFOptions,
