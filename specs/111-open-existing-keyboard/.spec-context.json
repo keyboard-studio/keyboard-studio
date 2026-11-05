@@ -416,11 +416,19 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-05T00:15:14.659Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-05T18:30:58.750Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T050",
+  "currentTask": "T051",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -835,6 +843,13 @@
         "packages/studio/src/components/OpenKeyboardEntry.test.tsx",
         "packages/studio/src/StudioShell.tsx"
       ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Full gates green (build, typecheck, lint, pnpm -r test); golden walk fails locally only on CRLF kvks/kpj from stale autocrlf ../keyboards checkout, baseline unchanged",
+      "files": [
+        "none"
+      ]
     }
   },
   "verified": [
@@ -850,6 +865,11 @@
       "what": "engine 4946, contracts 1047, keyboard-lint 547 vitest; studio openMode test; pnpm typecheck",
       "command": "pnpm -r test; pnpm typecheck",
       "result": "pass"
+    },
+    {
+      "what": "build, typecheck, lint, pnpm -r test (contracts 1073, oauth 314, keyboard-lint 564, glottolog 42, engine 4985, studio 11301)",
+      "command": "pnpm build; pnpm typecheck; pnpm lint; pnpm -r test",
+      "result": "all pass, per km-programmer run"
     }
   ],
   "concerns": [
@@ -870,9 +890,13 @@
     },
     {
       "note": "T046 gate is per help screen, not per question: any missing/failing help doc asks the whole help step"
+    },
+    {
+      "note": "golden walk fails locally: source/test.kvks and test.kpj are CRLF because ../keyboards working copy is autocrlf CRLF (index LF). Baseline zip is LF and correct; not recaptured. Needs CI or an LF checkout to confirm SC-004.",
+      "step": "implement"
     }
   ],
-  "last_action": "Phase 1 done (T001)",
+  "last_action": "all tasks done",
   "decisions": [
     {
       "decision": "18.6 finding key gets #U+XXXX suffix so each missing character is its own key",
@@ -887,7 +911,7 @@
   ],
   "step_summaries": {
     "implement": {
-      "summary": "Phase 7: exemplar union, 18.6 on Open, per-Apply consistency suggestions UI"
+      "summary": "Spec 111 final gates run; golden walk unconfirmed locally (CRLF env)"
     }
   }
 }
