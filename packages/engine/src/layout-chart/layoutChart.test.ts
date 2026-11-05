@@ -236,4 +236,26 @@ describe("renderLayoutCharts — SC-008 legibility", () => {
     const [chart] = renderLayoutCharts(legibilityKvksInput());
     expect(chart!.svg).toContain(`class="${EMPTY_KEYCAP_CLASS}"`);
   });
+
+  // A hand test of an Ewondo keyboard drew its core letters as U+025B, U+0254
+  // and U+0259. Every block below is covered by Noto Sans, the stack's lead
+  // face, so each character renders as itself.
+  it.each([
+    ["IPA Extensions", "ɛ"], // ɛ
+    ["Latin Extended Additional", "ẅ"], // ẅ
+    ["Latin Extended-C", "Ɑ"], // Ɑ
+    ["Latin Extended-D", "ꞌ"], // ꞌ
+    ["Geometric Shapes", "◌"], // ◌, also the carrier a kvks mark label leads with
+    ["Letterlike Symbols", "™"], // ™
+    ["Alphabetic Presentation Forms", "ﬀ"], // ﬀ
+  ])("renders a %s character as itself, not as its scalar name", (_block, ch) => {
+    const kvks: KvksIR = {
+      layers: [{ shift: "", keys: [{ vkey: "K_A", label: ch }] }],
+      usealtgr: false,
+      nodeIds: [],
+    };
+    const [chart] = renderLayoutCharts({ displayName: "Coverage KB", kvks, ir: makeTestIR([]), touchLayout: null });
+    expect(chart!.svg).toContain(`>${ch}<`);
+    expect(chart!.svg).not.toContain(`class="${NO_GLYPH_LABEL_CLASS}"`);
+  });
 });
