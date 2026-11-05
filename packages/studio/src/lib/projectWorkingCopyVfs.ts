@@ -380,6 +380,19 @@ export type IdentityOverlay = {
    * never the help-page line (research D-06). Omitted entirely when absent.
    */
   websiteUrl?: string;
+  /**
+   * The descriptor's `<Info><Copyright>` / `<Author>` (spec 064 FR-003), from
+   * the same holder block LICENSE.md is written from (engine
+   * `packageAttributionFields`). Descriptor-only: unlike `copyright`, it never
+   * touches `store(&COPYRIGHT)`, which carries the starting keyboard's line.
+   * Used only when step 3.6 generates the descriptor; a patched one keeps its
+   * own.
+   */
+  packageAttribution?: {
+    copyrightLine?: string;
+    authorName?: string;
+    authorEmail?: string;
+  };
 };
 
 export interface ProjectWorkingCopyVfsResult {
@@ -1193,6 +1206,7 @@ export function projectWorkingCopyVfs(
       ...(identity.websiteUrl !== undefined && identity.websiteUrl !== ""
         ? { websiteUrl: identity.websiteUrl }
         : {}),
+      ...(identity.packageAttribution ?? {}),
     };
     // `applyIdentityToKps` never throws — an absent or unreadable descriptor
     // reports through its warnings, which merge into the projection's own. A

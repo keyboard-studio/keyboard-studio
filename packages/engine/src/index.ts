@@ -358,6 +358,7 @@ export {
   renameFilesInVfs,
   generateStubs,
   resolveInheritedHolders,
+  packageAttributionFields,
 } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export {

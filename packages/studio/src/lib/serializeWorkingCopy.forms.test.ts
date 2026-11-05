@@ -100,7 +100,8 @@ describe.each(DOC_FIXTURES.map((f) => [f.id, f] as const))("documentation forms 
     expect(docs.license).toContain(`Copyright © `);
     expect(docs.license).toContain(HOLDER);
     for (const text of [docs.license, docs.kps, docs.kmn, docs.readme, docs.readmeHtm, docs.welcome, docs.help]) {
-      for (const m of text.matchAll(/(?:Copyright|©)\s*(?:©\s*)?(?:\d{4}(?:-\d{4})?\s+)?([^<\n'"]+)/g)) {
+      // `(?<![</])` skips the .kps element's own tag name (`<Copyright URL="">`).
+      for (const m of text.matchAll(/(?<![</])(?:Copyright|©)\s*(?:©\s*)?(?:\d{4}(?:-\d{4})?\s+)?([^<\n'"]+)/g)) {
         expect(m[1]!.trim()).toContain(HOLDER);
       }
     }
