@@ -80,7 +80,24 @@
       "{{/platforms}}"
     ],
     "readmeHtm": [
-      "<html><body>{{#description}}<h1>{{displayName}}</h1><p>{{description}}</p>{{/description}}{{#noDescription}}<p>{{displayName}} keyboard</p>{{/noDescription}}{{#readmeIntro}}<p>{{readmeIntro}}</p>{{/readmeIntro}}{{#addsLine}}<p>Adds: {{addsLine}}</p>{{/addsLine}}{{#fontLine}}<p>{{fontLine}}</p>{{/fontLine}}{{#typingTable}}<p>After installing, see the welcome page for how to type each character.</p>{{/typingTable}}{{#helpPageUrl}}<p>Help: <a href=\"{{helpPageUrl}}\">{{helpPageUrl}}</a></p>{{/helpPageUrl}}</body></html>"
+      "<!DOCTYPE html>",
+      "<html{{#docLang}} lang=\"{{docLang}}\"{{/docLang}}>",
+      "<head>",
+      "<meta charset=\"utf-8\">",
+      "<title>{{displayName}}</title>",
+      "{{#pageStyle}}<style>{{pageStyle}}</style>{{/pageStyle}}",
+      "</head>",
+      "<body>",
+      "{{#description}}<h1>{{displayName}}</h1>",
+      "<p>{{description}}</p>{{/description}}",
+      "{{#noDescription}}<p>{{displayName}} keyboard</p>{{/noDescription}}",
+      "{{#readmeIntro}}<p>{{readmeIntro}}</p>{{/readmeIntro}}",
+      "{{#addsLine}}<p>Adds: {{addsLine}}</p>{{/addsLine}}",
+      "{{#fontLine}}<p>{{fontLine}}</p>{{/fontLine}}",
+      "{{#typingTable}}<p>After installing, see the welcome page for how to type each character.</p>{{/typingTable}}",
+      "{{#helpPageUrl}}<p>Help: <a href=\"{{helpPageUrl}}\">{{helpPageUrl}}</a></p>{{/helpPageUrl}}",
+      "</body>",
+      "</html>"
     ],
     "welcome": [
       "<!DOCTYPE html>",

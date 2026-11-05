@@ -742,7 +742,13 @@ export function renderReadmeHtm(input: HelpDocsRenderInput): string {
   const description = readmeDescriptionOf(input);
   const facts = input.readme;
   const hasTyping = facts !== undefined && facts.typingRows.length + facts.literalRows.length > 0;
+  // The same shell as the fresh welcome page: doctype, page language, UTF-8
+  // charset and the shared style. The "Adds:" line is non-ASCII by
+  // construction, so the charset must be declared rather than guessed.
+  const lang = proseLang(input.answers, input.primaryBcp47);
   return renderDocForm(DOC_FORMS.forms.readmeHtm, {
+    docLang: lang !== undefined ? escapeDocHtml(lang) : "",
+    pageStyle: DOC_PAGE_STYLE,
     displayName: escapeDocHtml(input.displayName),
     description: description !== undefined ? escapeDocHtml(description) : "",
     noDescription: description === undefined ? "1" : "",
