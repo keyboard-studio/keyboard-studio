@@ -88,13 +88,14 @@ import {
   findSlotOccupant,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
+  carvedTouchIdentityIds,
   keyMatchesRemovalSetWithProduction,
   resolvedTextProductions,
   touchKeyIdFamily,
   type PlacementResolverContext,
   type RemovalProductionContext,
 } from "./touch-mechanism-shared.js";
-import type { RawKey, RawLayer, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
+import type { RawKey, RawLayer, RawPlatform, RawRow, RawSubKey } from "./touch-layout-wire-format.js";
 import type { DesktopModifications } from "./applyDesktopModifications.js";
 import { DEFAULT_TOUCH_LAYER, touchLayerForChar } from "./touchLayer.js";
 import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
@@ -161,6 +162,13 @@ function removeAcrossRawLayout(
   removalSet: ReadonlySet<string>,
   resolverCtx?: PlacementResolverContext,
 ): void {
+  // T_/U_ ids carved as identities — every occurrence goes, not only the
+  // ones whose layer state has a producing rule (see carvedTouchIdentityIds).
+  const identityIds =
+    resolverCtx !== undefined
+      ? carvedTouchIdentityIds(rawLayoutOccurrences(layout), removalSet, resolverCtx)
+      : new Set<string>();
+
   for (const pName of Object.keys(layout)) {
     const platform = layout[pName];
     if (!platform || typeof platform !== "object") continue;
@@ -181,7 +189,40 @@ function removeAcrossRawLayout(
       for (const row of layer.row) {
         if (!Array.isArray(row.key)) continue;
         for (const key of row.key) {
-          stripRemovedFromRawKey(key, removalSet, productionCtx);
+          stripRemovedFromRawKey(
+            key,
+            (c) =>
+              (typeof c.id === "string" && identityIds.has(c.id)) ||
+              keyMatchesRemovalSetWithProduction(c, removalSet, productionCtx),
+          );
+        }
+      }
+    }
+  }
+}
+
+/** Every main key and gesture entry in the raw layout, with the id of its layer. */
+function* rawLayoutOccurrences(
+  layout: RawTouchLayout,
+): Generator<{ entry: RawKey | RawSubKey; layerId: string }> {
+  for (const platform of Object.values(layout)) {
+    if (!platform || typeof platform !== "object") continue;
+    const p = platform as RawPlatform;
+    if (!Array.isArray(p.layer)) continue;
+    for (const layer of p.layer) {
+      if (!Array.isArray(layer.row) || typeof layer.id !== "string") continue;
+      for (const row of layer.row) {
+        if (!Array.isArray(row.key)) continue;
+        for (const key of row.key) {
+          yield { entry: key, layerId: layer.id };
+          const subs = [
+            ...(Array.isArray(key.sk) ? key.sk : []),
+            ...(Array.isArray(key.multitap) ? key.multitap : []),
+            ...(key.flick && typeof key.flick === "object" ? Object.values(key.flick) : []),
+          ];
+          for (const sub of subs) {
+            if (sub) yield { entry: sub, layerId: layer.id };
+          }
         }
       }
     }
@@ -191,25 +232,24 @@ function removeAcrossRawLayout(
 /** Mutate `key` in place, dropping carved gesture entries / primary production. */
 function stripRemovedFromRawKey(
   key: RawKey,
-  removalSet: ReadonlySet<string>,
-  productionCtx?: RemovalProductionContext,
+  isRemoved: (candidate: RawKey | RawSubKey) => boolean,
 ): void {
   if (Array.isArray(key.sk)) {
-    key.sk = key.sk.filter((s) => !keyMatchesRemovalSetWithProduction(s, removalSet, productionCtx));
+    key.sk = key.sk.filter((s) => !isRemoved(s));
   }
   if (Array.isArray(key.multitap)) {
-    key.multitap = key.multitap.filter((m) => !keyMatchesRemovalSetWithProduction(m, removalSet, productionCtx));
+    key.multitap = key.multitap.filter((m) => !isRemoved(m));
   }
   if (key.flick && typeof key.flick === "object") {
     for (const direction of Object.keys(key.flick)) {
       const sub = key.flick[direction];
-      if (sub && keyMatchesRemovalSetWithProduction(sub, removalSet, productionCtx)) {
+      if (sub && isRemoved(sub)) {
         delete key.flick[direction];
       }
     }
   }
 
-  if (keyMatchesRemovalSetWithProduction(key, removalSet, productionCtx)) {
+  if (isRemoved(key)) {
     // Never delete the key object — row geometry/widths stay stable (R9).
     // The emptied-key spelling is shared with the IR twin (BLANK_KEY_ID /
     // BLANK_KEY_SP in touch-mechanism-shared.ts), which carries the full

@@ -871,4 +871,32 @@ describe("applyDesktopModifications — removals match ruled T_ keys by producti
 
     expect(getKey(layout, "T_0300")).toBeDefined();
   });
+
+  // Cameroon QWERTY's T_1DC4 sits on the shift layer (`+ [SHIFT T_1DC4]`)
+  // and again on rightalt-caps, a state no rule covers. Blanking only the
+  // producing occurrence left the other copy on the layout as a dead key,
+  // and the output projection — which carves T_ ids by identity only when
+  // some occurrence still produces — could no longer see it.
+  it("blanks every occurrence of a carved T_ key, including layers whose state has no rule for it", () => {
+    const ctx = resolverCtxFor([
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'tid'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [SHIFT T_1DC4] > U+1DC4",
+      "+ [SHIFT K_Q] > U+1DC4",
+      "+ [K_Q] > 'q'",
+    ].join("\n"));
+    const seed = makeLayout(
+      [makeKey("T_1DC4", { text: "◌᷄", output: undefined }), makeKey("K_Q", { text: "q", output: undefined })],
+      { shiftLayer: [makeKey("T_1DC4", { text: "◌᷄", output: undefined })] },
+    );
+    const { layout } = applyDesktopModifications(seed, { removals: ["᷄"], placements: [] }, ctx);
+
+    const ids = layout.platforms.flatMap((p) => p.layers.flatMap((l) => l.rows.flatMap((r) => r.keys.map((k) => k.id))));
+    expect(ids).not.toContain("T_1DC4");
+    // A K_ id is the physical key, not one character: SHIFT K_Q producing the
+    // carved mark must not blank the unshifted K_Q, which still types q.
+    expect(getKey(layout, "K_Q")).toBeDefined();
+  });
 });

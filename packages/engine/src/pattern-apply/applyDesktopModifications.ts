@@ -40,6 +40,7 @@ import {
   BLANK_KEY_ID,
   BLANK_KEY_SP,
   buildRemovalSet,
+  carvedTouchIdentityIds,
   findSlotOccupant,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
@@ -119,6 +120,19 @@ function removeAcrossLayout(
   removalSet: ReadonlySet<string>,
   resolverCtx?: PlacementResolverContext,
 ): TouchLayoutIR {
+  // T_/U_ ids carved as identities — every occurrence goes, not only the
+  // ones whose layer state has a producing rule (see carvedTouchIdentityIds).
+  const identityIds =
+    resolverCtx !== undefined
+      ? carvedTouchIdentityIds(layoutOccurrences(layout), removalSet, resolverCtx)
+      : new Set<string>();
+  const matches = (
+    candidate: TouchKeyIR,
+    productionCtx: RemovalProductionContext | undefined,
+  ): boolean =>
+    identityIds.has(candidate.id) ||
+    keyMatchesRemovalSetWithProduction(candidate, removalSet, productionCtx);
+
   let anyPlatformChanged = false;
   const newPlatforms = layout.platforms.map((platform) => {
     let anyLayerChanged = false;
@@ -136,7 +150,7 @@ function removeAcrossLayout(
       const newRows = layer.rows.map((row) => {
         let anyKeyChanged = false;
         const newKeys = row.keys.map((key) => {
-          const { key: nextKey, changed } = stripRemovedFromKey(key, removalSet, productionCtx);
+          const { key: nextKey, changed } = stripRemovedFromKey(key, (c) => matches(c, productionCtx));
           if (changed) anyKeyChanged = true;
           return nextKey;
         });
@@ -157,6 +171,28 @@ function removeAcrossLayout(
   return { ...layout, platforms: newPlatforms };
 }
 
+/** Every main key and gesture entry in `layout`, with the id of its layer. */
+function* layoutOccurrences(
+  layout: TouchLayoutIR,
+): Generator<{ entry: TouchKeyIR; layerId: string }> {
+  for (const platform of layout.platforms) {
+    for (const layer of platform.layers) {
+      for (const row of layer.rows) {
+        for (const key of row.keys) {
+          yield { entry: key, layerId: layer.id };
+          for (const sub of [
+            ...(key.sk ?? []),
+            ...(key.multitap ?? []),
+            ...Object.values(key.flick ?? {}),
+          ]) {
+            if (sub !== undefined) yield { entry: sub, layerId: layer.id };
+          }
+        }
+      }
+    }
+  }
+}
+
 /**
  * Strip carved-character traces from a single key: drop matching sk/flick/
  * multitap entries, and — if the key's own primary production (text/output/
@@ -166,32 +202,31 @@ function removeAcrossLayout(
  */
 function stripRemovedFromKey(
   key: TouchKeyIR,
-  removalSet: ReadonlySet<string>,
-  productionCtx?: RemovalProductionContext,
+  isRemoved: (candidate: TouchKeyIR) => boolean,
 ): { key: TouchKeyIR; changed: boolean } {
   let sk = key.sk;
   if (sk) {
-    const filtered = sk.filter((s) => !keyMatchesRemovalSetWithProduction(s, removalSet, productionCtx));
+    const filtered = sk.filter((s) => !isRemoved(s));
     if (filtered.length !== sk.length) sk = filtered;
   }
 
   let multitap = key.multitap;
   if (multitap) {
-    const filtered = multitap.filter((m) => !keyMatchesRemovalSetWithProduction(m, removalSet, productionCtx));
+    const filtered = multitap.filter((m) => !isRemoved(m));
     if (filtered.length !== multitap.length) multitap = filtered;
   }
 
   let flick = key.flick;
   if (flick) {
     const entries = Object.entries(flick).filter(
-      ([, v]) => v !== undefined && !keyMatchesRemovalSetWithProduction(v, removalSet, productionCtx),
+      ([, v]) => v !== undefined && !isRemoved(v),
     );
     if (entries.length !== Object.keys(flick).length) {
       flick = Object.fromEntries(entries) as NonNullable<TouchKeyIR["flick"]>;
     }
   }
 
-  const primaryRemoved = keyMatchesRemovalSetWithProduction(key, removalSet, productionCtx);
+  const primaryRemoved = isRemoved(key);
   const gestureEntriesChanged = sk !== key.sk || multitap !== key.multitap || flick !== key.flick;
 
   if (!primaryRemoved && !gestureEntriesChanged) {
