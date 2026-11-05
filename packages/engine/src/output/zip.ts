@@ -42,6 +42,12 @@ Your keyboard has been packaged and is ready to submit to the Keyman keyboard re
 2. Create a branch: \`git checkout -b add/<your-keyboard-id>\`
 3. Copy the keyboard files into \`release/<first-letter>/<your-keyboard-id>/\`.
    Do not copy \`NEXT_STEPS.md\` or the \`${STUDIO_METADATA_PREFIX}\` folder — see "Studio metadata" below.
+   Leave out two more folders if the zip has them:
+   - \`build/\` holds compiled files. The repository builds its own, and a pull
+     request must not contain compiled output.
+   - \`shared/\` holds fonts the package uses. They belong in the repository's
+     top-level \`shared/\` folder, which is where the \`.kps\` file looks for them
+     (\`..\\..\\..\\shared\\…\`). Most are already there; add only a font that is missing.
 4. Commit and push your branch
 5. Open a pull request from your fork to \`keyboard-studio/keyboards:master\`
 
