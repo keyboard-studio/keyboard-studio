@@ -580,6 +580,16 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // localStart lives in the session store; we update it when the working-copy's startKeyboard
   // prop changes so the wizard stays in sync with the pipeline-settled base.
   useEffect(() => {
+    // Open records the starting keyboard before this view mounts; the working copy
+    // is not instantiated until the pipeline below compiles it, so a null prop
+    // must not erase that pending start.
+    if (
+      startKeyboard === null &&
+      useSurveySessionStore.getState().localStart !== null &&
+      useDecisionStore.getState().decisions["authoring-track"]?.value === "adapt"
+    ) {
+      return;
+    }
     setLocalStart(startKeyboard);
   }, [startKeyboard, setLocalStart]);
 

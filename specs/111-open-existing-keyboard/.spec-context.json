@@ -392,11 +392,35 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-04T22:50:54.607Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T00:15:14.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T00:15:14.338Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T00:15:14.659Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
   "unattended": true,
-  "currentTask": "T047",
+  "currentTask": "T050",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -784,6 +808,32 @@
         "packages/engine/src/shared/docSlots.ts",
         "packages/studio/src/components/SuggestedFixes.tsx",
         "packages/studio/src/lib/docRegenerationFix.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Reworded spec.md Scenario F as a Track 1 Copy, 110 US5 and workflow-model Track 2 as update",
+      "files": [
+        "spec.md",
+        "specs/110-readme-template/spec.md",
+        "docs/workflow-model.md"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "spec-trace acknowledged section 15 drift; 56 sections clean",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Open E2E passes (SC-009, SC-008); Open now instantiates via survey then hands off to criteria; markVisited lifts welcome gate",
+      "files": [
+        "packages/studio/e2e/open-existing-keyboard.spec.ts",
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/components/OpenKeyboardEntry.test.tsx",
+        "packages/studio/src/StudioShell.tsx"
       ]
     }
   },

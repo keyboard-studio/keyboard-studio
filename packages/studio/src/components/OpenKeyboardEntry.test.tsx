@@ -36,7 +36,9 @@ describe("openExistingKeyboard", () => {
     expect(decisions["authoring-track"]?.value).toBe("adapt");
     expect(decisions["base-keyboard"]?.value).toEqual({ id: KB.id, name: KB.displayName });
     expect(useSurveySessionStore.getState().localStart?.id).toBe(KB.id);
-    expect(navigateTo).toHaveBeenCalledWith("criteria");
+    // The working copy is instantiated by the walk's pipeline; the criteria page follows it.
+    expect(navigateTo).toHaveBeenCalledWith("survey");
+    expect(navigateTo).not.toHaveBeenCalledWith("criteria");
     expect(useSurveySessionStore.getState().activeStepId).toBe("attribution");
     expect(useWorkingCopyStore.getState().startSource).toBeNull();
   });

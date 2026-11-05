@@ -158,9 +158,9 @@
 
 ## Phase 10: Polish & cross-cutting
 
-- [ ] T048 [P] Amend [spec.md](../../spec.md) §15 Scenario F (replaced; a single-language keyboard from a country keyboard is a Copy), [specs/110-readme-template/spec.md](../110-readme-template/spec.md) User Story 5, and [docs/workflow-model.md](../../docs/workflow-model.md) Track 2 wording, editing the existing text, not appending
-- [ ] T049 [P] Run `node utilities/spec-trace check` and acknowledge the intended drift from T048
-- [ ] T050 Playwright E2E for the Open happy path ([quickstart.md §5](quickstart.md) steps 1–2, 5) in `packages/studio/e2e/open-existing-keyboard.spec.ts`. Check SC-009 (≤3 interactions to the criteria view) and SC-008 (no change without interaction).
+- [x] T048 [P] Amend [spec.md](../../spec.md) §15 Scenario F (replaced; a single-language keyboard from a country keyboard is a Copy), [specs/110-readme-template/spec.md](../110-readme-template/spec.md) User Story 5, and [docs/workflow-model.md](../../docs/workflow-model.md) Track 2 wording, editing the existing text, not appending
+- [x] T049 [P] Run `node utilities/spec-trace check` and acknowledge the intended drift from T048
+- [x] T050 Playwright E2E for the Open happy path ([quickstart.md §5](quickstart.md) steps 1–2, 5) in `packages/studio/e2e/open-existing-keyboard.spec.ts`. Check SC-009 (≤3 interactions to the criteria view) and SC-008 (no change without interaction).
 - [ ] T051 Full gates: `pnpm lint`, the studio/engine/contracts/keyboard-lint vitest suites, and the golden walk (SC-004)
 
 ---

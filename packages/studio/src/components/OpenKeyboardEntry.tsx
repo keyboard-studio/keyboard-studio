@@ -17,6 +17,7 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { markVisited } from "../lib/firstVisit.ts";
 import {
   forkIsNewer,
   replacesCuratedCopy,
@@ -53,8 +54,24 @@ export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef 
     history: [],
     visited: ["identity", "layout", "choose_base", "track", "attribution"],
   });
+  // Opening a keyboard leaves the welcome screen, so the first-visit gate must lift
+  // or the route would be forced back to welcome.
+  markVisited();
   // Open lands on the criteria page: what was already wrong, before any edit.
-  navigateTo("criteria");
+  // The working copy is instantiated by the survey view's compile pipeline, so the
+  // walk route mounts first and hands over to the criteria page once the copy exists.
+  navigateTo("survey");
+  const landOnCriteria = (): boolean => {
+    const wc = useWorkingCopyStore.getState();
+    if (wc.startKeyboard === null || wc.startKeyboard.id !== keyboard.id) return false;
+    navigateTo("criteria");
+    return true;
+  };
+  if (!landOnCriteria()) {
+    const unsubscribe = useWorkingCopyStore.subscribe(() => {
+      if (landOnCriteria()) unsubscribe();
+    });
+  }
   return true;
 }
 
