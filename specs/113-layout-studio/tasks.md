@@ -176,11 +176,14 @@ tab, the Code tab, the simulator, and the downloaded `.kmn` show them; undo each
 
 ### Implementation for User Story 2
 
-- [ ] T056 [US2] Settle `kmn-edits` replay ordering (research R12): read `orderByDependencies` (`ST/decisions/orderDecisions.ts`) and `ST/decisions/replayKeyboard.ts` to see how a `requires` on a decision with no recorded value behaves (`kmn-edits` is recorded at edit time, before `physical-layout` is recorded at completion). Choose `requires` or an ordering-only declaration so `kmn-edits` replays after `carved-layout`, `deadkeys-defined`, `rule-set`, and `physical-layout` without waiting for them; record the choice in [research.md](research.md) R12
+- [ ] T056 [US2] Settle how recording `kmn-edits` interacts with rebuild, then its ordering (research R12), and record both answers in [research.md](research.md) R12 before T060:
+  - **Does recording trigger a replay?** Find every path that reacts to a recorded decision: `useDecisionStore` subscribers (`ST/lib/draftPersistence.ts` subscribes for saving), `rebuildWorkingCopyFromStores` (`ST/decisions/rebuildWorkingCopy.ts:319`, documented as "rebuild after a completion" via `ReducerDeps.rebuildFromDecisions` in `ST/steps/reducer.ts` / `ST/lib/studioReducerDeps.ts`), and `ST/hooks/usePreviewArtifact.ts`. If an edit-time `record` of `kmn-edits` can start a rebuild, T060's manual live apply would double-apply or race it, and a rebuild would drop live-only edits (R6) — in that case T060 records through whichever path avoids the rebuild, or relies on the rebuild instead of the manual apply; decide here.
+  - **Ordering:** read `orderByDependencies` (`ST/decisions/orderDecisions.ts`) and `ST/decisions/replayKeyboard.ts` to see how a `requires` on a decision with no recorded value behaves (`kmn-edits` is recorded at edit time, before `physical-layout` is recorded at completion). Choose `requires` or an ordering-only declaration so `kmn-edits` replays after `carved-layout`, `deadkeys-defined`, `rule-set`, and `physical-layout` without waiting for them.
+  - The same question for re-recording `deadkeys-defined` mid-step (T080): would it mark downstream decisions for re-proposal (spec 093 downstream closure, `ST/decisions/downstreamClosure.ts`)? Record the answer; T080 follows it.
 - [ ] T057 [US2] Add `"kmn-edits"` to `DecisionId` in `ST/decisions/decisionTypes.ts` with its IR paths `[["groups"]]` in `decisionIRPaths` (US8 extends them in T094)
 - [ ] T058 [US2] Implement the gallery module `ST/survey/questions/gallery/kmnEdits.ts` (`provides: ["kmn-edits"]`, T056's ordering, `writes: [irPath("groups")]`, `apply` → `replayKmnEdits`) with a trail renderer `ST/survey/questions/gallery/KmnEditsRenderer.tsx` listing the entries in plain words, and register it in `ST/survey/questions/registry.ts` beside `deadkeysDefined`; passes T049
 - [ ] T059 [US2] Declare `LAYOUT_WRITES` (the entry group's `rules` path) in `ST/steps/editorMutate.ts` beside `DEADKEY_WRITES`
-- [ ] T060 [US2] Add `commitKmnEdit` and `undoKmnEdit` and undo kinds `l` / `lb` to `ST/stores/workingCopyStore.ts` (live: `applyLayoutOp` → `applyMutatePatch(ir, patch, LAYOUT_WRITES)` → `setWorkingIR`; then `useDecisionStore.getState().record({ id: "kmn-edits", … })`; the undo entry holds the `KmnEditEffect`). No new state field. Passes T050
+- [ ] T060 [US2] Add `commitKmnEdit` and `undoKmnEdit` and undo kinds `l` / `lb` to `ST/stores/workingCopyStore.ts` (live: `applyLayoutOp` → `applyMutatePatch(ir, patch, LAYOUT_WRITES)` → `setWorkingIR`; then `useDecisionStore.getState().record({ id: "kmn-edits", … })`; the undo entry holds the `KmnEditEffect`). No new state field. **The live-apply-then-record sequence is conditional on T056's answer**: if recording triggers a rebuild, follow the path T056 chose instead. Passes T050
 - [ ] T061 [US2] In the **same commit as T060**: register surface `kmn-edits` in `ST/decisions/derivedSurfaceRegistry.ts` (decisionIds `["kmn-edits"]`, storeActions `commitKmnEdit`, `undoKmnEdit`, evidence citing R12), status **equivalence-proven**, and extend `ST/decisions/derivedEquivalence.test.ts`'s replay arm (a rebuild from decisions reproduces the entry group's rules after Layout edits) and draft-load arm (the value reloads from the draft envelope) — SC-011. The census and coverage arms must be green in that commit (FR-026)
 - [ ] T062 [US2] Pass the `kmn-edits` value into the projection through `ST/lib/projectionInput.ts`, and add projection step 2.2 to `ST/lib/projectWorkingCopyVfs.ts` (parse → `replayKmnEdits` → emit, only when there are entries) plus the step 2.7 tolerance-variant skip; passes T051
 - [ ] T063 [US2] Re-measure replay performance with `ST/decisions/rebuildPerf.measure.ts` (spec 105 / 093 baselines: warm edit 7.20 ms, cold resume 9.58 ms, sil_euro_latin) with and without 20 `kmn-edits` entries; record the numbers in the phase commit message; a regression beyond the noise band blocks the phase
@@ -223,7 +226,7 @@ deadkey keyboard, every table row matches the compiled keyboard (SC-007 deadkey 
 
 ### Implementation for User Story 3
 
-- [ ] T080 [US3] Add the deadkey option to `LY/KeyEditPanel.tsx`: **new** deadkey → `commitDeadkeyOp({ kind: "define", … })` showing spec 083's base-keyboard disclosure (reuse the component in `ST/editors/deadkey/`), **existing** deadkey → a `set-key` entry with a deadkey output. Every Layout-tab deadkey op also records `deadkeys-defined` at the confirm with the current op list (ruling 6: edits are decisions; the Deadkeys step's completion record stays as is)
+- [ ] T080 [US3] Add the deadkey option to `LY/KeyEditPanel.tsx`: **new** deadkey → `commitDeadkeyOp({ kind: "define", … })` showing spec 083's base-keyboard disclosure (reuse the component in `ST/editors/deadkey/`), **existing** deadkey → a `set-key` entry with a deadkey output. Every Layout-tab deadkey op also records `deadkeys-defined` at the confirm with the current op list (ruling 6: edits are decisions; the Deadkeys step's completion record stays as is) — **unless T056 found that re-recording it mid-step pushes re-proposals onto downstream decisions**; then record it at the Mechanisms step's completion instead, and note the gap against spec 105 phase 2 (its T202) in [research.md](research.md) R12
 - [ ] T081 [US3] Implement `LY/DeadkeyTablePanel.tsx`: fan-out rows via `add-pair` / `remove-pair` (`insert-pair` per T074), pushing undo kind `ld`; keystroke-keyed rows via `set-row` / `remove-row` `kmn-edits` entries, pushing `l`; the space-row proposal; passes T077 and T079. Add undo kind `ld` to `ST/stores/workingCopyStore.ts`
 - [ ] T082 [US3] Implement `LY/AfterContextView.tsx` (deadkey mode) and the switch into it from the grid and the table; passes T078
 - [ ] T083 [US3] Implement `LY/DeadkeyList.tsx` in `LayoutPane`: every deadkey the keyboard defines, including ones on no key (place or delete — delete through spec 083), and the "no combinations yet" flag; one deadkey on several keys or layers shows one table. Tests in `LY/DeadkeyList.test.tsx`
@@ -271,10 +274,11 @@ tab and the edit still wins, flagged; a syntax error and a compile error each re
 - [ ] T100 [US8] Show "changed in code" where a code entry overrode another editor's node: the Layout tab's provenance detail (`LY/KeyDetailPanel.tsx`), the Assign tab (`ST/editors/assignLoop/MechanismGallery.tsx`), and the deadkey editor (`ST/editors/deadkey/`), driven by `authorEdit: "code-tab"`; tests beside each
 - [ ] T101 [US8] Replace T047's `it.todo` with the Code-tab half of US1 scenario 7 in `LY/LayoutPane.test.tsx`: after a Code-tab Apply and a republished artifact, the Layout tab shows the change, hand-set from the Code tab
 - [ ] T102 [US8] Extend the `kmn-edits` surface in `ST/decisions/derivedSurfaceRegistry.ts` (Code-tab evidence) and `ST/decisions/derivedEquivalence.test.ts`'s replay and draft-load arms with a mix of Layout and Code entries (SC-011)
-- [ ] T103 [US8] i18n for Phase 6 (as T045)
-- [ ] T104 [US8] E2E US8 row in `E2E`: change, add, and delete a rule and Apply; the download has exactly those changes; reload keeps them; a syntax error and a compile error each record nothing; overriding an Assign-tab rule shows the owner confirm and a review flag; re-assigning that key in the Assign tab leaves the code edit in effect and flagged
+- [ ] T103 [US8] Three paths must agree: add `ST/lib/projectWorkingCopyVfs.codeEdits.test.ts`. For T097's SC-010 code-edit set, apply each edit live (`commitKmnEdit` on the working IR), then run `projectWorkingCopyVfs` (step 2.2 replays onto the IR the projection assembles from `startIr` plus overlays — a different IR from the live one). Assert the projected `.kmn` contains every edit with **zero misses**, and that it equals the decision-rebuild result from T102 for the same rules. A change that applies live but misses in the projection fails this test (the R1 trap)
+- [ ] T104 [US8] i18n for Phase 6 (as T045)
+- [ ] T105 [US8] E2E US8 row in `E2E`: change, add, and delete a rule and Apply; the download has exactly those changes; reload keeps them; a syntax error and a compile error each record nothing; overriding an Assign-tab rule shows the owner confirm and a review flag; re-assigning that key in the Assign tab leaves the code edit in effect and flagged
 
-**Checkpoint**: Commit `spec 113 T088-T104`.
+**Checkpoint**: Commit `spec 113 T088-T105`.
 
 ---
 
@@ -285,12 +289,12 @@ tab and the edit still wins, flagged; a syntax error and a compile error each re
 **Independent Test**: on a context-heavy keyboard, open the detail of three read-only keys and
 follow "view in code"; the Code tab opens at the rule that fires.
 
-- [ ] T105 [P] [US5] Extend `LY/KeyDetailPanel.test.tsx`: the number of rules that match the key in this layer; every matching rule listed with its shape and editability; the replaced starting-point value when a hand-set value replaced it; "view in code" per rule, defaulting to the rule that fires
-- [ ] T106 [US5] Extend `LY/KeyDetailPanel.tsx` to pass T105 (FR-016 complete)
-- [ ] T107 [US5] i18n for Phase 7 (as T045)
-- [ ] T108 [US5] E2E US5 row in `E2E`: open a read-only key's detail; "view in code" reveals the rule's line
+- [ ] T106 [P] [US5] Extend `LY/KeyDetailPanel.test.tsx`: the number of rules that match the key in this layer; every matching rule listed with its shape and editability; the replaced starting-point value when a hand-set value replaced it; "view in code" per rule, defaulting to the rule that fires
+- [ ] T107 [US5] Extend `LY/KeyDetailPanel.tsx` to pass T106 (FR-016 complete)
+- [ ] T108 [US5] i18n for Phase 7 (as T045)
+- [ ] T109 [US5] E2E US5 row in `E2E`: open a read-only key's detail; "view in code" reveals the rule's line
 
-**Checkpoint**: Commit `spec 113 T105-T108`.
+**Checkpoint**: Commit `spec 113 T106-T109`.
 
 ---
 
@@ -303,14 +307,14 @@ policy surface.
 punctuation policy; those keys stop being provisional; assign one letter key; it stops being
 provisional; nothing else changes (SC-006).
 
-- [ ] T109 [P] [US6] Extend `LY/desktopGridViewModel.test.ts` and `LY/DesktopKeyGrid.test.tsx`: provisional cells visually distinct and announced "provisional" to assistive technology; per-layer provisional counts passed to `LayerSelector`'s `findingCountsByLayerId`; a confirmed class policy removes its keys from the count and shows the confirmed result; an author-assigned key is never provisional (SC-006)
-- [ ] T110 [US6] Implement the provisional styling, announcement, and per-layer counts in `LY/DesktopKeyCell.tsx`, `LY/desktopGridViewModel.ts`, and `LY/LayoutPane.tsx`; passes T109
-- [ ] T111 [US6] Add "change the fallback policy" to a provisional key's detail in `LY/KeyDetailPanel.tsx`, reaching `ST/editors/fallback/FallbackPolicySection.tsx` for that key's character class (the Layout tab never sets policy, FR-031); test in `LY/KeyDetailPanel.test.tsx`
-- [ ] T112 [US6] SC-006 over the corpus set in `LY/provenance.test.ts` (or the engine corpus suite if it needs no studio state): every unhandled key provisional, no `authorEdit` key provisional
-- [ ] T113 [US6] i18n for Phase 8 (as T045)
-- [ ] T114 [US6] E2E US6 row in `E2E` (uses `packages/studio/e2e/fallback-policy.spec.ts`'s helpers where they fit)
+- [ ] T110 [P] [US6] Extend `LY/desktopGridViewModel.test.ts` and `LY/DesktopKeyGrid.test.tsx`: provisional cells visually distinct and announced "provisional" to assistive technology; per-layer provisional counts passed to `LayerSelector`'s `findingCountsByLayerId`; a confirmed class policy removes its keys from the count and shows the confirmed result; an author-assigned key is never provisional (SC-006)
+- [ ] T111 [US6] Implement the provisional styling, announcement, and per-layer counts in `LY/DesktopKeyCell.tsx`, `LY/desktopGridViewModel.ts`, and `LY/LayoutPane.tsx`; passes T110
+- [ ] T112 [US6] Add "change the fallback policy" to a provisional key's detail in `LY/KeyDetailPanel.tsx`, reaching `ST/editors/fallback/FallbackPolicySection.tsx` for that key's character class (the Layout tab never sets policy, FR-031); test in `LY/KeyDetailPanel.test.tsx`
+- [ ] T113 [US6] SC-006 over the corpus set in `LY/provenance.test.ts` (or the engine corpus suite if it needs no studio state): every unhandled key provisional, no `authorEdit` key provisional
+- [ ] T114 [US6] i18n for Phase 8 (as T045)
+- [ ] T115 [US6] E2E US6 row in `E2E` (uses `packages/studio/e2e/fallback-policy.spec.ts`'s helpers where they fit)
 
-**Checkpoint**: Commit `spec 113 T109-T114`.
+**Checkpoint**: Commit `spec 113 T110-T115`.
 
 ---
 
@@ -323,14 +327,14 @@ never-fires duplicates shown read-only.
 replacement matches the simulator seeded with `n`; add "after `a`, `e` becomes `æ`"; typing `a e`
 gives `æ`.
 
-- [ ] T115 [P] [US4] Add `isContextReachable(ir, layers, context)` to `EN/layout-attribution/` (can some listed layer type the context's characters?) with tests in `EN/layout-attribution/isContextReachable.test.ts`
-- [ ] T116 [P] [US4] Extend `LY/AfterContextView.test.tsx` with literal-context mode: the context list (literal contexts and deadkeys, with key counts, from `listContexts`); entering a new context, with an unreachable one flagged before confirm (FR-029a); a "becomes" edit writes exactly the entered text, optionally with deadkeys, and never guesses what is kept; two rules for one context and key show the firing one editable and the other "never fires", read-only, with "view in code"
-- [ ] T117 [US4] Implement literal-context mode in `LY/AfterContextView.tsx` and the "becomes" editor `LY/BecomesEditor.tsx` writing `set-row` / `remove-row` `kmn-edits` entries (undo kind `l`); passes T116
-- [ ] T118 [US4] SC-007 context half and SC-009 in `EN/layout-attribution/layout-attribution.corpus.test.ts`: every editable literal-context row matches `simulateEach` seeded with its context; for every positional corpus keyboard with no FR-013 read-only shapes, 100% of rules editable; print the editable share per keyboard for the rest and paste the table into [research.md](research.md) as the store-based next-frontier baseline
-- [ ] T119 [US4] i18n for Phase 9 (as T045)
-- [ ] T120 [US4] E2E US4 row in `E2E`: "after `n`", set `g` → `ŋ`; typing `n g` gives `ŋ`; the download has the rule; a never-fires duplicate shows read-only
+- [ ] T116 [P] [US4] Add `isContextReachable(ir, layers, context)` to `EN/layout-attribution/` (can some listed layer type the context's characters?) with tests in `EN/layout-attribution/isContextReachable.test.ts`
+- [ ] T117 [P] [US4] Extend `LY/AfterContextView.test.tsx` with literal-context mode: the context list (literal contexts and deadkeys, with key counts, from `listContexts`); entering a new context, with an unreachable one flagged before confirm (FR-029a); a "becomes" edit writes exactly the entered text, optionally with deadkeys, and never guesses what is kept; two rules for one context and key show the firing one editable and the other "never fires", read-only, with "view in code"
+- [ ] T118 [US4] Implement literal-context mode in `LY/AfterContextView.tsx` and the "becomes" editor `LY/BecomesEditor.tsx` writing `set-row` / `remove-row` `kmn-edits` entries (undo kind `l`); passes T117
+- [ ] T119 [US4] SC-007 context half and SC-009 in `EN/layout-attribution/layout-attribution.corpus.test.ts`: every editable literal-context row matches `simulateEach` seeded with its context; for every positional corpus keyboard with no FR-013 read-only shapes, 100% of rules editable; print the editable share per keyboard for the rest and paste the table into [research.md](research.md) as the store-based next-frontier baseline
+- [ ] T120 [US4] i18n for Phase 9 (as T045)
+- [ ] T121 [US4] E2E US4 row in `E2E`: "after `n`", set `g` → `ŋ`; typing `n g` gives `ŋ`; the download has the rule; a never-fires duplicate shows read-only
 
-**Checkpoint**: Commit `spec 113 T115-T120`.
+**Checkpoint**: Commit `spec 113 T116-T121`.
 
 ---
 
@@ -344,10 +348,10 @@ the retirement pass → FR-050 and US7 are removed from the spec, not rolled for
 
 ## Phase 10: Polish & cross-cutting
 
-- [ ] T121 [P] Update [docs/packages.md](docs/packages.md) (new engine modules `layout-attribution`, `layout-ops`, `kmn-diff`; contracts `layoutOps`, `kmnEdits`) and [docs/architecture.md](docs/architecture.md) (the `kmn-edits` decision as the record of all KMN edits; projection step 2.2)
-- [ ] T122 [P] Run `/speckit-analyze` over spec, plan, and tasks; fix drift it reports in the spec folder
-- [ ] T123 Run every command and E2E row in [quickstart.md](quickstart.md) and record the results in the final PR body
-- [ ] T124 Close out the spec's Art XI notes: the store-based next frontier (owner + trigger) and the tray gate stay as written; confirm no other deferred item lacks an owner and trigger
+- [ ] T122 [P] Update [docs/packages.md](docs/packages.md) (new engine modules `layout-attribution`, `layout-ops`, `kmn-diff`; contracts `layoutOps`, `kmnEdits`) and [docs/architecture.md](docs/architecture.md) (the `kmn-edits` decision as the record of all KMN edits; projection step 2.2)
+- [ ] T123 [P] Run `/speckit-analyze` over spec, plan, and tasks; fix the drift it reports in `specs/113-layout-studio/spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/*.md`
+- [ ] T124 Run every command and E2E row in [quickstart.md](quickstart.md) and record the results in the final PR body
+- [ ] T125 Close out the Art XI notes in `specs/113-layout-studio/spec.md` (Assumptions): the store-based next frontier (owner + trigger) and the tray gate stay as written; confirm no other deferred item in `spec.md` or `plan.md` lacks an owner and trigger
 
 ---
 
