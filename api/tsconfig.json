@@ -1,1 +1,11 @@
-{"$schema":"https://json.schemastore.org/tsconfig","compilerOptions":{"noEmit":true,"types":["node"]},"exclude":["node_modules","**/*.test.ts"],"extends":"../tsconfig.base.json","include":["./**/*.ts"]}
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "rootDir": ".."
+  },
+  "exclude": ["node_modules", "**/*.test.ts"],
+  "extends": "../tsconfig.base.json",
+  "include": ["./**/*.ts"]
+}
