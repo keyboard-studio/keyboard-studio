@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Layout tab — a visual desktop-layout editor that never shows what it can't produce",
   "branch": "km/113-layout-studio",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "plan",
+  "status": "planned",
   "history": [
     {
       "step": "specify",
@@ -11,6 +11,13 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-11-04T20:11:13.039Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-05T00:51:47.789Z"
     }
   ]
 }

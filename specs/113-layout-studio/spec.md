@@ -451,7 +451,10 @@ lands as a US2 assignment would; the tray empties.
   - Each **contextual row** (a rule whose context is literal text, deadkeys, or both) is editable
     when its output is literal text, deadkeys, or `nul`, and what the compiled keyboard produces
     for that context plus that keystroke equals the rule's output.
-  - Anything that uses stores (`any()`, `index()`, `notany()`), `if()`, `platform()`, options,
+  - A **deadkey table in the studio's own shape** (spec 083's fan-out: `dk(x) + any(bases) >
+    index(outputs, n)`, with both stores plain character lists) is editable as rows of base
+    character → result, despite using stores. (Amended by the plan, research R3.)
+  - Anything else that uses stores (`any()`, `index()`, `notany()`), `if()`, `platform()`, options,
     `use()` chains whose later groups change the result, `beep`, or an opaque fragment is a
     read-only row with its reason. A read-only row never makes the key's other behaviours
     read-only, unless it changes what the plain output produces (then the plain output is
@@ -526,7 +529,8 @@ lands as a US2 assignment would; the tray empties.
 - **FR-028**: Each deadkey MUST have a **display character** (shown on its key, usually the spacing
   form of the accent) and a **combination table** the author can edit in the tab: each row is a
   following keystroke (shown as the key, its layer, and the character that key types) and its
-  result — literal text, or nothing. The author can add, change, and remove rows.
+  result — literal text, or nothing. For tables in spec 083's fan-out shape, a row is keyed by the
+  base character (as in MSKLC) and shown with the key that types it. The author can add, change, and remove rows.
   For a new deadkey, a row "space → display character" is proposed for the author to confirm
   (Art X), not added silently.
 - **FR-029**: The grid MUST offer an **after …** view. The author chooses what came before — a
