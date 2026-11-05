@@ -6,12 +6,12 @@
 //   buildHistoryProposal:
 //     2. Empty seed, no base -> single "Initial release." bullet.
 //     3. Base only (adaptation, no other changes) -> single "Adapted from" bullet, no "Initial release.".
-//     4. Full seed (base + characters + mechanisms + keys removed) -> bullets in order.
+//     4. Full seed (base + characters + mechanisms + characters removed) -> bullets in order.
 //     5. Characters-added bullet lists every character under the cap.
 //     6. Characters-added bullet caps the inline list with "and N more".
 //     7. Mechanisms-assigned bullet lists every mechanism under the cap.
-//     8. keysRemoved === 0 -> no "Removed" bullet.
-//     9. keysRemoved > 0 -> "Removed N keys." bullet.
+//     8. charactersRemoved === 0 -> no "Removed" bullet.
+//     9. charactersRemoved > 0 -> "Removed N characters." bullet.
 //     11. Combining marks in charactersAdded render on a dotted-circle carrier.
 //     10. version/dateIso pass through onto the returned HistoryProposal unchanged.
 
@@ -27,7 +27,7 @@ function emptySeed(overrides: Partial<HistoryProposalSeed> = {}): HistoryProposa
     base: null,
     charactersAdded: [],
     mechanismsAssigned: [],
-    keysRemoved: 0,
+    charactersRemoved: 0,
     ...overrides,
   };
 }
@@ -52,19 +52,19 @@ describe("buildHistoryProposal", () => {
     expect(proposal.bullets).toEqual(["Adapted from basic_kbdfr v1.3 via keyboard-studio."]);
   });
 
-  it("full seed produces bullets in order: base, characters, mechanisms, keys removed", () => {
+  it("full seed produces bullets in order: base, characters, mechanisms, characters removed", () => {
     const seed: HistoryProposalSeed = {
       base: { id: "basic_kbdfr", version: "1.3" },
       charactersAdded: ["é", "è"],
       mechanismsAssigned: ["dead key"],
-      keysRemoved: 2,
+      charactersRemoved: 2,
     };
     const proposal = buildHistoryProposal(seed, "1.1", "2026-06-18");
     expect(proposal.bullets).toEqual([
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
       "Added 2 characters: é, è.",
       "Assigned mechanisms: dead key.",
-      "Removed 2 keys.",
+      "Removed 2 characters.",
     ]);
   });
 
@@ -74,10 +74,10 @@ describe("buildHistoryProposal", () => {
     expect(proposal.bullets).toEqual(["Added 1 character: a."]);
   });
 
-  it("uses singular 'key' for exactly one key removed", () => {
-    const seed = emptySeed({ keysRemoved: 1 });
+  it("uses singular 'character' for exactly one character removed", () => {
+    const seed = emptySeed({ charactersRemoved: 1 });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
-    expect(proposal.bullets).toEqual(["Removed 1 key."]);
+    expect(proposal.bullets).toEqual(["Removed 1 character."]);
   });
 
   it("lists every character under the inline cap", () => {
@@ -101,24 +101,24 @@ describe("buildHistoryProposal", () => {
     expect(proposal.bullets).toEqual(["Assigned mechanisms: dead key, multi-tap."]);
   });
 
-  it("omits the 'Removed' bullet when keysRemoved is 0", () => {
-    const seed = emptySeed({ charactersAdded: ["a"], keysRemoved: 0 });
+  it("omits the 'Removed' bullet when charactersRemoved is 0", () => {
+    const seed = emptySeed({ charactersAdded: ["a"], charactersRemoved: 0 });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
     expect(proposal.bullets.some((b) => b.startsWith("Removed"))).toBe(false);
   });
 
-  it("includes a 'Removed N keys.' bullet when keysRemoved > 0", () => {
-    const seed = emptySeed({ keysRemoved: 5 });
+  it("includes a 'Removed N characters.' bullet when charactersRemoved > 0", () => {
+    const seed = emptySeed({ charactersRemoved: 5 });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
-    expect(proposal.bullets).toEqual(["Removed 5 keys."]);
+    expect(proposal.bullets).toEqual(["Removed 5 characters."]);
   });
 
   it("uses singular nouns when the count is 1", () => {
     expect(buildHistoryProposal(emptySeed({ charactersAdded: ["ŋ"] }), "1.0", "2026-06-18").bullets).toEqual([
       "Added 1 character: ŋ.",
     ]);
-    expect(buildHistoryProposal(emptySeed({ keysRemoved: 1 }), "1.0", "2026-06-18").bullets).toEqual([
-      "Removed 1 key.",
+    expect(buildHistoryProposal(emptySeed({ charactersRemoved: 1 }), "1.0", "2026-06-18").bullets).toEqual([
+      "Removed 1 character.",
     ]);
   });
 
