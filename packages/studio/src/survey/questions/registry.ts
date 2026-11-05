@@ -265,6 +265,9 @@ function openedKeyboardLacksTouchLayout(d: DecisionSet): boolean {
 export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
   new Map<string, (decisions: DecisionSet) => boolean>([
     ...[...openHiddenScreens].map((id) => [id, notOpen] as const),
+    // The start screen records the track (New = copy, Open = adapt), so the track
+    // step only asks a walk that has none yet: a draft from before the start screen.
+    ["track", (d) => d["authoring-track"] === undefined],
     // Spec 111 FR-029: on Open the help step is asked only when a help document
     // is missing or fails its criteria. Copy always asks it.
     ["help", (d) => notOpen(d) || openHelpStepWanted()],

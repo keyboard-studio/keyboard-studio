@@ -30,7 +30,8 @@ describe("declared gates", () => {
     for (const id of openHiddenScreens) {
       const gate = openScreenGates.get(id)!;
       expect(gate(adapt), id).toBe(false);
-      expect(gate(ctx("copy").decisions), id).toBe(true);
+      // The track step also hides on copy: the start screen recorded the track.
+      expect(gate(ctx("copy").decisions), id).toBe(id !== "track");
       expect(gate(ctx(null).decisions), id).toBe(true);
     }
   });
@@ -53,10 +54,12 @@ describe("advance", () => {
     expect(next("characters", "adapt")).toBe("osk");
   });
 
-  it("Copy: the walk is unchanged", () => {
+  it("Copy: the walk skips only the track step, which the start screen answered", () => {
     expect(next("identity", "copy")).toBe("layout");
     expect(next("layout", "copy")).toBe("choose_base");
-    expect(next("choose_base", "copy")).toBe("track");
+    // The start screen recorded the track, so the track step is skipped.
+    expect(next("choose_base", "copy")).toBe("attribution");
+    expect(next("choose_base", null)).toBe("track");
     expect(next("attribution", "copy")).toBe("project_name");
     expect(next("project_name", "copy")).toBe("characters");
     expect(next("characters", "copy")).toBe("marks");

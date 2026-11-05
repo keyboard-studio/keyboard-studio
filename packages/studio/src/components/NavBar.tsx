@@ -159,8 +159,11 @@ export function NavBar({
           minHeight: 44,
         }}
       >
-        <span
+        {/* The wordmark is the way back to the New-or-Open choice (spec 111). */}
+        <a
+          href="#start"
           style={{
+            textDecoration: "none",
             fontSize: 15,
             fontWeight: 700,
             // System tracking for a 15px title: the headline step of the
@@ -176,7 +179,7 @@ export function NavBar({
               (welcome.title, profile.accountKind.signedIn) — translators
               decide whether it transliterates, we don't decide for them. */}
           <Trans id="nav.wordmark">Keyboard Studio</Trans>
-        </span>
+        </a>
         {/* Narrow viewports hide the keyboard indicator — the slim bar keeps
             brand + overflow only (mobile adaptation, Phase 1). */}
         {!isNarrow && active !== "welcome" && <CurrentKeyboardIndicator />}

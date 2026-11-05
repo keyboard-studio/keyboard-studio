@@ -2,7 +2,8 @@
  * E2E: Open an existing keyboard (spec 111 quickstart section 5, steps 1-2, 5).
  *
  * Flow under test:
- *   welcome -> "Open an existing keyboard" -> search -> choose -> "Open this keyboard"
+ *   welcome -> "Continue as guest" -> start screen (New leads, Open follows)
+ *     -> "Open an existing keyboard" -> search -> choose -> "Open this keyboard"
  *     -> criteria view, every finding marked as already failing (pre-existing)
  *
  * Checks:
@@ -21,15 +22,21 @@ import { test, expect } from "playwright/test";
 // partial local keyboards checkout the dev server enumerates.
 const OPEN_ID = "basic_kbdfr";
 
-/** Interactions the author performs from the welcome screen to the criteria view. */
+/** Interactions the author performs from the start screen to the criteria view. */
 const MAX_INTERACTIONS = 3;
 
 test.describe("Open an existing keyboard (spec 111)", () => {
   test("opens to the criteria view within 3 interactions, all findings pre-existing", async ({ page }) => {
     await page.goto("/");
+    await page.getByRole("button", { name: "Continue as guest" }).click();
 
+    // toBeInViewport, not toBeVisible: a card clipped below an overflow:hidden
+    // pane still counts as "visible" to Playwright, which is how the entry once
+    // shipped unreachable under the welcome screen.
+    const create = page.getByTestId("start-new");
+    await expect(create).toBeInViewport({ timeout: 30_000 });
     const entry = page.getByRole("region", { name: /open an existing keyboard/i });
-    await expect(entry).toBeVisible({ timeout: 30_000 });
+    await expect(entry).toBeInViewport();
 
     let interactions = 0;
 
@@ -69,8 +76,9 @@ test.describe("Open an existing keyboard (spec 111)", () => {
 
   test("no change without interaction: waiting on the criteria view adds no new findings", async ({ page }) => {
     await page.goto("/");
+    await page.getByRole("button", { name: "Continue as guest" }).click();
     const entry = page.getByRole("region", { name: /open an existing keyboard/i });
-    await expect(entry).toBeVisible({ timeout: 30_000 });
+    await expect(entry).toBeInViewport({ timeout: 30_000 });
     await entry.getByRole("combobox").fill(OPEN_ID);
     await entry.locator(`[id$="-opt-${OPEN_ID}"]`).first().click({ timeout: 15_000 });
     const open = entry.getByRole("button", { name: /open this keyboard/i });

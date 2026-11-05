@@ -898,6 +898,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // navigation — no reload yet).
     await page.goto("/#welcome");
     await page.getByRole("button", { name: "Continue as guest" }).click();
+    await page.getByTestId("start-new").click();
     await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 15_000 });
 
     // A SUBSEQUENT reload must start fresh — the cleared draft must not

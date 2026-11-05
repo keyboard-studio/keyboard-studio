@@ -3,7 +3,7 @@
   "specName": "Open an existing keyboard",
   "branch": "111-open-existing-keyboard",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -424,6 +424,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-05T18:30:58.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T20:20:51.349Z"
     }
   ],
   "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",

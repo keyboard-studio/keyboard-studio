@@ -179,7 +179,7 @@ The help step asks only about documentation that is missing or fails a criterion
 
 **Entry and source**
 
-- **FR-001**: The studio MUST offer "Open an existing keyboard" as an entry separate from creating a keyboard. Opening MUST search by name, keyboard ID or language.
+- **FR-001**: The studio MUST offer a start screen with two choices, "Create a new keyboard" (the leading, most prominent option) and "Open an existing keyboard". The start screen MUST follow sign-in or continuing as a guest, MUST be where a returning author without a draft lands, and MUST stay reachable from the navigation bar at any time. Each choice MUST record the authoring track, and the Copy walk MUST NOT offer Open again (its track step asks only a draft with no recorded track, and offers Copy only). Opening MUST search by name, keyboard ID or language.
 - **FR-002**: When a keyboard's source differs between keymanapp/keyboards and keyboard-studio/keyboards, the studio MUST let the author choose which to open. When they are identical, it MUST open without asking.
 - **FR-003**: The studio MUST warn when the chosen upstream copy would replace curated content in keyboard-studio/keyboards.
 - **FR-004**: Submissions from Open MUST target keyboard-studio/keyboards, and MUST record the source repository and version in the PR body.

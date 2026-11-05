@@ -225,15 +225,16 @@ describe("section marks — one per non-active manifest step", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "characters",
-          history: ["identity", "layout", "choose_base", "track", "attribution", "project_name"],
+          history: ["identity", "layout", "choose_base", "attribution", "project_name"],
           selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
     });
-    // open_languages is Open-only (spec 111) — every OTHER on-path step has a mark.
+    // open_languages is Open-only (spec 111), and the track step is gated off once
+    // the start screen records the track — every OTHER on-path step has a mark.
     const onPathIds = manifest
-      .filter((s) => s.id !== "open_languages" && s.id !== "package")
+      .filter((s) => s.id !== "open_languages" && s.id !== "track" && s.id !== "package")
       .map((s) => s.id);
     for (const id of onPathIds) {
       expect(dots.some((d) => d.id === id || d.location.step === id)).toBe(true);

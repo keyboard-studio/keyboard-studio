@@ -38,6 +38,9 @@ import type { ActiveStepId } from "../stores/surveySessionStore.ts";
  */
 export type RouteId =
   | "welcome"
+  // The New-or-Open choice (spec 111): where "Continue as guest", the nav
+  // wordmark and a returning author without a draft land.
+  | "start"
   | "survey"
   | "preview"
   | "output"
@@ -90,6 +93,7 @@ const SEGMENT = /^[a-z0-9_]+$/;
  */
 const ROUTE_TOKENS: Record<RouteId, true> = {
   welcome: true,
+  start: true,
   survey: true,
   preview: true,
   output: true,

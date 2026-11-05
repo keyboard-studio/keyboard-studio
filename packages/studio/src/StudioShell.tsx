@@ -111,7 +111,7 @@ import { AfterApplySuggestions } from "./components/AfterApplySuggestions.tsx";
 import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
-import { OpenKeyboardEntry } from "./components/OpenKeyboardEntry.tsx";
+import { StartScreen } from "./components/StartScreen.tsx";
 import { ReviewScreen } from "./review/ReviewScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
@@ -175,6 +175,7 @@ const VALID_ROUTES = new Set<RouteId>(
   (
     [
       "welcome",
+      "start",
       "survey",
       "preview",
       "output",
@@ -204,8 +205,9 @@ function isRouteId(v: string): v is RouteId {
 // hash, so beyond that this only governs the initial landing and stale-hash
 // cases.
 function defaultLandingRoute(): RouteId {
-  if (hasVisited()) return "survey";
+  // A resumable draft resumes; a returning author without one chooses New or Open.
   if (loadDraftMeta() !== null) return "survey";
+  if (hasVisited()) return "start";
   return "welcome";
 }
 
@@ -1950,12 +1952,10 @@ function StudioShellContent() {
   let content: ReactNode;
   switch (route) {
     case "welcome":
-      content = (
-        <>
-          <WelcomeScreen />
-          <OpenKeyboardEntry />
-        </>
-      );
+      content = <WelcomeScreen />;
+      break;
+    case "start":
+      content = <StartScreen />;
       break;
     case "survey":
       content = (

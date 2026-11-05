@@ -184,6 +184,9 @@ describe("StudioShell — cloud-resume banner Resume/Discard (km-triage PR #1642
     serverDraftHoisted.loadServerDraftMeta.mockResolvedValue(serverMetaFor(envelope));
     serverDraftHoisted.loadServerDraftContent.mockResolvedValue(envelope);
     markVisited();
+    // The banner lives in the survey; a returning author with no local draft
+    // otherwise lands on the start screen, which links here (StartScreen.test).
+    window.location.hash = "#survey";
 
     await act(async () => {
       render(<StudioShell />);
@@ -229,6 +232,9 @@ describe("StudioShell — cloud-resume banner Resume/Discard (km-triage PR #1642
     const envelope = buildRemoteEnvelope();
     serverDraftHoisted.loadServerDraftMeta.mockResolvedValue(serverMetaFor(envelope));
     markVisited();
+    // The banner lives in the survey; a returning author with no local draft
+    // otherwise lands on the start screen, which links here (StartScreen.test).
+    window.location.hash = "#survey";
 
     await act(async () => {
       render(<StudioShell />);

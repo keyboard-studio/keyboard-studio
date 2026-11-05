@@ -197,7 +197,8 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> osk -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "attribution", "project_name", "characters",
+      // No "track": the start screen recorded it, so the step is gated off.
+      "identity", "layout", "choose_base", "attribution", "project_name", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
@@ -306,8 +307,13 @@ describe("advance: layout", () => {
 });
 
 describe("advance: choose_base", () => {
-  it("→ track (spine next after choose_base)", () => {
+  it("→ attribution when the start screen recorded the track (the track step is gated off)", () => {
     const { next } = advance("choose_base", undefined, copyCtx);
+    expect(next).toBe("attribution");
+  });
+
+  it("→ track for a draft with no track recorded (from before the start screen)", () => {
+    const { next } = advance("choose_base", undefined, { ...copyCtx, selectedTrack: null, decisions: {} });
     expect(next).toBe("track");
   });
 });

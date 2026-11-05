@@ -1,4 +1,4 @@
-// OpenKeyboardEntry — "Open an existing keyboard" on the welcome screen (spec 111).
+// OpenKeyboardEntry — "Open an existing keyboard" on the start screen (spec 111).
 //
 // Searches the start-keyboard catalog by name, id or language (the same
 // combobox the copy path uses) and, on Open, records the two decisions that

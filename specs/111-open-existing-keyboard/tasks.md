@@ -165,6 +165,15 @@
 
 ---
 
+## Phase 11: Start screen (FR-001, amended 2026-11-05)
+
+The Open entry shipped as a card under the welcome screen, clipped out of view and skipped entirely for returning authors, while the old Open option stayed in the Copy walk's track step. The owner ruled: New or Open after sign-in or guest, New leading, reachable from the nav at any time, and no Open mid-walk.
+
+- [x] T052 [US1] Add the `start` route and `StartScreen` (`packages/studio/src/components/StartScreen.tsx`): "Create a new keyboard" leads, the Open entry follows; continue an existing local or account draft; New confirms before discarding a draft. Guest leads there (`WelcomeScreen.tsx`, fresh-session reset moved to `lib/freshSession.ts`); a returning author with no draft lands there (`StudioShell.tsx` `defaultLandingRoute`); the nav wordmark links there (`NavBar.tsx`).
+- [x] T053 [US1] New records `authoring-track = "copy"`; gate the track step on an unrecorded track (`registry.ts` `openScreenGates`); remove the Open option and the track proposal (`track_choice.ts`, `flowStepOptionRecords.ts`, `lib/proposeTrack.ts` deleted); retire the e2e `chooseAdaptTrack` helper
+- [x] T054 [US1] Tests: `StartScreen.test.tsx`; landing, guest and gate tests updated; `boot-smoke` checks New and Open are in the viewport after guest and the wordmark leads back; `open-existing-keyboard.spec.ts` starts from the start screen and asserts `toBeInViewport`
+- [ ] T055 [US1] Convert the e2e specs that walked the removed mid-walk Open route (`chooseAdaptTrack`, now throwing with a pointer to the start screen) to open from the start screen or walk Copy, per what each spec tests. None runs in the CI lanes; list: `grep -rln "chooseAdaptTrack(page)" packages/studio/e2e`
+
 ## Dependencies
 
 ```

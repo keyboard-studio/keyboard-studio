@@ -5,7 +5,7 @@
 //     "sign up" are the same connect() call; the provider decides whether the
 //     user is new or returning. So these reuse the existing useGitHubAuth /
 //     useGoogleAuth connect() — no new auth plumbing (see SignUpPanel.tsx).
-//   • "Continue as guest" → navigateTo('survey') (fresh start).
+//   • "Continue as guest" → navigateTo('start') (fresh start; New or Open).
 //
 // Deliberately plain: two columns — what Studio is on the left, the sign-in
 // decision in a card on the right — stacking to one column when they no longer
@@ -36,15 +36,8 @@ import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
+import { startFreshSession } from "../lib/freshSession.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "../lib/jumpToLocation.ts";
-import { useViewStateStore } from "../stores/viewStateStore.ts";
-import { useStepWalkStore } from "../stores/stepWalkStore.ts";
-import { useStepNavStore } from "../stores/stepNavStore.ts";
-import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
-import { useDecisionStore } from "../stores/decisionStore.ts";
-import { discardActiveDraft } from "../lib/draftPersistence.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
   BG_PAGE,
   BG_CARD,
@@ -319,27 +312,10 @@ export function WelcomeScreen() {
                 // about signing in — a first-time visitor who wanted an account
                 // still picked it, precisely because they were new).
                 //
-                // A durable draft may already have been restored at boot
-                // (main.tsx's pre-mount loadDraft) before the author ever saw this
-                // screen — honoring a fresh start means clearing that draft (and
-                // the active-project pointer) and resetting both stores, not
-                // silently keeping the restored state around for a later boot to
-                // re-surface.
-                discardActiveDraft();
-                useSurveySessionStore.getState().reset();
-                useWorkingCopyStore.getState().reset();
-                // Spec 057 FR-052: view state clears with the session. This and
-                // StudioShell's handleStartOver are the only two places a reset
-                // belongs — the same two the survey-session reset above lives in.
-                useViewStateStore.getState().reset();
-                // Within-step positions belong to the abandoned walk — see the
-                // same call in StudioShell's handleStartOver.
-                useStepWalkStore.getState().reset();
-                useStepNavStore.getState().reset();
-                useSurveyAnswerStore.getState().reset();
-                // Spec 088 FR-007: decision records reset with the answers.
-                useDecisionStore.getState().reset();
-                leaveWelcome(() => navigateTo("survey"));
+                // A fresh start: see lib/freshSession.ts. The author then
+                // chooses New or Open on the start screen.
+                startFreshSession();
+                leaveWelcome(() => navigateTo("start"));
               }}
               style={{
                 ...providerButtonBase,
