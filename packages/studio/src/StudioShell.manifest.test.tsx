@@ -19,6 +19,7 @@ vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShel
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
+vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -243,7 +244,10 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("track-adapt"));
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
-    // Must land on prefill (characters step), not project-name.
+    // Spec 111: adapt is Open, so the language list comes next, then prefill
+    // (characters step), never project-name.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();

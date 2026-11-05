@@ -2,7 +2,9 @@
 // Re-instrumented in spec 029 (full convergence, Option A): mock seam moved
 // from survey/index.ts (PhaseTrack/PhaseProjectName/PhaseF) to
 // survey/FlowStepHost.tsx (used directly by makeFlowStepComponent factory).
-// Fixtures copy.json and adapt.json are BYTE-IDENTICAL — the store-mutation
+// Fixtures copy.json and adapt.json were BYTE-IDENTICAL until spec 111 added the
+// Open-only open_languages step to the adapt walk (copy.json is unchanged,
+// SC-004). Originally: the store-mutation
 // sequence is unchanged; only the test's mock wiring changes.
 //
 // SEAM CHOICE: This harness renders SurveyView with the same shallow mock
@@ -93,6 +95,9 @@ import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 // ---------------------------------------------------------------------------
 
 vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studioShellMocks/FlowStepHost.tsx"));
+vi.mock("../../src/survey/languageList/LanguageListHost.tsx", () =>
+  import("../../src/test/studioShellMocks/LanguageListHost.tsx"),
+);
 vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 // CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
 // the barrel), so the shallow stubs must be registered for the files too.
@@ -609,22 +614,14 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "attribution", testId: "survey-advance" },
+    // Open (spec 111): the editable language list rides the adapt track only.
+    { stepId: "open_languages", testId: "survey-advance" },
     { stepId: "characters/prefill", testId: "prefill-continue" },
     // marks skips transparently inside this window, landing on punctuation.
-    { stepId: "characters/B", testId: "charlist-done", settleFor: "punctuation-done" },
-    // See driveCopyTrack — the ungated punctuation page, accepted empty, whose
-    // window absorbs the async convenience skip.
-    { stepId: "punctuation", testId: "punctuation-done", settleFor: "invisibles-continue" },
-    // The invisible-characters step (spec 075) ALWAYS renders — no skip gate —
-    // so it is a real stop on every walk; accepted empty. The async
-    // convenience skip that follows it is absorbed by this window instead.
-    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
-    { stepId: "carve", testId: "carve-continue" },
-    { stepId: "deadkeys", testId: "deadkeys-continue" },
-    { stepId: "rules", testId: "rules-continue" },
-    { stepId: "mechanisms", testId: "mechanisms-continue" },
+    // Open (spec 111) hides the punctuation, invisibles, carve, deadkeys, rules,
+    // mechanisms and touch_seed_source screens; the walk goes straight from characters to osk.
+    { stepId: "characters/B", testId: "charlist-done", settleFor: "osk-continue" },
     { stepId: "osk", testId: "osk-continue", async: true },
-    { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },
     { stepId: "help", testId: "survey-advance", async: true },
@@ -778,10 +775,12 @@ async function reviseFromOutput(stepId: string, controlTestId: string) {
   return { newEntries, completedSteps, routes, entriesBefore, movedTo, positionBefore, positionAfter };
 }
 
+// Open (spec 111) hides punctuation and rules, so the adapt track revises the
+// Open-only language list (pane) and the osk step (full layout) instead.
 describe.each([
-  ["copy", driveCopyTrack],
-  ["adapt", driveAdaptTrack],
-] as const)("revise-from-Output loop (spec 094) — %s track", (_name, drive) => {
+  ["copy", driveCopyTrack, "punctuation", "punctuation-done", "rules"],
+  ["adapt", driveAdaptTrack, "open_languages", "survey-advance", "osk"],
+] as const)("revise-from-Output loop (spec 094) — %s track", (_name, drive, paneStep, paneControl, fullStep) => {
   beforeEach(async () => {
     const recorder = createRecorder();
     await act(async () => {
@@ -798,8 +797,8 @@ describe.each([
 
   it("a pane step: confirm returns to Output, touching no other step", async () => {
     const { newEntries, completedSteps, routes, movedTo, positionBefore, positionAfter } = await reviseFromOutput(
-      "punctuation",
-      "punctuation-done",
+      paneStep,
+      paneControl,
     );
     // The step completed (one advance past it), then the walk went back to
     // where it stood before the revision; nothing else ran before the return.
@@ -807,14 +806,14 @@ describe.each([
     // be empty; any that exist belong to this step.
     expect(movedTo).toHaveLength(2);
     expect(positionAfter).toBe(positionBefore);
-    expect(newEntries.every((e) => e.stepId === "punctuation")).toBe(true);
-    expect(completedSteps.every((s) => s === "punctuation")).toBe(true);
+    expect(newEntries.every((e) => e.stepId === paneStep)).toBe(true);
+    expect(completedSteps.every((s) => s === paneStep)).toBe(true);
     expect(routes[routes.length - 1]).toBe("output");
   });
 
   it("a full-layout step: Back to testing completes it and returns to Output", async () => {
     const { newEntries, completedSteps, routes, movedTo, positionBefore, positionAfter } = await reviseFromOutput(
-      "rules",
+      fullStep,
       "step-revision-back-to-testing",
     );
     // The step completed (one advance past it), then the walk went back to
@@ -823,14 +822,14 @@ describe.each([
     // be empty; any that exist belong to this step.
     expect(movedTo).toHaveLength(2);
     expect(positionAfter).toBe(positionBefore);
-    expect(newEntries.every((e) => e.stepId === "rules")).toBe(true);
-    expect(completedSteps.every((s) => s === "rules")).toBe(true);
+    expect(newEntries.every((e) => e.stepId === fullStep)).toBe(true);
+    expect(completedSteps.every((s) => s === fullStep)).toBe(true);
     expect(routes[routes.length - 1]).toBe("output");
   });
 
   it("Discard returns to Output and records nothing", async () => {
     const { newEntries, completedSteps, routes, movedTo, positionBefore } = await reviseFromOutput(
-      "punctuation",
+      paneStep,
       "step-revision-discard",
     );
     // The only move is back to where the walk stood before the revision.

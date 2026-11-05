@@ -19,6 +19,7 @@ vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShel
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
+vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -49,7 +50,7 @@ import { SurveyView } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { advanceToTrack, completeInvisibles, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToTrack, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks({ warmLazySteps: true });
 
@@ -191,7 +192,9 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
     expect(screen.queryByTestId("stage-track")).toBeNull();
 
-    // Advance through attribution to prefill.
+    // Advance through attribution and the Open language list (spec 111) to prefill.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
@@ -229,7 +232,7 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 // project_name) converges on the same carve-back behavior as the copy-track path.
 
 describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)", () => {
-  it("adapt-track: selects adapt → skips project_name → prefill-continue → stage-B → charlist-done → punctuation → carve → back-backs land on stage-B (not prefill)", async () => {
+  it("adapt-track: selects adapt → skips project_name → prefill-continue → stage-B → charlist-done → osk (Open hides carve) → back lands on stage-B (not prefill)", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -242,6 +245,8 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     // project-name).
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
 
@@ -249,25 +254,14 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     fireEvent.click(screen.getByTestId("prefill-continue"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // Advance through PhaseB (and the ungated punctuation and invisibles
-    // pages) to carve — the landing is async (see advanceToCarve).
+    // Open (spec 111) hides marks, punctuation, invisibles, carve and the other
+    // feature galleries, so PhaseB hands straight to the OSK step. Its back
+    // must re-enter PhaseB (not prefill).
     fireEvent.click(screen.getByTestId("charlist-done"));
-    fireEvent.click(screen.getByTestId("punctuation-done"));
-    completeInvisibles();
-    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-osk")).toBeTruthy();
+    expect(screen.queryByTestId("stage-carve")).toBeNull();
 
-    // carve-back lands on the invisible-characters page (spec 075, the last
-    // real page before carve — convenience pops through, having auto-skipped
-    // forward).
-    fireEvent.click(screen.getByTestId("carve-back"));
-    expect(screen.getByTestId("invisibles-step")).toBeTruthy();
-
-    // invisibles-back re-enters the punctuation page.
-    fireEvent.click(screen.getByTestId("invisibles-back"));
-    expect(screen.getByTestId("punctuation-step")).toBeTruthy();
-
-    // punctuation-back must re-enter PhaseB (not prefill) — marks pops through.
-    fireEvent.click(screen.getByTestId("punctuation-back"));
+    fireEvent.click(screen.getByTestId("osk-back"));
 
     expect(screen.getByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();

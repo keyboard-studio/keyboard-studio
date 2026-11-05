@@ -61,8 +61,7 @@
     "applyStepCompletion": [],
     "storeMutations": [
       "recordAll",
-      "advance",
-      "setCharactersSubStage"
+      "advance"
     ],
     "workingCopyMutations": [
       "recordPhase",
@@ -71,6 +70,17 @@
     "decisionMutations": [
       "recordAll"
     ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "open_languages",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance",
+      "setCharactersSubStage"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -91,26 +101,8 @@
   {
     "stepId": "characters/B",
     "applyStepCompletion": [
-      "characters",
-      "marks"
+      "characters"
     ],
-    "storeMutations": [
-      "advance",
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase",
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "punctuation",
-    "applyStepCompletion": [],
     "storeMutations": [
       "advance"
     ],
@@ -118,73 +110,6 @@
       "recordPhase"
     ],
     "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "invisibles",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "advance",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase",
-      "recordPhase"
-    ],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "carve",
-    "applyStepCompletion": [
-      "carve"
-    ],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "deadkeys",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "advance"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "rules",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "mechanisms",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "lockDesktop"
-    ],
-    "decisionMutations": [
-      "record"
-    ],
     "navigateTo": []
   },
   {
@@ -195,19 +120,6 @@
     ],
     "workingCopyMutations": [],
     "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "touch_seed_source",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
     "navigateTo": []
   },
   {

@@ -840,6 +840,13 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "open_languages": {
+          // Open-only gallery step (spec 111): journeys keep the keyboard's own
+          // language list, so the step advances with no edit.
+          result = undefined;
+          break;
+        }
+
         case "css": {
           // Optional embed CSS — corpus fixtures carry none; advance with empty css.
           result = { css: "" };
