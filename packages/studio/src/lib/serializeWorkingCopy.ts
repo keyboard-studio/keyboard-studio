@@ -44,6 +44,7 @@ import {
   renderHelpPhp,
   renderHistoryMd,
   renderLayoutCharts,
+  parseKmn,
   parseKvks,
   parseTouchLayout,
   ensurePackageFiles,
@@ -491,7 +492,9 @@ export async function projectWorkingCopyForOutput(
   // layer), generated from the MODEL (never the on-screen preview) unless the
   // base ships its own images and the author has not asked to regenerate —
   // on a copy, only when the author explicitly chose to keep them.
-  // Computed before the projection so the descriptor's <Files> can list them.
+  // Computed before the projection so the descriptor's <Files> can list them;
+  // only the NAMES are used from this pass — the shipped chart content is
+  // re-rendered from the projected model in step 5c.
   // Chart names carry the reserved `ks-layout-` prefix, so a base image can
   // never be overwritten; a (theoretical) same-named base image wins.
   const docWarnings: string[] = [];
@@ -603,13 +606,25 @@ export async function projectWorkingCopyForOutput(
   //     regex the package descriptor already runs (FR-008) — never re-derived
   //     from StartKeyboard, which can disagree with what this build actually emits.
   const projectedKmnText = readVfsText(clonedVfs, `source/${resolvedKeyboardId}.kmn`) ?? "";
-  // spec 102 US2: the derived sections, from the working-copy IR as built (the
-  //     same buildDocContent call useDocsPreview makes). The inherited prose
+  // The model every derived doc describes is the SHIPPED one: removals (carve,
+  // fallback policy, disabled families, key edits) are applied by the
+  // projection above, never to the store's working IR, so documenting
+  // `workingIr` teaches keys the shipped .kmn no longer has.
+  const shipped = shippedDocModel(
+    clonedVfs,
+    resolvedKeyboardId,
+    projectedKmnText,
+    workingIr ?? startIr,
+    touchLayoutJson,
+    docWarnings,
+  );
+  // spec 102 US2: the derived sections, from the projected IR (the same
+  //     buildDocContent call useDocsPreview makes). The inherited prose
   //     is the start keyboard's welcome/help text, which exists on Track 2
   //     only; it decides whether the typing guide is already covered.
   const docContent = buildDocContent({
-    ir: workingIr ?? startIr,
-    touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+    ir: shipped.ir,
+    touchLayout: parseTouchLayoutOrNull(shipped.touchLayoutJson),
     inheritedProse: inheritedWelcomeHtmText ?? inheritedHelpPhpText,
   });
   // Issue 1908: the author's ACCEPTED documentation-fix proposals become
@@ -636,8 +651,8 @@ export async function projectWorkingCopyForOutput(
     // recorded answers (the same gatherer useDocsPreview uses).
     readme: buildReadmeFacts(
       readmeFactsInputFrom({
-        ir: workingIr ?? startIr,
-        touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+        ir: shipped.ir,
+        touchLayout: parseTouchLayoutOrNull(shipped.touchLayoutJson),
         decisions: getDecisionSnapshot(),
         isAdaptation,
         startKeyboard,
@@ -673,8 +688,25 @@ export async function projectWorkingCopyForOutput(
     clonedVfs.set(`source/${img.path}`, img.bytes, true);
   }
   // FR-013: the generated charts, beside the page (text SVG — research R1).
+  // Re-rendered from the projected model so a removed key is not drawn. The
+  // descriptor already lists the pre-projection names, so a name the
+  // projected render does not produce keeps its pre-projection chart rather
+  // than leaving the package a dangling <File>.
+  const shippedCharts = new Map(
+    (charts.length > 0
+      ? buildLayoutCharts({
+          displayName: identity?.displayName ?? startKeyboard.displayName,
+          kvksXml: shipped.kvksXml,
+          ir: shipped.ir,
+          touchLayoutJson: shipped.touchLayoutJson,
+          reservedNames: carriedImageNames,
+          warnings: docWarnings,
+        })
+      : []
+    ).map((c) => [c.filename, c.svg]),
+  );
   for (const chart of charts) {
-    clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
+    clonedVfs.set(`source/welcome/${chart.filename}`, shippedCharts.get(chart.filename) ?? chart.svg, false);
   }
   clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, inheritedHelpPhpText, inheritedWelcomeHtmText), false);
 
@@ -813,6 +845,47 @@ export async function projectWorkingCopyForOutput(
     version,
     warnings,
     missingInheritedImages,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The shipped model the derived docs describe
+// ---------------------------------------------------------------------------
+
+interface ShippedDocModel {
+  ir: KeyboardIR;
+  touchLayoutJson: string | null;
+  kvksXml: string | null;
+}
+
+/**
+ * The keyboard as it ships: the projected `.kmn` re-parsed, plus the projected
+ * touch layout and `.kvks` read back from the output VFS. A projected `.kmn`
+ * the codec cannot parse falls back to the working IR with a `[docs]` warning
+ * (the docs may then over-describe) rather than failing the production.
+ */
+function shippedDocModel(
+  vfs: VirtualFS,
+  keyboardId: string,
+  projectedKmnText: string,
+  fallbackIr: KeyboardIR,
+  fallbackTouchLayoutJson: string | null,
+  warnings: string[],
+): ShippedDocModel {
+  let ir = fallbackIr;
+  if (projectedKmnText !== "") {
+    try {
+      ir = parseKmn(projectedKmnText, keyboardId).ir;
+    } catch (err) {
+      warnings.push(
+        `[docs] the projected .kmn could not be re-read (${err instanceof Error ? err.message : String(err)}); the typing guide and charts may list removed keys`,
+      );
+    }
+  }
+  return {
+    ir,
+    touchLayoutJson: readVfsText(vfs, `source/${keyboardId}.keyman-touch-layout`) ?? fallbackTouchLayoutJson,
+    kvksXml: readVfsText(vfs, `source/${keyboardId}.kvks`) ?? null,
   };
 }
 

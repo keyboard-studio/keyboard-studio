@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { parseKmn } from "@keyboard-studio/engine";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDocsPreview } from "./useDocsPreview.ts";
@@ -120,6 +121,25 @@ describe("useDocsPreview derived documentation (spec 102)", () => {
 
     expect(result.current.welcomeHtm).toContain("ɔ");
     expect(result.current.welcomeHtm).not.toContain("ŋ");
+  });
+
+  it("leaves a removed key out of the typing guide, as the shipped docs do", () => {
+    const kmn = "begin Unicode > use(main)\n\ngroup(main) using keys\n+ [RALT K_F] > U+00E6\n+ [RALT K_N] > U+014B\n";
+    const { ir } = parseKmn(kmn, basicKbdus.id);
+    const vfs = createVirtualFS([{ path: `source/${basicKbdus.id}.kmn`, content: kmn, isBinary: false }]);
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    const aeRule = ir.groups
+      .flatMap((g) => g.rules)
+      .find((r) => r.output.some((o) => o.kind === "char" && o.value === "æ"));
+    if (aeRule === undefined) throw new Error("fixture rule for æ not found");
+    useWorkingCopyStore.getState().deleteNode(aeRule.nodeId);
+
+    const { result } = renderHook(() => useDocsPreview());
+
+    for (const page of [result.current.welcomeHtm, result.current.helpPhp]) {
+      expect(page).not.toContain("U+00E6");
+      expect(page).toContain("U+014B");
+    }
   });
 
   it("creates no timer", () => {
