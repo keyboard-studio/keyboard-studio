@@ -494,6 +494,7 @@
   "editor.assignLoop.css.code.warnings": "{count, plural, one {# warning} other {# warnings}}",
   "editor.assignLoop.css.continue": "Continue",
   "editor.assignLoop.css.description": "Add custom CSS to style your keyboard. This affects the touch layout and desktop on-screen keyboard. Leave empty to skip.",
+  "editor.assignLoop.css.discard": "Discard changes",
   "editor.assignLoop.css.editorLabel": "CSS",
   "editor.assignLoop.css.preview.desktopLabel": "Desktop OSK",
   "editor.assignLoop.css.preview.noDesktop": "No desktop OSK available.",

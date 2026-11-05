@@ -30,6 +30,17 @@ function blobPathname(userId: number, draftId: string): string {
   return `drafts/${userId}/${draftId}.json`;
 }
 
+/**
+ * The Blob token option, spread into @vercel/blob calls. The SDK's option
+ * types declare `token?: string`, which under `exactOptionalPropertyTypes`
+ * rejects an explicit `undefined` — so the key is spread in only when the
+ * env var is set, rather than passed as `string | undefined`.
+ */
+function blobTokenOption(): { token?: string } {
+  const token = process.env["BLOB_READ_WRITE_TOKEN"];
+  return token === undefined ? {} : { token };
+}
+
 /** Map a Postgres row (BIGINT columns arrive as strings) to a DraftMeta. */
 function rowToMeta(row: Record<string, unknown>): DraftMeta {
   return {
@@ -60,7 +71,7 @@ export class VercelDraftStore implements DraftStore {
 
     const result = await get(blobPathname(userId, draftId), {
       access: "private",
-      token: process.env["BLOB_READ_WRITE_TOKEN"],
+      ...blobTokenOption(),
     });
     // Metadata row exists but the blob is gone (manual deletion / partial
     // write) — treat as no draft rather than surfacing a corrupt half-state.
@@ -90,7 +101,7 @@ export class VercelDraftStore implements DraftStore {
       allowOverwrite: true,
       addRandomSuffix: false,
       contentType: "application/json",
-      token: process.env["BLOB_READ_WRITE_TOKEN"],
+      ...blobTokenOption(),
     });
 
     await sql`
@@ -121,7 +132,7 @@ export class VercelDraftStore implements DraftStore {
     // blob del is best-effort (idempotent — no error if already absent).
     await sql`DELETE FROM drafts WHERE github_user_id = ${userId} AND draft_id = ${draftId}`;
     try {
-      await del(blobPathname(userId, draftId), { token: process.env["BLOB_READ_WRITE_TOKEN"] });
+      await del(blobPathname(userId, draftId), { ...blobTokenOption() });
     } catch {
       // Blob already gone or transient del failure — the row is what gates
       // GET, so the draft is effectively cleared regardless.

@@ -494,6 +494,7 @@
   "editor.assignLoop.css.code.warnings": "{count, plural, one {# avertissement} other {# avertissements}}",
   "editor.assignLoop.css.continue": "Continuer",
   "editor.assignLoop.css.description": "Ajoutez du CSS personnalisé pour styliser votre clavier. Cela affecte la disposition tactile et le clavier visuel de bureau. Laissez vide pour ignorer.",
+  "editor.assignLoop.css.discard": "Annuler les modifications",
   "editor.assignLoop.css.editorLabel": "CSS",
   "editor.assignLoop.css.preview.desktopLabel": "Clavier visuel de bureau",
   "editor.assignLoop.css.preview.noDesktop": "Aucun clavier visuel de bureau disponible.",

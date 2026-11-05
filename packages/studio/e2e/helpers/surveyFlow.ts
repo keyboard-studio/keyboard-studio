@@ -1156,23 +1156,6 @@ export async function driveCssEditorStep(page: Page): Promise<void> {
   }
 }
 
-/** Optional HTML editor step (after help): skip and continue with empty HTML. */
-export async function driveHtmlEditorStep(page: Page): Promise<void> {
-  // driveHelpPhase already walks the tail (html included) to #output.
-  if (/#output$/.test(page.url())) return;
-  const continueBtn = page.getByTestId("html-continue");
-  const continueByName = page.getByRole("button", { name: "Continue" });
-  await Promise.race([
-    continueBtn.waitFor({ state: "visible", timeout: 60_000 }),
-    continueByName.waitFor({ state: "visible", timeout: 60_000 }),
-  ]);
-  if (await continueBtn.isVisible().catch(() => false)) {
-    await continueBtn.click({ timeout: 30_000 });
-  } else {
-    await continueByName.click({ timeout: 30_000 });
-  }
-}
-
 /**
  * The top-level tab route tokens, as they appear in the hash and therefore in
  * the nav link's `href`. These are ROUTE tokens, not labels — `preview` is the

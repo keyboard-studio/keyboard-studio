@@ -435,6 +435,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     desktopLocked: s.desktopLocked,
     sequenceFlaggedChars: s.sequenceFlaggedChars,
     touchLayoutJson: s.touchLayoutJson,
+    customCss: s.customCss,
     touchDraft: s.touchDraft,
     galleryIntrosSeen: s.galleryIntrosSeen,
     staleSteps: [...s.staleSteps],
@@ -614,6 +615,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // an absent value must not clobber the store default with undefined.
     sequenceFlaggedChars: snapshot.sequenceFlaggedChars ?? [],
     touchLayoutJson: snapshot.touchLayoutJson,
+    // Drafts saved before the CSS step wrote a value carry no key.
+    customCss: snapshot.customCss ?? null,
     touchDraft: snapshot.touchDraft,
     galleryIntrosSeen: snapshot.galleryIntrosSeen,
     staleSteps: new Set(snapshot.staleSteps),

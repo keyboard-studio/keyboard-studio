@@ -137,3 +137,20 @@ They were re-captured with the capture command above against corpus
 byte-identical to the previous baseline. A whole local capture is not
 committed because a Windows checkout with `core.autocrlf=true` gives
 `test.kvks` / `test.kpj` CRLF line endings that CI never produces.
+
+## 2026-11-05 — `&CasedKeys` lists only cased keys (spec 112, PR #2513)
+
+PR #2513 changed the Copy walk's `&CasedKeys` store from every key
+(`[K_0] .. [K_9] [K_A] .. [K_Z]` plus punctuation and `K_SPACE`) to only the
+keys with an upper/lowercase pair. The golden lane could not show this: since
+the html editor joined the survey tail (`cfb2feaf`), `driveHelpPhase` walks
+through the html step to `#output`, and the walk's separate
+`driveHtmlEditorStep` call then timed out waiting for a step already passed.
+That call (and the now-unused helper) is removed. Captured locally from main
+`ba3bdaa3` (Playwright desktop, Windows, corpus `435f82d6`); the differing
+entries were `source/test.kmn` (the `&CasedKeys` line only) and the
+recompiled `build/test.js` / `build/test.kmx`, spliced into this zip.
+`test.kvks` / `test.kpj` differed only by CRLF (the autocrlf note above) and
+`HISTORY.md` / `.studio/decision-record.json` only by dates, so they were not
+replaced. Locally, verify then differs only in the CRLF-only `test.kvks` /
+`test.kpj`; CI's LF checkout is the gate.

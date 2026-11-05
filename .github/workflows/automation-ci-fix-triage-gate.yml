@@ -30,11 +30,14 @@ jobs:
               inputSha && /^[0-9a-f]{40}$/i.test(inputSha)
                 ? inputSha
                 : context.sha;
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha,
-              state: 'success',
-              context: 'km-triage/review',
-              description: 'Main CI fix PR — automation gate (temporary workflow)',
-            });
+            const contexts = ['km-triage/review', 'muse-triage/review'];
+            for (const checkContext of contexts) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha,
+                state: 'success',
+                context: checkContext,
+                description: 'Main CI fix PR — automation gate (temporary workflow)',
+              });
+            }
