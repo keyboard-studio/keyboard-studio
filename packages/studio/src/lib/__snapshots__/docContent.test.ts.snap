@@ -40,7 +40,7 @@ exports[`buildDocContent snapshots > doc_large: one snapshot per slot > doc_larg
 
 exports[`buildDocContent snapshots > doc_large: one snapshot per slot > doc_large.typingGuide 1`] = `"<p>This keyboard types 210 characters beyond the standard keyboard, too many to list here. The layout pictures show where each one is.</p><ul><li>Letters: 202</li><li>Marks: 7</li><li>Punctuation and symbols: 1</li></ul>"`;
 
-exports[`buildDocContent snapshots > doc_plain: one snapshot per slot > doc_plain.characterInventory 1`] = `"<h3>Letters</h3><ul><li>a U+0061 LATIN SMALL LETTER A</li></ul><h3>Digits</h3><ul><li>1 U+0031 DIGIT ONE</li></ul>"`;
+exports[`buildDocContent snapshots > doc_plain: one snapshot per slot > doc_plain.characterInventory 1`] = `"<h3>Letters</h3><ul><li>a U+0061 LATIN SMALL LETTER A</li></ul><h3>Numbers</h3><ul><li>1 U+0031 DIGIT ONE</li></ul>"`;
 
 exports[`buildDocContent snapshots > doc_plain: one snapshot per slot > doc_plain.layoutPictures 1`] = `""`;
 
