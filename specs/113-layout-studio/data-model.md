@@ -1,31 +1,42 @@
 # Data model: Layout tab (spec 113)
 
-Types are specified in [contracts/layout-ops.md](contracts/layout-ops.md) and
+Types are specified in [contracts/layout-ops.md](contracts/layout-ops.md),
+[contracts/code-edits.md](contracts/code-edits.md), and
 [contracts/attribution.md](contracts/attribution.md); this page names the entities, where each
 lives, and its rules.
 
-## Persisted (draft envelope and decision)
+Revised 2026-11-05 (rulings 6 and 7): edits to the KMN are one bundled decision, `kmn-edits`,
+recorded at each confirm. There is no `layoutOps` store slice and no snapshot into
+`physical-layout`.
+
+## Persisted (the decision set, in the draft envelope)
 
 | Entity | Lives in | Fields | Rules |
 |---|---|---|---|
-| **LayoutOperation** | `contracts` (type + zod schema + drift guard) | `seq`, `at`, `op`, `vkey`, `layer`, and per op `output` / `context` / `becomes` / `partner` | Append-only per draft. `seq` monotonic. Later ops on the same `(vkey, layer[, context])` win at replay. Never holds a rule from a `readonly` group or a `RawKmnFragment`. |
-| **layoutOps** (store slice) | `workingCopyStore` | `LayoutOperation[]` | Saved and restored with the draft (`persistWorkingCopy.ts`), beside the deadkey op log. Classified `EDITOR-AUTHORED`; registered under surface `layout-tab` (FR-026). |
-| **PhysicalLayoutValue.layoutOps** | `studio/src/survey/assignLoop/physicalLayoutValue.ts` | optional `LayoutOperation[]` | Snapshot of the slice at step completion. Additive (the `displacedDeclined` precedent). The decision stays record-only (registry phase 4, pending). |
-| **IRRule.layoutTabOwned** | `contracts/src/keyboard-ir.ts` | optional `boolean` | Set only by `applyLayoutOp`. Drives the hand-set label. Additive, mirrors `rulesStepAdded`; not part of the `Pattern` schema. |
-| **Deadkey ops** | existing, spec 083 | `DeadkeyOperation` | Deadkey define/rename/retarget/delete and fan-out pair edits from the Layout tab go here, not into `layoutOps`. |
-| **Deadkey display character** | existing deadkey record (spec 083) or, if it has no slot, a `set-name`-style lifecycle field | `displayChar?: string` | Plan task A checks spec 083's deadkey record for a label field before adding one; if added, it is a lifecycle field, not a layout op. |
+| **`kmn-edits` decision** | `DecisionId` in `studio/src/decisions/decisionTypes.ts`; gallery module `studio/src/survey/questions/gallery/kmnEdits.ts` | value `KmnEditsValue = { entries: KmnEdit[] }` | Recorded (provenance `asked`) on every confirm, Apply, review action, and undo. `apply()` replays `entries` in order, after every other rule-writing decision. Persists with the decision set; no working-copy field. Registered as surface `kmn-edits` in the derived-surface registry, equivalence-proven (FR-026, SC-011). |
+| **KmnEdit** | `contracts` (type + zod schema + drift guard) | `LayoutOperation` \| `CodeEdit` \| `ReviewKept` | `seq` monotonic within the value; later entries win. Never holds a `.kmn` text string to re-parse. |
+| **LayoutOperation** | `contracts/src/layoutOps.ts` | `seq`, `at`, `op`, `vkey`, `layer`, per op `output` / `context` / `becomes` / `partner` | Never targets a rule in a `readonly` group or a `RawKmnFragment`. |
+| **CodeEdit** (phase E) | `contracts/src/kmnEdits.ts` | `seq`, `at`, `op: "code-apply"`, `changes: IRChange[]`, `overrides: OwnerRef[]` | One Code-tab Apply. `changes` are located by content (FR-065). `overrides` records the FR-062 owners found at Apply (review flag a). |
+| **ReviewKept** (phase E) | `contracts/src/kmnEdits.ts` | `seq`, `at`, `op: "review-kept"`, `target: number` | The author kept a flagged entry (FR-064). Clears flag (a) for `target`; no IR effect. |
+| **IRRule.authorEdit** | `contracts/src/keyboard-ir.ts` | optional `"layout-tab" \| "code-tab"` | Set only by `applyLayoutOp` and `applyIRChanges`. Drives the hand-set and "changed in code" labels. Additive, beside `rulesStepAdded`; not part of the `Pattern` schema. |
+| **Deadkey ops** | existing, spec 083, decision `deadkeys-defined` | `DeadkeyOperation` | Deadkey define/rename/retarget/delete and fan-out pair edits from the Layout tab go here, not into `kmn-edits`. |
+| **Deadkey display character** | spec 083 `define.accentChar` (also the trigger's double-tap escape output) or, if that cannot serve, a `set-display` lifecycle op | `accentChar` / `displayChar?` | Phase A confirms; a new field is a lifecycle op, not a `kmn-edits` entry. |
 
 ## Undo entries (`workingCopyStore` `UndoEntry`)
 
+Every undo records `kmn-edits` (or `deadkeys-defined`) anew and applies a local inverse to the
+live IR. No rebuild (R6).
+
 | Kind | Holds | Undo does |
 |---|---|---|
-| `l` | one layout op `seq` + its `LayoutOpEffect` | Remove that op from `layoutOps`; apply the inverse effect to the live IR (drop inserted rules, restore removed rules at their positions). No rebuild. |
-| `lb` | layout op `seq`s + effects (edit + accepted case partner) | The same for each, as one step. |
-| `ld` | the inverse `DeadkeyOperation` of a Layout-tab table edit | Append the inverse to the deadkey log (the log stays append-only). |
+| `l` | one entry `seq` + its `KmnEditEffect` | Record `kmn-edits` without that entry; apply the inverse effect to the live IR (drop inserted nodes, restore removed nodes at their positions). |
+| `lb` | entry `seq`s + effects (edit + accepted case partner) | The same for each, as one step. |
+| `ld` | the inverse `DeadkeyOperation` of a Layout-tab table edit | Append the inverse to the deadkey op list and record `deadkeys-defined`. |
+| `c` (phase E) | one `CodeEdit` `seq` + its `KmnEditEffect` | As `l`. |
 
-**LayoutOpEffect** (undo entry only, not persisted in the op): `{ insertedNodeIds: string[];
-removed: Array<{ groupNodeId: string; index: number; rule: IRRule }> }`. Recorded when the op is
-applied to the live IR.
+**KmnEditEffect** (undo entry only, not in the decision): `{ insertedNodeIds: string[];
+removed: Array<{ containerNodeId: string; index: number; node: IRNode }> }`. Recorded when the
+entry is applied to the live IR.
 
 ## Derived, never stored
 
@@ -37,6 +48,7 @@ applied to the live IR.
 | **Context list** | `listContexts(ir)` | Literal contexts and deadkeys in use, with key counts (US4). |
 | **Base fallback cell** | `enumerateUnhandledPositions` × `referenceBaseLayouts` × picked base keyboards | Primary first; "unknown" / "system shortcut" where no data. |
 | **Provisional count per layer** | base fallback cells not covered by a confirmed class policy | Fed to `LayerSelector`'s per-layer count (FR-030). |
+| **Review flags** (phase E) | `CodeEdit.overrides` minus `ReviewKept`; replay misses; `findShadowedRules` | Misses and shadowed rules are recomputed on every replay, never stored (FR-063). |
 
 ## State transitions of a cell
 
@@ -44,8 +56,8 @@ applied to the live IR.
 unhandled (base-derived, provisional)
    │ set-key                         │ class policy confirmed (spec 109 surface)
    ▼                                 ▼
-hand-set ◄── set-key ── starting-point     unhandled (confirmed: base char, or "types nothing"
-   │                                         once swallowUndefined ships)
+hand-set ◄── set-key / code edit ── starting-point     unhandled (confirmed: base char, or
+   │                                                     "types nothing" once swallowUndefined ships)
    │ clear-key / undo
    ▼
 starting-point (or unhandled, if the starting point had no rule)

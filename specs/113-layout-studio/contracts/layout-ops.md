@@ -1,9 +1,17 @@
-# Contract: layout op log
+# Contract: Layout-tab edits in the `kmn-edits` decision
 
-The replayable record of Layout-tab edits ([research.md](../research.md) R1, R2). Persisted in the
-draft envelope and in the `physical-layout` decision value, so it is a contract: the TypeScript
-type lives in `packages/contracts`, with a zod schema bound by a compile-time drift guard (the
-repo's standard pattern). It is additive and does not touch the locked `Pattern` schema.
+The replayable record of Layout-tab edits ([research.md](../research.md) R1, R2, R12). Each
+confirmed edit is one entry in the bundled `kmn-edits` decision (ruling 6, 2026-11-05), which
+persists with the decision set, so it is a contract: the TypeScript type lives in
+`packages/contracts`, with a zod schema bound by a compile-time drift guard (the repo's standard
+pattern). It is additive and does not touch the locked `Pattern` schema. Code-tab entries are in
+[code-edits.md](code-edits.md).
+
+```ts
+/** The `kmn-edits` decision value. Entries replay in order; later entries win. */
+interface KmnEditsValue { entries: KmnEdit[] }
+type KmnEdit = LayoutOperation | CodeEdit | ReviewKept;   // CodeEdit, ReviewKept: phase E
+```
 
 ## Type
 
@@ -43,7 +51,7 @@ type LayoutBecomes = ReadonlyArray<
 `seq` is monotonic per draft; `at` is a timestamp. Deadkey **definition** and fan-out-store pair
 edits are not layout ops — they are spec 083 `DeadkeyOperation`s (R2).
 
-## Semantics of `applyLayoutOp(ir, op): KeyboardIR` (engine, pure)
+## Semantics of `applyLayoutOp(ir, op): { ir: KeyboardIR; effect: KmnEditEffect }` (engine, pure)
 
 Operates on the entry keys-group (the group the `begin Unicode` statement uses).
 
@@ -55,8 +63,15 @@ Operates on the entry keys-group (the group the `begin Unicode` statement uses).
 | `remove-row` | Remove the rule(s) with exactly this `context` + key. |
 | `decline-case-partner` | No IR effect; recorded so FR-020a does not re-propose. |
 
-Rules the op touches are stamped `layoutTabOwned: true` (an optional `IRRule` field, mirroring
+Rules the op inserts are stamped `authorEdit: "layout-tab"` (an optional `IRRule` field, beside
 `rulesStepAdded`) so attribution can label them hand-set.
+
+**Replay is not a plain reduce.** `replayKmnEdits(ir, entries)` first normalises the list (a
+`clear-key` drops the earlier `set-key` entries for its `(vkey, layer)`; a `ReviewKept` has no IR
+effect), then applies the rest in order with `applyLayoutOp` / `applyIRChanges`. It returns
+`{ ir, misses }`. The live path does not replay: it applies one entry and records its
+`KmnEditEffect`, and a live `clear-key` restores the context-free rules for its `(vkey, layer)`
+from the IR built without the cleared `set-key`s — tested equal to what replay produces.
 
 **Refusals (throw, caller shows the reason):** the target rule is inside a `readonly` group or a
 `RawKmnFragment`; the keyboard is mnemonic; the deadkey id is unknown.
@@ -68,8 +83,9 @@ the same `(vkey, layer[, context])` win.
 
 | Where | Call |
 |---|---|
-| Live edit (studio) | `applyMutatePatch(ir, { groups }, LAYOUT_WRITES)` → `setWorkingIR`; `commitLayoutOp(op)` appends to `layoutOps` and pushes undo entry `l`/`lb`. `LAYOUT_WRITES` = the entry group's `rules` path, declared in `studio/src/steps/editorMutate.ts` beside `DEADKEY_WRITES`. |
-| Artifact (studio projection) | `projectWorkingCopyVfs` step 2.2 — after assignments (2) and deadkey ops (1.8), before layer propagation (2.5), mark guards (2.6), context tolerance (2.7). Only when `layoutOps` is non-empty: parse → `layoutOps.reduce(applyLayoutOp)` → emit. |
-| Undo (studio) | Local inverse from the `LayoutOpEffect` held in the undo entry (inserted node ids; removed rules with positions). No rebuild. |
-| Decision | `PhysicalLayoutValue.layoutOps?: LayoutOperation[]`, snapshotted by `completePhysicalLayoutStep`. |
-| Draft | `layoutOps` slice saved and restored by `persistWorkingCopy.ts`, beside the deadkey op log. |
+| Live edit (studio) | `commitKmnEdit(entry)`: `applyLayoutOp` → `applyMutatePatch(ir, { groups }, LAYOUT_WRITES)` → `setWorkingIR`; then `useDecisionStore.getState().record({ id: "kmn-edits", value: { entries: [...prev, entry] }, provenance: "asked" })`; pushes undo entry `l`/`lb`. `LAYOUT_WRITES` = the entry group's `rules` path, declared in `studio/src/steps/editorMutate.ts` beside `DEADKEY_WRITES`. |
+| Decision replay | Gallery module `survey/questions/gallery/kmnEdits.ts`: `apply(value, ctx)` → `replayKmnEdits(ctx.ir, entries)`; composes from `ctx.decisions["kmn-edits"]` when called with `undefined` (the `deadkeysDefined` precedent). |
+| Artifact (studio projection) | `projectWorkingCopyVfs` step 2.2 — after assignments (2) and deadkey ops (1.8), before layer propagation (2.5), mark guards (2.6), context tolerance (2.7). Only when `kmn-edits` has entries: parse → `replayKmnEdits` → emit. The value reaches the projection through `lib/projectionInput.ts`. |
+| Undo (studio) | `undoKmnEdit()`: record `kmn-edits` without the entry; local inverse from the `KmnEditEffect` held in the undo entry (inserted node ids; removed nodes with positions). No rebuild. |
+| Draft | Nothing new: the decision set already persists in the draft envelope. |
+| `physical-layout` | Unchanged. Stays record-only (spec 105 phase 4). |

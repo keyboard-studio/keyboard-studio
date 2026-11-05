@@ -23,50 +23,56 @@ replayable overlays: carve (:635), the deadkey op log (:888-898), Assign-tab ass
   for the live view, `commitDeadkeyOp` to an append-only log, `applyDeadkeyOpsToVfs`
   (`studio/src/lib/deadkeyOps.ts:66`) at projection.
 
-**Decision.** A new append-only **layout op log**, mirroring the deadkey op log:
+**Decision (revised 2026-11-05, ruling 6).** Each confirmed edit is one entry in a new bundled
+decision, **`kmn-edits`**, recorded at the confirm. (The first version of this plan kept a
+separate `layoutOps` store slice and copied it into `physical-layout` at step completion; the
+product owner ruled that edits to the KMN are decisions — see R12.)
 
-- Each confirmed edit is one `LayoutOperation` ([contracts/layout-ops.md](contracts/layout-ops.md)).
+- Each confirmed Layout-tab edit is one `LayoutOperation` ([contracts/layout-ops.md](contracts/layout-ops.md)),
+  appended to the `kmn-edits` value; Code-tab Applies append `CodeEdit` entries (R13).
 - Live: `applyLayoutOp(ir, op)` (pure, engine) → `applyMutatePatch(ir, patch, LAYOUT_WRITES)` →
-  `setWorkingIR`.
+  `setWorkingIR`, then `useDecisionStore.getState().record({ id: "kmn-edits", … })`.
 - Artifact: a new projection step **2.2**, after assignments (step 2) and deadkey ops (step 1.8)
   so a key-first edit wins over an earlier character-first one on the same key, and **before**
   layer propagation (2.5), mark guards (2.6), and context tolerance (2.7), so those see the edited
-  keyboard. It parses the assembled `.kmn`, applies the ops, and emits — **only when the log is
-  non-empty**, the step 1.7b precedent (`projectWorkingCopyVfs.ts:848-869`), so keyboards with no
-  Layout edits keep a byte-identical artifact. The re-parse at `:954` is deliberately not
-  re-emitted (comment at `:948`: the text artifact must equal the pre-flag path's), which is why
-  the step is gated on a non-empty log rather than always re-emitting.
+  keyboard. It parses the assembled `.kmn`, replays the `kmn-edits` entries, and emits — **only
+  when `kmn-edits` has entries**, the step 1.7b precedent (`projectWorkingCopyVfs.ts:848-869`), so
+  keyboards with no edits keep a byte-identical artifact. The re-parse at `:954` is deliberately
+  not re-emitted (comment at `:948`: the text artifact must equal the pre-flag path's), which is
+  why the step is gated on a non-empty list rather than always re-emitting.
 - Context tolerance (2.7) replays variants of named rules; a variant whose source rule a layout op
   removed is skipped with a warning, never left firing.
-- Recorded: `PhysicalLayoutValue` (`studio/src/survey/assignLoop/physicalLayoutValue.ts:19-30`)
-  gains optional `layoutOps?: LayoutOperation[]` — the `displacedDeclined` precedent for an
-  additive field. `completePhysicalLayoutStep` snapshots the log, as it does the assignments.
+- The projection input (`lib/projectionInput.ts`) reads the `kmn-edits` value from the decision
+  store, not from a working-copy slice.
+- `physical-layout` is untouched: still record-only, still spec 105 phase 4's to fold.
 
-**Rationale.** Replace, remove, and `nul` need an IR op; replay needs a log; the deadkey log
-already proves the shape in this codebase.
+**Rationale.** Replace, remove, and `nul` need an IR op; replay needs an ordered list; the deadkey
+op log (`deadkeys-defined`, whose `apply()` replays `DeadkeyOperation`s) already proves the shape
+as a decision in this codebase.
 
 **Alternatives rejected.** (a) Route through Assign-tab assignments: text path, and the
 assignment key (`modality/scope/target`, `contracts/src/assignmentMap.ts:83-85`) is character-keyed
 — two keys typing one character collide, and `nul` has no key. (b) Stamp-and-splice: add-only.
-(c) Make `physical-layout` apply() do the work: that is spec 105 phase 4 (the decision's replay
-fold), larger than this feature and owned there; the op log is replayable now and becomes that
-fold's input later.
+(c) Make `physical-layout` apply() do the work: that is spec 105 phase 4, larger than this feature
+and owned there. (d) A separate `layoutOps` store slice snapshotted into `physical-layout` at
+completion (this plan's first version): rejected by ruling 6 — it adds a stored source of author
+truth outside the decisions, against spec 105 Option A.
 
-**Side finding — verified (not this spec's scope).** The Code tab's Apply (`KmnCodePane.tsx:195`)
+**Side finding — verified; now in scope as User Story 8 (ruling 7).** The Code tab's Apply (`KmnCodePane.tsx:195`)
 calls only `setWorkingIR`. The production projection input passes only
 `deriveRuleAdditions(state.ir, state.startIr)` (`lib/projectionInput.ts:129`), which collects only
 rules stamped `rulesStepAdded`; a Code-tab parse stamps nothing. A probe test (2026-11-04: parse
 `+ [K_Q] > 'x'`, Apply an edit to `'y'` plus a new `+ [K_W] > 'z'`, run `projectWorkingCopyVfs`
 with the derived additions) passed with the projected `.kmn` still `'x'` and no `K_W`. So a
-Code-tab Apply changes the live view but not the preview or download. Owner: Engine team.
-Trigger: report to the product owner now; fix under its own `bug(studio)` issue, outside this
-spec. The Layout tab must not copy the Code tab's write path.
+Code-tab Apply changes the live view but not the preview or download. Reported to the product
+owner 2026-11-05, who ruled the fix into this spec: Code-tab edits are imported into
+`kmn-edits` (R13, User Story 8). The Layout tab must not copy the Code tab's current write path.
 
 ## R2. Recording `nul`, deadkey-on-key, and contextual rows
 
 **Decision.**
-- `nul`, text, and deadkey-on-key edits are `LayoutOperation`s (`set-key`), keyed by
-  `(vkey, modifiers)`, not by character.
+- `nul`, text, and deadkey-on-key edits are `LayoutOperation`s (`set-key`) in `kmn-edits`, keyed
+  by `(vkey, modifiers)`, not by character.
 - Deadkey definition, rename, retarget, delete, and **fan-out-store pair edits** go through the
   existing spec 083 lifecycle and its op log (`survey/deadkeys/deadkeyOps.ts:58-97`;
   `commitDeadkeyOp`, `workingCopyStore.ts:2352`). Spec 083 is implemented
@@ -147,12 +153,16 @@ decision set, not editor overlays.
 - Each live application of a layout op records what it did: the node ids it inserted and the rules
   it removed with their positions (`LayoutOpEffect`, data-model). The effect is held in the undo
   entry only, not in the persisted op.
-- New kinds: `l` (one op by seq, mirroring `k`) and `lb` (an edit plus its accepted case partner).
-  Undo removes the op from the log (so projection replays without it) and applies the inverse
-  effect to the live IR: drop the inserted rules, restore the removed ones at their positions,
-  through `applyMutatePatch`.
-- `clear-key` uses the same effect record: it is an op whose effect restores what the earlier
-  `set-key` replaced.
+- New kinds: `l` (one op by seq, mirroring `k`), `lb` (an edit plus its accepted case partner),
+  and `c` (one Code-tab Apply, R13). Undo records `kmn-edits` without the entry (so replay and
+  projection run without it; the spec 053 decision log keeps the history) and applies the
+  inverse effect to the live IR: drop the inserted nodes, restore the removed ones at their
+  positions, through `applyMutatePatch`.
+- `clear-key` is an entry whose live effect restores the context-free rules for its
+  `(vkey, layer)` as the IR would have them without the cleared `set-key`s (the earlier set-key
+  effects' removed rules, or the starting point's rules after a reload); replay drops the cleared
+  `set-key`s instead ([contracts/layout-ops.md](contracts/layout-ops.md)). The two are tested
+  equal.
 - Deadkey-table edits from the Layout tab push `ld`, holding the **inverse** `DeadkeyOperation`
   (add-pair ↔ remove-pair). Undo appends the inverse, so the deadkey log stays append-only. Spec 083
   kept its ops off the undo stack because undo was "out of scope for spec 083"
@@ -209,10 +219,15 @@ ledger to see layout ops' outputs.
 
 ## R10. Derived-surface registry
 
-**Decision.** New entry `layout-tab` (phase 4, status pending, decisionIds `["physical-layout"]`),
-storeActions `commitLayoutOp`, `undoLayoutOp`; field `layoutOps`, classified
-`EDITOR-AUTHORED` in `WORKING_COPY_MEMBER_CLASSIFICATION`. `derivedEquivalence.test.ts`'s census
-fails until both are added, which is the gate FR-026 wants.
+**Decision (revised 2026-11-05, ruling 6).** New entry `kmn-edits` (decisionIds `["kmn-edits"]`),
+storeActions `commitKmnEdit`, `undoKmnEdit` (the live-IR half of each edit and undo); no new
+`WorkingCopyState` field, because the edit list lives in the decision, not the store. Status
+**equivalence-proven** in the change that adds it: extend `derivedEquivalence.test.ts`'s replay
+arm (rebuild from decisions reproduces the rules after Layout edits) and draft-load arm (the
+decision reloads from the draft envelope). The `phase` field takes the number spec 105 assigns
+for a surface born derived (Phase 0 precedent: `survey-decision-replay`, phase 0); confirm with
+the registry's type when adding it. The census and coverage arms fail until the store actions
+are registered, which is the gate FR-026 wants.
 
 ## R11. Size re-estimate
 
@@ -223,16 +238,90 @@ with projection replay, persistence, and undo. Estimate by phase (production + t
 
 | Phase | Scope | Production | Tests | Total |
 |---|---|---|---|---|
-| A | Foundation: ISO geometry, attribution module, `simulateEach`, emit line map, `LayoutOperation` contract + `applyLayoutOp` | ~1,300 | ~1,100 | ~2,400 |
-| B | US1 read-only tab: grid, cells, layer selector, detail panel, base fallback join, tab bar | ~1,300 | ~800 | ~2,100 |
-| C | US2 change keys: editor, case partner, key-first displacement, op log store/persist/replay, decision field, registry, undo | ~1,400 | ~1,100 | ~2,500 |
+| A | Foundation: ISO geometry, attribution module (+ shadowed-rule check), `simulateEach`, emit line map, `LayoutOperation` + `KmnEditsValue` contracts, `applyLayoutOp` + replay | ~1,400 | ~1,150 | ~2,550 |
+| B | US1 read-only tab: grid, cells, layer selector, detail panel, view in code, base fallback join, tab bar | ~1,300 | ~800 | ~2,100 |
+| C | US2 change keys: editor, case partner, key-first displacement, `kmn-edits` decision module + edit-time recording + projection replay, registry (equivalence-proven), undo | ~1,400 | ~1,150 | ~2,550 |
 | D | US3 deadkeys: lifecycle surface, display character, both table shapes, "after deadkey" view, inverse-op undo | ~1,100 | ~800 | ~1,900 |
-| E | US5 + US6: read-only detail + view in code; provisional counts and fallback-policy link | ~800 | ~500 | ~1,300 |
-| F | US4 contextual rows: context list, "after …" for literal contexts, "becomes" editor, never-fires | ~900 | ~700 | ~1,600 |
-| — | E2E (Playwright) + SC-001/SC-007/SC-009 corpus harness | ~200 | ~400 | ~600 |
-| **v1 total** | | **~7,000** | **~5,400** | **~12,400** |
-| G | US7 tray (gated, not counted) | ~600 | ~400 | ~1,000 |
+| E | US8 Code-tab edits: structural diff, content-anchored apply, error gate, ownership + review flags, review list | ~1,200 | ~1,000 | ~2,200 |
+| F | US5 + US6: richer read-only detail; provisional counts and fallback-policy link | ~800 | ~500 | ~1,300 |
+| G | US4 contextual rows: context list, "after …" for literal contexts, "becomes" editor, never-fires | ~900 | ~700 | ~1,600 |
+| — | E2E (Playwright) + SC-001/SC-007/SC-009/SC-010 corpus harness | ~200 | ~450 | ~650 |
+| **v1 total** | | **~8,300** | **~6,550** | **~14,850** |
+| H | US7 tray (gated, not counted) | ~600 | ~400 | ~1,000 |
 
-**US1–US3 ship first** (phases A–D plus their E2E): about **8,900 lines** (~5,100 production).
+**US1–US3 ship first** (phases A–D plus their E2E): about **9,100 lines** (~5,200 production).
 That is roughly three times the draft's figure for the same stories; the difference is mostly the
-op log (R1) and deadkeys at full depth.
+replayable edit decision (R1, R12) and deadkeys at full depth. Phase E (US8) adds ~2,200 and ships
+next.
+
+## R12. `kmn-edits` — the bundled decision (ruling 6, 2026-11-05)
+
+**Finding.**
+- `decisionStore.record({ id, value, provenance })` stores the value; it does not apply it
+  (`lib/mechanismStepCompletion.ts`, every `complete*Step`). A module's `apply()` runs on replay,
+  in `decisions/replayKeyboard.ts:216`, and in `decisions/impact.ts:118`.
+- Precedent: `deadkeys-defined` (`survey/questions/gallery/deadkeysDefined.ts`) is a gallery
+  module whose value is an op list and whose `apply()` replays it over `ctx.ir`, composing from
+  `ctx.decisions` when called with `undefined`. Its declared writes are mirrored in
+  `decisions/decisionTypes.ts` (`decisionIRPaths`).
+- Spec 105's phase 2 asks the deadkey surface to move to edit-time recording (its T201); this
+  decision is born that way.
+
+**Decision.**
+- New `DecisionId` `"kmn-edits"` in `decisions/decisionTypes.ts`, with IR paths `groups`,
+  `stores`, `raw` (plus the header path if Code-tab entries may touch headers — check
+  `irPath`'s kinds).
+- New gallery module `survey/questions/gallery/kmnEdits.ts`: `provides: ["kmn-edits"]`;
+  `apply(value, ctx)` replays the entries in order (`replayKmnEdits`, engine), composing from
+  `ctx.decisions` like `deadkeysDefined`; renderer lists the entries (Content-team copy).
+- Ordering: `kmn-edits` must replay after every decision that writes rules (`carved-layout`,
+  `deadkeys-defined`, `rule-set`, `physical-layout`). It is recorded at edit time, before
+  `physical-layout` is recorded at step completion, so the ordering must not make it wait for an
+  unrecorded decision. Confirm how `orderByDependencies` and `replayKeyboard` treat a `requires`
+  entry with no recorded value before choosing `requires` vs an ordering-only declaration.
+- Value: `KmnEditsValue = { entries: KmnEdit[] }`, `KmnEdit = LayoutOperation | CodeEdit`
+  (contracts; `CodeEdit` added in phase E as an additive union arm). Recorded with provenance
+  `"asked"` on every confirm, Apply, review action, and undo.
+- Live: the editor applies the entry to the working IR through `applyMutatePatch` (the
+  deadkey precedent) and records the decision; it never relies on `record` to apply.
+
+## R13. Code-tab import (ruling 7, 2026-11-05)
+
+**Finding.**
+- `KmnCodePane.handleApply` (`editors/assignLoop/KmnCodePane.tsx:~195`) lints synchronously,
+  parses, skips a formatting-only change (`current === canonical`), then `setWorkingIR(after.ir)`
+  — a wholesale replacement.
+- Node ids are minted per parse in order (`engine/src/shared/node-ids.ts`: `rule#0`, `rule#1`, …),
+  so one inserted rule renumbers every later rule. A diff cannot match by node id, and the
+  wholesale replacement renumbers nodes that overlays keyed by node id may reference (not
+  verified here; FR-060's in-place apply avoids it by construction).
+- The download path already compiles on an explicit author action
+  (`lib/buildOutputBundle.ts`), outside the D3 cycle.
+
+**Decision.**
+1. **Diff** — new pure engine module `engine/src/kmn-diff/`: `diffIR(before, after): IRChange[]`.
+   Groups and stores align by name; the begin statement and headers by kind; rules and comments
+   within a group by a longest-common-subsequence over each node's canonical emitted text; opaque
+   fragments by text. Changes: insert, remove, replace (node), set-store, add/remove group,
+   set-begin, set-header.
+2. **Anchors** (FR-065) — each change locates its target by content: the node's canonical text
+   plus its previous and next siblings' text within its container. `applyIRChanges(ir, changes)`
+   returns `{ ir, effect, misses }`; a miss is a change whose anchor is not found (FR-063 b).
+   Inserted nodes get fresh ids above the IR's highest id; untouched nodes keep theirs.
+3. **Error gate** (FR-061, FR-067) — on Apply: parse and lint (existing), Layer A validator
+   errors on the parsed IR (`engine/src/validator`), then one compile of the candidate through the
+   compile service the download path uses. Explicit, one-shot, no timer. km-validator reviews this
+   against D3 before phase E lands.
+4. **Ownership** (FR-062) — a changed or removed node is "owned by another decision" when it is
+   not identical to a node of `startIr`. The owner is named from markers where they exist: the
+   `@deadkey` marker or a `dk_*` store → deadkeys; `rulesStepAdded` → rules step; `authorEdit` →
+   Layout or Code tab; identity's header stores → identity; otherwise "another step" (Assign-tab
+   rules carry no marker; the label stays honest rather than guessing).
+5. **Flags** (FR-063) — (a) owner overrides, recorded on the entry at Apply; (b) replay misses,
+   computed on each replay, never stored; (c) shadowed rules, from the engine's
+   `findShadowedRules` (phase A, shared with US4's never-fires). "Keep" records a
+   `review-kept` entry naming the flagged entry's `seq`; "revert" undoes the latest entry, or
+   appends the inverse of an older one (`invertChanges`; removed and replaced nodes are stored
+   with the change for this), so the list stays append-only and nothing is rebuilt (FR-064).
+6. **Stamping** — rules a code entry inserts or replaces carry `authorEdit: "code-tab"`, so the
+   Layout tab labels them hand-set and the owning editors show "changed in code".

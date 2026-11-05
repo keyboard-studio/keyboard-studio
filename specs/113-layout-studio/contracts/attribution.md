@@ -46,7 +46,14 @@ function isMnemonic(ir: KeyboardIR): boolean;
 ```
 
 Rules: FR-013 as amended (per behaviour; R3's fan-out exemption). Provenance `hand-set` iff the
-rule carries `layoutTabOwned`, or the character is in an Assign-tab assignment for that slot.
+rule carries `authorEdit` (`"layout-tab"` or `"code-tab"`; the detail says which), or the
+character is in an Assign-tab assignment for that slot.
+
+```ts
+/** Rules that can never fire: an earlier rule in the same group with the same context and key
+ *  element always matches first. Shared by US4's never-fires and US8's review flag (c). */
+function findShadowedRules(ir: KeyboardIR): Array<{ ruleNodeId: string; shadowedBy: string }>;
+```
 
 ## Engine: simulator addition
 

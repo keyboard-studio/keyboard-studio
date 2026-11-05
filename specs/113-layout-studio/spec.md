@@ -51,7 +51,7 @@ Mechanical Gallery and use it, not when the component exists.
    **placement tray** (drag characters from the confirmed inventory onto keys, Touch Builder style)
    is an optional later phase (User Story 7).
 3. **Flow placement** — a **third tab in the Mechanical Gallery**: Assign | Code | Layout. No new
-   wizard step, no new decision id.
+   wizard step. (The original "no new decision id" is superseded by ruling 6.)
 4. **Edit depth** — **as much as possible, where a useful UI exists** (amended by the 2026-11-04
    clarifications below). v1 edits literal text, nothing (`nul`), deadkeys with their combinations
    (chains included), and literal contextual replacements, through the confirmed "after …" view.
@@ -59,6 +59,20 @@ Mechanical Gallery and use it, not when the component exists.
    changes, opaque fragments) is read-only with a way to see it in code.
 5. **Base seeding** — keys the keyboard does not handle show what the **base keyboard** types
    there, marked **base-derived and provisional**. An author edit makes the key hand-set.
+
+## Rulings (Matthew, 2026-11-05)
+
+6. **Edits to the KMN are decisions.** Layout-tab edits are not a separately stored log copied
+   into `physical-layout` at step completion. They are recorded, at each confirm, as one bundled
+   decision, **`kmn-edits`**: an ordered list of edits whose `apply()` reproduces them. This is
+   the spec 105 Option A direction (the working copy derived from decisions) from the first day;
+   it does not wait for spec 105 phase 4. One bundled decision, not one decision per edit; each
+   edit still appears in the decision trail.
+7. **Code-tab edits are imported into the same decision** (User Story 8). Code-tab Apply parses
+   the edited text, computes the structural difference from the working copy, and records it in
+   `kmn-edits`. **The code edit wins** over a rule another editor produced, but **errors are
+   blocked** (nothing is recorded) and **inconsistencies are flagged for review**. Ships as its
+   own phase after User Story 3, so the first PR stays at US1–US3.
 
 ## Clarifications
 
@@ -86,6 +100,19 @@ Mechanical Gallery and use it, not when the component exists.
   wished for this view in Keyman's own on-screen keyboard. Literal contextual replacements
   (User Story 4) and chained deadkeys are in scope through it; store-based rules
   (`any()`/`index()`) stay read-only, with a sketched next frontier (Assumptions).
+
+### Session 2026-11-05
+
+- Q: The plan stored Layout-tab edits in their own log and copied it into `physical-layout` at
+  step completion, while spec 105's Option A says the working copy becomes purely derived from
+  decisions. Acceptable? → A: No. Edits to the KMN are additional decisions: one bundled
+  decision, `kmn-edits`, recorded at each confirm (ruling 6).
+- Q: The template keyboard is already interpreted (parsed into the IR). Should Code-tab edits
+  be imported as a diff, checked, and stored the same way? → A: Yes, in this spec, as its own
+  phase after US3 (ruling 7).
+- Q: When a Code-tab edit changes a rule another editor owns (an Assign-tab assignment, a
+  deadkey, a Layout-tab edit), what happens? → A: The code edit wins, but errors are blocked
+  and inconsistencies are flagged for review (ruling 7; FR-061–FR-063).
 
 ## The problem
 
@@ -161,7 +188,8 @@ either matches or is marked read-only with its reason. No keyboard is refused.
    views it, **Then** the cell is marked as code the studio cannot show here, read-only, with "view
    in code".
 7. **Given** the author edits the working copy in the Assign or Code tab, **When** they return to
-   the Layout tab, **Then** every cell reflects the change.
+   the Layout tab, **Then** every cell reflects the change. (The Code-tab half holds once User
+   Story 8 ships: today a Code-tab Apply never reaches the compiled keyboard, research R1.)
 
 ---
 
@@ -350,6 +378,52 @@ lands as a US2 assignment would; the tray empties.
 3. **Given** a read-only key, **When** the author tries to drop a character on it, **Then** the drop
    is refused with the same explanation as US2 scenario 5.
 
+---
+
+### User Story 8 — Edits in the Code tab are kept (Priority: P2)
+
+The author edits the `.kmn` text in the Code tab and applies it. The studio reads the edited text
+back into the keyboard model, works out exactly what changed, and records those changes in the
+`kmn-edits` decision, beside the Layout tab's edits. The edit reaches the preview, the simulator,
+and the downloaded keyboard, survives reload, and can be undone. If the text has errors, nothing
+is recorded. If the edit overrides something another editor produced, or later stops fitting
+because an earlier decision changed, it is flagged for the author to review.
+
+**Why this priority**: Today a Code-tab Apply changes what the studio shows but never reaches the
+preview or the download (research R1) — the author's work is silently lost. Ruling 7 brings the
+Code tab under the same decision as the Layout tab. P2, shipped right after PR 1, because it
+reuses the decision and replay that User Story 2 builds.
+
+**Independent Test**: On a simple positional keyboard, change one rule, add one, and delete one in
+the Code tab, and Apply. Download the source; the `.kmn` has exactly those changes. Reload; they
+are still there. Change an Assign-tab assignment the edit overrode; the edit still wins and is
+flagged. Introduce a syntax error and a compile error; Apply is refused both times and nothing is
+recorded.
+
+**Acceptance Scenarios**:
+
+1. **Given** the author changes `+ [K_Q] > 'q'` to `+ [K_Q] > 'ŋ'` in the Code tab, **When** they
+   Apply, **Then** the `kmn-edits` decision gains one entry, the simulator types `ŋ` on `K_Q`, the
+   Layout tab shows the key as hand-set (from the Code tab), and the downloaded `.kmn` has the rule.
+2. **Given** edited text that does not parse, fails a validator error check, or does not compile,
+   **When** the author tries to Apply, **Then** nothing is recorded, the working copy is unchanged,
+   and the errors are shown at their lines.
+3. **Given** an edit that changes or removes a rule another editor produced (an Assign-tab
+   assignment, a deadkey, a Layout-tab edit), **When** the author Applies, **Then** they are told
+   before confirming which editor owns it; on confirm the code edit wins, the owning editor shows
+   the rule as "changed in code", and the edit is flagged for review.
+4. **Given** a recorded code edit whose rule an earlier decision later changes or removes (the
+   author switches the starting point, or re-assigns that key), **When** the keyboard is rebuilt,
+   **Then** the edit is not applied where it no longer fits, is flagged for review with the reason,
+   and is never dropped silently.
+5. **Given** flagged edits, **When** the author opens the review list, **Then** each shows what it
+   changed, why it is flagged, and "view in code"; the author can keep it (the flag clears, on
+   record) or revert it.
+6. **Given** a change that only reformats the text (the emitter normalises it away), **When** the
+   author Applies, **Then** nothing is recorded.
+7. **Given** an applied code edit, **When** the author undoes, **Then** the whole Apply is reversed
+   as one step, and the entry leaves `kmn-edits`.
+
 ### Edge Cases
 
 - **Mnemonic keyboards** (`&mnemoniclayout`): what a key types depends on the base keyboard's
@@ -394,6 +468,14 @@ lands as a US2 assignment would; the tray empties.
   Caps-sensitive, and the preview says so (MSKLC's per-key "Caps Lock affects this key").
 - **A key with a hand-set assignment that the copied keyboard also had**: hand-set wins in the
   label; the copied keyboard's value appears in the detail as "replaced".
+- **A Code-tab edit to a Layout-tab rule, or the reverse**: the later edit in `kmn-edits` wins
+  (one ordered list); a Code-tab edit that overrides a Layout-tab rule is flagged (FR-062).
+- **A Code-tab edit to header or system stores** (`&NAME`, `&VERSION`, `&TARGETS`) that identity or
+  other decisions produce: the code edit wins and is flagged like any other override (FR-062).
+- **A Code-tab edit inside an opaque fragment**: recorded as a change to that fragment's text; the
+  fragment stays opaque.
+- **A Code-tab edit that renames or reorders groups, or changes the `begin` statement**: recorded
+  like any other structural change; the Layout tab re-reads the entry group from the result.
 
 ## Requirements *(mandatory)*
 
@@ -402,8 +484,10 @@ lands as a US2 assignment would; the tray empties.
 **Placement in the flow**
 
 - **FR-001**: The Mechanical Gallery MUST offer a third tab, **Layout**, beside Assign and Code.
-  The tab is a view over the same working copy. It adds no wizard step, no decision id, and no
-  survey question (Art IX: the gallery step is already registered).
+  The tab is a view over the same working copy. It adds no wizard step and no survey question
+  (Art IX: the gallery step is already registered). It adds exactly one decision id,
+  `kmn-edits` (ruling 6), declared as a gallery decision module in the module registry like
+  every other decision.
 - **FR-002**: Switching tabs MUST NOT lose state. A change made in any tab is visible in the other
   two the next time they render.
 
@@ -494,15 +578,18 @@ lands as a US2 assignment would; the tray empties.
   proposed again for that key and layer. If the partner layer's key is read-only, the proposal
   says so and is not offered. Nothing is written to the partner layer without acceptance (Art X).
 - **FR-021**: A confirmed change MUST:
-  - be recorded with the Mechanical Gallery's `physical-layout` decision, so that the decision
-    carries it at step completion and the Assign tab shows it where its own model can represent it
-    (a character placed on a key);
+  - be recorded **at the confirm**, as one entry appended to the `kmn-edits` decision (ruling 6) —
+    not held in a separate store and copied into `physical-layout` at step completion. The
+    decision's `apply()` MUST reproduce the change on replay, so a rebuild from decisions alone
+    yields it;
+  - be shown by the Assign tab where its own model can represent it (a character placed on a
+    key), labelled as set in the Layout tab;
   - reach the KeyboardIR through the `mutate()` seam (Art IX; the same seam spec 109 FR-013 uses);
   - use no text-level path — not the `kmnFragment` injection path (spec 082 FR-015), and not a
     parse of edited `.kmn` text.
-  The Assign tab's assignment set is keyed by character, so it cannot by itself hold "this key types
-  nothing", "this key emits deadkey dk(x)", or a contextual row. How those edits are
-  recorded is plan-phase research (Assumptions); this requirement fixes only the constraints above.
+  - reach the compiled keyboard, the preview, and the downloaded keyboard, not only the live view.
+  Deadkey definitions and fan-out table edits stay spec 083 operations recorded in
+  `deadkeys-defined` (FR-027); they are decisions already.
 - **FR-022**: A change whose character another key already types, or which displaces a character
   this key typed, MUST go through the same duplicate and displacement choices the Assign tab
   offers. The Layout tab MUST NOT resolve them silently.
@@ -511,14 +598,16 @@ lands as a US2 assignment would; the tray empties.
 - **FR-024**: Every Layout-tab change MUST be undoable, one confirmed change per undo step (a change
   with an accepted case partner is one step), through the working copy's existing undo stack (the
   one deletions and touch key edits already use). This is new work: the Assign tab has no undo for
-  assignments today. Undoing restores the working copy to its state before the change.
+  assignments today. Undoing restores the working copy to its state before the change and
+  removes the entry from `kmn-edits` (the decision log keeps the history).
 - **FR-025**: Edits MUST be refused with an explanation, and nothing written, when: the cell is
   read-only; the working copy does not compile; or the step is locked.
-- **FR-026**: The Layout tab's write surface MUST be registered in the derived-surface registry
-  (spec 105 FR-010) in the same change that adds it. An unregistered write surface is a gate
-  failure. It inherits the `physical-layout` surface's status (pending, phase 4): the decision is
-  record-only today and replay has no fold for it, so this spec does not claim replay reproduces
-  Layout-tab edits.
+- **FR-026**: The `kmn-edits` write surface (the Layout tab, and the Code tab from User Story 8)
+  MUST be registered in the derived-surface registry (spec 105 FR-010) in the same change that
+  adds it. An unregistered write surface is a gate failure. Because `kmn-edits` is recorded at
+  edit time and has a reproducing `apply()`, the surface MUST reach **equivalence-proven** status
+  (the gate's replay and draft-load arms cover it) in the change that adds it. It does not
+  depend on `physical-layout`'s phase 4, which stays as spec 105 left it.
 
 **Deadkeys and contexts (US3, US4) — the MSKLC bar and beyond**
 
@@ -546,9 +635,10 @@ lands as a US2 assignment would; the tray empties.
   guess which part of the context is kept. A new context that no listed layer can type MUST be
   flagged before confirm. Two rules for the same context and keystroke show the one that fires as
   editable and the other as "never fires", read-only.
-- **FR-029b**: Combination and contextual-row edits follow FR-021 (recorded with `physical-layout`,
-  through `mutate()`, no text path), FR-024 (one undo step per confirmed row change), and FR-025
-  (refused when the working copy does not compile or the step is locked).
+- **FR-029b**: Combination and contextual-row edits follow FR-021 (recorded in `kmn-edits`, or
+  in `deadkeys-defined` for fan-out tables, through `mutate()`, no text path), FR-024 (one undo
+  step per confirmed row change), and FR-025 (refused when the working copy does not compile or
+  the step is locked).
 
 **Provisional keys (US6)**
 
@@ -558,6 +648,43 @@ lands as a US2 assignment would; the tray empties.
   character class. The Layout tab MUST NOT set fallback policy itself.
 - **FR-032**: When a class's fallback policy is confirmed, the keys of that class MUST stop being
   shown as provisional and show the confirmed result.
+
+**Code-tab edits (US8) — ruling 7**
+
+- **FR-060**: Code-tab Apply MUST record the edit as one entry in `kmn-edits`: the **structural
+  difference** between the working copy's IR the text was emitted from and the IR parsed from the
+  edited text — rules inserted, removed, or replaced; stores, groups, headers, and opaque
+  fragments added, changed, or removed. The entry holds IR changes, never `.kmn` text, so the
+  text is parsed once at Apply and never re-parsed on replay (spec 082 FR-015 forbids the text
+  path for behaviours). Apply MUST change the live working copy by applying that difference, not
+  by replacing the IR wholesale, so untouched nodes keep their identity.
+- **FR-061**: **Errors are blocked.** Apply MUST record nothing and leave the working copy
+  unchanged when the edited text does not parse, has a validator error (Layer A), or does not
+  compile. The errors are shown at their lines. Warnings do not block.
+- **FR-062**: **The code edit wins.** When the difference changes or removes a node another
+  decision produced — an Assign-tab assignment, a deadkey (spec 083), a Layout-tab edit, a rules
+  step addition, identity's header stores — the author MUST be told which editor owns it before
+  confirming. On confirm, the code edit is applied and wins; the owning editor shows the node as
+  "changed in code"; the entry is flagged for review. Rules from the starting point are the
+  author's to change and are not flagged.
+- **FR-063**: **Inconsistencies are flagged for review, never resolved silently.** A code entry is
+  flagged when: (a) it overrides another decision's node (FR-062); (b) on replay, a change in it
+  no longer fits because an earlier decision changed — its anchor is gone — in which case that
+  change is not applied and the reason is shown; (c) it leaves a rule that can never fire (an
+  earlier rule with the same context and key always matches first). A flagged entry stays in
+  effect where it fits.
+- **FR-064**: Flagged entries MUST be listed for review in the Code tab, with a count on the tab,
+  and shown on the `kmn-edits` entry in the decision trail. Each item shows what changed, why it
+  is flagged, and "view in code"; the author can **keep** it (the flag clears, recorded in the
+  decision) or **revert** it (the latest edit is undone; an older one is reversed by a new entry
+  that restores what it changed). Flags do not block step completion or download.
+- **FR-065**: A code entry MUST locate what it changes by content (the rule's own text and its
+  neighbours within its group), not by node id, because node ids are renumbered by every parse.
+- **FR-066**: A change the emitter normalises away (formatting only) MUST record nothing. Each
+  Apply is one undo step (FR-024); undoing removes its entry from `kmn-edits`.
+- **FR-067**: Code-tab Apply MUST NOT add a validation timer (decision D3). How FR-061's compile
+  check runs on the candidate text is plan-phase research; it is an explicit, one-shot check on
+  the author's Apply, like the compile on download.
 
 **Accessibility and copy**
 
@@ -582,8 +709,9 @@ lands as a US2 assignment would; the tray empties.
 - **Cell attribution** — the per-cell result of FR-013: which rules match the key in this layer,
   which fired with an empty context, and whether the compiled output matches the rule's own
   output. Derived from the working copy on every recompute. Never stored.
-- **Assignment** — the Mechanical Gallery's existing record of what an author put where. A Layout
-  character edit creates or changes one.
+- **Assignment** — the Mechanical Gallery's existing record of what an author put where
+  (`physical-layout`). A Layout character edit does not create one (it is a `kmn-edits` entry);
+  the Assign tab shows it on the key, labelled as set in the Layout tab.
 - **Deadkey** — spec 083's deadkey entity: a stable id, a name, the keys and layers that emit it,
   and a display character.
 - **Contextual row** — one "after …" rule: the context (a deadkey, literal text, or both), the
@@ -592,6 +720,12 @@ lands as a US2 assignment would; the tray empties.
   copy.
 - **Base-keyboard position** — spec 109's unhandled position joined with each picked base
   keyboard's character there. Read, not owned.
+- **KMN edits decision (`kmn-edits`)** — one bundled decision: the ordered list of the author's
+  edits to the keyboard rules, from the Layout tab (key and layer edits, contextual rows) and the
+  Code tab (structural differences). Recorded at each confirm or Apply; its `apply()` replays the
+  list in order, after every other decision that writes rules. Later entries win.
+- **Code edit entry** — one Code-tab Apply: the structural changes, each located by content
+  (FR-065), plus its review flags and whether the author kept them.
 
 ## Success Criteria *(mandatory)*
 
@@ -624,6 +758,14 @@ lands as a US2 assignment would; the tray empties.
   keyboard none of whose rules falls in FR-013's read-only list, 100% of its rules are editable in
   the Layout tab. For the rest, the plan reports the share of rules editable per keyboard as a baseline for the
   store-based next frontier.
+- **SC-010 (code edits kept)**: Across a test set of Code-tab edits (change, add, delete a rule;
+  edit a store; edit a header; edit inside an opaque fragment) on at least five corpus keyboards,
+  100% of applied edits appear in the downloaded `.kmn` and survive reload; 100% of edits with a
+  parse, validator, or compile error record nothing; and after an earlier decision changes, every
+  change that no longer fits is flagged — zero silent drops.
+- **SC-011 (derived from decisions)**: The `kmn-edits` surface passes the spec 105 equivalence
+  gate's replay and draft-load arms: a rebuild from decisions alone reproduces the working copy's
+  rules after any mix of Layout-tab and Code-tab edits.
 
 ## Assumptions
 
@@ -659,9 +801,9 @@ lands as a US2 assignment would; the tray empties.
   is recorded by this spec's retirement pass, FR-050 and US7 are removed from the spec rather than
   rolled forward.
 - **Plan-phase research** (not decided here): how a character edit reaches the IR through
-  `mutate()` for a direct key mapping; how "types nothing", deadkey, and combination-row edits are
-  recorded with the `physical-layout` decision, given the assignment set is keyed by character;
-  how FR-013's attribution is computed from the IR and the simulator's fired-rule tracking; how
+  `mutate()` for a direct key mapping; the shape of `kmn-edits` entries (ruling 6); how a
+  structural difference is computed and located by content (FR-060, FR-065); how FR-061's
+  compile check runs without a validation timer; how FR-013's attribution is computed from the IR and the simulator's fired-rule tracking; how
   the deadkey display character is stored; how "view in code" finds the rule's line in the Code
   tab's text.
 - **Vocabulary.** "Desktop layout" is the layout being edited; "base keyboard" is the OS layout
@@ -671,8 +813,9 @@ lands as a US2 assignment would; the tray empties.
 ## Out of scope
 
 - Editing store-based rules (`any()`/`index()`/`notany()`), `if()`/`platform()`/options,
-  `use()` chains whose later groups change results, or opaque fragments (read-only
-  in v1; store-based rows are the next frontier).
+  `use()` chains whose later groups change results, or opaque fragments **in the Layout tab**
+  (read-only there in v1; store-based rows are the next frontier). The Code tab edits all of
+  them (User Story 8).
 - Editing mnemonic keyboards.
 - The touch layout (Touch Builder owns it) and on-screen-keyboard labels and images (the OSK editor
   owns them).
