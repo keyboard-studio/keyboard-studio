@@ -162,6 +162,27 @@ describe("buildSlotOccupancy — base IR walk", () => {
   });
 });
 
+describe("buildSlotOccupancy — physical keys only", () => {
+  // A hand test (Ewondo from Cameroon QWERTY) put ‐ on [ and lost the acute
+  // accent with no proposal: the base's touch-only `+ [T_0301] > U+0301`
+  // made the acute look "still produced on another slot", though no
+  // physical key typed it any more.
+  it("does not record touch-only T_ or U_ keys, which no physical keystroke reaches", () => {
+    const ir = makeTestIR([
+      groupWith([
+        vkeyRule("r-phys", "K_LBRKT", [], "́"),
+        vkeyRule("r-touch", "T_0301", [], "́"),
+        vkeyRule("r-unicode", "U_0300", [], "̀"),
+      ]),
+    ]);
+    const occ = buildSlotOccupancy(ir, []);
+    expect(occ.get("K_LBRKT|")).toEqual({ char: "́", source: "base" });
+    expect(occ.has("T_0301|")).toBe(false);
+    expect(occ.has("U_0300|")).toBe(false);
+    expect(isProducedOnOtherSlot(occ, "́", "K_LBRKT|")).toBe(false);
+  });
+});
+
 describe("buildSlotOccupancy — session overlay", () => {
   it("overlays an S-01 session assignment over the base occupant", () => {
     const ir = makeTestIR([groupWith([vkeyRule("r1", "K_QUOTE", [], "'")])]);

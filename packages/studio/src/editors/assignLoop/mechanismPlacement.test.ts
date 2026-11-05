@@ -2,9 +2,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { buildSlotOccupancy } from "../../survey/slotOccupancy.ts";
 import {
+  baseOnlyProducedSetFor,
   buildNeedSets,
   canGoNextFor,
+  displacementProposalFor,
   companionConfirmAssignments,
   dismissedSuggestionEntryKey,
   displacementConfirmAssignments,
@@ -252,5 +256,36 @@ describe("placementSequence", () => {
     const steps = placementSequence(plan({ displacement }), current);
     expect(steps.map((s) => s.kind)).toEqual(["record", "propose-displacement"]);
     expect(current).toEqual([existing]);
+  });
+});
+
+describe("displacementProposalFor", () => {
+  // The Ewondo hand test: Cameroon QWERTY types the acute (high tone) on [
+  // and also has a touch-only T_0301 key. Putting ‐ on [ must propose a new
+  // home for the acute — the touch key does not keep it typeable on desktop.
+  it("proposes re-homing a needed mark displaced from [, despite a touch-only key for it", () => {
+    const startIr = makeTestIR([
+      {
+        nodeId: "g-main",
+        name: "main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          { nodeId: "r-acute", context: [{ kind: "vkey", name: "K_LBRKT", modifiers: [] }], output: [{ kind: "char", value: "́" }] },
+          { nodeId: "r-touch", context: [{ kind: "vkey", name: "T_0301", modifiers: [] }], output: [{ kind: "char", value: "́" }] },
+        ],
+      },
+    ]);
+    const hyphen = swap("‐", "+ [K_LBRKT] > U+2010");
+    const proposal = displacementProposalFor({
+      assignment: hyphen,
+      currentChar: "‐",
+      slotOccupancy: buildSlotOccupancy(startIr, []),
+      needSets: buildNeedSets(["́", "‐"], baseOnlyProducedSetFor(startIr)),
+      sessionAssignments: [],
+    });
+    expect(proposal).not.toBeNull();
+    expect(proposal!.displacedChar).toBe("́");
+    expect(proposal!.vkey).toBe("K_LBRKT");
   });
 });
