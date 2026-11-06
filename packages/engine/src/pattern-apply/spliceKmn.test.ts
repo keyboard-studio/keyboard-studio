@@ -187,62 +187,79 @@ describe.skipIf(!existsSync(CORPUS))("spliceKmn on a corpus keyboard (basic_kbdf
     throw new Error("no sourced rule");
   }
 
-  it("delete removes only that rule's lines and keeps CRLF", () => {
-    const start = parsed(text);
-    const ir = structuredClone(start);
-    const { group, rule } = firstSourcedRule(ir);
-    ir.groups[group]!.rules = ir.groups[group]!.rules.filter((r) => r.nodeId !== rule.nodeId);
-    const r = projectKmnText(text, start, ir);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    const before = linesOf(text);
-    const after = linesOf(r.text);
-    expect(before.length - after.length).toBeGreaterThanOrEqual(1);
-    // Everything before the deleted rule is untouched; everything after it
-    // lines up with the original tail.
-    expect(after.slice(0, rule.sourceLine! - 1)).toEqual(before.slice(0, rule.sourceLine! - 1));
-    const tail = before.length - (rule.sourceLine! - 1) - (before.length - after.length);
-    expect(after.slice(after.length - tail)).toEqual(before.slice(before.length - tail));
-    expect(r.text.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
-  });
+  // The corpus file is LF as committed in the pinned snapshot, so the
+  // line-ending assertions must follow the input, not assume CRLF. Each case
+  // runs against the file as committed and against a CRLF conversion of it,
+  // so CRLF preservation on real content stays covered too.
+  for (const [label, input] of [
+    ["as committed", text],
+    ["CRLF", crlf(text)],
+  ] as const) {
+    describe(label, () => {
+      // The output uses the input's line ending throughout: no lone CR or LF.
+      const assertEol = (out: string): void => {
+        const eol = input.includes("\r\n") ? "\r\n" : "\n";
+        expect(out.replaceAll(eol, "")).not.toMatch(/[\r\n]/);
+      };
 
-  it("replace changes only that rule's lines", () => {
-    const start = parsed(text);
-    const ir = structuredClone(start);
-    const { group, rule } = firstSourcedRule(ir);
-    const target = ir.groups[group]!.rules.find((r) => r.nodeId === rule.nodeId)!;
-    target.output = [{ kind: "char", value: "Z" }];
-    const r = projectKmnText(text, start, ir);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    const before = linesOf(text);
-    const after = linesOf(r.text);
-    expect(after.slice(0, rule.sourceLine! - 1)).toEqual(before.slice(0, rule.sourceLine! - 1));
-    expect(after[rule.sourceLine! - 1]).not.toBe(before[rule.sourceLine! - 1]);
-    // The line after the rule is unchanged (single-line rule on this keyboard
-    // unless it is continued; either way the suffix still matches).
-    const suffix = 10;
-    expect(after.slice(-suffix)).toEqual(before.slice(-suffix));
-    expect(r.text.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
-  });
+      it("delete removes only that rule's lines and keeps the line endings", () => {
+        const start = parsed(input);
+        const ir = structuredClone(start);
+        const { group, rule } = firstSourcedRule(ir);
+        ir.groups[group]!.rules = ir.groups[group]!.rules.filter((r) => r.nodeId !== rule.nodeId);
+        const r = projectKmnText(input, start, ir);
+        expect(r.ok).toBe(true);
+        if (!r.ok) return;
+        const before = linesOf(input);
+        const after = linesOf(r.text);
+        expect(before.length - after.length).toBeGreaterThanOrEqual(1);
+        // Everything before the deleted rule is untouched; everything after it
+        // lines up with the original tail.
+        expect(after.slice(0, rule.sourceLine! - 1)).toEqual(before.slice(0, rule.sourceLine! - 1));
+        const tail = before.length - (rule.sourceLine! - 1) - (before.length - after.length);
+        expect(after.slice(after.length - tail)).toEqual(before.slice(before.length - tail));
+        assertEol(r.text);
+      });
 
-  it("insert leaves every original line in place", () => {
-    const start = parsed(text);
-    const ir = structuredClone(start);
-    const { group, rule } = firstSourcedRule(ir);
-    const added: IRRule = { ...structuredClone(rule), nodeId: "new-corpus-rule" };
-    delete added.sourceLine;
-    added.output = [{ kind: "char", value: "Z" }];
-    ir.groups[group]!.rules.push(added);
-    const r = projectKmnText(text, start, ir);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    const before = linesOf(text);
-    const after = linesOf(r.text);
-    expect(after.length).toBeGreaterThan(before.length);
-    let bi = 0;
-    for (const l of after) if (bi < before.length && l === before[bi]) bi++;
-    expect(bi).toBe(before.length);
-    expect(r.text.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
-  });
+      it("replace changes only that rule's lines", () => {
+        const start = parsed(input);
+        const ir = structuredClone(start);
+        const { group, rule } = firstSourcedRule(ir);
+        const target = ir.groups[group]!.rules.find((r) => r.nodeId === rule.nodeId)!;
+        target.output = [{ kind: "char", value: "Z" }];
+        const r = projectKmnText(input, start, ir);
+        expect(r.ok).toBe(true);
+        if (!r.ok) return;
+        const before = linesOf(input);
+        const after = linesOf(r.text);
+        expect(after.slice(0, rule.sourceLine! - 1)).toEqual(before.slice(0, rule.sourceLine! - 1));
+        expect(after[rule.sourceLine! - 1]).not.toBe(before[rule.sourceLine! - 1]);
+        // The line after the rule is unchanged (single-line rule on this keyboard
+        // unless it is continued; either way the suffix still matches).
+        const suffix = 10;
+        expect(after.slice(-suffix)).toEqual(before.slice(-suffix));
+        assertEol(r.text);
+      });
+
+      it("insert leaves every original line in place", () => {
+        const start = parsed(input);
+        const ir = structuredClone(start);
+        const { group, rule } = firstSourcedRule(ir);
+        const added: IRRule = { ...structuredClone(rule), nodeId: "new-corpus-rule" };
+        delete added.sourceLine;
+        added.output = [{ kind: "char", value: "Z" }];
+        ir.groups[group]!.rules.push(added);
+        const r = projectKmnText(input, start, ir);
+        expect(r.ok).toBe(true);
+        if (!r.ok) return;
+        const before = linesOf(input);
+        const after = linesOf(r.text);
+        expect(after.length).toBeGreaterThan(before.length);
+        let bi = 0;
+        for (const l of after) if (bi < before.length && l === before[bi]) bi++;
+        expect(bi).toBe(before.length);
+        assertEol(r.text);
+      });
+    });
+  }
 });
