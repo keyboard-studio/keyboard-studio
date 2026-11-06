@@ -22,6 +22,7 @@
 
 import { phaseFOptions } from "../../../editors/adapters/flowStepOptionRecords.ts";
 import { buildFindingsByQuestionId } from "../../../lint/lintToQuestion.ts";
+import { PHASE_F_HELPDOCS_QUESTION_IDS } from "../../../survey/questions/flowModules.ts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
 import { completeFlowStep } from "./flowStep.ts";
 import type { StepDrivers } from "./types.ts";
@@ -35,7 +36,9 @@ export const capsDrivers: StepDrivers = {
       phaseFOptions,
       {
         placeholders: { pf_welcome_paragraph: () => PLACEHOLDER_TEXT },
-        findingsByQuestionId: buildFindingsByQuestionId(useWorkingCopyStore.getState().validatorFindings),
+        findingsByQuestionId: buildFindingsByQuestionId(useWorkingCopyStore.getState().validatorFindings, undefined, {
+          questionIdFilter: PHASE_F_HELPDOCS_QUESTION_IDS,
+        }),
       },
       ctx,
     ),

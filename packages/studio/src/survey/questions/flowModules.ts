@@ -301,6 +301,14 @@ export const flowModules = {
 } as const satisfies Record<string, readonly QuestionModule[]>;
 
 /**
+ * Question ids on the live `phase_f_helpdocs` walk (spec 087). Kept in sync
+ * with `flowModules.phase_f_helpdocs` — do not hand-maintain a second list.
+ */
+export const PHASE_F_HELPDOCS_QUESTION_IDS: ReadonlySet<string> = new Set(
+  flowModules.phase_f_helpdocs.map((m) => m.definition.id),
+);
+
+/**
  * Demoted Phase F tip slots: registered + on disk + test-covered but
  * deliberately absent from the live flow. Demotion is not deletion — moving a
  * module into `flowModules.phase_f_helpdocs` revives it with no other change.

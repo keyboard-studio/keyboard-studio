@@ -20,9 +20,12 @@
 // `keysRemoved` counts rule nodes + store slots (481 in that test), not
 // characters or keys a reader would recognise (103 characters).
 
-import { buildProducedSet, effectiveEntries, type DecisionRecord, type KeyboardIR, type SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { buildProducedSet, type DecisionRecord, type KeyboardIR, type SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { HistoryProposalSeed } from "@keyboard-studio/engine";
 import { snapshotDecisionRecord } from "./decisionLogStore.ts";
+
+/** Cap mechanism-edit samples merged into HISTORY seed — large keyboards can record thousands of edits (#2469). */
+const MECHANISM_SAMPLE_CAP = 200;
 
 /** What the working copy gained and lost relative to its starting keyboard. */
 export interface HistoryModelFacts {
@@ -89,7 +92,14 @@ export function buildHistoryProposalSeed(
   const mechanismsAssigned: string[] = [];
   const added = new Set(facts.charactersAdded);
 
-  for (const entry of effectiveEntries(record.entries)) {
+  const superseded = new Set<string>();
+  for (const entry of record.entries) {
+    if (entry.supersedes !== null) superseded.add(entry.supersedes);
+  }
+
+  for (const entry of record.entries) {
+    if (superseded.has(entry.entryId)) continue;
+
     const payload = entry.payload;
 
     if (payload.kind === "base-contribution") {
@@ -102,8 +112,13 @@ export function buildHistoryProposalSeed(
     }
 
     if (payload.kind === "editor-action" && payload.actionType === "mechanism_edit") {
-      mechanismsAssigned.push(...payload.summary.sample.filter((target) => !added.has(target)));
+      for (const target of payload.summary.sample) {
+        if (added.has(target)) continue;
+        mechanismsAssigned.push(target);
+        if (mechanismsAssigned.length >= MECHANISM_SAMPLE_CAP) break;
+      }
     }
+    if (mechanismsAssigned.length >= MECHANISM_SAMPLE_CAP) break;
   }
 
   return {
