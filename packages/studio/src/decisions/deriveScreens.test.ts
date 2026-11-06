@@ -333,11 +333,12 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
     expect(identity.decisionIds).not.toContain("copyright-holder");
   });
 
-  it("frozen trail: project_name is a gated side trail joining characters", () => {
+  it("project_name is a gated side trail joining the first ungated spine screen after it", () => {
     const projectName = screens.find((s) => s.id === "project_name")!;
     expect(projectName.kind).toBe("question");
     expect(projectName.spine).toBe(false);
-    expect(projectName.joinTarget).toBe("characters");
+    const after = screens.slice(screens.indexOf(projectName) + 1);
+    expect(projectName.joinTarget).toBe(after.find((s) => s.spine && s.gatedBy === undefined)?.id);
     expect(projectName.gatedBy).toBeDefined();
     expect(projectName.gatedBy!(decision("authoring-track", "copy"))).toBe(true);
     expect(projectName.gatedBy!(decision("authoring-track", "adapt"))).toBe(false);

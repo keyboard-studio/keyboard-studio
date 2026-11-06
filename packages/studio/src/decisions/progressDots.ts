@@ -182,6 +182,9 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   track: msg({ id: "footer.stage.track", message: "Copy or open" }),
   attribution: msg({ id: "footer.stage.attribution", message: "Author & copyright" }),
   project_name: msg({ id: "footer.stage.projectName", message: "Project name" }),
+  open_languages: msg({ id: "footer.stage.openLanguages", message: "Languages" }),
+  open_missing_letters: msg({ id: "footer.stage.openLetters", message: "Letters" }),
+  open_upgrades: msg({ id: "footer.stage.openUpgrades", message: "Upgrades" }),
   characters: msg({ id: "footer.stage.characters", message: "Characters" }),
   marks: msg({ id: "footer.stage.marks", message: "Accents & marks" }),
   punctuation: msg({ id: "footer.stage.punctuation", message: "Punctuation" }),
@@ -193,7 +196,10 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   mechanisms: msg({ id: "footer.stage.mechanisms", message: "Mechanisms" }),
   touch_seed_source: msg({ id: "footer.stage.touchSeedSource", message: "Touch seed" }),
   touch: msg({ id: "footer.stage.touch", message: "Touch layout" }),
+  osk: msg({ id: "footer.stage.osk", message: "On-screen keyboard" }),
+  css: msg({ id: "footer.stage.css", message: "Custom CSS" }),
   help: msg({ id: "footer.stage.help", message: "Help & credits" }),
+  html: msg({ id: "footer.stage.html", message: "Welcome page" }),
 };
 
 const SCREEN_OF_STAGE_MESSAGE = (stage: string, position: number, total: number) =>

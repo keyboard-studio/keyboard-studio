@@ -221,3 +221,12 @@ Polish (T048–T051) after the last story shipped in this spec
 - [x] T060 [US8] Review step: the criteria view as the walk's last step on Open, Continue to Output with the FR-027 gate; Documentation is the existing help step (FR-029)
 - [x] T061 [US8] Tests: the Open walk order with and without each problem kind (`advance.open.test.ts`); a Continue-only e2e walk of basic_kbdus to Output
 
+### Phase 12 follow-up: the revised Open walk (owner ruling 2026-11-06)
+
+**Goal**: Languages, Letters, Upgrades (only if any), Mechanisms, OSK, Touch, CSS, Documentation (only if needed), Review, Output; the order derives from declared inputs and outputs.
+
+- [x] T062 [US8] Record whether the opened keyboard is basic as a derived decision (`open-basic-keyboard`) when it is opened (`OpenKeyboardEntry.tsx`, reusing `lib/basicKeyboard.ts`); gate Letters and Mechanisms on it (`decisions/openIssues.ts`, `survey/questions/registry.ts`)
+- [x] T063 [US8] Letters step (was Missing letters): always walked for a non-basic keyboard, shows the characters the keyboard types, per-letter and free-form Add into the character inventory (`lib/openInventory.ts`), the missing-by-language grouping with Remove language; for a basic keyboard only with missing letters (`survey/openWalk/MissingLettersStep.tsx`)
+- [x] T064 [US8] Mechanisms and Touch are walked on Open (Mechanisms not for a basic keyboard); Open's pages become gated spine screens whose order comes from `provides` / `screenRequires` (Mechanisms screen-requires Upgrades), and `advance.ts` no longer hard-codes the Open sequence
+- [x] T065 [US8] Footer labels for the Open pages, the OSK, CSS and welcome-page steps; the first help question is not required on Open; criteria findings for 18.6 and upgrades open the Letters and Upgrades steps
+- [x] T066 [US8] Tests: `advance.open.test.ts` asserts dependency order, gates and the Open/Copy split instead of literal sequences; the Continue-only e2e asserts Languages, Letters, Mechanisms, OSK, Touch

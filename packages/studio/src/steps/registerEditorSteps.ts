@@ -272,7 +272,7 @@ export const languageListStep: EditorStep = step({
  */
 export const missingLettersStep: EditorStep = step({
   id: "open_missing_letters",
-  title: "Missing letters",
+  title: "Letters",
   layout: "pane",
   component: MissingLettersHost,
   specRef: "specs/111-open-existing-keyboard",

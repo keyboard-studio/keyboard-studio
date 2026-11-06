@@ -83,6 +83,31 @@
     "navigateTo": []
   },
   {
+    "stepId": "open_missing_letters",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "mechanisms",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "record",
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "lockDesktop"
+    ],
+    "decisionMutations": [
+      "record"
+    ],
+    "navigateTo": []
+  },
+  {
     "stepId": "osk",
     "applyStepCompletion": [],
     "storeMutations": [

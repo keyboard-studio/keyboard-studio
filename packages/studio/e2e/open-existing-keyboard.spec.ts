@@ -28,6 +28,9 @@ const OPEN_ID = "basic_kbdfr";
 // The upstream basic keyboard the Continue-only walk takes (spec 111 Story 8 independent test).
 const WALK_ID = "basic_kbdus";
 
+// A small non-basic keyboard: its walk includes Letters and the Mechanisms gallery.
+const NON_BASIC_ID = "sudest";
+
 /** Interactions the author performs from the start screen to the first walk step. */
 const MAX_INTERACTIONS = 3;
 
@@ -145,27 +148,59 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     await expect(page.locator('[data-testid^="criteria-open-mark-"][data-finding-class="new"]')).toHaveCount(0);
   });
 
-  test("a Continue-only walk of upstream basic_kbdus reaches Review, then Output (US8)", async ({ page }) => {
-    test.setTimeout(300_000);
-    await openKeyboard(page, WALK_ID);
+  /** Walk `keyboardId` with Continue only; returns the controls pressed, in order, ending at Output. */
+  async function continueOnlyWalk(page: Page, keyboardId: string): Promise<string[]> {
+    await openKeyboard(page, keyboardId);
     await expect(page.getByRole("heading", { name: /languages this keyboard supports/i })).toBeVisible({
       timeout: 60_000,
     });
-
     await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
 
-    // Continue until the walk hands over to Review (the criteria view).
     const pressed: string[] = [];
-    for (let step = 0; step < 30 && !/#criteria/.test(page.url()); step += 1) {
+    for (let step = 0; step < 40 && !/#criteria/.test(page.url()); step += 1) {
       pressed.push(await continueWalk(page));
       await page.waitForTimeout(500);
     }
     // eslint-disable-next-line no-console
-    console.log(`[OK] walk controls pressed: ${pressed.join(" > ")}`);
+    console.log(`[OK] ${keyboardId} walk controls pressed: ${pressed.join(" > ")}`);
     await expect(page).toHaveURL(/#criteria/);
     await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId("criteria-continue").click();
     await expect(page).toHaveURL(/#output/);
+    return pressed;
+  }
+
+  test("a Continue-only walk of upstream basic_kbdus reaches Review, then Output (US8)", async ({ page }) => {
+    test.setTimeout(300_000);
+    const pressed = await continueOnlyWalk(page, WALK_ID);
+    // A basic keyboard's physical layout is fixed: its walk never offers the Mechanisms gallery.
+    expect(pressed.some((p) => p.includes("mechanisms"))).toBe(false);
+    expect(pressed).toContain("osk-continue");
+    expect(pressed).toContain("touch-continue");
+  });
+
+  test("a non-basic keyboard walks Languages, Letters, Mechanisms, OSK, Touch in that order (US8)", async ({ page }) => {
+    test.setTimeout(300_000);
+    await openKeyboard(page, NON_BASIC_ID);
+    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+
+    // Languages -> Letters, which a non-basic keyboard always walks.
+    await continueWalk(page);
+    await expect(page.getByRole("heading", { name: /^letters$/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("open-letters-inventory")).toBeVisible();
+
+    // The Letters page's Continue leads to the Mechanisms gallery, then the OSK, then Touch.
+    const pressed: string[] = [await continueWalk(page)];
+    for (let step = 0; step < 40 && !/#criteria/.test(page.url()); step += 1) {
+      pressed.push(await continueWalk(page));
+      await page.waitForTimeout(500);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[OK] ${NON_BASIC_ID} walk controls pressed after Letters: ${pressed.join(" > ")}`);
+    const at = (id: string) => pressed.findIndex((p) => p.includes(id));
+    expect(at("mechanisms")).toBeGreaterThan(-1);
+    expect(at("osk-continue")).toBeGreaterThan(at("mechanisms"));
+    expect(at("touch-continue")).toBeGreaterThan(at("osk-continue"));
   });
 });

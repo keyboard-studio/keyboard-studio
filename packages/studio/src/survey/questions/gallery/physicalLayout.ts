@@ -52,6 +52,9 @@ const physicalLayout: GalleryModule<PhysicalLayoutValue> = {
   provides: ["physical-layout"],
   screen: "mechanisms",
   requires: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
+  // Spec 111 Open walk: authors edit the keyboard as upgraded, and the characters they
+  // confirmed on the Letters page are placed here. Order only; Copy never shows those pages.
+  screenRequires: ["upgrades-review"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the
   // module real IR writes updates decisionIRPaths in the same change

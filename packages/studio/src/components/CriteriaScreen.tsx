@@ -20,6 +20,10 @@ import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { ALL_CRITERIA } from "@keyboard-studio/contracts";
+import { MISSING_LETTERS_RULE } from "../criteria/openIssues.ts";
+import { upgradePairFor } from "../criteria/upgradePairs.ts";
 import { useRouteSuggestedFix } from "../hooks/useRouteSuggestedFix.ts";
 import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
 import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
@@ -48,6 +52,20 @@ const noticeStyle: React.CSSProperties = {
   fontSize: 13,
   color: TEXT_DIM,
 };
+
+/**
+ * Where a finding's "open editor" goes on Open: missing letters (18.6) to the Letters
+ * step, a criterion with a registered upgrade to the Upgrades step, anything else to the
+ * walk where it stands.
+ */
+function openEditorFor(criterionId: string): void {
+  const criterion = ALL_CRITERIA.find((c) => c.id === criterionId);
+  const rule = criterion !== undefined && "lintRuleId" in criterion ? criterion.lintRuleId : undefined;
+  const step =
+    rule === MISSING_LETTERS_RULE ? "open_missing_letters" : rule !== undefined && upgradePairFor(rule) !== undefined ? "open_upgrades" : null;
+  if (step !== null && jumpToLocation({ route: "survey", step }).kind !== "refused") return;
+  navigateTo("survey");
+}
 
 export function CriteriaScreen() {
   const { t } = useLingui();
@@ -144,7 +162,7 @@ export function CriteriaScreen() {
               onRemoveNote: removeReviewNote,
               // The walk is where a failing item is edited; per-fix links
               // arrive with the suggested-fix work.
-              onOpenEditor: () => navigateTo("survey"),
+              onOpenEditor: (criterionId) => openEditorFor(criterionId),
             },
           }
         : {})}

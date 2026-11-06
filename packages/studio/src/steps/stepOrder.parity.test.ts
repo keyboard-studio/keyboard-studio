@@ -93,10 +93,9 @@ const BASELINE_ORDER = [
 
 /** Side-trail step -> the step it rejoins (the old spine:false + joinTarget). */
 const BASELINE_SIDE_TRAILS: Readonly<Record<string, string>> = {
-  project_name: "characters",
-  open_languages: "characters",
-  open_missing_letters: "characters",
-  open_upgrades: "characters",
+  // spec 111 Phase 12 amendment: Open's three pages are gated SPINE screens (their
+  // gates are false on Copy), so project_name now rejoins at the first of them.
+  project_name: "open_languages",
   touch_seed_source: "touch",
 };
 
@@ -110,15 +109,12 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["layout", "choose_base", "spine"],
   ["choose_base", "track", "spine"],
   ["track", "attribution", "spine"],
-  ["attribution", "characters", "spine"],
+  ["attribution", "open_languages", "spine"],
   ["attribution", "project_name", "fork"],
-  ["attribution", "open_languages", "fork"],
-  ["attribution", "open_missing_letters", "fork"],
-  ["attribution", "open_upgrades", "fork"],
-  ["project_name", "characters", "join"],
-  ["open_languages", "characters", "join"],
-  ["open_missing_letters", "characters", "join"],
-  ["open_upgrades", "characters", "join"],
+  ["project_name", "open_languages", "join"],
+  ["open_languages", "open_missing_letters", "spine"],
+  ["open_missing_letters", "open_upgrades", "spine"],
+  ["open_upgrades", "characters", "spine"],
   ["characters", "marks", "spine"],
   ["marks", "punctuation", "spine"],
   ["punctuation", "invisibles", "spine"],
@@ -323,8 +319,11 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //   - open_languages (spec 111 amendment) is a gated side trail with only
     //     the track gate, so it is a tie-break against every other screen.
     //   - open_missing_letters and open_upgrades (spec 111 Phase 12) are chained
-    //     after open_languages (and each other) by screenRequires, so they are
-    //     tie-breaks against the same screens open_languages is, and no others.
+    //     after open_languages (and each other) by screenRequires, and the
+    //     Mechanisms screen screen-requires the Upgrades page, so all three Open pages
+    //     precede mechanisms and everything after it (which orders attribution before them
+    //     too, through the language list). They stay tie-breaks only
+    //     against the character-survey and trim screens that Open hides.
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
       ["layout", "track"],
@@ -347,13 +346,6 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["attribution", "carve"],
       ["attribution", "deadkeys"],
       ["attribution", "rules"],
-      ["attribution", "mechanisms"],
-      ["attribution", "osk"],
-      ["attribution", "touch_seed_source"],
-      ["attribution", "touch"],
-      ["attribution", "css"],
-      ["attribution", "help"],
-      ["attribution", "html"],
       ["project_name", "open_languages"],
       ["project_name", "open_missing_letters"],
       ["project_name", "open_upgrades"],
@@ -365,13 +357,6 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["open_languages", "carve"],
       ["open_languages", "deadkeys"],
       ["open_languages", "rules"],
-      ["open_languages", "mechanisms"],
-      ["open_languages", "osk"],
-      ["open_languages", "touch_seed_source"],
-      ["open_languages", "touch"],
-      ["open_languages", "css"],
-      ["open_languages", "help"],
-      ["open_languages", "html"],
       ["open_missing_letters", "characters"],
       ["open_missing_letters", "marks"],
       ["open_missing_letters", "punctuation"],
@@ -380,13 +365,6 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["open_missing_letters", "carve"],
       ["open_missing_letters", "deadkeys"],
       ["open_missing_letters", "rules"],
-      ["open_missing_letters", "mechanisms"],
-      ["open_missing_letters", "osk"],
-      ["open_missing_letters", "touch_seed_source"],
-      ["open_missing_letters", "touch"],
-      ["open_missing_letters", "css"],
-      ["open_missing_letters", "help"],
-      ["open_missing_letters", "html"],
       ["open_upgrades", "characters"],
       ["open_upgrades", "marks"],
       ["open_upgrades", "punctuation"],
@@ -395,13 +373,6 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["open_upgrades", "carve"],
       ["open_upgrades", "deadkeys"],
       ["open_upgrades", "rules"],
-      ["open_upgrades", "mechanisms"],
-      ["open_upgrades", "osk"],
-      ["open_upgrades", "touch_seed_source"],
-      ["open_upgrades", "touch"],
-      ["open_upgrades", "css"],
-      ["open_upgrades", "help"],
-      ["open_upgrades", "html"],
       ["marks", "punctuation"],
       ["marks", "invisibles"],
       ["marks", "convenience"],

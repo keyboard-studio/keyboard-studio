@@ -1,80 +1,125 @@
-// MissingLettersStep: the Open walk's Missing letters page (spec 111 FR-033).
+// MissingLettersStep: the Open walk's Letters page (spec 111 FR-031, FR-033).
 //
-// Shown only when the baseline recorded that the keyboard can't type letters
-// its listed languages need (open-issues, FR-032). Each missing letter is
-// grouped under every language that expects it, with an Add button per letter
-// (routes to the editor that places it) and a Remove language button per group
-// (the other way out). The list follows the live criteria result, so a letter
-// leaves it once the keyboard can type it.
+// The author confirms the characters the keyboard types (read from what it
+// produces, seeded by useOpenInventorySeed) and may add more, including letters
+// beyond the base set. Letters the listed languages need but the keyboard cannot
+// type are grouped by language, each with Add and each group with Remove language.
+// "Add" puts the character into the character inventory; the Mechanisms and Touch
+// galleries later in the walk are where it gets its keys, as on Copy.
+//
+// Shown always for a keyboard that is not basic, and for a basic keyboard only when
+// the baseline found missing letters (decisions/openIssues.ts openLettersGate). A
+// basic keyboard's physical layout is fixed, so there an added character can go
+// on the touch layout only.
 
-import { useMemo } from "react";
-import { Trans } from "@lingui/react/macro";
+import { useMemo, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { MissingLettersByLanguage } from "../../components/MissingLettersByLanguage.tsx";
 import { useOpenWalkCriteria } from "../../hooks/useOpenWalkCriteria.ts";
-import { useRouteSuggestedFix } from "../../hooks/useRouteSuggestedFix.ts";
 import { useBasicKeyboardOpen } from "../../hooks/useBasicKeyboardOpen.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { missingCharacterFixes } from "../../criteria/missingCharacterFixes.ts";
+import { addToInventory, charactersOf } from "../../lib/openInventory.ts";
+import { Button } from "../../ui/Button.tsx";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
 import { WalkNav } from "./WalkNav.tsx";
 
 export function MissingLettersRenderer({ onChange }: DecisionRendererProps<boolean>) {
+  const { t } = useLingui();
   const { onComplete } = useGalleryStepContext();
   const { result } = useOpenWalkCriteria();
-  const routeFix = useRouteSuggestedFix();
-  // The per-letter Add routes to the physical keys, which a basic keyboard never changes.
-  const physicalFixed = useBasicKeyboardOpen();
+  const basic = useBasicKeyboardOpen();
+  const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const [typed, setTyped] = useState("");
 
-  const fixes = useMemo(
+  const have = useMemo(() => new Set((inventory ?? []).map((c) => c.normalize("NFC"))), [inventory]);
+  const missing = useMemo(
     () =>
       result === null
         ? []
         : missingCharacterFixes(
             result.rows.flatMap((r) => (r.status === "not-met" ? (r.evidence().findings ?? []) : [])),
-          ),
+          ).flatMap((f) => (f.action !== undefined ? [f.action.subject] : [])),
     [result],
   );
-  const missing = fixes.flatMap((f) => (f.action !== undefined ? [f.action.subject] : []));
   const sourcesByChar = result?.expectedCoverage?.sourcesByChar;
 
   return (
     <section
-      aria-labelledby="open-missing-letters-heading"
+      aria-labelledby="open-letters-heading"
       style={{ maxWidth: 640, margin: "24px auto", padding: 20, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontFamily: FONT, color: TEXT_MAIN }}
     >
-      <h2 id="open-missing-letters-heading" style={{ margin: "0 0 8px", fontSize: 18 }}>
-        <Trans id="open.missingLetters.title">Missing letters</Trans>
+      <h2 id="open-letters-heading" style={{ margin: "0 0 8px", fontSize: 18 }}>
+        <Trans id="open.letters.title">Letters</Trans>
       </h2>
+
+      <h3 style={{ margin: "12px 0 4px", fontSize: 14 }}>
+        <Trans id="open.letters.current.title">Characters this keyboard types</Trans>
+      </h3>
+      <p style={{ margin: "0 0 8px", fontSize: 13, color: TEXT_DIM }}>
+        <Trans id="open.letters.current.intro">
+          Check these are the letters and marks the keyboard should have. Add any it should also have; the
+          keyboard can type more than the base set.
+        </Trans>
+      </p>
+      {have.size === 0 ? (
+        <p style={{ fontSize: 13, color: TEXT_DIM }}>
+          <Trans id="open.letters.current.empty">No characters have been read from the keyboard yet.</Trans>
+        </p>
+      ) : (
+        <p data-testid="open-letters-inventory" style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.6, wordBreak: "break-all" }}>
+          {[...have].join(" ")}
+        </p>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          addToInventory(charactersOf(typed));
+          setTyped("");
+        }}
+        style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", margin: "0 0 16px" }}
+      >
+        <label style={{ fontSize: 13 }}>
+          <Trans id="open.letters.add.label">Characters to add</Trans>
+          <br />
+          <input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            style={{ fontFamily: FONT, fontSize: 16 }}
+            aria-label={t({ id: "open.letters.add.input", message: "Characters to add to the keyboard" })}
+          />
+        </label>
+        <Button type="submit" size="compact" disabled={charactersOf(typed).length === 0}>
+          <Trans id="open.letters.add.button">Add characters</Trans>
+        </Button>
+      </form>
+
       {result === null ? (
         <p role="status" style={{ fontSize: 13, color: TEXT_DIM }}>
           <Trans id="open.missingLetters.preparing">Checking which letters the keyboard can type...</Trans>
         </p>
-      ) : sourcesByChar === undefined || missing.length === 0 ? (
+      ) : sourcesByChar !== undefined && missing.length > 0 ? (
+        <MissingLettersByLanguage
+          missing={missing}
+          sourcesByChar={sourcesByChar}
+          added={have}
+          onAdd={(ch) => addToInventory([ch])}
+        />
+      ) : (
         <p role="status" style={{ fontSize: 13, color: TEXT_DIM }} data-testid="missing-letters-none">
           <Trans id="open.missingLetters.none">
             The keyboard can now type every letter its listed languages need.
           </Trans>
         </p>
-      ) : (
-        <MissingLettersByLanguage
-          missing={missing}
-          sourcesByChar={sourcesByChar}
-          {...(physicalFixed
-            ? {}
-            : {
-                onAdd: (ch: string) => {
-                  const fix = fixes.find((f) => f.action?.subject === ch);
-                  if (fix !== undefined) routeFix(fix);
-                },
-              })}
-        />
       )}
-      {physicalFixed && missing.length > 0 && (
+      {basic && (
         <p style={{ fontSize: 13, color: TEXT_DIM }} data-testid="missing-letters-physical-fixed">
           <Trans id="open.missingLetters.physicalFixed">
-            This keyboard's physical layout is fixed to match Windows, so letters can't be added to its keys. Remove
-            a language the keyboard isn't meant to support, or continue.
+            This keyboard's physical layout is fixed to match Windows, so added letters can only go on its touch
+            layout. Remove a language the keyboard isn't meant to support, or continue.
           </Trans>
         </p>
       )}

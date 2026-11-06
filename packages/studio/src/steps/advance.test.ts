@@ -123,9 +123,13 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("track")).toBe("attribution");
   });
 
-  it("attribution → characters (skips project_name which is a derived side trail)", () => {
+  it("attribution → the next spine screen, never the project_name side trail", () => {
     // project_name is a derived side trail so nextMainLineStepAfter("attribution") skips it.
-    expect(nextMainLineStepAfter("attribution")).toBe("characters");
+    const next = nextMainLineStepAfter("attribution", copyCtx);
+    expect(next).not.toBe("project_name");
+    expect(STEP_TRAILS.get(next)?.spine).toBe(true);
+    // Copy's gates skip Open's pages.
+    expect(next.startsWith("open_")).toBe(false);
   });
 
   it("characters → marks (spec 071)", () => {
@@ -208,7 +212,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "attribution", "open_languages", "osk", "touch", "css", "done",
+      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "osk", "touch", "css", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     // Open ends at Review (the criteria view), whose Continue opens Output.
@@ -268,7 +272,9 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   it("spine ids (spine !== false) are in the locked order", () => {
     const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
-      "identity", "layout", "choose_base", "track", "attribution", "characters",
+      "identity", "layout", "choose_base", "track", "attribution",
+      // Spec 111: Open's gated pages sit on the spine; Copy's gates skip them.
+      "open_languages", "open_missing_letters", "open_upgrades", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "css", "help", "html", "package",
     ]);
   });
@@ -357,7 +363,8 @@ describe("advance: attribution — adapt fork (US2)", () => {
 
   it("adapt track leaves the language list for the on-screen keyboard; the character survey is hidden on Open (spec 111 FR-031)", () => {
     const outcome = advance("open_languages", undefined, adaptCtx);
-    expect(outcome.next).toBe("osk");
+    // Open (spec 111 Open walk): the Letters page is always walked for a non-basic keyboard.
+    expect(outcome.next).toBe("open_missing_letters");
     expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
@@ -702,8 +709,8 @@ describe("spec 091 T021 — derived screens in the walk", () => {
     // walks through it on BOTH tracks.
     expect(advance("project_name", undefined, copyCtx).next).toBe("characters");
     // Open (spec 111) hides the character survey, so the language list goes straight on.
-    expect(advance("open_languages", undefined, adaptCtx).next).toBe("osk");
-    expect(advance("characters", undefined, adaptCtx).next).toBe("osk");
+    expect(advance("open_languages", undefined, adaptCtx).next).toBe("open_missing_letters");
+    expect(advance("characters", undefined, adaptCtx).next).toBe("mechanisms");
     expect(advance("characters", undefined, copyCtx).next).toBe("marks");
   });
 

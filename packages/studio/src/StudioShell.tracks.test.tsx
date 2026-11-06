@@ -199,6 +199,10 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
+    // Letters and the Mechanisms gallery (a non-basic keyboard) come before the OSK.
+    expect(screen.getByTestId("stage-open-missing-letters")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("mechanisms-continue"));
     expect(screen.getByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
@@ -236,7 +240,7 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 // project_name) converges on the same carve-back behavior as the copy-track path.
 
 describe("SurveyView — Open walk back-navigation (spec 111)", () => {
-  it("adapt-track: attribution -> language list -> osk, and osk's back returns to the language list", async () => {
+  it("adapt-track: after the language list, Letters and Mechanisms precede the osk, and osk's back returns to Mechanisms", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -248,13 +252,16 @@ describe("SurveyView — Open walk back-navigation (spec 111)", () => {
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     // Open hides the character survey, marks, punctuation, invisibles, carve and the
-    // other feature galleries, so the language list hands straight to the OSK step.
+    // other opt-in galleries; the walk goes on through Letters and Mechanisms.
+    expect(await screen.findByTestId("stage-open-missing-letters")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(await screen.findByTestId("mechanisms-continue"));
     expect(await screen.findByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
 
     fireEvent.click(screen.getByTestId("osk-back"));
-    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
   });
 });
 

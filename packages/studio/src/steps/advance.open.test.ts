@@ -1,27 +1,41 @@
-// Spec 111 T018/T019/T021 and Phase 12 (T061): on Open (authoring-track = "adapt")
-// the identity-first screens, the remove tool, the feature galleries and the
-// character survey leave the walk; the language list, and the Missing letters,
-// Upgrades and Documentation pages (only for the problem kinds the baseline
-// recorded) join it; the walk ends at Review. Copy's walk is unchanged.
+// Spec 111 (Open walk): the walk's order is not pinned here. It follows from what
+// each screen's modules require and provide (decisions/deriveScreens.ts); these
+// tests check the properties that makes true: every step comes after the steps that
+// provide what it requires, a gated step appears exactly when its decision says so,
+// Open never shows a Copy-only step, and each walk ends where it should.
 
 import { describe, expect, it } from "vitest";
 import { advance, type AdvanceContext } from "./advance.ts";
-import { declaredScreenGates, openHiddenScreens, openMenuScreens, openScreenGates } from "../survey/questions/registry.ts";
+import { screenGates } from "./manifest.ts";
+import {
+  decisionModules,
+  declaredScreenGates,
+  openHiddenScreens,
+  openMenuScreens,
+  openScreenGates,
+} from "../survey/questions/registry.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import type { OpenIssueKind } from "../decisions/openIssues.ts";
 
-function ctx(track: "copy" | "adapt" | null, issues?: readonly OpenIssueKind[]): AdvanceContext {
-  const decisions =
-    track === null
-      ? {}
-      : ({
-          "authoring-track": { id: "authoring-track", value: track, provenance: "asked", step: "t" },
-          ...(issues !== undefined
-            ? { "open-issues": { id: "open-issues", value: issues, provenance: "derived", step: "open" } }
-            : {}),
-        } as unknown as DecisionSet);
+type Track = "copy" | "adapt";
+
+function decisionsFor(track: Track | null, issues?: readonly OpenIssueKind[], basic = false): DecisionSet {
+  if (track === null) return {};
   return {
-    decisions,
+    "authoring-track": { id: "authoring-track", value: track, provenance: "asked", step: "t" },
+    ...(issues !== undefined
+      ? { "open-issues": { id: "open-issues", value: issues, provenance: "derived", step: "open" } }
+      : {}),
+    ...(track === "adapt"
+      ? { "open-basic-keyboard": { id: "open-basic-keyboard", value: basic, provenance: "derived", step: "open" } }
+      : {}),
+  } as unknown as DecisionSet;
+}
+
+function ctx(track: Track | null, issues?: readonly OpenIssueKind[], basic = false): AdvanceContext {
+  return {
+    decisions: decisionsFor(track, issues, basic),
     selectedTrack: track,
     identitySupported: true,
     touchSeedSource: null,
@@ -29,130 +43,200 @@ function ctx(track: "copy" | "adapt" | null, issues?: readonly OpenIssueKind[]):
   };
 }
 
-const next = (from: Parameters<typeof advance>[0], track: "copy" | "adapt" | null, issues?: readonly OpenIssueKind[]) =>
-  advance(from, undefined, ctx(track, issues)).next;
-
-/** Walk Open from the Languages step to the end, returning every step visited and the final navigation. */
-function walkOpen(issues?: readonly OpenIssueKind[]): { steps: string[]; navigate: string | undefined } {
-  const c = ctx("adapt", issues);
-  const steps = ["open_languages"];
-  let current: Parameters<typeof advance>[0] = "open_languages";
-  for (let guard = 0; guard < 30; guard++) {
+/** Drive advance() from `start` to the done terminal; every step visited, and where the walk hands over. */
+function walk(
+  start: Parameters<typeof advance>[0],
+  c: AdvanceContext,
+): { steps: string[]; navigate: string | undefined } {
+  const steps: string[] = [start];
+  let current = start;
+  for (let guard = 0; guard < 40; guard++) {
     const outcome = advance(current, undefined, c);
     steps.push(outcome.next);
     if (outcome.next === "done") return { steps, navigate: outcome.navigate };
     current = outcome.next;
   }
-  throw new Error("Open walk did not terminate");
+  throw new Error("walk did not terminate");
 }
 
-describe("declared gates", () => {
-  it("hide every Open-hidden screen on adapt and show it otherwise", () => {
-    const adapt = ctx("adapt").decisions;
+// --- what each screen needs, read from the modules (the same source the order derives from) ---
+
+const screens = deriveScreens(decisionModules, declaredScreenGates);
+const screenOfDecision = new Map<string, string>();
+for (const s of screens) for (const d of s.decisionIds) screenOfDecision.set(d, s.id);
+const moduleById = new Map(decisionModules.map((m) => [m.definition.id, m] as const));
+
+/** The screens whose decisions `screenId`'s modules require (data or order-only), excluding itself. */
+function providersOf(screenId: string): string[] {
+  const screen = screens.find((s) => s.id === screenId);
+  if (screen === undefined) return [];
+  const out = new Set<string>();
+  for (const moduleId of screen.moduleIds) {
+    const m = moduleById.get(moduleId);
+    // A module that names another screen's step as its group is an intra-step member
+    // (caps handling on the layout screen); its needs are not the screen's.
+    if (screen.kind === "custom" && m?.group !== undefined) continue;
+    for (const d of [...(m?.requires ?? []), ...(m?.screenRequires ?? [])]) {
+      const provider = screenOfDecision.get(d);
+      if (provider !== undefined && provider !== screenId) out.add(provider);
+    }
+  }
+  return [...out];
+}
+
+/** Every visited step comes after each of its providers that was visited too. */
+function expectDependencyOrder(steps: readonly string[]): void {
+  for (const [i, id] of steps.entries()) {
+    for (const provider of providersOf(id)) {
+      const at = steps.indexOf(provider);
+      if (at !== -1) expect(at, `${provider} (needed by ${id}) must come before it`).toBeLessThan(i);
+    }
+  }
+}
+
+const OPEN_PAGES = ["open_languages", "open_missing_letters", "open_upgrades"] as const;
+const WALKED_ON_OPEN_BY_GATE = [...OPEN_PAGES, "mechanisms", "help", "html"] as const;
+const COPY_ONLY = ["project_name", ...openHiddenScreens] as const;
+
+describe("gates", () => {
+  it("hide every Open-hidden screen on Open and show it otherwise", () => {
+    const open = decisionsFor("adapt");
     for (const id of openHiddenScreens) {
       const gate = openScreenGates.get(id)!;
-      expect(gate(adapt), id).toBe(false);
-      // The track step also hides on copy: the start screen recorded the track.
-      expect(gate(ctx("copy").decisions), id).toBe(id !== "track");
-      expect(gate(ctx(null).decisions), id).toBe(true);
+      expect(gate(open), id).toBe(false);
+      // The track step also hides on Copy: the start screen recorded the track.
+      expect(gate(decisionsFor("copy")), id).toBe(id !== "track");
+      expect(gate(decisionsFor(null)), id).toBe(true);
     }
   });
 
-  it("show the language screen on adapt only", () => {
-    const gate = declaredScreenGates.get("open_languages")!;
-    expect(gate(ctx("adapt").decisions)).toBe(true);
-    expect(gate(ctx("copy").decisions)).toBe(false);
-  });
-
-  it("show Missing letters and Upgrades only on Open and only for the recorded problem kind", () => {
-    const missing = declaredScreenGates.get("open_missing_letters")!;
-    const upgrades = declaredScreenGates.get("open_upgrades")!;
-    expect(missing(ctx("adapt", ["missing-letters"]).decisions)).toBe(true);
-    expect(missing(ctx("adapt", ["upgrades", "docs"]).decisions)).toBe(false);
-    // No recorded decision (baseline not taken yet): the pages stay hidden.
-    expect(missing(ctx("adapt").decisions)).toBe(false);
-    expect(upgrades(ctx("adapt", ["upgrades"]).decisions)).toBe(true);
-    expect(upgrades(ctx("adapt", ["missing-letters"]).decisions)).toBe(false);
-    expect(upgrades(ctx("adapt").decisions)).toBe(false);
-    // Copy never shows them, whatever is recorded.
-    expect(missing(ctx("copy", ["missing-letters"]).decisions)).toBe(false);
-    expect(upgrades(ctx("copy", ["upgrades"]).decisions)).toBe(false);
-  });
-
-  it("menu screens are all hidden-on-Open screens", () => {
+  it("menu screens are all hidden-on-Open screens, and walked screens are not menu entries", () => {
     for (const id of openMenuScreens) expect(openHiddenScreens.has(id), id).toBe(true);
+    for (const id of ["mechanisms", "touch"]) expect(openMenuScreens.includes(id), id).toBe(false);
+  });
+
+  it("Letters: always for a non-basic keyboard, only with missing letters for a basic one, never on Copy", () => {
+    const gate = screenGates.get("open_missing_letters")!;
+    expect(gate(decisionsFor("adapt", []))).toBe(true);
+    expect(gate(decisionsFor("adapt"))).toBe(true);
+    expect(gate(decisionsFor("adapt", [], true))).toBe(false);
+    expect(gate(decisionsFor("adapt", ["upgrades", "docs"], true))).toBe(false);
+    expect(gate(decisionsFor("adapt", ["missing-letters"], true))).toBe(true);
+    expect(gate(decisionsFor("copy", ["missing-letters"]))).toBe(false);
+  });
+
+  it("Upgrades, help and the welcome page follow the recorded problem kind and stay off until it is recorded", () => {
+    const upgrades = screenGates.get("open_upgrades")!;
+    const help = screenGates.get("help")!;
+    expect(upgrades(decisionsFor("adapt", ["upgrades"]))).toBe(true);
+    expect(upgrades(decisionsFor("adapt", ["missing-letters", "docs"]))).toBe(false);
+    expect(upgrades(decisionsFor("adapt"))).toBe(false);
+    expect(upgrades(decisionsFor("copy", ["upgrades"]))).toBe(false);
+    expect(help(decisionsFor("adapt", ["docs"]))).toBe(true);
+    expect(help(decisionsFor("adapt", ["upgrades"]))).toBe(false);
+    expect(help(decisionsFor("adapt"))).toBe(false);
+    expect(help(decisionsFor("copy"))).toBe(true);
+  });
+
+  it("Mechanisms: walked on Open unless the keyboard is basic; Copy always walks it", () => {
+    const gate = screenGates.get("mechanisms")!;
+    expect(gate(decisionsFor("adapt", [], false))).toBe(true);
+    expect(gate(decisionsFor("adapt", [], true))).toBe(false);
+    expect(gate(decisionsFor("copy"))).toBe(true);
+    expect(gate(decisionsFor(null))).toBe(true);
+  });
+
+  it("the language list is an Open page", () => {
+    const gate = screenGates.get("open_languages")!;
+    expect(gate(decisionsFor("adapt"))).toBe(true);
+    expect(gate(decisionsFor("copy"))).toBe(false);
   });
 });
 
-describe("advance", () => {
-  it("Open: attribution goes to the language list; the character survey and the galleries are skipped", () => {
-    expect(next("attribution", "adapt")).toBe("open_languages");
-    expect(next("open_languages", "adapt")).toBe("osk");
-  });
-
-  it("Copy: the walk skips only the track step, which the start screen answered", () => {
-    expect(next("identity", "copy")).toBe("layout");
-    expect(next("layout", "copy")).toBe("choose_base");
-    // The start screen recorded the track, so the track step is skipped.
-    expect(next("choose_base", "copy")).toBe("attribution");
-    expect(next("choose_base", null)).toBe("track");
-    expect(next("attribution", "copy")).toBe("project_name");
-    expect(next("project_name", "copy")).toBe("characters");
-    expect(next("characters", "copy")).toBe("marks");
-    expect(next("carve", "copy")).toBe("deadkeys");
-    expect(next("touch", "copy")).toBe("css");
+describe("declared dependencies", () => {
+  it("the Open pages are ordered by what they require: Languages, then Letters, then Upgrades, then Mechanisms", () => {
+    const order = screens.map((s) => s.id);
+    const before = (a: string, b: string) => expect(order.indexOf(a), `${a} before ${b}`).toBeLessThan(order.indexOf(b));
+    expect(providersOf("open_missing_letters")).toContain("open_languages");
+    expect(providersOf("open_upgrades")).toContain("open_missing_letters");
+    expect(providersOf("mechanisms")).toContain("open_upgrades");
+    before("open_languages", "open_missing_letters");
+    before("open_missing_letters", "open_upgrades");
+    before("open_upgrades", "mechanisms");
   });
 });
 
-describe("the Open walk (spec 111 FR-031, FR-032)", () => {
-  it("a keyboard with no problems: Languages, On-screen keyboard, Touch, CSS, then Review", () => {
-    expect(walkOpen([])).toEqual({
-      steps: ["open_languages", "osk", "touch", "css", "done"],
-      navigate: "criteria",
-    });
+/** The Open problem-kind and basic-keyboard combinations the walk must handle. */
+const OPEN_CASES: ReadonlyArray<{ issues: readonly OpenIssueKind[] | undefined; basic: boolean }> = [
+  { issues: undefined, basic: false },
+  { issues: [], basic: false },
+  { issues: ["missing-letters"], basic: false },
+  { issues: ["upgrades"], basic: false },
+  { issues: ["docs"], basic: false },
+  { issues: ["missing-letters", "upgrades", "docs"], basic: false },
+  { issues: [], basic: true },
+  { issues: ["missing-letters"], basic: true },
+  { issues: ["upgrades", "docs"], basic: true },
+  { issues: ["missing-letters", "upgrades", "docs"], basic: true },
+];
+
+describe.each(OPEN_CASES)("the Open walk (issues $issues, basic $basic)", ({ issues, basic }) => {
+  const c = ctx("adapt", issues, basic);
+  const { steps, navigate } = walk("attribution", c);
+
+  it("every step comes after the steps that provide what it requires", () => {
+    expectDependencyOrder(steps);
   });
 
-  it("before the baseline is recorded the conditional pages are skipped", () => {
-    expect(walkOpen().steps).not.toContain("open_missing_letters");
-    expect(walkOpen().steps).not.toContain("open_upgrades");
+  it("each gated step appears exactly when its decision says so", () => {
+    for (const id of WALKED_ON_OPEN_BY_GATE) {
+      const gate = screenGates.get(id)!;
+      expect(steps.includes(id), id).toBe(gate(c.decisions));
+    }
   });
 
-  it("missing letters adds the Missing letters page", () => {
-    expect(walkOpen(["missing-letters"]).steps).toEqual([
-      "open_languages", "open_missing_letters", "osk", "touch", "css", "done",
-    ]);
+  it("never shows a Copy-only step", () => {
+    for (const id of COPY_ONLY) expect(steps, id).not.toContain(id);
   });
 
-  it("a failing upgrade adds the Upgrades page", () => {
-    expect(walkOpen(["upgrades"]).steps).toEqual(["open_languages", "open_upgrades", "osk", "touch", "css", "done"]);
+  it("starts with the language list, always reaches the OSK and Touch, and ends at Review", () => {
+    expect(steps[1]).toBe("open_languages");
+    expect(steps).toContain("osk");
+    expect(steps).toContain("touch");
+    expect(steps.at(-1)).toBe("done");
+    expect(navigate).toBe("criteria");
+  });
+});
+
+describe("the Copy walk", () => {
+  const c = ctx("copy");
+  const { steps, navigate } = walk("identity", c);
+
+  it("every step comes after the steps that provide what it requires", () => {
+    expectDependencyOrder(steps);
   });
 
-  it("documentation problems add the help and welcome-page steps", () => {
-    expect(walkOpen(["docs"]).steps).toEqual(["open_languages", "osk", "touch", "css", "help", "html", "done"]);
+  it("walks project_name (its gate passes) and none of Open's pages", () => {
+    expect(steps).toContain("project_name");
+    for (const id of OPEN_PAGES) expect(steps, id).not.toContain(id);
   });
 
-  it("every problem kind: Languages, Missing letters, Upgrades, OSK, Touch, CSS, Documentation, Review", () => {
-    expect(walkOpen(["missing-letters", "upgrades", "docs"])).toEqual({
-      steps: ["open_languages", "open_missing_letters", "open_upgrades", "osk", "touch", "css", "help", "html", "done"],
-      navigate: "criteria",
-    });
+  it("walks every screen whose gate passes for Copy, and no other", () => {
+    for (const s of screens) {
+      if (s.id === "touch_seed_source") continue; // a fork the walk takes only while unrecorded
+      const gate = screenGates.get(s.id);
+      const applies = gate === undefined || gate(c.decisions);
+      expect(steps.includes(s.id), s.id).toBe(applies);
+    }
   });
 
-  it("an Add that left for the mechanisms gallery returns to Missing letters, not past Upgrades", () => {
-    expect(next("mechanisms", "adapt", ["missing-letters", "upgrades"])).toBe("open_missing_letters");
-    expect(next("mechanisms", "adapt", ["upgrades"])).toBe("osk");
-    expect(next("mechanisms", "copy")).toBe("osk");
+  it("ends at Output", () => {
+    expect(steps.at(-1)).toBe("done");
+    expect(navigate).toBe("output");
   });
 
-  it("help does not hold Open on unfinished letters", () => {
-    const stuck = { ...ctx("adapt", ["docs"]), allCharactersImplemented: false };
-    expect(advance("help", undefined, stuck).next).toBe("html");
-    const copyStuck = { ...ctx("copy"), allCharactersImplemented: false };
-    expect(advance("help", undefined, copyStuck).next).toBe("help");
-  });
-
-  it("Copy still ends at Output", () => {
-    const outcome = advance("html", undefined, ctx("copy"));
-    expect(outcome).toEqual({ next: "done", navigate: "output" });
+  it("help holds Copy on unfinished letters, but not Open", () => {
+    expect(advance("help", undefined, { ...ctx("copy"), allCharactersImplemented: false }).next).toBe("help");
+    expect(advance("help", undefined, { ...ctx("adapt", ["docs"]), allCharactersImplemented: false }).next).not.toBe("help");
   });
 });
