@@ -125,8 +125,6 @@ import {
 import type { RadioOption } from "../../../ui/index.ts";
 import { TEXT_DIM, TEXT_MAIN } from "../../../lib/galleryTheme.ts";
 import { resolveMessage } from "../../../lib/i18nResolve.ts";
-import type { RemovalWarning } from "../../../lib/removalWarning.ts";
-import { RemovalWarningNotice } from "../../../components/RemovalWarningNotice.tsx";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
 
 // ---------------------------------------------------------------------------
@@ -443,15 +441,6 @@ export interface RemoveKeyDialogProps {
   isLastKeyInRow?: boolean;
   /** T104/T105's seam — see {@link RemoveKeyDialogCollateralWarning}. `undefined` renders no collateral section at all. */
   collateralWarning?: RemoveKeyDialogCollateralWarning;
-  /**
-   * Needed-letter warnings for the characters this removal would discard
-   * (FR-006), already resolved by the caller (`useRemovalWarning`) — this
-   * dialog stays store-free. Dismissable and never blocking: Confirm stays
-   * available whether or not the notice is showing.
-   */
-  removalWarnings?: readonly RemovalWarning[];
-  /** Dismiss one needed-letter warning; the removal stands. */
-  onDismissRemovalWarning?: (char: string) => void;
   /** Escape, the Cancel button, or the backdrop. Does not itself move focus back — the caller owns the invoker and restores focus to it (mirrors RenameDialog.tsx's convention). */
   onCancel: () => void;
   /** Fired exactly once per confirmed choice — see {@link RemoveKeyDialogConfirmResult}. */
@@ -467,8 +456,6 @@ export function RemoveKeyDialog({
   proposedReason,
   isLastKeyInRow,
   collateralWarning,
-  removalWarnings,
-  onDismissRemovalWarning,
   onCancel,
   onConfirm,
   label,
@@ -760,13 +747,6 @@ export function RemoveKeyDialog({
             </Trans>
           </span>
         </div>
-      )}
-
-      {removalWarnings !== undefined && removalWarnings.length > 0 && (
-        <RemovalWarningNotice
-          warnings={removalWarnings}
-          onDismiss={(char) => onDismissRemovalWarning?.(char)}
-        />
       )}
 
       {(hasLostOutputs || hasAvailableElsewhere) && (
