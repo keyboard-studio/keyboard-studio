@@ -695,6 +695,10 @@
     },
     {
       "note": "T053 open: golden-walk e2e (SC-003) fails locally on source/test.kvks and test.kpj. Content is identical after stripping CR; baseline is LF, walk emits CRLF, because ../keyboards is CRLF here. This branch does not touch those emitters. Not re-run on main; needs a CI run or LF corpus to confirm."
+    },
+    {
+      "note": "km-qc review CONDITIONAL, no P0. P1: RemoveKeyDialog removalWarnings props have no production mount (the dialog itself is unmounted; warning is live in CarveGalleryV2 and MechanismGallery). P2: advisory uses ADVISORY_LINT_CODES allowlist not spec wording; parseKmn unguarded in rawCtrlUpgrade; preview drops non-char outputs; basic_ exemption and ALT_MODIFIERS duplicated across two checks.",
+      "step": "implement"
     }
   ],
   "livingSpecs": {
