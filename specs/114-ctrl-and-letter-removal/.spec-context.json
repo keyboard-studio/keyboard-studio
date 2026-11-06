@@ -654,6 +654,9 @@
     {
       "note": "RemoveKeyDialog is not mounted anywhere (TouchGallery holds unused handlers); the T036 warning has no live caller. T037 covered by MechanismGallery existing-method removal only. Carve/Mechanism warning paths lack their own tests.",
       "step": "implement"
+    },
+    {
+      "note": "T053 open: golden-walk e2e (SC-003) fails locally on source/test.kvks and test.kpj. Content is identical after stripping CR; baseline is LF, walk emits CRLF, because ../keyboards is CRLF here. This branch does not touch those emitters. Not re-run on main; needs a CI run or LF corpus to confirm."
     }
   ]
 }
