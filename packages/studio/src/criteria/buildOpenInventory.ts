@@ -11,9 +11,11 @@
 //   - a language with no CLDR/SLDR data is left out of the union and counted
 //     (never guessed, and never skipping the whole check the way Copy does:
 //     on Open the keyboard's own languages are a fact, not an author claim);
-//   - the auxiliary (loanword) tier and the author's confirmed decisions are
-//     not part of the expectation: an inherited keyboard is judged against
-//     what its languages need, and nothing else.
+//   - only the main ("standard") tier counts. The auxiliary (loanword),
+//     punctuation and numbers tiers, and the author's confirmed decisions, are
+//     not part of the expectation: an inherited keyboard is judged against the
+//     letters its languages need, not typographic punctuation (– … § †) or
+//     number-formatting symbols (ᵈ ² ‰, no-break spaces).
 //
 // When no listed language has data the build is skipped, so 18.6 stays
 // "not yet checkable" with the tag named, as on Copy.
@@ -65,7 +67,7 @@ export function buildOpenCriteriaInventory(input: BuildOpenInventoryInput): Open
       tag,
       inv === null
         ? null
-        : { ...inv, characters: inv.characters.filter((c) => c.tier !== "auxiliary") },
+        : { ...inv, characters: inv.characters.filter((c) => c.tier === "main") },
     );
   }
 

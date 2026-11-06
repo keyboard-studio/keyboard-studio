@@ -10,7 +10,10 @@ import { buildOpenCriteriaInventory } from "./buildOpenInventory.ts";
 import { findingKeysOf } from "./openRatchet.ts";
 import type { ResolvedRow } from "./criteriaTypes.ts";
 
-function sourced(tag: string, chars: Array<[string, "main" | "auxiliary"]>): SourcedInventory {
+function sourced(
+  tag: string,
+  chars: Array<[string, "main" | "auxiliary" | "punctuation" | "numbers"]>,
+): SourcedInventory {
   return {
     resolvedTag: tag,
     source: "cldr",
@@ -26,7 +29,16 @@ function sourced(tag: string, chars: Array<[string, "main" | "auxiliary"]>): Sou
 }
 
 const index = new Map<string, SourcedInventory | null>([
-  ["ewo", sourced("ewo", [["a", "main"], ["ə", "main"], ["c", "auxiliary"]])],
+  [
+    "ewo",
+    sourced("ewo", [
+      ["a", "main"],
+      ["ə", "main"],
+      ["c", "auxiliary"],
+      ["…", "punctuation"],
+      ["ᵈ", "numbers"],
+    ]),
+  ],
   ["bkm", sourced("bkm", [["a", "main"], ["ɔ", "main"]])],
   ["zzz", null],
 ]);
@@ -37,7 +49,7 @@ function chars(b: ReturnType<typeof buildOpenCriteriaInventory>): string[] {
 }
 
 describe("buildOpenCriteriaInventory", () => {
-  it("is the union over the listed languages, standard tiers only", () => {
+  it("is the union over the listed languages, main tier only", () => {
     const b = buildOpenCriteriaInventory({ languageTags: ["ewo", "bkm"], script: "Latin", sourcedByTag: index });
     expect(chars(b)).toEqual(["a", "ɔ", "ə"].sort());
     expect(b.coverage).toEqual({ withData: 2, total: 2, withoutData: [] });
