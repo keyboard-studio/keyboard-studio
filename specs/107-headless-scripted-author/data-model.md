@@ -73,7 +73,6 @@ copied keyboard) → the case fails with `placeholder-clash` (spec Edge Cases).
 | `skippedSteps` | `{ step; reason }[]` (steps the product auto-completed) |
 | `knownGaps` | `{ gate: GateId; owner: string }[]` matched from spec 106's test-code `KNOWN_GAPS` table. The author adds two rows to it: G1 on `bj_cree_woods` (a dead rule after carving a whole `any()` store) and G6 on every touch-bearing keyboard walked. The G6 row is `walkOnly`: it applies to author runs, not to the decision-point replay, which walks no touch step. |
 | `notCovered` | `string[]`: the ids of the 15 Playwright-only rules in `HA/playwrightOnly.ts` (FR-042) |
-| `fallbackPolicy` | the store default used (FR-060; removed once #2366 lands) |
 | `timingMs` | `{ author; replay }` (feeds SC-001/SC-002 evidence) |
 
 ## Parity allow-list entry

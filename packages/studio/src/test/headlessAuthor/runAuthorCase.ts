@@ -208,7 +208,7 @@ function withTouchApplicability(g: GateResult, hasShippedTouch: boolean): GateRe
 
 export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promise<AuthorRun> {
   resetAuthorStores();
-  const report = createRunReport(useWorkingCopyStore.getState().fallbackPolicy);
+  const report = createRunReport();
   const base = { caseId: c.id, gates: [], report: report.report };
 
   try {

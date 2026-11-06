@@ -65,6 +65,10 @@
     "§8",
     "specs/007-strategy-selection"
   ],
+  "fallback_policy": [
+    "specs/076-rule-behaviours",
+    "specs/109-base-keyboard-fallback"
+  ],
   "osk": [
     "specs/osk-editor"
   ],
