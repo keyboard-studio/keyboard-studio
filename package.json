@@ -66,8 +66,7 @@
     "crowdin:diagnose": "node utilities/crowdin-diagnose/index.js",
     "crowdin:diagnose:selftest": "node utilities/crowdin-diagnose/selftest.js",
     "test:affected": "node scripts/test-affected.mjs",
-    "test:pr": "node scripts/test-pr.mjs",
-    "prepare": "husky"
+    "test:pr": "node scripts/test-pr.mjs"
   },
   "devDependencies": {
     "@crowdin/cli": "^4.14.4",
@@ -79,7 +78,6 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-lingui": "^0.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "husky": "^9.1.7",
     "prettier": "^3.8.3",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
