@@ -1,10 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createVirtualFS, type LintFinding } from "@keyboard-studio/contracts";
 
 import { deriveOpenHelpGaps } from "./openHelpGaps.ts";
 import { docRegenerationFix } from "./docRegenerationFix.ts";
 import { openScreenGates } from "../survey/questions/registry.ts";
-import { setOpenHelpGaps } from "../survey/questions/openHelpGaps.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 
 function fullVfs() {
@@ -50,25 +49,28 @@ describe("deriveOpenHelpGaps", () => {
 });
 
 describe("help step gate on Open", () => {
-  afterEach(() => setOpenHelpGaps(null));
-  const open = { "authoring-track": { value: "adapt" } } as unknown as DecisionSet;
+  const open = (issues?: string[]) =>
+    ({
+      "authoring-track": { value: "adapt" },
+      ...(issues !== undefined ? { "open-issues": { value: issues } } : {}),
+    }) as unknown as DecisionSet;
   const copy = { "authoring-track": { value: "copy" } } as unknown as DecisionSet;
   const gate = openScreenGates.get("help")!;
 
-  it("skips the help step when nothing is missing or failing", () => {
-    setOpenHelpGaps(new Set());
-    expect(gate(open)).toBe(false);
+  it("skips the help step when the baseline found no documentation problem", () => {
+    expect(gate(open([]))).toBe(false);
+    expect(gate(open(["upgrades"]))).toBe(false);
   });
 
-  it("asks when a document is missing, and when the state is unknown", () => {
-    setOpenHelpGaps(new Set(["help-php"]));
-    expect(gate(open)).toBe(true);
-    setOpenHelpGaps(null);
-    expect(gate(open)).toBe(true);
+  it("asks when the baseline recorded a documentation problem", () => {
+    expect(gate(open(["docs"]))).toBe(true);
+  });
+
+  it("skips the help step until the baseline is recorded", () => {
+    expect(gate(open())).toBe(false);
   });
 
   it("never changes Copy", () => {
-    setOpenHelpGaps(new Set());
     expect(gate(copy)).toBe(true);
   });
 });

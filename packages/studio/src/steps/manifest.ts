@@ -50,6 +50,8 @@ import {
   attributionStep,
   projectNameStep,
   languageListStep,
+  missingLettersStep,
+  upgradesStep,
   carveStep,
   deadkeysStep,
   rulesStep,
@@ -156,6 +158,11 @@ const stepPool: readonly Step[] = [
 
   // --- Open: the editable language list (gated side trail, spec 111) ---
   languageListStep,
+
+  // --- Open: Missing letters and Upgrades (gated side trails, spec 111) ---
+  // Each shows only when the baseline recorded that kind of problem.
+  missingLettersStep,
+  upgradesStep,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,

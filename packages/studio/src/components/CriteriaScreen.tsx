@@ -25,8 +25,10 @@ import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
 import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
 import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
 import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
-import { MissingLettersByLanguage } from "./MissingLettersByLanguage.tsx";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { isOpenMode } from "../lib/openMode.ts";
+import { Button } from "../ui/Button.tsx";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
 const containerStyle: React.CSSProperties = {
@@ -55,6 +57,8 @@ export function CriteriaScreen() {
   const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
   const routeFix = useRouteSuggestedFix();
   const docFixes = useDocRegenerationFixes();
+  // Review is the Open walk's last step: Continue hands over to Output (spec 111 FR-031).
+  const isOpen = isOpenMode(useWorkingCopyStore((s) => s.instantiationMode));
   const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
   const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
@@ -109,12 +113,6 @@ export function CriteriaScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
     <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
-      {result.expectedCoverage?.sourcesByChar !== undefined && (
-        <MissingLettersByLanguage
-          missing={missingFixes.flatMap((f) => (f.action !== undefined ? [f.action.subject] : []))}
-          sourcesByChar={result.expectedCoverage.sourcesByChar}
-        />
-      )}
       <SuggestedFixesPanel
         extra={[...missingFixes, ...docFixes]}
         onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))} testId="criteria-suggested-fixes" />
@@ -152,6 +150,13 @@ export function CriteriaScreen() {
         : {})}
     />
     </div>
+    {isOpen && (
+      <div style={{ flex: "none", display: "flex", justifyContent: "flex-end", padding: "8px 24px", borderTop: `1px solid ${BORDER}` }}>
+        <Button variant="primary" onClick={() => navigateTo("output")} data-testid="criteria-continue">
+          <Trans id="criteria.continueToOutput">Continue to Output</Trans>
+        </Button>
+      </div>
+    )}
     </div>
   );
 }

@@ -32,6 +32,8 @@ import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
 import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
 import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
 import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
+import { MissingLettersHost } from "../survey/openWalk/MissingLettersHost.tsx";
+import { UpgradesHost } from "../survey/openWalk/UpgradesHost.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -260,6 +262,32 @@ export const languageListStep: EditorStep = step({
   title: "Languages",
   layout: "pane",
   component: LanguageListHost,
+  specRef: "specs/111-open-existing-keyboard",
+  persistence: "working-copy",
+});
+
+/**
+ * Open: the Missing letters page (spec 111 FR-033). Gated to Open, and to a
+ * baseline that found missing letters, by the declared screen gate in registry.ts.
+ */
+export const missingLettersStep: EditorStep = step({
+  id: "open_missing_letters",
+  title: "Missing letters",
+  layout: "pane",
+  component: MissingLettersHost,
+  specRef: "specs/111-open-existing-keyboard",
+  persistence: "working-copy",
+});
+
+/**
+ * Open: the Upgrades page (spec 111 FR-034). Gated to Open, and to a baseline
+ * with a failing upgrade criterion, by the declared screen gate in registry.ts.
+ */
+export const upgradesStep: EditorStep = step({
+  id: "open_upgrades",
+  title: "Upgrades",
+  layout: "pane",
+  component: UpgradesHost,
   specRef: "specs/111-open-existing-keyboard",
   persistence: "working-copy",
 });

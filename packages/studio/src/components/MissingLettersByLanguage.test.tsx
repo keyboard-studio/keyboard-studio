@@ -41,4 +41,14 @@ describe("MissingLettersByLanguage", () => {
     const recorded = useDecisionStore.getState().decisions["language-list"]?.value as { tag: string }[];
     expect(recorded.map((l) => l.tag)).toEqual(["en", "ht"]);
   });
+
+  it("offers an Add button per letter when the host routes adds, and none otherwise", () => {
+    const added: string[] = [];
+    const { unmount } = render(<MissingLettersByLanguage missing={["è", "ā"]} sourcesByChar={sources} onAdd={(c) => added.push(c)} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add ā to the keyboard/ }));
+    expect(added).toEqual(["ā"]);
+    unmount();
+    render(<MissingLettersByLanguage missing={["è"]} sourcesByChar={sources} />);
+    expect(screen.queryByRole("button", { name: /Add è/ })).toBeNull();
+  });
 });

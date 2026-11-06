@@ -1,66 +1,116 @@
 /**
- * E2E: Open an existing keyboard (spec 111 quickstart section 5, steps 1-2, 5).
+ * E2E: Open an existing keyboard (spec 111 quickstart section 5, steps 1-2, 5; Phase 12 walk).
  *
  * Flow under test:
  *   welcome -> "Continue as guest" -> start screen (New leads, Open follows)
  *     -> "Open an existing keyboard" -> search -> choose -> "Open this keyboard"
- *     -> criteria view, every finding marked as already failing (pre-existing)
+ *     -> the Languages step (the start of the Open walk, FR-031)
+ *     -> Continue through the walk -> Review (the criteria view, every finding
+ *        marked as already failing) -> Continue to Output
  *
  * Checks:
- *   SC-009  the criteria view is reached within 3 interactions
+ *   SC-009  the walk starts within 3 interactions
  *   SC-008  opening changes nothing: no finding is classed "new" until the
  *           author edits something
+ *   US8     a Continue-only walk of an upstream basic keyboard reaches Output
  *
  * A first-time visitor sees the welcome screen, so this spec does not seed a
  * returning visitor. Playwright is imported from "playwright/test" like the
  * other specs.
  */
 
-import { test, expect } from "playwright/test";
+import { test, expect, type Page } from "playwright/test";
 
 // A small codec-clean catalog keyboard present in every catalog, including the
 // partial local keyboards checkout the dev server enumerates.
 const OPEN_ID = "basic_kbdfr";
 
-/** Interactions the author performs from the start screen to the criteria view. */
+// The upstream basic keyboard the Continue-only walk takes (spec 111 Story 8 independent test).
+const WALK_ID = "basic_kbdus";
+
+/** Interactions the author performs from the start screen to the first walk step. */
 const MAX_INTERACTIONS = 3;
 
+/** Open `keyboardId` from the start screen; returns the interaction count. */
+async function openKeyboard(page: Page, keyboardId: string = OPEN_ID): Promise<number> {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue as guest" }).click();
+
+  // toBeInViewport, not toBeVisible: a card clipped below an overflow:hidden
+  // pane still counts as "visible" to Playwright, which is how the entry once
+  // shipped unreachable under the welcome screen.
+  const create = page.getByTestId("start-new");
+  await expect(create).toBeInViewport({ timeout: 30_000 });
+  const entry = page.getByRole("region", { name: /open an existing keyboard/i });
+  await expect(entry).toBeInViewport();
+
+  let interactions = 0;
+
+  // Interaction 1: search by id in the entry's picker.
+  await entry.getByRole("combobox").fill(keyboardId);
+  interactions += 1;
+
+  // Interaction 2: choose the keyboard from the results.
+  await entry.locator(`[id$="-opt-${keyboardId}"]`).first().click({ timeout: 15_000 });
+  interactions += 1;
+
+  // Interaction 3: open it. The button stays disabled while both
+  // repositories are being checked.
+  const open = entry.getByRole("button", { name: /open this keyboard/i });
+  await expect(open).toBeEnabled({ timeout: 30_000 });
+  await open.click();
+  interactions += 1;
+  return interactions;
+}
+
+/**
+ * Press the Continue of the walk step on screen. Steps carry it under their own
+ * test ids (`osk-continue`, `touch-continue`, `survey-advance`, ...), and the
+ * Languages page has a plain Continue button. Returns the control pressed.
+ */
+async function continueWalk(page: Page): Promise<string> {
+  const control = page
+    .locator(
+      '[data-testid$="-continue"], [data-testid="survey-advance"], [data-testid="gallery-intro-start"], [data-testid="touch-seed-confirm"]',
+    )
+    .or(page.getByRole("button", { name: /^continue$/i }))
+    .first();
+  await control.waitFor({ state: "visible", timeout: 30_000 });
+  const id = (await control.getAttribute("data-testid")) ?? "continue";
+  // The Documentation step asks a required description when the keyboard has none
+  // to prefill from; answer it so the walk can go on (the only typing in this walk).
+  if (await control.isDisabled()) {
+    await page.getByRole("textbox").first().fill("A keyboard for typing English on a US layout.");
+  }
+  await control.click();
+  return id;
+}
+
 test.describe("Open an existing keyboard (spec 111)", () => {
-  test("opens to the criteria view within 3 interactions, all findings pre-existing", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Continue as guest" }).click();
+  test("opens on the Languages step within 3 interactions", async ({ page }) => {
+    const interactions = await openKeyboard(page);
 
-    // toBeInViewport, not toBeVisible: a card clipped below an overflow:hidden
-    // pane still counts as "visible" to Playwright, which is how the entry once
-    // shipped unreachable under the welcome screen.
-    const create = page.getByTestId("start-new");
-    await expect(create).toBeInViewport({ timeout: 30_000 });
-    const entry = page.getByRole("region", { name: /open an existing keyboard/i });
-    await expect(entry).toBeInViewport();
-
-    let interactions = 0;
-
-    // Interaction 1: search by id in the entry's picker.
-    const search = entry.getByRole("combobox");
-    await search.fill(OPEN_ID);
-    interactions += 1;
-
-    // Interaction 2: choose the keyboard from the results.
-    await entry.locator(`[id$="-opt-${OPEN_ID}"]`).first().click({ timeout: 15_000 });
-    interactions += 1;
-
-    // Interaction 3: open it. The button stays disabled while both
-    // repositories are being checked.
-    const open = entry.getByRole("button", { name: /open this keyboard/i });
-    await expect(open).toBeEnabled({ timeout: 30_000 });
-    await open.click();
-    interactions += 1;
-
-    await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
-    await expect(page).toHaveURL(/#criteria/);
+    await expect(page.getByRole("heading", { name: /languages this keyboard supports/i })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page).toHaveURL(/#survey/);
+    await expect(page.getByRole("button", { name: /^continue$/i })).toBeVisible();
 
     // SC-009
     expect(interactions).toBeLessThanOrEqual(MAX_INTERACTIONS);
+  });
+
+  test("Review lists every finding as pre-existing, and none is new", async ({ page }) => {
+    await openKeyboard(page);
+    await expect(page.getByRole("heading", { name: /languages this keyboard supports/i })).toBeVisible({
+      timeout: 60_000,
+    });
+    // The criteria view stays reachable from the navigation bar at any time.
+    // The walk's pipeline instantiates the working copy while Languages is showing;
+    // the list fills from the keyboard's own descriptor once it exists.
+    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+    await page.evaluate(() => { window.location.hash = "criteria"; });
+    await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
 
     // Every marked finding is pre-existing; none is new (SC-008, SC-009 step 1).
     // Wait for the ratchet marks to settle, then assert on whatever is shown.
@@ -75,16 +125,14 @@ test.describe("Open an existing keyboard (spec 111)", () => {
   });
 
   test("no change without interaction: waiting on the criteria view adds no new findings", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Continue as guest" }).click();
-    const entry = page.getByRole("region", { name: /open an existing keyboard/i });
-    await expect(entry).toBeInViewport({ timeout: 30_000 });
-    await entry.getByRole("combobox").fill(OPEN_ID);
-    await entry.locator(`[id$="-opt-${OPEN_ID}"]`).first().click({ timeout: 15_000 });
-    const open = entry.getByRole("button", { name: /open this keyboard/i });
-    await expect(open).toBeEnabled({ timeout: 30_000 });
-    await open.click();
-
+    await openKeyboard(page);
+    await expect(page.getByRole("heading", { name: /languages this keyboard supports/i })).toBeVisible({
+      timeout: 60_000,
+    });
+    // The walk's pipeline instantiates the working copy while Languages is showing;
+    // the list fills from the keyboard's own descriptor once it exists.
+    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+    await page.evaluate(() => { window.location.hash = "criteria"; });
     await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
     const marks = page.locator('[data-testid^="criteria-open-mark-"]');
     await expect(marks.first()).toBeVisible({ timeout: 60_000 });
@@ -95,5 +143,29 @@ test.describe("Open an existing keyboard (spec 111)", () => {
 
     expect(await marks.count()).toBe(before);
     await expect(page.locator('[data-testid^="criteria-open-mark-"][data-finding-class="new"]')).toHaveCount(0);
+  });
+
+  test("a Continue-only walk of upstream basic_kbdus reaches Review, then Output (US8)", async ({ page }) => {
+    test.setTimeout(300_000);
+    await openKeyboard(page, WALK_ID);
+    await expect(page.getByRole("heading", { name: /languages this keyboard supports/i })).toBeVisible({
+      timeout: 60_000,
+    });
+
+    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+
+    // Continue until the walk hands over to Review (the criteria view).
+    const pressed: string[] = [];
+    for (let step = 0; step < 30 && !/#criteria/.test(page.url()); step += 1) {
+      pressed.push(await continueWalk(page));
+      await page.waitForTimeout(500);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[OK] walk controls pressed: ${pressed.join(" > ")}`);
+    await expect(page).toHaveURL(/#criteria/);
+    await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
+
+    await page.getByTestId("criteria-continue").click();
+    await expect(page).toHaveURL(/#output/);
   });
 });

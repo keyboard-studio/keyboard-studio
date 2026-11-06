@@ -112,6 +112,8 @@ export type ActiveStepId =
   | "attribution"
   | "project_name"
   | "open_languages"
+  | "open_missing_letters"
+  | "open_upgrades"
   | "characters"
   | "carve"
   | "deadkeys"

@@ -44,8 +44,10 @@ import {
 } from "@keymanapp/keyboard-lint";
 
 import {
+  applyInventoryOutcome,
   assembleLintContext,
   sharedFontRefsMissingFromVfs,
+  type InventoryOutcome,
 } from "./assembleLintContext.ts";
 import { deriveCriteriaFacts } from "./deriveCriteriaFacts.ts";
 import { licenseTextHints } from "./fontLicense.ts";
@@ -100,6 +102,13 @@ export interface JudgeForeignOptions {
     | { kind: "text"; text: string }
     | { kind: "absent" }
     | { kind: "failed" };
+  /**
+   * Supplies the expected-characters inventory for the package's listed
+   * languages (spec 111 FR-032: an opened keyboard's baseline needs it to
+   * know whether letters are missing). Omitted everywhere else, so 18.6 stays
+   * Not yet checkable as before. Called with the .kps language tags and script.
+   */
+  inventoryFor?: (languageTags: readonly string[], script: string) => Promise<InventoryOutcome | undefined>;
 }
 
 const HISTORY_TRUNCATED_CODE = "KM_LINT_HISTORY_TRUNCATED";
@@ -293,7 +302,7 @@ export async function judgeForeignKeyboard(
     placement,
     options.reviewContext,
   );
-  const assembled = assembleLintContext({
+  const assembledBase = assembleLintContext({
     vfs,
     keyboardId,
     placement,
@@ -303,6 +312,17 @@ export async function judgeForeignKeyboard(
       ? { reviewContext: options.reviewContext }
       : {}),
   });
+  const inventoryTags = [
+    ...new Set(
+      (assembledBase.ctx.criteriaInput?.kpsLanguages ?? []).map((t) => t.trim()).filter((t) => t.length > 0),
+    ),
+  ];
+  const inventoryOutcome =
+    options.inventoryFor !== undefined && inventoryTags.length > 0
+      ? await options.inventoryFor(inventoryTags, assembledBase.script)
+      : undefined;
+  const assembled =
+    inventoryOutcome !== undefined ? applyInventoryOutcome(assembledBase, inventoryOutcome) : assembledBase;
   const { ctx } = assembled;
   const contextMissing: Record<string, string> = {
     ...assembled.contextMissing,

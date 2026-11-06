@@ -48,6 +48,12 @@
 // characters; BASELINE_MEMBERSHIP gains its one decision; the Flow Map
 // gains a fork from attribution and a join back at characters. The Copy
 // walk and every other entry are unchanged.
+//
+// AMENDMENT (spec 111 Phase 12, same rule -- a deliberate decision, not a
+// regeneration): the Open walk adds two more gated side trails after
+// open_languages, "open_missing_letters" and "open_upgrades" (each shown only
+// for the problem kind the baseline recorded). Both rejoin at characters, gain
+// one membership entry each and a Flow Map fork and join. Nothing else moves.
 
 import { describe, expect, it } from "vitest";
 import { manifest, screenTrails } from "./manifest.ts";
@@ -65,6 +71,8 @@ const BASELINE_ORDER = [
   "attribution",
   "project_name",
   "open_languages",
+  "open_missing_letters",
+  "open_upgrades",
   "characters",
   "marks",
   "punctuation",
@@ -87,6 +95,8 @@ const BASELINE_ORDER = [
 const BASELINE_SIDE_TRAILS: Readonly<Record<string, string>> = {
   project_name: "characters",
   open_languages: "characters",
+  open_missing_letters: "characters",
+  open_upgrades: "characters",
   touch_seed_source: "touch",
 };
 
@@ -103,8 +113,12 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["attribution", "characters", "spine"],
   ["attribution", "project_name", "fork"],
   ["attribution", "open_languages", "fork"],
+  ["attribution", "open_missing_letters", "fork"],
+  ["attribution", "open_upgrades", "fork"],
   ["project_name", "characters", "join"],
   ["open_languages", "characters", "join"],
+  ["open_missing_letters", "characters", "join"],
+  ["open_upgrades", "characters", "join"],
   ["characters", "marks", "spine"],
   ["marks", "punctuation", "spine"],
   ["punctuation", "invisibles", "spine"],
@@ -133,6 +147,8 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   attribution: ["author-name", "author-email", "copyright-holder"],
   project_name: ["project-display-name", "project-keyboard-id"],
   open_languages: ["language-list"],
+  open_missing_letters: ["missing-letters-review"],
+  open_upgrades: ["upgrades-review"],
   characters: ["existing-keyboards", "co-installed-keyboards", "discovery-intro", "text-sample", "text-sample-review", "linguist-confirm", "picker-confirm", "standard-letters", "typing-approach", "special-letters-wanted", "special-letters", "special-letters-notes", "latin-digraphs-wanted", "latin-digraphs-list", "punctuation-wanted", "punctuation-list", "digit-set", "char-count", "latin-qwerty-branch", "spare-keys-qwerty", "latin-azerty-branch", "azerty-qz-swap", "spare-keys-azerty", "non-roman-branch", "indic-conjuncts-wanted", "indic-virama", "indic-vowels-separate", "indic-pre-base-vowels", "indic-nukta-wanted", "indic-nukta-detail", "indic-onset-vowels-wanted", "indic-onset-vowels-list", "sea-medials", "sea-stacked-consonants", "rtl-direction-confirm", "rtl-short-vowels", "rtl-special-letters", "syllabic-note", "syllabic-grid", "syllabic-finals-wanted", "syllabic-finals-list", "other-free-entry", "contact-language", "legacy-encoding", "use-case", "additional-methods", "character-inventory"],
   marks: ["marks-treatment"],
   punctuation: ["punctuation-inventory"],
@@ -306,12 +322,17 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //     the others (#1901 reclassification).
     //   - open_languages (spec 111 amendment) is a gated side trail with only
     //     the track gate, so it is a tie-break against every other screen.
+    //   - open_missing_letters and open_upgrades (spec 111 Phase 12) are chained
+    //     after open_languages (and each other) by screenRequires, so they are
+    //     tie-breaks against the same screens open_languages is, and no others.
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
       ["layout", "track"],
       ["layout", "attribution"],
       ["layout", "project_name"],
       ["layout", "open_languages"],
+      ["layout", "open_missing_letters"],
+      ["layout", "open_upgrades"],
       ["layout", "characters"],
       ["layout", "marks"],
       ["layout", "punctuation"],
@@ -334,6 +355,8 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["attribution", "help"],
       ["attribution", "html"],
       ["project_name", "open_languages"],
+      ["project_name", "open_missing_letters"],
+      ["project_name", "open_upgrades"],
       ["open_languages", "characters"],
       ["open_languages", "marks"],
       ["open_languages", "punctuation"],
@@ -349,6 +372,36 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["open_languages", "css"],
       ["open_languages", "help"],
       ["open_languages", "html"],
+      ["open_missing_letters", "characters"],
+      ["open_missing_letters", "marks"],
+      ["open_missing_letters", "punctuation"],
+      ["open_missing_letters", "invisibles"],
+      ["open_missing_letters", "convenience"],
+      ["open_missing_letters", "carve"],
+      ["open_missing_letters", "deadkeys"],
+      ["open_missing_letters", "rules"],
+      ["open_missing_letters", "mechanisms"],
+      ["open_missing_letters", "osk"],
+      ["open_missing_letters", "touch_seed_source"],
+      ["open_missing_letters", "touch"],
+      ["open_missing_letters", "css"],
+      ["open_missing_letters", "help"],
+      ["open_missing_letters", "html"],
+      ["open_upgrades", "characters"],
+      ["open_upgrades", "marks"],
+      ["open_upgrades", "punctuation"],
+      ["open_upgrades", "invisibles"],
+      ["open_upgrades", "convenience"],
+      ["open_upgrades", "carve"],
+      ["open_upgrades", "deadkeys"],
+      ["open_upgrades", "rules"],
+      ["open_upgrades", "mechanisms"],
+      ["open_upgrades", "osk"],
+      ["open_upgrades", "touch_seed_source"],
+      ["open_upgrades", "touch"],
+      ["open_upgrades", "css"],
+      ["open_upgrades", "help"],
+      ["open_upgrades", "html"],
       ["marks", "punctuation"],
       ["marks", "invisibles"],
       ["marks", "convenience"],

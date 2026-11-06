@@ -615,17 +615,14 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "track", testId: "track-adapt" },
     { stepId: "attribution", testId: "survey-advance" },
     // Open (spec 111): the editable language list rides the adapt track only.
-    { stepId: "open_languages", testId: "survey-advance" },
-    { stepId: "characters/prefill", testId: "prefill-continue" },
-    // marks skips transparently inside this window, landing on punctuation.
-    // Open (spec 111) hides the punctuation, invisibles, carve, deadkeys, rules,
-    // mechanisms and touch_seed_source screens; the walk goes straight from characters to osk.
-    { stepId: "characters/B", testId: "charlist-done", settleFor: "osk-continue" },
+    { stepId: "open_languages", testId: "survey-advance", settleFor: "osk-continue" },
+    // Open (spec 111) hides the character survey, punctuation, invisibles, carve,
+    // deadkeys, rules, mechanisms and touch_seed_source screens; the language list
+    // goes straight to osk. Missing letters, Upgrades, help and html appear only when
+    // the baseline recorded that problem, which this walk (no baseline) did not.
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },
-    { stepId: "help", testId: "survey-advance", async: true },
-    { stepId: "html", testId: "html-continue", async: true },
   ]);
 }
 

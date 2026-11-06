@@ -40,6 +40,8 @@ interface JourneyCase {
   lastStep?: string;
   /** The replay's last edge is html->done (help and html editor steps precede output). */
   endsAtDone: boolean;
+  /** The last edge when it is not html->done: Open skips help and html when its documents are fine. */
+  lastEdge?: string;
 }
 
 const JOURNEYS: readonly JourneyCase[] = [
@@ -93,12 +95,14 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: ["open_languages"],
     skips: ["project_name", "carve", "mechanisms"],
     endsAtDone: true,
+    lastEdge: "css->done",
   },
   {
     name: "minimal-defaults",
     summary: "reaches done with only the required questions answered (US1, T012)",
     skips: ["project_name"],
     endsAtDone: true,
+    lastEdge: "css->done",
   },
   {
     name: "backtrack-journey",
@@ -126,7 +130,7 @@ describe.each(JOURNEYS)("replayJourney — $name", (j) => {
       expect(result.exercisedStepIds.filter((s) => s === id)).toHaveLength(1);
     }
     if (j.lastStep !== undefined) expect(result.exercisedStepIds.at(-1)).toBe(j.lastStep);
-    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe("html->done");
+    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe(j.lastEdge ?? "html->done");
   });
 });
 

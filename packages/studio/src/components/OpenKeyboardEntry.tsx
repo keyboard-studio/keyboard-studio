@@ -48,30 +48,19 @@ export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef 
   useWorkingCopyStore.getState().setStartSource(source);
   useSurveySessionStore.getState().setLocalStart(keyboard);
   // The identity-first screens are gated off on Open (registry.ts
-  // `openHiddenScreens`), so the walk starts at the first screen that applies.
+  // `openHiddenScreens`), so the walk starts at its first page, the Languages
+  // step (spec 111 FR-031). The working copy is instantiated by the survey
+  // view's compile pipeline, which the walk route mounts; the Languages page
+  // reads the keyboard's list from it as soon as it exists.
   useSurveySessionStore.setState({
-    activeStepId: "attribution",
+    activeStepId: "open_languages",
     history: [],
     visited: ["identity", "layout", "choose_base", "track", "attribution"],
   });
   // Opening a keyboard leaves the welcome screen, so the first-visit gate must lift
   // or the route would be forced back to welcome.
   markVisited();
-  // Open lands on the criteria page: what was already wrong, before any edit.
-  // The working copy is instantiated by the survey view's compile pipeline, so the
-  // walk route mounts first and hands over to the criteria page once the copy exists.
   navigateTo("survey");
-  const landOnCriteria = (): boolean => {
-    const wc = useWorkingCopyStore.getState();
-    if (wc.startKeyboard === null || wc.startKeyboard.id !== keyboard.id) return false;
-    navigateTo("criteria");
-    return true;
-  };
-  if (!landOnCriteria()) {
-    const unsubscribe = useWorkingCopyStore.subscribe(() => {
-      if (landOnCriteria()) unsubscribe();
-    });
-  }
   return true;
 }
 

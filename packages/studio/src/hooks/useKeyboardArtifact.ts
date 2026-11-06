@@ -2,11 +2,14 @@ import { isOskStylesheetPath } from "../lib/oskStylesheetPath.ts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
-import { peekDecision } from "../stores/decisionStore.ts";
+import { peekDecision, useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { judgeForeignKeyboard, placementFromRepoPath } from "../criteria/judgeForeign.ts";
 import { takeBaseline } from "../criteria/openRatchet.ts";
+import { openIssuesOf } from "../criteria/openIssues.ts";
+import { openBaselineInventory } from "../criteria/openBaselineInventory.ts";
+import { deriveOpenHelpGaps } from "../lib/openHelpGaps.ts";
 import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
@@ -1294,14 +1297,28 @@ export function useKeyboardArtifact(
           if (peekDecision("authoring-track")?.value === "adapt") {
             const criteriaStore = useCriteriaRecordStore.getState();
             criteriaStore.setOpenBaseline(null);
+            useDecisionStore.getState().forget("open-issues");
             const openedVfs = vfs;
             void judgeForeignKeyboard(openedVfs, kb.id, kb.displayName, {
               placement: placementFromRepoPath(kb.path),
+              inventoryFor: openBaselineInventory,
             })
               .then((judged) => {
-                useCriteriaRecordStore
-                  .getState()
-                  .setOpenBaseline(takeBaseline(judged, new Date().toISOString()));
+                const baseline = takeBaseline(judged, new Date().toISOString());
+                useCriteriaRecordStore.getState().setOpenBaseline(baseline);
+                // The problem kinds the baseline found decide which of the walk's
+                // conditional pages appear (FR-032); recorded once, with the baseline.
+                const docGaps = deriveOpenHelpGaps({
+                  vfs: openedVfs,
+                  keyboardId: kb.id,
+                  baselineFindings: useWorkingCopyStore.getState().baselineDocFindings,
+                });
+                useDecisionStore.getState().record({
+                  id: "open-issues",
+                  value: openIssuesOf(baseline, docGaps),
+                  provenance: "derived",
+                  step: "open",
+                });
               })
               .catch((err: unknown) => {
                 // eslint-disable-next-line no-console -- developers want this; not actionable on screen

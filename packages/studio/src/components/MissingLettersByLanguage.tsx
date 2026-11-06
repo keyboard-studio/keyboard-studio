@@ -62,9 +62,12 @@ const itemStyle: React.CSSProperties = {
 export function MissingLettersByLanguage({
   missing,
   sourcesByChar,
+  onAdd,
 }: {
   missing: readonly string[];
   sourcesByChar: Readonly<Record<string, readonly string[]>>;
+  /** When given, each letter carries an Add button that calls it with that letter. */
+  onAdd?: (char: string) => void;
 }) {
   const { t } = useLingui();
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -89,10 +92,16 @@ export function MissingLettersByLanguage({
         <Trans id="missingLetters.title">Letters the listed languages need</Trans>
       </h3>
       <p style={{ margin: "0 0 4px", color: TEXT_DIM }}>
-        <Trans id="missingLetters.intro">
-          The keyboard can't type these letters. Add them below, or remove a language
-          the keyboard isn't meant to support.
-        </Trans>
+        {onAdd === undefined ? (
+          <Trans id="missingLetters.introNoAdd">
+            The keyboard can't type these letters. Remove a language the keyboard isn't meant to support.
+          </Trans>
+        ) : (
+          <Trans id="missingLetters.intro">
+            The keyboard can't type these letters. Add them below, or remove a language
+            the keyboard isn't meant to support.
+          </Trans>
+        )}
       </p>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {groups.map(({ tag, chars }) => {
@@ -101,7 +110,26 @@ export function MissingLettersByLanguage({
           return (
             <li key={tag} style={itemStyle} data-testid={`missing-letters-${tag}`}>
               <span style={{ flex: "1 1 200px" }}>
-                <strong>{name}</strong>: <span lang={tag}>{chars.join(" ")}</span>
+                <strong>{name}</strong>:{" "}
+                {onAdd === undefined ? (
+                  <span lang={tag}>{chars.join(" ")}</span>
+                ) : (
+                  chars.map((ch) => (
+                    <span key={ch} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 8 }}>
+                      <span lang={tag}>{ch}</span>
+                      <Button
+                        size="compact"
+                        onClick={() => onAdd(ch)}
+                        aria-label={t({
+                          id: "missingLetters.add.label",
+                          message: `Add ${ch} to the keyboard (${name})`,
+                        })}
+                      >
+                        <Trans id="missingLetters.add">Add</Trans>
+                      </Button>
+                    </span>
+                  ))
+                )}
               </span>
               {entry !== undefined && (
                 <Button

@@ -340,6 +340,10 @@ export function DecisionTrailView({
         return t({ id: "trail.stage.name.projectName", message: "Project name" });
       case "open_languages":
         return t({ id: "trail.stage.name.openLanguages", message: "Keyboard languages" });
+      case "open_missing_letters":
+        return t({ id: "trail.stage.name.openMissingLetters", message: "Missing letters" });
+      case "open_upgrades":
+        return t({ id: "trail.stage.name.openUpgrades", message: "Upgrades" });
       case "characters":
         return t({ id: "trail.stage.name.characters", message: "Character inventory" });
       case "marks":

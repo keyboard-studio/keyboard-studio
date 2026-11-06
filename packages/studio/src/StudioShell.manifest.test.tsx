@@ -20,6 +20,8 @@ vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMoc
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
 vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
+vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
+vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -218,12 +220,13 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("track-adapt"));
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
-    // Spec 111: adapt is Open, so the language list comes next, then prefill
-    // (characters step), never project-name.
+    // Spec 111: adapt is Open, so the language list comes next, then the on-screen
+    // keyboard (the character survey is hidden on Open), never project-name.
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 

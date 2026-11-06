@@ -19,19 +19,25 @@ export const CASEDKEYS_MISSING = "KM_LINT_CASEDKEYS_MISSING";
 
 /** What a fixer needs to build its offer. */
 export interface UpgradeInput {
-  /** Path of the `.kmn` in the working-copy VFS (the preview's file). */
+  /** Path of the `.kmn` in the working-copy VFS. */
   file: string;
   kmnText: string;
   keyboardId: string;
   /** Primary language tag, when known (casing rules such as Turkish i). */
   bcp47?: string;
   caps: Pick<CapsEngine, "upgradeToCasedKeys" | "compareCapsBehaviour">;
+  /** Text of any working-copy file by VFS path; undefined when absent. */
+  readText(path: string): string | undefined;
+  /** Every path in the working copy. */
+  paths: readonly string[];
 }
 
 export interface UpgradeOffer {
   fix: SuggestedFix;
-  /** The full `.kmn` text to write when the author accepts. */
-  afterKmn: string;
+  /** The working-copy path the upgrade rewrites. */
+  file: string;
+  /** The full text to write there when the author accepts. */
+  afterText: string;
 }
 
 export interface UpgradePair {
@@ -55,7 +61,8 @@ async function buildCasedKeysOffer(input: UpgradeInput): Promise<UpgradeOffer | 
   const cmp = await input.caps.compareCapsBehaviour(input.kmnText, afterKmn, upgraded.set.keys, opts);
   if (cmp.verdict === "differs") return null;
   return {
-    afterKmn,
+    file: input.file,
+    afterText: afterKmn,
     fix: {
       id: `upgrade:${CASEDKEYS_MISSING}:${input.file}`,
       kind: "upgrade",
