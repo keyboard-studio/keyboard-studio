@@ -62,6 +62,7 @@ import {
   cssStep,
   helpStep,
   htmlStep,
+  iconStep,
   packageStep,
 } from "./registerEditorSteps.ts";
 
@@ -325,10 +326,16 @@ const stepPool: readonly Step[] = [
   // --- Help (Phase F: usage tips and credits) ---
   helpStep,
 
-  // --- Documentation (welcome.htm, Markdown) ---
-  // Monaco editor for the keyboard's user manual. readme.htm, README.md,
+  // --- Documentation (welcome.htm, HTML) ---
+  // Editor for the keyboard's user manual. readme.htm, README.md,
   // and .php versions are generated exports from this source.
   htmlStep,
+
+  // --- Keyboard icon (after Documentation) ---
+  // Modern reimagining of TIKE's bitmap editor: import-first (SVG/PNG/ICO),
+  // 256px pixel editing, low-res-friendly text tool, live 16/32/48 previews.
+  // Unskippable — unchanged means the template keyboard's icon.
+  iconStep,
 
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
@@ -509,12 +516,13 @@ export function validateManifestShape(): void {
     "touch_seed_source",
     "css",
     "html",
+    "icon",
   ]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source/css/html may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/osk/touch/touch_seed_source/css/html/icon may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

@@ -313,6 +313,8 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "css",
       "help",
       "html",
+      // #2485: the icon editor step walks after Documentation.
+      "icon",
     ]);
   });
 

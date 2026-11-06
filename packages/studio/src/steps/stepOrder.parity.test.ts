@@ -39,6 +39,12 @@
 // help-doc-language-second-other, in walk order after
 // help-doc-language. No order, trail, lock or edge changes: the new
 // modules chain inside the help screen via their own requires.
+//
+// AMENDMENT (icon editor PR #2485, same rule — a deliberate decision,
+// not a regeneration): the icon editor step lands after the HTML step.
+// BASELINE_ORDER gains "icon" after "html"; BASELINE_MEMBERSHIP gains
+// icon: ["icon"]; the Flow Map edges re-route: html -> icon -> package
+// (icon requires welcome-htm, so it follows the html screen).
 
 //
 // AMENDMENT (spec 111, same rule -- a deliberate decision, not a
@@ -88,6 +94,7 @@ const BASELINE_ORDER = [
   "css",
   "help",
   "html",
+  "icon",
   "package",
 ] as const;
 
@@ -130,7 +137,8 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["touch", "css", "spine"],
   ["css", "help", "spine"],
   ["help", "html", "spine"],
-  ["html", "package", "spine"],
+  ["html", "icon", "spine"],
+  ["icon", "package", "spine"],
 ];
 
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
@@ -160,6 +168,7 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   css: ["custom-css"],
   help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-doc-language-other", "help-doc-language-second", "help-doc-language-second-other", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
   html: ["welcome-htm"],
+  icon: ["icon"],
   package: [],
 };
 
@@ -203,6 +212,17 @@ const requiresReach = (start: string): Set<string> => {
 };
 
 /**
+ * An intra-step member (spec 112: caps-handling on the layout screen) has a
+ * custom renderer AND a group naming another screen. deriveScreens gives it
+ * no ordering edge — only screen owners order a screen — so ordering
+ * assertions must skip it too.
+ */
+const isIntraStepMember = (id: string): boolean => {
+  const m = byModuleId.get(id);
+  return m !== undefined && typeof m.renderer === "function" && m.group !== undefined;
+};
+
+/**
  * Screen `a` must precede screen `b`: some member of `b` transitively
  * requires a decision a member of `a` provides.
  */
@@ -211,12 +231,7 @@ const mustPrecede = (a: string, b: string): boolean => {
   const sb = screenById.get(b);
   if (sa === undefined || sb === undefined) return false;
   const aModules = new Set(sa.moduleIds);
-  // An intra-step member (spec 112: caps-handling on the layout screen) forms
-  // no ordering edge, as in deriveScreens: only screen owners order a screen.
-  return sb.moduleIds.filter((id) => {
-    const m = byModuleId.get(id);
-    return !(m !== undefined && typeof m.renderer === "function" && m.group !== undefined);
-  }).some((id) =>
+  return sb.moduleIds.filter((id) => !isIntraStepMember(id)).some((id) =>
     [...requiresReach(id)].some((provider) => aModules.has(provider)),
   );
 };
@@ -260,8 +275,7 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
   });
 
   it("derived trails equal the baseline side trails", () => {
-    const sideTrails: Record<string, string> = {};
-    for (const [id, trail] of STEP_TRAILS) {
+    const sideTrails: Record<string, string> = {};    for (const [id, trail] of STEP_TRAILS) {
       if (!trail.spine) {
         expect(trail.joinTarget, `side trail "${id}" must have a join target`).toBeDefined();
         sideTrails[id] = trail.joinTarget as string;
