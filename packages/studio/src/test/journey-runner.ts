@@ -77,6 +77,7 @@ import {
 import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
 import { selectStrategy, deriveCarveNeededSet, generateKvksFromIR, oskContinueResult } from "@keyboard-studio/engine";
 import { completeOskStep } from "../lib/oskStepCompletion.ts";
+import { completeFallbackPolicyStep } from "../lib/fallbackPolicyStepCompletion.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -784,6 +785,12 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           // reducer to lib/assignLoopCompletion.ts — the same effects
           // AddPhysicalAdapter fires on the live path (D-090-38).
           applyPhysicalCompletionEffects();
+          result = undefined;
+          break;
+        }
+
+        case "fallback_policy": {
+          completeFallbackPolicyStep();
           result = undefined;
           break;
         }

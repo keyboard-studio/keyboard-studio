@@ -29,6 +29,7 @@ export const LEGACY_STEP_ID_MAP: Readonly<Record<string, string>> = {
   deadkeys: "deadkeys",
   rules: "rules",
   mechanisms: "mechanisms",
+  fallback_policy: "fallback_policy",
   touch_seed_source: "touch_seed_source",
   touch: "touch",
   help: "help",

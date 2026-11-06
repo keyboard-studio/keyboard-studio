@@ -56,6 +56,7 @@ import {
   deadkeysStep,
   rulesStep,
   mechanismsStep,
+  fallbackPolicyStep,
   oskStep,
   touchSeedSourceStep,
   touchStep,
@@ -299,6 +300,9 @@ const stepPool: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
+  // --- Fallback policy (spec 109) — after mechanisms, before OSK (#2539) ---
+  fallbackPolicyStep,
+
   // --- OSK (on-screen keyboard customization) ---
   // Runs after the Mechanical gallery: the underlying OSK is generated from
   // the physical layout, and this step lets the author customize key labels.
@@ -488,7 +492,7 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, deadkeys, rules, mechanisms, osk, touch, touch_seed_source,
+  // EXACTLY {carve, deadkeys, rules, mechanisms, fallback_policy, osk, touch, touch_seed_source,
   // css, html} must declare layout:"full"; all others must be "pane" or omit
   // layout. A
   // mismatched layout would silently change the chrome. touch_seed_source
@@ -504,6 +508,7 @@ export function validateManifestShape(): void {
     "deadkeys",
     "rules",
     "mechanisms",
+    "fallback_policy",
     "osk",
     "touch",
     "touch_seed_source",
@@ -514,7 +519,7 @@ export function validateManifestShape(): void {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source/css/html may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/fallback_policy/osk/touch/touch_seed_source/css/html may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

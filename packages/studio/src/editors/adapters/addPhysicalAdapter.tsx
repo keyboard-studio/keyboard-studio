@@ -27,7 +27,6 @@ import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
 import { completePhysicalLayoutStep } from "../../lib/mechanismStepCompletion.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
-import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
 
 // Lazy-loaded so the Monaco bundle never lands in the main chunk (same
 // discipline as TouchCodePane).
@@ -56,8 +55,6 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     onComplete(undefined);
   }
 
-  // Interim host for the keyboard-wide fallback policy (the Behaviours step
-  // that will own it has not landed): a collapsed section below the gallery.
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div
@@ -132,7 +129,6 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
           />
         </div>
       </div>
-      <FallbackPolicySection />
     </div>
   );
 }

@@ -148,7 +148,8 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     console.log(`[OK] ${NON_BASIC_ID} walk controls pressed after Letters: ${pressed.join(" > ")}`);
     const at = (id: string) => pressed.findIndex((p) => p.includes(id));
     expect(at("mechanisms")).toBeGreaterThan(-1);
-    expect(at("osk-continue")).toBeGreaterThan(at("mechanisms"));
+    expect(at("fallback-policy-continue")).toBeGreaterThan(at("mechanisms"));
+    expect(at("osk-continue")).toBeGreaterThan(at("fallback-policy-continue"));
     expect(at("touch-continue")).toBeGreaterThan(at("osk-continue"));
   });
 });

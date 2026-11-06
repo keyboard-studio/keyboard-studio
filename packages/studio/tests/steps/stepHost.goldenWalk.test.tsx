@@ -124,6 +124,9 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
 );
+vi.mock("../../src/editors/adapters/fallbackPolicyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/FallbackPolicyAdapter.tsx"),
+);
 vi.mock("../../src/editors/adapters/oskAdapter.tsx", async () => {
   const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
   return {
@@ -550,7 +553,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
  * project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
- * mechanisms -> touch_seed_source -> touch -> help -> done
+ * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
  * right-hand preview pane swaps for a one-character sequence builder while
@@ -561,8 +564,9 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
  * "deadkeys-continue" testid — before the real "mechanisms" step (still the
  * MechanismGallery mock, "mechanisms-continue").
  *
- * touch_seed_source (spec 035 R4/R12) is inserted between mechanisms and touch
- * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
+ * fallback_policy (#2539) and osk sit after mechanisms; touch_seed_source
+ * (spec 035 R4/R12) is inserted between osk and touch on a FRESH walk because
+ * touchSeedSource starts null — advance("osk")
  * routes into the fork instead of straight to "touch". The fork step renders
  * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
  * via its own "seed-source-confirm" testid — before the real "touch" step
@@ -594,6 +598,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "deadkeys", testId: "deadkeys-continue" },
     { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
+    { stepId: "fallback_policy", testId: "fallback-policy-continue", async: true },
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
@@ -608,7 +613,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
  * identity -> layout -> choose_base -> track(adapt) -> attribution ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
- * mechanisms -> touch_seed_source -> touch -> help -> done
+ * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
  * separate "sequences" step.
@@ -627,7 +632,8 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     // problem, which this walk (no baseline) did not.
     { stepId: "open_languages", testId: "survey-advance" },
     { stepId: "open_missing_letters", testId: "survey-advance", settleFor: "mechanisms-continue" },
-    { stepId: "mechanisms", testId: "mechanisms-continue", settleFor: "osk-continue" },
+    { stepId: "mechanisms", testId: "mechanisms-continue", settleFor: "fallback-policy-continue" },
+    { stepId: "fallback_policy", testId: "fallback-policy-continue", settleFor: "osk-continue" },
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },

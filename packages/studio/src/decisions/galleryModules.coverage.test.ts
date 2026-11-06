@@ -60,11 +60,12 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   deadkeys: ["carved-layout"],
   rules: ["deadkeys-defined", "windows-layout"],
   mechanisms: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
-  osk: ["physical-layout"],
+  fallback_policy: ["physical-layout"],
+  osk: ["physical-layout", "fallback-policy"],
   touch_seed_source: ["osk-layout"],
   touch: ["osk-layout", "touch-seed-source"],
   css: ["touch-layout"],
-  help: ["physical-layout", "touch-layout", "custom-css"],
+  help: ["physical-layout", "fallback-policy", "touch-layout", "custom-css"],
   html: ["help-docs"],
 };
 
@@ -80,8 +81,8 @@ const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the twenty-one gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling)", () => {
-    expect(SETTLES.size).toBe(21);
+  it("the derived settles set is exactly the twenty-two gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling; issue #2539 adds fallback-policy)", () => {
+    expect(SETTLES.size).toBe(22);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "caps-handling",
@@ -89,6 +90,7 @@ describe("gallery module coverage (FR-002)", () => {
       "character-inventory",
       "custom-css",
       "deadkeys-defined",
+      "fallback-policy",
       "help-docs",
       "invisibles-inventory",
       "language-list",
