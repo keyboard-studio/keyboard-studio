@@ -251,6 +251,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     decisions: spec.decisions,
     point: spec.point,
     startIr,
+    ...(startIr.touchLayout !== undefined ? { startTouchIr: startIr.touchLayout } : {}),
     ...(spec.touchLayoutJson !== undefined ? { includeTouch: true } : {}),
     ...(again !== null ? { repeatVfs: again.vfs } : {}),
   });
