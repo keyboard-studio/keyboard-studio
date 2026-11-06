@@ -22,6 +22,21 @@ describe("compareCapsBehaviour", () => {
     expect(cmp.rows.length).toBeGreaterThanOrEqual(26);
   }, 60_000);
 
+  it("upstream basic_kbdfr (AZERTY): the number row joins the store and the offer stands", async () => {
+    const { ir } = parse(fx("upstream_basic_kbdfr/basic_kbdfr.kmn"), "basic_kbdfr");
+    const before = emit(ir);
+    const res = upgradeToCasedKeys(ir, { bcp47: "fr" });
+    expect(res.set.keys).toEqual(expect.arrayContaining(["K_1", "K_0", "K_A", "K_Z"]));
+    const cmp = await compareCapsBehaviour(before, emit(res.ir), res.set.keys, { bcp47: "fr" });
+    expect(cmp.error).toBeUndefined();
+    expect(cmp.differs).toEqual([]);
+    for (const row of cmp.rows) {
+      // Plain and Shift never change; Caps only comes to act as Shift.
+      expect(row.after.none).toBe(row.before.none);
+      expect(row.after.shift).toBe(row.before.shift);
+    }
+  }, 60_000);
+
   it("no_caps gains uppercase; only the caps cells change", async () => {
     const { cmp } = await upgradeAndCompare(fx("no_caps.kmn"), "no_caps");
     expect(cmp.verdict).toBe("gains-uppercase");
