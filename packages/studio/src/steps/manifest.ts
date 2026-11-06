@@ -29,6 +29,7 @@ import type { Step } from "./types.ts";
 import {
   decisionModules,
   declaredScreenGates,
+  openScreenGates,
 } from "../survey/questions/registry.ts";
 import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
@@ -48,6 +49,9 @@ import {
   trackStep,
   attributionStep,
   projectNameStep,
+  languageListStep,
+  missingLettersStep,
+  upgradesStep,
   carveStep,
   deadkeysStep,
   rulesStep,
@@ -151,6 +155,14 @@ const stepPool: readonly Step[] = [
   // this step, adapt-track bypasses it, and both reconverge at the next
   // ungated step.
   projectNameStep,
+
+  // --- Open: the editable language list (gated side trail, spec 111) ---
+  languageListStep,
+
+  // --- Open: Missing letters and Upgrades (gated side trails, spec 111) ---
+  // Each shows only when the baseline recorded that kind of problem.
+  missingLettersStep,
+  upgradesStep,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,
@@ -380,11 +392,13 @@ export const derivedScreens: readonly DerivedScreen[] = deriveScreens(
  * via its ResolveContext) come from here.
  */
 export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
-  new Map(
-    derivedScreens.flatMap((s) =>
+  new Map([
+    ...derivedScreens.flatMap((s) =>
       s.gatedBy !== undefined ? [[s.id, s.gatedBy] as const] : [],
     ),
-  );
+    // Spec 111: the screens Open hides gate the walk without leaving the spine.
+    ...openScreenGates,
+  ]);
 
 // The author's current route for the lint fallback (spec 108 FR-015): a screen is on the route
 // while its derived gate passes, and a screen with no gate always is. Registered here, not

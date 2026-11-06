@@ -227,7 +227,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     expect(raltAssignment).toBeDefined();
     expect(raltAssignment?.target).toBe("θ");
     expect(raltAssignment?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[ALT K_W]",
+      "[RALT K_W]",
     );
 
     const quadAssignment = assignments.find(

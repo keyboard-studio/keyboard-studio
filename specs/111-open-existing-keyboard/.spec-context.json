@@ -1,0 +1,924 @@
+{
+  "workflow": "speckit",
+  "specName": "Open an existing keyboard",
+  "branch": "111-open-existing-keyboard",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-03T21:34:25.607Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-03T21:40:30.327Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-03T21:44:11.096Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-03T21:57:24.287Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:00:25.783Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:01:32.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:02:42.587Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:03:31.683Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:04:01.213Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:04:11.440Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:04:11.671Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:21:34.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:21:34.926Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:21:35.127Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:36:29.527Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:36:29.709Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:36:29.879Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:39.963Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:40.187Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:40.363Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:41:40.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:47:50.226Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:47:50.381Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-03T22:47:50.530Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:28:31.397Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:28:31.569Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:28:31.765Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:25.828Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.170Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.309Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.445Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.574Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T17:59:26.705Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T18:15:11.723Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T18:15:11.856Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T18:15:12.045Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T18:15:12.256Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T18:15:12.434Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T18:15:12.595Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:02:30.999Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:02:31.295Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:02:31.576Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:07:50.230Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:07:50.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:15:30.898Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T19:15:31.087Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T22:50:54.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-04T22:50:54.607Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T00:15:14.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T00:15:14.338Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T00:15:14.659Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-05T18:30:58.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T20:20:51.349Z"
+    }
+  ],
+  "telemetryInstanceId": "5a4ad873-817a-4863-92aa-5b8858054f6a",
+  "unattended": true,
+  "currentTask": "T051",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Sample keyboard list (20 ids) + 9 phonebook rows",
+      "files": [
+        "packages/studio/src/test/openSampleKeyboards.ts",
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added isOpenMode helper and test",
+      "files": [
+        "packages/studio/src/lib/openMode.ts",
+        "packages/studio/src/lib/openMode.test.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added SourceRef, FindingKey, ReviewNote types and export",
+      "files": [
+        "packages/contracts/src/openKeyboard.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "spliceKmn contract tests: no-op, delete/replace/insert (fixture + basic_kbdfr corpus), continued rule, ineligible node id, CRLF",
+      "files": [
+        "packages/engine/src/pattern-apply/spliceKmn.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "carveViaSplice now delegates to spliceKmn with delete-only edits (LF kept)",
+      "files": [
+        "packages/engine/src/pattern-apply/carveViaSplice.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Exported emitRule and emitStore from codec and engine barrels",
+      "files": [
+        "packages/engine/src/codec/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Implemented diffIrToKmnEdits, spliceKmn, projectKmnText per kmn-projection contract",
+      "files": [
+        "packages/engine/src/pattern-apply/spliceKmn.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "keepKps option keeps .kps in VFS with ..\\build entries rewritten to staged paths; tests",
+      "files": [
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts",
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "OpenKpsOptions branch in applyIdentityToKps/patchKpsIdentity (keep Description, author language list, no migration); tests",
+      "files": [
+        "packages/engine/src/package-descriptor/patch.ts",
+        "packages/engine/src/package-descriptor/patch.test.ts",
+        "packages/engine/src/package-descriptor/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "open option inserts &KEYBOARDVERSION after &VERSION, keeps CRLF; tests",
+      "files": [
+        "packages/engine/src/stub-mutator/index.ts",
+        "packages/engine/src/stub-mutator/index.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "No-edit round trip test over the corpus sample set incl. 278-language Cameroon .kps",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.open.test.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "One-rule-delete test: .kmn differs only in that rule's lines (plus version)",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.open.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Art II/III amendment applied, footer 2.3.0",
+      "files": [
+        ".specify/memory/constitution.md"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Updated lineage in renderHistoryMd; serialize writes it on Open",
+      "files": [
+        "packages/engine/src/shared/renderHistoryMd.ts",
+        "packages/engine/src/shared/renderHistoryMd.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Open skips README/readme.htm/welcome/help/chart/hygiene regeneration, carries originals (VFS, slice fallback)",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "projectKmnText on Open edit paths (carve seam, rename, marks, tolerance) with consent hold + reformatRequired; touch layout untouched when unchanged",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+        "packages/studio/src/lib/projectionInput.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.open.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Seed identity.languages from .kps (parseKpsLanguages); identitySeedFromSession branches on mode",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/stores/identityPatch.ts",
+        "packages/studio/src/lib/confirmRebase.ts",
+        "packages/studio/src/stores/workingCopyStore.openLanguages.test.ts",
+        "packages/engine/src/start-browser/kps-parser.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "OpenKeyboardEntry on welcome (picker, records base-keyboard + authoring-track=adapt, previews, navigates), mounted in StudioShell, open.entry.* ids with FR; walk landing awaits gates (T019 deferred)",
+      "files": [
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/components/OpenKeyboardEntry.test.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "repairOpenDraftDescriptor refetches .kps for old Adapt drafts, rewrites build entries, seeds languages; wired after draft restore",
+      "files": [
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/lib/persistWorkingCopy.openRepair.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Adapt to Open wording (track choice, footer stage); messages extracted, FR written, catalogs sorted and lint-clean",
+      "files": [
+        "packages/studio/src/survey/questions/g/track_choice.ts",
+        "packages/studio/src/decisions/progressDots.ts",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Editable language-list question as a registry gallery module with panel/host/step; en+fr messages",
+      "files": [
+        "packages/studio/src/survey/questions/gallery/languageList.ts",
+        "packages/studio/src/survey/languageList/LanguageListPanel.tsx",
+        "packages/studio/src/survey/languageList/LanguageListHost.tsx",
+        "packages/studio/src/survey/languageList/LanguageListPanel.test.tsx",
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/components/ResumeDraftBanner.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Open screen gates hide identity/layout/choose_base/track on adapt via openScreenGates in registry",
+      "files": [
+        "packages/studio/src/survey/questions/registry.ts",
+        "packages/studio/src/steps/manifest.ts",
+        "packages/studio/src/steps/advance.open.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Carve and feature galleries gated off the Open walk, reachable from the Tools menu",
+      "files": [
+        "packages/studio/src/components/OpenToolsMenu.tsx",
+        "packages/studio/src/components/OpenToolsMenu.test.tsx",
+        "packages/studio/src/survey/questions/registry.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Gate-matrix unit test",
+      "files": [
+        "packages/studio/src/criteria/openRatchet.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Baseline at Open via judgeForeignKeyboard stored in criteria slice",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts",
+        "packages/studio/src/stores/criteriaRecordStore.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Pre-existing/new classification and row mark",
+      "files": [
+        "packages/studio/src/criteria/openRatchet.ts",
+        "packages/studio/src/criteria/CriteriaPage.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Criteria page as Open landing view",
+      "files": [
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/criteria/CriteriaPage.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Review note editor with auto-drop",
+      "files": [
+        "packages/studio/src/criteria/ReviewNoteEditor.tsx",
+        "packages/studio/src/hooks/useOpenRatchet.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Ratchet submit gate and coverage gate lift on Open",
+      "files": [
+        "packages/studio/src/hooks/useInventoryCoverageGate.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Source and review PR blocks with escaping and tests",
+      "files": [
+        "packages/studio/src/criteria/openPrBlocks.ts",
+        "packages/studio/src/criteria/openPrBlocks.test.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "replaceStartingPointFromText store action + replaceStartingPointAndReplay wrapper",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/replaceStartingPoint.ts",
+        "packages/studio/src/stores/workingCopyStore.replaceStartingPoint.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Open .kmn code pane shows VFS text and applies via replace",
+      "files": [
+        "packages/studio/src/editors/assignLoop/KmnCodePane.tsx",
+        "packages/studio/src/editors/assignLoop/KmnCodePane.open.test.tsx"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Open .kvks code pane",
+      "files": [
+        "packages/studio/src/editors/assignLoop/OskCodePane.tsx",
+        "packages/studio/src/editors/assignLoop/OskCodePane.open.test.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Open touch code pane bypasses structural refusal",
+      "files": [
+        "packages/studio/src/editors/assignLoop/touchBuilder/TouchCodePane.tsx",
+        "packages/studio/src/editors/assignLoop/touchBuilder/TouchCodePane.open.test.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "OSK edits existing kvks on Open; touch_seed_source gate only when file missing",
+      "files": [
+        "packages/studio/src/editors/assignLoop/OskEditor.tsx",
+        "packages/studio/src/survey/questions/registry.ts",
+        "packages/studio/src/survey/questions/registry.touchSeedGate.test.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "FR-009 consent holds in UI: shared useReformatConsent hook guards downloads (zip, kmp, test build) and PR submit; dialog rendered in OutputScreen and ManagedPRSubmitPanel",
+      "files": [
+        "packages/studio/src/hooks/useReformatConsent.ts",
+        "packages/studio/src/lib/reformatConsentError.ts",
+        "packages/studio/src/lib/buildOutputBundle.ts",
+        "packages/studio/src/hooks/usePreviewArtifact.ts",
+        "packages/studio/src/components/OutputScreen.tsx",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx",
+        "packages/studio/src/hooks/useReformatConsent.test.tsx",
+        "packages/studio/src/lib/buildOutputBundle.reformat.test.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "openSourceChoice resolves both repo copies, newer flag, tests",
+      "files": [
+        "packages/studio/src/lib/openSourceChoice.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Choice UI + curated warning; SourceRef in snapshot",
+      "files": [
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/lib/persistWorkingCopy.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "SourceRef feeds PR source block",
+      "files": [
+        "packages/studio/src/criteria/openPrBlocks.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Exemplar union (NFC, standard tiers) with withData/total/withoutData counts, injected lookup, unit tested",
+      "files": [
+        "packages/studio/src/lib/openExpectedInventory.ts",
+        "packages/studio/src/lib/openExpectedInventory.test.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Per-Apply consistency delta (produced set, touch coverage, 11.6 layers) and suggestionsFromDelta, unit tested",
+      "files": [
+        "packages/studio/src/lib/consistencySuggestions.ts",
+        "packages/studio/src/lib/consistencySuggestions.test.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Open expected-characters inventory (exemplar union) feeds 18.6; per-character ratchet keys; add-character fixes; re-runs on language change; coverage count surfaced",
+      "files": [
+        "packages/studio/src/criteria/buildOpenInventory.ts",
+        "packages/studio/src/criteria/buildOpenInventory.test.ts",
+        "packages/studio/src/criteria/openRatchet.ts",
+        "packages/studio/src/hooks/useCriteriaFindings.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "SuggestedFixes accept/skip UI, dispositions in 053 record, Apply watcher, mounted on criteria page and shell",
+      "files": [
+        "packages/studio/src/components/SuggestedFixes.tsx",
+        "packages/studio/src/components/AfterApplySuggestions.tsx",
+        "packages/studio/src/hooks/useConsistencyOnApply.ts",
+        "packages/studio/src/lib/suggestionDispositions.ts",
+        "packages/studio/src/stores/suggestedFixesStore.ts",
+        "packages/studio/src/components/CriteriaScreen.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Open help gate per screen (openScreenGates help), openHelpGaps, phaseFSeeds prefers own .kps + self-closed WebSite",
+      "files": [
+        "packages/studio/src/survey/questions/registry.ts",
+        "packages/studio/src/lib/phaseFSeeds.ts",
+        "packages/studio/src/lib/openHelpGaps.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "replaceGeneratedBlock splice, docRegenerationFix producer + before/after preview, wired in CriteriaScreen",
+      "files": [
+        "packages/engine/src/shared/docSlots.ts",
+        "packages/studio/src/components/SuggestedFixes.tsx",
+        "packages/studio/src/lib/docRegenerationFix.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Reworded spec.md Scenario F as a Track 1 Copy, 110 US5 and workflow-model Track 2 as update",
+      "files": [
+        "spec.md",
+        "specs/110-readme-template/spec.md",
+        "docs/workflow-model.md"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "spec-trace acknowledged section 15 drift; 56 sections clean",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Open E2E passes (SC-009, SC-008); Open now instantiates via survey then hands off to criteria; markVisited lifts welcome gate",
+      "files": [
+        "packages/studio/e2e/open-existing-keyboard.spec.ts",
+        "packages/studio/src/components/OpenKeyboardEntry.tsx",
+        "packages/studio/src/components/OpenKeyboardEntry.test.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Full gates green (build, typecheck, lint, pnpm -r test); golden walk fails locally only on CRLF kvks/kpj from stale autocrlf ../keyboards checkout, baseline unchanged",
+      "files": [
+        "none"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "studio typecheck",
+      "command": "pnpm --filter @keyboard-studio/studio exec tsc --noEmit -p .",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 13.1,
+      "result": "no output"
+    },
+    {
+      "what": "engine 4946, contracts 1047, keyboard-lint 547 vitest; studio openMode test; pnpm typecheck",
+      "command": "pnpm -r test; pnpm typecheck",
+      "result": "pass"
+    },
+    {
+      "what": "build, typecheck, lint, pnpm -r test (contracts 1073, oauth 314, keyboard-lint 564, glottolog 42, engine 4985, studio 11301)",
+      "command": "pnpm build; pnpm typecheck; pnpm lint; pnpm -r test",
+      "result": "all pass, per km-programmer run"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "pnpm lint exits 1 on 3 pre-existing errors (generate-kvks.test.ts, OskEditor.test.tsx), unchanged by this phase",
+      "step": "implement"
+    },
+    {
+      "note": "Branch is behind main: pnpm lint has 3 errors in untouched files (generate-kvks.test.ts, OskEditor.test.tsx) and ~100 studio tests fail with [manifest] 20 steps vs 19 screens, reproduced on clean HEAD. Merge main to clear.",
+      "step": "implement"
+    },
+    {
+      "note": "Apply watcher reads layers from touch layout plus default, not .kvks; desktop-only layer change undetected. 6 StudioShell charmap/tracks tests fail pre-existing (verified with changes stashed).",
+      "step": "implement"
+    },
+    {
+      "note": "Phase 8 (T044-T045) blocked: criterion 7.28 / KM_LINT_CASEDKEYS_MISSING not on main (branch km/casedkeys-criterion unmerged, no PR)"
+    },
+    {
+      "note": "T046 gate is per help screen, not per question: any missing/failing help doc asks the whole help step"
+    },
+    {
+      "note": "golden walk fails locally: source/test.kvks and test.kpj are CRLF because ../keyboards working copy is autocrlf CRLF (index LF). Baseline zip is LF and correct; not recaptured. Needs CI or an LF checkout to confirm SC-004.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "all tasks done",
+  "decisions": [
+    {
+      "decision": "18.6 finding key gets #U+XXXX suffix so each missing character is its own key",
+      "why": "a language added later must read as new under the ratchet",
+      "rejected": "rule:file key per data-model R5"
+    },
+    {
+      "decision": "Accepting a suggestion records the decision and routes to the owning editor, never edits",
+      "why": "suggestions are never auto-applied",
+      "rejected": "in-place apply"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Spec 111 final gates run; golden walk unconfirmed locally (CRLF env)"
+    }
+  }
+}

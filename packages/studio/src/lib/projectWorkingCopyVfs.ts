@@ -112,6 +112,7 @@ import {
   parseTouchKeyAddress,
   parseKmn,
   emitKmn,
+  projectKmnText,
   resetIdentity,
   renameFilesInVfs,
   parseSlotId,
@@ -128,7 +129,7 @@ import {
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
-import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
+import type { OpenKpsOptions, PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
 import {
   applyCarveMutate,
@@ -376,6 +377,25 @@ export interface ProjectWorkingCopyVfsInput {
    * `.kmn`, never rewrite the no-edit fast path.
    */
   ruleAdditions?: DerivedRuleAdditions;
+  /**
+   * Open mode (a keyboard opened for update, spec 111). Present only on the
+   * Open track; absent for Copy, whose projection is unchanged.
+   *
+   * - The `.kmn` edit paths splice the changed nodes into the current text
+   *   (`projectKmnText`) instead of re-emitting the whole file.
+   * - The identity stub writes `&KEYBOARDVERSION` after `&VERSION` when absent.
+   * - The package descriptor is patched in place (`kps`), never regenerated.
+   */
+  openMode?: {
+    /** In-place descriptor options (author's language list, edited name/description). */
+    kps: OpenKpsOptions;
+    /**
+     * The author agreed to a full re-emit of a file whose change cannot be
+     * placed precisely. Without it such a file is left as it was and named in
+     * the result's `reformatRequired`.
+     */
+    consentedReemit?: boolean;
+  };
 }
 
 /** Step 2.6's input: the marks completion payload (buffer-start behaviour is per mark on the worklist, issue #2374). */
@@ -434,6 +454,12 @@ export interface ProjectWorkingCopyVfsResult {
    * in, or they will look for the pre-rename filename and fail to find it.
    */
   effectiveKeyboardId?: string;
+  /**
+   * Open mode: the `.kmn` files a change could not be placed into precisely.
+   * They were left unchanged, awaiting the author's consent to a full re-emit.
+   * Absent when there are none (and always on Copy).
+   */
+  reformatRequired?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -499,6 +525,37 @@ export function projectWorkingCopyVfs(
   } = input;
 
   const warnings: string[] = [];
+  const openMode = input.openMode;
+  const reformatRequired: string[] = [];
+
+  // Writes a changed `.kmn`: a splice into the current text on Open (FR-008),
+  // a full emit otherwise. `currentText`/`currentIr` are the file as the VFS
+  // holds it right now, so node ids and line spans agree by construction.
+  const writeKmn = (
+    path: string,
+    currentText: string,
+    currentIr: KeyboardIR,
+    nextIr: KeyboardIR,
+  ): void => {
+    if (openMode === undefined) {
+      vfs.set(path, emitKmn(nextIr), false);
+      return;
+    }
+    const projected = projectKmnText(currentText, currentIr, nextIr);
+    if (projected.ok) {
+      vfs.set(path, projected.text, false);
+      return;
+    }
+    if (openMode.consentedReemit === true) {
+      vfs.set(path, emitKmn(nextIr), false);
+      warnings.push(`[open] ${path} was reformatted with the author's agreement (${projected.reason})`);
+      return;
+    }
+    reformatRequired.push(path);
+    warnings.push(
+      `[open] ${path} cannot be updated in place (${projected.reason}); it needs the author's agreement to be reformatted and was left unchanged`,
+    );
+  };
 
   // Step 0: Touch layout injection — write the Phase E touch layout JSON into
   // `source/<keyboardId>.keyman-touch-layout` before any other projection step.
@@ -508,11 +565,14 @@ export function projectWorkingCopyVfs(
   // Previously serializeWorkingCopy injected this inline before calling this helper;
   // centralizing it here is the fix that makes the OSK preview equivalent to the ZIP.
   if (touchLayoutJson !== null && touchLayoutJson !== undefined) {
-    vfs.set(
-      `source/${keyboardId}.keyman-touch-layout`,
-      tabulateTouchLayoutJson(touchLayoutJson),
-      false,
-    );
+    const touchPath = `source/${keyboardId}.keyman-touch-layout`;
+    // Open (spec 111 FR-010): a layout the author did not change is the file's
+    // own text, not a re-serialization of it.
+    const unchangedOnOpen =
+      openMode !== undefined && readVfsText(vfs, touchPath) === touchLayoutJson;
+    if (!unchangedOnOpen) {
+      vfs.set(touchPath, tabulateTouchLayoutJson(touchLayoutJson), false);
+    }
   }
 
   // Step 0b: OSK stylesheet — the CSS step's text becomes the keyboard's
@@ -712,9 +772,18 @@ export function projectWorkingCopyVfs(
       additions !== undefined
         ? spliceRuleAdditions(seamIr, additions, allWholeNodeIds)
         : seamIr;
-    carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
-      irRewritten: true,
-    });
+    if (openMode !== undefined) {
+      // Open (spec 111 FR-008): the carved IR reaches the text as a splice of
+      // the changed nodes into the file as it stands, never a whole re-emit.
+      const carveKmnPath = `source/${keyboardId}.kmn`;
+      const carveKmnText = readVfsText(vfs, carveKmnPath);
+      if (carveKmnText !== undefined) writeKmn(carveKmnPath, carveKmnText, startIr, mergedSeamIr);
+      carveResult = { warnings: [] };
+    } else {
+      carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
+        irRewritten: true,
+      });
+    }
   } else {
     // Legacy path without suppression — unchanged pre-T015 behavior:
     // slot-item nul-rewrites first, then whole-node deletions inside
@@ -901,7 +970,7 @@ export function projectWorkingCopyVfs(
           renameOps,
         );
         if (renameResult.changed) {
-          vfs.set(kmnPathForRename, emitKmn(renameResult.ir), false);
+          writeKmn(kmnPathForRename, kmnTextForRename, parsedForRename.ir, renameResult.ir);
         }
         warnings.push(...renameResult.warnings);
       } catch (err: unknown) {
@@ -1032,7 +1101,9 @@ export function projectWorkingCopyVfs(
     a.mechanisms.some((m) => m.patternId === "modifier_as_layer_switch"),
   );
   const hasLayerSwitchInStartIr = collectLayerCombosInUse(startIr).length > 0;
-  if (hasLayerSwitchAssignment || hasLayerSwitchInStartIr) {
+  // Open (spec 111 FR-010): a combo layer the keyboard already carries is the
+  // file's own business; only a combo this session adds reaches the layout.
+  if (hasLayerSwitchAssignment || (hasLayerSwitchInStartIr && openMode === undefined)) {
     const touchLayoutPath = findTouchLayoutPath(vfs);
     if (touchLayoutPath !== undefined) {
       const touchEntry = vfs.get(touchLayoutPath);
@@ -1087,7 +1158,7 @@ export function projectWorkingCopyVfs(
           marksGuards.backspace ?? "peel",
           marksGuards.stacks ?? [],
         );
-        if (guarded.ir !== parsedForGuards) vfs.set(kmnPathForGuards, emitKmn(guarded.ir), false);
+        if (guarded.ir !== parsedForGuards) writeKmn(kmnPathForGuards, kmnTextForGuards, parsedForGuards, guarded.ir);
         if (guarded.guardHopSkipped === true) {
           warnings.push(
             "[project-working-copy] mark guards not reached: the entry group's match rule already ends in another use()",
@@ -1121,7 +1192,7 @@ export function projectWorkingCopyVfs(
           parsedForTolerance,
           contextToleranceOverlay,
         );
-        vfs.set(kmnPathForTolerance, emitKmn(replay.ir), false);
+        writeKmn(kmnPathForTolerance, kmnTextForTolerance, parsedForTolerance, replay.ir);
         warnings.push(
           ...replay.warnings.map((w) => `[project-working-copy] ${w}`),
         );
@@ -1220,7 +1291,11 @@ export function projectWorkingCopyVfs(
 
     if (Object.keys(identityArg).length > 0) {
       try {
-        applyIdentityStubMutation(vfs, keyboardId, identityArg);
+        if (openMode !== undefined) {
+          applyIdentityStubMutation(vfs, keyboardId, identityArg, { open: true });
+        } else {
+          applyIdentityStubMutation(vfs, keyboardId, identityArg);
+        }
       } catch (err: unknown) {
         // The stub mutator throws if the file is missing (e.g. carve removed all
         // rules and the file was never written). Warn rather than abort.
@@ -1306,6 +1381,8 @@ export function projectWorkingCopyVfs(
       // it, so the pre-rename (base) id must not appear in them.
       targetKeyboardId ?? keyboardId,
       input.packageFonts,
+      [],
+      openMode?.kps,
     );
     warnings.push(...kpsResult.warnings);
   }
@@ -1359,6 +1436,7 @@ export function projectWorkingCopyVfs(
   return {
     warnings,
     ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
+    ...(reformatRequired.length > 0 ? { reformatRequired } : {}),
   };
 }
 

@@ -67,6 +67,11 @@ disclosed here once rather than at each site. Reverse them on a re-sync.
   time (for example, "does not provide an export named 'TouchLayoutPlatform'").
   Each such binding found by the type checker now carries an inline `type`
   modifier. There are 67 of them across 21 files.
+  The same holds for the namespace aliases `import X = NS.Y` that name a type
+  (11 of them, in activeLayout.ts, defaultLayouts.ts and jsKeyboard.ts): each
+  emitted a `var X = NS.Y` that is undefined at runtime and that Rollup flags as
+  "not exported", so they are now `type X = NS.Y`. The aliases that name values
+  (`TouchLayoutKeySp`, `ButtonClasses`) stay imports.
 
 ## New files (not vendored — written for this project)
 

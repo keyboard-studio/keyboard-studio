@@ -156,6 +156,11 @@ export type DecisionId =
   | "physical-layout"
   | "osk-layout"
   | "touch-seed-source"
+  | "language-list"
+  | "open-issues"
+  | "open-basic-keyboard"
+  | "missing-letters-review"
+  | "upgrades-review"
   | "touch-layout"
   | "custom-css"
   | "help-docs"
@@ -424,6 +429,13 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "physical-layout": [],
   "osk-layout": [],
   "touch-seed-source": [],
+  "language-list": [],
+  // spec 111 Open walk: the baseline's problem kinds (derived) and the two
+  // reviewed marks; none of them reach the IR.
+  "open-issues": [],
+  "open-basic-keyboard": [],
+  "missing-letters-review": [],
+  "upgrades-review": [],
   "touch-layout": [],
   "custom-css": [],
   "help-docs": [],

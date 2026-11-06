@@ -1,4 +1,4 @@
-// Starting keyboard and track: the case names both; proposeTrack is recorded for comparison.
+// Starting keyboard and track: the case names both.
 //
 // choose_base: the case names the copied keyboard, so the walk policy's choice is
 // that override, applied through the functions "Choose this keyboard" runs: the
@@ -14,10 +14,8 @@
 // keyboard, and live extraction sees the starting point only after the track.
 //
 // track: the track flow (`trackOptions`) walks with the case's track as the
-// override. proposeTrack is the flow's own seed (options.seeds.getSeedValue), so
-// the proposal the run reports and the record's `analysis` source come from the
-// product; a case track equal to the proposal is recorded as the kept proposal,
-// a different one as overturned, by the product's own answer origin.
+// override. Since spec 111 the step only offers Copy (Open is chosen on the start
+// screen), so a case track is always "copy".
 
 import { dirname } from "node:path";
 import type { StartKeyboard } from "@keyboard-studio/contracts";

@@ -317,3 +317,35 @@ export function parseKpsPackageDetails(xml: string): KpsPackageDetails {
     description: extractInfoValue(xml, "Description", ""),
   };
 }
+
+/** One `<Languages><Language ID="tag">name</Language>` entry of a `.kps`. */
+export interface KpsLanguage {
+  tag: string;
+  /** The display text; empty when the element has none. */
+  name: string;
+}
+
+/**
+ * The `.kps` language list in source order, with each entry's display text.
+ * Unlike {@link parseKps} (tags only, for the gallery hot path) this keeps the
+ * names, so an editable list can show them (spec 111). Entities in the name are
+ * decoded; the tag is taken verbatim.
+ */
+export function parseKpsLanguages(xml: string): KpsLanguage[] {
+  const block = /<Languages(?:\s[^>]*)?>([\s\S]*?)<\/Languages\s*>/i.exec(xml)?.[1];
+  if (block === undefined) return [];
+  const out: KpsLanguage[] = [];
+  for (const m of block.matchAll(/<Language\b[^>]*\bID="([^"]*)"[^>]*>([^<]*)<\/Language\s*>/g)) {
+    const tag = m[1] ?? "";
+    if (tag === "") continue;
+    const name = (m[2] ?? "")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;|&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .trim();
+    out.push({ tag, name });
+  }
+  return out;
+}

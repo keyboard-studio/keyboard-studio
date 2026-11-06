@@ -327,9 +327,10 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
       name: /^touch layer 2 for long-press$/i,
     });
     const values = await selectMenuOptionValues(slot2);
-    // RALT and CTRL each complete one of the two SHIFT-combos in D; CAPS
+    // RALT completes one of the SHIFT-combos in D (CTRL is filtered); CAPS
     // appears in neither and is never offered.
-    expect(values).toEqual(["", "RALT", "CTRL"]);
+    // (raw CTRL is no longer offered as a new touch plane.)
+    expect(values).toEqual(["", "RALT"]);
   });
 
   it("hides the add button once the selection has no legal extension toward any combo in D", async () => {

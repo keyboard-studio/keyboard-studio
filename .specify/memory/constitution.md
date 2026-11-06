@@ -35,8 +35,12 @@ that proposes editing the schema MUST stop and escalate rather than proceed.
 
 ### II. KeyboardIR is the engine spine
 All scaffolding, import, validation, and mutation operate on the typed
-`KeyboardIR`, never on raw `.kmn` text (`scaffold()` is `parse → scaffoldIR →
-emit`). Constructs the codec cannot model are preserved as opaque
+`KeyboardIR` (`scaffold()` is `parse → scaffoldIR → emit`). Projecting the IR
+back to text is a full emit for a new keyboard. For a keyboard opened for
+update (spec 111) it is a splice of the changed nodes into the starting text,
+as carve already does. A full re-emit of an opened keyboard needs the
+author's consent. An author's code edit is not a mutation: it is parsed into
+a new starting point (Article III). Constructs the codec cannot model are preserved as opaque
 `RawKmnFragment` nodes and are **never silently dropped**. A base the codec
 cannot parse fails the whole scaffold — no try/catch around `parse()`.
 
@@ -50,12 +54,16 @@ Persistence is the **draft envelope**, and it saves more than the decisions:
 the starting point, a working-copy snapshot, the decision set, the spec-053
 decision record, and per-feature slices (survey answers, testing, criteria).
 A reload restores from that envelope; decisions-only drafts are **not** the
-shipped model, and no plan may assume them. Scoped truths, to end the
+shipped model, and no plan may assume them. On a keyboard opened for update,
+the starting point is the current file text and its parse: an applied code
+edit or accepted text-level fix replaces the starting point, and decisions
+replay on top of it (the starting-point switch of Article X). File text,
+including review notes, is never stored as a decision. Scoped truths, to end the
 collisions of unscoped ones:
 
 | Question | Source of truth |
 |---|---|
-| What renders / emits | The KeyboardIR working copy |
+| What renders / emits | The KeyboardIR working copy; **on Open, the starting text plus spliced changes** |
 | What the author decided (live) | The decision set (spec 088) |
 | What is saved | The draft envelope (this Article) |
 | What happened, in order | The decision record (spec 053) — audit, not live state |
@@ -205,4 +213,4 @@ existing text MUST edit that text. Append-only amendments — a new paragraph
 that silently reverses an old one while both stand — are the failure this
 version exists to end, and a reviewer MUST reject one on sight.
 
-**Version**: 2.2.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-01 (Art VII: LDML export in scope, spec 108; compiled LDML desktop package, spec 108 Story 5) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)
+**Version**: 2.3.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-03 (Art II/III: text-sourced starting point for keyboards opened for update, spec 111; earlier: 2026-11-01 Art VII: LDML export in scope, spec 108; compiled LDML desktop package, spec 108 Story 5) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)

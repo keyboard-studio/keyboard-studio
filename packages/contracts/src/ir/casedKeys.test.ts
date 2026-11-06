@@ -179,6 +179,42 @@ describe("casedKeySet", () => {
     expect(casedKeySet(ir, { floor: [] }).keys).toEqual([]);
   });
 
+  it("AZERTY: Caps typing the Shift output qualifies a key with no case pair", () => {
+    // basic_kbdfr's number row: & / 1, and Caps types 1.
+    const ir = irOf([
+      rule(["NCAPS"], "K_1", "&"),
+      rule(["NCAPS", "SHIFT"], "K_1", "1"),
+      rule(["CAPS"], "K_1", "1"),
+      rule(["CAPS", "SHIFT"], "K_1", "&"),
+    ]);
+    expect(casedKeySet(ir, { floor: [] })).toEqual({ keys: ["K_1"], extra: ["K_1"], conflicts: [] });
+  });
+
+  it("Caps that types neither the Shift output nor the case counterpart is a conflict", () => {
+    const ir = irOf([
+      rule(["NCAPS"], "K_A", "a"),
+      rule(["NCAPS", "SHIFT"], "K_A", "A"),
+      rule(["CAPS"], "K_A", "ä"),
+    ]);
+    expect(casedKeySet(ir, { floor: [] }).keys).toEqual([]);
+    // In the floor it is still left out, and reported.
+    expect(casedKeySet(ir, { floor: ["K_A"] }).conflicts).toEqual([{ vkey: "K_A", plane: "base", unshifted: "a", shifted: "A" }]);
+  });
+
+  it("Caps ignored on one plane keeps the key out, since the store would change that plane", () => {
+    const ir = irOf([
+      rule(["NCAPS"], "K_E", "e"),
+      rule(["NCAPS", "SHIFT"], "K_E", "E"),
+      rule(["CAPS"], "K_E", "E"),
+      rule(["NCAPS", "RALT"], "K_E", "€"),
+      rule(["NCAPS", "SHIFT", "RALT"], "K_E", "£"),
+      rule(["CAPS", "RALT"], "K_E", "€"),
+    ]);
+    const set = casedKeySet(ir, { floor: [] });
+    expect(set.keys).toEqual([]);
+    expect(set.conflicts.map((c) => c.plane)).toEqual(["ralt"]);
+  });
+
   it("caseless: empty", () => {
     const ir = irOf([rule([], "K_1", "1"), rule(["SHIFT"], "K_1", "!"), rule([], "K_COMMA", ","), rule(["SHIFT"], "K_COMMA", ";")]);
     expect(casedKeySet(ir, { floor: [] })).toEqual({ keys: [], extra: [], conflicts: [] });

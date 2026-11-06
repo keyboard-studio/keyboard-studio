@@ -166,13 +166,22 @@ function planeOf(modifiers: readonly string[]): Plane | null {
   return shift ? "shift" : "base";
 }
 
-function parseKeySpec(text: string): { vkey: string; plane: Plane } | null {
+/** The plane of a CAPS rule (CAPS dropped from its modifiers); null when the rule is not a CAPS rule. */
+function capsPlaneOf(modifiers: readonly string[]): Plane | null {
+  if (!modifiers.some((m) => m.toUpperCase() === "CAPS")) return null;
+  return planeOf(modifiers.filter((m) => m.toUpperCase() !== "CAPS"));
+}
+
+function parseKeySpec(
+  text: string,
+  planeFor: (modifiers: readonly string[]) => Plane | null = planeOf,
+): { vkey: string; plane: Plane } | null {
   const m = /^\[([^\]]*)\]$/.exec(text.trim());
   if (m === null) return null;
   const parts = (m[1] as string).trim().split(/\s+/);
   const vkey = parts[parts.length - 1];
   if (vkey === undefined || vkey === "") return null;
-  const plane = planeOf(parts.slice(0, -1));
+  const plane = planeFor(parts.slice(0, -1));
   return plane === null ? null : { vkey: upperVKey(vkey), plane };
 }
 
@@ -188,6 +197,21 @@ function findStore(ir: KeyboardIR, name: string): IRStore | undefined {
  * CAPS/NCAPS sibling pair folds to the NCAPS output.
  */
 export function keyPlaneOutputs(ir: KeyboardIR): Map<string, Partial<Record<Plane, string>>> {
+  return collectPlaneOutputs(ir, planeOf);
+}
+
+/**
+ * What each key's own CAPS rules type, by the plane the rule sits on with Caps
+ * on (e.g. `[CAPS K_1]` -> base, `[SHIFT CAPS K_1]` -> shift).
+ */
+export function capsPlaneOutputs(ir: KeyboardIR): Map<string, Partial<Record<Plane, string>>> {
+  return collectPlaneOutputs(ir, capsPlaneOf);
+}
+
+function collectPlaneOutputs(
+  ir: KeyboardIR,
+  planeFor: (modifiers: readonly string[]) => Plane | null,
+): Map<string, Partial<Record<Plane, string>>> {
   const out = new Map<string, Partial<Record<Plane, string>>>();
   const put = (vkey: string, plane: Plane, ch: string): void => {
     const row = out.get(vkey) ?? {};
@@ -200,7 +224,7 @@ export function keyPlaneOutputs(ir: KeyboardIR): Map<string, Partial<Record<Plan
       if (rule.context.length !== 1 || rule.output.length === 0) continue;
       const ctx = rule.context[0] as ContextElement;
       if (ctx.kind === "vkey") {
-        const plane = planeOf(ctx.modifiers);
+        const plane = planeFor(ctx.modifiers);
         if (plane === null) continue;
         let text = "";
         let ok = true;
@@ -221,9 +245,10 @@ export function keyPlaneOutputs(ir: KeyboardIR): Map<string, Partial<Record<Plan
         keys.items.forEach((item, i) => {
           const target = chars.items[i];
           if (target === undefined || target.kind !== "char") return;
-          if (item.kind === "vkey") put(upperVKey(item.name), "base", target.value);
-          else if (item.kind === "raw") {
-            const spec = parseKeySpec(item.text);
+          if (item.kind === "vkey") {
+            if (planeFor([]) !== null) put(upperVKey(item.name), "base", target.value);
+          } else if (item.kind === "raw") {
+            const spec = parseKeySpec(item.text, planeFor);
             if (spec !== null) put(spec.vkey, spec.plane, target.value);
           }
         });
@@ -292,14 +317,22 @@ const PLANE_PAIRS: readonly (readonly [Plane, Plane])[] = [
 
 /**
  * The keys `&CasedKeys` should list (research R1): the family floor, plus any key
- * with a case pair on a used plane, minus any key with a distinct non-case pair
- * on another used plane (reported in `conflicts`, even when it is in the floor).
+ * whose Caps acts as Shift on a used plane, minus any key where Caps would not
+ * (reported in `conflicts`, even when it is in the floor). `&CasedKeys` makes
+ * Caps act as Shift on every plane of a listed key, so a key qualifies only when
+ * that holds on each plane whose unshifted and shifted outputs differ.
+ *
+ * Where the keyboard has CAPS rules for a key and plane they decide: Caps acts
+ * as Shift when it types the shifted output, case pair or not (AZERTY's number
+ * row types its digits under Caps). Where it has none, the plane must be a case
+ * pair.
  */
 export function casedKeySet(
   ir: KeyboardIR,
   opts: { bcp47?: string; floor: readonly string[] },
 ): CasedKeySet {
   const outputs = keyPlaneOutputs(ir);
+  const capsOutputs = capsPlaneOutputs(ir);
   const floor = opts.floor.map(upperVKey);
   const floorSet = new Set(floor);
   const qualifying = new Set<string>();
@@ -313,8 +346,9 @@ export function casedKeySet(
       const u = planes[lo];
       const s = planes[hi];
       if (u === undefined || s === undefined || u === s) continue;
+      const c = capsOutputs.get(vkey)?.[lo];
       const cp = caseCounterpart(u, opts.bcp47);
-      if (cp !== null && cp.counterpart === s) hasPair = true;
+      if (c !== undefined ? c === s : cp !== null && cp.counterpart === s) hasPair = true;
       else if (conflict === undefined) conflict = { vkey, plane: lo, unshifted: u, shifted: s };
     }
     if (conflict !== undefined) {

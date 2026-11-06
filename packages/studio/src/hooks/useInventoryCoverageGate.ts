@@ -22,6 +22,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useInventoryDiff } from "./useInventoryDiff.ts";
 import { selectDesktopAssignments, type InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 import { coverageGateFrom } from "../lib/inventoryDiff.ts";
+import { isOpenMode } from "../lib/openMode.ts";
 
 export function useInventoryCoverageGate(): InventoryCoverageGate {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -45,14 +46,23 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
     [phaseResults],
   );
 
-  return useMemo(
-    () =>
-      coverageGateFrom(desktopAssignments, { lettersToAdd, producedSet }, {
+  const openMode = isOpenMode(useWorkingCopyStore((s) => s.instantiationMode));
+
+  return useMemo(() => {
+    const gate = coverageGateFrom(desktopAssignments, { lettersToAdd, producedSet }, {
         touchLayoutJson,
         confirmedInventory,
         ...(alphabet !== undefined ? { alphabet } : {}),
         ...(marksWorklist !== undefined ? { marksWorklist } : {}),
-      }),
-    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory, producedSet, alphabet, marksWorklist],
-  );
+      });
+    // Open (spec 111, ratchet): a gap the keyboard already had must not stop
+    // an update, so the hard block is lifted here and criterion 18.6 is
+    // judged by the submit ratchet instead (new gaps still block there). The
+    // gap lists stay, so every warning still names them. An unreadable touch
+    // layout stays blocking: that is a failure, not an inherited gap.
+    if (openMode && !gate.touchLayoutCorrupted) {
+      return { ...gate, blockedOnDesktop: false, blockedOnTouch: false, blocked: false };
+    }
+    return gate;
+  }, [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory, producedSet, alphabet, marksWorklist, openMode]);
 }

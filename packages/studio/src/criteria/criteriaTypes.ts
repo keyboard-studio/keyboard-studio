@@ -306,6 +306,11 @@ export interface ResolvedRow {
    */
   contrastiveAttested?: boolean;
   /**
+   * True for an advisory row (see advisoryChecks.ts) that has findings:
+   * shown as a warning and never blocking.
+   */
+  advisory?: true;
+  /**
    * For the §9 rows (controls: "font-attest"): the bundled-font
    * inventory and the author's per-font license attestations, so the
    * row's editor renders from the same data the resolver judged.
@@ -336,4 +341,17 @@ export interface CriteriaResult {
    * judge; absent in authored mode.
    */
   fileTree?: import("../review/fileTree.ts").FileTreeNode[];
+  /**
+   * Open mode only (spec 111 FR-018a): how many of the keyboard's listed
+   * languages had exemplar data for the expected-characters check.
+   */
+  expectedCoverage?: ExpectedCoverage;
+}
+
+/** Open's expected-characters coverage (spec 111 FR-018a). */
+export interface ExpectedCoverage {
+  withData: number;
+  total: number;
+  /** Each expected character -> the listed languages that require it. */
+  sourcesByChar?: Readonly<Record<string, readonly string[]>>;
 }

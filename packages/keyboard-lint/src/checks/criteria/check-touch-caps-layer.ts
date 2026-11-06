@@ -9,9 +9,26 @@
 // Frame keys (Shift, symbol, RAlt, ...) may switch layers; only character
 // keys are held to the no-switch rule. A caps key is compared with the
 // default key of the same id.
+//
+// The full Capsifesto behaviour (the owner's `processTouch.py`) adds: a
+// `rightalt-caps` / `ctrl-caps` layer beside each `rightalt-shift` /
+// `shift-ctrl`, double-tap Shift on `rightalt` / `ctrl`, character keys on
+// other layers returning to `default` (one-shot Shift), and Shift keys
+// labelled `*Shifted*` / `*ShiftedLock*` returning to the unshifted layer.
+// `syncTouchCapsLayerRaw` (engine) is the fixer; both read the layer rules
+// from `touchLayerRules` in contracts.
 
 import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { caseCounterpart, isTouchFrameKey } from "@keyboard-studio/contracts";
+import {
+  caseCounterpart,
+  isTouchCapsLayerId,
+  isTouchFrameKey,
+  isTouchOneShotKey,
+  isTouchShiftLayerId,
+  TOUCH_CAPS_FROM_SHIFT,
+  touchDoubleTapTarget,
+  unshiftedTouchLayerId,
+} from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -107,6 +124,67 @@ export function checkTouchCapsLayer(
         `${where}: caps-layer keys switch layer after typing: ${switching.map((k) => k.id).join(", ")}.`,
         "Remove nextlayer from the caps layer's character keys so Caps Lock stays on.",
       );
+    }
+
+    // Capsifesto: the right-alt and ctrl variants, one-shot Shift and Shift labels.
+    const ids = new Set(platform.layers.map((l) => l.id));
+    for (const [shiftId, capsId] of TOUCH_CAPS_FROM_SHIFT) {
+      if (capsId === "caps") continue;
+      if (ids.has(shiftId) && !ids.has(capsId)) {
+        add(
+          `${where}: no ${capsId} layer although ${shiftId} exists.`,
+          `Add a ${capsId} layer copied from ${shiftId}, reached by double-tapping Shift.`,
+        );
+      } else if (ids.has(capsId)) {
+        const stuck = topKeys(platform.layers.find((l) => l.id === capsId)!).filter(
+          (k) => k.nextlayer !== undefined && k.nextlayer !== "" && !isTouchFrameKey(k),
+        );
+        if (stuck.length > 0) {
+          add(
+            `${where}: ${capsId} keys switch layer after typing: ${stuck.map((k) => k.id).join(", ")}.`,
+            `Remove nextlayer from the ${capsId} layer's character keys so Caps Lock stays on.`,
+          );
+        }
+      }
+    }
+    for (const layer of platform.layers) {
+      const target = touchDoubleTapTarget(layer.id, ids);
+      if (target === undefined || layer.id === "default") continue;
+      const shiftKey = topKeys(layer).find((k) => k.id === "K_SHIFT");
+      if (shiftKey !== undefined && shiftKey.multitap?.some((m) => m.nextlayer === target) !== true) {
+        add(
+          `${where}: Shift on ${layer.id} has no double-tap to ${target}.`,
+          `Add a multitap { "id": "T_CAPS", "text": "*ShiftLock*", "nextlayer": "${target}" } to the ${layer.id} layer's K_SHIFT.`,
+        );
+      }
+    }
+    for (const layer of platform.layers) {
+      if (layer.id === "default" || isTouchCapsLayerId(layer.id)) continue;
+      const oneShot = topKeys(layer).filter(
+        (k) => k.nextlayer === undefined && isTouchOneShotKey(k.sp),
+      );
+      if (oneShot.length > 0) {
+        add(
+          `${where}: ${layer.id} character keys stay on the layer after typing: ${oneShot.map((k) => k.id).join(", ")}.`,
+          'Give them "nextlayer": "default" so Shift is one-shot.',
+        );
+      }
+    }
+    for (const layer of platform.layers) {
+      const isShift = isTouchShiftLayerId(layer.id);
+      if (!isShift && !isTouchCapsLayerId(layer.id)) continue;
+      const back = unshiftedTouchLayerId(layer.id, ids);
+      if (back === undefined) continue;
+      const label = isShift ? "*Shifted*" : "*ShiftedLock*";
+      const wrong = topKeys(layer).filter(
+        (k) => k.id === "K_SHIFT" && (k.text !== label || k.nextlayer !== back),
+      );
+      if (wrong.length > 0) {
+        add(
+          `${where}: Shift on ${layer.id} is not ${label} returning to ${back}.`,
+          `Set the layer's K_SHIFT text to ${label} and nextlayer to ${back}.`,
+        );
+      }
     }
   }
 

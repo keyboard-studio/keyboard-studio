@@ -22,6 +22,15 @@ try {
   process.exit(0);
 }
 
+// A briefly-shipped husky setup pointed core.hooksPath at .husky/_, which no longer
+// exists; while it is set git ignores the hooks directory, so clear it.
+try {
+  const hooksPath = execFileSync("git", ["config", "--get", "core.hooksPath"], { cwd: root, encoding: "utf8" }).trim();
+  if (hooksPath === ".husky/_") execFileSync("git", ["config", "--unset", "core.hooksPath"], { cwd: root });
+} catch {
+  // Unset (git exits 1): nothing to clear.
+}
+
 const target = join(hooksDir, "pre-push");
 if (existsSync(target) && !readFileSync(target, "utf8").includes(MARKER)) {
   console.warn("[WARN] install-git-hooks: a different pre-push hook exists; leaving it alone.");

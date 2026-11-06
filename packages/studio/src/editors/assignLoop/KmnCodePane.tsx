@@ -21,6 +21,12 @@ import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { emitKmn, parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { isOpenMode } from "../../lib/openMode.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
+import {
+  replaceStartingPointAndReplay,
+  startingPointPath,
+} from "../../lib/replaceStartingPoint.ts";
 import {
   lintKmnCodeText,
   type KmnCodeMarker,
@@ -51,11 +57,26 @@ export function KmnCodePane() {
   const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const setWorkingIR = useWorkingCopyStore((s) => s.setWorkingIR);
-  // parseKmn needs a keyboard id; the IR header name is the stable choice.
-  const keyboardId = ir?.header.name ?? "keyboard";
+  const mode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  // Open mode (spec 111 FR-009): the pane shows the file's own text and Apply
+  // replaces the starting point with it.
+  const openPath =
+    isOpenMode(mode) && startKeyboard !== null
+      ? startingPointPath(startKeyboard.id, "kmn")
+      : null;
+  const openText =
+    openPath !== null && startVfs !== null ? readVfsText(startVfs, openPath) : undefined;
+  // parseKmn needs a keyboard id; the IR header name is the stable choice
+  // (Open: the keyboard's own id, which names its files).
+  const keyboardId =
+    openText !== undefined && startKeyboard !== null
+      ? startKeyboard.id
+      : (ir?.header.name ?? "keyboard");
 
-  // The canonical text for the current IR.
-  const canonical = ir === null ? null : emitKmn(ir);
+  // The canonical text for the current IR (Open: the file's text, verbatim).
+  const canonical = ir === null ? null : (openText ?? emitKmn(ir));
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -184,6 +205,18 @@ export function KmnCodePane() {
       after = parseKmn(current, id);
     } catch (err) {
       setApplyError(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    if (openText !== undefined && openPath !== null) {
+      // Open: a formatting-only change is still a change to the file.
+      if (current === canonical) return;
+      const result = replaceStartingPointAndReplay(openPath, current);
+      if (!result.ok) {
+        setApplyError(result.error);
+        return;
+      }
+      justAppliedRef.current = true;
+      setApplyError(null);
       return;
     }
     if (current === canonical) {

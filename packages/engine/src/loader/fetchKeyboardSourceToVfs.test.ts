@@ -1015,3 +1015,43 @@ describe("releasePathToVfsKey", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Open mode: keepKps (spec 111)
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — keepKps (Open mode)", () => {
+  const KPS = [
+    "<Package>\r\n",
+    "  <Files>\r\n",
+    "    <File>\r\n      <Name>..\\build\\sil_euro_latin.kmx</Name>\r\n    </File>\r\n",
+    "    <File>\r\n      <Name>..\\build\\other.js</Name>\r\n    </File>\r\n",
+    "    <File>\r\n      <Name>..\\build\\readme.txt</Name>\r\n    </File>\r\n",
+    "  </Files>\r\n",
+    "</Package>\r\n",
+  ].join("");
+
+  const responses = {
+    [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnMinimal },
+    [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: true, status: 200, body: KPS },
+  };
+
+  it("keeps the .kps in the VFS and points build entries at the staged paths", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch(responses);
+    await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl, keepKps: true });
+    const kps = vfs.get("source/sil_euro_latin.kps")?.content as string;
+    expect(kps).toContain("<Name>..\\build\\sil_euro_latin.kmx</Name>");
+    expect(kps).toContain("<Name>..\\build\\sil_euro_latin.js</Name>");
+    expect(kps).toContain("<Name>..\\build\\readme.txt</Name>");
+    // Everything but the one rewritten value is byte-identical, CRLF included.
+    expect(kps).toBe(KPS.replace("other.js", "sil_euro_latin.js"));
+  });
+
+  it("does not write the .kps without the flag (Copy)", async () => {
+    const vfs = createVirtualFS();
+    const { fetchImpl } = makeMockFetch(responses);
+    await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    expect(vfs.get("source/sil_euro_latin.kps")).toBeUndefined();
+  });
+});

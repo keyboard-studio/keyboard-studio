@@ -296,9 +296,10 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
     expect(spineOf(found)).toBe(false);
   });
 
-  it("project_name.joinTarget is 'characters'", () => {
+  it("project_name.joinTarget is the first ungated spine step after it", () => {
     const found = manifest.find((s) => s.id === "project_name");
-    expect(joinOf(found)).toBe("characters");
+    const after = manifest.slice(manifest.findIndex((s) => s.id === "project_name") + 1);
+    expect(joinOf(found)).toBe(after.find((s) => spineOf(s) && derivedScreenById.get(s.id)?.gatedBy === undefined)?.id);
   });
 
   it("project_name.joinTarget resolves to a spine step", () => {
@@ -318,7 +319,7 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Off-spine step inventory", () => {
-  it("exactly two derived side-trail steps exist (project_name and touch_seed_source)", () => {
+  it("exactly two derived side-trail steps exist (project_name, touch_seed_source); Open's pages are gated spine screens", () => {
     const offSpine = offSpineSteps(manifest);
     expect(offSpine).toHaveLength(2);
     const ids = offSpine.map((s) => s.id).sort();

@@ -21,6 +21,15 @@
   "project_name": [
     "§8"
   ],
+  "open_languages": [
+    "specs/111-open-existing-keyboard"
+  ],
+  "open_missing_letters": [
+    "specs/111-open-existing-keyboard"
+  ],
+  "open_upgrades": [
+    "specs/111-open-existing-keyboard"
+  ],
   "characters": [
     "§8",
     "specs/027-qu-characters-step"

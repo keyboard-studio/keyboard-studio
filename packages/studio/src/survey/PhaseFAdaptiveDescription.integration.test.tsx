@@ -115,7 +115,7 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
     expect(nextButton().disabled).toBe(false);
   });
 
-  it("adapt track, base classified none: stays required, unfilled (no usable description to propose)", () => {
+  it("Open, base classified none: unfilled and not required, so Continue is offered (spec 111 FR-031)", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
       startDocProfile: NONE_PROFILE,
@@ -125,10 +125,10 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
     render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     expect(descriptionField().value).toBe("");
-    expect(nextButton().disabled).toBe(true);
+    expect(nextButton().disabled).toBe(false);
   });
 
-  it("adapt track, no profile computed yet (baseDocProfile null): stays required, unfilled", () => {
+  it("Open, no profile computed yet (baseDocProfile null): unfilled and not required", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
       startDocProfile: null,
@@ -138,6 +138,6 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
     render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     expect(descriptionField().value).toBe("");
-    expect(nextButton().disabled).toBe(true);
+    expect(nextButton().disabled).toBe(false);
   });
 });

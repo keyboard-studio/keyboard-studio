@@ -25,6 +25,7 @@ import {
 } from "@keyboard-studio/contracts";
 import {
   prepareWorkingCopySnapshot,
+  repairOpenDraftDescriptor,
   snapshotWorkingCopyData,
 } from "./persistWorkingCopy.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -1683,6 +1684,10 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // slice's orphans (spec 090 T025) join them here, after the
     // decisionRecord hydrate above, for the same reason.
     appendMigrationOrphans([...sliceOrphans, ...(envelope.migrationOrphans ?? [])]);
+
+    // An Adapt draft saved before Open carried the package descriptor gets it
+    // back in the background; a failure leaves the draft as it was.
+    void repairOpenDraftDescriptor().catch(() => undefined);
 
     return { ok: true };
   } catch {

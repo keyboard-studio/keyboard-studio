@@ -30,12 +30,12 @@ import {
 // ---------------------------------------------------------------------------
 
 type WalkStep =
-  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "characters"
+  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "open_languages" | "characters"
   | "carve" | "deadkeys" | "rules" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "osk" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
-): { sequence: WalkStep[]; navigateAtEnd: "output" | undefined } {
+): { sequence: WalkStep[]; navigateAtEnd: "output" | "criteria" | undefined } {
   // Spec 088 T020 (fixture construction only): the gate set is a DecisionSet
   // literal matching the context's track — advance() reads gates from it.
   const fullCtx = {
@@ -55,7 +55,7 @@ function walkSpine(
   };
   const sequence: WalkStep[] = ["identity"];
   let current: WalkStep = "identity";
-  let navigateAtEnd: "output" | undefined;
+  let navigateAtEnd: "output" | "criteria" | undefined;
   for (let guard = 0; guard < 50; guard++) {
     const outcome = advance(current, undefined, fullCtx);
     sequence.push(outcome.next as WalkStep);
@@ -123,9 +123,13 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("track")).toBe("attribution");
   });
 
-  it("attribution → characters (skips project_name which is a derived side trail)", () => {
+  it("attribution → the next spine screen, never the project_name side trail", () => {
     // project_name is a derived side trail so nextMainLineStepAfter("attribution") skips it.
-    expect(nextMainLineStepAfter("attribution")).toBe("characters");
+    const next = nextMainLineStepAfter("attribution", copyCtx);
+    expect(next).not.toBe("project_name");
+    expect(STEP_TRAILS.get(next)?.spine).toBe(true);
+    // Copy's gates skip Open's pages.
+    expect(next.startsWith("open_")).toBe(false);
   });
 
   it("characters → marks (spec 071)", () => {
@@ -197,21 +201,22 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> osk -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "attribution", "project_name", "characters",
+      // No "track": the start screen recorded it, so the step is gated off.
+      "identity", "layout", "choose_base", "attribution", "project_name", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
   });
 
-  it("SR-2 adapt track: same spine but project_name is skipped (attribution is walked)", () => {
+  it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "attribution", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "done",
+      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "osk", "touch", "css", "done",
     ]);
     expect(sequence).not.toContain("project_name");
-    expect(navigateAtEnd).toBe("output");
+    // Open ends at Review (the criteria view), whose Continue opens Output.
+    expect(navigateAtEnd).toBe("criteria");
   });
 
   it("SR-5: the physical -> touch -> docs tail is never reordered (touch after osk, css after touch, help after css)", () => {
@@ -267,7 +272,9 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   it("spine ids (spine !== false) are in the locked order", () => {
     const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
-      "identity", "layout", "choose_base", "track", "attribution", "characters",
+      "identity", "layout", "choose_base", "track", "attribution",
+      // Spec 111: Open's gated pages sit on the spine; Copy's gates skip them.
+      "open_languages", "open_missing_letters", "open_upgrades", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "css", "help", "html", "package",
     ]);
   });
@@ -307,8 +314,13 @@ describe("advance: layout", () => {
 });
 
 describe("advance: choose_base", () => {
-  it("→ track (spine next after choose_base)", () => {
+  it("→ attribution when the start screen recorded the track (the track step is gated off)", () => {
     const { next } = advance("choose_base", undefined, copyCtx);
+    expect(next).toBe("attribution");
+  });
+
+  it("→ track for a draft with no track recorded (from before the start screen)", () => {
+    const { next } = advance("choose_base", undefined, { ...copyCtx, selectedTrack: null, decisions: {} });
     expect(next).toBe("track");
   });
 });
@@ -344,14 +356,16 @@ describe("advance: attribution — copy fork", () => {
 });
 
 describe("advance: attribution — adapt fork (US2)", () => {
-  it("adapt track → characters (skips project_name)", () => {
+  it("adapt track → open_languages (skips project_name; spec 111 asks the language list first)", () => {
     const { next } = advance("attribution", undefined, adaptCtx);
-    expect(next).toBe("characters");
+    expect(next).toBe("open_languages");
   });
 
-  it("adapt track carries setCharactersSubStage:'prefill'", () => {
-    const outcome = advance("attribution", undefined, adaptCtx);
-    expect(outcome.setCharactersSubStage).toBe("prefill");
+  it("adapt track leaves the language list for the on-screen keyboard; the character survey is hidden on Open (spec 111 FR-031)", () => {
+    const outcome = advance("open_languages", undefined, adaptCtx);
+    // Open (spec 111 Open walk): the Letters page is always walked for a non-basic keyboard.
+    expect(outcome.next).toBe("open_missing_letters");
+    expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
 
@@ -582,7 +596,7 @@ describe("advance: pure — result is ignored", () => {
 // ---------------------------------------------------------------------------
 
 describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
-  it("adapt in the DecisionSet skips project_name even when the field says copy", () => {
+  it("adapt in the DecisionSet skips project_name even when the field says copy (lands on the Open language list, spec 111)", () => {
     // The fork is evaluated at the attribution step's completion (#1901):
     // the project_name gate reads the DecisionSet, not the field.
     const outcome = advance("attribution", undefined, {
@@ -594,7 +608,7 @@ describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
         "authoring-track": { id: "authoring-track", value: "adapt", provenance: "asked" },
       },
     });
-    expect(outcome.next).toBe("characters");
+    expect(outcome.next).toBe("open_languages");
   });
 
   it("a recorded touch-seed-source in the DecisionSet routes osk straight to touch", () => {
@@ -679,7 +693,7 @@ describe("spec 091 T021 — derived screens in the walk", () => {
     // forwards there on both tracks first.
     expect(advance("track", undefined, adaptCtx).next).toBe("attribution");
     const outcome = advance("attribution", undefined, adaptCtx);
-    expect(outcome.next).toBe("characters");
+    expect(outcome.next).toBe("open_languages");
   });
 
   it("the same screen is walked when its gate passes (copy walks project_name)", () => {
@@ -693,8 +707,10 @@ describe("spec 091 T021 — derived screens in the walk", () => {
     // The characters screen has no entry in the derived screen gates (its
     // members' gates are per-question routing), so advance lands on it and
     // walks through it on BOTH tracks.
-    expect(advance("attribution", undefined, adaptCtx).next).toBe("characters");
-    expect(advance("characters", undefined, adaptCtx).next).toBe("marks");
+    expect(advance("project_name", undefined, copyCtx).next).toBe("characters");
+    // Open (spec 111) hides the character survey, so the language list goes straight on.
+    expect(advance("open_languages", undefined, adaptCtx).next).toBe("open_missing_letters");
+    expect(advance("characters", undefined, adaptCtx).next).toBe("mechanisms");
     expect(advance("characters", undefined, copyCtx).next).toBe("marks");
   });
 
