@@ -60,7 +60,8 @@ import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
@@ -70,6 +71,7 @@ import {
   driveHelpPhase,
   seedReturningVisitor,
   switchTab,
+  zipSourceEntry,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -98,8 +100,6 @@ const SURVIVOR_CHAR = "ɔ";
  *  alternate on the K_E touch key (whose base text "e" is non-empty). */
 const PLACED_CHAR = "é";
 
-const KMN_ZIP_PATH = `source/${START_KEYBOARD_ID}.kmn`;
-const TOUCH_ZIP_PATH = `source/${START_KEYBOARD_ID}.keyman-touch-layout`;
 
 /**
  * FORMERLY the pre-existing 1.4.3 (Contrast Minimum) offender on the Phase B
@@ -218,8 +218,9 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
 
     await driveIdentityLite(page);
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
     await confirmPrefill(page);
 
     // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long
@@ -315,8 +316,8 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     // .kmn sanity — the carved characters must not survive in the desktop
     // source either (belt-and-suspenders; the touch-layout assertions below
     // are this test's real focus).
-    const kmnBytes = entries[KMN_ZIP_PATH];
-    expect(kmnBytes, `expected ${KMN_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const kmnBytes = zipSourceEntry(entries, "kmn");
+    expect(kmnBytes, "expected source/<id>.kmn in the emitted zip").toBeDefined();
     const kmnText = strFromU8(kmnBytes as Uint8Array);
     for (const ch of CARVED_CHARS) {
       expect(kmnText, `.kmn must not still produce carved char ${ch}`).not.toContain(`'${ch}'`);
@@ -325,8 +326,8 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     // ---------------------------------------------------------------------
     // Touch-layout assertions (FR-002/004/005, SC-001).
     // ---------------------------------------------------------------------
-    const touchBytes = entries[TOUCH_ZIP_PATH];
-    expect(touchBytes, `expected ${TOUCH_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const touchBytes = zipSourceEntry(entries, "keyman-touch-layout");
+    expect(touchBytes, "expected source/<id>.keyman-touch-layout in the emitted zip").toBeDefined();
     const touchText = strFromU8(touchBytes as Uint8Array);
     const touchJson = JSON.parse(touchText) as {
       phone?: { font?: string; layer?: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };

@@ -5,7 +5,7 @@
  * Flow under test:
  *   identity-lite step
  *     -> base-keyboard picker
- *       -> track choice (adapt)
+ *       -> track choice (copy)
  *         -> characters step (Phase B intro)
  *           -> browser Back (page.goBack()) -> track choice reappears
  *             -> browser Back again -> base picker reappears
@@ -28,7 +28,8 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   seedReturningVisitor,
   switchTab,
@@ -51,16 +52,16 @@ test.describe("browser Back mid-survey (F7)", () => {
 
   test("physical Back button steps back one manifest step at a time", async ({ page }) => {
     // Walk: identity -> choose_base -> track -> attribution (#1901) ->
-    // characters (adapt skips project_name — see steps/manifest.ts's
-    // track-routing docstring).
+    // project_name -> characters.
     await driveIdentityLite(page, {
       english: FIXTURE.english,
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
 
     // Now on "characters" (its "prefill" sub-stage renders first — see
     // CharactersStep.tsx). Which sub-stage of "characters" we land on doesn't
@@ -92,22 +93,27 @@ test.describe("browser Back mid-survey (F7)", () => {
     await page.goBack();
     await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 20_000 });
 
-    // One physical Back: characters -> attribution. The attribution
-    // step's first question reappears (with the asked author name
-    // restored).
+    // One physical Back: characters -> project_name. The project-name
+    // survey step replaces the characters step.
     await page.goBack();
-    await expect(page.locator("#il_author_name")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("prefill-continue")).toBeHidden({ timeout: 15_000 });
+    await expect(page.getByTestId("survey-advance")).toBeVisible({ timeout: 15_000 });
 
-    // A second physical Back: attribution -> track. The track radio choice
-    // reappears (its own onComplete re-fires chooseAdaptTrack forward again
-    // below to confirm the walk is genuinely reversible, not just "some
-    // earlier screen appeared").
+    // A second physical Back: project_name -> attribution. The attribution
+    // step reappears.
     await page.goBack();
-    await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Author & copyright" })).toBeVisible({
+      timeout: 15_000,
+    });
 
-    // A third physical Back: track -> choose_base. The base picker
+    // A third physical Back: attribution -> track. The track radio choice
+    // reappears.
+    await page.goBack();
+    await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 15_000 });
+
+    // A fourth physical Back: track -> choose_base. The base picker
     // reappears — proves the browser's own history stack (not just the
-    // in-app "<- Back" dispatch) drives the wizard back three full manifest
+    // in-app "<- Back" dispatch) drives the wizard back four full manifest
     // steps in a row.
     await page.goBack();
     await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });

@@ -20,6 +20,7 @@
  */
 
 import { test, expect, type Page } from "playwright/test";
+import { continueOpenWalk as continueWalk, openExistingKeyboard } from "./helpers/surveyFlow";
 
 // A small codec-clean catalog keyboard present in every catalog, including the
 // partial local keyboards checkout the dev server enumerates.
@@ -34,60 +35,7 @@ const NON_BASIC_ID = "sudest";
 /** Interactions the author performs from the start screen to the first walk step. */
 const MAX_INTERACTIONS = 3;
 
-/** Open `keyboardId` from the start screen; returns the interaction count. */
-async function openKeyboard(page: Page, keyboardId: string = OPEN_ID): Promise<number> {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue as guest" }).click();
-
-  // toBeInViewport, not toBeVisible: a card clipped below an overflow:hidden
-  // pane still counts as "visible" to Playwright, which is how the entry once
-  // shipped unreachable under the welcome screen.
-  const create = page.getByTestId("start-new");
-  await expect(create).toBeInViewport({ timeout: 30_000 });
-  const entry = page.getByRole("region", { name: /open an existing keyboard/i });
-  await expect(entry).toBeInViewport();
-
-  let interactions = 0;
-
-  // Interaction 1: search by id in the entry's picker.
-  await entry.getByRole("combobox").fill(keyboardId);
-  interactions += 1;
-
-  // Interaction 2: choose the keyboard from the results.
-  await entry.locator(`[id$="-opt-${keyboardId}"]`).first().click({ timeout: 15_000 });
-  interactions += 1;
-
-  // Interaction 3: open it. The button stays disabled while both
-  // repositories are being checked.
-  const open = entry.getByRole("button", { name: /open this keyboard/i });
-  await expect(open).toBeEnabled({ timeout: 30_000 });
-  await open.click();
-  interactions += 1;
-  return interactions;
-}
-
-/**
- * Press the Continue of the walk step on screen. Steps carry it under their own
- * test ids (`osk-continue`, `touch-continue`, `survey-advance`, ...), and the
- * Languages page has a plain Continue button. Returns the control pressed.
- */
-async function continueWalk(page: Page): Promise<string> {
-  const control = page
-    .locator(
-      '[data-testid$="-continue"], [data-testid="survey-advance"], [data-testid="gallery-intro-start"], [data-testid="touch-seed-confirm"]',
-    )
-    .or(page.getByRole("button", { name: /^continue$/i }))
-    .first();
-  await control.waitFor({ state: "visible", timeout: 30_000 });
-  const id = (await control.getAttribute("data-testid")) ?? "continue";
-  // The Documentation step asks a required description when the keyboard has none
-  // to prefill from; answer it so the walk can go on (the only typing in this walk).
-  if (await control.isDisabled()) {
-    await page.getByRole("textbox").first().fill("A keyboard for typing English on a US layout.");
-  }
-  await control.click();
-  return id;
-}
+const openKeyboard = (page: Page, keyboardId: string = OPEN_ID) => openExistingKeyboard(page, keyboardId);
 
 test.describe("Open an existing keyboard (spec 111)", () => {
   test("opens on the Languages step within 3 interactions", async ({ page }) => {

@@ -37,7 +37,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  chooseTrackCopy,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -45,7 +45,6 @@ import {
   carveCharacter,
   driveDeadkeysStep,
   driveMechanismsGallery,
-  surveyAdvance,
 } from "./helpers/surveyFlow";
 
 // window.__ksE2E__ typing — mirrors src/lib/e2eHook.ts, declared locally
@@ -86,14 +85,16 @@ async function readSavedDraft(page: Page): Promise<DraftShape> {
   });
 }
 
+/** The primary picked layout: the first of `layoutIds` (multi-select), or the older single `layoutId`. */
 function layoutIdOf(draft: DraftShape): string {
   const value = draft.decisions?.["windows-layout"]?.value as
-    | { layoutId?: unknown }
+    | { layoutIds?: unknown; layoutId?: unknown }
     | undefined;
-  if (typeof value?.layoutId !== "string") {
-    throw new Error("draft carries no windows-layout layoutId");
+  const primary = Array.isArray(value?.layoutIds) ? value.layoutIds[0] : value?.layoutId;
+  if (typeof primary !== "string") {
+    throw new Error("draft carries no windows-layout layout id");
   }
-  return value.layoutId;
+  return primary;
 }
 
 /** Spine back-navigation until the layout step renders (bounded). */
@@ -154,7 +155,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
     script: "other",
   });
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseAdaptTrack(page);
+  await chooseTrackCopy(page);
 
   // The post-track attribution step (#1901): author name (blank for a
   // guest — type it), email blank, and the copyright holder pre-filled
@@ -168,13 +169,15 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
 
   // Carve: discard ᓬ (U+14EC); the cascade records both producing rules
   // in the working copy's deleted-item overlay (carve.spec.ts AC2).
+  // A marked suggestion is discarded by Continue (spec 106 FR-042), so the
+  // overlay is read after it.
   await carveCharacter(page, CARVED_CHAR);
+  await page.getByTestId("carve-continue").click();
   await expect
     .poll(() => page.evaluate(() => window.__ksE2E__?.getDeletedItemIds() ?? []), {
       timeout: 5_000,
     })
     .toEqual(expect.arrayContaining(TARGET_RULE_IDS));
-  await page.getByTestId("carve-continue").click();
 
   // Deadkeys step (spec 083) sits between carve and rules (#2053).
   await driveDeadkeysStep(page);
@@ -221,7 +224,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
 
   // ---- Forward again through the re-completions. ----
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseAdaptTrack(page);
+  await chooseTrackCopy(page);
   // Re-walk through attribution: the asked records render pre-filled
   // (author name from the first pass, holder preserved from the base) —
   // confirm as-is.

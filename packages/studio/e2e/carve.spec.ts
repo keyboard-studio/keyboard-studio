@@ -64,7 +64,8 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
@@ -72,6 +73,7 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
+  zipSourceEntry,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -90,7 +92,6 @@ const TARGET_CODEPOINT_LABEL = "U+14EC";
 // producers of U+14EC in this fixture — verified by grep, no store or other
 // rule references it) survives.
 const KEPT_ONLY_TOKEN = "U+14EC";
-const KMN_ZIP_PATH = `source/${START_KEYBOARD_ID}.kmn`;
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -187,8 +188,9 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       script: "other",
     });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 
@@ -292,8 +294,8 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     const zipBytes = await readFile(zipPath as string);
     const entries = unzipSync(new Uint8Array(zipBytes));
 
-    const kmnBytes = entries[KMN_ZIP_PATH];
-    expect(kmnBytes, `expected ${KMN_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const kmnBytes = zipSourceEntry(entries, "kmn");
+    expect(kmnBytes, "expected source/<id>.kmn in the emitted zip").toBeDefined();
     const kmnText = strFromU8(kmnBytes as Uint8Array);
 
     expect(kmnText).not.toContain(KEPT_ONLY_TOKEN);
@@ -365,8 +367,9 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       script: "other",
     });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 
@@ -415,8 +418,8 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     const zipBytes = await readFile(zipPath as string);
     const entries = unzipSync(new Uint8Array(zipBytes));
 
-    const kmnBytes = entries[KMN_ZIP_PATH];
-    expect(kmnBytes, `expected ${KMN_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const kmnBytes = zipSourceEntry(entries, "kmn");
+    expect(kmnBytes, "expected source/<id>.kmn in the emitted zip").toBeDefined();
     const kmnText = strFromU8(kmnBytes as Uint8Array);
 
     expect(kmnText).toContain(KEPT_ONLY_TOKEN);
