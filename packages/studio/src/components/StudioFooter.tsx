@@ -56,6 +56,7 @@ import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
 import {
   CRITERIA_ROUTE_NAV_STEP_ID,
+  START_ROUTE_NAV_STEP_ID,
   useStepNavStore,
   hasSlots,
 } from "../stores/stepNavStore.ts";
@@ -288,7 +289,11 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
   // Spec 081 FR-021: a step that publishes Back / forward buttons needs the
   // footer up to reach them, whatever else is true.
   const stepIdForFooterNav =
-    activeRoute === "criteria" ? CRITERIA_ROUTE_NAV_STEP_ID : activeStepId;
+    activeRoute === "start"
+      ? START_ROUTE_NAV_STEP_ID
+      : activeRoute === "criteria"
+        ? CRITERIA_ROUTE_NAV_STEP_ID
+        : activeStepId;
   const activeHasNav = useStepNavStore((s) =>
     hasSlots(s.entries[stepIdForFooterNav]?.spec),
   );

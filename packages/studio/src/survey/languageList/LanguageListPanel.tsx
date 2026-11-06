@@ -5,12 +5,13 @@
 // the author's edits are recorded as the `language-list` decision and mirrored
 // into the identity patch, which is what the `.kps` patch writes.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT, galleryForwardBtnStyle } from "../../lib/galleryTheme.ts";
+import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 export type LanguageEntry = { tag: string; name?: string };
 export type LanguageListValue = readonly LanguageEntry[];
@@ -61,6 +62,27 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
     onChange(next);
     setIdentity({ ...identity, languages: next });
   };
+
+  const navSpec = useMemo(
+    () => ({
+      ...(onBack !== undefined
+        ? {
+            back: {
+              label: t({ id: "open.languages.back", message: "Back" }),
+              onClick: onBack,
+              testId: "open-languages-back",
+            },
+          }
+        : {}),
+      forward: {
+        label: t({ id: "open.languages.continue", message: "Continue" }),
+        onClick: () => onComplete(undefined),
+        testId: "open-languages-continue",
+      },
+    }),
+    [onBack, onComplete, t],
+  );
+  usePublishStepNav(navSpec);
 
   return (
     <section
@@ -139,16 +161,6 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
           {t({ id: "open.languages.add", message: "Add language" })}
         </button>
       </form>
-      <div style={{ display: "flex", gap: 8 }}>
-        {onBack !== undefined && (
-          <button type="button" style={smallBtn} onClick={onBack}>
-            {t({ id: "open.languages.back", message: "Back" })}
-          </button>
-        )}
-        <button type="button" style={galleryForwardBtnStyle} onClick={() => onComplete(undefined)}>
-          {t({ id: "open.languages.continue", message: "Continue" })}
-        </button>
-      </div>
     </section>
   );
 }
