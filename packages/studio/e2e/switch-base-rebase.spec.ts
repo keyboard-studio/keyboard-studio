@@ -12,13 +12,13 @@
 //
 // Fixture (same as the exploration spec): initial base bj_cree_woods, switch
 // to basic_kbdfr, free-text identity ("Test" / script "other") routing to the
-// in-survey "adapt" track choice (the exploration log's own header labels
-// this "Track 1 (adapt)").
+// in-survey track choice (the exploration log's own header labels
+// this "Track 1").
 //
 // Run: cd packages/studio && npx playwright test e2e/switch-base-rebase.spec.ts
 
 import { test, expect, type Page, type Dialog } from "playwright/test";
-import { driveIdentityLite, chooseAdaptTrack, driveAttributionStep, seedReturningVisitor } from "./helpers/surveyFlow";
+import { driveIdentityLite, chooseTrackCopy, acceptProjectName, driveAttributionStep, seedReturningVisitor } from "./helpers/surveyFlow";
 
 const BASE_A = "bj_cree_woods";
 const BASE_B = "basic_kbdfr";
@@ -134,7 +134,7 @@ async function buildToBaseAConfirmed(page: Page): Promise<void> {
   await driveIdentityLite(page, { english: "Test", autonym: "Test Autonym", script: "other" });
   await previewStart(page, BASE_A);
   await clickConfirm(page);
-  await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe.configure({ mode: "serial" });
@@ -184,7 +184,7 @@ test.describe("F1 — switch-base rebase confirm", () => {
     // cleanly: working copy, draft key, AND the wizard all move to base B.
     dialogs.setAction("accept");
     await clickConfirm(page);
-    await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
 
     expect(dialogs.dialogCount()).toBe(2);
     const afterOk = await hookState(page);
@@ -211,7 +211,7 @@ test.describe("F1 — switch-base rebase confirm", () => {
 
     dialogs.setAction("accept"); // should never be consulted
     await clickConfirm(page);
-    await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
 
     expect(dialogs.dialogCount()).toBe(0);
     const after = await hookState(page);
@@ -231,8 +231,9 @@ test.describe("F1 — switch-base rebase confirm", () => {
   test("F2: refresh at the track step — no popup, phaseResults preserved", async ({ page }) => {
     const dialogs = attachDialogHarness(page);
     await buildToBaseAConfirmed(page);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
     await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 30_000 });
 
     const before = await hookState(page);

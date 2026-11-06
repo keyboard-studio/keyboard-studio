@@ -134,7 +134,7 @@
 
 ## Phase 8: User Story 6 - Upgrade the keyboard's Keyman structure (P3)
 
-**Blocked until** criterion 7.28 (branch `km/casedkeys-criterion`) merges to main.
+**Was blocked until** criterion 7.28 (branch `km/casedkeys-criterion`) merged; it is now on this branch.
 
 **Independent Test**: [quickstart.md §5](quickstart.md) step 4 (upstream `basic_kbdus`).
 
@@ -160,7 +160,7 @@
 
 - [x] T048 [P] Amend [spec.md](../../spec.md) §15 Scenario F (replaced; a single-language keyboard from a country keyboard is a Copy), [specs/110-readme-template/spec.md](../110-readme-template/spec.md) User Story 5, and [docs/workflow-model.md](../../docs/workflow-model.md) Track 2 wording, editing the existing text, not appending
 - [x] T049 [P] Run `node utilities/spec-trace check` and acknowledge the intended drift from T048
-- [x] T050 Playwright E2E for the Open happy path ([quickstart.md §5](quickstart.md) steps 1–2, 5) in `packages/studio/e2e/open-existing-keyboard.spec.ts`. Check SC-009 (≤3 interactions to the criteria view) and SC-008 (no change without interaction).
+- [x] T050 Playwright E2E for the Open happy path ([quickstart.md §5](quickstart.md) steps 1–2, 5) in `packages/studio/e2e/open-existing-keyboard.spec.ts`. Check SC-009 (≤3 interactions to the first walk step, Languages, as amended) and SC-008 (no change without interaction).
 - [x] T051 Full gates: `pnpm lint`, the studio/engine/contracts/keyboard-lint vitest suites, and the golden walk (SC-004)
 
 ---
@@ -172,7 +172,7 @@ The Open entry shipped as a card under the welcome screen, clipped out of view a
 - [x] T052 [US1] Add the `start` route and `StartScreen` (`packages/studio/src/components/StartScreen.tsx`): "Create a new keyboard" leads, the Open entry follows; continue an existing local or account draft; New confirms before discarding a draft. Guest leads there (`WelcomeScreen.tsx`, fresh-session reset moved to `lib/freshSession.ts`); a returning author with no draft lands there (`StudioShell.tsx` `defaultLandingRoute`); the nav wordmark links there (`NavBar.tsx`).
 - [x] T053 [US1] New records `authoring-track = "copy"`; gate the track step on an unrecorded track (`registry.ts` `openScreenGates`); remove the Open option and the track proposal (`track_choice.ts`, `flowStepOptionRecords.ts`, `lib/proposeTrack.ts` deleted); retire the e2e `chooseAdaptTrack` helper
 - [x] T054 [US1] Tests: `StartScreen.test.tsx`; landing, guest and gate tests updated; `boot-smoke` checks New and Open are in the viewport after guest and the wordmark leads back; `open-existing-keyboard.spec.ts` starts from the start screen and asserts `toBeInViewport`
-- [ ] T055 [US1] Convert the e2e specs that walked the removed mid-walk Open route (`chooseAdaptTrack`, now throwing with a pointer to the start screen) to open from the start screen or walk Copy, per what each spec tests. None runs in the CI lanes; list: `grep -rln "chooseAdaptTrack(page)" packages/studio/e2e`
+- [x] T055 [US1] Convert the e2e specs that walked the removed mid-walk Open route (`chooseAdaptTrack`, now throwing with a pointer to the start screen) to open from the start screen or walk Copy, per what each spec tests. None runs in the CI lanes; list: `grep -rln "chooseAdaptTrack(page)" packages/studio/e2e` Done 2026-11-06: `chooseAdaptTrack` deleted. light-theme-a11y, derived-keyboard and switch-base-rebase F1 still fail for reasons unrelated to Open (see the commit).
 
 ## Dependencies
 

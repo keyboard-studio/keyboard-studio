@@ -40,8 +40,8 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
   chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   seedReturningVisitor,
   switchTab,
@@ -79,7 +79,9 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     await page.goto("/");
   });
 
-  test("activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions", async ({
+  // The track step is skipped on every path now (the trail records its answer as the tool's
+  // suggestion, with no jump link), so the single-question target this walk revises is gone.
+  test.skip("activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions", async ({
     page,
   }) => {
     // ---- Walk far enough to have a real, multi-step decision record -------
@@ -89,12 +91,11 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
       script: FIXTURE.targetScript,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
 
-    // Past "track" now (adapt-track skips project_name; the fork leaves
-    // from attribution since #1901 — steps/manifest.ts's track-routing
-    // docstring), so the prefill summary is the phase boundary landmark.
+    // Past "track" now, so the prefill summary is the phase boundary landmark.
     await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 30_000 });
 
     // ---- Open Decisions and find the early "track" answer ------------------
@@ -115,10 +116,11 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     await trackEntry.getByTestId("decision-entry-jump").click();
 
     // FR-030/FR-031: arrives on the "track" step with the recorded answer
-    // ("adapt") still shown. A single-question step, so "on the step" and
+    // ("copy") still shown. A single-question step, so "on the step" and
     // "on the question" are the same landing — see the module header.
-    await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("track-adapt")).toBeChecked();
+    const copyRadio = page.getByRole("radio", { name: /^Copy/i });
+    await expect(copyRadio).toBeVisible({ timeout: 15_000 });
+    await expect(copyRadio).toBeChecked();
 
     // FR-034/Q3: the revise-and-return banner is up, with its explicit
     // opt-out — the choice is offered, not forced, and not a modal prompt.

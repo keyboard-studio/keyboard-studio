@@ -19,7 +19,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   driveIdentityLite,
-  chooseAdaptTrack,
+  chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
@@ -143,7 +144,7 @@ function attach(page: Page, scenario: string, level: string, probe: string): Har
           .catch(() => false),
         basePicker: await vis(() => p.getByTestId("base-picker")),
         baseConfirm: await vis(() => p.getByTestId("base-confirm")),
-        trackAdapt: await vis(() => p.getByTestId("track-adapt")),
+        trackCopy: await vis(() => p.getByRole("radio", { name: /^Copy/i })),
         prefillConfirm: await vis(() => p.getByTestId("prefill-continue")),
         phaseBIntro: await vis(() => p.getByTestId("charlist-continue")),
         carveGallery: await vis(() => p.getByTestId("carve-gallery")),
@@ -308,14 +309,15 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   if (level === "L2-base-previewed") return;
 
   await confirmStart(page, h);
-  await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
   h.note("base confirmed; at track step");
   if (level === "L3-base-confirmed") return;
 
-  await chooseAdaptTrack(page);
+  await chooseTrackCopy(page);
   await driveAttributionStep(page);
+  await acceptProjectName(page);
   await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 30_000 });
-  h.note("track chosen (adapt); at prefill confirmation");
+  h.note("track chosen (copy); at prefill confirmation");
   if (level === "L4-track-chosen") return;
 
   await confirmPrefill(page);

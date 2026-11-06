@@ -33,7 +33,6 @@ import {
   pickStartKeyboard,
   chooseTrackCopy,
   driveAttributionStep,
-  chooseAdaptTrack,
   acceptProjectName,
   confirmPrefill,
   buildOneCharacterList,
@@ -559,45 +558,6 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     expect(helpText.startsWith("<?php")).toBe(true);
     expect(helpText).toContain("$pagename = ");
     expect(helpText).toContain("require_once('header.php')");
-  });
-
-  test("adapt track: emitted .kps declares the author's language, not the und placeholder", async ({
-    page,
-  }) => {
-    // The adapt track skips project_name, which on the copy track is what writes
-    // the identity-lite language onto the working copy. The working copy must
-    // still start with that language, or every `identity.bcp47` reader runs
-    // without it — the carve needed set never consults the language's exemplars,
-    // and the descriptor below falls back to `und`.
-    await driveIdentityLite(page, {
-      english: FIXTURE.english,
-      autonym: FIXTURE.autonym,
-      script: FIXTURE.targetScript,
-      languageCode: FIXTURE.languageCode,
-    });
-    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseAdaptTrack(page);
-    await driveAttributionStep(page);
-    await confirmPrefill(page);
-    await completePhaseB(page);
-    await finishGalleryWork(page);
-    await navigateToOutput(page);
-    const download = await triggerDownload(page);
-
-    const dlPath = await download.path();
-    expect(dlPath).not.toBeNull();
-    const entries = Object.entries(unzipSync(new Uint8Array(fs.readFileSync(dlPath!))));
-    const kps = entries.find(([name]) => name.endsWith(".kps"));
-    expect(kps, "zip must contain a .kps package file").toBeDefined();
-    const kpsText = new TextDecoder().decode(kps![1]);
-
-    // Same composed tag and display text as the copy-track test above.
-    const languageElements = kpsText.match(/<Language\b[^>]*>[^<]*<\/Language>/g) ?? [];
-    expect(
-      languageElements,
-      ".kps must declare exactly one language: the author's composed tag, with their language's English name",
-    ).toEqual([`<Language ID="fr">${FIXTURE.english}</Language>`]);
-    expect(kpsText).not.toContain('<Language ID="und">');
   });
 });
 

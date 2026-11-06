@@ -22,12 +22,14 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
-  buildOneCharacterList,
+  driveMarksSeries,
   drivePunctuationStep,
   driveInvisiblesStep,
+  driveConvenienceStep,
 } from "./helpers/surveyFlow";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
@@ -116,8 +118,9 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   await expectNoSeriousAxeViolations(page, "base picker (light)");
 
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseAdaptTrack(page);
+  await chooseTrackCopy(page);
   await driveAttributionStep(page);
+  await acceptProjectName(page);
 
   // "Confirm the basics" — the densest read-only surface in the flow, and the
   // one whose label/value colour pairs were most at risk from the token swap.
@@ -126,14 +129,16 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   await confirmPrefill(page);
   await expectNoSeriousAxeViolations(page, "characters (light)");
 
-  await buildOneCharacterList(page, "᙮");
+  // buildOneCharacterList's own steps, inlined so the invisible-characters
+  // screen can be scanned between them (the helper drives it without a pause).
+  await page.click('[data-testid="charlist-continue"]');
+  await page.fill('[aria-label="Character to add"]', "᙮");
+  await page.getByTestId("charlist-add").click();
+  await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+  await page.click('[data-testid="charlist-done"]');
+  await driveMarksSeries(page);
 
-  // Punctuation — a new spine step (main, post-#533) between the marks series
-  // and convenience: unconditional, so it always renders. drivePunctuationStep
-  // is a self-guarding no-op if the step isn't showing, so this is safe
-  // regardless of manifest order. Without this call the walk stalled here and
-  // the "discard gallery" wait below timed out waiting for a screen it could
-  // never reach — not an app bug, this spec simply predated the step.
+  // Punctuation — between the marks series and invisibles; unconditional.
   await drivePunctuationStep(page);
 
   // Invisible characters (spec 075) — always renders between punctuation and
@@ -144,6 +149,7 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   await expect(page.getByTestId("invisibles-step")).toBeVisible({ timeout: 20_000 });
   await expectNoSeriousAxeViolations(page, "invisible characters (light)");
   await driveInvisiblesStep(page);
+  await driveConvenienceStep(page);
 
   // Discard gallery — the character grid, the suggested-to-discard card with
   // its red top rule and red bulk button, and the details rail. The single

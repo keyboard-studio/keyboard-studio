@@ -39,6 +39,20 @@ function readText(vfs: ReturnType<typeof createVirtualFS>, path: string): string
   return typeof content === "string" ? content : null;
 }
 
+/** The proxy base serving `ref`'s repository at its pinned commit. */
+export function pinnedProxyBase(ref: Pick<SourceRef, "owner" | "repo" | "commit">): string {
+  return `/review-proxy/${ref.owner}/${ref.repo}/${ref.commit}`;
+}
+
+/**
+ * The source the Open choice pinned for `keyboard`, or null when none was
+ * recorded or it was recorded for a different keyboard. Nothing clears the
+ * recorded choice, so a later start of another keyboard must not inherit it.
+ */
+export function pinnedSourceFor(keyboard: StartKeyboard, source: SourceRef | null): SourceRef | null {
+  return source !== null && source.path === keyboard.path ? source : null;
+}
+
 /** The latest commit touching `keyboard.path` in `owner/keyboards`, or null. */
 async function lastChangeCommit(
   owner: SourceOwner,
@@ -72,7 +86,7 @@ async function resolveCopy(
     if (commit === null) return null;
     const vfs = createVirtualFS();
     await fetchKeyboardSourceToVfs(keyboard, vfs, {
-      proxyBase: `/review-proxy/${owner}/${REPO}/${commit.sha}`,
+      proxyBase: pinnedProxyBase({ owner, repo: REPO, commit: commit.sha }),
       fetchImpl,
       keepKps: true,
     });

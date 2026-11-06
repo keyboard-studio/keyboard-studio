@@ -181,7 +181,7 @@ The walk on Open:
 **Acceptance Scenarios**:
 
 1. **Given** the author opens a keyboard, **When** it loads, **Then** the Languages step shows, with Continue.
-2. **Given** a keyboard that can't type letters its listed languages need, **When** the author continues from Languages, **Then** Missing letters shows each language with its missing letters, and offers to add each letter or remove that language.
+2. **Given** a keyboard that can't type letters its listed languages need, **When** the author continues from Languages, **Then** Letters shows each language with its missing letters, and offers to add each letter or remove that language.
 3. **Given** a keyboard with no missing letters and no failing upgrade criterion, **When** the author walks it, **Then** neither page appears.
 4. **Given** an upgrade the author applies, **When** it is applied, **Then** only the lines and layers that upgrade concerns change (FR-008), and its criterion passes.
 5. **Given** the author reaches Review, **When** they continue, **Then** Output opens, with the same submit gate as FR-027.
@@ -229,7 +229,7 @@ The walk on Open:
 
 - **FR-014**: Code views for the source, on-screen keyboard and touch layout MUST show the actual file text on Open. Applying an edit MUST save the text as written and refresh every surface from it.
 - **FR-015**: Applying a code edit MUST be refused only when the text cannot be read (a parse error), with positioned errors and the edited text kept.
-- **FR-016**: The remove tool and the feature galleries MUST be optional on Open, reachable from the menu and from findings, and MUST change only the parts they concern (FR-008).
+- **FR-016** *(amended 2026-11-06)*: The Mechanisms step is walked on Open for a non-`basic_*` keyboard (FR-031). The remove tool and the other feature galleries MUST be optional on Open, reachable from the menu and from findings. All of them MUST change only the parts they concern (FR-008).
 - **FR-017**: The on-screen keyboard and touch editors MUST edit the existing files and MUST offer generation only when the file is missing.
 - **FR-018**: The character inventory on Open MUST come from what the keyboard produces. A text sample, if given, is used only to report missing characters.
 - **FR-018a**: The expected characters on Open MUST be the union of the standard character exemplars of every language in the keyboard's language list, where exemplar data exists. Expected characters the keyboard can't produce are reported as findings, each with a suggested fix to add the character. The view states how many listed languages had exemplar data. Adding a language to the list re-runs this check, and the characters it adds count as new findings.
@@ -255,7 +255,7 @@ The walk on Open:
 
 - **FR-031**: Opening MUST start a walk: Languages, Letters, Upgrades, Mechanisms, On-screen keyboard, Touch, Documentation, Review, Output (Story 8). Every step MUST offer Continue. The order MUST follow from what each page requires and provides, not from a hand-kept sequence; the only positional rule is that the walk ends at Review.
 - **FR-032**: Upgrades and Documentation MUST appear only when the opened keyboard has that kind of problem. Letters MUST appear for every keyboard that is not basic, and for a basic keyboard only when it has missing letters. Mechanisms MUST appear only for a keyboard that is not basic. Which problem kinds it has MUST be recorded as a decision when the baseline is taken, and whether it is basic MUST be recorded when it is opened, so the walk's pages depend on recorded decisions only (Constitution: screens derive from decisions).
-- **FR-033**: Missing letters MUST group each missing letter under every listed language that expects it, and offer to add the letter or remove the language. Composed and decomposed forms MUST count as the same letter.
+- **FR-033**: The Letters step MUST group each missing letter under every listed language that expects it, and offer to add the letter or remove the language. Composed and decomposed forms MUST count as the same letter.
 - **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28), the touch caps layer (18.16, the full Capsifesto behaviour: caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift), consistent Ctrl/RAlt touch keys, and a symbols layer. Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
 
 **Ctrl and removing letters** *(moved 2026-11-06)*
@@ -289,7 +289,7 @@ FR-035..FR-040 (raw Ctrl reporting and its fix, no new Ctrl content or layers, `
 - **SC-006**: Submission is blocked in exactly these cases, in a test matrix that covers each one alone and in combination: compile error, unconfirmed red item, unjustified new failure. Pre-existing failures alone never block.
 - **SC-007**: Opening upstream basic_kbdus shows the cased-keys finding with its suggested fix. Accepting it makes the criterion pass, and the change touches only the declaration and the CAPS rules.
 - **SC-008**: No change reaches a file without either the author's own edit or the author's acceptance of a suggestion. Verified by opening, waiting and submitting with no interaction.
-- **SC-009**: An author goes from the start screen to the criteria view of an opened keyboard in at most three interactions when the two repositories agree.
+- **SC-009** *(amended 2026-11-06)*: An author goes from the start screen to the first step of the Open walk (Languages) in at most three interactions when the two repositories agree.
 
 ## Constitution impact
 
@@ -325,4 +325,4 @@ These are named here so `/speckit-plan`'s Constitution Check can't miss them:
 - Hand-written help pages without section markers may support only "append a section", not "replace a section" (planning item).
 - Fetching from both repositories is fast enough to compare on open. Comparison covers the keyboard source and package descriptor.
 - Reviewers at keyboard-studio/keyboards read review notes in the PR body. No separate review UI is needed.
-- Criterion 7.28 (cased keys) exists on branch `km/casedkeys-criterion`, not yet on main. FR-025 and SC-007 depend on it merging.
+- Criterion 7.28 (cased keys) was on branch `km/casedkeys-criterion` when this was written; it is now on this branch (`KM_LINT_CASEDKEYS_MISSING`), so FR-025 and SC-007 are unblocked.

@@ -86,7 +86,8 @@ import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  chooseTrackCopy,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
@@ -96,6 +97,7 @@ import {
   driveHelpPhase,
   seedReturningVisitor,
   switchTab,
+  zipSourceEntry,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -166,8 +168,6 @@ const PIAROA_SURVIVOR_CHAR = "ñ";
  *  deadkey default leaves Apply already enabled with zero field edits). */
 const PLACED_CHAR = "é";
 
-const PIAROA_KMN_ZIP_PATH = `source/${PIAROA_START_ID}.kmn`;
-const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_START_ID}.keyman-touch-layout`;
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -189,7 +189,6 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 const BAMBARA_START_ID = "bambara";
 const BAMBARA_CARVED_CHARS = ["ɛ", "ŋ"] as const;
 const BAMBARA_SURVIVOR_CHAR = "ɔ";
-const BAMBARA_TOUCH_ZIP_PATH = `source/${BAMBARA_START_ID}.keyman-touch-layout`;
 
 // ---------------------------------------------------------------------------
 // Page-object-lite helpers — the identity/base/track/prefill/build-list steps
@@ -425,8 +424,9 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
 
     await driveIdentityLite(page, { autonym: "Piaroa", code: "pid", script: "Latn" });
     await pickStartKeyboard(page, PIAROA_START_ID);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
     await confirmPrefill(page);
 
     // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long
@@ -491,8 +491,8 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
 
     // .kmn sanity — the carved characters must not survive in the desktop
     // source either.
-    const kmnBytes = entries[PIAROA_KMN_ZIP_PATH];
-    expect(kmnBytes, `expected ${PIAROA_KMN_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const kmnBytes = zipSourceEntry(entries, "kmn");
+    expect(kmnBytes, "expected source/<id>.kmn in the emitted zip").toBeDefined();
     const kmnText = strFromU8(kmnBytes as Uint8Array);
     for (const ch of PIAROA_CARVED_CHARS) {
       expect(kmnText, `.kmn must not still produce carved char ${ch}`).not.toContain(`'${ch}'`);
@@ -501,8 +501,8 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     // ---------------------------------------------------------------------
     // Touch-layout assertions (FR-002/004/005/008, SC-002/SC-004).
     // ---------------------------------------------------------------------
-    const touchBytes = entries[PIAROA_TOUCH_ZIP_PATH];
-    expect(touchBytes, `expected ${PIAROA_TOUCH_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const touchBytes = zipSourceEntry(entries, "keyman-touch-layout");
+    expect(touchBytes, "expected source/<id>.keyman-touch-layout in the emitted zip").toBeDefined();
     const touchText = strFromU8(touchBytes as Uint8Array);
     const touchJson = JSON.parse(touchText) as TouchLayoutJson;
 
@@ -560,8 +560,9 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
 
     await driveIdentityLite(page, { autonym: "Bamanankan", code: "bm", script: "Latn" });
     await pickStartKeyboard(page, BAMBARA_START_ID);
-    await chooseAdaptTrack(page);
+    await chooseTrackCopy(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
     await confirmPrefill(page);
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
@@ -586,8 +587,8 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
 
     const entries = await emitAndUnzip(page);
 
-    const touchBytes = entries[BAMBARA_TOUCH_ZIP_PATH];
-    expect(touchBytes, `expected ${BAMBARA_TOUCH_ZIP_PATH} in the emitted zip`).toBeDefined();
+    const touchBytes = zipSourceEntry(entries, "keyman-touch-layout");
+    expect(touchBytes, "expected source/<id>.keyman-touch-layout in the emitted zip").toBeDefined();
     const touchText = strFromU8(touchBytes as Uint8Array);
     const touchJson = JSON.parse(touchText) as TouchLayoutJson;
 

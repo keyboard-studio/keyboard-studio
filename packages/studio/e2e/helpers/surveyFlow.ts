@@ -162,7 +162,7 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  * (#1901: the author/copyright questions — il_author_name, il_author_email,
  * il_copyright_holder — are no longer part of this flow. They form the
  * post-track attribution step; see driveAttributionStep, which walks call
- * after chooseTrackCopy / chooseAdaptTrack.)
+ * after chooseTrackCopy.)
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -303,11 +303,93 @@ export async function pickStartKeyboard(
   await confirm.click();
 }
 
-/** Retired: the track step no longer offers Open (spec 111). Kept so old callers fail with a reason. */
-export async function chooseAdaptTrack(_page: Page): Promise<void> {
-  // Spec 111 removed the mid-walk Open option: an update starts from the start
-  // screen's "Open an existing keyboard" (see open-existing-keyboard.spec.ts).
-  throw new Error("chooseAdaptTrack: the track step no longer offers Open (spec 111); open the keyboard from the start screen");
+/**
+ * Open `keyboardId` from the start screen ("Open an existing keyboard", spec 111)
+ * and land on the first step of the Open walk (Languages). Starts from a cold
+ * page, so a first-time visitor sees the welcome screen; callers that seeded a
+ * returning visitor must not use this. Returns the interactions the author
+ * performed (search, choose, open) so a spec can assert SC-009.
+ */
+export async function openExistingKeyboard(page: Page, keyboardId: string): Promise<number> {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue as guest" }).click();
+
+  // toBeInViewport, not toBeVisible: a card clipped below an overflow:hidden
+  // pane still counts as "visible" to Playwright, which is how the entry once
+  // shipped unreachable under the welcome screen.
+  const create = page.getByTestId("start-new");
+  await expect(create).toBeInViewport({ timeout: 30_000 });
+  const entry = page.getByRole("region", { name: /open an existing keyboard/i });
+  await expect(entry).toBeInViewport();
+
+  let interactions = 0;
+
+  // Interaction 1: search by id in the entry's picker.
+  await entry.getByRole("combobox").fill(keyboardId);
+  interactions += 1;
+
+  // Interaction 2: choose the keyboard from the results.
+  await entry.locator(`[id$="-opt-${keyboardId}"]`).first().click({ timeout: 15_000 });
+  interactions += 1;
+
+  // Interaction 3: open it. The button stays disabled while both
+  // repositories are being checked.
+  const open = entry.getByRole("button", { name: /open this keyboard/i });
+  await expect(open).toBeEnabled({ timeout: 30_000 });
+  await open.click();
+  interactions += 1;
+  return interactions;
+}
+
+/**
+ * Press the Continue of the walk step on screen. Steps carry it under their own
+ * test ids (`osk-continue`, `touch-continue`, `survey-advance`, ...), and the
+ * Languages page has a plain Continue button. Returns the control pressed.
+ */
+export async function continueOpenWalk(page: Page): Promise<string> {
+  const control = page
+    .locator(
+      '[data-testid$="-continue"], [data-testid="survey-advance"], [data-testid="gallery-intro-start"], [data-testid="touch-seed-confirm"]',
+    )
+    .or(page.getByRole("button", { name: /^continue$/i }))
+    .first();
+  await control.waitFor({ state: "visible", timeout: 30_000 });
+  const id = (await control.getAttribute("data-testid")) ?? "continue";
+  // The Documentation step asks a required description when the keyboard has none
+  // to prefill from; answer it so the walk can go on (the only typing in this walk).
+  if (await control.isDisabled()) {
+    await page.getByRole("textbox").first().fill("A keyboard for typing English on a US layout.");
+  }
+  await control.click();
+  return id;
+}
+
+/**
+ * Press Continue through the Open walk until `testId` is visible, then return
+ * (the caller drives from there). Walk order is pinned by inputs and outputs,
+ * so this asserts only that the target step is reached, not the steps between.
+ */
+export async function continueOpenWalkUntil(page: Page, testId: string): Promise<void> {
+  const target = page.getByTestId(testId);
+  for (let step = 0; step < 40; step += 1) {
+    if (await target.first().isVisible().catch(() => false)) return;
+    await continueOpenWalk(page);
+    await page.waitForTimeout(500);
+  }
+  await expect(target.first()).toBeVisible({ timeout: 15_000 });
+}
+
+/**
+ * The member of an emitted zip named `source/<id>.<extension>`, whatever `<id>`
+ * is. The Copy track mints its own keyboard id from the project name, so a walk
+ * finds its output by shape rather than by the copied keyboard's id.
+ */
+export function zipSourceEntry(
+  entries: Record<string, Uint8Array>,
+  extension: string,
+): Uint8Array | undefined {
+  const name = Object.keys(entries).find((n) => n.startsWith("source/") && !n.slice(7).includes("/") && n.endsWith(`.${extension}`));
+  return name === undefined ? undefined : entries[name];
 }
 
 /**
@@ -325,8 +407,7 @@ export async function chooseTrackCopy(page: Page): Promise<void> {
 
 /**
  * Drive the attribution step (#1901) — the author/copyright questions,
- * asked AFTER the track choice (call after chooseTrackCopy /
- * chooseAdaptTrack, before acceptProjectName / confirmPrefill):
+ * asked AFTER the track choice (call after chooseTrackCopy, before acceptProjectName / confirmPrefill):
  *
  *   1. il_author_name (text) — REQUIRED (validate() rejects blank). Unseeded
  *      in an unauthenticated e2e run (the profile seed comes from
@@ -1032,7 +1113,21 @@ export async function driveHelpPhase(
   welcomeText: string = "Welcome to the keyboard.",
   usageTipText: string = "Press a key to start.",
 ): Promise<void> {
-  await page.locator("#pf_welcome_paragraph").fill(welcomeText);
+  // The optional custom CSS step sits between touch and help. A walk that
+  // arrives straight from the touch gallery lands on it first; continue past
+  // it (empty CSS) so the welcome paragraph below is the next thing shown.
+  const welcome = page.locator("#pf_welcome_paragraph");
+  const cssContinue = page.getByTestId("css-continue");
+  await Promise.race([
+    welcome.waitFor({ state: "visible", timeout: 30_000 }),
+    cssContinue.waitFor({ state: "visible", timeout: 30_000 }),
+  ]).catch(() => {
+    // Neither landmark showed: the fill below names the stall.
+  });
+  if (await cssContinue.isVisible().catch(() => false)) {
+    await driveCssEditorStep(page);
+  }
+  await welcome.fill(welcomeText);
   await surveyAdvance(page).click();
 
   // pf_font_guidance (#2182) sits in the core flow between the welcome

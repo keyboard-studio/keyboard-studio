@@ -56,7 +56,7 @@ Around them, mostly reuse:
 |---|---|---|
 | I Pattern schema | PASS | Untouched. |
 | II IR is the spine | **AMEND** | Mutations stay on the IR; projecting to text becomes a splice on Open, and code edits become new starting points. The text is in [contracts/constitution-amendment.md](contracts/constitution-amendment.md). It lands with Phase 1 and needs owner approval. |
-| III State model | **AMEND** | On Open, the starting point is file text plus its parse, and a code edit is a starting-point switch (already sanctioned by Article X). Review notes live in the criteria slice, never as decisions. Same amendment. The 053/088 mapping is unchanged because no new decision kind is added. Accepted and declined suggestions are recorded in the 053 record only. |
+| III State model | **AMEND** | On Open, the starting point is file text plus its parse, and a code edit is a starting-point switch (already sanctioned by Article X). Review notes live in the criteria slice, never as decisions. Same amendment. The 053/088 mapping gains two derived decisions (added 2026-11-05/06 with the Open walk): `open-basic-keyboard`, recorded when a keyboard is opened, and `open-issues`, recorded from the criteria baseline. Both are 088 decisions with `provenance: "derived"`, computed from the starting point rather than chosen by the author, and they only gate which walk steps appear. Accepted and declined suggestions are recorded in the 053 record only. |
 | IV Validator layering | PASS | The baseline reuses the existing assembly and worker; rechecks ride the D3 cycle. No new timer. |
 | V VirtualFS only | PASS | The `.kps` and docs enter the VFS; nothing touches host disk. |
 | VI Team boundaries | PASS | **Engine** owns the projection, import, gate, output, entry and panes. **Content** owns criteria rows (incl. upgrade criteria), suggestion and review-note wording, help questions and PR-block wording. |
@@ -64,7 +64,7 @@ Around them, mostly reuse:
 | VIII Conventions | PASS | Commit titles per house style; no issue numbers in code. |
 | IX Registry-only surfaces | PASS | Screen gates are declarations in `declaredScreenGates`; the Open entry records an existing decision. Any new question (language list, review note) is declared through the registry, which is a functional requirement of the phase that adds it. |
 | X Defaults are proposals | PASS | Carried values are the keyboard's own content, not proposals. Every studio change on Open is a suggested fix needing acceptance. Switching repositories is a starting-point switch that keeps decisions. |
-| XI Done means integrated | PASS (planned) | Each phase ends with its surface reachable from the Open entry. Upgrade pairs depend on criterion 7.28 merging (owner: whoever lands the `km/casedkeys-criterion` branch; trigger: its merge). |
+| XI Done means integrated | PASS (planned) | Each phase ends with its surface reachable from the Open entry. Upgrade pairs depended on criterion 7.28 merging; it is now on this branch. |
 
 **Gate result**: proceed. The Article II/III amendment was **approved by the owner on 2026-11-03**; it lands in the Phase 1 PR (Governance). Re-checked after Phase 1 design: no new violations. The splice contract and data model stay inside the amended articles.
 

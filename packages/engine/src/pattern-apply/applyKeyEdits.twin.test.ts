@@ -596,7 +596,7 @@ describe("applyKeyEdits twin equivalence — moveToLayer", () => {
         position: "before",
       }),
     ]);
-    // `suppressed` is reachable via nextlayer on the fixture's symbol layer… 
+    // `suppressed` is reachable via nextlayer on the fixture's symbol layer…
     // fall back to asserting twin equivalence on whatever the anchor resolved to.
     expect(layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol)).toEqual(
       layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol),

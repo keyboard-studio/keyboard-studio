@@ -18,10 +18,10 @@
 //      keys — surfaces the repair list at the touch step, and leaving
 //      it unvisited lists the unapplied repairs at Output (FR-015's
 //      ruling: preselection is not consent).
-//   3. Adapt + repair (US3, FR-009): adapting basic_kbdus, applying the
+//   3. Open + repair (US3, FR-009): opening basic_kbdus, applying the
 //      criteria-default repair (convert T_0031 to U_0031) makes the key
 //      type in the live OSK preview (symbol layer, tap U_0031 → "1").
-//   4. Track 2 choice + FR-017 (US3, FR-016/FR-017/FR-018): on Adapt, an
+//   4. Track 2 choice + FR-017 (US3, FR-016/FR-017/FR-018): when updating an opened keyboard, an
 //      editor edit that would sever a K_ link is held and decided inline;
 //      "keep the link" is recorded and pins the choice — re-triggering
 //      the identical edit (after renaming the key back, the only editor
@@ -61,7 +61,8 @@ import {
   driveIdentityLite,
   pickStartKeyboard,
   chooseTrackCopy,
-  chooseAdaptTrack,
+  openExistingKeyboard,
+  continueOpenWalkUntil,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -150,10 +151,7 @@ async function enterTouchStep(page: Page): Promise<void> {
  * Phase B adds one already-produced character ("a") — the walk is about
  * the imported keys, not about new-character placement.
  */
-async function driveToBasicKbdusTouchStep(
-  page: Page,
-  track: "copy" | "adapt",
-): Promise<void> {
+async function driveToBasicKbdusTouchStep(page: Page): Promise<void> {
   await seedReturningVisitor(page);
   await page.goto("/");
   await driveIdentityLite(page, {
@@ -163,13 +161,9 @@ async function driveToBasicKbdusTouchStep(
     languageCode: "en",
   });
   await pickStartKeyboard(page, "basic_kbdus");
-  if (track === "copy") {
-    await chooseTrackCopy(page);
-  } else {
-    await chooseAdaptTrack(page);
-  }
+  await chooseTrackCopy(page);
   await driveAttributionStep(page);
-  if (track === "copy") await acceptProjectName(page);
+  await acceptProjectName(page);
   await confirmPrefill(page);
   await buildOneCharacterList(page, "a");
   await finishGalleryWork(page);
@@ -177,6 +171,17 @@ async function driveToBasicKbdusTouchStep(
   await expect(page.getByTestId("touch-key-identity-list")).toBeVisible({
     timeout: 30_000,
   });
+}
+
+/**
+ * basic_kbdus opened from the start screen (spec 111) and walked with Continue
+ * to the touch step, where the imported keys' identity list shows. The update
+ * path keeps the keyboard's own touch layout, so the repair rows are the
+ * keyboard's, not a reseed.
+ */
+async function openBasicKbdusToTouchStep(page: Page): Promise<void> {
+  await openExistingKeyboard(page, "basic_kbdus");
+  await continueOpenWalkUntil(page, "touch-key-identity-list");
 }
 
 /**
@@ -418,7 +423,7 @@ test.describe("spec 104 walk 2: copy parity and the repair list", () => {
     page,
   }) => {
     test.setTimeout(480_000);
-    await driveToBasicKbdusTouchStep(page, "copy");
+    await driveToBasicKbdusTouchStep(page);
 
     // FR-015: the repair list lives at the owning step (the touch step),
     // rows present before first download, defaults preselected.
@@ -439,15 +444,15 @@ test.describe("spec 104 walk 2: copy parity and the repair list", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Walk 3 — Adapt: apply a repair, the key types in the preview (FR-009)
+// Walk 3 — Open: apply a repair, the key types in the preview (FR-009)
 // ---------------------------------------------------------------------------
 
-test.describe("spec 104 walk 3: adapt with repair", () => {
+test.describe("spec 104 walk 3: open with repair", () => {
   test("applying the default repair to dead T_0031 makes it produce '1' in the OSK preview", async ({
     page,
   }) => {
     test.setTimeout(480_000);
-    await driveToBasicKbdusTouchStep(page, "adapt");
+    await openBasicKbdusToTouchStep(page);
 
     const rows = page.getByTestId("touch-key-repair-row");
     const row = rows.filter({ hasText: "T_0031" }).first();
@@ -525,7 +530,8 @@ test.describe("spec 104 walk 4: Track 2 identity choice and decline suppression"
     const choice = page.getByTestId("touch-key-identity-choice");
     const decisionRows = page.getByTestId("touch-key-decision-row");
 
-    // --- The triggering edit: redefine K_A to æ on the Adapt track.
+    // --- The triggering edit: redefine K_A to æ. This severing choice is asked on the Open path;
+    // driveToTouchStep walks Copy, so revive this walk with an Open prelude.
     await cellByAddressSuffix(page, ":shift:K_A").click();
     await assignCharToSelectedKey(page, "U+00E6");
 
