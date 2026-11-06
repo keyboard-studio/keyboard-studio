@@ -21,16 +21,27 @@
 // The attestation / confirmation controls stay authored-only, and the
 // GitHub file links stay /review-only: the author's files are not on
 // GitHub at a pinned sha.
+//
+// Footer nav (spec 081 / issue #2535): the criteria route sits outside StepHost.
+// After html→done the session's activeStepId is "done", so StepNavCluster had no
+// published Back/forward slots. Publish under CRITERIA_ROUTE_NAV_STEP_ID via
+// StepNavContext; StudioFooter reads that on `#criteria`. Open walk only: same
+// predicate as the former in-page Continue bar (`isOpenMode`).
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
+import {
+  StepNavContext,
+  usePublishStepNav,
+} from "../hooks/usePublishStepNav.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { isOpenMode } from "../lib/openMode.ts";
 import { ALL_CRITERIA } from "@keyboard-studio/contracts";
 import { MISSING_LETTERS_RULE } from "../criteria/openIssues.ts";
 import { upgradePairFor } from "../criteria/upgradePairs.ts";
@@ -44,9 +55,9 @@ import {
   type AuthoredSeverity,
 } from "../review/reviewSeverity.ts";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
+import { CRITERIA_ROUTE_NAV_STEP_ID } from "../stores/stepNavStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { isOpenMode } from "../lib/openMode.ts";
-import { Button } from "../ui/Button.tsx";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
 const containerStyle: React.CSSProperties = {
@@ -82,15 +93,61 @@ function openEditorFor(criterionId: string): void {
 }
 
 export function CriteriaScreen() {
+  return (
+    <StepNavContext.Provider value={CRITERIA_ROUTE_NAV_STEP_ID}>
+      <CriteriaScreenBody />
+    </StepNavContext.Provider>
+  );
+}
+
+function CriteriaScreenBody() {
   const { t } = useLingui();
   const artifact = usePreviewArtifact();
   const result = useAuthoredCriteria(artifact.stage);
 
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const hasProject = useWorkingCopyStore((s) => s.startKeyboard !== null);
+  const isOpen = isOpenMode(instantiationMode);
+
+  const history = useSurveySessionStore((s) => s.history);
+  const popHistory = useSurveySessionStore((s) => s.popHistory);
+
+  const showOpenCriteriaFooter = isOpen && hasProject;
+  const canWalkBack = history.length > 0;
+
+  const handleCriteriaBack = useCallback(() => {
+    popHistory();
+    navigateTo("survey");
+  }, [popHistory]);
+
+  const navSpec = useMemo(() => {
+    if (!showOpenCriteriaFooter) return {};
+    return {
+      ...(canWalkBack
+        ? {
+            back: {
+              label: t({ id: "criteria.footer.back", message: "Back" }),
+              onClick: handleCriteriaBack,
+              testId: "criteria-footer-back",
+            },
+          }
+        : {}),
+      forward: {
+        label: t({
+          id: "criteria.continueToOutput",
+          message: "Continue to Output",
+        }),
+        onClick: () => navigateTo("output"),
+        testId: "criteria-footer-continue-output",
+      },
+    };
+  }, [showOpenCriteriaFooter, canWalkBack, handleCriteriaBack, t]);
+
+  usePublishStepNav(navSpec);
+
   const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
   const routeFix = useRouteSuggestedFix();
   const docFixes = useDocRegenerationFixes();
-  // Review is the Open walk's last step: Continue hands over to Output (spec 111 FR-031).
-  const isOpen = isOpenMode(useWorkingCopyStore((s) => s.instantiationMode));
   const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
   const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
@@ -165,59 +222,52 @@ export function CriteriaScreen() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-    <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
-      <SuggestedFixesPanel
-        extra={[...missingFixes, ...docFixes]}
-        onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))} testId="criteria-suggested-fixes" />
-    </div>
-    <div style={{ flex: 1, minHeight: 0 }}>
-    <CriteriaPage
-      result={result}
-      mode="authored"
-      {...(keyboard !== undefined ? { keyboardLabel: keyboard } : {})}
-      banner={{
-        eyebrow: t({ id: "nav.wordmark", message: "Keyboard Studio" }),
-        title: <Trans id="criteria.title">Criteria</Trans>,
-        meta:
-          keyboard !== undefined
-            ? `${t({ id: "criteria.keyboard", message: `Keyboard: ${keyboard}` })} · ${judgedNote}`
-            : judgedNote,
-      }}
-      {...(severityMap !== undefined ? { severityMap } : {})}
-      {...(result.fileTree !== undefined
-        ? { fileTree: result.fileTree }
-        : {})}
-      onAttest={attest}
-      onClearAttestation={clearAttestation}
-      onConfirm={confirm}
-      onUnconfirm={unconfirm}
-      onAttestContrastive={attestContrastiveRegion}
-      onClearContrastive={clearContrastiveRegion}
-      onAttestFontLicense={attestFontLicense}
-      onClearFontLicense={clearFontLicense}
-      {...(ratchet !== null
-        ? {
-            openRatchet: {
-              baseline: ratchet.baseline,
-              notes: ratchet.notes,
-              onSaveNote: (key, criterionId, text) =>
-                setReviewNote({ key, criterionId, text }),
-              onRemoveNote: removeReviewNote,
-              // The walk is where a failing item is edited; per-fix links
-              // arrive with the suggested-fix work.
-              onOpenEditor: (criterionId) => openEditorFor(criterionId),
-            },
-          }
-        : {})}
-    />
-    </div>
-    {isOpen && (
-      <div style={{ flex: "none", display: "flex", justifyContent: "flex-end", padding: "8px 24px", borderTop: `1px solid ${BORDER}` }}>
-        <Button variant="primary" onClick={() => navigateTo("output")} data-testid="criteria-continue">
-          <Trans id="criteria.continueToOutput">Continue to Output</Trans>
-        </Button>
+      <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
+        <SuggestedFixesPanel
+          extra={[...missingFixes, ...docFixes]}
+          onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))}
+          testId="criteria-suggested-fixes"
+        />
       </div>
-    )}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <CriteriaPage
+          result={result}
+          mode="authored"
+          {...(keyboard !== undefined ? { keyboardLabel: keyboard } : {})}
+          banner={{
+            eyebrow: t({ id: "nav.wordmark", message: "Keyboard Studio" }),
+            title: <Trans id="criteria.title">Criteria</Trans>,
+            meta:
+              keyboard !== undefined
+                ? `${t({ id: "criteria.keyboard", message: `Keyboard: ${keyboard}` })} · ${judgedNote}`
+                : judgedNote,
+          }}
+          {...(severityMap !== undefined ? { severityMap } : {})}
+          {...(result.fileTree !== undefined ? { fileTree: result.fileTree } : {})}
+          onAttest={attest}
+          onClearAttestation={clearAttestation}
+          onConfirm={confirm}
+          onUnconfirm={unconfirm}
+          onAttestContrastive={attestContrastiveRegion}
+          onClearContrastive={clearContrastiveRegion}
+          onAttestFontLicense={attestFontLicense}
+          onClearFontLicense={clearFontLicense}
+          {...(ratchet !== null
+            ? {
+                openRatchet: {
+                  baseline: ratchet.baseline,
+                  notes: ratchet.notes,
+                  onSaveNote: (key, criterionId, text) =>
+                    setReviewNote({ key, criterionId, text }),
+                  onRemoveNote: removeReviewNote,
+                  // The walk is where a failing item is edited; per-fix links
+                  // arrive with the suggested-fix work.
+                  onOpenEditor: (criterionId) => openEditorFor(criterionId),
+                },
+              }
+            : {})}
+        />
+      </div>
     </div>
   );
 }

@@ -731,9 +731,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       return;
     }
     autosaveTeardownRef.current = installDraftAutosave(PENDING_PROJECT_KEY);
-    // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
-    // are stable module-level imports, and the refs are stable by construction.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -2120,7 +2117,7 @@ function StudioShellContent() {
           ABSENT, not an empty shell, on Welcome and wherever there is no
           project yet (Q6). A route-by-route conditional here would be a second
           place to keep that rule, and the two would drift. */}
-      <StudioFooter />
+      <StudioFooter activeRoute={route} />
     </div>
   );
 }

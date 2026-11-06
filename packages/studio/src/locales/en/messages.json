@@ -126,6 +126,7 @@
   "criteria.font.licensePlaceholder": "License, e.g. OFL-1.1",
   "criteria.font.openLabel": "This is an open license",
   "criteria.font.save": "Save attestation",
+  "criteria.footer.back": "Back",
   "criteria.judgedNote.authored": "Judging the keyboard as it would be downloaded from Output.",
   "criteria.keyboard": "Keyboard: {keyboard}",
   "criteria.notReady": "The keyboard is still being prepared, so its criteria cannot be judged yet. The verdicts will appear here once the compiled keyboard is ready.",

@@ -126,6 +126,7 @@
   "criteria.font.licensePlaceholder": "Licence, par exemple OFL-1.1",
   "criteria.font.openLabel": "Il s'agit d'une licence libre.",
   "criteria.font.save": "Enregistrer l'attestation",
+  "criteria.footer.back": "Retour",
   "criteria.judgedNote.authored": "Évaluation du clavier tel qu'il serait téléchargé depuis Output.",
   "criteria.keyboard": "Clavier : {keyboard}",
   "criteria.notReady": "Le clavier est encore en cours de préparation ; il n'est donc pas encore possible d'en évaluer les caractéristiques. Les avis seront publiés ici dès que le clavier finalisé sera prêt.",
