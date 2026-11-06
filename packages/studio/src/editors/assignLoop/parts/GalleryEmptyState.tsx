@@ -47,7 +47,7 @@ export function GalleryEmptyState({
       ? {}
       : {
           back: {
-            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
             onClick: onBack,
             testId: "gallery-empty-back",
             ...(backAriaLabel !== undefined ? { ariaLabel: backAriaLabel } : {}),

@@ -63,7 +63,7 @@ export function GalleryIntroSplash({
     ...(onBack !== undefined
       ? {
           back: {
-            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
             onClick: onBack,
             testId: "gallery-intro-back",
             ...(backAriaLabel !== undefined ? { ariaLabel: backAriaLabel } : {}),

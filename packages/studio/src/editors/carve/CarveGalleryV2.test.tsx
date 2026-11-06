@@ -821,7 +821,7 @@ describe('CarveGalleryV2 — footer nav (spec 081)', () => {
     render(<CarveGalleryV2 onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
 
     const nav = screen.getByRole('group', { name: 'Step navigation' });
-    expect(within(nav).getByTestId('carve-back').textContent).toBe('← Back');
+    expect(within(nav).getByTestId('carve-back').textContent).toBe('Back');
     expect(within(nav).getByTestId('carve-skip').textContent).toBe('Skip');
     expect(within(nav).getByTestId('carve-continue').textContent).toBe('Continue →');
   });
@@ -836,7 +836,7 @@ describe('CarveGalleryV2 — footer nav (spec 081)', () => {
     });
     render(<CarveGalleryV2 onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
 
-    expect(screen.getByTestId('carve-back').textContent).toBe('← Retour');
+    expect(screen.getByTestId('carve-back').textContent).toBe('Retour');
     expect(screen.getByTestId('carve-skip').textContent).toBe('Passer');
     expect(screen.getByTestId('carve-continue').textContent).toBe('Continuer →');
   });
@@ -849,7 +849,7 @@ describe('CarveGalleryV2 — footer nav (spec 081)', () => {
     });
     render(<CarveGalleryV2 onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     expect(screen.getByText('Chargement du clavier…')).not.toBeNull();
-    expect(screen.getByTestId('carve-back').textContent).toBe('← Retour');
+    expect(screen.getByTestId('carve-back').textContent).toBe('Retour');
   });
 });
 

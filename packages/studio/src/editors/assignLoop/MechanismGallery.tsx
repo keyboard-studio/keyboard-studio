@@ -3533,7 +3533,7 @@ export function MechanismGallery({
     ...(onBack !== undefined || currentIdx > 0
       ? {
           back: {
-            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
             onClick: handleBack,
             testId: "mechanisms-back",
           },

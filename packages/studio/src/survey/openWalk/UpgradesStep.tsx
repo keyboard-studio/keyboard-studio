@@ -24,7 +24,12 @@ import { readVfsText } from "../../lib/vfsText.ts";
 import { replaceStartingPointAndReplay } from "../../lib/replaceStartingPoint.ts";
 import { decidedSuggestions, recordSuggestionDisposition } from "../../lib/suggestionDispositions.ts";
 import type { SuggestedFix } from "../../lib/consistencySuggestions.ts";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
+import { TEXT_DIM } from "../../ui/theme.ts";
+import {
+  phaseHeading,
+  surveyCard,
+  surveyPageColumn,
+} from "../surveyStyles.ts";
 import { WalkNav } from "./WalkNav.tsx";
 
 /** The lint rule ids of the failing findings, sorted, joined into a stable effect key. */
@@ -105,48 +110,50 @@ export function UpgradesRenderer({ onChange }: DecisionRendererProps<boolean>) {
     recordSuggestionDisposition(fix, "accepted");
   };
 
+  // Same composition as the survey steps (Prefill): left-aligned column,
+  // display title above the accent-topped card — not the old centred card
+  // with a plain 18px title this page used to render.
   return (
-    <section
-      aria-labelledby="open-upgrades-heading"
-      style={{ maxWidth: 720, margin: "24px auto", padding: 20, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontFamily: FONT, color: TEXT_MAIN }}
-    >
-      <h2 id="open-upgrades-heading" style={{ margin: "0 0 8px", fontSize: 18 }}>
+    <div style={surveyPageColumn}>
+      <h2 id="open-upgrades-heading" style={phaseHeading}>
         <Trans id="open.upgrades.title">Upgrades</Trans>
       </h2>
-      <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.6, color: TEXT_DIM }}>
-        <Trans id="open.upgrades.intro">
-          These bring the keyboard up to the current Keyman way of doing things. Each one changes only what it
-          concerns, and nothing changes until you apply it. Preview it first, or skip it.
-        </Trans>
-      </p>
-      {offers === null ? (
-        <p role="status" style={{ fontSize: 13, color: TEXT_DIM }}>
-          <Trans id="open.upgrades.preparing">Preparing the upgrades...</Trans>
+      <section aria-labelledby="open-upgrades-heading" style={surveyCard}>
+        <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.6, color: TEXT_DIM }}>
+          <Trans id="open.upgrades.intro">
+            These bring the keyboard up to the current Keyman way of doing things. Each one changes only what it
+            concerns, and nothing changes until you apply it. Preview it first, or skip it.
+          </Trans>
         </p>
-      ) : pending.length === 0 ? (
-        <p role="status" style={{ fontSize: 13, color: TEXT_DIM }} data-testid="upgrades-none">
-          <Trans id="open.upgrades.none">No upgrades are waiting.</Trans>
-        </p>
-      ) : (
-        <SuggestedFixes
-          fixes={pending.map((o) => o.fix)}
-          testId="upgrade-offers"
-          mode="apply"
-          onAccept={apply}
-          onSkip={(fix) => recordSuggestionDisposition(fix, "declined")}
+        {offers === null ? (
+          <p role="status" style={{ fontSize: 13, color: TEXT_DIM }}>
+            <Trans id="open.upgrades.preparing">Preparing the upgrades...</Trans>
+          </p>
+        ) : pending.length === 0 ? (
+          <p role="status" style={{ fontSize: 13, color: TEXT_DIM }} data-testid="upgrades-none">
+            <Trans id="open.upgrades.none">No upgrades are waiting.</Trans>
+          </p>
+        ) : (
+          <SuggestedFixes
+            fixes={pending.map((o) => o.fix)}
+            testId="upgrade-offers"
+            mode="apply"
+            onAccept={apply}
+            onSkip={(fix) => recordSuggestionDisposition(fix, "declined")}
+          />
+        )}
+        {error !== null && (
+          <p role="alert" style={{ fontSize: 13 }}>
+            {error}
+          </p>
+        )}
+        <WalkNav
+          onContinue={() => {
+            onChange(true);
+            onComplete(undefined);
+          }}
         />
-      )}
-      {error !== null && (
-        <p role="alert" style={{ fontSize: 13 }}>
-          {error}
-        </p>
-      )}
-      <WalkNav
-        onContinue={() => {
-          onChange(true);
-          onComplete(undefined);
-        }}
-      />
-    </section>
+      </section>
+    </div>
   );
 }
