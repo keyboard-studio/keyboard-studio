@@ -54,6 +54,7 @@ type ActiveStepId =
   | "css"
   | "help"
   | "html"
+  | "icon"
   | "done"
   | "unsupported";
 
@@ -375,6 +376,9 @@ function advanceStep(
         : { next: "help" };
 
     case "html":
+      return { next: nextMainLineStepAfter("html") }; // icon
+
+    case "icon":
       return { next: "done", navigate: "output" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).

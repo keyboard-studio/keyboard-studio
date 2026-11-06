@@ -67,6 +67,7 @@ export type StepId =
   | "css"
   | "help"
   | "html"
+  | "icon"
   | "package";
 
 // ---------------------------------------------------------------------------
@@ -131,7 +132,11 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "F",
     label: msg({ id: "phaseStepper.phase.f", message: "Finalize" }),
-    stepIds: ["help", "html"],
+    // icon (icon editor step): after Documentation (html), before the
+    // reserved package stub — same Finalize phase as help/html. Added here
+    // because validatePhaseMap() throws at module load for any manifest
+    // step with no phase (this is that guard doing its job).
+    stepIds: ["help", "html", "icon"],
   },
 ] as const;
 
