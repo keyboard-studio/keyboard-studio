@@ -722,7 +722,7 @@ describe("MechanismGallery — combined Assign-to-a-key card (S-01/S-08 merge)",
     expect(assignments).toHaveLength(1);
     expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[ALT K_E]",
+      "[RALT K_E]",
     );
   });
 

@@ -5472,7 +5472,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const validLayerCombos = useMemo<ModifierToken[][]>(
     () =>
       workingIrForLayers !== null
-        ? collectLayerCombosInUse(workingIrForLayers)
+        ? // No raw Ctrl plane (unsided CTRL without Alt) is offered as new
+          // touch content; sided Ctrl and Ctrl+Alt (AltGr) stay.
+          collectLayerCombosInUse(workingIrForLayers).filter(
+            (combo) =>
+              !(
+                combo.includes("CTRL") &&
+                !combo.some((t) => t === "ALT" || t === "RALT" || t === "LALT")
+              ),
+          )
         : [],
     [workingIrForLayers],
   );

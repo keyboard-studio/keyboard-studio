@@ -125,6 +125,62 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T09:13:44.408Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:24.771Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:24.943Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.071Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.179Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.290Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.400Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.531Z"
     }
   ],
   "decisions": [
@@ -223,7 +279,7 @@
       ]
     }
   },
-  "currentTask": "T014",
+  "currentTask": "T025",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -287,6 +343,61 @@
       "did": "Registered KM_LINT_RAW_CTRL pair",
       "files": [
         "packages/studio/src/criteria/upgradePairs.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "No-Ctrl and AltGr-form gallery tests",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.noCtrl.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Touch gallery no-Ctrl and template-apply no-Ctrl-layer tests",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.noCtrl.test.tsx",
+        "packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Carve removal contributors include Ctrl rule; urdu no-carve keeps text",
+      "files": [
+        "packages/studio/src/lib/irToCarveNodes.removal.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Pool drops raw CTRL, AltGr follows keyboard Alt form (RALT default, CTRL ALT, ALT); suggestion fallbacks use altgrTokensFor; existing layer tests updated",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx",
+        "packages/studio/src/editors/assignLoop/assignmentFromSuggestion.ts",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.layers.test.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.methods.test.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Touch gallery filters raw Ctrl combos from validLayerCombos",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx",
+        "packages/studio/src/editors/assignLoop/TouchGallery.layers.test.tsx"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified only: builder has no add-layer path and override options carry no ctrl; no code change",
+      "files": [
+        "packages/studio/src/editors/assignLoop/touchBuilder/TouchBuilderPane.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified only: carve removal already covers Ctrl rules; no change",
+      "files": [
+        "packages/studio/src/lib/irToCarveNodes.ts"
       ]
     }
   },

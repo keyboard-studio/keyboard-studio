@@ -48,18 +48,18 @@ Files: packages/studio/src/editors/assignLoop/MechanismGallery.tsx, mechanismPla
 
 ### Tests
 
-- [ ] **T020** [P] [US2] Write failing tests: the Mechanism gallery offers no raw Ctrl combination on Copy or Open, still offers AltGr in the keyboard's existing Alt form (`CTRL ALT`, `RALT`/`LALT` or `ALT`) and as `RALT` when it has none, and still offers `LCTRL` / `RCTRL` · packages/studio/src/editors/assignLoop/MechanismGallery.noCtrl.test.tsx
-- [ ] **T026** [P] [US2] Write failing tests: the Touch gallery offers no raw Ctrl plane, and the touch layer editor cannot add a Ctrl layer the keyboard lacks · packages/studio/src/editors/assignLoop/TouchGallery.noCtrl.test.tsx, packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.test.ts
-- [ ] **T021** [P] [US2] Write failing tests: carving a character typed on Ctrl removes its Ctrl rules with its other rules; a basic_kbdurdu Copy with nothing carved keeps every Ctrl rule (SC-004) · packages/studio/src/lib/irToCarveNodes.removal.test.ts
+- [x] **T020** [P] [US2] Write failing tests: the Mechanism gallery offers no raw Ctrl combination on Copy or Open, still offers AltGr in the keyboard's existing Alt form (`CTRL ALT`, `RALT`/`LALT` or `ALT`) and as `RALT` when it has none, and still offers `LCTRL` / `RCTRL` · packages/studio/src/editors/assignLoop/MechanismGallery.noCtrl.test.tsx
+- [x] **T026** [P] [US2] Write failing tests: the Touch gallery offers no raw Ctrl plane, and the touch layer editor cannot add a Ctrl layer the keyboard lacks · packages/studio/src/editors/assignLoop/TouchGallery.noCtrl.test.tsx, packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.test.ts
+- [x] **T021** [P] [US2] Write failing tests: carving a character typed on Ctrl removes its Ctrl rules with its other rules; a basic_kbdurdu Copy with nothing carved keeps every Ctrl rule (SC-004) · packages/studio/src/lib/irToCarveNodes.removal.test.ts
 
 ### Implementation
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T022** [P] [US2] Drop unsided `CTRL` without Alt from the gallery's modifier pool (`computeModifierPool`), and write new AltGr placements in the keyboard's existing Alt form, `RALT` when it has none (FR-003, lead ruling 2): extend `computeModifierPool` / `raltDefaultToken` to detect `CTRL ALT` with `collectLayerCombosInUse`, and check the hard-coded `RALT` fallbacks in `assignmentFromSuggestion.ts`. `mechanismPlacement.ts` has no Ctrl code; change it only if a test shows it must · packages/studio/src/editors/assignLoop/MechanismGallery.tsx
-- [ ] **T023** [P] [US2] Filter Ctrl planes out of the Touch gallery (FR-003) · packages/studio/src/editors/assignLoop/TouchGallery.tsx
-- [ ] **T024** [P] [US2] Stop the touch layer editor adding a Ctrl layer where the keyboard has none (FR-003) · packages/studio/src/editors/assignLoop/touchBuilder/TouchBuilderPane.tsx, packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.ts
-- [ ] **T025** [P] [US2] Verify carve removal covers CTRL planes on basic_kbdurdu; change the file only if T021 fails · packages/studio/src/lib/irToCarveNodes.ts
+- [x] **T022** [P] [US2] Drop unsided `CTRL` without Alt from the gallery's modifier pool (`computeModifierPool`), and write new AltGr placements in the keyboard's existing Alt form, `RALT` when it has none (FR-003, lead ruling 2): extend `computeModifierPool` / `raltDefaultToken` to detect `CTRL ALT` with `collectLayerCombosInUse`, and check the hard-coded `RALT` fallbacks in `assignmentFromSuggestion.ts`. `mechanismPlacement.ts` has no Ctrl code; change it only if a test shows it must · packages/studio/src/editors/assignLoop/MechanismGallery.tsx
+- [x] **T023** [P] [US2] Filter Ctrl planes out of the Touch gallery (FR-003) · packages/studio/src/editors/assignLoop/TouchGallery.tsx
+- [x] **T024** [P] [US2] Stop the touch layer editor adding a Ctrl layer where the keyboard has none (FR-003) · packages/studio/src/editors/assignLoop/touchBuilder/TouchBuilderPane.tsx, packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.ts
+- [x] **T025** [P] [US2] Verify carve removal covers CTRL planes on basic_kbdurdu; change the file only if T021 fails · packages/studio/src/lib/irToCarveNodes.ts
 
 **Checkpoint**: no gallery or touch editor action on either path produces a Ctrl plane or layer (SC-005).
 

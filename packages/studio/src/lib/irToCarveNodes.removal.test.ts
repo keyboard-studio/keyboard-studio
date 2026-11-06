@@ -10,6 +10,12 @@ import { collectCharContributors, deriveCarveNeededSet } from '@keyboard-studio/
 import { loadLangtags } from './langtagsDefaults.ts';
 import { irGroup } from '@keyboard-studio/contracts/fixtures';
 import { makeCharOnlyRule, makeGroup, makeIR } from './__fixtures__/irToCarveNodes.ts';
+import { irToCharacterView, characterCellIds } from './irToCharacterView.ts';
+import { classifyRemovalCapabilities, applyCarveToVfs, parseKmn } from '@keyboard-studio/engine';
+import { vkeyRule } from '@keyboard-studio/contracts/fixtures';
+import { createVirtualFS } from '@keyboard-studio/contracts';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // isSimpleRemovableRule — #525 BANNER slice allowlist predicate
@@ -858,5 +864,45 @@ describe('recommendedRemovalChars — shared uppercase retires last (spec 051 FR
 
     expect(result.map((r) => r.ch).sort()).toEqual(['s', 'ſ']);
     expect(result.every((r) => r.caseGroup === undefined)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ctrl rules go with their character when it is carved (spec 114 FR-003, SC-004)
+// ---------------------------------------------------------------------------
+
+describe('carving a character typed on Ctrl', () => {
+  it('lists the raw-Ctrl rule among the removal contributors, with the other rules for the character', () => {
+    const ir = makeIR({
+      groups: [
+        makeGroup([
+          vkeyRule({ nodeId: 'r-plain', vkey: 'K_E', modifiers: [], output: 'é' }),
+          vkeyRule({ nodeId: 'r-ctrl', vkey: 'K_E', modifiers: ['CTRL'], output: 'é' }),
+          vkeyRule({ nodeId: 'r-other', vkey: 'K_A', modifiers: [], output: 'a' }),
+        ]),
+      ],
+    });
+    const cells = irToCharacterView(ir, classifyRemovalCapabilities(ir), new Set(), new Set());
+    const cell = cells.find((c) => c.ch === 'é');
+    expect(cell).toBeDefined();
+    const ids = characterCellIds(cell!);
+    expect(ids).toContain('r-plain');
+    expect(ids).toContain('r-ctrl');
+    expect(ids).not.toContain('r-other');
+  });
+});
+
+const URDU_KMN = resolve('C:/Github/keyboards/release/basic/basic_kbdurdu/source/basic_kbdurdu.kmn');
+
+describe('basic_kbdurdu Copy with nothing carved', () => {
+  it.skipIf(!existsSync(URDU_KMN))('keeps every Ctrl rule', () => {
+    const text = readFileSync(URDU_KMN, 'utf8');
+    const startIr = parseKmn(text).ir;
+    const vfs = createVirtualFS([{ path: 'source/basic_kbdurdu.kmn', content: text, isBinary: false }]);
+    const result = applyCarveToVfs(vfs, 'basic_kbdurdu', startIr, new Set());
+    expect(result.warnings).toEqual([]);
+    // Nothing carved: the source text is untouched, so every Ctrl rule stays.
+    const after = vfs.get('source/basic_kbdurdu.kmn')?.content;
+    expect(after).toBe(text);
   });
 });
