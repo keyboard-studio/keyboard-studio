@@ -325,6 +325,7 @@ export {
   isCodePointCovered,
   formatCodePointLabel,
   DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_ISO,
   DESKTOP_GEOMETRY_WIDTH,
 } from "./layout-chart/index.js";
 export type {
