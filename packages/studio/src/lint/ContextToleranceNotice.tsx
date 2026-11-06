@@ -110,7 +110,7 @@ function GapCase({ finding, names }: { finding: RuleToleranceFinding; names: Cha
         </>
       )}
       <p style={{ margin: "4px 0 0 0", fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>
-        <Trans id="lint.contextTolerance.case.joined">When the diacritic is joined to the letter, the text becomes:</Trans>
+        <Trans id="lint.contextTolerance.case.joined">When the mark is joined to the letter, the text becomes:</Trans>
       </p>
       <CharList text={finding.precomposedOutput ?? ""} names={names} />
       {preceding !== undefined && (
@@ -124,7 +124,7 @@ function GapCase({ finding, names }: { finding: RuleToleranceFinding; names: Cha
         </>
       )}
       <p style={{ margin: "4px 0 0 0", fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>
-        <Trans id="lint.contextTolerance.case.separate">When the letter and its diacritic are two separate characters, the text becomes:</Trans>
+        <Trans id="lint.contextTolerance.case.separate">When the letter and its mark are two separate characters, the text becomes:</Trans>
       </p>
       <CharList text={finding.decomposedOutput ?? ""} names={names} />
     </li>

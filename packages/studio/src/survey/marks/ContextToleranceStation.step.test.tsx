@@ -43,13 +43,15 @@ function renderStep(prior?: Parameters<typeof ContextToleranceStation>[0]["prior
 describe("ContextToleranceStation, normalization step", () => {
   it("shows the rule count, the examples and the rewrite disclosure, with no per-site ticks", async () => {
     renderStep();
-    expect(screen.getByText("Adds 9 rules. None of your rules change.")).toBeTruthy();
+    expect(screen.getByText(/It adds 9 rules; none of your rules change\./)).toBeTruthy();
+    // The problem is stated before the fix is offered.
+    expect(screen.getByText(/your keyboard's rules only match one of them/)).toBeTruthy();
     expect(screen.getByRole("list")).toBeTruthy();
     await screen.findByText(/U\+0323 COMBINING DOT BELOW/);
     expect(screen.getByText(/joined or separate form of a letter this keyboard can produce/)).toBeTruthy();
     expect(screen.getByText(/Other pasted text is left as it is/)).toBeTruthy();
     // Direction-neutral heading: the step maps in both directions.
-    expect(screen.getByRole("heading", { name: "Letters and diacritics written in a different form" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Should your keys also work on letters stored the other way?" })).toBeTruthy();
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     // One confirm and one decline, both native buttons.
     expect(screen.getByRole("button", { name: "Add this step" }).tagName).toBe("BUTTON");
@@ -69,7 +71,7 @@ describe("ContextToleranceStation, normalization step", () => {
         onDecide={onDecide}
       />,
     );
-    expect(screen.getByText("Adds 1 rule. None of your rules change.")).toBeTruthy();
+    expect(screen.getByText(/It adds 1 rule; none of your rules change\./)).toBeTruthy();
   });
 
   it("accept records an accept decision naming the single site, never partial", () => {
@@ -104,7 +106,7 @@ describe("ContextToleranceStation, normalization step", () => {
     });
     expect(screen.getByText(/step that converts pasted letters/)).toBeTruthy();
     // The prior view is still the step view: its heading stays direction-neutral.
-    expect(screen.getByRole("heading", { name: "Letters and diacritics written in a different form" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Should your keys also work on letters stored the other way?" })).toBeTruthy();
     expect(screen.getByTestId("context-tolerance-change")).toBeTruthy();
   });
 });

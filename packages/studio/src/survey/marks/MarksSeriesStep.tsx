@@ -489,8 +489,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           t({
             id: "marks.contextTolerance.station.description",
             message: plural(added, {
-              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
-              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
+              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the mark is joined to the letter or stored as a separate character.`,
+              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the mark is joined to the letter or stored as a separate character.`,
             }),
           }),
       }),
@@ -960,8 +960,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         {t({
           id: "survey.marks.series.intro",
           message: plural(gate.alphabet.marks.length, {
-            one: "Your alphabet includes # mark. Confirm how they attach to your letters before placing keys.",
-            other: "Your alphabet includes # marks. Confirm how they attach to your letters before placing keys.",
+            one: "Your alphabet includes # mark. These questions settle how it is typed and how it combines with your letters.",
+            other: "Your alphabet includes # marks. These questions settle how they are typed and how they combine with your letters.",
           }),
         })}
       </p>
@@ -1007,7 +1007,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       {activeStation === "marks_context_tolerance" && toleranceProposal === null && (
         <p data-testid="context-tolerance-checking" style={mutedParaFlush}>
           <Trans id="marks.contextTolerance.station.checking">
-            Checking whether your keys also work when the letter and its diacritic are stored as separate characters.
+            Checking whether your keys also work when the letter and its mark are stored as separate characters.
             You can continue; the result will appear with the other messages.
           </Trans>
         </p>
