@@ -233,4 +233,6 @@ Polish (T048–T051) after the last story shipped in this spec
 - [ ] T073 [US6] Advisory criterion for `LCTRL` / `RCTRL`: allowed, Alt-based placement preferred
 - [ ] T074 [US6] (awaiting owner: FR-039) `CTRL ALT` to `RALT` upgrade with whole-keyboard modifier conversion and a before/after AltGr simulation
 - [ ] T075 [US6] (proposed) Touch upgrade: rename the 11 `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content to `rightalt` / `rightalt-shift` (and basic_kbdth0's to `leftctrl`), with their `nextlayer` references
+- [ ] T076 [US6] Copy from a `basic_*` keyboard keeps its Ctrl rules; carving a character removes its Ctrl rules along with its other rules (check carve's rule removal covers CTRL planes; test with basic_kbdurdu)
+- [ ] T077 [US5] Removal warning (FR-040): carve (Copy), the Remove tool and gallery deletions (Open) warn, dismissably, when a removed character is in a listed language's main exemplar set, naming the language(s); reuse `useCarveNeededSet` / the Open exemplar union rather than a new lookup
 
