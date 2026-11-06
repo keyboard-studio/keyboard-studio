@@ -333,6 +333,95 @@ export function applyKeyEditsToLayout(
         break;
       }
 
+      case "moveToLayer": {
+        // SPLICE THE EXISTING NODE — the cross-layer sibling of `move`'s
+        // FR-021 guarantee: `nodeId`, `provenance`, `keycapAuthored`, `sk`,
+        // `multitap`, `flick`, `width` and `pad` survive because the object
+        // identity does. See MoveToLayerOp's doc for why remove+add cannot
+        // express this.
+        if (op.scope === "family") {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" carries scope "family", which has no shared referent across a layer family — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const platform = layout.platforms[platformIndex]!;
+        const targetLayerIndex = platform.layers.findIndex((l) => l.id === op.toLayer);
+        if (targetLayerIndex === -1) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" names unknown layer "${op.toLayer}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        if (targetLayerIndex === layerIndex) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" targets its own layer "${op.toLayer}" — no change`,
+          );
+          break;
+        }
+        const targetState = getOrCreateLayerState(platformIndex, targetLayerIndex);
+        // Id collision on the target layer: two keys with one id cannot be
+        // told apart, so the move is refused rather than half-applied.
+        const collides = targetState.workingRows.some((r) =>
+          r.keys.some((k) => k.id === key.id),
+        );
+        if (collides) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}": target layer "${op.toLayer}" already has a key with id "${key.id}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        // Splice out of the source row first, so a stale anchor pointing at
+        // the moved key itself falls back to append instead of inserting
+        // the key next to itself.
+        const [movedKey] = row.keys.splice(keyIndex, 1);
+        if (!movedKey) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" found no key — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        // Anchor: insert before/after a key on the target layer. Resolved
+        // against the live view (post-splice); falls back to append when
+        // absent or unresolvable.
+        let inserted = false;
+        if (op.anchorAddress !== undefined) {
+          const anchorParts = parseTouchKeyAddress(op.anchorAddress);
+          const anchorResolved =
+            anchorParts !== undefined ? resolveKeyAddress(liveView(), anchorParts) : undefined;
+          if (
+            anchorResolved !== undefined &&
+            anchorResolved.platformIndex === platformIndex &&
+            anchorResolved.layerIndex === targetLayerIndex
+          ) {
+            const anchorRow = targetState.workingRows[anchorResolved.rowIndex];
+            if (anchorRow !== undefined) {
+              const at =
+                anchorResolved.keyIndex + (op.position === "after" ? 1 : 0);
+              anchorRow.keys.splice(at, 0, movedKey);
+              inserted = true;
+            }
+          } else {
+            warnings.push(
+              `[key-edit-apply] moveToLayer at "${op.address}": anchor "${op.anchorAddress}" did not resolve on layer "${op.toLayer}" — appended instead`,
+            );
+          }
+        }
+        if (!inserted) {
+          const lastRow = targetState.workingRows[targetState.workingRows.length - 1];
+          if (lastRow === undefined) {
+            targetState.workingRows.push({ keys: [movedKey] });
+          } else {
+            lastRow.keys.push(movedKey);
+          }
+        }
+        break;
+      }
+
       case "suppress": {
         // The compound sp+id derivation is shared, exactly once, in
         // keyEditOps.ts (FR-029b) — see applySuppressSemantics's doc for why

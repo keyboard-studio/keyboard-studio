@@ -165,3 +165,32 @@ describe("review note lifecycle", () => {
     expect(kept.map((n) => n.key)).toEqual([NEW_KEY]);
   });
 });
+
+describe("advisory rows (sided Ctrl)", () => {
+  const ADVISORY: ResolvedRow = {
+    ...row("7.30-sided-ctrl-advisory", "not-met", {
+      rule: "KM_LINT_SIDED_CTRL_ADVISORY",
+      file: "source/k.kmn",
+    }),
+    advisory: true,
+  };
+  const RAW = row("7.29-no-raw-ctrl-rules", "not-met", {
+    rule: "KM_LINT_RAW_CTRL",
+    file: "source/k.kmn",
+  });
+  const empty: OpenBaseline = { takenAt: "t", failing: [], unresolvable: [] };
+
+  it("does not gate on a new advisory, and records it in no baseline", () => {
+    const result = resultOf([ADVISORY]);
+    expect(newFailures(result, empty)).toEqual([]);
+    expect(classifyRow(ADVISORY, empty)).toBeNull();
+    expect(takeBaseline(result, "t").failing).toEqual([]);
+    expect(ratchetFor(result, empty, [], false).blocked).toBe(false);
+  });
+
+  it("still blocks on a new raw-Ctrl failure without a note", () => {
+    const gate = ratchetFor(resultOf([ADVISORY, RAW]), empty, [], false);
+    expect(gate.blocked).toBe(true);
+    expect(gate.unjustified.map((f) => f.key)).toEqual(["KM_LINT_RAW_CTRL:source/k.kmn"]);
+  });
+});

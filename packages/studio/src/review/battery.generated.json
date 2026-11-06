@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-11-06T03:53:30.895Z",
- "catalogSize": 206,
+ "generatedAt": "2026-11-06T09:58:29.157Z",
+ "catalogSize": 208,
  "byBand": {
-  "layer-c-enforce": 122,
+  "layer-c-enforce": 124,
   "scaffolder-bake": 40,
   "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 115,
+ "implementedCount": 117,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -2665,6 +2665,36 @@
    "precertified": false,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-filename-convention.ts"
+   ]
+  },
+  {
+   "id": "7.29-no-raw-ctrl-rules",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "[content review] No rule uses Ctrl without Alt (a raw Ctrl modifier) to produce a character; those characters belong on a Shift or Alt-based layer so Ctrl keeps its application-shortcut meaning. Ctrl+Space and `basic_*` keyboards are exempt",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_RAW_CTRL"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts"
+   ]
+  },
+  {
+   "id": "7.30-sided-ctrl-advisory",
+   "band": "layer-c-enforce",
+   "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+   "description": "[content review] Advisory: a rule that uses a left- or right-sided Ctrl modifier is reported as a warning, with a suggestion to prefer an Alt-based placement",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_SIDED_CTRL_ADVISORY"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts"
    ]
   }
  ]

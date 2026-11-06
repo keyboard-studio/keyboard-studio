@@ -11,9 +11,9 @@
 
 import { parseKmn, projectKmnText } from "@keyboard-studio/engine";
 
-import type { SuggestedFix } from "../lib/consistencySuggestions.ts";
-import type { CapsEngine } from "../lib/capsEngine.ts";
+import type { UpgradeInput, UpgradeOffer } from "./upgradeTypes.ts";
 import { findingKeyOf } from "./openRatchet.ts";
+import { RAW_CTRL, buildRawCtrlOffer } from "./rawCtrlUpgrade.ts";
 import {
   TOUCH_CAPS_LAYER,
   TOUCH_MODIFIER_KEYS,
@@ -23,30 +23,9 @@ import {
   buildTouchSymbolsOffer,
 } from "./touchUpgradePairs.ts";
 
+export type { UpgradeInput, UpgradeOffer } from "./upgradeTypes.ts";
+
 export const CASEDKEYS_MISSING = "KM_LINT_CASEDKEYS_MISSING";
-
-/** What a fixer needs to build its offer. */
-export interface UpgradeInput {
-  /** Path of the `.kmn` in the working-copy VFS. */
-  file: string;
-  kmnText: string;
-  keyboardId: string;
-  /** Primary language tag, when known (casing rules such as Turkish i). */
-  bcp47?: string;
-  caps: Pick<CapsEngine, "upgradeToCasedKeys" | "compareCapsBehaviour">;
-  /** Text of any working-copy file by VFS path; undefined when absent. */
-  readText(path: string): string | undefined;
-  /** Every path in the working copy. */
-  paths: readonly string[];
-}
-
-export interface UpgradeOffer {
-  fix: SuggestedFix;
-  /** The working-copy path the upgrade rewrites. */
-  file: string;
-  /** The full text to write there when the author accepts. */
-  afterText: string;
-}
 
 export interface UpgradePair {
   /** The criterion's lintRuleId this pair repairs. */
@@ -88,6 +67,7 @@ export const UPGRADE_PAIRS: readonly UpgradePair[] = [
   { lintRuleId: TOUCH_CAPS_LAYER, build: buildTouchCapsOffer },
   { lintRuleId: TOUCH_MODIFIER_KEYS, build: buildTouchModifierKeysOffer },
   { lintRuleId: TOUCH_SYMBOLS_LAYER, build: buildTouchSymbolsOffer },
+  { lintRuleId: RAW_CTRL, build: buildRawCtrlOffer },
 ];
 
 /** The fixer registered for a criterion's lint rule, if any. */

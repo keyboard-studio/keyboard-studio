@@ -1452,5 +1452,19 @@
     "band": "layer-c-enforce",
     "description": "All files in the keyboard folder follow the filename convention: lowercase extensions, and names containing only alphanumerics, `-`, `_`, `+`, `.`",
     "lintRuleId": "KM_LINT_FILENAME_CONVENTION"
+  },
+  {
+    "id": "7.29-no-raw-ctrl-rules",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "[content review] No rule uses Ctrl without Alt (a raw Ctrl modifier) to produce a character; those characters belong on a Shift or Alt-based layer so Ctrl keeps its application-shortcut meaning. Ctrl+Space and `basic_*` keyboards are exempt",
+    "lintRuleId": "KM_LINT_RAW_CTRL"
+  },
+  {
+    "id": "7.30-sided-ctrl-advisory",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "[content review] Advisory: a rule that uses a left- or right-sided Ctrl modifier is reported as a warning, with a suggestion to prefer an Alt-based placement",
+    "lintRuleId": "KM_LINT_SIDED_CTRL_ADVISORY"
   }
 ]

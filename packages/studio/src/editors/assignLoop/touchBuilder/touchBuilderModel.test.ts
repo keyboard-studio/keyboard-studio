@@ -550,3 +550,27 @@ describe("round-trip (parse → emit)", () => {
     expect(emitted.phone.layer[0].row[0].key[0]).not.toHaveProperty("hint");
   });
 });
+
+// ---------------------------------------------------------------------------
+// No Ctrl layer the keyboard lacks (spec 114 FR-003)
+// ---------------------------------------------------------------------------
+
+describe("template apply never adds a Ctrl layer", () => {
+  const layout = (layers: string[]): TouchLayoutIR =>
+    parseTouchLayoutString(
+      JSON.stringify({
+        phone: {
+          layer: layers.map((id) => ({
+            id,
+            row: [{ id: 1, key: [{ id: "K_A", text: id === "default" ? "a" : id }] }],
+          })),
+        },
+      }),
+    );
+
+  it("emits ops only for layers the keyboard already has, even when the template carries a ctrl layer", () => {
+    const ops = buildTemplateApplyOps(layout(["default"]), layout(["default", "ctrl", "ctrl-alt"]));
+    for (const op of ops) expect(op.address).not.toMatch(/:ctrl/);
+    expect(ops.every((op) => op.address.startsWith("phone:default:"))).toBe(true);
+  });
+});

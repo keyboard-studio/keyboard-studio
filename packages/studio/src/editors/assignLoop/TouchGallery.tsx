@@ -3046,6 +3046,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         if (parts !== undefined) {
           setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
         }
+      } else if (op.kind === "moveToLayer") {
+        // The moved key keeps its id — follow it to the target layer.
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+        }
       }
 
       if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
@@ -5472,7 +5478,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const validLayerCombos = useMemo<ModifierToken[][]>(
     () =>
       workingIrForLayers !== null
-        ? collectLayerCombosInUse(workingIrForLayers)
+        ? // No raw Ctrl plane (unsided CTRL without Alt) is offered as new
+          // touch content; sided Ctrl and Ctrl+Alt (AltGr) stay.
+          collectLayerCombosInUse(workingIrForLayers).filter(
+            (combo) =>
+              !(
+                combo.includes("CTRL") &&
+                !combo.some((t) => t === "ALT" || t === "RALT" || t === "LALT")
+              ),
+          )
         : [],
     [workingIrForLayers],
   );

@@ -14,7 +14,12 @@
 // slice — so no file can be "referenced by HISTORY but deleted". The check
 // stays wired for a future surface that does delete files.
 
-import type { DocLintInput, DocMemberId, LintFinding } from "@keyboard-studio/contracts";
+import type {
+  Attribution,
+  DocLintInput,
+  DocMemberId,
+  LintFinding,
+} from "@keyboard-studio/contracts";
 import { DOC_MEMBER_IDS } from "@keyboard-studio/contracts";
 import {
   parseKvks,
@@ -107,6 +112,40 @@ export function kpsCopyright(kpsText: string | null | undefined): string | undef
   const m = /<Copyright(?:\s[^>]*)?>([^<]*)<\/Copyright>/i.exec(kpsText);
   const value = m?.[1]?.trim() ?? "";
   return value === "" ? undefined : value;
+}
+
+/** The `<Author>` element text inside `<Info>` of a `.kps`, or undefined. */
+export function kpsAuthor(kpsText: string | null | undefined): string | undefined {
+  if (kpsText === undefined || kpsText === null) return undefined;
+  const m = /<Author(?:\s[^>]*)?>([^<]*)<\/Author>/i.exec(kpsText);
+  const value = m?.[1]?.trim() ?? "";
+  return value === "" ? undefined : value;
+}
+
+/**
+ * Working-copy `attribution` for Track 2 (open/adapt): seed from the fetched
+ * package's `.kps` / `.kmn` descriptor fields when the author has not been
+ * through the attribution flow. Pure.
+ */
+export function attributionSeedFromPackageSources(args: {
+  kmnText: string | null;
+  kpsText: string | null;
+}): Attribution | null {
+  const authorRaw = kpsAuthor(args.kpsText);
+  const kmnCopyrightLine = kmnSystemStore(args.kmnText, "COPYRIGHT");
+  const kpsCopyrightLine = kpsCopyright(args.kpsText);
+  const holderFromKmn = holderFromNotice(kmnCopyrightLine);
+  const holderFromKps = holderFromNotice(kpsCopyrightLine);
+
+  let authorName = (authorRaw ?? "").trim();
+  let copyrightHolder = (holderFromKmn ?? holderFromKps ?? "").trim();
+
+  if (authorName === "" && copyrightHolder === "") return null;
+
+  if (authorName === "") authorName = copyrightHolder;
+  if (copyrightHolder === "") copyrightHolder = authorName;
+
+  return { authorName, copyrightHolder };
 }
 
 /**

@@ -255,8 +255,37 @@ export interface RemoveSubKeyOp extends KeyEditOperationBase {
 }
 
 /**
+ * Move a key to a different layer on the same platform (touch-builder
+ * "Move key to…" + cross-layer drag-drop).
+ *
+ * Like `move`, this is a splice, not a remove+add: both appliers relocate
+ * the EXISTING node, so the key keeps its `nodeId`, sub-keys (`sk`,
+ * `flick`, `multitap`), geometry, `provenance` and `keycapAuthored` flag
+ * (FR-021's identity preservation, extended across layers). A remove+add
+ * composition would mint a fresh `nodeId` and drop every sub-key —
+ * `NewKeySpec` carries neither — and silently orphan the key's decision
+ * history, so the op exists precisely to make that composition unnecessary.
+ *
+ * Addressing follows the `move` precedent: the target is a layer id (stable
+ * under replay), never a row index. The optional anchor names a key on the
+ * target layer to insert before/after; when it is absent or no longer
+ * resolves (an earlier op in the same overlay removed it), the key appends
+ * to the target layer's last row. `scope: "family"` is rejected like `move`.
+ */
+export interface MoveToLayerOp extends KeyEditOperationBase {
+  readonly kind: "moveToLayer";
+  /** Target layer id on the key's platform. Must exist. */
+  readonly toLayer: string;
+  /** Optional anchor key address on the target layer for before/after insert. */
+  readonly anchorAddress?: string;
+  readonly position?: "before" | "after";
+}
+
+/**
  * A single committed key-level edit (contract §3). Row and layer operations
- * are deliberately NOT admitted — see the module docstring.
+ * are deliberately NOT admitted — see the module docstring — with the one
+ * exception of `moveToLayer`, which relocates a single key without touching
+ * row/layer structure itself.
  */
 export type KeyEditOperation =
   | SetKeyOp
@@ -266,7 +295,8 @@ export type KeyEditOperation =
   | MoveKeyOp
   | SuppressKeyOp
   | SetSubKeyOp
-  | RemoveSubKeyOp;
+  | RemoveSubKeyOp
+  | MoveToLayerOp;
 
 
 // ---------------------------------------------------------------------------
@@ -278,11 +308,12 @@ export type KeyEditOperation =
  * its own fields — no layout lookup, no resolver. `undefined` (never `""`)
  * when the operation carries no declared output of its own.
  *
- * Exactly three of the eight kinds ever author `output` directly:
+ * Exactly three of the nine kinds ever author `output` directly:
  * - `add` — a brand-new key's `key.output`;
  * - `set` / `setSubKey` — a patch that happens to touch `fields.output`.
  *
- * The other five — `rename`, `remove`, `move`, `suppress`, `removeSubKey` — name
+ * The other six — `rename`, `remove`, `move`, `moveToLayer`, `suppress`,
+ * `removeSubKey` — name
  * an EXISTING key or sub-entry by address/sub-ref only; they never repeat its
  * content, so this function returns `undefined` for them even though the key
  * they touch may well produce a character. That gap is deliberate: this
@@ -651,6 +682,7 @@ export type UnsequencedKeyEditOperation =
   | Omit<AddKeyOp, "seq">
   | Omit<RemoveKeyOp, "seq">
   | Omit<MoveKeyOp, "seq">
+  | Omit<MoveToLayerOp, "seq">
   | Omit<SuppressKeyOp, "seq">
   | Omit<SetSubKeyOp, "seq">
   | Omit<RemoveSubKeyOp, "seq">;

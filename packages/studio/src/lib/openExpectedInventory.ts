@@ -61,6 +61,33 @@ export function unionExemplars(
 }
 
 /**
+ * The per-language needed-letter map (character to the languages that need it):
+ * each listed language's MAIN exemplar tier, NFC on both sides. Unlike
+ * `unionExemplars` it keeps which language asked for each character, and it
+ * leaves out the punctuation, numbers and auxiliary tiers (a removal warning is
+ * about letters). A tag with no data contributes nothing. Languages for one
+ * character appear in list order.
+ */
+export function neededLettersByLanguage(
+  tags: readonly string[],
+  sourced: ReadonlyMap<string, SourcedInventory | null>,
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const tag of distinctLanguageTags(tags)) {
+    const inv = sourced.get(tag) ?? null;
+    if (inv === null) continue;
+    for (const c of inv.characters) {
+      if (c.tier !== "main") continue;
+      const ch = c.char.normalize("NFC");
+      const langs = map.get(ch);
+      if (langs === undefined) map.set(ch, [tag]);
+      else if (!langs.includes(tag)) langs.push(tag);
+    }
+  }
+  return map;
+}
+
+/**
  * `sourceExemplars(tag)` over each tag after `loadExemplarSource()`. A lookup
  * that throws counts as no data for that tag.
  */
