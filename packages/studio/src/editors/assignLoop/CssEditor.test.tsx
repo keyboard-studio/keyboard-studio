@@ -49,39 +49,39 @@ describe("CssEditor", () => {
   afterEach(cleanup);
 
   it("opens on the keyboard's existing stylesheet instead of a blank editor", async () => {
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect((await screen.findByTestId("seed")).textContent).toBe(".kmw-key { color: red; }");
   });
 
   it("shows the real preview pane in the right column", () => {
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect(screen.getByTestId("osk-frame")).toBeTruthy();
   });
 
   it("leaves the working copy alone when the author applied nothing", () => {
     const onComplete = vi.fn();
-    render(<CssEditor onComplete={onComplete} onBack={() => undefined} />);
+    render(<CssEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("css-continue"));
     expect(useWorkingCopyStore.getState().customCss).toBeNull();
     expect(onComplete).toHaveBeenCalledWith({ css: ".kmw-key { color: red; }" });
   });
 
   it("records the applied text on Continue", async () => {
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     fireEvent.click(await screen.findByTestId("apply-new"));
     fireEvent.click(screen.getByTestId("css-continue"));
     expect(useWorkingCopyStore.getState().customCss).toBe(".new { color: blue; }");
   });
 
   it("records an empty string when the author applies an emptied editor", async () => {
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     fireEvent.click(await screen.findByTestId("apply-empty"));
     fireEvent.click(screen.getByTestId("css-continue"));
     expect(useWorkingCopyStore.getState().customCss).toBe("");
   });
 
   it("Discard changes drops this visit's edits and leaves the working copy untouched", async () => {
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     const discard = screen.getByRole("button", { name: "Discard changes" }) as HTMLButtonElement;
     expect(discard.disabled).toBe(true);
     fireEvent.click(await screen.findByTestId("apply-new"));
@@ -99,20 +99,20 @@ describe("CssEditor", () => {
     previewVfs.set("source/t.kmn", KMN, false);
     previewVfs.set("source/kb.css", ".from-preview { top: 2px; }", false);
     artifact.stage = { kind: "ready", vfs: previewVfs, keyboardId: "t", scaffoldWarnings: [] };
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect((await screen.findByTestId("seed")).textContent).toBe(".from-preview { top: 2px; }");
   });
 
   it("waits for the preview before opening the editor blank", () => {
     useWorkingCopyStore.setState({ startVfs: createVirtualFS() });
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect(screen.queryByTestId("seed")).toBeNull();
     expect(screen.getByText("Loading editor…")).toBeTruthy();
   });
 
   it("reopens on what the author left here before", async () => {
     seedStore(".left { top: 1px; }");
-    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect((await screen.findByTestId("seed")).textContent).toBe(".left { top: 1px; }");
   });
 });

@@ -647,6 +647,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
             <Trans id="step.revision.discard">Discard changes and go back</Trans>
           </button>
         )}
+        {/* eslint-disable no-restricted-syntax -- not step nav: the host's deep-link banner action — it resumes the walk from here instead of following the deep link; the step's own nav stays in the footer. */}
         <button
           type="button"
           data-testid="step-deep-link-continue-instead"
@@ -655,6 +656,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
         >
           <Trans id="step.deepLinkReturn.continueButton">Continue from here instead</Trans>
         </button>
+        {/* eslint-enable no-restricted-syntax */}
       </div>
     ) : offTargetRevision ? (
       <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>

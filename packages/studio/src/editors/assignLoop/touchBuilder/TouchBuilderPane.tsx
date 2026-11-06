@@ -1978,6 +1978,7 @@ function TemplateDialog(props: {
           <button type="button" onClick={onClose} style={ghostBtn}>
             {t({ id: "editor.assignLoop.touch.builder.templateCancel", message: "Cancel" })}
           </button>
+          {/* eslint-disable no-restricted-syntax -- not step nav: a two-step template confirm — first click arms it ("Continue"), second applies; the step's own nav stays in the footer. */}
           <button
             type="button"
             data-testid="touch-builder-template-apply"
@@ -1994,6 +1995,7 @@ function TemplateDialog(props: {
               ? t({ id: "editor.assignLoop.touch.builder.templateApply", message: "Apply" })
               : t({ id: "editor.assignLoop.touch.builder.templateContinue", message: "Continue" })}
           </button>
+          {/* eslint-enable no-restricted-syntax */}
         </div>
       </div>
     </div>

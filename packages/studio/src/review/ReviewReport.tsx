@@ -173,6 +173,7 @@ export function ReviewReport({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
+      {/* eslint-disable no-restricted-syntax -- not step nav: the /review page's "pick another keyboard" link, not a step's back; no step walk is mounted here. */}
       <button
         type="button"
         onClick={onBack}
@@ -189,6 +190,7 @@ export function ReviewReport({
       >
         <Trans id="review.report.backToPicker">← Pick another keyboard</Trans>
       </button>
+      {/* eslint-enable no-restricted-syntax */}
 
       <ReportBanner
         eyebrow="kbstudio.langtech.cloud/review"

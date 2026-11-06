@@ -15,6 +15,7 @@
 
 import { lazy, Suspense, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 
 // Lazy-load the Monaco pane so it never lands in the main chunk.
@@ -42,6 +43,26 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
     // The output pipeline generates readme.htm, README.md, and .php from this source
     onComplete({ html });
   };
+
+  // Footer nav (spec 081, #2527): Back / Continue publish to the footer
+  // instead of rendering in the in-body bar. Test id is unchanged, so e2e
+  // keeps finding html-continue in the footer.
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.html.back", message: "Back" }),
+            onClick: onBack,
+            testId: "html-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "editor.assignLoop.html.continue", message: "Continue" }),
+      onClick: handleContinue,
+      testId: "html-continue",
+    },
+  });
 
   return (
     <div
@@ -153,52 +174,6 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
             )}
           </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          paddingTop: 16,
-          borderTop: "1px solid var(--app-border)",
-        }}
-      >
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={{
-              padding: "10px 20px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: "1px solid var(--app-border)",
-              background: "var(--app-surface)",
-              color: "var(--app-text)",
-              cursor: "pointer",
-            }}
-          >
-            {t({ id: "editor.assignLoop.html.back", message: "Back" })}
-          </button>
-        )}
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="html-continue"
-          onClick={handleContinue}
-          style={{
-            padding: "10px 24px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: "1px solid var(--app-accent)",
-            background: "var(--app-accent-bg)",
-            color: "var(--app-text)",
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          {t({ id: "editor.assignLoop.html.continue", message: "Continue" })}
-        </button>
       </div>
     </div>
   );

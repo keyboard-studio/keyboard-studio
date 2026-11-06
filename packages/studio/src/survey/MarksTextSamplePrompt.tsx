@@ -92,6 +92,7 @@ export function MarksTextSamplePrompt({
         })}
       </p>
       <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+        {/* eslint-disable no-restricted-syntax -- not step nav: this sub-prompt's Back moves within the text-sample prompt, not between steps; the step's own nav stays in the footer. */}
         <button
           type="button"
           data-testid="marks-text-sample-prompt-back"
@@ -103,6 +104,7 @@ export function MarksTextSamplePrompt({
             message: "Back",
           })}
         </button>
+        {/* eslint-enable no-restricted-syntax */}
         <button
           type="button"
           data-testid="marks-text-sample-prompt-skip"
