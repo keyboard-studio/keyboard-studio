@@ -71,9 +71,9 @@ spine after instantiation:
   A **project-name step** collects the new display name and auto-derives the
   keyboardId (via `slugifyKeyboardId`); the scaffolder then copies the base's IR,
   rewrites identity-bearing fields, and enters the shared spine at prefill.
-- **Track 2 — adapt an existing keyboard** (`instantiateFromExisting`): after
-  identity-lite and base resolution, the user picks Track 2 to adapt the chosen base
-  in place. Identity is preserved from the base; the project-name step is skipped.
+- **Track 2 — update an existing keyboard** (`instantiateFromExisting`): after
+  identity-lite and base resolution, the user picks Track 2 to update the chosen base
+  in place. A single-language keyboard made from a country keyboard is a Copy (Track 1), not Track 2. Identity is preserved from the base; the project-name step is skipped.
   Both tracks converge at base-derived prefill.
 
 Identity-lite runs **first** for both tracks (user override of spec §8 line 1063):
@@ -100,7 +100,7 @@ graph TD
   MANUAL --> TRACK
   BLANK --> TRACK
   TRACK -->|Track 1: new keyboard from base| PROJNAME["Project-name: display name + auto-derived keyboardId"]
-  TRACK -->|Track 2: adapt existing keyboard| PREFILL
+  TRACK -->|Track 2: update existing keyboard| PREFILL
   PROJNAME --> PREFILL
   PREFILL[Base-derived prefill: routing_group, A2, BCP47, existing inventory, A7 diff - shown as confirmations]
   PREFILL --> INV[Inventory: discovery diffed against base, seeded by identity]
@@ -126,7 +126,7 @@ graph TD
   [keyboard-index.md](keyboard-index.md) — the lookup substrate already exists.
 - **Track choice follows base resolution.** The author evaluates the suggested
   base on its merits (script match, language match) and then decides whether to
-  copy it under a new identity (Track 1) or adapt it in place (Track 2). Track 1
+  copy it under a new identity (Track 1) or update it in place (Track 2). Track 1
   adds a project-name step before prefill; Track 2 skips it.
 - **Language and script are decoupled.** The keyboard's target is a **(language,
   script) pair**, and the script is an *independent* choice — not derived from the
@@ -339,7 +339,7 @@ script family that silently gets a degraded strategy. Both need an explicit
   catalogs (physical: modifiers/dead keys/combos/rotas; touch: modifiers+layers/
   long-press/flicks/multitaps). See "The gallery is handled twice" in §3.
 - **Two authoring tracks, one working-copy spine (v1.3.0):** The hybrid flow in
-  the diagram above is Track 1 (new keyboard from a base). Track 2 (adapt an
+  the diagram above is Track 1 (new keyboard from a base). Track 2 (update an
   existing keyboard) enters via source-picker, skips identity-lite (identity is
   already known), and instantiates the working copy from the existing keyboard's
   IR with identity preserved. Both tracks converge on the same spine at the carve

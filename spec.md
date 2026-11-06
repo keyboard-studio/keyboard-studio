@@ -907,12 +907,12 @@ Rationale: The alphanumeric scheme was misleading. The survey is reached in a hy
 **Expected output:** Red checklist includes: "I confirm I am the copyright holder or am authorized to submit on behalf of [copyright holder]." Green checks listed as auto-verified. Yellow items listed with the values the studio emitted (e.g. BCP47 tag, display name) for the reviewer's reference.
 **Pass criteria:** No red item is pre-checked by the studio. User must check each red item manually before the "Confirm and submit" button becomes active.
 
-### Scenario F: Adapting a country keyboard down to a single language
+### Scenario F: Copying a country keyboard down to a single language (Track 1)
 
 **Starting state:** Studio open; user selects `release/c/cm_qwerty` (a hypothetical multilingual Cameroonian QWERTY) from the source-selection browser. The codec parses it; the pattern recognizer lifts the Bafut deadkey family and the Fulfulde sequence-replace rules into recognized Patterns; remaining language families render in the carve gallery as deletable cards. The Layer A' I2 round-trip check passes; I5 reports two `RawKmnFragment` nodes (an `outs()` composition and a `save()` option store) as info-level entries.
 **User actions:** Carve gallery — the user deletes the Fulfulde, Ewondo, and Duala rule families, keeping the Bafut Pattern intact. Phase A — sets `id = bfd_keyboard`, BCP47 = `bfd-Latn`, copyright = the language community organization. Phase B — confirms the Bafut character inventory pre-populated from the surviving rules; adds two characters the import missed. Phases C-G complete with defaults. Clicks "Submit via GitHub OAuth".
-**Expected output:** Draft PR opened on the user's fork. PR body lists the import attribution (`adapted from release/c/cm_qwerty`, round-trip clean, two opaque features deleted as part of carving). `HISTORY.md` contains an "Adapted from `release/c/cm_qwerty`" bullet under the 1.0 entry. The PR commit does not contain a `.kmn.imported` sidecar (removed per D11).
-**Pass criteria:** WASM oracle produces no errors. Layer A' I2 passes on every emit during the session. The committed `.kmn` builds with `kmc build` exit code 0. Re-importing the emitted `.kmn` into the studio produces an IR functionally equivalent to the one at submit time.
+**Expected output:** Draft PR opened on the user's fork. PR body lists the import attribution (`copied from release/c/cm_qwerty`, round-trip clean, two opaque features deleted as part of carving). `HISTORY.md` contains an "Copied from `release/c/cm_qwerty`" bullet under the 1.0 entry. The PR commit does not contain a `.kmn.imported` sidecar (removed per D11).
+**Pass criteria:** WASM oracle produces no errors. Layer A' I2 passes on every emit during the session. The committed `.kmn` builds with `kmc build` exit code 0. Re-importing the emitted `.kmn` into the studio produces an IR functionally equivalent to the one at submit time. A single-language keyboard made from a country keyboard is a Copy (Track 1), not an update; opening an existing keyboard to update it is Track 2.
 
 ---
 

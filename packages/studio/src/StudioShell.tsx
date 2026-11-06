@@ -93,6 +93,7 @@ import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
+import { useOpenInventorySeed } from "./hooks/useOpenInventorySeed.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
@@ -106,9 +107,11 @@ import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
+import { AfterApplySuggestions } from "./components/AfterApplySuggestions.tsx";
 import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { StartScreen } from "./components/StartScreen.tsx";
 import { ReviewScreen } from "./review/ReviewScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
@@ -172,6 +175,7 @@ const VALID_ROUTES = new Set<RouteId>(
   (
     [
       "welcome",
+      "start",
       "survey",
       "preview",
       "output",
@@ -201,8 +205,9 @@ function isRouteId(v: string): v is RouteId {
 // hash, so beyond that this only governs the initial landing and stale-hash
 // cases.
 function defaultLandingRoute(): RouteId {
-  if (hasVisited()) return "survey";
+  // A resumable draft resumes; a returning author without one chooses New or Open.
   if (loadDraftMeta() !== null) return "survey";
+  if (hasVisited()) return "start";
   return "welcome";
 }
 
@@ -577,6 +582,16 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // localStart lives in the session store; we update it when the working-copy's startKeyboard
   // prop changes so the wizard stays in sync with the pipeline-settled base.
   useEffect(() => {
+    // Open records the starting keyboard before this view mounts; the working copy
+    // is not instantiated until the pipeline below compiles it, so a null prop
+    // must not erase that pending start.
+    if (
+      startKeyboard === null &&
+      useSurveySessionStore.getState().localStart !== null &&
+      useDecisionStore.getState().decisions["authoring-track"]?.value === "adapt"
+    ) {
+      return;
+    }
     setLocalStart(startKeyboard);
   }, [startKeyboard, setLocalStart]);
 
@@ -1206,6 +1221,8 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // so they render, publish, and classify exactly like every other finding.
   // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
   const documentationFindings = useDocumentationFindings();
+  // Spec 111: an opened keyboard's Touch step walks an inventory the skipped character survey would have built.
+  useOpenInventorySeed();
   // The sole-source oe2 Layer C warning rides the same findings array on
   // the same terms (memoised synchronous hook, no second timer): it is
   // owned by the mechanisms step via the lintToQuestion mapping for its
@@ -1937,6 +1954,9 @@ function StudioShellContent() {
     case "welcome":
       content = <WelcomeScreen />;
       break;
+    case "start":
+      content = <StartScreen />;
+      break;
     case "survey":
       content = (
         <SurveyView
@@ -2089,6 +2109,10 @@ function StudioShellContent() {
       {route === "survey" && !isNarrow && (
         <PhaseStepper activeStepId={surveyActiveStepId} />
       )}
+      {/* Spec 111 US5: consistency suggestions raised by an applied change.
+          Always mounted (it watches the working copy); the list shows only
+          off the criteria page, which lists them itself. */}
+      <AfterApplySuggestions showPanel={route !== "criteria"} />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns

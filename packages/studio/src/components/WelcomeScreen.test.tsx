@@ -55,11 +55,11 @@ describe("WelcomeScreen — marks visited on leaving", () => {
     expect(googleConnect).toHaveBeenCalledTimes(1);
   });
 
-  it('marks visited and navigates to survey when "Continue as guest" is clicked', () => {
+  it('marks visited and navigates to the New-or-Open choice when "Continue as guest" is clicked', () => {
     render(<WelcomeScreen />);
     fireEvent.click(screen.getByText("Continue as guest"));
     expect(hasVisited()).toBe(true);
-    expect(navigateTo).toHaveBeenCalledWith("survey");
+    expect(navigateTo).toHaveBeenCalledWith("start");
   });
 });
 

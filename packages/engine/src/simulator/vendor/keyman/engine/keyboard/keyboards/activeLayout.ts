@@ -7,10 +7,10 @@ import type { LayoutKey, LayoutSubKey, LayoutRow, LayoutLayer, LayoutFormFactor,
 import { type JSKeyboard } from "./jsKeyboard.js";
 
 import { TouchLayout } from "../../../common/types/main.js";
-import TouchLayoutDefaultHint = TouchLayout.TouchLayoutDefaultHint;
-import TouchLayoutFlick = TouchLayout.TouchLayoutFlick;
-import TouchLayoutSpec = TouchLayout.TouchLayoutPlatform;
-import TouchLayerSpec = TouchLayout.TouchLayoutLayer;
+type TouchLayoutDefaultHint = TouchLayout.TouchLayoutDefaultHint;
+type TouchLayoutFlick = TouchLayout.TouchLayoutFlick;
+type TouchLayoutSpec = TouchLayout.TouchLayoutPlatform;
+type TouchLayerSpec = TouchLayout.TouchLayoutLayer;
 import TouchLayoutKeySp = TouchLayout.TouchLayoutKeySp;
 import { type DeviceSpec } from "../../../common/web-utils/index.js";
 

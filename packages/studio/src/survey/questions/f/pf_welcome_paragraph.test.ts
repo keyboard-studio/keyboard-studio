@@ -148,7 +148,7 @@ describe("pf_welcome_paragraph — requiredWhen (spec 079 FR-009)", () => {
     expect(requiredWhen(ctx({ instantiationMode: null }))).toBe(true);
   });
 
-  it("adapt track, base classified none: stays required", () => {
+  it("Open, base classified none: not required either (every Open step offers Continue)", () => {
     expect(
       requiredWhen(
         ctx({
@@ -156,7 +156,7 @@ describe("pf_welcome_paragraph — requiredWhen (spec 079 FR-009)", () => {
           startDocProfile: NONE_PROFILE,
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

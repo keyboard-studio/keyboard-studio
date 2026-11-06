@@ -44,6 +44,9 @@ const { trivialStep } = vi.hoisted(() => {
 
 vi.mock("../steps/registerEditorSteps.ts", () => ({
   identityStep: trivialStep("identity"),
+  languageListStep: trivialStep("open_languages"),
+  missingLettersStep: trivialStep("open_missing_letters"),
+  upgradesStep: trivialStep("open_upgrades"),
   layoutStep: trivialStep("layout"),
   chooseStartStep: trivialStep("choose_base"),
   trackStep: trivialStep("track"),

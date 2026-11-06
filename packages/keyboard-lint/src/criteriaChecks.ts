@@ -74,9 +74,13 @@ import { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
 import { checkDeprecatedNumericFormats } from "./checks/criteria/check-numeric-formats.js";
 import { checkCapsNcapsConsistent } from "./checks/criteria/check-caps-ncaps.js";
 import { checkCasedKeysDeclared, isMnemonicLayout } from "./checks/criteria/check-cased-keys.js";
+import { checkRawCtrl } from "./checks/criteria/check-raw-ctrl.js";
+import { checkSidedCtrlAdvisory } from "./checks/criteria/check-sided-ctrl-advisory.js";
 import { checkDeprecatedHeaders } from "./checks/criteria/check-deprecated-headers.js";
 import { checkTouchRequiredKeys } from "./checks/criteria/check-touch-required-keys.js";
 import { checkTouchCapsLayer } from "./checks/criteria/check-touch-caps-layer.js";
+import { checkTouchModifierKeys } from "./checks/criteria/check-touch-modifier-keys.js";
+import { checkTouchSymbolsLayer } from "./checks/criteria/check-touch-symbols-layer.js";
 import { checkFilenameConvention } from "./checks/criteria/check-filename-convention.js";
 import {
   checkTargetsAnyAlone,
@@ -280,6 +284,10 @@ export function runCriteriaChecks(
         ...(input.kpsLanguages[0] !== undefined ? { bcp47: input.kpsLanguages[0] } : {}),
       }),
     );
+    // 18.17 — consistent Ctrl/RAlt touch keys.
+    collect(checkTouchModifierKeys(touchLayout, touchLayoutPath(keyboardId)));
+    // 18.18 — a symbol layer reached by K_SYMBOLS link keys.
+    collect(checkTouchSymbolsLayer(touchLayout, touchLayoutPath(keyboardId)));
   }
 
   // 8.12 / 9.6 — package font scans over .kps facts + the VFS inventory.
@@ -481,6 +489,10 @@ export function runCriteriaChecks(
     collect(
       checkCasedKeysDeclared(keyboardIR, keyboardId, input.kpsLanguages[0]),
     );
+
+    // 7.29 / 7.30 — raw Ctrl rules and the sided-Ctrl advisory (spec 114).
+    collect(checkRawCtrl(keyboardIR, keyboardId));
+    collect(checkSidedCtrlAdvisory(keyboardIR, keyboardId));
 
     // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
     // Runs whenever the .kmn IR exists. An undeclared <Targets> list

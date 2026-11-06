@@ -312,3 +312,35 @@ describe("renderHistoryMd — created lineage (Copy, spec 102 FR-011)", () => {
     );
   });
 });
+
+describe("renderHistoryMd — updated lineage (Open, spec 111)", () => {
+  it("writes an Updated entry above the existing history, with no Adapted-from attribution", () => {
+    const existing = "# Change History\n\n## 1.0 (2020-01-01)\n* Initial release.\n";
+    const rendered = renderHistoryMd(null, {
+      version: "1.1",
+      dateIso: "2026-11-03",
+      lineage: { kind: "updated", id: "sil_cameroon_qwerty", version: "1.0" },
+      startHistoryText: existing,
+    });
+    expect(rendered).toBe(
+      "# Change History\n\n## 1.1 (2026-11-03)\n* Updated via keyboard-studio.\n\n## 1.0 (2020-01-01)\n* Initial release.\n",
+    );
+    expect(rendered).not.toContain("Adapted from");
+  });
+});
+
+describe("renderHistoryMd — updated lineage keeps the history's line endings (Open, spec 111)", () => {
+  it("writes the new entry with CRLF over a CRLF history and leaves the old text byte-identical", () => {
+    const existing = "Change History\r\n==============\r\n\r\n1.0 (2020-01-01)\r\n----------------\r\n* Initial release.\r\n";
+    const rendered = renderHistoryMd(null, {
+      version: "1.1",
+      dateIso: "2026-11-03",
+      lineage: { kind: "updated", id: "x", version: "1.0" },
+      startHistoryText: existing,
+    });
+    expect(rendered).not.toMatch(/[^\r]\n/);
+    expect(rendered).toContain("## 1.1 (2026-11-03)\r\n* Updated via keyboard-studio.\r\n");
+    expect(rendered.endsWith("1.0 (2020-01-01)\r\n----------------\r\n* Initial release.\r\n")).toBe(true);
+    expect(rendered.startsWith("Change History\r\n==============\r\n")).toBe(true);
+  });
+});

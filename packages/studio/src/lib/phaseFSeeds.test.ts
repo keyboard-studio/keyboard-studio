@@ -44,6 +44,15 @@ describe("proposeProjectUrl", () => {
     ).toBe("https://bafut.org");
   });
 
+  it("reads the keyboard's own descriptor and a self-closed WebSite", () => {
+    const vfs = createVirtualFS();
+    vfs.set("source/a_other.kps", '<WebSite URL="https://wrong.org"/>');
+    vfs.set("source/sil_bafut.kps", '<Info><WebSite URL="https://bafut.org" /></Info>');
+    expect(proposeProjectUrl({ instantiationMode: "adapt-existing", startKeyboard: BASE, startVfs: vfs })).toBe(
+      "https://bafut.org",
+    );
+  });
+
   it("proposes nothing on a copy, whose website is not the original's", () => {
     expect(
       proposeProjectUrl({ instantiationMode: "new-from-base", startKeyboard: BASE, startVfs: vfsWithKps(kps) }),

@@ -8,12 +8,27 @@
  * outside the caps layer (and the default layer's `K_SHIFT` apart from its
  * multitap) is kept; the IR form wraps it so there is one implementation.
  *
+ * It also carries the rest of the owner's Capsifesto touch behaviour
+ * (`processTouch.py`): `rightalt-caps` and `ctrl-caps` built from their shift
+ * layers and reached by double-tapping Shift on `rightalt` / `ctrl`, character
+ * keys on other layers returning to `default` after one tap (one-shot Shift),
+ * and Shift keys labelled `*Shifted*` / `*ShiftedLock*` returning to the
+ * unshifted layer.
+ *
  * Only platforms that have a `default` layer with a cased letter are touched.
- * `rightalt-caps` is out of scope and never edited (R8).
  */
 
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
-import { caseCounterpart, isTouchFrameKey } from "@keyboard-studio/contracts";
+import {
+  caseCounterpart,
+  isTouchCapsLayerId,
+  isTouchFrameKey,
+  isTouchOneShotKey,
+  isTouchShiftLayerId,
+  TOUCH_CAPS_FROM_SHIFT,
+  touchDoubleTapTarget,
+  unshiftedTouchLayerId,
+} from "@keyboard-studio/contracts";
 import { emitTouchLayout, parseTouchLayout, TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 
 interface RawKey {
@@ -93,22 +108,73 @@ function syncPlatform(layers: RawLayer[], bcp47: string | undefined): boolean {
     }
   }
 
-  // 3. Character keys on the caps layer stay on it.
-  for (const k of keysOf(caps)) {
-    if (k.nextlayer === undefined || k.nextlayer === null) continue;
-    if (isTouchFrameKey({ id: k.id ?? "", ...(k.text !== undefined ? { text: k.text } : {}) })) continue;
-    delete k.nextlayer;
-    changed = true;
+  // 3. rightalt-caps and ctrl-caps are copies of their shift layers.
+  for (const [shiftId, capsId] of TOUCH_CAPS_FROM_SHIFT) {
+    if (capsId === "caps") continue;
+    const from = layers.find((l) => l.id === shiftId);
+    if (from !== undefined && !layers.some((l) => l.id === capsId)) {
+      layers.push(cloneLayer(from, capsId));
+      changed = true;
+    }
   }
 
-  // 4. Double-tap Shift on default reaches caps.
-  const shiftKey = keysOf(def).find((k) => k.id === "K_SHIFT");
-  if (shiftKey !== undefined && shiftKey.multitap?.some((m) => m["nextlayer"] === "caps") !== true) {
-    shiftKey.multitap = [
-      ...(shiftKey.multitap ?? []),
-      { id: "T_CAPS", text: "*ShiftLock*", nextlayer: "caps" },
-    ];
-    changed = true;
+  // 4. Character keys on a caps layer stay on it.
+  const capsIds = new Set(TOUCH_CAPS_FROM_SHIFT.map(([, c]) => c));
+  for (const layer of layers.filter((l) => capsIds.has(l.id))) {
+    for (const k of keysOf(layer)) {
+      if (k.nextlayer === undefined || k.nextlayer === null) continue;
+      if (isTouchFrameKey({ id: k.id ?? "", ...(k.text !== undefined ? { text: k.text } : {}) })) continue;
+      delete k.nextlayer;
+      changed = true;
+    }
+  }
+
+  // 5. Character keys on every other non-default layer return to default
+  //    after one tap (one-shot Shift).
+  for (const layer of layers) {
+    if (layer.id === "default" || isTouchCapsLayerId(layer.id)) continue;
+    for (const k of keysOf(layer)) {
+      if (k.nextlayer !== undefined && k.nextlayer !== null) continue;
+      if (!isTouchOneShotKey(k["sp"] as string | number | undefined)) continue;
+      k.nextlayer = "default";
+      changed = true;
+    }
+  }
+
+  // 6. Double-tap Shift reaches the layer's caps layer.
+  const ids = new Set(layers.map((l) => l.id));
+  for (const layer of layers) {
+    const target = touchDoubleTapTarget(layer.id, ids);
+    if (target === undefined) continue;
+    const shiftKey = keysOf(layer).find((k) => k.id === "K_SHIFT");
+    if (shiftKey !== undefined && shiftKey.multitap?.some((m) => m["nextlayer"] === target) !== true) {
+      shiftKey.multitap = [
+        ...(shiftKey.multitap ?? []),
+        { id: "T_CAPS", text: "*ShiftLock*", nextlayer: target },
+      ];
+      changed = true;
+    }
+  }
+
+  // 7. Shift on a shift or caps layer is labelled and returns to the
+  //    unshifted layer.
+  for (const layer of layers) {
+    const isShift = isTouchShiftLayerId(layer.id);
+    if (!isShift && !isTouchCapsLayerId(layer.id)) continue;
+    const back = unshiftedTouchLayerId(layer.id, ids);
+    if (back === undefined) continue;
+    const label = isShift ? "*Shifted*" : "*ShiftedLock*";
+    for (const k of keysOf(layer)) {
+      if (k.id !== "K_SHIFT") continue;
+      if (k.text !== label) {
+        k.text = label;
+        changed = true;
+      }
+      if (k.nextlayer !== back) {
+        k.nextlayer = back;
+        changed = true;
+      }
+    }
   }
   return changed;
 }

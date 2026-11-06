@@ -49,6 +49,9 @@ export type StepId =
   | "track"
   | "attribution"
   | "project_name"
+  | "open_languages"
+  | "open_missing_letters"
+  | "open_upgrades"
   | "characters"
   | "marks"
   | "punctuation"
@@ -96,7 +99,7 @@ export const PHASES: readonly PhaseDef[] = [
     // attribution (#1901): the author/copyright step walks between
     // track and project_name — same "Base keyboard" phase as its
     // neighbours (it settles who the base-derived keyboard belongs to).
-    stepIds: ["choose_base", "track", "attribution", "project_name"],
+    stepIds: ["choose_base", "track", "attribution", "project_name", "open_languages", "open_missing_letters", "open_upgrades"],
   },
   {
     letter: "C",

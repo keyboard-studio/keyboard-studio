@@ -2,7 +2,14 @@ import { isOskStylesheetPath } from "../lib/oskStylesheetPath.ts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
+import { peekDecision, useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
+import { judgeForeignKeyboard, placementFromRepoPath } from "../criteria/judgeForeign.ts";
+import { takeBaseline } from "../criteria/openRatchet.ts";
+import { openIssuesOf } from "../criteria/openIssues.ts";
+import { openBaselineInventory } from "../criteria/openBaselineInventory.ts";
+import { deriveOpenHelpGaps } from "../lib/openHelpGaps.ts";
 import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
@@ -16,7 +23,10 @@ export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
-import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
+import {
+  attributionSeedFromPackageSources,
+  computeBaselineDocFindings,
+} from "../lib/collectDocLintInput.ts";
 import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
 import { runContextToleranceAnalysis } from "../lib/contextToleranceRun.ts";
 
@@ -25,7 +35,7 @@ interface EngineModule {
   fetchKeyboardSourceToVfs: (
     startKeyboard: StartKeyboard,
     fs: VirtualFS,
-    opts?: { proxyBase?: string }
+    opts?: { proxyBase?: string; keepKps?: boolean }
   ) => Promise<{
     options?: Record<string, unknown>;
     filesLoaded?: string[];
@@ -1198,6 +1208,10 @@ export function useKeyboardArtifact(
         const fetchResult = await withTimeout(
           engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
             proxyBase: LOCAL_PROXY_BASE,
+            // Open (spec 111): the keyboard is updated in place, so its own
+            // descriptor and documentation files come into the working copy.
+            // Copy never reaches this branch with the adapt track recorded.
+            ...(peekDecision("authoring-track")?.value === "adapt" ? { keepKps: true } : {}),
           }),
           FETCH_TIMEOUT_MS,
           "Loading keyboard source",
@@ -1245,6 +1259,27 @@ export function useKeyboardArtifact(
           wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
           // The fonts the adaptation's generated descriptor declares.
           wc.setStartPackageFonts(fetchResult.packageFonts ?? null);
+          // Open/adapt (Track 2): seed working-copy attribution from the package's
+          // .kps / .kmn so Output does not block on fields the walk never asks for
+          // when the opened keyboard already declares them (spec 111 FR-012).
+          if (wc.instantiationMode === "adapt-existing" && wc.attribution === null) {
+            const kmnPathForAttr = findKmnPath(vfs);
+            const pathsForKps = vfs.list();
+            const kpsPathForAttr =
+              pathsForKps.find((p) => p === `source/${kb.id}.kps`) ??
+              pathsForKps.find(
+                (p) => p.startsWith("source/") && p.toLowerCase().endsWith(".kps"),
+              );
+            const kmnTextForAttr =
+              kmnPathForAttr !== undefined ? (readVfsText(vfs, kmnPathForAttr) ?? null) : null;
+            const kpsTextForAttr =
+              kpsPathForAttr !== undefined ? (readVfsText(vfs, kpsPathForAttr) ?? null) : null;
+            const seed = attributionSeedFromPackageSources({
+              kmnText: kmnTextForAttr,
+              kpsText: kpsTextForAttr,
+            });
+            if (seed !== null) wc.setAttribution(seed);
+          }
           // spec 080 FR-020 (research R8): run the documentation checks ONCE
           // over the base's own files as fetched. A later finding on a still-
           // inherited member whose code appears here is the base's, not the
@@ -1278,6 +1313,41 @@ export function useKeyboardArtifact(
                 },
               }),
             );
+          }
+          // Open (spec 111): take the criteria baseline once, over the keyboard
+          // exactly as opened, so later findings classify as pre-existing or new.
+          // The same foreign-mode assembly the Compare tab runs; a later edit
+          // never retakes it. Copy never reaches here with the adapt track.
+          if (peekDecision("authoring-track")?.value === "adapt") {
+            const criteriaStore = useCriteriaRecordStore.getState();
+            criteriaStore.setOpenBaseline(null);
+            useDecisionStore.getState().forget("open-issues");
+            const openedVfs = vfs;
+            void judgeForeignKeyboard(openedVfs, kb.id, kb.displayName, {
+              placement: placementFromRepoPath(kb.path),
+              inventoryFor: openBaselineInventory,
+            })
+              .then((judged) => {
+                const baseline = takeBaseline(judged, new Date().toISOString());
+                useCriteriaRecordStore.getState().setOpenBaseline(baseline);
+                // The problem kinds the baseline found decide which of the walk's
+                // conditional pages appear (FR-032); recorded once, with the baseline.
+                const docGaps = deriveOpenHelpGaps({
+                  vfs: openedVfs,
+                  keyboardId: kb.id,
+                  baselineFindings: useWorkingCopyStore.getState().baselineDocFindings,
+                });
+                useDecisionStore.getState().record({
+                  id: "open-issues",
+                  value: openIssuesOf(baseline, docGaps),
+                  provenance: "derived",
+                  step: "open",
+                });
+              })
+              .catch((err: unknown) => {
+                // eslint-disable-next-line no-console -- developers want this; not actionable on screen
+                console.warn("[WARN] open baseline could not be taken", err);
+              });
           }
         }
         // Build a blob URL for the OSK font so the frame can inject an

@@ -1,0 +1,712 @@
+{
+  "workflow": "companion",
+  "specName": "Ctrl rules and removing needed letters",
+  "branch": "114-ctrl-and-letter-removal",
+  "unattended": true,
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-06T08:37:21.924Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:38:31.355Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:38:31.737Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:38:32.707Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-06T08:38:59.891Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:40:08.816Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:40:09.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-06T09:03:59.214Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:05:27.192Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:05:27.460Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:11:23.715Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:11:52.169Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:01.747Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:44.029Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:44.225Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:44.408Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:24.771Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:24.943Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.071Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.179Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.290Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.400Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:41:25.531Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.038Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.232Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.424Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.729Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.842Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.951Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:09.065Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:59:44.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:59:44.270Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:59:44.552Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T10:02:45.975Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T10:02:46.173Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T10:02:55.153Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T16:48:42.994Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Layer C keyboard-lint check KM_LINT_RAW_CTRL plus upgrade pair in studio",
+      "why": "matches existing criterion and upgrade seams",
+      "rejected": "studio-only check"
+    },
+    {
+      "decision": "Report raw Ctrl in any group; warn once per char per session",
+      "why": "collision is group-independent; removal is the author's call",
+      "rejected": "main group only; repeat warnings"
+    },
+    {
+      "decision": "moved UpgradeInput/UpgradeOffer to upgradeTypes.ts",
+      "why": "depcruise no-circular between upgradePairs and rawCtrlUpgrade",
+      "rejected": "inline import in fixer"
+    },
+    {
+      "decision": "FR-004 realised as explicit advisory set (advisoryChecks.ts) not all-warning rule",
+      "why": "every criteria finding is warning severity, so the all-warning rule would un-block every Layer C row",
+      "rejected": "per-check severity change; criteria data flag"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan: check, upgrade, no-new-Ctrl limits, removal warning; FR-005/007 stubbed",
+      "key_finding": "All pieces reuse existing seams (upgradePairs, carveNeededSet, criteria.json)"
+    },
+    "tasks": {
+      "summary": "53 tasks across Foundational, US1-US4 and Polish; 3 waves of parallel work, one sequencing exception at T037"
+    },
+    "implement": {
+      "summary": "Polish phase validated; spec 114 gates green"
+    }
+  },
+  "approach": "Add a keyboard-lint raw-Ctrl check and advisory with criteria rows, an IR-splice upgrade returning characters to the inventory, gallery/touch limits against Ctrl, and a dismissable needed-letter warning reusing carveNeededSet.",
+  "coverage": {
+    "FR-001": {
+      "title": "Outside basic_* keyboards, a rule on unsided CTRL (without Alt) on a letter, number or punctuation key is reported with a move-off-Ctrl recommendation and a may-not-be-accepted warning",
+      "tasks": [
+        "T010",
+        "T012"
+      ]
+    },
+    "FR-002": {
+      "title": "The fix removes those Ctrl rules by text splice and returns each typed character to the inventory as unplaced, without re-adding characters typed elsewhere",
+      "tasks": [
+        "T011",
+        "T013",
+        "T014"
+      ]
+    },
+    "FR-003": {
+      "title": "No new Ctrl content or Ctrl layer on Copy or in the Open galleries; existing basic_* Ctrl content kept unless carved",
+      "tasks": [
+        "T020",
+        "T021",
+        "T022",
+        "T023",
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-004": {
+      "title": "LCTRL and RCTRL allowed, with an advisory that an Alt-based placement is preferred",
+      "tasks": [
+        "T002",
+        "T040",
+        "T041"
+      ]
+    },
+    "FR-005": {
+      "title": "Unsided CTRL ALT offered an RALT upgrade, withheld unless a before/after AltGr simulation matches (stub, awaiting owner)",
+      "tasks": [
+        "T001"
+      ]
+    },
+    "FR-006": {
+      "title": "Removing a needed letter on Copy or Open shows a dismissable warning naming the languages that need it; composed and decomposed forms match",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T035",
+        "T036",
+        "T037"
+      ]
+    },
+    "FR-007": {
+      "title": "basic_* touch ctrl and shift-ctrl layers may be renamed to rightalt and rightalt-shift (stub, awaiting owner)",
+      "tasks": [
+        "T001"
+      ]
+    },
+    "FR-008": {
+      "title": "The criterion and advisory are criteria.json rows with keyboard-lint checks; the fixes are upgrade pairs",
+      "tasks": [
+        "T001",
+        "T002",
+        "T014"
+      ]
+    }
+  },
+  "currentTask": "T053",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added KM_LINT_RAW_CTRL and KM_LINT_SIDED_CTRL_ADVISORY criteria rows",
+      "files": [
+        "packages/contracts/data/criteria.json"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Stub raw-Ctrl and sided-Ctrl checks registered in runner and index",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts",
+        "packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts",
+        "packages/keyboard-lint/src/criteriaChecks.ts",
+        "packages/keyboard-lint/src/index.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Raw-Ctrl predicate tests",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Raw-Ctrl check implemented, listed in implementedChecks and gateCoverage",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts",
+        "packages/keyboard-lint/src/index.ts",
+        "packages/studio/src/criteria/implementedChecks.ts",
+        "packages/studio/src/test/gateCoverage.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Failing tests for raw-Ctrl fix on ewe and registry",
+      "files": [
+        "packages/studio/src/criteria/rawCtrlUpgrade.test.ts",
+        "packages/studio/src/criteria/upgradePairs.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Raw-Ctrl fix (IR drop, projectKmnText, inventory additions, preview)",
+      "files": [
+        "packages/studio/src/criteria/rawCtrlUpgrade.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "UpgradeOffer.inventoryAdditions and accept path addToInventory",
+      "files": [
+        "packages/studio/src/criteria/upgradePairs.ts",
+        "packages/studio/src/survey/openWalk/UpgradesStep.tsx"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Registered KM_LINT_RAW_CTRL pair",
+      "files": [
+        "packages/studio/src/criteria/upgradePairs.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "No-Ctrl and AltGr-form gallery tests",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.noCtrl.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Touch gallery no-Ctrl and template-apply no-Ctrl-layer tests",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.noCtrl.test.tsx",
+        "packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Carve removal contributors include Ctrl rule; urdu no-carve keeps text",
+      "files": [
+        "packages/studio/src/lib/irToCarveNodes.removal.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Pool drops raw CTRL, AltGr follows keyboard Alt form (RALT default, CTRL ALT, ALT); suggestion fallbacks use altgrTokensFor; existing layer tests updated",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx",
+        "packages/studio/src/editors/assignLoop/assignmentFromSuggestion.ts",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.layers.test.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.methods.test.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Touch gallery filters raw Ctrl combos from validLayerCombos",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx",
+        "packages/studio/src/editors/assignLoop/TouchGallery.layers.test.tsx"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified only: builder has no add-layer path and override options carry no ctrl; no code change",
+      "files": [
+        "packages/studio/src/editors/assignLoop/touchBuilder/TouchBuilderPane.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified only: carve removal already covers Ctrl rules; no change",
+      "files": [
+        "packages/studio/src/lib/irToCarveNodes.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "removal warning model tests",
+      "files": [
+        "packages/studio/src/lib/removalWarning.test.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "per-language needed-letter map tests",
+      "files": [
+        "packages/studio/src/lib/openExpectedInventory.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "neededLettersByLanguage (main tier, NFC, char to languages)",
+      "files": [
+        "packages/studio/src/lib/openExpectedInventory.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "pure RemovalWarning model with session dismissal",
+      "files": [
+        "packages/studio/src/lib/removalWarning.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "useRemovalWarning hook plus shared RemovalWarningNotice; fr strings",
+      "files": [
+        "packages/studio/src/hooks/useRemovalWarning.ts",
+        "packages/studio/src/components/RemovalWarningNotice.tsx",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "dismissable needed-letter warning on carve in Copy",
+      "files": [
+        "packages/studio/src/editors/carve/CarveGalleryV2.tsx"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "RemoveKeyDialog accepts and shows dismissable removal warnings, with test",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.test.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "warning on Mechanism gallery existing-method removal when last producer of a needed char",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "tests for sided-Ctrl advisory, resolver and ratchet",
+      "files": [
+        "check-sided-ctrl-advisory.test.ts",
+        "resolveCriteria.test.ts",
+        "openRatchet.test.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "advisory check implemented and listed",
+      "files": [
+        "check-sided-ctrl-advisory.ts",
+        "implementedChecks.ts",
+        "gateCoverage.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "explicit advisory set; resolver and ratchet treat as non-blocking",
+      "files": [
+        "advisoryChecks.ts",
+        "resolveCriteria.ts",
+        "openRatchet.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "recomputed criteria count and band split to 208 (40/124/34/10) from criteria.json",
+      "files": [
+        "packages/contracts/data/criteria-summary.md"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "raw-Ctrl census over release (39 reported of 920 parsed) recorded with differences",
+      "files": [
+        "specs/114-ctrl-and-letter-removal/census.md"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Documented the 14 basic_* ctrl/shift-ctrl layers (AltGr vs Ctrl vs LCTRL), KeymanWeb layer-id modifier derivation with source cites, and output under ctrl vs rightalt",
+      "files": [
+        "specs/114-ctrl-and-letter-removal/fr-007-verification.md"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Gate green: typecheck, pnpm -r test, lint, golden-walk e2e",
+      "files": [
+        "none"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "typecheck",
+      "command": "pnpm typecheck",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 15.4,
+      "result": "packages/engine typecheck: Done · packages/studio typecheck$ tsc --noEmit · packages/studio typecheck: Done"
+    },
+    {
+      "what": "lint",
+      "command": "pnpm lint",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 40.7,
+      "result": "Reparsing as ES module because module syntax was detected. This incurs a performance overhead. · To eliminate this warning, add \"type\": \"module\" to C:\\Github\\keyboard-studio-114\\package.json. · (Use `node --trace-warnings ...` to show where the warning was created)"
+    },
+    {
+      "what": "phase 3 gates",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint",
+      "result": "all green (studio 11408 pass)"
+    },
+    {
+      "what": "pnpm typecheck",
+      "command": "pnpm typecheck",
+      "result": "exit 0"
+    },
+    {
+      "what": "pnpm -r test",
+      "command": "pnpm -r test",
+      "result": "all packages pass (studio 11435, engine 5011, contracts 1085, lint 596)"
+    },
+    {
+      "what": "pnpm lint",
+      "command": "pnpm lint",
+      "result": "exit 0"
+    },
+    {
+      "what": "golden walk e2e SC-003",
+      "command": "playwright test e2e/golden-walk.spec.ts",
+      "result": "1 passed"
+    }
+  ],
+  "last_action": "T053 closed, all tasks done",
+  "concerns": [
+    {
+      "note": "RemoveKeyDialog is not mounted anywhere (TouchGallery holds unused handlers); the T036 warning has no live caller. T037 covered by MechanismGallery existing-method removal only. Carve/Mechanism warning paths lack their own tests.",
+      "step": "implement"
+    },
+    {
+      "note": "T053 open: golden-walk e2e (SC-003) fails locally on source/test.kvks and test.kpj. Content is identical after stripping CR; baseline is LF, walk emits CRLF, because ../keyboards is CRLF here. This branch does not touch those emitters. Not re-run on main; needs a CI run or LF corpus to confirm."
+    },
+    {
+      "note": "km-qc review CONDITIONAL, no P0. P1: RemoveKeyDialog removalWarnings props have no production mount (the dialog itself is unmounted; warning is live in CarveGalleryV2 and MechanismGallery). P2: advisory uses ADVISORY_LINT_CODES allowlist not spec wording; parseKmn unguarded in rawCtrlUpgrade; preview drops non-char outputs; basic_ exemption and ALT_MODIFIERS duplicated across two checks.",
+      "step": "implement"
+    }
+  ],
+  "livingSpecs": {
+    "skipped": [
+      {
+        "name": "none",
+        "reason": "no loaded capabilities"
+      }
+    ]
+  }
+}

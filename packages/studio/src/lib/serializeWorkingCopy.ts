@@ -60,6 +60,7 @@ import {
   effectiveChartPreference,
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
+import { isOpenedWithDescriptor } from "./openMode.ts";
 import { applyOutputHygiene } from "./outputHygiene.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 import { hasTestBuilds } from "../stores/testingStore.ts";
@@ -121,6 +122,12 @@ export interface ProjectWorkingCopyForOutputResult {
    * welcome row without parsing prose.
    */
   missingInheritedImages: string[];
+  /**
+   * Open mode: the `.kmn` files a change could not be placed into precisely.
+   * They were left as they were, awaiting the author's agreement to a full
+   * re-emit (`ReformatConsentDialog`). Absent when there are none.
+   */
+  reformatRequired?: string[];
 }
 
 /**
@@ -145,6 +152,11 @@ export interface ProjectForOutputOptions {
    * overlay, which is how "what if the author had left this blank?" is expressed.
    */
   identityOverride?: Partial<IdentityOverlay>;
+  /**
+   * Open mode: the author agreed to a full re-emit of the files named in an
+   * earlier result's `reformatRequired` (spec 111 FR-009).
+   */
+  consentedReemit?: boolean;
   /**
    * spec 094 (contracts C2): produce test build `number` at `version` — the
    * version replaces the publish version everywhere it ships, and the package
@@ -381,6 +393,10 @@ export async function projectWorkingCopyForOutput(
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
   const isAdaptation = instantiationMode === "adapt-existing";
+  // Open (spec 111): the keyboard is updated in place. Its files are carried
+  // from the working copy unchanged; only the version, the HISTORY entry and
+  // what the author edited are written.
+  const isOpen = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId);
   // spec 102 FR-032 / spec 080 FR-007: only an adaptation inherits the start
   // keyboard's welcome/help prose. The slices are session state another
   // screen's artifact run can refill, so a copy is guarded here by its track,
@@ -499,7 +515,7 @@ export async function projectWorkingCopyForOutput(
   const isCopyTrack = instantiationMode === "new-from-base";
   const chartsWanted =
     effectiveChartPreference(chartPreference, baseShipsImages, isCopyTrack) === "regenerate" || !baseShipsImages;
-  const charts = chartsWanted
+  const charts = chartsWanted && !isOpen
     ? buildLayoutCharts({
         displayName: identity?.displayName ?? startKeyboard.displayName,
         kvksXml: readVfsText(clonedVfs, `source/${keyboardId}.kvks`) ?? null,
@@ -516,7 +532,11 @@ export async function projectWorkingCopyForOutput(
   // spec 106 FR-005: every store-derived field comes from the same
   // projectionInputFromState the preview uses, so the download carries the
   // fallback policy, disabled families and keep-inert set the OSK compiled.
-  const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs(
+  const {
+    warnings: projectionWarnings,
+    effectiveKeyboardId,
+    reformatRequired,
+  } = projectWorkingCopyVfs(
     projectionInputFromState({ ...state, startIr }, {
       vfs: clonedVfs,
       keyboardId,
@@ -532,6 +552,18 @@ export async function projectWorkingCopyForOutput(
       // fallback above sets identityForProjection.displayName to this same value,
       // so they compare equal and the base's &NAME store is left byte-identical.
       baseDisplayName: startKeyboard.displayName,
+      ...(isOpen
+        ? {
+            openMode: {
+              kps: {
+                nameEdited:
+                  identity?.displayName !== undefined && identity.displayName !== startKeyboard.displayName,
+                ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
+              },
+              ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
+            },
+          }
+        : {}),
     }),
   );
 
@@ -591,9 +623,13 @@ export async function projectWorkingCopyForOutput(
   //     A `store(&COPYRIGHT)` carried through from the starting keyboard is
   //     the starting point's own notice — carried, never silently replaced
   //     (issue 2281) — so the year strip leaves it byte-identical.
-  applyOutputHygiene(clonedVfs, resolvedKeyboardId, {
-    carriedCopyright: startIr.header.copyright || undefined,
-  });
+  //     Open (spec 111 FR-010) skips it: the opened keyboard's own .kpj and
+  //     notices are carried unchanged.
+  if (!isOpen) {
+    applyOutputHygiene(clonedVfs, resolvedKeyboardId, {
+      carriedCopyright: startIr.header.copyright || undefined,
+    });
+  }
 
   // 5c. spec 061 FR-010: regenerate the shipped documentation files from the
   //     author's CURRENT help-docs answers on EVERY call — not a write-if-absent
@@ -656,28 +692,37 @@ export async function projectWorkingCopyForOutput(
   // Spec 110 FR-011 (amending spec 080 FR-006): the README is regenerated on
   // both tracks; an adaptation keeps only the inherited description, carried
   // on the facts when the author has not written one.
-  clonedVfs.set("README.md", renderReadmeMd(docsInput), false);
-  clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
+  //
+  // Open (spec 111 FR-010): README.md, readme.htm, the welcome page and the
+  // help page are carried from the opened keyboard unchanged (they are in the
+  // VFS from the open). Refreshing them is an accepted suggested fix (a later
+  // story), never a side effect of output.
+  if (!isOpen) {
+    clonedVfs.set("README.md", renderReadmeMd(docsInput), false);
+    clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
+  }
   // spec 079 FR-002: the welcome page lives at the folder-convention path and
   // NOWHERE else — the flat `source/welcome.htm` is never written. A stale flat
   // copy can only come from a pre-076 base VFS (an old scaffolded stub or an
   // imported flat-convention base); it is removed so the shipped tree never
   // carries two welcome pages (FR-002 "must not appear in output").
-  clonedVfs.delete(FLAT_WELCOME_PATH);
-  clonedVfs.set(
-    WELCOME_PAGE_PATH,
-    renderWelcomeHtm(docsInput, inheritedWelcomeHtmText, welcomeFolderFiles, inheritedHelpPhpText),
-    false,
-  );
-  // FR-006: every carried base image, beside the page under its own name.
-  for (const img of carriedImages) {
-    clonedVfs.set(`source/${img.path}`, img.bytes, true);
+  if (!isOpen) {
+    clonedVfs.delete(FLAT_WELCOME_PATH);
+    clonedVfs.set(
+      WELCOME_PAGE_PATH,
+      renderWelcomeHtm(docsInput, inheritedWelcomeHtmText, welcomeFolderFiles, inheritedHelpPhpText),
+      false,
+    );
+    // FR-006: every carried base image, beside the page under its own name.
+    for (const img of carriedImages) {
+      clonedVfs.set(`source/${img.path}`, img.bytes, true);
+    }
+    // FR-013: the generated charts, beside the page (text SVG — research R1).
+    for (const chart of charts) {
+      clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
+    }
+    clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, inheritedHelpPhpText, inheritedWelcomeHtmText), false);
   }
-  // FR-013: the generated charts, beside the page (text SVG — research R1).
-  for (const chart of charts) {
-    clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
-  }
-  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, inheritedHelpPhpText, inheritedWelcomeHtmText), false);
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is
@@ -688,7 +733,7 @@ export async function projectWorkingCopyForOutput(
   // stylesheet already carrying an img max-width rule is left alone.
   // Declined or unanswered writes nothing: the slice stays out of the
   // output, exactly as the loader left it out of the start VFS.
-  if (isAdaptation && docFixProposals?.imageWidth === "accepted") {
+  if (isAdaptation && !isOpen && docFixProposals?.imageWidth === "accepted") {
     for (const path of clonedVfs.list()) {
       if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(path)) continue;
       const css = readVfsText(clonedVfs, path);
@@ -725,7 +770,7 @@ export async function projectWorkingCopyForOutput(
     renderHistoryMd(historyEntryState, {
       version: historyVersion,
       dateIso,
-      lineage: { kind: isAdaptation ? "adapted" : "created", id: keyboardId, version: rawVersion },
+      lineage: { kind: isOpen ? "updated" : isAdaptation ? "adapted" : "created", id: keyboardId, version: rawVersion },
       startHistoryText: isAdaptation ? (startHistoryMdText ?? existingHistoryMd) : null,
     }),
     false,
@@ -768,6 +813,26 @@ export async function projectWorkingCopyForOutput(
     clonedVfs.get("LICENSE.md") === undefined
   ) {
     clonedVfs.set("LICENSE.md", startLicenseText, false);
+  }
+  // Open (spec 111 FR-010): the opened keyboard's documentation files travel
+  // unchanged. They are in the VFS when the keyboard was opened through the
+  // loader's Open path; a working copy restored from a draft that predates it
+  // holds them only as slices, so any that are missing are carried from there,
+  // verbatim, rather than regenerated.
+  if (isOpen) {
+    const carryIfAbsent = (path: string, text: string | null | undefined): void => {
+      if (text !== null && text !== undefined && clonedVfs.get(path) === undefined) clonedVfs.set(path, text, false);
+    };
+    carryIfAbsent("README.md", startReadmeMdText);
+    carryIfAbsent(
+      state.startWelcomeConvention === "flat" ? FLAT_WELCOME_PATH : WELCOME_PAGE_PATH,
+      startWelcomeHtmText,
+    );
+    carryIfAbsent(`source/help/${resolvedKeyboardId}.php`, startHelpPhpText);
+    for (const img of carriedImages) {
+      if (clonedVfs.get(`source/${img.path}`) === undefined) clonedVfs.set(`source/${img.path}`, img.bytes, true);
+    }
+    for (const css of startDocCssTexts ?? []) carryIfAbsent(css.path, css.text);
   }
   const { created } = ensurePackageFiles({ vfs: clonedVfs });
   if (created.length > 0) {
@@ -814,6 +879,7 @@ export async function projectWorkingCopyForOutput(
     version,
     warnings,
     missingInheritedImages,
+    ...(reformatRequired !== undefined ? { reformatRequired } : {}),
   };
 }
 

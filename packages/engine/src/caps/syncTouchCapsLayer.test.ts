@@ -50,7 +50,7 @@ describe("syncTouchCapsLayerRaw", () => {
     }
   });
 
-  it("leaves keys outside the caps layer, and the default K_SHIFT's own fields, untouched", () => {
+  it("leaves the default layer, and every key's output, untouched", () => {
     const input = fx("touch/caps_no_doubletap.keyman-touch-layout");
     const before = JSON.parse(input) as Raw;
     const after = JSON.parse(syncTouchCapsLayerRaw(input, { bcp47: "en" }).json) as Raw;
@@ -58,10 +58,12 @@ describe("syncTouchCapsLayerRaw", () => {
       const a = layerOf(after, l.id)!;
       for (const k of keysOf(l)) {
         const k2 = keysOf(a).find((x) => x.id === k.id)!;
-        if (l.id === "default" && k.id === "K_SHIFT") {
+        if (l.id === "default") {
           expect({ ...k2, multitap: undefined }).toEqual({ ...k, multitap: undefined });
         } else {
-          expect(k2).toEqual(k);
+          // Other layers only gain one-shot nextlayer and Shift's label.
+          expect({ ...k2, nextlayer: undefined, text: undefined }).toEqual({ ...k, nextlayer: undefined, text: undefined });
+          if (k.id !== "K_SHIFT") expect(k2.text).toBe(k.text);
         }
       }
     }
@@ -83,14 +85,14 @@ describe("syncTouchCapsLayerRaw", () => {
     expect(keysOf(layerOf(out, "caps")).find((k) => k.id === "K_Q")?.text).toBe("Q");
   });
 
-  it("leaves rightalt-caps untouched", () => {
+  it("keeps the character keys of an existing rightalt-caps on that layer", () => {
     const raw = JSON.parse(fx("touch/caps_missing_letters.keyman-touch-layout")) as Raw;
     raw["tablet"]!.layer.push({
       id: "rightalt-caps",
       row: [{ key: [{ id: "K_Q", text: "Q", nextlayer: "default" }] }],
     });
     const out = JSON.parse(syncTouchCapsLayerRaw(JSON.stringify(raw), { bcp47: "en" }).json) as Raw;
-    expect(layerOf(out, "rightalt-caps")).toEqual(layerOf(raw, "rightalt-caps"));
+    expect(keysOf(layerOf(out, "rightalt-caps"))).toEqual([{ id: "K_Q", text: "Q" }]);
   });
 
   it("returns the input string unchanged when nothing needs doing", () => {
@@ -104,6 +106,89 @@ describe("syncTouchCapsLayerRaw", () => {
     keysOf(layerOf(raw, "shift")).find((k) => k.id === "K_P")!.text = "";
     const out = JSON.parse(syncTouchCapsLayerRaw(JSON.stringify(raw), { bcp47: "en" }).json) as Raw;
     expect(keysOf(layerOf(out, "caps")).find((k) => k.id === "K_P")?.text).toBe("Ŋ");
+  });
+});
+
+describe("syncTouchCapsLayerRaw full Capsifesto behaviour", () => {
+  /** caps_missing_letters plus rightalt / ctrl layers cloned from default and shift. */
+  function withModifierLayers(): Raw {
+    const raw = JSON.parse(fx("touch/caps_missing_letters.keyman-touch-layout")) as Raw;
+    const clone = (id: string, from: string) => {
+      const layer = { ...(JSON.parse(JSON.stringify(layerOf(raw, from))) as RawLayer), id };
+      for (const k of keysOf(layer)) delete k.multitap;
+      raw["tablet"]!.layer.push(layer);
+    };
+    clone("rightalt", "default");
+    clone("rightalt-shift", "shift");
+    clone("ctrl", "default");
+    clone("shift-ctrl", "shift");
+    return raw;
+  }
+  const run = (raw: Raw): Raw =>
+    JSON.parse(syncTouchCapsLayerRaw(JSON.stringify(raw), { bcp47: "en" }).json) as Raw;
+
+  it("builds rightalt-caps and ctrl-caps from their shift layers", () => {
+    const out = run(withModifierLayers());
+    for (const [caps, shift] of [["rightalt-caps", "rightalt-shift"], ["ctrl-caps", "shift-ctrl"]] as const) {
+      expect(layerOf(out, caps)).toBeDefined();
+      expect(keysOf(layerOf(out, caps)).length).toBe(keysOf(layerOf(out, shift)).length);
+    }
+  });
+
+  it("double-tapping Shift on rightalt and ctrl reaches their caps layers", () => {
+    const out = run(withModifierLayers());
+    const tap = (layer: string) =>
+      keysOf(layerOf(out, layer)).find((k) => k.id === "K_SHIFT")?.multitap;
+    expect(tap("rightalt")).toEqual([{ id: "T_CAPS", text: "*ShiftLock*", nextlayer: "rightalt-caps" }]);
+    expect(tap("ctrl")).toEqual([{ id: "T_CAPS", text: "*ShiftLock*", nextlayer: "ctrl-caps" }]);
+  });
+
+  it("does not build rightalt-caps when there is no rightalt-shift", () => {
+    const out = run(JSON.parse(fx("touch/caps_missing_letters.keyman-touch-layout")) as Raw);
+    expect(layerOf(out, "rightalt-caps")).toBeUndefined();
+    expect(layerOf(out, "ctrl-caps")).toBeUndefined();
+  });
+
+  it("character keys on non-default, non-caps layers return to default; special keys do not", () => {
+    const raw = withModifierLayers();
+    const out = run(raw);
+    for (const id of ["shift", "rightalt", "rightalt-shift", "ctrl"]) {
+      for (const k of keysOf(layerOf(out, id))) {
+        if (k.id === "K_SHIFT") continue; // covered by the labelling test
+        const sp = Number((k as { sp?: string | number }).sp ?? 0);
+        const before = keysOf(layerOf(raw, id)).find((x) => x.id === k.id)!;
+        if ([1, 2, 8, 9, 10].includes(sp) || before.nextlayer !== undefined) {
+          expect(k.nextlayer, `${id}/${k.id}`).toBe(before.nextlayer);
+        } else {
+          expect(k.nextlayer, `${id}/${k.id}`).toBe("default");
+        }
+      }
+    }
+    // default and caps character keys are left alone.
+    for (const id of ["default", "caps", "rightalt-caps"]) {
+      const l = layerOf(out, id);
+      for (const k of keysOf(l)) {
+        if (!(k.id.startsWith("K_") && /^[A-Z]$/.test(k.id.slice(2)))) continue;
+        expect(k.nextlayer, `${id}/${k.id}`).toBeUndefined();
+      }
+    }
+  });
+
+  it("labels Shift on shift and caps layers and returns it to the unshifted layer", () => {
+    const out = run(withModifierLayers());
+    const shiftKey = (layer: string) => keysOf(layerOf(out, layer)).find((k) => k.id === "K_SHIFT")!;
+    expect(shiftKey("shift")).toMatchObject({ text: "*Shifted*", nextlayer: "default" });
+    expect(shiftKey("caps")).toMatchObject({ text: "*ShiftedLock*", nextlayer: "default" });
+    expect(shiftKey("rightalt-shift")).toMatchObject({ text: "*Shifted*", nextlayer: "rightalt" });
+    expect(shiftKey("rightalt-caps")).toMatchObject({ text: "*ShiftedLock*", nextlayer: "rightalt" });
+    expect(shiftKey("shift-ctrl")).toMatchObject({ text: "*Shifted*", nextlayer: "ctrl" });
+    expect(shiftKey("ctrl-caps")).toMatchObject({ text: "*ShiftedLock*", nextlayer: "ctrl" });
+  });
+
+  it("is idempotent on the full layout", () => {
+    const once = syncTouchCapsLayerRaw(JSON.stringify(withModifierLayers()), { bcp47: "en" });
+    const twice = syncTouchCapsLayerRaw(once.json, { bcp47: "en" });
+    expect(twice).toEqual({ json: once.json, changed: false });
   });
 });
 

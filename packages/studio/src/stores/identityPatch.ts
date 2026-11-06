@@ -22,6 +22,12 @@ export type IdentityPatch = Partial<{
    */
   languageName: string;
   /**
+   * The keyboard's language list (Open mode, spec 111): the package
+   * descriptor's own list, seeded on open and editable by the author. The
+   * descriptor is written with exactly this list. Absent on Copy.
+   */
+  languages: ReadonlyArray<{ tag: string; name?: string }>;
+  /**
    * New keyboard identifier chosen by the author (Track 1 only).
    *
    * Must satisfy validateKeyboardId (§10 Layer A check #1: 1-255 chars,

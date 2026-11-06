@@ -36,6 +36,9 @@ type ActiveStepId =
   | "track"
   | "attribution"
   | "project_name"
+  | "open_languages"
+  | "open_missing_letters"
+  | "open_upgrades"
   | "characters"
   | "carve"
   | "deadkeys"
@@ -108,7 +111,7 @@ export interface AdvanceOutcome {
    * Set ONLY when the advance reaches the "done" terminal — signals the host
    * to call navigateTo("output") after session.advance(next).
    */
-  readonly navigate?: "output";
+  readonly navigate?: "output" | "criteria";
   /**
    * Set when the advance outcome requires setCharactersSubStage("prefill") to
    * fire AFTER session.advance(next). Used for adapt-track and project_name so
@@ -171,7 +174,7 @@ export function isTouchPreviewAvailable(stepId: string | null | undefined): bool
 // end-of-manifest is reached.
 // ---------------------------------------------------------------------------
 
-export function nextMainLineStepAfter(currentId: string): ActiveStepId {
+export function nextMainLineStepAfter(currentId: string, ctx?: AdvanceContext): ActiveStepId {
   const currentIdx = manifestIndexOf(currentId);
   // Guard: unknown id returns -1; scanning from index 0 would return the first
   // spine step ("identity") which is incorrect. Return "done" instead.
@@ -180,6 +183,8 @@ export function nextMainLineStepAfter(currentId: string): ActiveStepId {
     const step = manifest[i];
     if (step === undefined) break;
     if (STEP_TRAILS.get(step.id)?.spine === false) continue;
+    // A spine screen Open hides (spec 111) is skipped once the context records Open.
+    if (ctx !== undefined && !stepApplies(step, ctx)) continue;
     const id = step.id;
     // "package" is the reserved terminal; reaching it means we're done.
     if (id === "package") return "done";
@@ -214,7 +219,21 @@ function stepById(stepId: string): Step | undefined {
 // has no per-step advance branching.
 // ---------------------------------------------------------------------------
 
+const isOpenWalk = (ctx: AdvanceContext): boolean => ctx.decisions?.["authoring-track"]?.value === "adapt";
+
 export function advance(
+  completedStepId: ActiveStepId,
+  result: unknown,
+  ctx: AdvanceContext,
+): AdvanceOutcome {
+  const outcome = advanceStep(completedStepId, result, ctx);
+  // Open ends at Review (the criteria view), then Output (spec 111 FR-031): the
+  // walk's last step hands over to Review rather than the done panel.
+  if (isOpenWalk(ctx) && outcome.next === "done") return { next: "done", navigate: "criteria" };
+  return outcome;
+}
+
+function advanceStep(
   completedStepId: ActiveStepId,
   _result: unknown,
   ctx: AdvanceContext,
@@ -222,17 +241,17 @@ export function advance(
   switch (completedStepId) {
     case "identity":
       return ctx.identitySupported
-        ? { next: nextMainLineStepAfter("identity") }   // layout
+        ? { next: nextMainLineStepAfter("identity", ctx) }   // layout
         : { next: "unsupported" };
 
     case "layout":
       // The community-layout question (spec 076 A4). Answers persist per
       // question in the answer store; no reducer side effects, so it is absent
       // from STEPS_WITH_APPLY_COMPLETION.
-      return { next: nextMainLineStepAfter("layout") }; // choose_base
+      return { next: nextMainLineStepAfter("layout", ctx) }; // choose_base
 
     case "choose_base":
-      return { next: nextMainLineStepAfter("choose_base") }; // track
+      return { next: nextMainLineStepAfter("choose_base", ctx) }; // track
 
     case "track":
       // #1901: both tracks continue to the attribution step — the
@@ -247,12 +266,11 @@ export function advance(
           // Copy-track: project_name side-trail (gated on the copy track).
           return { next: "project_name" };
         }
-        // Update-track: skip the project_name side trail → characters.
-        // Also signals host to call setCharactersSubStage("prefill") post-advance.
-        return {
-          next: nextMainLineStepAfter("attribution"),  // characters
-          setCharactersSubStage: "prefill",
-        };
+        // Skip the project_name side trail. Open's pages follow from the derived order
+        // and their gates; Copy rejoins at characters, which also signals the host to
+        // call setCharactersSubStage("prefill") post-advance.
+        const after = nextMainLineStepAfter("attribution", ctx);
+        return after === "characters" ? { next: after, setCharactersSubStage: "prefill" } : { next: after };
       } else {
         // Invariant violation: selectedTrack is null here, but the track
         // step's completion recorded the authoring-track decision before
@@ -270,15 +288,26 @@ export function advance(
       }
 
     case "project_name":
-      // The side trail rejoins at "characters"; advance there directly.
-      // Also signals host to call setCharactersSubStage("prefill") post-advance.
-      return { next: "characters", setCharactersSubStage: "prefill" };
+      // The side trail rejoins the main line at the next screen that applies (Open's pages
+      // are gated off on Copy, so that is characters, which also signals the host to call
+      // setCharactersSubStage("prefill") post-advance).
+      {
+        const after = nextMainLineStepAfter("project_name", ctx);
+        return after === "characters" ? { next: after, setCharactersSubStage: "prefill" } : { next: after };
+      }
+
+    case "open_languages":
+    case "open_missing_letters":
+    case "open_upgrades":
+      // Open's pages are gated spine screens: the next one is whichever follows in the
+      // derived order and still applies (spec 111 FR-031, FR-032).
+      return { next: nextMainLineStepAfter(completedStepId, ctx) };
 
     case "characters":
-      return { next: nextMainLineStepAfter("characters") }; // marks (spec 071)
+      return { next: nextMainLineStepAfter("characters", ctx) }; // marks (spec 071)
 
     case "marks":
-      return { next: nextMainLineStepAfter("marks") }; // punctuation
+      return { next: nextMainLineStepAfter("marks", ctx) }; // punctuation
 
     case "punctuation":
       // The punctuation-selection page (clone of the Phase B build-list,
@@ -286,7 +315,7 @@ export function advance(
       // effects — its SurveyPhaseResult reaches the session through StepHost's
       // generic recordPhase path (confirmedInventory union). Absent from
       // STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextMainLineStepAfter("punctuation") }; // invisibles
+      return { next: nextMainLineStepAfter("punctuation", ctx) }; // invisibles
 
     case "invisibles":
       // The invisible-characters step (spec 075): always renders, no reducer
@@ -294,33 +323,33 @@ export function advance(
       // character plus the shared phase-C confirmedInventory union) reaches
       // the session through StepHost's generic recordPhase path. Absent from
       // STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextMainLineStepAfter("invisibles") }; // convenience
+      return { next: nextMainLineStepAfter("invisibles", ctx) }; // convenience
 
     case "convenience":
       // The pre-carve "keep these letters?" question. No reducer side effects —
       // its SurveyPhaseResult reaches the session through StepHost's generic
       // recordPhase path, and the carve gallery reads it off the merged
       // session. Absent from STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextMainLineStepAfter("convenience") }; // carve
+      return { next: nextMainLineStepAfter("convenience", ctx) }; // carve
 
     case "carve":
-      return { next: nextMainLineStepAfter("carve") }; // deadkeys
+      return { next: nextMainLineStepAfter("carve", ctx) }; // deadkeys
 
     case "deadkeys":
       // Spec 083: the deadkeys surface saves every lifecycle edit to the
       // working copy immediately — no reducer side effects, no
       // applyStepCompletion. Absent from STEPS_WITH_APPLY_COMPLETION for
       // that reason (same as convenience).
-      return { next: nextMainLineStepAfter("deadkeys") }; // rules
+      return { next: nextMainLineStepAfter("deadkeys", ctx) }; // rules
 
     case "rules":
       // The before/after rule demo (spec 082): a read-only view of the
       // working copy's compiled rules — no reducer side effects, so absent
       // from STEPS_WITH_APPLY_COMPLETION (same as convenience above).
-      return { next: nextMainLineStepAfter("rules") }; // mechanisms
+      return { next: nextMainLineStepAfter("rules", ctx) }; // mechanisms
 
     case "mechanisms":
-      return { next: "osk" };
+      return { next: nextMainLineStepAfter("mechanisms", ctx) };
 
     case "osk":
       // Same touch-seed fork as the former post-mechanisms hop (spec 035 R4/R12).
@@ -333,14 +362,16 @@ export function advance(
       return { next: "touch" };
 
     case "touch":
-      return { next: nextMainLineStepAfter("touch") }; // css
+      return { next: nextMainLineStepAfter("touch", ctx) }; // css
 
     case "css":
-      return { next: nextMainLineStepAfter("css") }; // help
+      return { next: nextMainLineStepAfter("css", ctx) }; // help
 
     case "help":
-      return ctx.allCharactersImplemented
-        ? { next: nextMainLineStepAfter("help") } // html
+      // Open does not hold the walk on unfinished letters: they are the Missing
+      // letters page's and the submit gate's concern, not a block here.
+      return ctx.allCharactersImplemented || isOpenWalk(ctx)
+        ? { next: nextMainLineStepAfter("help", ctx) } // html
         : { next: "help" };
 
     case "html":

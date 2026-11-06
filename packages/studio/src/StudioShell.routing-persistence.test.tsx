@@ -194,7 +194,7 @@ describe("StudioShell — first-visit landing gate", () => {
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
   });
 
-  it("skips welcome and lands in the survey for a returning visitor", async () => {
+  it("skips welcome and lands on the New-or-Open choice for a returning visitor with no draft", async () => {
     window.location.hash = "";
     localStorage.clear();
     localStorage.setItem("ks.visited", "1"); // browser has entered the app before
@@ -203,7 +203,8 @@ describe("StudioShell — first-visit landing gate", () => {
       render(<StudioShell />);
     });
 
-    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.getByTestId("start-new")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
     expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
   });
 

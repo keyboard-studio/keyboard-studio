@@ -137,8 +137,20 @@ function rowVerdict(before: CapsOutputs, after: CapsOutputs, bcp47: string | und
     return "identical";
   }
   if (before.none !== after.none || before.shift !== after.shift) return "differs";
-  const capsOk = before.caps === after.caps || after.caps === counterpartOf(after.none, bcp47);
-  const shiftCapsOk = before.shiftCaps === after.shiftCaps || after.shiftCaps === counterpartOf(after.shift, bcp47);
+  // Caps may change only toward acting as Shift (Caps types the Shift output,
+  // Shift+Caps the plain one; AZERTY's digits count, not only case pairs), and
+  // only where the old Caps output did nothing of its own: it typed the plain
+  // or Shift output, or nothing. Old Caps output that diverged any other way
+  // is deliberate and blocks the offer.
+  const plainCaps = (old: string): boolean => old === "" || old === before.none || old === before.shift;
+  const capsOk =
+    before.caps === after.caps ||
+    (plainCaps(before.caps) &&
+      (after.caps === after.shift || after.caps === counterpartOf(after.none, bcp47)));
+  const shiftCapsOk =
+    before.shiftCaps === after.shiftCaps ||
+    (plainCaps(before.shiftCaps) &&
+      (after.shiftCaps === after.none || after.shiftCaps === counterpartOf(after.shift, bcp47)));
   return capsOk && shiftCapsOk ? "gains-uppercase" : "differs";
 }
 

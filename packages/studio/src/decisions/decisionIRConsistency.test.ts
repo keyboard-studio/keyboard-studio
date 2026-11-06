@@ -36,6 +36,13 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   // spec 112: caps handling is derived by projection step 2.8.
   "caps-handling",
   "authoring-track",
+  // spec 111: the Open language list lands in the descriptor, not the IR.
+  "language-list",
+  // spec 111 Open walk: the baseline's problem kinds and the two reviewed marks.
+  "open-issues",
+  "open-basic-keyboard",
+  "missing-letters-review",
+  "upgrades-review",
   "reserve-desktop-notice",
   "reserve-language-autonym",
   "reserve-language-region",

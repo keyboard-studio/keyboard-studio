@@ -7,9 +7,9 @@ import { type TextStore } from "../textStore.js";
 import { KeymanWebKeyboard, ModifierKeyConstants, TouchLayout } from "../../../common/types/main.js";
 import { type VariableStores } from "../variableStore.js";
 
-import ComplexKeyboardStore = KeymanWebKeyboard.ComplexKeyboardStore;
-import KeyboardObject = KeymanWebKeyboard.KeyboardObject;
-import LayoutSpec = KeymanWebKeyboard.LayoutSpec;
+type ComplexKeyboardStore = KeymanWebKeyboard.ComplexKeyboardStore;
+type KeyboardObject = KeymanWebKeyboard.KeyboardObject;
+type LayoutSpec = KeymanWebKeyboard.LayoutSpec;
 
 type TouchLayoutSpec = TouchLayout.TouchLayoutPlatform & { isDefault?: boolean};
 

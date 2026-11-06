@@ -24,6 +24,7 @@
 import type { GalleryModule, QuestionModule } from "../types.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
+import { hasOpenIssue, openIssueGate, openLettersGate, openMechanismsGate } from "../../decisions/openIssues.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
 import capsHandlingModule from "./gallery/capsHandling.ts";
@@ -39,6 +40,9 @@ import ruleSetModule from "./gallery/ruleSet.ts";
 import physicalLayoutModule from "./gallery/physicalLayout.ts";
 import oskLayoutModule from "./gallery/oskLayout.ts";
 import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
+import languageListModule from "./gallery/languageList.ts";
+import missingLettersModule from "./gallery/missingLetters.ts";
+import upgradesModule from "./gallery/upgrades.ts";
 import touchLayoutModule from "./gallery/touchLayout.ts";
 import customCssModule from "./gallery/customCss.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
@@ -106,6 +110,9 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   windowsLayoutModule,
   capsHandlingModule,
   startKeyboardModule,
+  languageListModule,
+  missingLettersModule,
+  upgradesModule,
   characterInventoryModule,
   marksTreatmentModule,
   punctuationInventoryModule,
@@ -175,6 +182,45 @@ export const decisionModules: readonly QuestionModule[] = [
 ];
 
 /**
+ * Screens that do not appear in the walk on Open (spec 111 FR-016, research R6).
+ * The first four are the identity-first steps (the keyboard already exists);
+ * the rest are the remove tool and the feature galleries, which stay reachable
+ * from the menu. (The Mechanisms and Touch galleries are walked, so they are not here.) Declared here once; the gates below and the advance policy
+ * (steps/advance.ts) both read this set.
+ */
+export const openHiddenScreens: ReadonlySet<string> = new Set([
+  "identity",
+  "layout",
+  "choose_base",
+  "track",
+  // The character survey: Open's Missing letters page replaces it (spec 111 FR-031).
+  "characters",
+  "marks",
+  "punctuation",
+  "invisibles",
+  "convenience",
+  "carve",
+  "deadkeys",
+  "rules",
+]);
+
+/**
+ * The screens a menu entry reaches on Open: the remove tool and the feature galleries
+ * that stay opt-in. Mechanisms and Touch are not among them: they are walked steps.
+ */
+export const openMenuScreens: readonly string[] = [
+  "carve",
+  "marks",
+  "punctuation",
+  "invisibles",
+  "convenience",
+  "deadkeys",
+  "rules",
+];
+
+const notOpen = (d: DecisionSet): boolean => d["authoring-track"]?.value !== "adapt";
+
+/**
  * Declared screen gates (spec 091 FR-003, Delta P6): the gates of screens
  * whose visibility is NOT routing-expressible — the project_name fork
  * (manifest-level in StudioShell, never a property of the flow's `next`
@@ -190,8 +236,57 @@ export const declaredScreenGates: ReadonlyMap<
   (decisions: DecisionSet) => boolean
 > = new Map([
   ["project_name", (d) => d["authoring-track"]?.value === "copy"],
-  ["touch_seed_source", (d) => d["touch-seed-source"] === undefined],
+  [
+    "touch_seed_source",
+    // Open (spec 111 FR-009): the keyboard's own touch layout is edited as it
+    // is; generation is offered only when the file is missing.
+    (d) =>
+      d["touch-seed-source"] === undefined &&
+      (d["authoring-track"]?.value !== "adapt" || openedKeyboardLacksTouchLayout(d)),
+  ],
 ]);
+
+/**
+ * True when the opened keyboard's catalog entry names no touch platform, so it
+ * has no touch layout of its own to edit. Reads only the recorded
+ * `base-keyboard` decision (gates receive nothing else).
+ */
+function openedKeyboardLacksTouchLayout(d: DecisionSet): boolean {
+  const targets = (d["base-keyboard"]?.value as { targets?: readonly string[] } | undefined)?.targets;
+  if (targets === undefined) return false;
+  return !targets.some((t) => t === "web" || t === "mobile" || t === "tablet");
+}
+
+/**
+ * Spec 111 (Open): the screens hidden once the Open entry records
+ * `authoring-track = "adapt"` (the identity-first screens, the remove tool and
+ * the feature galleries). Kept apart from `declaredScreenGates` on purpose: a
+ * declared gate makes its screen an off-spine side trail, and these screens
+ * stay on the static spine that Copy walks and the Flow Map draws. The manifest
+ * folds these into its `screenGates`, so the walk skips them only on Open.
+ */
+export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
+  new Map<string, (decisions: DecisionSet) => boolean>([
+    ...[...openHiddenScreens].map((id) => [id, notOpen] as const),
+    // The start screen records the track (New = copy, Open = adapt), so the track
+    // step only asks a walk that has none yet: a draft from before the start screen.
+    ["track", (d) => d["authoring-track"] === undefined],
+    // Spec 111: the Open walk's own pages. Their gates are decisions (the track, the
+    // recorded problem kinds, whether the keyboard is basic); where they sit in the walk
+    // comes from the modules' provides / requires / screenRequires, not from this file.
+    // They stay on the spine (Copy's gate is false), so no step hard-codes the next one.
+    ["open_languages", (d) => !notOpen(d)],
+    ["open_missing_letters", openLettersGate],
+    ["open_upgrades", openIssueGate("upgrades")],
+    // Spec 111 (Open walk): the Mechanisms gallery is walked on Open unless the keyboard
+    // is basic, whose physical layout is fixed. Copy always walks it.
+    ["mechanisms", openMechanismsGate],
+    // Spec 111 FR-029/FR-032: on Open the help step is asked only when the baseline
+    // recorded a help document that is missing or fails its criteria. Copy always asks it.
+    ["help", (d) => notOpen(d) || hasOpenIssue(d, "docs")],
+    // The welcome-page editor follows the help step: asked on Open only with it.
+    ["html", (d) => notOpen(d) || hasOpenIssue(d, "docs")],
+  ]);
 
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically

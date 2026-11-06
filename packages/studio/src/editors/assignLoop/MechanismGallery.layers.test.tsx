@@ -15,7 +15,19 @@ import { createVirtualFS, type IRGroup } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { changeSelectMenu, selectMenuValue, selectMenuOptionValues } from "../../test/selectMenuTestUtils.ts";
 import { installMechanismGalleryHooks } from "../../test/mechanismGallery/mocks.tsx";
-import { seedInventory, instantiateWorkingCopy, instantiateWithModifiersInUse } from "../../test/mechanismGallery/harness.ts";
+import { seedInventory, instantiateWorkingCopy, instantiateWithModifiersInUse, groupWithModifiers } from "../../test/mechanismGallery/harness.ts";
+
+/** Seed a working copy whose `main` group carries one rule per modifier list. */
+function instantiateWithCombosInUse(combos: string[][]): void {
+  const groups = combos.map((m, i) => groupWithModifiers(`K_${"WXYZ"[i] ?? "W"}`, m));
+  const merged: IRGroup = { ...groups[0]!, rules: groups.flatMap((g) => g.rules) };
+  const seedVfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ]);
+  useWorkingCopyStore
+    .getState()
+    .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([merged], []) });
+}
 
 vi.mock("../../lib/services.ts", () => import("../../test/mechanismGallery/mocks.tsx"));
 vi.mock("../../hooks/useKeyboardArtifact.ts", () => import("../../test/mechanismGallery/mocks.tsx"));
@@ -33,7 +45,7 @@ installMechanismGalleryHooks();
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
-  it("emits a [ALT K_X] rule by default (unshifted plane, generic alt until chirality is in use)", async () => {
+  it("emits a [RALT K_X] rule by default (unshifted plane, RALT when the keyboard has no Alt form yet)", async () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
@@ -52,14 +64,14 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(assignments[0]?.target).toBe("ε");
     expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[ALT K_E]",
+      "[RALT K_E]",
     );
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "ε",
     );
   });
 
-  it("emits a [SHIFT ALT K_X] rule when a second SHIFT layer is added", async () => {
+  it("emits a [SHIFT RALT K_X] rule when a second SHIFT layer is added", async () => {
     // The user is adding Ε (capital epsilon) via the shifted Alt plane of
     // K_E — Shift+Alt+E should produce Ε, not the unshifted Alt character.
     // Base slot defaults to generic ALT (no chiral alt in use); a second
@@ -91,7 +103,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(assignments[0]?.target).toBe("Ε");
     expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[SHIFT ALT K_E]",
+      "[SHIFT RALT K_E]",
     );
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "Ε",
@@ -127,7 +139,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[SHIFT ALT K_E]",
+      "[SHIFT RALT K_E]",
     );
   });
 
@@ -164,9 +176,9 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     // (KM_WARN_KMCMP_4202659) and can never be delivered by a real
     // keypress either. The picker must emit the all-generic, functional
     // [CTRL ALT K_X] rule instead.
-    // LALT must already be "in use" for the pool to offer it under the new
-    // gating rule (computeModifierPool).
-    instantiateWithModifiersInUse("K_W", ["LALT"]);
+    // CTRL is offered only where the keyboard already writes `CTRL ALT`, and
+    // LALT must be "in use" for the pool to offer it (computeModifierPool).
+    instantiateWithCombosInUse([["CTRL", "ALT"], ["LALT"]]);
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
@@ -191,7 +203,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     // chirality unification — under the new gating rule (computeModifierPool)
     // generic ALT is the default until a chiral alt token is already in use,
     // so seed RALT as already in use to get the RALT default here.
-    instantiateWithModifiersInUse("K_W", ["RALT"]);
+    instantiateWithCombosInUse([["CTRL", "ALT"], ["RALT"]]);
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
@@ -288,7 +300,8 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
   });
 
   it("caps the layer combo at 4 dropdowns", async () => {
-    instantiateWorkingCopy();
+    // A `CTRL ALT` keyboard: the first layer is CTRL + ALT (two slots).
+    instantiateWithCombosInUse([["CTRL", "ALT"]]);
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
@@ -296,8 +309,6 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "CTRL");
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     await changeSelectMenu(screen.getByLabelText(/Layer 3 for layer-switch combo/i), "SHIFT");
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
@@ -316,14 +327,14 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    // Slot 1 defaults to generic ALT (no chiral alt in use). Add slot 2
-    // (CTRL) and slot 3 (SHIFT).
+    // Slot 1 defaults to RALT (no Alt form in use). Add slot 2
+    // (CAPS) and slot 3 (SHIFT).
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "CTRL");
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "CAPS");
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     await changeSelectMenu(screen.getByLabelText(/Layer 3 for layer-switch combo/i), "SHIFT");
 
-    // Remove the middle slot (CTRL, index 1).
+    // Remove the middle slot (CAPS, index 1).
     fireEvent.click(screen.getByRole("button", { name: /Remove layer 2/i }));
 
     // Slot 3 is gone; slot 2 now holds what was slot 3's value (SHIFT) —
@@ -333,7 +344,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(selectMenuValue(layer2)).toBe("SHIFT");
 
     // Applying still produces a valid, canonically-ordered combo from the
-    // remaining (ALT, SHIFT) slots — the removed CTRL is gone entirely.
+    // remaining (RALT, SHIFT) slots — the removed CAPS is gone entirely.
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
 
@@ -341,7 +352,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[SHIFT ALT K_E]",
+      "[SHIFT RALT K_E]",
     );
   });
 
@@ -476,13 +487,13 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       /Layer 1 for layer-switch combo/i,
     ) as HTMLElement;
 
-    // Pre-filled with the default alt-family token (generic ALT).
-    expect(selectMenuValue(firstLayerSelect)).toBe("ALT");
+    // Pre-filled with the default alt-family token (RALT: no Alt form in use).
+    expect(selectMenuValue(firstLayerSelect)).toBe("RALT");
 
     const optionValues = (await selectMenuOptionValues(firstLayerSelect))
       .filter((v) => v !== "");
     expect(new Set(optionValues)).toEqual(
-      new Set(["SHIFT", "CTRL", "ALT", "CAPS"]),
+      new Set(["SHIFT", "RALT", "LALT", "CAPS"]),
     );
 
     // Applying still works end to end against the fallback pool.
@@ -492,7 +503,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     const assignments = useWorkingCopyStore
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
-    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[ALT K_E]");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[RALT K_E]");
   });
 });
 
@@ -516,7 +527,7 @@ async function firstLayerOptionValues(): Promise<Set<string>> {
 }
 
 describe("MechanismGallery — computeModifierPool gating", () => {
-  it("(i) no alt/ctrl in use: alt pool is [ALT] only (no RALT/LALT), ctrl pool is [CTRL] only (no LCTRL/RCTRL)", async () => {
+  it("(i) no alt/ctrl in use: alt pool is [RALT,LALT] (RALT default), no raw CTRL offered", async () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
@@ -524,7 +535,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     });
 
     const options = await firstLayerOptionValues();
-    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "CAPS"]));
+    expect(options).toEqual(new Set(["SHIFT", "RALT", "LALT", "CAPS"]));
   });
 
   it("(ii) RALT in use: alt pool becomes both chiral options [RALT,LALT] — generic ALT drops (CHANGE: RALT-in-use now also surfaces LALT)", async () => {
@@ -535,7 +546,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     });
 
     const options = await firstLayerOptionValues();
-    expect(options).toEqual(new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS"]));
+    expect(options).toEqual(new Set(["SHIFT", "RALT", "LALT", "CAPS"]));
   });
 
   it("(iii) LALT in use: alt pool becomes both chiral options [RALT,LALT] — generic ALT drops", async () => {
@@ -546,7 +557,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     });
 
     const options = await firstLayerOptionValues();
-    expect(options).toEqual(new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS"]));
+    expect(options).toEqual(new Set(["SHIFT", "RALT", "LALT", "CAPS"]));
   });
 
   it("(iv) RCTRL in use: ctrl pool becomes both chiral options [LCTRL,RCTRL] — generic CTRL drops", async () => {
@@ -558,7 +569,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
 
     const options = await firstLayerOptionValues();
     expect(options).toEqual(
-      new Set(["SHIFT", "LCTRL", "RCTRL", "ALT", "CAPS"]),
+      new Set(["SHIFT", "LCTRL", "RCTRL", "RALT", "LALT", "CAPS"]),
     );
   });
 
@@ -571,7 +582,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
 
     const options = await firstLayerOptionValues();
     expect(options).toEqual(
-      new Set(["SHIFT", "LCTRL", "RCTRL", "ALT", "CAPS"]),
+      new Set(["SHIFT", "LCTRL", "RCTRL", "RALT", "LALT", "CAPS"]),
     );
   });
 
@@ -583,7 +594,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     });
 
     const options = await firstLayerOptionValues();
-    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "CAPS"]));
+    expect(options).toEqual(new Set(["SHIFT", "ALT", "CAPS"]));
   });
 });
 

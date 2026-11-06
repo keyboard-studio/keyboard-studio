@@ -98,7 +98,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
         ))}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {activeTab === "code" ? (
+        {activeTab === "code" && (
           <Suspense
             fallback={
               <div style={{ padding: 24, color: "var(--app-text-muted)" }}>
@@ -111,14 +111,26 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
           >
             <KmnCodePane />
           </Suspense>
-        ) : (
+        )}
+        {/* Stays mounted (hidden) on the Code tab: the gallery publishes the
+            step's footer Back/Continue, with their completion gating, and
+            unmounting it stranded the author without navigation. */}
+        <div
+          hidden={activeTab === "code"}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: activeTab === "code" ? "none" : "flex",
+            flexDirection: "column",
+          }}
+        >
           <MechanismGallery
             selectedStartKeyboard={startKeyboard}
             onComplete={handleComplete}
             {...(placementMap ? { placementMap } : {})}
             {...(onBack ? { onBack } : {})}
           />
-        )}
+        </div>
       </div>
       <FallbackPolicySection />
     </div>
