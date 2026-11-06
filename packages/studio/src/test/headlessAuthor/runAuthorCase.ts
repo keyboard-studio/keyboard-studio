@@ -93,6 +93,7 @@ import { oskDrivers } from "./stepDrivers/osk.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
 import { customCssDrivers } from "./stepDrivers/customCss.ts";
 import { welcomeHtmDrivers } from "./stepDrivers/welcomeHtm.ts";
+import { iconDrivers } from "./stepDrivers/icon.ts";
 
 export interface AuthorRunOptions {
   /** Eligibility slice for sweeps. Default: no slice filter (US1). */
@@ -126,6 +127,7 @@ const DRIVERS: StepDrivers = {
   ...customCssDrivers,
   ...capsDrivers,
   ...welcomeHtmDrivers,
+  ...iconDrivers,
 };
 
 const TERMINALS = new Set(["done", "unsupported"]);
