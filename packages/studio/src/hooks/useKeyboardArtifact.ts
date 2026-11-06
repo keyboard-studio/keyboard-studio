@@ -23,7 +23,10 @@ export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
-import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
+import {
+  attributionSeedFromPackageSources,
+  computeBaselineDocFindings,
+} from "../lib/collectDocLintInput.ts";
 import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
 import { runContextToleranceAnalysis } from "../lib/contextToleranceRun.ts";
 
@@ -1256,6 +1259,27 @@ export function useKeyboardArtifact(
           wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
           // The fonts the adaptation's generated descriptor declares.
           wc.setStartPackageFonts(fetchResult.packageFonts ?? null);
+          // Open/adapt (Track 2): seed working-copy attribution from the package's
+          // .kps / .kmn so Output does not block on fields the walk never asks for
+          // when the opened keyboard already declares them (spec 111 FR-012).
+          if (wc.instantiationMode === "adapt-existing" && wc.attribution === null) {
+            const kmnPathForAttr = findKmnPath(vfs);
+            const pathsForKps = vfs.list();
+            const kpsPathForAttr =
+              pathsForKps.find((p) => p === `source/${kb.id}.kps`) ??
+              pathsForKps.find(
+                (p) => p.startsWith("source/") && p.toLowerCase().endsWith(".kps"),
+              );
+            const kmnTextForAttr =
+              kmnPathForAttr !== undefined ? (readVfsText(vfs, kmnPathForAttr) ?? null) : null;
+            const kpsTextForAttr =
+              kpsPathForAttr !== undefined ? (readVfsText(vfs, kpsPathForAttr) ?? null) : null;
+            const seed = attributionSeedFromPackageSources({
+              kmnText: kmnTextForAttr,
+              kpsText: kpsTextForAttr,
+            });
+            if (seed !== null) wc.setAttribution(seed);
+          }
           // spec 080 FR-020 (research R8): run the documentation checks ONCE
           // over the base's own files as fetched. A later finding on a still-
           // inherited member whose code appears here is the base's, not the
