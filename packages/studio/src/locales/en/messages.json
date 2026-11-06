@@ -2333,6 +2333,7 @@
   "shell.skipToStepNavigation": "Skip to step navigation",
   "shell.surveyQuestionsPaneLabel": "Survey questions",
   "start.continue": "Continue your current keyboard",
+  "start.continue.hint": "Use Continue in the footer to resume your draft.",
   "start.continue.named": "Continue {label}",
   "start.new.button": "Create a new keyboard",
   "start.new.confirm": "This closes your current keyboard and discards its draft.",

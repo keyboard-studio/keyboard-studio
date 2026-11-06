@@ -58,6 +58,13 @@ export const STANDALONE_STEP_ID = "__standalone__";
 export const CRITERIA_ROUTE_NAV_STEP_ID = "__criteria_route__";
 
 /**
+ * Footer nav for the `#start` route (spec 111 FR-001 / spec 081 FR-001). The
+ * screen is outside StepHost, like `/criteria`, so it publishes under a stable
+ * id instead of `activeStepId`.
+ */
+export const START_ROUTE_NAV_STEP_ID = "__start_route__";
+
+/**
  * A revision opened from Output (spec 094 research R3). A full-page editor
  * owns its step's nav slots (one publisher per step), so StepHost cannot add
  * "Back to testing" / "Discard" there — it publishes them on this separate

@@ -6,8 +6,8 @@
 // (OpenKeyboardEntry) starts an update. Each records the authoring track up front,
 // so the walk's own track step never asks (registry.ts gates it).
 
-import { useEffect, useState } from "react";
-import { Trans } from "@lingui/react/macro";
+import { useEffect, useMemo, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { OpenKeyboardEntry } from "./OpenKeyboardEntry.tsx";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
@@ -30,6 +30,11 @@ import {
   galleryForwardBtnStyle,
   galleryGhostBtn,
 } from "../lib/galleryTheme.ts";
+import {
+  StepNavContext,
+  usePublishStepNav,
+} from "../hooks/usePublishStepNav.ts";
+import { START_ROUTE_NAV_STEP_ID } from "../stores/stepNavStore.ts";
 
 /** Start a new keyboard: a clean session whose walk is the Copy track. */
 export function createNewKeyboard(): void {
@@ -60,7 +65,8 @@ const newButtonStyle = {
   fontSize: 16,
 } as const;
 
-export function StartScreen(): React.JSX.Element {
+function StartScreenBody(): React.JSX.Element {
+  const { t } = useLingui();
   const localDraft = loadDraftMeta();
   const hasLocalDraft = localDraft !== null;
   // A signed-in author on a new device has no local draft, only one saved to their
@@ -92,6 +98,25 @@ export function StartScreen(): React.JSX.Element {
   const label = localDraft !== null ? localDraft.label : (cloudLabel ?? null);
   const [confirmingNew, setConfirmingNew] = useState(false);
 
+  const navSpec = useMemo(() => {
+    if (!resumable) return {};
+    return {
+      forward: {
+        label:
+          label !== null
+            ? t({
+                id: "start.continue.named",
+                message: `Continue ${{ label: label }}`,
+              })
+            : t({ id: "start.continue", message: "Continue your current keyboard" }),
+        onClick: () => navigateTo("survey"),
+        testId: "start-continue-draft",
+      },
+    };
+  }, [resumable, label, t]);
+
+  usePublishStepNav(navSpec);
+
   return (
     <div
       style={{
@@ -110,19 +135,9 @@ export function StartScreen(): React.JSX.Element {
         </h1>
         {resumable && (
           <p style={{ margin: "0 0 8px", fontSize: 14, color: TEXT_DIM }}>
-            <button
-              type="button"
-              style={galleryGhostBtn}
-              onClick={() => navigateTo("survey")}
-            >
-              {label !== null ? (
-                <Trans id="start.continue.named">Continue {label}</Trans>
-              ) : (
-                <Trans id="start.continue">
-                  Continue your current keyboard
-                </Trans>
-              )}
-            </button>
+            <Trans id="start.continue.hint">
+              Use Continue in the footer to resume your draft.
+            </Trans>
           </p>
         )}
         <section aria-labelledby="start-new-heading" style={newCardStyle}>
@@ -186,5 +201,14 @@ export function StartScreen(): React.JSX.Element {
         <OpenKeyboardEntry />
       </div>
     </div>
+  );
+}
+
+/** New/Open hub (spec 111). Provider wraps the body so `usePublishStepNav` sees the route step id. */
+export function StartScreen(): React.JSX.Element {
+  return (
+    <StepNavContext.Provider value={START_ROUTE_NAV_STEP_ID}>
+      <StartScreenBody />
+    </StepNavContext.Provider>
   );
 }

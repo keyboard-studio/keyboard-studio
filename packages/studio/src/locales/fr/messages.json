@@ -2333,6 +2333,7 @@
   "shell.skipToStepNavigation": "Passer à la navigation par étapes",
   "shell.surveyQuestionsPaneLabel": "Questions de l'enquête",
   "start.continue": "Continuer votre clavier en cours",
+  "start.continue.hint": "Utilisez Continuer dans le pied de page pour reprendre votre brouillon.",
   "start.continue.named": "Continuer {label}",
   "start.new.button": "Créer un nouveau clavier",
   "start.new.confirm": "Cela ferme votre clavier en cours et supprime son brouillon.",

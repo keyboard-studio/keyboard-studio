@@ -26,6 +26,7 @@ vi.mock("../lib/draftPersistence.ts", async (importOriginal) => ({
 import { StartScreen } from "./StartScreen.tsx";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { hasVisited } from "../lib/firstVisit.ts";
+import { START_ROUTE_NAV_STEP_ID, useStepNavStore } from "../stores/stepNavStore.ts";
 
 beforeEach(() => {
   token.current = null;
@@ -59,7 +60,9 @@ describe("StartScreen", () => {
   it("with a draft, offers to continue it and asks before New discards it", () => {
     draftMeta.current = { label: "Ewondo" };
     render(<StartScreen />);
-    fireEvent.click(screen.getByText("Continue Ewondo"));
+    const forward = useStepNavStore.getState().entries[START_ROUTE_NAV_STEP_ID]?.spec.forward;
+    expect(forward).toBeDefined();
+    forward!.onClick();
     expect(navigateTo).toHaveBeenCalledWith("survey");
     navigateTo.mockClear();
 
@@ -74,6 +77,10 @@ describe("StartScreen", () => {
     token.current = { accessToken: "t" };
     loadServerDraftMeta.mockResolvedValue({ label: "Cloud Bafut" });
     render(<StartScreen />);
-    await waitFor(() => expect(screen.getByText("Continue Cloud Bafut")).toBeTruthy());
+    await waitFor(() => {
+      const forward = useStepNavStore.getState().entries[START_ROUTE_NAV_STEP_ID]?.spec.forward;
+      expect(forward).toBeDefined();
+      expect(forward!.label).toContain("Cloud Bafut");
+    });
   });
 });
