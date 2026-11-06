@@ -5,7 +5,7 @@
 // (R12 determinism, matching `generateStubs(emitYear)` /
 // `stageAdaptHistory(dateIso)`). The seeds are exactly what the decision
 // record already captures (base identity, characters added, mechanisms
-// chosen, keys removed) — no new journal.
+// chosen, characters removed) — no new journal.
 //
 // `renderHistoryMd` (packages/engine/src/shared/renderHistoryMd.ts) is the
 // separate seam that turns a stored `HistoryProposal`/`HistoryEntryState`
@@ -17,14 +17,16 @@ import { DOTTED_CIRCLE } from "@keyboard-studio/contracts";
 import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 import { HISTORY_INITIAL_RELEASE_BULLET, adaptedFromBullet } from "../shared/renderHistoryMd.js";
 
-/** Seeds sourced from the decision record (R6) — no new journal. */
+/** The facts the proposed HISTORY entry states (no new journal — R6). */
 export interface HistoryProposalSeed {
   /** Adaptation attribution; `null` on a net-new (Track 1) build. */
   base: { id: string; version: string } | null;
+  /** Characters the keyboard now types that the starting keyboard did not. */
   charactersAdded: string[];
   /** Human-readable mechanism names, in application order. */
   mechanismsAssigned: string[];
-  keysRemoved: number;
+  /** Characters of the starting keyboard this keyboard no longer types. */
+  charactersRemoved: number;
 }
 
 /** `## <version> (<dateIso>)` — the one heading shape both authoring tracks use. */
@@ -57,7 +59,7 @@ function plural(count: number, singular: string, pluralForm: string): string {
 
 /**
  * The proposed first HISTORY entry (FR-010): the base it started from (when
- * any), characters added, mechanisms chosen, keys removed — in that bullet
+ * any), characters added, mechanisms chosen, characters removed — in that bullet
  * order. Criterion 3.5 format (heading + bullet items) is satisfied by the
  * caller pairing this with `historyEntryHeading` (or `renderHistoryMd`, which
  * derives the same heading). An adaptation seed always yields the "Adapted
@@ -84,9 +86,9 @@ export function buildHistoryProposal(
   if (seed.mechanismsAssigned.length > 0) {
     bullets.push(`Assigned mechanisms: ${formatList(seed.mechanismsAssigned)}.`);
   }
-  if (seed.keysRemoved > 0) {
-    const n = seed.keysRemoved;
-    bullets.push(`Removed ${n} ${plural(n, "key", "keys")}.`);
+  if (seed.charactersRemoved > 0) {
+    const n = seed.charactersRemoved;
+    bullets.push(`Removed ${n} ${plural(n, "character", "characters")}.`);
   }
   if (bullets.length === 0) {
     bullets.push(HISTORY_INITIAL_RELEASE_BULLET);

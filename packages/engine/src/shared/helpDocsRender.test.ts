@@ -1138,6 +1138,17 @@ describe("README.md and readme.htm from ReadmeFacts (spec 110)", () => {
     expect(readme).toContain("- Removed from French: œ");
   });
 
+  it("readme.htm shares the welcome page's shell: doctype, page language, UTF-8 charset and the shared style", () => {
+    const htm = renderReadmeHtm(hausa({ primaryBcp47: "ha-Latn-NG" }));
+    expect(htm.startsWith("<!DOCTYPE html>\n<html lang=\"ha-Latn-NG\">\n<head>\n<meta charset=\"utf-8\">\n<title>Hausa Latin</title>\n")).toBe(true);
+    expect(htm).toContain(`<style>${DOC_PAGE_STYLE}</style>`);
+    expect(htm.endsWith("</body>\n</html>")).toBe(true);
+  });
+
+  it("readme.htm omits the lang attribute when no language is known", () => {
+    expect(renderReadmeHtm(baseInput())).toContain("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">");
+  });
+
   it("readme.htm is the brief install-time page: no table, links, platforms, use case or design notes", () => {
     const htm = renderReadmeHtm(hausa());
     expect(htm).toContain("<h1>Hausa Latin</h1>");

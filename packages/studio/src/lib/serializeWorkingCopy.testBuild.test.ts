@@ -115,7 +115,7 @@ describe("(b) test-build overrides", () => {
     const kps = kpsOf(files);
     expect(kps).toMatch(/<Keyboard>[\s\S]*?<Version>2\.3\.2<\/Version>/);
     expect(kps).toMatch(/<Info>[\s\S]*?<Name URL="">Bambara \(Test build 2\)<\/Name>/);
-    expect(kps).toMatch(/<Description URL="">Test build 2 — Bambara keyboard/);
+    expect(kps).toMatch(/<Description URL="">Test build 2 — Author prose\./);
     expect(files["HISTORY.md"]!.split("\n").find((l) => l.startsWith("## "))).toMatch(/^## 2\.3\.2 /);
     expect(files["source/welcome/welcome.htm"]).toMatch(/Test build 2/);
     // &NAME is the keyboard's identity across the upgrade to the release.

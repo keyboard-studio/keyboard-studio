@@ -24,14 +24,14 @@ const EMPTY_SEED: HistoryProposalSeed = {
   base: null,
   charactersAdded: [],
   mechanismsAssigned: [],
-  keysRemoved: 0,
+  charactersRemoved: 0,
 };
 
 const FULL_SEED: HistoryProposalSeed = {
   base: { id: "basic_kbdfr", version: "1.3" },
   charactersAdded: ["é", "è"],
   mechanismsAssigned: ["dead key"],
-  keysRemoved: 2,
+  charactersRemoved: 2,
 };
 
 describe("pf_history_entry — module shape", () => {
@@ -97,7 +97,7 @@ describe("deriveHistoryEntryState — first render (no prior state)", () => {
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
       "Added 2 characters: é, è.",
       "Assigned mechanisms: dead key.",
-      "Removed 2 keys.",
+      "Removed 2 characters.",
     ]);
   });
 
@@ -151,7 +151,7 @@ describe("deriveHistoryEntryState — version change (spec edge case)", () => {
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
       "Added 2 characters: é, è.",
       "Assigned mechanisms: dead key.",
-      "Removed 2 keys.",
+      "Removed 2 characters.",
     ]);
   });
 

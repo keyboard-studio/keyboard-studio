@@ -795,6 +795,34 @@ describe("applyDesktopModificationsToRawJson \u2014 removals match ruled T_ keys
     expect(warnings).toEqual([]);
   });
 
+  it("neutralizes every occurrence of a carved T_ key, including layers whose state has no rule for it", () => {
+    const ctx = resolverCtxFor([
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'tid-raw'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [SHIFT T_1DC4] > U+1DC4",
+      "+ [SHIFT K_Q] > U+1DC4",
+      "+ [K_Q] > 'q'",
+    ].join("\n"));
+    const json = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "shift", row: [{ id: 1, key: [{ id: "T_1DC4", text: "\u25cc\u1dc4" }] }] },
+          { id: "rightalt-caps", row: [{ id: 1, key: [{ id: "T_1DC4", text: "\u25cc\u1dc4" }] }] },
+          { id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }] }] },
+        ],
+      },
+    });
+    const { json: out } = applyDesktopModificationsToRawJson(json, { removals: ["\u1dc4"], placements: [] }, ctx);
+
+    const ids = JSON.parse(out).tablet.layer.flatMap((l) => l.row.flatMap((r) => r.key.map((k) => k.id)));
+    expect(ids).not.toContain("T_1DC4");
+    // A K_ id is the physical key: SHIFT K_Q producing the carved mark must
+    // not blank the unshifted K_Q.
+    expect(ids).toContain("K_Q");
+  });
+
   it("without a resolver context the legacy behaviour is unchanged (ruled T_ kept)", () => {
     const json = makePhoneOnlyJson([{ id: "T_0300", text: "\u25cc\u0300" }]);
     const { json: out } = applyDesktopModificationsToRawJson(json, {

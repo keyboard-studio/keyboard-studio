@@ -151,10 +151,10 @@ describe("touch notes", () => {
 });
 
 describe("character inventory", () => {
-  it("groups as letters, marks, punctuation and symbols, and digits", () => {
+  it("groups as letters, marks, punctuation and symbols, and numbers", () => {
     const inv = build(NO_TOUCH_FIXTURE).slots.characterInventory;
     expect(inv.indexOf("Letters")).toBeGreaterThanOrEqual(0);
-    expect(inv.indexOf("Digits")).toBeGreaterThan(inv.indexOf("Letters"));
+    expect(inv.indexOf("Numbers")).toBeGreaterThan(inv.indexOf("Letters"));
     expect(inv).toContain("U+0061 LATIN SMALL LETTER A");
     expect(inv).toContain("U+0031 DIGIT ONE");
     const marks = build(COMBINING_FIXTURE).slots.characterInventory;

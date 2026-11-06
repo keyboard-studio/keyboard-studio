@@ -27,6 +27,8 @@
 //   - Deadkey-only trigger rules (output is a lone deadkey token) produce
 //     no glyph and are skipped, as are backspace-correction rules (the
 //     same `contextHasDirectBackspace` predicate buildProducedSet uses).
+//   - Touch-only virtual keys (`T_*`, `U_*`) are not physical slots and are
+//     skipped, matching the session overlay's physical-modality filter.
 //   - Opaque fragments (ir.raw without a typed rule) are invisible here.
 //     Occupancy is KNOWN occupancy; copy built on it must not claim
 //     exhaustiveness.
@@ -83,6 +85,11 @@ export interface SlotOccupant {
   source: SlotSource;
 }
 
+/** Keyman's touch-only virtual keys: `T_` (custom) and `U_` (Unicode) ids. */
+function isTouchOnlyVkey(name: string): boolean {
+  return /^[TU]_/i.test(name);
+}
+
 /** True when a rule's whole output is a lone deadkey token (an S-02 trigger). */
 function isDeadkeyOnlyOutput(output: readonly { kind: string }[]): boolean {
   return (
@@ -124,6 +131,10 @@ export function buildSlotOccupancy(
         if (rule.context.length !== 1) continue;
         const vkeyEl = rule.context[0];
         if (vkeyEl === undefined || vkeyEl.kind !== "vkey") continue;
+        // Physical slots only, like the session overlay below: a touch-only
+        // T_/U_ key is reached by no keystroke, so counting it would let a
+        // glyph look "still produced elsewhere" when desktop has lost it.
+        if (isTouchOnlyVkey(vkeyEl.name)) continue;
         const glyphs = new Set<string>();
         collectFromElements(rule.output, storeMap, glyphs, false);
         // Conservative: only a single-glyph output names an incumbent.

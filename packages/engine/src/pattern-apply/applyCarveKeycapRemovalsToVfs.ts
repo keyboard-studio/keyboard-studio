@@ -842,6 +842,36 @@ export function scanRemovedTouchKeyIds(
   return { removedMainKeyIds, removedSubKeyIds };
 }
 
+/**
+ * Every key id (main keys and gesture entries, normalized) on the layout, or
+ * null when the JSON cannot be read.
+ */
+function touchLayoutKeyIds(json: string): Set<string> | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  const ids = new Set<string>();
+  const visit = (value: unknown, isKey: boolean): void => {
+    if (Array.isArray(value)) {
+      for (const v of value) visit(v, isKey);
+      return;
+    }
+    if (value === null || typeof value !== "object") return;
+    const obj = value as Record<string, unknown>;
+    if (isKey && typeof obj["id"] === "string") ids.add(normalizeTouchKeyId(obj["id"]));
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === "key" || k === "sk" || k === "multitap") visit(v, true);
+      else if (k === "flick" && v !== null && typeof v === "object") visit(Object.values(v), true);
+      else if (typeof v === "object") visit(v, false);
+    }
+  };
+  visit(data, false);
+  return ids;
+}
+
 /** Inputs to {@link removedTouchKeyRuleIds}. */
 export interface RemovedTouchKeyRuleIdsInput {
   /** Slot ids (`<storeNodeId>#<index>`) — feeds the carved-character derivation. */
@@ -882,8 +912,9 @@ export interface RemovedTouchKeyRuleIds {
  * A rule is in scope iff it binds at least one key AND every key it binds
  * is a touch-only (`T_`) key that is gone from the touch surface — removed
  * by the carve keycap pass (076 FR-023 T020 default, via
- * {@link scanRemovedTouchKeyIds}) or deleted individually. Such a keystroke
- * can never fire:
+ * {@link scanRemovedTouchKeyIds}), deleted individually, or — for a key a
+ * carved rule binds — already absent from the layout (the touch step's
+ * replay blanked it first). Such a keystroke can never fire:
  *
  * - rules already in the carve's whole-node deletion set are returned as
  *   `suppressionExemptIds`: the pipeline deletes them whole-node instead
@@ -931,6 +962,21 @@ export function removedTouchKeyRuleIds(
   for (const id of scan.removedSubKeyIds) gone.add(normalizeTouchKeyId(id));
   if (input.deletedTouchKeyIds !== undefined) {
     for (const id of input.deletedTouchKeyIds) gone.add(normalizeTouchKeyId(id));
+  }
+  // A carved rule's T_ key that is already absent from this layout is gone
+  // too. The touch step's desktop-modification replay blanks carved keys
+  // before this projection runs, so the scan above never sees them leave;
+  // without this the carved rules fall through to `> nul` suppression and
+  // their guard lines stay behind. Scoped to keys the carve's own rules
+  // bind, so an unrelated rule for a key the layout never placed is left as
+  // the author wrote it.
+  const present = touchLayoutKeyIds(touchLayoutJson);
+  if (present !== null) {
+    const cascade = resolveCarveCascade(startIr, input.wholeNodeIds);
+    for (const [keyId, bindings] of ruleIndex.byId) {
+      if (!keyId.startsWith("T_") || present.has(keyId)) continue;
+      if (bindings.some((b) => cascade.deletedRuleIds.has(b.ruleNodeId))) gone.add(keyId);
+    }
   }
   if (gone.size === 0) return none;
 

@@ -71,6 +71,12 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
     expect(kps).not.toContain("French AZERTY");
   });
 
+  it("writes the author's own description into Info/Description", () => {
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
+    applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", description: "For writing Bambara." }, KMN);
+    expect(textAt(vfs, "source/bm_sil.kps")).toContain('<Description URL="">For writing Bambara.</Description>');
+  });
+
   it("leaves Files, System, Options and Version untouched (contract §2)", () => {
     const before = frenchStartDescriptor();
     const vfs = vfsWith("source/bm_sil.kps", before);

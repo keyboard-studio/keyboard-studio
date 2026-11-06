@@ -28,7 +28,7 @@ import {
   type AdaptiveDescriptionContext,
 } from "../../lib/adaptiveDescription.ts";
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
-import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
+import { buildHistoryProposalSeed, historyModelFacts } from "../../decisions/historyProposalSeed.ts";
 import { hasTestBuilds } from "../../stores/testingStore.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
@@ -438,15 +438,18 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 
   // spec 079 US5: derive the HISTORY-entry proposal once per mount (entering
   // the Phase F step), from the decision record no new journal was needed for
-  // (buildHistoryProposalSeed) and the same version `serializeWorkingCopy.ts`
+  // (buildHistoryProposalSeed, with the working copy's historyModelFacts) and the same version `serializeWorkingCopy.ts`
   // will independently recompute at output time (deriveHistoryVersion).
   // Identity-guarded: deriveHistoryEntryState returns `previous` UNCHANGED
   // when the version has not moved, so a re-mount (Back then forward into
   // this step again) never re-stamps `dateIso` (research R12) and never
   // fires a redundant store write.
   onMount(deps: FlowStepDeps): void {
+    const wc = useWorkingCopyStore.getState();
     const next = deriveHistoryEntryState({
-      seed: buildHistoryProposalSeed(),
+      seed: buildHistoryProposalSeed(
+        historyModelFacts({ startIr: wc.startIr, phaseResults: wc.phaseResults, carveChars: wc.carveChars }),
+      ),
       version: deriveHistoryVersion(),
       dateIso: new Date().toISOString().slice(0, 10),
       previous: deps.historyEntryState,

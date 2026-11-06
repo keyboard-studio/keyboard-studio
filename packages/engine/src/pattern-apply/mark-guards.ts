@@ -153,6 +153,68 @@ function isAnyUseGroupOutput(el: { kind: string; text?: string }): boolean {
   return false;
 }
 
+/** The group a `use(...)` output element names (structured or raw), or null. */
+function groupTargetOf(el: { kind: string; groupName?: string; text?: string }): string | null {
+  if (el.kind === "useGroup") return el.groupName ?? null;
+  if (el.kind === "raw") return /^use\(([^)]*)\)$/.exec(stripTrailingComment(el.text ?? ""))?.[1]?.trim() ?? null;
+  return null;
+}
+
+const GUARD_HOP_NODE_ID: Record<"match" | "nomatch", string> = {
+  match: "gen-marks-guard-hop",
+  nomatch: "gen-marks-guard-hop-nomatch",
+};
+
+/**
+ * Enter the guard group from the end of a `use()` chain that starts at
+ * `firstTarget`. Follows each context group whose `match`/`nomatch` rules
+ * hand off to the SAME further group; the first group that ends the chain
+ * gets a hop on BOTH `match` (one of its rules fired) and `nomatch` (none
+ * did) — a context group's `match` alone would enter the guard only after,
+ * say, a deadkey composition. Mutates the (already copied) `groups`' rule
+ * arrays. Returns false when the chain cannot be followed: a missing or
+ * `using keys` target, a fork (`match` and `nomatch` to different groups),
+ * or a cycle.
+ */
+function hopAtChainEnd(groups: IRGroup[], firstTarget: string | null): boolean {
+  const visited = new Set<string>();
+  let name = firstTarget;
+  while (name !== null) {
+    if (visited.has(name) || name === MARKS_GUARD_GROUP) return false;
+    visited.add(name);
+    const group = groups.find((g) => g.name === name);
+    if (group === undefined || group.usingKeys) return false;
+    const exits = (["match", "nomatch"] as const).map((kind) => {
+      const rule = group.rules.find((r) => r.matchKind === kind);
+      const last = rule?.output[rule.output.length - 1];
+      return last !== undefined && isAnyUseGroupOutput(last) ? groupTargetOf(last) : null;
+    });
+    if (exits[0] === null && exits[1] === null) {
+      for (const kind of ["match", "nomatch"] as const) {
+        const index = group.rules.findIndex((r) => r.matchKind === kind);
+        const hop = { kind: "useGroup" as const, groupName: MARKS_GUARD_GROUP };
+        group.rules =
+          index === -1
+            ? [
+                ...group.rules,
+                {
+                  nodeId: GUARD_HOP_NODE_ID[kind],
+                  matchKind: kind,
+                  context: [],
+                  output: [hop],
+                  trailingComment: "generated: marks-series guard hop",
+                },
+              ]
+            : group.rules.map((r, i) => (i === index ? { ...r, output: [...r.output, hop] } : r));
+      }
+      return true;
+    }
+    if (exits[0] !== exits[1]) return false;
+    name = exits[0] ?? null;
+  }
+  return false;
+}
+
 const MARK = /\p{M}/u;
 
 const lastCodePoint = (s: string): string => [...s].at(-1) ?? "";
@@ -432,7 +494,7 @@ export function applyMarkGuards(
         (r) =>
           r.nodeId === "gen-marks-unwrap-rule" ||
           r.nodeId.startsWith(MARKS_WHOLESTACK_RULE_PREFIX) ||
-          (r.matchKind === "match" && r.nodeId === "gen-marks-guard-hop") ||
+          (r.matchKind !== undefined && Object.values(GUARD_HOP_NODE_ID).includes(r.nodeId)) ||
           r.output.some((o) => isUseGroupOutputFor(o, MARKS_GUARD_GROUP)),
       ),
     );
@@ -454,7 +516,7 @@ export function applyMarkGuards(
           (r) =>
             r.nodeId !== "gen-marks-unwrap-rule" &&
             !r.nodeId.startsWith(MARKS_WHOLESTACK_RULE_PREFIX) &&
-            !(r.matchKind === "match" && r.nodeId === "gen-marks-guard-hop"),
+            !(r.matchKind !== undefined && Object.values(GUARD_HOP_NODE_ID).includes(r.nodeId)),
         )
         .map((r) =>
           r.output.some((o) => isUseGroupOutputFor(o, MARKS_GUARD_GROUP))
@@ -464,10 +526,10 @@ export function applyMarkGuards(
               }
             : r,
         )
-        // A match rule left with no output was only ever the guard hop: one
-        // parsed back from a .kmn has lost its generated nodeId. Dropping it
-        // lets the hop be re-added whole, comment included.
-        .filter((r) => !(r.matchKind === "match" && r.output.length === 0)),
+        // A match/nomatch rule left with no output was only ever the guard
+        // hop: one parsed back from a .kmn has lost its generated nodeId.
+        // Dropping it lets the hop be re-added whole, comment included.
+        .filter((r) => !(r.matchKind !== undefined && r.output.length === 0)),
     }));
   const stores = ir.stores
     .filter((s) => !isGeneratedStore(s.name))
@@ -512,9 +574,11 @@ export function applyMarkGuards(
         // Already present from a previous run — nothing to do.
       } else if (endsWithForeignUseGroup) {
         // The rule already ends in a use() to some other group; kmcmplib
-        // allows only one trailing use() per rule. Leave the foreign rule
-        // untouched rather than chaining a second hop after it.
-        guardHopSkipped = true;
+        // allows only one trailing use() per rule, so the foreign rule is
+        // left untouched. Enter the guard at the END of that chain instead
+        // (Cameroon's `match > use(deadkeys)` shape); skip only when the
+        // chain cannot be followed to a context group that ends it.
+        guardHopSkipped = !hopAtChainEnd(groups, groupTargetOf(lastOutput));
       } else {
         const updatedMatch: IRRule = {
           ...existingMatch,

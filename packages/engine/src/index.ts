@@ -365,6 +365,7 @@ export {
   renameFilesInVfs,
   generateStubs,
   resolveInheritedHolders,
+  packageAttributionFields,
 } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity, casedKeysFloor } from "./scaffolder/scaffold-ir.js";
 export { detectStartLayoutFamily } from "./placement/filters.js";

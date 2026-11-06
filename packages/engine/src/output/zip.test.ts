@@ -65,6 +65,16 @@ describe("toZip", () => {
     expect(content).toContain("keyboard-studio/keyboards");
   });
 
+  // The download carries build/ (compiled files) and shared/fonts/ beside the
+  // keyboard's own files; copied into release/<l>/<id>/ they put compiled
+  // output in the pull request and fonts where the .kps does not look.
+  it("NEXT_STEPS.md says to leave build/ and shared/ out of the keyboard's folder", async () => {
+    const content = dec.decode(unzipSync(await toZip(makeFixtureFS()))["NEXT_STEPS.md"]);
+    expect(content).toContain("`build/` holds compiled files");
+    expect(content).toContain("`shared/` holds fonts");
+    expect(content).toContain("(`..\\..\\..\\shared\\…`)");
+  });
+
   it("preserves text file content exactly", async () => {
     const bytes = await toZip(makeFixtureFS());
     const entries = unzipSync(bytes);

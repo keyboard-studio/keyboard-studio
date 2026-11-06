@@ -25,6 +25,7 @@ import { buildReadmeFacts } from "../lib/readmeFacts.ts";
 import { readmeFactsInputFrom } from "../lib/readmeFactsInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
+import { applyCarveMutate } from "../steps/editorMutate.ts";
 
 export interface DocsPreview {
   readmeMd: string;
@@ -62,6 +63,8 @@ export function useDocsPreview(): DocsPreview {
   const isAdaptation = useWorkingCopyStore((s) => s.instantiationMode === "adapt-existing");
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const fallbackPolicy = useWorkingCopyStore((s) => s.fallbackPolicy);
   const decisions = useDecisionStore((s) => s.decisions);
   // Issue #1908: the recorded documentation-fix proposals. Read under the
@@ -80,7 +83,19 @@ export function useDocsPreview(): DocsPreview {
     const platforms = startIr?.header.targets.map((t) => t.toLowerCase()) ?? [];
     // Same input the output projection passes (serializeWorkingCopy step 5c):
     // the start prose is non-null on Track 2 only.
-    const ir = workingIr ?? startIr;
+    // Removals are applied at projection, never to the store's working IR, so
+    // the guide documents the carved IR — the same applyCarveMutate the
+    // projection runs (as deriveDesktopModifications does for its preview).
+    // The output path re-reads the projected .kmn itself; this synchronous
+    // approximation omits projection-only steps such as touch-key rule
+    // deletion, which can only remove more.
+    const uncarvedIr = workingIr ?? startIr;
+    const ir =
+      uncarvedIr !== null && (deletedNodeIds.size > 0 || deletedItemIds.size > 0 || carveChars.size > 0)
+        ? applyCarveMutate(uncarvedIr, deletedNodeIds, deletedItemIds, carveChars, {
+            ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
+          })
+        : uncarvedIr;
     const docContent =
       ir !== null
         ? buildDocContent({
@@ -132,5 +147,5 @@ export function useDocsPreview(): DocsPreview {
       helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, fallbackPolicy, decisions]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions]);
 }

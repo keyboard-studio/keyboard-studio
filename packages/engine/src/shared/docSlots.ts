@@ -32,7 +32,7 @@ export interface DocSlotModel {
   hasLinks: string;
   /** helpSiteHeader(displayName); help form only. */
   helpHeader: string;
-  /** The shared inline style (DOC_PAGE_STYLE); welcome and help forms only, so the two pages carry identical CSS. */
+  /** The shared inline style (DOC_PAGE_STYLE); welcome, help and readme.htm forms, so the pages carry identical CSS. */
   pageStyle: string;
   /** Non-empty exactly on a fresh (non-inherited) render, so the shared body opens with the page's one <h1>. */
   pageHeading: string;
