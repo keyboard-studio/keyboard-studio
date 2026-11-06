@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-04",
+  "lastUpdated": "2026-11-06",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1208,6 +1208,14 @@
     "specs/112-cased-keys": {
       "title": "Feature Specification: Caps Lock and `&CasedKeys`",
       "hash": "sha256:4c6340695c920abe",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/icon-editor": {
+      "title": "Feature Specification: Icon editor step",
+      "hash": "sha256:b00bab60c9122b65",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

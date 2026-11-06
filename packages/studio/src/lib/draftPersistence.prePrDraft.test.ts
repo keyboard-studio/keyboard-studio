@@ -59,13 +59,14 @@ describe("pre-reordering draft loads on the current build", () => {
     useSurveyAnswerStore.getState().reset();
   });
 
-  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111)", () => {
+  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485)", () => {
     // The 091 reordering itself changed no ids. #1901 deliberately ADDED
-    // one step (attribution) and spec 111 added open_languages (Open only) —
+    // one step (attribution), spec 111 added open_languages (Open only),
+    // open_missing_letters and open_upgrades, and #2485 added icon --
     // every pre-reordering id still exists, so a draft persisted before
-    // either change names only known steps.
+    // any of these changes names only known steps.
     expect([...STEP_ORDER].sort()).toEqual(
-      [...PRE_REORDER_STEP_IDS, "attribution", "open_languages", "open_missing_letters", "open_upgrades"].sort(),
+      [...PRE_REORDER_STEP_IDS, "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon"].sort(),
     );
   });
 

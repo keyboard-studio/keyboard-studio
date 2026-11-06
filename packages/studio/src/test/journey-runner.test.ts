@@ -38,7 +38,7 @@ interface JourneyCase {
   visitsOnce?: readonly string[];
   /** The step the replay ends on. */
   lastStep?: string;
-  /** The replay's last edge is html->done (help and html editor steps precede output). */
+  /** The replay's last edge is icon->done (help, html and icon editor steps precede output). */
   endsAtDone: boolean;
   /** The last edge when it is not html->done: Open skips help and html when its documents are fine. */
   lastEdge?: string;
@@ -62,8 +62,9 @@ const JOURNEYS: readonly JourneyCase[] = [
       "css",
       "help",
       "html",
+      "icon",
     ],
-    lastStep: "html",
+    lastStep: "icon",
     endsAtDone: true,
   },
   {
@@ -83,8 +84,9 @@ const JOURNEYS: readonly JourneyCase[] = [
       "css",
       "help",
       "html",
+      "icon",
     ],
-    lastStep: "html",
+    lastStep: "icon",
     endsAtDone: true,
   },
   {
@@ -130,7 +132,7 @@ describe.each(JOURNEYS)("replayJourney — $name", (j) => {
       expect(result.exercisedStepIds.filter((s) => s === id)).toHaveLength(1);
     }
     if (j.lastStep !== undefined) expect(result.exercisedStepIds.at(-1)).toBe(j.lastStep);
-    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe(j.lastEdge ?? "html->done");
+    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe(j.lastEdge ?? "icon->done");
   });
 });
 
