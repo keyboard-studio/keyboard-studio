@@ -4,7 +4,7 @@
   "branch": "114-ctrl-and-letter-removal",
   "unattended": true,
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "plan",
@@ -293,6 +293,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T10:02:55.153Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T16:48:42.994Z"
     }
   ],
   "decisions": [
@@ -324,6 +332,9 @@
     },
     "tasks": {
       "summary": "53 tasks across Foundational, US1-US4 and Polish; 3 waves of parallel work, one sequencing exception at T037"
+    },
+    "implement": {
+      "summary": "Polish phase validated; spec 114 gates green"
     }
   },
   "approach": "Add a keyboard-lint raw-Ctrl check and advisory with criteria rows, an IR-splice upgrade returning characters to the inventory, gallery/touch limits against Ctrl, and a dismissable needed-letter warning reusing carveNeededSet.",
@@ -396,7 +407,7 @@
       ]
     }
   },
-  "currentTask": "T054",
+  "currentTask": "T053",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -624,6 +635,13 @@
       "files": [
         "specs/114-ctrl-and-letter-removal/fr-007-verification.md"
       ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Gate green: typecheck, pnpm -r test, lint, golden-walk e2e",
+      "files": [
+        "none"
+      ]
     }
   },
   "verified": [
@@ -647,9 +665,29 @@
       "what": "phase 3 gates",
       "command": "pnpm typecheck; pnpm -r test; pnpm lint",
       "result": "all green (studio 11408 pass)"
+    },
+    {
+      "what": "pnpm typecheck",
+      "command": "pnpm typecheck",
+      "result": "exit 0"
+    },
+    {
+      "what": "pnpm -r test",
+      "command": "pnpm -r test",
+      "result": "all packages pass (studio 11435, engine 5011, contracts 1085, lint 596)"
+    },
+    {
+      "what": "pnpm lint",
+      "command": "pnpm lint",
+      "result": "exit 0"
+    },
+    {
+      "what": "golden walk e2e SC-003",
+      "command": "playwright test e2e/golden-walk.spec.ts",
+      "result": "1 passed"
     }
   ],
-  "last_action": "Phase 5 done: T030-T037",
+  "last_action": "T053 closed, all tasks done",
   "concerns": [
     {
       "note": "RemoveKeyDialog is not mounted anywhere (TouchGallery holds unused handlers); the T036 warning has no live caller. T037 covered by MechanismGallery existing-method removal only. Carve/Mechanism warning paths lack their own tests.",
@@ -658,5 +696,13 @@
     {
       "note": "T053 open: golden-walk e2e (SC-003) fails locally on source/test.kvks and test.kpj. Content is identical after stripping CR; baseline is LF, walk emits CRLF, because ../keyboards is CRLF here. This branch does not touch those emitters. Not re-run on main; needs a CI run or LF corpus to confirm."
     }
-  ]
+  ],
+  "livingSpecs": {
+    "skipped": [
+      {
+        "name": "none",
+        "reason": "no loaded capabilities"
+      }
+    ]
+  }
 }
