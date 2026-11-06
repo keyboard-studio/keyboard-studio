@@ -15,6 +15,7 @@ import { useId, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { TransformProposal, UserDisposition } from "@keyboard-studio/engine";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
+import { primaryButton, secondaryButton } from "../../survey/surveyStyles.ts";
 
 export interface FacetTransformPanelProps {
   proposal: TransformProposal;
@@ -279,11 +280,11 @@ export function FacetTransformPanel({
           );
         })()}
 
-      <footer className="actions">
-        <button type="button" onClick={handleConfirm}>
+      <footer className="actions" style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button type="button" onClick={handleConfirm} style={primaryButton(false)}>
           {confirmLabel ?? <Trans id="facetTransform.confirm">Confirm and apply</Trans>}
         </button>
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={onCancel} style={secondaryButton}>
           {cancelLabel ?? <Trans id="facetTransform.cancel">Cancel</Trans>}
         </button>
       </footer>

@@ -20,7 +20,7 @@ import type { NormalizationRefusalReason } from "@keyboard-studio/contracts";
 
 import { FacetTransformPanel } from "../../components/facet-transform/FacetTransformPanel.tsx";
 import { ToleranceGapCases } from "../../lint/ContextToleranceNotice.tsx";
-import { mutedParaFlush, sectionHeading } from "../surveyStyles.ts";
+import { mutedParaFlush, secondaryButton, sectionHeading } from "../surveyStyles.ts";
 import { NormalizationExamples, type NormalizationExample } from "./NormalizationExamples.tsx";
 import { decisionFromProposal } from "./contextToleranceProposal.ts";
 
@@ -256,7 +256,7 @@ export function ContextToleranceStation({
                   message: "You chose to leave your keyboard as it is.",
                 })}
         </p>
-        <button type="button" data-testid="context-tolerance-change" onClick={() => setChanging(true)} style={{ alignSelf: "flex-start" }}>
+        <button type="button" data-testid="context-tolerance-change" onClick={() => setChanging(true)} style={{ ...secondaryButton, alignSelf: "flex-start" }}>
           <Trans id="marks.contextTolerance.station.prior.change">Change this decision</Trans>
         </button>
       </div>
