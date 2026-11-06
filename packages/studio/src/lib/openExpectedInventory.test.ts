@@ -4,6 +4,7 @@ import type { SourcedInventory } from "./services.ts";
 import {
   distinctLanguageTags,
   loadExemplarUnion,
+  neededLettersByLanguage,
   unionExemplars,
 } from "./openExpectedInventory.ts";
 
@@ -61,5 +62,38 @@ describe("loadExemplarUnion", () => {
     expect(union.withData).toBe(1);
     expect(union.withoutData).toEqual(["b"]);
     expect(sourcedByTag.get("b")).toBeNull();
+  });
+});
+
+describe("neededLettersByLanguage", () => {
+  const index = new Map<string, SourcedInventory | null>([
+    ["fr", inv([["e", "main"], ["é", "main"], ["œ", "auxiliary"], [".", "punctuation"]])],
+    ["fr-CA", inv([["é", "main"]])],
+    ["bkm", inv([["e", "main"], ["ɔ", "main"], ["1", "numbers"]])],
+    ["zzz", null],
+  ]);
+
+  it("maps each character to every listed language whose main set has it", () => {
+    const m = neededLettersByLanguage(["fr", "fr-CA", "bkm", "zzz"], index);
+    expect(m.get("é")).toEqual(["fr", "fr-CA"]);
+    expect(m.get("e")).toEqual(["fr", "bkm"]);
+    expect(m.get("ɔ")).toEqual(["bkm"]);
+  });
+
+  it("uses the main tier only", () => {
+    const m = neededLettersByLanguage(["fr", "bkm"], index);
+    expect(m.has("œ")).toBe(false);
+    expect(m.has(".")).toBe(false);
+    expect(m.has("1")).toBe(false);
+  });
+
+  it("normalises exemplar characters to NFC", () => {
+    const m = neededLettersByLanguage(["d"], new Map([["d", inv([["é", "main"]])]]));
+    expect(m.get("é")).toEqual(["d"]);
+  });
+
+  it("gives no entry for a tag with no data and ignores duplicate tags", () => {
+    const m = neededLettersByLanguage(["zzz", "fr", "fr"], index);
+    expect(m.get("e")).toEqual(["fr"]);
   });
 });

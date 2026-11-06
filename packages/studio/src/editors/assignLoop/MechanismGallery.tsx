@@ -123,6 +123,8 @@ import {
   useTreatmentFilteredChars,
 } from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
+import { useRemovalWarning } from "../../hooks/useRemovalWarning.ts";
+import { RemovalWarningNotice } from "../../components/RemovalWarningNotice.tsx";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
 } from "../../survey/placementSeeds.ts";
@@ -3107,6 +3109,11 @@ export function MechanismGallery({
     currentCharBadge,
   ]);
 
+  // Characters whose last existing method was removed here (FR-006 warning).
+  const [removedCharsForWarning, setRemovedCharsForWarning] = useState<string[]>([]);
+  const { warnings: removalWarnings, dismiss: dismissRemovalWarning } =
+    useRemovalWarning(removedCharsForWarning);
+
   const handleRemoveExistingMethod = useCallback(
     (row: ExistingMethodRow) => {
       if (!row.deletable) return;
@@ -3120,8 +3127,18 @@ export function MechanismGallery({
       } else if (row.kind === "slot") {
         cascadeDelete([], [row.id]);
       }
+      // FR-006: the character is gone from the keyboard only when no other
+      // method still produces it; then a needed letter warns (dismissably).
+      if (
+        currentChar !== null &&
+        !existingMethods.some((m) => m.id !== row.id && !m.isUsed)
+      ) {
+        setRemovedCharsForWarning((prev) =>
+          prev.includes(currentChar) ? prev : [...prev, currentChar],
+        );
+      }
     },
-    [cascadeDelete],
+    [cascadeDelete, currentChar, existingMethods],
   );
 
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
@@ -4199,6 +4216,9 @@ export function MechanismGallery({
                   rows are built and removed, and NonDeletableMethodChip
                   (parts/RemovableChipRow.tsx) for the shared static-chip
                   palette. */}
+            {removalWarnings.length > 0 && (
+              <RemovalWarningNotice warnings={removalWarnings} onDismiss={dismissRemovalWarning} />
+            )}
             {currentChar !== null && existingMethods.length > 0 && (
               <div>
                 <p

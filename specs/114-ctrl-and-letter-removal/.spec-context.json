@@ -181,6 +181,70 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T09:41:25.531Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.038Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.232Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.424Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.729Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.842Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:08.951Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:49:09.065Z"
     }
   ],
   "decisions": [
@@ -279,7 +343,7 @@
       ]
     }
   },
-  "currentTask": "T025",
+  "currentTask": "T037",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -399,6 +463,66 @@
       "files": [
         "packages/studio/src/lib/irToCarveNodes.ts"
       ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "removal warning model tests",
+      "files": [
+        "packages/studio/src/lib/removalWarning.test.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "per-language needed-letter map tests",
+      "files": [
+        "packages/studio/src/lib/openExpectedInventory.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "neededLettersByLanguage (main tier, NFC, char to languages)",
+      "files": [
+        "packages/studio/src/lib/openExpectedInventory.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "pure RemovalWarning model with session dismissal",
+      "files": [
+        "packages/studio/src/lib/removalWarning.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "useRemovalWarning hook plus shared RemovalWarningNotice; fr strings",
+      "files": [
+        "packages/studio/src/hooks/useRemovalWarning.ts",
+        "packages/studio/src/components/RemovalWarningNotice.tsx",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "dismissable needed-letter warning on carve in Copy",
+      "files": [
+        "packages/studio/src/editors/carve/CarveGalleryV2.tsx"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "RemoveKeyDialog accepts and shows dismissable removal warnings, with test",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.test.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "warning on Mechanism gallery existing-method removal when last producer of a needed char",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
     }
   },
   "verified": [
@@ -424,5 +548,11 @@
       "result": "all green (studio 11408 pass)"
     }
   ],
-  "last_action": "phase 3 (US1) done"
+  "last_action": "Phase 5 done: T030-T037",
+  "concerns": [
+    {
+      "note": "RemoveKeyDialog is not mounted anywhere (TouchGallery holds unused handlers); the T036 warning has no live caller. T037 covered by MechanismGallery existing-method removal only. Carve/Mechanism warning paths lack their own tests.",
+      "step": "implement"
+    }
+  ]
 }

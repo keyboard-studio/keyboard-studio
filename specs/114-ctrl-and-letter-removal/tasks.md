@@ -71,25 +71,25 @@ Files: packages/studio/src/lib/carveNeededSet.ts (+ test), packages/studio/src/l
 
 ### Tests
 
-- [ ] **T030** [P] [US3] Write failing tests for the removal warning: NFC-normalised lookup, composed and decomposed forms match, each character maps to every listed language, a non-needed character gives no warning, dismissal keeps the removal · packages/studio/src/lib/removalWarning.test.ts
-- [ ] **T031** [P] [US3] Write failing tests for the per-language needed-letter map built from main exemplar sets · packages/studio/src/lib/openExpectedInventory.test.ts
+- [x] **T030** [P] [US3] Write failing tests for the removal warning: NFC-normalised lookup, composed and decomposed forms match, each character maps to every listed language, a non-needed character gives no warning, dismissal keeps the removal · packages/studio/src/lib/removalWarning.test.ts
+- [x] **T031** [P] [US3] Write failing tests for the per-language needed-letter map built from main exemplar sets · packages/studio/src/lib/openExpectedInventory.test.ts
 
 ### Implementation
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T032** [P] [US3] Add the per-language needed-letter map (character to languages) from each listed language's main exemplar set, using the per-tag data in `openExpectedInventory.ts` (`standardExemplarChars`), NFC on both sides, shared by Copy and Open (FR-006). Do not build it on `carveNeededSet.ts`: that set covers one language and also unions marks and the confirmed inventory, so it would warn on characters no language needs · packages/studio/src/lib/openExpectedInventory.ts
-- [ ] **T033** [P] [US3] Implement the pure warning model: `RemovalWarning` with char, languages and session-scoped dismissal (FR-006) · packages/studio/src/lib/removalWarning.ts
-- [ ] **T034** [P] [US3] Implement the hook that exposes the warning to the removal paths (FR-006) · packages/studio/src/hooks/useRemovalWarning.ts
+- [x] **T032** [P] [US3] Add the per-language needed-letter map (character to languages) from each listed language's main exemplar set, using the per-tag data in `openExpectedInventory.ts` (`standardExemplarChars`), NFC on both sides, shared by Copy and Open (FR-006). Do not build it on `carveNeededSet.ts`: that set covers one language and also unions marks and the confirmed inventory, so it would warn on characters no language needs · packages/studio/src/lib/openExpectedInventory.ts
+- [x] **T033** [P] [US3] Implement the pure warning model: `RemovalWarning` with char, languages and session-scoped dismissal (FR-006) · packages/studio/src/lib/removalWarning.ts
+- [x] **T034** [P] [US3] Implement the hook that exposes the warning to the removal paths (FR-006) · packages/studio/src/hooks/useRemovalWarning.ts
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T035** [US3] Show the dismissable warning on carve in Copy (FR-006) · packages/studio/src/editors/carve/CarveGalleryV2.tsx
-- [ ] **T036** [US3] Show the dismissable warning on the Remove tool in Open (FR-006) · packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx
+- [x] **T035** [US3] Show the dismissable warning on carve in Copy (FR-006) · packages/studio/src/editors/carve/CarveGalleryV2.tsx
+- [x] **T036** [US3] Show the dismissable warning on the Remove tool in Open (FR-006) · packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx
 
 **⟶ Wait for Phase 4 to finish, then:**
 
-- [ ] **T037** [US3] Show the dismissable warning on gallery deletion in Open (FR-006). First locate the real deletion entry points: the Mechanism gallery's "remove" removes a modifier slot, not a character; character deletion likely goes through the key grid (`useKeyEditGuards`) · files to be confirmed
+- [x] **T037** [US3] Show the dismissable warning on gallery deletion in Open (FR-006). First locate the real deletion entry points: the Mechanism gallery's "remove" removes a modifier slot, not a character; character deletion likely goes through the key grid (`useKeyEditGuards`) · files to be confirmed
 
 **Checkpoint**: removing é on a French copy warns and names French; dismissing keeps it removed; no non-needed removal warns (SC-006).
 

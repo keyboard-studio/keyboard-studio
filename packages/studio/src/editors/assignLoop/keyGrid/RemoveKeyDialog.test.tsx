@@ -527,3 +527,31 @@ describe("RemoveKeyDialog — the last-key-in-row keep-row control (T099)", () =
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. The needed-letter warning (spec 114 FR-006) — dismissable, never blocking
+// ---------------------------------------------------------------------------
+
+describe("RemoveKeyDialog needed-letter warning", () => {
+  const warnings = [{ char: "\u00e9", languages: ["fr"] }];
+
+  it("renders no warning by default", () => {
+    render(<RemoveKeyDialog {...defaultProps()} />);
+    expect(screen.queryByTestId("removal-warning")).toBeNull();
+  });
+
+  it("shows the warning, dismisses it by character, and never disables Confirm", () => {
+    const onDismissRemovalWarning = vi.fn();
+    render(
+      <RemoveKeyDialog
+        {...defaultProps({ proposedOutcome: "suppress" })}
+        removalWarnings={warnings}
+        onDismissRemovalWarning={onDismissRemovalWarning}
+      />,
+    );
+    expect(screen.getByTestId("removal-warning")).toBeTruthy();
+    expect((screen.getByTestId("remove-key-dialog-confirm") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss warning/ }));
+    expect(onDismissRemovalWarning).toHaveBeenCalledWith("\u00e9");
+  });
+});
