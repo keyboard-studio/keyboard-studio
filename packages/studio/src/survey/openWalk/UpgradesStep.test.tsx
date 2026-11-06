@@ -37,7 +37,6 @@ vi.mock("../../hooks/useOpenWalkCriteria.ts", () => ({
 import { UpgradesRenderer } from "./UpgradesStep.tsx";
 import { GalleryStepContext } from "../../steps/galleryHost.tsx";
 import { StepNavCluster } from "../../components/StepNavCluster.tsx";
-import { STANDALONE_STEP_ID } from "../../stores/stepNavStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useDecisionLogStore } from "../../decisions/decisionLogStore.ts";
 import { STANDALONE_STEP_ID, useStepNavStore } from "../../stores/stepNavStore.ts";
