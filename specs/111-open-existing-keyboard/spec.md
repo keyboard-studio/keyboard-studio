@@ -258,23 +258,13 @@ The walk on Open:
 - **FR-033**: Missing letters MUST group each missing letter under every listed language that expects it, and offer to add the letter or remove the language. Composed and decomposed forms MUST count as the same letter.
 - **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28), the touch caps layer (18.16, the full Capsifesto behaviour: caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift), consistent Ctrl/RAlt touch keys, and a symbols layer. Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
 
-**Ctrl** *(added 2026-11-05; owner rulings, Keyman team decision)*
+**Ctrl and removing letters** *(moved 2026-11-06)*
 
-Keyman core matches unsided `CTRL` on either Ctrl key, and unsided `CTRL ALT` on AltGr as Windows reports it (Left Ctrl + Right Alt) and also on a plain left Ctrl+Alt (core `kmx_modifiers.cpp`). On a Mac, Control maps to `CTRL` and Command is never a keyboard modifier. Corpus census (release/): 131 keyboards type something on unsided Ctrl; 31 have output that no other key produces, on the number row (18 keyboards), letters (11), punctuation (13) and Space (5, all special spaces).
-
-- **FR-035**: Outside `basic_*` keyboards, a rule on unsided `CTRL` (without Alt) on a letter, number or punctuation key MUST be reported, recommending that it move off Ctrl and warning that the keyboard may not be accepted if it stays. Ctrl+Space (special spaces) is not reported. `basic_*` keyboards keep their Ctrl content and are never reported.
-- **FR-036**: The fix MUST remove those Ctrl rules (a text splice) and return each character they typed to the inventory as unplaced, so the Mechanisms gallery, which follows Upgrades in the Open walk, is where the author gives it a new key. A character also typed elsewhere is not re-added.
-- **FR-037**: On Copy, and in the Open galleries, no new content MAY be placed on a Ctrl layer, and no Ctrl layer MAY be added (physical or touch) where the keyboard has none. Existing Ctrl content on a copied `basic_*` keyboard is kept, unless the characters it types are carved: carving a character removes its Ctrl rules with its other rules.
-- **FR-038**: `LCTRL` / `RCTRL` are allowed, with an advisory that an Alt-based placement is preferred.
-- **FR-039** *(proposed, awaiting the owner)*: Unsided `CTRL ALT` is AltGr in practice, so it is not raw Ctrl; it is offered an upgrade to `RALT` that converts every unsided Alt/Ctrl rule in the keyboard (mixing sided and unsided modifiers is not allowed), withheld unless a before/after simulation shows every AltGr key types the same.
-
-**Removing letters** *(added 2026-11-06)*
-
-- **FR-040**: On both paths, removing a character that a listed language needs (its main CLDR/SLDR exemplar set; carve on Copy, the Remove tool and gallery deletions on Open) MUST show a warning naming the language or languages that need it. The warning is dismissable: the author can keep the removal. Composed and decomposed forms count as the same character.
+FR-035..FR-040 (raw Ctrl reporting and its fix, no new Ctrl content or layers, `LCTRL`/`RCTRL` advisory, the proposed `CTRL ALT` to `RALT` upgrade, and the warning on removing a letter a listed language needs) moved to [spec 114](../114-ctrl-and-letter-removal/spec.md), with their tasks (formerly T070-T077). The numbers are not reused here.
 
 **Copy path**
 
-- **FR-030** *(amended 2026-11-05)*: The Copy path's steps, prompts and output MUST be unchanged by this feature, with owner-approved exceptions that Copy shares with Open (the Ctrl rules FR-037, and the removal warning FR-040, also apply to Copy), the first two being: the touch caps layer follows the full Capsifesto behaviour (caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift, Shift-key labels), and `&CasedKeys` lists a key when its Caps output is its Shift output (so an AZERTY number row qualifies) and leaves out a key whose Caps does anything else. "Unchanged" is checked by Copy's outputs (the golden walk); walk order follows each step's inputs and outputs and is not pinned as a literal sequence.
+- **FR-030** *(amended 2026-11-05)*: The Copy path's steps, prompts and output MUST be unchanged by this feature, with owner-approved exceptions that Copy shares with Open (spec 114's Ctrl rules and removal warning also apply to Copy), the first two being: the touch caps layer follows the full Capsifesto behaviour (caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift, Shift-key labels), and `&CasedKeys` lists a key when its Caps output is its Shift output (so an AZERTY number row qualifies) and leaves out a key whose Caps does anything else. "Unchanged" is checked by Copy's outputs (the golden walk); walk order follows each step's inputs and outputs and is not pinned as a literal sequence.
 
 ### Key Entities
 

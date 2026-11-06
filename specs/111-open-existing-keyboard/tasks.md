@@ -231,18 +231,6 @@ Polish (T048–T051) after the last story shipped in this spec
 - [x] T065 [US8] Footer labels for the Open pages, the OSK, CSS and welcome-page steps; the first help question is not required on Open; criteria findings for 18.6 and upgrades open the Letters and Upgrades steps
 - [x] T066 [US8] Tests: `advance.open.test.ts` asserts dependency order, gates and the Open/Copy split instead of literal sequences; the Continue-only e2e asserts Languages, Letters, Mechanisms, OSK, Touch
 
-## Phase 13: Ctrl (FR-035..FR-039; added 2026-11-05)
+## Phase 13: Ctrl and removing letters (moved)
 
-**Goal**: report raw Ctrl outside `basic_*` keyboards, move its characters back to the Mechanisms gallery when the author accepts, and stop new Ctrl content and layers on both paths.
-
-**Independent test**: open ewe (accented vowels on Ctrl+1-9) and accept the fix: the Ctrl rules are gone, the vowels appear unplaced in the Mechanisms gallery, and Review no longer reports raw Ctrl. Open sil_bunong (thin space on Ctrl+Space): nothing is reported. Copy a `basic_*` keyboard with Ctrl rules: they survive, and no gallery offers a Ctrl placement.
-
-- [ ] T070 [US6] Criterion row (`packages/contracts/data/criteria.json`) and keyboard-lint check for unsided `CTRL` (no Alt) on letter, number and punctuation keys, not Space, skipped for `basic_*` keyboards; message recommends moving and warns the keyboard may not be accepted
-- [ ] T071 [US6] Upgrade pair: remove the reported Ctrl rules by splice and return their characters to the inventory unplaced (skipping characters typed elsewhere); register in `packages/studio/src/criteria/upgradePairs.ts`
-- [ ] T072 [US6] Galleries (mechanisms, touch) on both paths never offer a Ctrl plane or layer for new content, and the touch layer editor cannot add a Ctrl layer the keyboard lacks; existing `basic_*` Ctrl content is kept on Copy
-- [ ] T073 [US6] Advisory criterion for `LCTRL` / `RCTRL`: allowed, Alt-based placement preferred
-- [ ] T074 [US6] (awaiting owner: FR-039) `CTRL ALT` to `RALT` upgrade with whole-keyboard modifier conversion and a before/after AltGr simulation
-- [ ] T075 [US6] (proposed) Touch upgrade: rename the 11 `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content to `rightalt` / `rightalt-shift` (and basic_kbdth0's to `leftctrl`), with their `nextlayer` references
-- [ ] T076 [US6] Copy from a `basic_*` keyboard keeps its Ctrl rules; carving a character removes its Ctrl rules along with its other rules (check carve's rule removal covers CTRL planes; test with basic_kbdurdu)
-- [ ] T077 [US5] Removal warning (FR-040): carve (Copy), the Remove tool and gallery deletions (Open) warn, dismissably, when a removed character is in a listed language's main exemplar set, naming the language(s); reuse `useCarveNeededSet` / the Open exemplar union rather than a new lookup
-
+T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/spec.md) on 2026-11-06. Their ids are not reused here.
