@@ -137,3 +137,46 @@ They were re-captured with the capture command above against corpus
 byte-identical to the previous baseline. A whole local capture is not
 committed because a Windows checkout with `core.autocrlf=true` gives
 `test.kvks` / `test.kpj` CRLF line endings that CI never produces.
+
+## 2026-11-06 — Re-capture for PR #2523 (Ewondo test-run fixes)
+
+**Re-capture: 2026-11-06 (America/Chicago), from PR #2523
+(`km/ewondo-test-fixes`) at `3f0c193e` merged with main `321b39ca`.**
+Taken locally (Playwright desktop, pinned corpus `435f82d6`, vite dev
+server); verify mode passes against it locally.
+
+Why a merge tree: CI verifies the walk on the pull-request merge tree,
+and this branch predates main's #2513 (`&CasedKeys` derived in the
+projection) and #2518 (golden-walk spec fix — the dead
+`driveHtmlEditorStep` call, which would hang a capture on the branch
+head alone). The capture ran on a throwaway local merge
+(`tmp/2523-merge-test`, `dda91e81`); its single conflict, in
+`packages/studio/src/lib/serializeWorkingCopy.ts`, was resolved by
+keeping the PR-side projected-charts re-render — main's side only
+restructured the same lines with the `if (!isOpen)` guard. The branch
+itself is NOT rebased or merged by this commit: only the baseline zip
+and this record change here. If the eventual merge resolves that
+conflict differently, re-capture.
+
+The failing run was `42248482153` (golden-walk job `127996975924`):
+the walk differed from main's baseline in exactly thirteen entries,
+each an intended output change of PR #2523 (`source/test.kmn` differs
+only by the two added marks-guard lines — #2513's `&CasedKeys`
+narrowing is already shared by the walk and the baseline):
+`HISTORY.md` (model-derived added/removed lines; capture date
+2026-11-06, which verify normalises); `NEXT_STEPS.md` (leave `build/`
+and `shared/` out); `README.md`, `source/readme.htm`,
+`source/help/test.php`, `source/welcome/welcome.htm` (docs built from
+the projected keyboard, with a Marks section; `readme.htm` gains the
+welcome page's HTML shell); `source/test.kmn` (marks-guard hop) and
+the recompiled `build/test.js` / `build/test.kmx`; `source/test.kps`
+(author's own description, `<Author>` / `<Copyright>`); three layout
+charts re-rendered from the projected model (`desktop-shift` drops µ,
+`tablet-default` labels the space key, `tablet-rightalt` labels `;`).
+`.studio/decision-record.json` gains the OSK-step entry (main #2505)
+and is presence-checked only. Every other entry is byte-identical to
+main's baseline.
+
+Note: the CI `golden-walk-baseline` artifact is NOT the walked output
+— the workflow re-uploads the committed baseline file — so it cannot
+be used as a capture source; this baseline is a fresh local capture.
