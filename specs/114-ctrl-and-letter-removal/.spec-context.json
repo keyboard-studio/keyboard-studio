@@ -1,0 +1,57 @@
+{
+  "workflow": "companion",
+  "specName": "Ctrl rules and removing needed letters",
+  "branch": "114-ctrl-and-letter-removal",
+  "unattended": true,
+  "currentStep": "plan",
+  "status": "planned",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-06T08:37:21.924Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:38:31.355Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:38:31.737Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:38:32.707Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Layer C keyboard-lint check KM_LINT_RAW_CTRL plus upgrade pair in studio",
+      "why": "matches existing criterion and upgrade seams",
+      "rejected": "studio-only check"
+    },
+    {
+      "decision": "Report raw Ctrl in any group; warn once per char per session",
+      "why": "collision is group-independent; removal is the author's call",
+      "rejected": "main group only; repeat warnings"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan: check, upgrade, no-new-Ctrl limits, removal warning; FR-005/007 stubbed",
+      "key_finding": "All pieces reuse existing seams (upgradePairs, carveNeededSet, criteria.json)"
+    }
+  },
+  "approach": "Add a keyboard-lint raw-Ctrl check and advisory with criteria rows, an IR-splice upgrade returning characters to the inventory, gallery/touch limits against Ctrl, and a dismissable needed-letter warning reusing carveNeededSet."
+}
