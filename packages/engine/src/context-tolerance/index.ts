@@ -59,6 +59,10 @@ export {
   type NormalizationStepResult,
 } from '../pattern-apply/normalization-step/index.js';
 export { loadCharNames } from '../character-discovery/charNames.js';
-/** For `applyFacetTransform`'s injected behavioural verification. */
-export { simulate } from '../simulator/index.js';
+/**
+ * `simulate`: for `applyFacetTransform`'s injected behavioural verification.
+ * `simulateEach`: the Layout tab's verification pass (spec 113), one keyboard
+ * load per grid instead of one per key.
+ */
+export { simulate, simulateEach } from '../simulator/index.js';
 export type { ContextVariant } from '@keyboard-studio/contracts';

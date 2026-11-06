@@ -1,0 +1,314 @@
+// LayoutPane — the Layout tab end to end over the real stores and the real attribution hook
+// (spec 113 US1: FR-010a, FR-011, FR-017, FR-018, scenarios 1, 6, 7). Only the compiled keyboard
+// is faked: `fetch` returns placeholder bytes and the simulator is replaced by a table of what
+// "the compiled keyboard" types, which a test changes to republish the artifact.
+
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { parseKmn } from "@keyboard-studio/engine";
+import type { KeyboardIR, SimKeyInput, SimulationStep } from "@keyboard-studio/contracts";
+import { render } from "../../test/renderWithI18n.tsx";
+import {
+  makeErrorRulesDemoArtifact,
+  makeIdleRulesDemoArtifact,
+  makeReadyRulesDemoArtifact,
+  useRulesDemoArtifactStore,
+} from "../../stores/rulesDemoArtifactStore.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { LayoutPane } from "./LayoutPane.tsx";
+
+/** What the fake compiled keyboard types, by virtual key. Tests change it to "republish". */
+const compiled = vi.hoisted(() => ({ typed: new Map<string, string>(), fired: new Set<string>() }));
+
+vi.mock("@keyboard-studio/engine/context-tolerance", () => {
+  const simulateEach = (_c: unknown, inputs: readonly SimKeyInput[], seed?: { text?: string }): SimulationStep[] =>
+    inputs.map((input) => ({
+      input,
+      outputAfter: `${seed?.text ?? ""}${compiled.typed.get(input.vkey) ?? ""}`,
+      pendingDeadkeys: [],
+      beep: false,
+      ...(compiled.fired.has(input.vkey) ? { firedRule: { group: "main", ruleIndex: 0 } } : {}),
+    }));
+  return { simulate: vi.fn(), simulateEach };
+});
+
+const KMN = `store(&VERSION) '10.0'
+store(&NAME) 'T'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'x'
++ [K_B] > 'y'
++ [SHIFT K_A] > 'X'
+`;
+
+const MNEMONIC = `store(&VERSION) '10.0'
+store(&NAME) 'T'
+store(&MNEMONICLAYOUT) '1'
+begin Unicode > use(main)
+group(main) using keys
++ 'a' > 'x'
+`;
+
+let urlCounter = 0;
+/** The jsBytes cache is keyed by URL, so each republish uses a fresh one. */
+function nextUrl(): string {
+  urlCounter += 1;
+  return `blob:layout-pane-test-${urlCounter}`;
+}
+
+function publish(): void {
+  act(() => {
+    useRulesDemoArtifactStore.setState({ artifact: makeReadyRulesDemoArtifact(nextUrl(), "t") });
+  });
+}
+
+function load(kmn: string): KeyboardIR {
+  const ir = parseKmn(kmn, "t").ir;
+  useWorkingCopyStore.setState({ ir, startIr: ir, desktopLocked: false });
+  return ir;
+}
+
+async function settle(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  });
+}
+
+const cell = (vkey: string): HTMLElement => screen.getByTestId(`layout-cell-${vkey}`);
+
+beforeEach(() => {
+  compiled.fired = new Set();
+  compiled.typed = new Map([
+    ["K_A", "x"],
+    ["K_B", "y"],
+  ]);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode("// compiled").buffer })),
+  );
+  useRulesDemoArtifactStore.setState({ artifact: makeIdleRulesDemoArtifact() });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  useWorkingCopyStore.setState({ ir: null, startIr: null, desktopLocked: false });
+  useRulesDemoArtifactStore.setState({ artifact: makeIdleRulesDemoArtifact() });
+});
+
+describe("LayoutPane", () => {
+  it("says there is nothing to show without a keyboard", () => {
+    useWorkingCopyStore.setState({ ir: null, startIr: null });
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    expect(screen.getByTestId("layout-pane-empty")).toBeTruthy();
+  });
+
+  it("shows each key's compiled output, from the starting point, once the keyboard compiles (scenario 1)", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    expect(cell("K_A").getAttribute("aria-label")).toContain("types x");
+    expect(cell("K_A").getAttribute("aria-label")).toContain("From the starting point");
+    expect(cell("K_A").getAttribute("aria-readonly")).toBeNull();
+    expect(screen.queryByTestId("layout-banner-not-compiled")).toBeNull();
+    expect(screen.queryByTestId("layout-banner-stale")).toBeNull();
+  });
+
+  it("lists default and Shift as layers, default first, and the grid names the active layer", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    const tabs = within(screen.getByTestId("key-layer-selector")).getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["Default", "Shift"]);
+    expect(screen.getByRole("grid").getAttribute("aria-label")).toBe("Desktop layout, Default layer");
+    fireEvent.click(screen.getByTestId("key-layer-selector-option-SHIFT"));
+    expect(screen.getByRole("grid").getAttribute("aria-label")).toBe("Desktop layout, Shift layer");
+  });
+
+  it("keeps the selected key when the layer changes", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    fireEvent.click(cell("K_A"));
+    expect(screen.getByTestId("key-detail-heading").textContent).toBe("Key A, layer Default");
+    fireEvent.click(screen.getByTestId("key-layer-selector-option-SHIFT"));
+    expect(cell("K_A").getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("key-detail-heading").textContent).toBe("Key A, layer Shift");
+  });
+
+  it("opens the Code tab at the rule from the detail panel", async () => {
+    const ir = load(KMN);
+    const onViewInCode = vi.fn();
+    render(<LayoutPane onViewInCode={onViewInCode} />);
+    publish();
+    await settle();
+    fireEvent.click(cell("K_A"));
+    fireEvent.click(screen.getByTestId("key-detail-view-in-code"));
+    expect(onViewInCode).toHaveBeenCalledWith(ir.groups[0]!.rules[0]!.nodeId);
+  });
+
+  describe("banners", () => {
+    it("explains a keyboard that has not compiled, with every key read-only", () => {
+      load(KMN);
+      render(<LayoutPane onViewInCode={vi.fn()} />);
+      expect(screen.getByTestId("layout-banner-not-compiled").textContent).toContain("has not compiled yet");
+      expect(cell("K_A").getAttribute("aria-readonly")).toBe("true");
+      expect(cell("K_A").getAttribute("aria-label")).toContain("not compiled yet");
+    });
+
+    it("lists the compile error and links to the Code tab when the first compile fails", () => {
+      const ir = load(KMN);
+      const onViewInCode = vi.fn();
+      useRulesDemoArtifactStore.setState({
+        artifact: makeErrorRulesDemoArtifact("compile", "syntax error near line 7", []),
+      });
+      render(<LayoutPane onViewInCode={onViewInCode} />);
+      expect(screen.getByTestId("layout-banner-not-compiled").textContent).toContain("does not compile");
+      expect(screen.getByTestId("layout-compile-error-message").textContent).toContain("syntax error near line 7");
+      fireEvent.click(screen.getByTestId("layout-open-code"));
+      expect(onViewInCode).toHaveBeenCalledWith(ir.groups[0]!.nodeId);
+    });
+
+    it("keeps the last good result, marked stale, when a later compile fails", async () => {
+      load(KMN);
+      render(<LayoutPane onViewInCode={vi.fn()} />);
+      publish();
+      await settle();
+      act(() => {
+        useRulesDemoArtifactStore.setState({
+          artifact: makeErrorRulesDemoArtifact("compile", "broke", []),
+        });
+      });
+      await settle();
+      expect(screen.getByTestId("layout-banner-stale").textContent).toContain("last result that did");
+      expect(cell("K_A").getAttribute("aria-label")).toContain("types x");
+      expect(screen.getByTestId("layout-compile-error-message").textContent).toContain("broke");
+    });
+  });
+
+  it("renders a mnemonic keyboard read-only with the reason and a Code-tab link (FR-018)", async () => {
+    const ir = load(MNEMONIC);
+    const onViewInCode = vi.fn();
+    render(<LayoutPane onViewInCode={onViewInCode} />);
+    publish();
+    await settle();
+    expect(screen.getByTestId("layout-banner-mnemonic").textContent).toContain("mnemonic");
+    for (const key of ["K_A", "K_B", "K_Q"]) expect(cell(key).getAttribute("aria-readonly")).toBe("true");
+    fireEvent.click(cell("K_A"));
+    expect(screen.getByTestId("key-detail-editable").textContent).toBe("No, read-only");
+    fireEvent.click(screen.getByTestId("layout-open-code"));
+    expect(onViewInCode).toHaveBeenCalledWith(ir.groups[0]!.nodeId);
+  });
+
+  it("renders a locked desktop step read-only with the Assign tab's lock message", async () => {
+    load(KMN);
+    useWorkingCopyStore.setState({ desktopLocked: true });
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    expect(screen.getByTestId("layout-banner-locked").textContent).toContain(
+      "This desktop layout is complete. Editing it will flag your touch layout for re-review.",
+    );
+    expect(cell("K_A").getAttribute("aria-readonly")).toBe("true");
+    expect(cell("K_A").getAttribute("aria-label")).toContain("read-only");
+  });
+
+  describe("Add layer (FR-010a)", () => {
+    async function openDialog() {
+      load(KMN);
+      render(<LayoutPane onViewInCode={vi.fn()} />);
+      publish();
+      await settle();
+      fireEvent.click(screen.getByTestId("layout-add-layer"));
+    }
+
+    it("adds a combination as a layer labelled 'not saved until a key is set', selects it, and returns focus", async () => {
+      await openDialog();
+      fireEvent.change(screen.getByTestId("add-layer-alt"), { target: { value: "RALT" } });
+      expect(screen.getByTestId("add-layer-preview").textContent).toContain("AltGr");
+      expect(screen.queryByTestId("add-layer-shortcut")).toBeNull();
+      fireEvent.click(screen.getByTestId("add-layer-confirm"));
+      await settle();
+      const tab = screen.getByTestId("key-layer-selector-option-RALT");
+      expect(tab.getAttribute("aria-selected")).toBe("true");
+      expect(tab.textContent).toContain("not saved");
+      expect(screen.getByTestId("layout-unsaved-layer").textContent).toContain("not saved until a key is set");
+      expect(screen.queryByTestId("add-layer-dialog")).toBeNull();
+      expect(document.activeElement).toBe(screen.getByTestId("layout-add-layer"));
+    });
+
+    it("shows the system-shortcut consequence for Ctrl or Alt without AltGr before confirming", async () => {
+      await openDialog();
+      fireEvent.change(screen.getByTestId("add-layer-ctrl"), { target: { value: "CTRL" } });
+      expect(screen.getByTestId("add-layer-shortcut").textContent).toContain("shortcut");
+      expect(screen.getByTestId("add-layer-confirm").textContent).toBe("Add layer anyway");
+      // Nothing was added yet.
+      expect(screen.queryByTestId("key-layer-selector-option-CTRL")).toBeNull();
+    });
+
+    it("cancels without adding a layer", async () => {
+      await openDialog();
+      fireEvent.change(screen.getByTestId("add-layer-alt"), { target: { value: "RALT" } });
+      fireEvent.click(screen.getByTestId("add-layer-cancel"));
+      expect(screen.queryByTestId("key-layer-selector-option-RALT")).toBeNull();
+      expect(document.activeElement).toBe(screen.getByTestId("layout-add-layer"));
+    });
+
+    it("an added layer's keys show base-keyboard fallback until edited", async () => {
+      await openDialog();
+      fireEvent.change(screen.getByTestId("add-layer-alt"), { target: { value: "RALT" } });
+      fireEvent.click(screen.getByTestId("add-layer-confirm"));
+      await settle();
+      expect(cell("K_A").getAttribute("data-provenance")).toBe("base-fallback");
+    });
+  });
+
+  describe("US1 scenario 7: the cell follows the compiled keyboard", () => {
+    it("reflects an Assign-tab assignment after the artifact is republished", async () => {
+      load(KMN);
+      render(<LayoutPane onViewInCode={vi.fn()} />);
+      publish();
+      await settle();
+      expect(cell("K_A").getAttribute("aria-label")).toContain("types x");
+
+      // The Assign tab records the assignment; the existing validation cycle recompiles and
+      // republishes. The compiled keyboard now types z on K_A.
+      useWorkingCopyStore.getState().recordAssignments([]);
+      compiled.typed.set("K_A", "z");
+      publish();
+      await waitFor(() => expect(cell("K_A").getAttribute("aria-label")).toContain("types z"));
+      expect(cell("K_A").getAttribute("aria-label")).toContain("Complex output");
+      expect(cell("K_A").getAttribute("aria-readonly")).toBe("true");
+      expect(cell("K_B").getAttribute("aria-label")).toContain("types y");
+    });
+
+    it("reflects an Assign-tab assignment on a key with no rule, instead of the base keyboard", async () => {
+      load(KMN);
+      render(<LayoutPane onViewInCode={vi.fn()} />);
+      publish();
+      await settle();
+      // K_C has no rule: base-keyboard fallback.
+      expect(cell("K_C").getAttribute("data-provenance")).toBe("base-fallback");
+
+      // The assignment reaches the artifact through the projection, so the working IR still has
+      // no rule for K_C, but the compiled keyboard fires one.
+      useWorkingCopyStore.getState().recordAssignments([]);
+      compiled.typed.set("K_C", "q");
+      compiled.fired.add("K_C");
+      publish();
+      await waitFor(() => expect(cell("K_C").getAttribute("aria-label")).toContain("types q"));
+      expect(cell("K_C").getAttribute("data-provenance")).toBe("hand-set");
+      expect(cell("K_C").getAttribute("aria-label")).toContain("Hand-set");
+      expect(cell("K_C").getAttribute("aria-readonly")).toBeNull();
+      fireEvent.click(cell("K_C"));
+      expect(screen.queryByTestId("key-detail-fallback")).toBeNull();
+    });
+
+    // T101 (US8) asserts this once a Code-tab Apply reaches the artifact; today it never does
+    // (research R1), so the scenario cannot pass yet and must not pass silently.
+    it.todo("T101: reflects a Code-tab Apply after the artifact is republished (needs US8)");
+  });
+});

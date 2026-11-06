@@ -15,11 +15,12 @@
 
 import "./touchBuilder/monacoSetup.ts";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { emitKmn, parseKmn } from "@keyboard-studio/engine";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import {
   lintKmnCodeText,
@@ -47,15 +48,46 @@ function monacoSeverity(
   }
 }
 
-export function KmnCodePane() {
+/**
+ * The 1-based line to reveal for `nodeId`: the node's own line, or — for a
+ * node the emitter gives no line (an opaque fragment it folded into a
+ * group) — the header line of the group that owns it. `undefined` when the
+ * id is unknown.
+ */
+export function lineForNode(
+  ir: KeyboardIR,
+  lineByNodeId: ReadonlyMap<string, number>,
+  nodeId: string,
+): number | undefined {
+  const own = lineByNodeId.get(nodeId);
+  if (own !== undefined) return own;
+  const group = ir.groups.find((g) => g.rules.some((r) => r.nodeId === nodeId));
+  return group === undefined ? undefined : lineByNodeId.get(group.nodeId);
+}
+
+export interface KmnCodePaneProps {
+  /**
+   * Scroll to, and select, the source line of this IR node (a rule, store,
+   * group, or fragment id) once the editor has its text. Used by the Layout
+   * tab's "view in code". Re-applied when the id changes.
+   */
+  readonly revealNodeId?: string;
+}
+
+export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
   const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const setWorkingIR = useWorkingCopyStore((s) => s.setWorkingIR);
   // parseKmn needs a keyboard id; the IR header name is the stable choice.
   const keyboardId = ir?.header.name ?? "keyboard";
 
-  // The canonical text for the current IR.
-  const canonical = ir === null ? null : emitKmn(ir);
+  // The canonical text for the current IR, with the node-to-line map the
+  // reveal uses.
+  const emitted = useMemo(
+    () => (ir === null ? null : emitKmn(ir, { lineMap: true })),
+    [ir],
+  );
+  const canonical = emitted === null ? null : emitted.text;
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -75,6 +107,13 @@ export function KmnCodePane() {
   const lintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keyboardIdRef = useRef(keyboardId);
   keyboardIdRef.current = keyboardId;
+  const [editorReady, setEditorReady] = useState(false);
+  // The node id still waiting to be revealed; cleared once applied so a later
+  // keystroke or Assign-tab edit never re-scrolls the editor.
+  const pendingRevealRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    pendingRevealRef.current = revealNodeId;
+  }, [revealNodeId]);
 
   const applyMarkersToModel = (next: readonly KmnCodeMarker[]) => {
     const editor = editorRef.current;
@@ -125,6 +164,28 @@ export function KmnCodePane() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canonical]);
 
+  // Reveal once the editor is mounted and holds text. Uses the canonical
+  // line map: it matches the editor text while the draft is clean, and is the
+  // best available guess for a dirty one.
+  const hasText = text !== null;
+  useEffect(() => {
+    const nodeId = pendingRevealRef.current;
+    if (nodeId === undefined || !editorReady || !hasText) return;
+    const editor = editorRef.current;
+    if (editor === null || ir === null || emitted === null) return;
+    const line = lineForNode(ir, emitted.lineByNodeId, nodeId);
+    pendingRevealRef.current = undefined;
+    if (line === undefined) return;
+    editor.revealLineInCenter(line);
+    editor.setSelection({
+      startLineNumber: line,
+      startColumn: 1,
+      endLineNumber: line,
+      endColumn: editor.getModel()?.getLineMaxColumn(line) ?? 1,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealNodeId, editorReady, hasText]);
+
   useEffect(
     () => () => {
       if (lintTimerRef.current !== null) clearTimeout(lintTimerRef.current);
@@ -171,6 +232,7 @@ export function KmnCodePane() {
     editorRef.current = editor;
     monacoRef.current = monaco;
     applyMarkersToModel(markers);
+    setEditorReady(true);
   };
 
   const handleApply = () => {

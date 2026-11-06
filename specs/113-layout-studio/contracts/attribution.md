@@ -78,7 +78,11 @@ any editable plain or row whose simulated output differs from its own output to
 `later-group-change`. The corpus harness calls the same function. Fired-rule identity is checked
 through `firedRuleMapping`, passed in as the optional `firedRuleIs` callback. While the
 artifact is not ready, every cell is `not-compiled` and the last good result is shown stale
-(FR-018).
+(FR-018). An unhandled key whose empty-context step has a `firedRule` is not base fallback: the
+compiled keyboard has a rule the working IR lacks (an Assign-tab assignment reaches the artifact
+only through the projection, research R1), so the grid shows that compiled output as hand-set with
+no base-fallback detail; a step with no `firedRule` is the simulator's default and keeps the
+base-fallback cell (FR-014).
 
 ## Studio: base fallback join
 

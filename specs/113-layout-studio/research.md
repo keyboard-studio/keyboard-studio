@@ -146,7 +146,11 @@ of its own (D3 holds: it reads the one published artifact). Until the working co
 its cells use the existing not-compiled state (FR-018), never a guess. Two consequences for later
 phases:
 - The step that adds the OSK and touch layout must also widen `&TARGETS` to a web target, or
-  kmcmplib still emits no `.js`. Phase 3 confirms where that happens.
+  kmcmplib still emits no `.js`. Checked in Phase 3: no studio or engine code writes
+  `header.targets` or `&TARGETS` today. The docs preview and the output bundle only read them
+  (`useDocsPreview.ts`, `buildOutputBundle.ts`). So a `'windows'`-only keyboard stays without a
+  web build after its touch layout is generated. That gap belongs to the OSK/touch step, not to
+  this spec; until it closes, such keyboards show the not-compiled state in the Layout tab.
 - A keyboard such as `cs_pinyin`, whose rules do not compile for the web, fails at that step
   whatever the Layout tab does. That is the OSK/touch step's error to report, not this tab's.
 

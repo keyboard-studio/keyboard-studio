@@ -120,8 +120,33 @@ import type { KeyboardEventHandler } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { classifyPlane, groupLayerFamilies } from "@keyboard-studio/engine";
+import type { LayerCombo, ModifierToken } from "@keyboard-studio/contracts";
 import { orderLayerIdsByFamily } from "./useModeContextCarry.ts";
 import { BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
+
+/* eslint-disable lingui/no-unlocalized-strings -- Keyman modifier key names are data, not UI copy. */
+const MODIFIER_DISPLAY: Readonly<Record<ModifierToken, string>> = {
+  SHIFT: "Shift",
+  CAPS: "Caps",
+  NCAPS: "NoCaps",
+  ALT: "Alt",
+  RALT: "AltGr",
+  LALT: "LeftAlt",
+  CTRL: "Ctrl",
+  RCTRL: "RightCtrl",
+  LCTRL: "LeftCtrl",
+};
+/* eslint-enable lingui/no-unlocalized-strings */
+
+/**
+ * A desktop layer (a modifier combination) rendered the way authors say it:
+ * `["SHIFT", "RALT"]` reads "Shift+AltGr". The tokens are Keyman key names,
+ * data rather than UI copy, so they are not translated. The empty combo (the
+ * unshifted layer) returns `""` — its localized name is the caller's to give.
+ */
+export function formatLayerCombo(combo: LayerCombo): string {
+  return combo.map((token) => MODIFIER_DISPLAY[token]).join("+");
+}
 
 export interface LayerSelectorProps {
   /**
@@ -139,6 +164,18 @@ export interface LayerSelectorProps {
    * or timer.
    */
   readonly findingCountsByLayerId: ReadonlyMap<string, number>;
+  /**
+   * Display text per layer id, for ids that are not themselves readable —
+   * the desktop Layout tab passes `formatLayerCombo(combo)` per combo id. A
+   * missing entry (or an empty string) falls back to the id.
+   */
+  readonly layerLabels?: ReadonlyMap<string, string>;
+  /**
+   * Skip the "Base" / "Other layers" family headings. Desktop layers are
+   * modifier combinations, not plane families, so the headings would mislabel
+   * every one of them.
+   */
+  readonly hideGroupHeadings?: boolean;
   /** Localized accessible name override. */
   readonly label?: string;
 }
@@ -213,6 +250,8 @@ export function LayerSelector({
   activeLayerId,
   onSelectLayer,
   findingCountsByLayerId,
+  layerLabels,
+  hideGroupHeadings = false,
   label,
 }: LayerSelectorProps) {
   const { t } = useLingui();
@@ -238,12 +277,17 @@ export function LayerSelector({
 
   if (flatLayerIds.length === 0) return null;
 
+  const displayName = (layerId: string): string => {
+    const custom = layerLabels?.get(layerId);
+    return custom !== undefined && custom !== "" ? custom : layerId;
+  };
+
   /** The visible+accessible per-option text: `<layerId>` plus a real-text, worded finding-count clause when non-zero — see this file's module doc, "Counts". */
   function describeOption(layerId: string): { visibleCount: string | undefined; accessibleName: string } {
     const count = findingCountsByLayerId.get(layerId) ?? 0;
     const baseName = t({
       id: "editor.assignLoop.keyGrid.layerSelector.optionLabel",
-      message: `Layer ${{ layerId }}`,
+      message: `Layer ${{ layerId: displayName(layerId) }}`,
     });
     if (count <= 0) return { visibleCount: undefined, accessibleName: baseName };
 
@@ -281,7 +325,7 @@ export function LayerSelector({
               aria-label={accessibleName}
               style={{ fontSize: 12, color: TEXT_MAIN }}
             >
-              {onlyLayerId}
+              {displayName(onlyLayerId)}
               {visibleCount !== undefined && (
                 <span
                   data-testid={`key-layer-selector-count-${onlyLayerId}`}
@@ -359,7 +403,9 @@ export function LayerSelector({
           data-testid={`key-layer-selector-group-${group.planeSegment}`}
           style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}
         >
-          <div style={{ fontSize: 10, color: TEXT_DIM }}>{group.headingText}</div>
+          {!hideGroupHeadings && (
+            <div style={{ fontSize: 10, color: TEXT_DIM }}>{group.headingText}</div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {group.layerIds.map((layerId) => {
               const isActive = layerId === activeLayerId;
@@ -393,7 +439,7 @@ export function LayerSelector({
                     gap: 6,
                   }}
                 >
-                  {layerId}
+                  {displayName(layerId)}
                   {visibleCount !== undefined && (
                     <span
                       data-testid={`key-layer-selector-count-${layerId}`}

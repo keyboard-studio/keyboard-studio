@@ -1,0 +1,327 @@
+// LayoutPane — the Layout tab: layer selector, desktop key grid, key detail (spec 113 US1,
+// FR-010..FR-018). Read-only in this phase: it shows what every key really types and where that
+// comes from, and links read-only behaviour to the Code tab. The edit controls of the next phase
+// attach to the detail panel's `editSlot`.
+//
+// Everything shown is derived: attribution of the layer over the compiled artifact
+// (`useLayoutAttribution`, which starts no timer and calls no compile — decision D3), the base
+// keyboards' fallback characters, and the working copy's contexts. The only state this pane
+// owns is the selected layer, the selected key, the layers the author added this session, and
+// whether the Add layer dialog is open.
+
+import { useMemo, useRef, useState } from "react";
+import { useLingui } from "@lingui/react/macro";
+import { listContexts } from "@keyboard-studio/engine";
+import type { LayerCombo } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { usePickedWindowsLayouts } from "../../lib/layoutFamily.ts";
+import { plainDiagnosticMessage } from "../../lib/plainDiagnosticMessage.ts";
+import { groupDemoDiagnostics } from "../../components/rules/demoDiagnostics.ts";
+import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
+import { LayerSelector } from "../assignLoop/keyGrid/LayerSelector.tsx";
+import type { LayoutPanelProps } from "./layoutPanelProps.ts";
+import { baseFallbackCells } from "./baseFallbackCells.ts";
+import { buildDesktopGridViewModel } from "./desktopGridViewModel.ts";
+import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
+import { AddLayerDialog } from "./AddLayerDialog.tsx";
+import { DesktopKeyGrid } from "./DesktopKeyGrid.tsx";
+import { KeyDetailPanel } from "./KeyDetailPanel.tsx";
+import { DEFAULT_LAYER_KEY, isUnsavedLayer, layerKey, listAvailableLayers } from "./layerList.ts";
+import { DESKTOP_VKEYS, useLayoutAttribution } from "./useLayoutAttribution.ts";
+import { useLayoutCopy } from "./useLayoutCopy.ts";
+
+/** The most compile diagnostics listed in the banner. */
+const MAX_BANNER_DIAGNOSTICS = 3;
+
+const NO_FINDING_COUNTS: ReadonlyMap<string, number> = new Map();
+
+export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
+  const { t, i18n } = useLingui();
+  const copy = useLayoutCopy();
+  const ir = useWorkingCopyStore((s) => s.ir);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
+  const bases = usePickedWindowsLayouts();
+
+  const [addedLayers, setAddedLayers] = useState<readonly LayerCombo[]>([]);
+  const [layerId, setLayerId] = useState<string>(DEFAULT_LAYER_KEY);
+  const [selectedVkey, setSelectedVkey] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const addButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const layers = useMemo(() => listAvailableLayers(startIr, ir, addedLayers), [startIr, ir, addedLayers]);
+  const layer: LayerCombo = layers.find((l) => layerKey(l) === layerId) ?? [];
+  const layerIds = useMemo(() => layers.map(layerKey), [layers]);
+  const unsaved = isUnsavedLayer(layer, ir);
+
+  const attribution = useLayoutAttribution(layer);
+
+  const fallback = useMemo(
+    () => (ir === null ? new Map() : baseFallbackCells(ir, DESKTOP_VKEYS, layer, bases)),
+    // `layer` is covered by `layerId`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ir, layerId, bases],
+  );
+  const contexts = useMemo(() => (ir === null ? [] : listContexts(ir)), [ir]);
+
+  const cells = useMemo((): DesktopCellViewModel[] => {
+    const built = buildDesktopGridViewModel({
+      layer,
+      cells: attribution.cells,
+      state: attribution.state,
+      steps: attribution.steps,
+      mnemonic: attribution.mnemonic,
+      baseFallback: fallback,
+      contexts,
+    }).cells;
+    // A completed desktop step is read-only here as it is in the Assign tab.
+    return desktopLocked ? built.map((c) => (c.editable ? { ...c, editable: false } : c)) : built;
+    // `layer` is covered by `layerId`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attribution, fallback, contexts, desktopLocked, layerId]);
+
+  const selected = cells.find((c) => c.vkey === selectedVkey) ?? null;
+
+  const layerLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const l of layers) {
+      const name = copy.layerName(l);
+      labels.set(
+        layerKey(l),
+        isUnsavedLayer(l, ir) ? t({ id: "editor.layout.layer.unsavedLabel", message: `${{ name }} (not saved)` }) : name,
+      );
+    }
+    return labels;
+    // `copy` and `t` are recreated each render but only read the active locale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, ir, i18n.locale]);
+
+  if (ir === null) {
+    return (
+      <div data-testid="layout-pane" style={{ padding: 24, color: TEXT_DIM, fontFamily: FONT }}>
+        <p data-testid="layout-pane-empty" style={{ margin: 0 }}>
+          {t({
+            id: "editor.layout.pane.noKeyboard",
+            message: "The Layout tab needs a keyboard in the working copy. Nothing to show yet.",
+          })}
+        </p>
+      </div>
+    );
+  }
+
+  // The first group's node: a place to open the Code tab at when there is no rule to point to.
+  const codeEntryNodeId = ir.groups[0]?.nodeId;
+
+  const openCodeButton =
+    codeEntryNodeId === undefined ? null : (
+      <button
+        type="button"
+        onClick={() => onViewInCode(codeEntryNodeId)}
+        data-testid="layout-open-code"
+        style={linkButtonStyle}
+      >
+        {t({ id: "editor.layout.pane.openCode", message: "Open the Code tab" })}
+      </button>
+    );
+
+  const errorGroups = groupDemoDiagnostics(
+    attribution.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal"),
+  ).slice(0, MAX_BANNER_DIAGNOSTICS);
+  const hasCompileProblem = attribution.errorMessage !== null || errorGroups.length > 0;
+
+  function selectLayer(id: string): void {
+    setLayerId(id);
+  }
+
+  function handleAddLayer(combo: LayerCombo): void {
+    const key = layerKey(combo);
+    setAddedLayers((prev) => (prev.some((l) => layerKey(l) === key) ? prev : [...prev, combo]));
+    setLayerId(key);
+    setAddOpen(false);
+    addButtonRef.current?.focus();
+  }
+
+  function handleCancelAdd(): void {
+    setAddOpen(false);
+    addButtonRef.current?.focus();
+  }
+
+  return (
+    <div
+      data-testid="layout-pane"
+      style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, fontFamily: FONT, color: TEXT_MAIN, overflow: "auto" }}
+    >
+      {attribution.mnemonic && (
+        <div role="status" data-testid="layout-banner-mnemonic" style={bannerStyle}>
+          <p style={bannerText}>{copy.readOnlyReasonText("mnemonic")}</p>
+          {openCodeButton}
+        </div>
+      )}
+
+      {desktopLocked && (
+        <div role="status" data-testid="layout-banner-locked" style={bannerStyle}>
+          <p style={bannerText}>
+            {t({
+              id: "editor.assignLoop.desktopLockedNote",
+              message:
+                "This desktop layout is complete. Editing it will flag your touch layout for re-review.",
+            })}
+          </p>
+          <p style={bannerText}>
+            {t({
+              id: "editor.layout.pane.lockedFollows",
+              message: "The Layout tab follows the same lock as the Assign tab, so every key is read-only for now.",
+            })}
+          </p>
+        </div>
+      )}
+
+      {attribution.state === "not-compiled" && (
+        <div role="status" data-testid="layout-banner-not-compiled" style={bannerStyle}>
+          <p style={bannerText}>
+            {hasCompileProblem
+              ? t({
+                  id: "editor.layout.pane.notCompiledError",
+                  message:
+                    "The keyboard does not compile, so there is no result to show yet. Every key is read-only, and nothing here is a guess.",
+                })
+              : t({
+                  id: "editor.layout.pane.notCompiledWaiting",
+                  message:
+                    "The keyboard has not compiled yet. Every key is read-only until it does, and nothing here is a guess.",
+                })}
+          </p>
+        </div>
+      )}
+
+      {attribution.state === "stale" && (
+        <div role="status" data-testid="layout-banner-stale" style={bannerStyle}>
+          <p style={bannerText}>
+            {attribution.staleReason === "error"
+              ? t({
+                  id: "editor.layout.pane.staleError",
+                  message:
+                    "The keyboard does not compile right now. You are seeing the last result that did, so it may be out of date. Editing is blocked until the keyboard compiles.",
+                })
+              : t({
+                  id: "editor.layout.pane.staleLoading",
+                  message: "The keyboard is compiling again. You are seeing the previous result until it finishes.",
+                })}
+          </p>
+        </div>
+      )}
+
+      {hasCompileProblem && attribution.state !== "ready" && (
+        <div data-testid="layout-compile-errors" style={bannerStyle}>
+          <p style={{ ...bannerText, fontWeight: 600 }}>
+            {t({ id: "editor.layout.pane.compileErrorsHeading", message: "Compile errors" })}
+          </p>
+          {attribution.errorMessage !== null && (
+            <p style={bannerText} data-testid="layout-compile-error-message">
+              {attribution.errorMessage}
+            </p>
+          )}
+          {errorGroups.length > 0 && (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {errorGroups.map((g) => {
+                const plain = plainDiagnosticMessage(g.representative, i18n);
+                return (
+                  <li key={g.code} style={bannerText} data-testid="layout-compile-error-row">
+                    {plain.whatHappened} {plain.whatToTry}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {openCodeButton}
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+        <LayerSelector
+          layerIds={layerIds}
+          activeLayerId={layerId}
+          onSelectLayer={selectLayer}
+          findingCountsByLayerId={NO_FINDING_COUNTS}
+          layerLabels={layerLabels}
+          hideGroupHeadings
+          label={t({ id: "editor.layout.pane.layersLabel", message: "Layers" })}
+        />
+        <button
+          type="button"
+          ref={addButtonRef}
+          onClick={() => setAddOpen(true)}
+          data-testid="layout-add-layer"
+          className="ks-focus-ring ks-hit-target ks-press"
+          style={addButtonStyle}
+        >
+          {t({ id: "editor.layout.pane.addLayer", message: "Add layer" })}
+        </button>
+      </div>
+
+      {unsaved && (
+        <p role="status" data-testid="layout-unsaved-layer" style={{ margin: 0, fontSize: 12, color: TEXT_DIM }}>
+          {t({
+            id: "editor.layout.pane.unsavedLayer",
+            message:
+              "This layer is not saved until a key is set. It has no rules yet, so it does not exist in the keyboard.",
+          })}
+        </p>
+      )}
+
+      <DesktopKeyGrid
+        cells={cells}
+        selectedVkey={selectedVkey}
+        onSelectVkey={setSelectedVkey}
+        label={t({
+          id: "editor.layout.pane.gridLabel",
+          message: `Desktop layout, ${{ layer: copy.layerName(layer) }} layer`,
+        })}
+      />
+
+      <KeyDetailPanel cell={selected} onViewInCode={onViewInCode} />
+
+      <AddLayerDialog
+        open={addOpen}
+        onCancel={handleCancelAdd}
+        onConfirm={handleAddLayer}
+        listedKeys={new Set(layerIds)}
+      />
+    </div>
+  );
+}
+
+const bannerStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+  padding: "10px 12px",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  background: BG_CARD,
+} as const;
+
+const bannerText = { margin: 0, fontSize: 13, color: TEXT_MAIN, lineHeight: 1.5 } as const;
+
+const addButtonStyle = {
+  padding: "5px 10px",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  color: TEXT_MAIN,
+  fontSize: 12,
+  cursor: "pointer",
+  fontFamily: FONT,
+} as const;
+
+const linkButtonStyle = {
+  alignSelf: "flex-start",
+  background: "none",
+  border: "none",
+  padding: 0,
+  color: "var(--app-accent-text)",
+  textDecoration: "underline",
+  cursor: "pointer",
+  fontSize: 13,
+  fontFamily: FONT,
+} as const;
