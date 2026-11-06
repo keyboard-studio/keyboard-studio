@@ -50,6 +50,14 @@ export interface StepNavEntry {
 export const STANDALONE_STEP_ID = "__standalone__";
 
 /**
+ * Footer nav for the `#criteria` route (spec 084). CriteriaScreen publishes here so
+ * the footer’s StepNavCluster keys off a stable id while the survey session may still
+ * record `activeStepId === "done"` after the walk completes — which otherwise leaves
+ * no published Back/forward slots on this route.
+ */
+export const CRITERIA_ROUTE_NAV_STEP_ID = "__criteria_route__";
+
+/**
  * A revision opened from Output (spec 094 research R3). A full-page editor
  * owns its step's nav slots (one publisher per step), so StepHost cannot add
  * "Back to testing" / "Discard" there — it publishes them on this separate
