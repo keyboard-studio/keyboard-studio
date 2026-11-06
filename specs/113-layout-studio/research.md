@@ -137,11 +137,22 @@ path (`useKeyboardArtifact` uses an empty script URL when there is no `.js`). So
 keyboard the verification pass has nothing to run, and every cell would stay unverified. Forcing
 `&TARGETS 'any'` is not a general fix: `cs_pinyin` then fails to compile ("Virtual keys are not
 valid for mnemonic layouts" and KeymanWeb's unsupported virtual character keys), while
-`korean_phonetic` compiles. **Open for the product owner before Phase 3 (US1):** either show these
-keyboards read-only with the reason "not checked: this keyboard has no web build", or verify
-against a preview-only compile with a web target when that compile succeeds. Until that is
-decided, the corpus suites list these three in `NO_WEB_TARGET` and skip simulation for exactly
-those, asserting the list still matches what the compile produces.
+`korean_phonetic` compiles.
+
+**Ruling (product owner, 2026-11-06).** Keyboards without an OSK and touch layout get them in the
+process: the physical layout is adapted to the OSK, and then a starting touch layout is
+generated. So the web build arrives during the workflow, and the Layout tab adds no compile path
+of its own (D3 holds: it reads the one published artifact). Until the working copy has a `.js`,
+its cells use the existing not-compiled state (FR-018), never a guess. Two consequences for later
+phases:
+- The step that adds the OSK and touch layout must also widen `&TARGETS` to a web target, or
+  kmcmplib still emits no `.js`. Phase 3 confirms where that happens.
+- A keyboard such as `cs_pinyin`, whose rules do not compile for the web, fails at that step
+  whatever the Layout tab does. That is the OSK/touch step's error to report, not this tab's.
+
+The corpus suites keep the three in `NO_WEB_TARGET` because they test the source as released,
+before the process adds those layouts. They skip simulation for exactly those three and assert
+the list still matches what the compile produces.
 
 ## R3. Deadkey tables are store-based — an exemption FR-013 needs
 
