@@ -17,7 +17,7 @@
 //
 // Shared module mocks / harness: ../../test/mechanismGallery/.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, fireEvent, act, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery } from "./MechanismGallery.tsx";
@@ -25,6 +25,8 @@ import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
 import type { DisplacementProposal } from "./useDisplacementProposal.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { currentPhysicalLayoutValue } from "../../survey/assignLoop/physicalLayoutValue.ts";
+import { saveLayoutFamilyAnswer } from "../../lib/layoutFamily.ts";
+import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
 import {
   createVirtualFS,
   makePlacementMap,
@@ -36,6 +38,7 @@ import { expectCurrentChar } from "../../test/currentCharChip.ts";
 import { installMechanismGalleryHooks } from "../../test/mechanismGallery/mocks.tsx";
 import {
   getPhaseCPhysicalAssignments,
+  mainGroup,
   seedInventory,
   suggestionRowText,
 } from "../../test/mechanismGallery/harness.ts";
@@ -574,5 +577,177 @@ describe("DisplacementProposalBanner — demote-incoming inversion (steer 2)", (
     );
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2525: host pass-through displacement. The working IR has NO rule for
+// K_X — on the typist's host layout that key types 'x', which is in the
+// confirmed inventory — so assigning ŋ to K_X must raise the displacement
+// prompt, as a blocking MODAL (not a banner the author can scroll past).
+// The layout_family answer ("qwerty") resolves the likely host to US
+// alone, so the host lookup is unanimous.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — host pass-through displacement is a modal (#2525)", () => {
+  const hostMap: PlacementMap = makePlacementMap({
+    bcp47Context: "test",
+    baseLayoutFamily: "QWERTY",
+    entries: [
+      {
+        codepoint: "U+014B", // ŋ
+        candidates: [
+          {
+            vkey: "K_X",
+            modifiers: [],
+            mechanism: "direct",
+            priorSource: "corpus",
+            priorCount: 5,
+            confidence: 0.9,
+          },
+        ],
+      },
+    ],
+  });
+
+  afterEach(() => {
+    saveLayoutFamilyAnswer(undefined);
+  });
+
+  async function renderHostGallery() {
+    saveLayoutFamilyAnswer("qwerty");
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    // Empty main group: NO rule for K_X — 'x' comes only from the host.
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+    // 'x' and 'ŋ' are both core inventory: the both-core shape.
+    seedInventory(["x", "ŋ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={hostMap} />,
+        { withStepNav: true },
+      );
+    });
+  }
+
+  function displacementModal(): HTMLElement {
+    return screen.getByRole("dialog", { name: /Displaced character proposal/i });
+  }
+
+  it("accepting ŋ onto K_X raises a focus-trapped modal naming the host 'x'", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    await acceptSuggestion();
+
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    // The banner copy rides inside the modal — the modal is the prompt.
+    expect(
+      within(displacementModal()).getByRole("note", { name: /Displaced character proposal/i }),
+    ).toBeTruthy();
+    expect(displacementModal().textContent).toMatch(/frequency data/);
+    expect(displacementModal().textContent).toContain("x");
+    // Focus moved into the dialog on open (APG modal pattern).
+    expect(displacementModal().contains(document.activeElement)).toBe(true);
+  });
+
+  it("Tab cycles inside the modal (focus trap)", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    await acceptSuggestion();
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    const dialog = displacementModal();
+    const cancel = within(dialog).getByRole("button", { name: /Cancel — undo this placement/i });
+    cancel.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    // Wrapped from the last focusable (Cancel) to the first (Keep both).
+    expect(document.activeElement?.getAttribute("aria-label")).toMatch(/Keep both/);
+  });
+
+  it("'Demote x' records the RAlt demotion for the host 'x'; ŋ's placement stands", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    await acceptSuggestion();
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    fireEvent.click(within(displacementModal()).getByRole("button", { name: /Demote x/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /Displaced character proposal/i })).toBeNull();
+    });
+    const demotion = getPhaseCPhysicalAssignments().find((a) => a.target === "x");
+    expect(demotion).toBeDefined();
+    expect(demotion?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+    expect(demotion?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toContain("K_X");
+    expect(getPhaseCPhysicalAssignments().find((a) => a.target === "ŋ")).toBeDefined();
+  });
+
+  it("'Keep both' records the dismissal; 'x' stays unassigned and uncovered", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    await acceptSuggestion();
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    fireEvent.click(within(displacementModal()).getByRole("button", { name: /Keep both/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /Displaced character proposal/i })).toBeNull();
+    });
+    expect(getPhaseCPhysicalAssignments().find((a) => a.target === "x")).toBeUndefined();
+    expect(useWorkingCopyStore.getState().displacedDeclined).toEqual(["x|K_X||ŋ"]);
+    // ŋ took the key, so 'x' is produced nowhere: its strip badge reads 0 ways.
+    expect(screen.getByTestId("char-scroll-badge-0078").getAttribute("aria-label")).toMatch(
+      /0 ways produce this character/,
+    );
+  });
+
+  it("Cancel undoes the placement and records nothing", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    await acceptSuggestion();
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    fireEvent.click(
+      within(displacementModal()).getByRole("button", { name: /Cancel — undo this placement/i }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /Displaced character proposal/i })).toBeNull();
+    });
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+    expect(useWorkingCopyStore.getState().displacedDeclined).toEqual([]);
+  });
+
+  it("Escape cancels the same way (undoes the placement)", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    await acceptSuggestion();
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    fireEvent.keyDown(displacementModal(), { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /Displaced character proposal/i })).toBeNull();
+    });
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+    expect(useWorkingCopyStore.getState().displacedDeclined).toEqual([]);
+  });
+
+  it("manual Apply onto K_X raises the same modal", async () => {
+    await renderHostGallery();
+    await selectChar("char-scroll-chip-014B", "ŋ");
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_X");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ŋ/i }));
+    await waitFor(() => {
+      expect(displacementModal()).toBeTruthy();
+    });
+    expect(displacementModal().textContent).toContain("x");
   });
 });

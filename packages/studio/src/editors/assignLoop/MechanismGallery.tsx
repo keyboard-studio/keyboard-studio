@@ -145,7 +145,9 @@ import {
 import { useCasePairCompanion, type CasePairProposal } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { useDisplacementProposal } from "./useDisplacementProposal.ts";
-import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
+import { DisplacementModal } from "./DisplacementModal.tsx";
+import { useLikelyBaseLayouts } from "../../lib/layoutFamily.ts";
+import { hostCharForHosts } from "../../survey/hostOccupancy.ts";
 import {
   buildSlotOccupancy,
   displacementActions,
@@ -1956,6 +1958,21 @@ export function MechanismGallery({
   // that orders the chips; the producer order in contracts is untouched)
   // and the displacement check on the apply paths below. Memoized on the
   // same inputs the ledger is built from.
+  //
+  // -- #2525 host pass-through --------------------------------------------
+  // A slot the ledger does not cover still types the host layout's letter
+  // (the keystroke falls through to the OS layout). The likely hosts
+  // (FR-023 order: picked layout → layout_family → bcp47 region → all
+  // five) feed a unanimous host lookup — only a letter every likely host
+  // agrees on names a pass-through incumbent — which the displacement
+  // check consults for exactly those uncovered slots. The ledger itself
+  // (and the rationale's spare-hole factor) keeps reading IR + session
+  // occupancy only.
+  const likelyBases = useLikelyBaseLayouts(identity?.bcp47);
+  const hostCharFor = useMemo(
+    () => hostCharForHosts(likelyBases.hosts.map((h) => h.id)),
+    [likelyBases],
+  );
   const slotOccupancy = useMemo(
     () => buildSlotOccupancy(workingIr, sessionAssignments),
     [workingIr, sessionAssignments],
@@ -2391,6 +2408,7 @@ export function MechanismGallery({
       triggerKey,
       triggerKeyCustomChar,
       proposedTriggerKey: proposedTriggerKeyRef.current,
+      hostCharFor,
     });
     if (plan.kind === "dismiss") {
       // Dismisses THIS chip only — a sibling chip stays offered.
@@ -2414,7 +2432,8 @@ export function MechanismGallery({
       return;
     }
     // A shadowed still-needed glyph raises a demotion proposal inside the
-    // sequence (never blocks the accept — it already happened).
+    // sequence — as a blocking modal (#2525), so the author must decide
+    // before doing anything else (or Cancel, which undoes this accept).
     runPlacement(plan);
     // The successful accept's own mechanism is now recorded with this
     // strategyId — placementOffer filters this ONE chip out of the visible
@@ -2434,6 +2453,7 @@ export function MechanismGallery({
     needSets,
     markSuggestionEntryDismissed,
     runPlacement,
+    hostCharFor,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2603,6 +2623,7 @@ export function MechanismGallery({
             sessionAssignments,
             slotOccupancy,
             needSets,
+            hostCharFor,
           })
         : planSwapApply({
             currentChar,
@@ -2615,13 +2636,15 @@ export function MechanismGallery({
             sessionAssignments,
             slotOccupancy,
             needSets,
+            hostCharFor,
           });
     // Null when a pick does not resolve (or, for the swap card, a
     // mutually-exclusive combo the dropdown's own exclusion already
     // prevents) — skip recording rather than crash.
     if (plan === null) return;
     // A shadowed still-needed glyph raises a demotion proposal inside the
-    // sequence (never blocks the apply — it already happened).
+    // sequence — as a blocking modal (#2525), so the author must decide
+    // before doing anything else (or Cancel, which undoes this apply).
     runPlacement(plan);
     resetMethodState();
   }, [
@@ -2641,6 +2664,7 @@ export function MechanismGallery({
     deadkeyBaseLetterResolveOptions,
     slotOccupancy,
     needSets,
+    hostCharFor,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2752,6 +2776,49 @@ export function MechanismGallery({
     },
     [pendingDisplacement, sessionAssignments, workingIr, recordAssignments, clearDisplacement, dismissDisplacement],
   );
+
+  /**
+   * Cancel the displacement modal (#2525): undo the placement that raised
+   * it. The assignment is removed, a companion raised for that same base
+   * is cleared (a pre-accepted companion already recorded with the
+   * placement is undone first, restoring the assignments as they were
+   * before it went in — the same restore as handleCompanionUndo), and the
+   * proposal is cleared WITHOUT recording a dismissal: nothing was
+   * displaced — the placement never happened — so a later re-apply
+   * proposes afresh. A companion from an earlier apply (a different base)
+   * is untouched.
+   */
+  const handleDisplacementCancel = useCallback(() => {
+    if (pendingDisplacement === null) return;
+    const base = pendingDisplacement.baseAssignment;
+    let next = sessionAssignments;
+    if (isCompanionAccepted && acceptedCompanion !== null) {
+      const { before, after } = acceptedCompanion;
+      const unchanged =
+        next.length === after.length && next.every((a, i) => a === after[i]);
+      next = unchanged ? before : next.filter((a) => !after.includes(a) || before.includes(a));
+      setAcceptedCompanion(null);
+    }
+    next = next.filter((a) => a !== base);
+    recordAssignments(next);
+    if (
+      pendingCompanion !== null &&
+      pendingCompanion.mechanism !== "touch" &&
+      pendingCompanion.baseAssignment === base
+    ) {
+      clearCompanion();
+    }
+    clearDisplacement();
+  }, [
+    pendingDisplacement,
+    sessionAssignments,
+    isCompanionAccepted,
+    acceptedCompanion,
+    recordAssignments,
+    pendingCompanion,
+    clearCompanion,
+    clearDisplacement,
+  ]);
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -4053,24 +4120,24 @@ export function MechanismGallery({
               />
             )}
 
-            {/* Displacement (demotion) proposal — propose-then-confirm,
-                  never a silent loss (#2300, gate G3). Its own state slot:
-                  it can co-render with the case-pair companion above when
-                  one Apply raised both. */}
+            {/* Displacement (demotion) proposal — a BLOCKING modal (#2525,
+                  gate G3). The #2300 banner showed after the apply and
+                  could be scrolled past; the modal forces the choice
+                  before the author does anything else. Move / Leave are
+                  the banner's two actions (both-core: the DEFAULT keeps
+                  both primaries — a recorded dismissal — and demoting the
+                  displaced glyph is the explicit override). Cancel undoes
+                  the placement that raised it and records nothing. */}
             {pendingDisplacement !== null && (
-              <DisplacementProposalBanner
+              <DisplacementModal
                 proposal={pendingDisplacement}
-                // Both-core: the DEFAULT action keeps both primaries (a
-                // recorded dismissal — no demotion is picked without
-                // frequency data); demoting the displaced glyph is the
-                // explicit override on the other button. Every other
-                // direction confirms the demotion / dismisses as usual.
                 onConfirm={() =>
                   resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[0])
                 }
                 onDismiss={() =>
                   resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[1])
                 }
+                onCancel={handleDisplacementCancel}
               />
             )}
 

@@ -45,6 +45,7 @@ import {
   orthographyTier,
   slotKeyFor,
   type DisplacementAction,
+  type HostCharFor,
   type NeedSets,
   type SlotOccupant,
 } from "../../survey/slotOccupancy.ts";
@@ -366,13 +367,15 @@ export function displacementProposalFor(params: {
   slotOccupancy: ReadonlyMap<string, SlotOccupant>;
   needSets: NeedSets;
   sessionAssignments: MechanismAssignment[];
+  /** Pass-through host output for slots the ledger does not cover (#2525). */
+  hostCharFor?: HostCharFor | undefined;
 }): DisplacementProposalInput | null {
-  const { assignment, currentChar, slotOccupancy, needSets, sessionAssignments } = params;
+  const { assignment, currentChar, slotOccupancy, needSets, sessionAssignments, hostCharFor } = params;
   if (currentChar === null) return null;
   // A deadkey's trigger slot is not handled here: its own character's
   // escapes (double-tap / space / AltGr) are the escape banner's job.
   for (const slot of assignmentSlotKeys(assignment)) {
-    const displaced = displacedFor(slotOccupancy, slot.vkey, slot.modifiers, currentChar);
+    const displaced = displacedFor(slotOccupancy, slot.vkey, slot.modifiers, currentChar, hostCharFor);
     if (displaced === null) continue;
     if (!isStillNeeded(displaced.char, needSets)) continue;
     const takenSlotKey = slot.key;
@@ -395,10 +398,14 @@ export function displacementProposalFor(params: {
     });
     if (producedElsewhereByAssignment) continue;
     // Demotion rank: RAlt on the SAME key first; deadkey only when the RAlt
-    // slot is taken or IS the slot just taken.
+    // slot is taken or IS the slot just taken. A host-occupied RAlt slot
+    // counts as taken too (#2525 — the demotion must not shadow what the
+    // host types there).
     const raltSlotKey = slotKeyFor(slot.vkey, ["RALT"]);
+    const raltTaken =
+      slotOccupancy.has(raltSlotKey) || (hostCharFor?.(slot.vkey, ["RALT"]) ?? null) !== null;
     const demotionMethod: "ralt" | "deadkey" =
-      raltSlotKey !== takenSlotKey && !slotOccupancy.has(raltSlotKey) ? "ralt" : "deadkey";
+      raltSlotKey !== takenSlotKey && !raltTaken ? "ralt" : "deadkey";
     // WHO gets demoted follows the orthography tier: both core -> neither by
     // default; core incumbent + non-core incoming -> the INCOMING char loses
     // the primary slot; otherwise the incumbent is demoted.
@@ -816,8 +823,10 @@ export function planSuggestionAccept(params: {
   triggerKey: string;
   triggerKeyCustomChar: string;
   proposedTriggerKey: string;
+  /** Pass-through host output for slots the ledger does not cover (#2525). */
+  hostCharFor?: HostCharFor;
 }): SuggestionAcceptPlan {
-  const { entry, currentChar, sessionAssignments, workingIr, slotOccupancy, needSets } = params;
+  const { entry, currentChar, sessionAssignments, workingIr, slotOccupancy, needSets, hostCharFor } = params;
   const built = assignmentFromSuggestion({
     entry,
     currentChar,
@@ -853,7 +862,7 @@ export function planSuggestionAccept(params: {
         : null,
     // S-02 takes no slot (a deadkey composes on a base keystroke and shadows
     // nothing) and yields no slot entries there.
-    displacement: displacementProposalFor({ assignment, currentChar, slotOccupancy, needSets, sessionAssignments }),
+    displacement: displacementProposalFor({ assignment, currentChar, slotOccupancy, needSets, sessionAssignments, hostCharFor }),
     companionAfter:
       raltCompanionModifiers !== null
         ? raltCompanionInput({
@@ -884,8 +893,10 @@ export function planDeadkeyApply(params: {
   sessionAssignments: MechanismAssignment[];
   slotOccupancy: ReadonlyMap<string, SlotOccupant>;
   needSets: NeedSets;
+  /** Pass-through host output for slots the ledger does not cover (#2525). */
+  hostCharFor?: HostCharFor;
 }): PlacementRecord | null {
-  const { currentChar, sessionAssignments, workingIr, slotOccupancy, needSets } = params;
+  const { currentChar, sessionAssignments, workingIr, slotOccupancy, needSets, hostCharFor } = params;
   const base = resolveCharInput(params.baseLetterInput, params.baseLetterOptions);
   const triggerResolution = resolveKeyPickerSelection(
     params.triggerKey,
@@ -919,7 +930,7 @@ export function planDeadkeyApply(params: {
       assignment,
       sessionAssignments,
     }),
-    displacement: displacementProposalFor({ assignment, currentChar, slotOccupancy, needSets, sessionAssignments }),
+    displacement: displacementProposalFor({ assignment, currentChar, slotOccupancy, needSets, sessionAssignments, hostCharFor }),
     companionAfter: null,
   };
 }
@@ -941,8 +952,10 @@ export function planSwapApply(params: {
   sessionAssignments: MechanismAssignment[];
   slotOccupancy: ReadonlyMap<string, SlotOccupant>;
   needSets: NeedSets;
+  /** Pass-through host output for slots the ledger does not cover (#2525). */
+  hostCharFor?: HostCharFor;
 }): PlacementRecord | null {
-  const { currentChar, chosenTokens, workingIr, sessionAssignments, slotOccupancy, needSets } = params;
+  const { currentChar, chosenTokens, workingIr, sessionAssignments, slotOccupancy, needSets, hostCharFor } = params;
   const vkey = resolvedVkeyOf(resolveKeyPickerSelection(params.selectedKey, params.selectedKeyCustomChar));
   if (vkey === null) return null;
   const swap = swapAssignmentFor({ currentChar, vkey, chosenTokens, workingIr });
@@ -955,7 +968,7 @@ export function planSwapApply(params: {
       chosenTokens.length === 0 && shiftLayerAllowedFor(workingIr) && workingIr !== null
         ? physicalCompanionInput({ currentChar, vkey, capsHandling, assignment, sessionAssignments })
         : null,
-    displacement: displacementProposalFor({ assignment, currentChar, slotOccupancy, needSets, sessionAssignments }),
+    displacement: displacementProposalFor({ assignment, currentChar, slotOccupancy, needSets, sessionAssignments, hostCharFor }),
     companionAfter: null,
   };
 }
