@@ -24,7 +24,12 @@
  * module with its own module-scope cache and its own `_reset*` test seam makes
  * that failure mode unrepresentable rather than merely unlikely.
  *
- * MUST NOT read, or fall back to, any `GITHUB_APP_*` variable.
+ * EXCEPTION (operator decision): each variable falls back to its `GITHUB_APP_*`
+ * counterpart when the `CRASH_REPORT_APP_*` one is unset, so one App can serve
+ * both paths. That App then needs issues:write, and a bug in the public crash
+ * route runs with a token that can also write keyboard source. Setting the
+ * `CRASH_REPORT_APP_*` variables restores the separate issues-only App; the
+ * separate module and cache below keep the two auth instances apart either way.
  *
  * SECURITY CONTRACT (parity with installation-token.ts):
  *  - The decoded private key is never included in any error message or log.
@@ -55,19 +60,23 @@ function decodePem(b64: string): string {
   return Buffer.from(b64, "base64").toString("utf8");
 }
 
+/** `CRASH_REPORT_APP_<name>`, else `GITHUB_APP_<name>`; trimmed, "" when neither is set. */
+function appEnv(name: "ID" | "PRIVATE_KEY" | "INSTALLATION_ID"): string {
+  return (
+    (process.env[`CRASH_REPORT_APP_${name}`] ?? "").trim() ||
+    (process.env[`GITHUB_APP_${name}`] ?? "").trim()
+  );
+}
+
 /**
- * True when all three `CRASH_REPORT_APP_*` variables are present and non-empty.
+ * True when all three App variables resolve to a non-empty value (see `appEnv`).
  *
  * Exported so the route can distinguish "not configured" (503
  * `reporting_not_configured`) from "configured but the mint failed" (502
  * `submission_unavailable`) without minting a token to find out.
  */
 export function isCrashReportAppConfigured(): boolean {
-  return Boolean(
-    (process.env["CRASH_REPORT_APP_ID"] ?? "").trim() &&
-      (process.env["CRASH_REPORT_APP_PRIVATE_KEY"] ?? "").trim() &&
-      (process.env["CRASH_REPORT_APP_INSTALLATION_ID"] ?? "").trim(),
-  );
+  return Boolean(appEnv("ID") && appEnv("PRIVATE_KEY") && appEnv("INSTALLATION_ID"));
 }
 
 /**
@@ -79,11 +88,9 @@ export function isCrashReportAppConfigured(): boolean {
 function getCrashAuth(): AppAuth | undefined {
   if (_crashAuth !== undefined) return _crashAuth;
 
-  const appIdRaw = (process.env["CRASH_REPORT_APP_ID"] ?? "").trim();
-  const privateKeyB64 = (process.env["CRASH_REPORT_APP_PRIVATE_KEY"] ?? "").trim();
-  const installationIdRaw = (
-    process.env["CRASH_REPORT_APP_INSTALLATION_ID"] ?? ""
-  ).trim();
+  const appIdRaw = appEnv("ID");
+  const privateKeyB64 = appEnv("PRIVATE_KEY");
+  const installationIdRaw = appEnv("INSTALLATION_ID");
 
   if (!appIdRaw || !privateKeyB64 || !installationIdRaw) return undefined;
 
@@ -137,7 +144,7 @@ export async function getCrashReportInstallationToken(): Promise<string | undefi
  * optional — see the note on it in crash-report-pipeline.ts.
  */
 export function getCrashReportRetractionSecret(): string | undefined {
-  const raw = (process.env["CRASH_REPORT_APP_PRIVATE_KEY"] ?? "").trim();
+  const raw = appEnv("PRIVATE_KEY");
   return raw === "" ? undefined : raw;
 }
 

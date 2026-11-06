@@ -50,7 +50,8 @@ const webCrashFetch: CrashReportFetchFn = async (url, init) => {
 
 /**
  * Build a CrashReportPipelineConfig from environment. Returns `undefined` when
- * any `CRASH_REPORT_APP_*` var is absent or empty — the caller maps that to
+ * any App var is absent or empty (`CRASH_REPORT_APP_*`, falling back to
+ * `GITHUB_APP_*`) — the caller maps that to
  * 503 `reporting_not_configured`.
  *
  * Detecting the missing vars here rather than letting the mint fail keeps the
