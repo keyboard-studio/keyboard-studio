@@ -86,3 +86,77 @@ describe("checkTouchCapsLayer (18.16)", () => {
     expect(r.verified.join(" ")).toMatch(/no cased letters/i);
   });
 });
+
+describe("checkTouchCapsLayer (18.16) full Capsifesto requirements", () => {
+  type Key = Record<string, unknown>;
+  const k = (id: string, text: string, extra: Key = {}): Key => ({ id, text, ...extra });
+  /** A small complete layout: default, shift, caps, rightalt, rightalt-shift, rightalt-caps. */
+  function layout(edit: (layers: Record<string, Key[]>) => void = () => undefined) {
+    const layers: Record<string, Key[]> = {
+      default: [k("K_Q", "q"), k("K_SHIFT", "*Shift*", { sp: 1, nextlayer: "shift", multitap: [{ id: "T_CAPS", text: "*ShiftLock*", nextlayer: "caps" }] }), k("K_SPACE", "")],
+      shift: [k("K_Q", "Q", { nextlayer: "default" }), k("K_SHIFT", "*Shifted*", { sp: 2, nextlayer: "default" }), k("K_SPACE", "", { nextlayer: "default" })],
+      caps: [k("K_Q", "Q"), k("K_SHIFT", "*ShiftedLock*", { sp: 2, nextlayer: "default" }), k("K_SPACE", "")],
+      rightalt: [k("K_Q", "ä", { nextlayer: "default" }), k("K_SHIFT", "*Shift*", { sp: 1, nextlayer: "rightalt-shift", multitap: [{ id: "T_CAPS", text: "*ShiftLock*", nextlayer: "rightalt-caps" }] }), k("K_SPACE", "", { nextlayer: "default" })],
+      "rightalt-shift": [k("K_Q", "Ä", { nextlayer: "default" }), k("K_SHIFT", "*Shifted*", { sp: 2, nextlayer: "rightalt" }), k("K_SPACE", "", { nextlayer: "default" })],
+      "rightalt-caps": [k("K_Q", "Ä"), k("K_SHIFT", "*ShiftedLock*", { sp: 2, nextlayer: "rightalt" }), k("K_SPACE", "")],
+    };
+    edit(layers);
+    return parseTouchLayoutString(
+      JSON.stringify({
+        tablet: { layer: Object.entries(layers).map(([id, keys]) => ({ id, row: [{ id: 1, key: keys }] })) },
+      }),
+    );
+  }
+
+  it("passes the complete layout", () => {
+    expect(checkTouchCapsLayer(layout(), PATH).findings).toEqual([]);
+  });
+
+  it("reports a missing rightalt-caps and ctrl-caps", () => {
+    const ir = layout((l) => {
+      delete l["rightalt-caps"];
+      l["ctrl-shift"] = [k("K_Q", "Q", { nextlayer: "default" })];
+    });
+    const msg = MESSAGES(checkTouchCapsLayer(ir, PATH));
+    expect(msg).toContain("no rightalt-caps layer although rightalt-shift exists");
+    expect(msg).toContain("no ctrl-caps layer although ctrl-shift exists");
+  });
+
+  it("reports a missing double-tap on rightalt", () => {
+    const ir = layout((l) => {
+      for (const key of l["rightalt"]!) delete key["multitap"];
+    });
+    expect(MESSAGES(checkTouchCapsLayer(ir, PATH))).toContain("Shift on rightalt has no double-tap to rightalt-caps");
+  });
+
+  it("reports character keys that stay on a non-default layer", () => {
+    const ir = layout((l) => {
+      delete l["shift"]![0]!["nextlayer"];
+    });
+    expect(MESSAGES(checkTouchCapsLayer(ir, PATH))).toMatch(/shift character keys stay on the layer.*K_Q/);
+  });
+
+  it("does not hold special keys to one-shot", () => {
+    const ir = layout((l) => {
+      l["rightalt"]!.push(k("K_LOPT", "*Menu*", { sp: 1 }));
+    });
+    expect(checkTouchCapsLayer(ir, PATH).findings).toEqual([]);
+  });
+
+  it("reports Shift labels and targets on shift and caps layers", () => {
+    const ir = layout((l) => {
+      l["shift"]![1] = k("K_SHIFT", "*Shift*", { sp: 2, nextlayer: "default" });
+      l["rightalt-caps"]![1] = k("K_SHIFT", "*ShiftedLock*", { sp: 2, nextlayer: "default" });
+    });
+    const msg = MESSAGES(checkTouchCapsLayer(ir, PATH));
+    expect(msg).toContain("Shift on shift is not *Shifted* returning to default");
+    expect(msg).toContain("Shift on rightalt-caps is not *ShiftedLock* returning to rightalt");
+  });
+
+  it("reports rightalt-caps character keys that switch layer", () => {
+    const ir = layout((l) => {
+      l["rightalt-caps"]![0]!["nextlayer"] = "default";
+    });
+    expect(MESSAGES(checkTouchCapsLayer(ir, PATH))).toContain("rightalt-caps keys switch layer after typing: K_Q");
+  });
+});

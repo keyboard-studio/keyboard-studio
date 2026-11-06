@@ -97,8 +97,8 @@ describe("useCompareCriteria", () => {
 
     const judged = result.current.result;
     expect(judged).not.toBeNull();
-    expect(judged?.total).toBe(204);
-    expect(judged?.rows).toHaveLength(204);
+    expect(judged?.total).toBe(206);
+    expect(judged?.rows).toHaveLength(206);
 
     // Foreign mode offers no controls on any row (FR-023 / plan D2).
     expect(judged?.rows.every((row) => row.controls === null)).toBe(true);

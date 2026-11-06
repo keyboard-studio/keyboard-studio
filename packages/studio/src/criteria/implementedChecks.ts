@@ -217,4 +217,8 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_CASEDKEYS_MISSING",
   // §18.16 — touch caps layer complete, reached by double-tapping Shift.
   "KM_LINT_TOUCH_CAPS_LAYER",
+  // §18.17 — consistent Ctrl/RAlt touch keys.
+  "KM_LINT_TOUCH_MODIFIER_KEYS",
+  // §18.18 — touch symbol layer present and linked by K_SYMBOLS keys.
+  "KM_LINT_TOUCH_SYMBOLS_LAYER",
 ]);

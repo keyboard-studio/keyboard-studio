@@ -78,6 +78,7 @@ export * from "./ir/backspaceContext";
 export * from "./ir/composable";
 export * from "./ir/deadkeys";
 export * from "./ir/casedKeys";
+export * from "./ir/touchLayerRules";
 export * from "./ir/usBaseLayout";
 export * from "./ir/producedSet";
 export * from "./ir/outputRepertoire";
