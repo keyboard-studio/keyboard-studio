@@ -159,6 +159,34 @@ The help step asks only about documentation that is missing or fails a criterion
 
 ---
 
+### User Story 8 - Walk an opened keyboard step by step (Priority: P1)
+
+*(Added 2026-11-05.)* Opening a keyboard starts a walk, not a dashboard. The walk has fixed steps and adds a page only when the opened keyboard has that kind of problem. Every step has Continue, and the walk ends at Output.
+
+The walk on Open:
+
+1. **Languages** (always): the package's language list.
+2. **Missing letters** (only when the keyboard can't type letters its languages need): grouped by language. The author adds a letter, or removes a language the keyboard isn't meant to support. Replaces the character survey.
+3. **Upgrades** (only when an upgrade criterion fails): one entry per upgrade, each with a preview and Apply or Skip. Upgrades may be structural. The first two are cased keys (criterion 7.28: remove the CAPS rules and add the cased-keys declaration in the source) and the touch caps layer (criterion 18.16, following Keyman's Capsifesto: add a caps layer reached by double-tapping Shift).
+4. **On-screen keyboard** and **Touch** (always): edit the existing files, or generate them when missing.
+5. **Documentation** (only when documentation is missing or fails its criteria; Story 7).
+6. **Review** (always): the criteria view, with pre-existing and new findings, review notes and the submit gate.
+7. **Output**.
+
+**Why this priority**: Without it an opened keyboard has no path from the criteria view to submission.
+
+**Independent Test**: Open upstream basic_kbdus and walk it with Continue only, from Languages to Output. Then open a keyboard that has no missing letters and no failing upgrades, and check that those pages are skipped.
+
+**Acceptance Scenarios**:
+
+1. **Given** the author opens a keyboard, **When** it loads, **Then** the Languages step shows, with Continue.
+2. **Given** a keyboard that can't type letters its listed languages need, **When** the author continues from Languages, **Then** Missing letters shows each language with its missing letters, and offers to add each letter or remove that language.
+3. **Given** a keyboard with no missing letters and no failing upgrade criterion, **When** the author walks it, **Then** neither page appears.
+4. **Given** an upgrade the author applies, **When** it is applied, **Then** only the lines and layers that upgrade concerns change (FR-008), and its criterion passes.
+5. **Given** the author reaches Review, **When** they continue, **Then** Output opens, with the same submit gate as FR-027.
+
+---
+
 ### Edge Cases
 
 - **The keyboard source can't be parsed.** Opening fails with a message naming the problem and its line. No partial working copy is created.
@@ -209,7 +237,7 @@ The help step asks only about documentation that is missing or fails a criterion
 
 - **FR-019**: On opening, the studio MUST run the criteria and keep the result as the baseline for the session.
 - **FR-020**: Every finding MUST be marked pre-existing (it fails at the baseline) or new (it passed at the baseline).
-- **FR-021**: The criteria view MUST be the main view on Open. Each finding links to the editor or suggested fix that resolves it.
+- **FR-021** *(amended 2026-11-05)*: Opening MUST land on the Open walk (FR-031), not the criteria view. The criteria view stays reachable from the navigation bar at any time and is the walk's Review step. Each finding links to the step or suggested fix that resolves it.
 - **FR-022**: Criteria MUST be rechecked on apply, in the existing validation cycle; Open adds no second timer (Constitution Article IV).
 - **FR-023**: After each applied change, the studio MUST compare the characters and layers the change added or removed across physical keys, touch layout and documentation, and offer follow-up suggestions for parts left out (Story 5).
 - **FR-024**: Suggestions MUST never apply without the author's explicit acceptance.
@@ -221,6 +249,13 @@ The help step asks only about documentation that is missing or fails a criterion
 
 - **FR-028**: Hand-written documentation MUST be kept. Regenerating a document or one of its sections MUST be a suggested fix, with a preview of current and proposed text.
 - **FR-029**: The help step on Open MUST ask only about documentation that is missing or fails its criteria, prefilled from the existing documents.
+
+**The Open walk** *(added 2026-11-05)*
+
+- **FR-031**: Opening MUST start a walk: Languages, Missing letters, Upgrades, On-screen keyboard, Touch, Documentation, Review, Output (Story 8). Every step MUST offer Continue.
+- **FR-032**: Missing letters, Upgrades and Documentation MUST appear only when the opened keyboard has that kind of problem. Which kinds it has MUST be recorded as a decision when the baseline is taken, so the walk's pages depend on recorded decisions only (Constitution: screens derive from decisions).
+- **FR-033**: Missing letters MUST group each missing letter under every listed language that expects it, and offer to add the letter or remove the language. Composed and decomposed forms MUST count as the same letter.
+- **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28) and the touch caps layer (18.16). Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
 
 **Copy path**
 

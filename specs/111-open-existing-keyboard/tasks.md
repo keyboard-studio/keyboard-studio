@@ -204,3 +204,17 @@ Polish (T048–T051) after the last story shipped in this spec
 - **Then** US2 (the ratchet) before handing Open to authors at large, because it's the guardrail that makes free editing safe.
 - **Then** US3 / US4 in either order, then US5, US7, and US6 once 7.28 lands.
 - Every phase ends green and is committed and pushed (CLAUDE.md cadence). A red phase commits only what's genuinely done, with the diagnosis in the message.
+
+## Phase 12: The Open walk (US8, FR-021 amended, FR-031..FR-034; added 2026-11-05)
+
+**Goal**: Open lands on a walk with Continue on every step, adding Missing letters, Upgrades and Documentation only when the keyboard has those problems, and ending at Review then Output.
+
+**Independent test**: open upstream basic_kbdus and walk it with Continue only to Output; open a keyboard with no missing letters and no failing upgrade and check those pages are skipped.
+
+- [ ] T056 [US8] Record the baseline's problem kinds as a derived decision (`open-issues`: `missing-letters`, `upgrades`, `docs`) when the Open baseline is taken (`packages/studio/src/hooks/useKeyboardArtifact.ts`), and add the decision id (`packages/studio/src/decisions/decisionTypes.ts`)
+- [ ] T057 [US8] Open lands on the Languages step instead of the criteria view (`packages/studio/src/components/OpenKeyboardEntry.tsx`); update `open-existing-keyboard.spec.ts`
+- [ ] T058 [US8] Missing letters step: a gallery module gated on `open-issues` including `missing-letters`, rendering `MissingLettersByLanguage` with per-letter add; it replaces the character survey on Open (`packages/studio/src/survey/questions/gallery/`, `registry.ts`, `steps/advance.ts`)
+- [ ] T059 [US8] Upgrades step: a gallery module gated on `open-issues` including `upgrades`, listing failing upgrade criteria with preview and Apply/Skip; pairs 7.28 (cased keys) and 18.16 (touch caps layer, `syncTouchCapsLayerRaw`)
+- [ ] T060 [US8] Review step: the criteria view as the walk's last step on Open, Continue to Output with the FR-027 gate; Documentation is the existing help step (FR-029)
+- [ ] T061 [US8] Tests: the Open walk order with and without each problem kind (`advance.open.test.ts`); a Continue-only e2e walk of basic_kbdus to Output
+
