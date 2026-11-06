@@ -1,15 +1,30 @@
 /**
  * iconTools — pixel drawing operations for the icon editor.
  *
- * All tools operate on a 256×256 RGBA buffer (top-down row order),
- * the editor's canonical working resolution. Tools are pure functions
- * taking the pixel buffer plus parameters; the editor owns undo.
+ * All tools operate on a 48×48 RGBA buffer (top-down row order),
+ * the editor's canonical working resolution: 48px is the largest size
+ * an .ico entry for a keyboard icon ever needs, so the editor works
+ * 1:1 at that size and shows it big instead of editing high-res and
+ * downscaling. Tools are pure functions taking the pixel buffer plus
+ * parameters; the editor owns undo.
  */
 
-export const ICON_SIZE = 256;
+export const ICON_SIZE = 48;
 
-/** Canonical pixel buffer: 256×256 RGBA, top-down. */
+/** Canonical pixel buffer: 48×48 RGBA, top-down. */
 export type PixelBuffer = Uint8ClampedArray<ArrayBuffer>;
+
+/** A blank white canvas — the editor's starting point. */
+export function createBlankIcon(): PixelBuffer {
+  const px: PixelBuffer = new Uint8ClampedArray(ICON_SIZE * ICON_SIZE * 4);
+  for (let i = 0; i < px.length; i += 4) {
+    px[i] = 255;
+    px[i + 1] = 255;
+    px[i + 2] = 255;
+    px[i + 3] = 255;
+  }
+  return px;
+}
 
 export type Rgba = [number, number, number, number];
 
@@ -267,35 +282,6 @@ export const ICON_PALETTE: Array<{ name: string; rgba: Rgba }> = [
   { name: "gray-light", rgba: [229, 231, 235, 255] },
 ];
 
-/** Generate a default icon: first letter of `label` on a colored tile. */
-export function generateDefaultIcon(label: string): PixelBuffer {
-  const px: PixelBuffer = new Uint8ClampedArray(ICON_SIZE * ICON_SIZE * 4);
-  // Navy tile background (studio theme).
-  const bg: Rgba = [27, 58, 95, 255];
-  for (let i = 0; i < px.length; i += 4) {
-    px[i] = bg[0];
-    px[i + 1] = bg[1];
-    px[i + 2] = bg[2];
-    px[i + 3] = bg[3];
-  }
-  const letter = (label.trim().charAt(0) || "K").toUpperCase();
-  const pixelSize = 128;
-  // Measure, then draw centered directly.
-  const meas = document.createElement("canvas").getContext("2d");
-  let tw = pixelSize;
-  if (meas) {
-    meas.font = `${pixelSize}px "Courier New", ui-monospace, monospace`;
-    tw = Math.ceil(meas.measureText(letter).width);
-  }
-  drawText(
-    px,
-    letter,
-    Math.round((ICON_SIZE - tw) / 2),
-    Math.round((ICON_SIZE - pixelSize) / 2),
-    [255, 255, 255, 255],
-    pixelSize,
-  );
-  // Subtle border.
-  drawRect(px, 8, 8, ICON_SIZE - 9, ICON_SIZE - 9, [255, 255, 255, 255], false);
-  return px;
-}
+/* (generateDefaultIcon was removed with the 2026-11-06 three-option design:
+   when the template has no usable .ico the step offers only Create — a
+   blank white canvas — so no generated letter tile is needed.) */

@@ -103,10 +103,13 @@ describe("decodeIco", () => {
 
   it("preserves 1-bit transparency via the AND mask", async () => {
     const px = solidPixels(255, 255, 255, 0); // fully transparent
-    // Opaque red square in the middle.
+    // Opaque red square in the middle (bounds relative to ICON_SIZE so
+    // the test stays meaningful at any working resolution).
     const red: Rgba = [255, 0, 0, 255];
-    for (let y = 100; y < 156; y++) {
-      for (let x = 100; x < 156; x++) {
+    const lo = Math.floor(ICON_SIZE / 4);
+    const hi = Math.floor((ICON_SIZE * 3) / 4);
+    for (let y = lo; y < hi; y++) {
+      for (let x = lo; x < hi; x++) {
         const i = (y * ICON_SIZE + x) * 4;
         px[i] = red[0];
         px[i + 1] = red[1];
