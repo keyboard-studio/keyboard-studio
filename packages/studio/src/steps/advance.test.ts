@@ -216,7 +216,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "osk", "touch", "css", "done",
+      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "osk", "touch", "css", "icon", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     // Open ends at Review (the criteria view), whose Continue opens Output.

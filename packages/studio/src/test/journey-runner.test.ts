@@ -97,14 +97,12 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: ["open_languages", "open_missing_letters", "mechanisms"],
     skips: ["project_name", "carve"],
     endsAtDone: true,
-    lastEdge: "css->done",
   },
   {
     name: "minimal-defaults",
     summary: "reaches done with only the required questions answered (US1, T012)",
     skips: ["project_name"],
     endsAtDone: true,
-    lastEdge: "css->done",
   },
   {
     name: "backtrack-journey",
