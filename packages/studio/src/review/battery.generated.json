@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-06T09:26:23.441Z",
+ "generatedAt": "2026-11-06T09:58:29.157Z",
  "catalogSize": 208,
  "byBand": {
   "layer-c-enforce": 124,
@@ -7,7 +7,7 @@
   "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 116,
+ "implementedCount": 117,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -15,8 +15,7 @@
   "15.2-new-keyboard-created-in-release",
   "15.4-deprecated-md-created",
   "15.5-php-title-includes-deprecated",
-  "16.2-partner-keyboards-csv-updated",
-  "7.30-sided-ctrl-advisory"
+  "16.2-partner-keyboards-csv-updated"
  ],
  "precertified": [
   "KM_LINT_FILES_OUTSIDE_FOLDER",
@@ -2692,9 +2691,11 @@
     "kind": "lintRuleId",
     "id": "KM_LINT_SIDED_CTRL_ADVISORY"
    },
-   "implemented": false,
+   "implemented": true,
    "precertified": false,
-   "checkFiles": []
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts"
+   ]
   }
  ]
 }

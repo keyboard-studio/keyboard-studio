@@ -191,7 +191,7 @@ describe("CriteriaPage — header and rows agree", () => {
       // 140 on main plus the 5 consistency-batch checks (1.15/7.25/
       // 7.26/7.27/18.14), 7.28 and 18.17/18.18: with no findings supplied, each implemented
       // layer-c row resolves Met.
-      "150 of 208 criteria resolved",
+      "151 of 208 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
     expect(counted).toBe(208);

@@ -9,6 +9,7 @@
 
 import type { FindingKey, ReviewNote } from "@keyboard-studio/contracts";
 
+import { isAdvisoryRow } from "./advisoryChecks.ts";
 import type { CriteriaResult, ResolvedRow } from "./criteriaTypes.ts";
 
 /** The baseline taken when the keyboard was opened (the criteria slice). */
@@ -71,7 +72,7 @@ export function findingKeysOf(row: ResolvedRow): FindingKey[] {
 export function collectFailing(result: CriteriaResult): FailingFinding[] {
   const out: FailingFinding[] = [];
   for (const row of result.rows) {
-    if (row.status !== "not-met") continue;
+    if (row.status !== "not-met" || isAdvisoryRow(row)) continue;
     for (const key of findingKeysOf(row)) {
       out.push({ key, criterionId: row.criterion.id });
     }
@@ -103,7 +104,7 @@ export function classifyRow(
   row: ResolvedRow,
   baseline: OpenBaseline,
 ): FindingClass | null {
-  if (row.status !== "not-met") return null;
+  if (row.status !== "not-met" || isAdvisoryRow(row)) return null;
   if (baseline.unresolvable.includes(row.criterion.id)) return "pre-existing";
   return findingKeysOf(row).some((k) => classifyKey(k, baseline) === "new")
     ? "new"

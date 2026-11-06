@@ -99,12 +99,12 @@ Files: packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts (
 
 ### Tests
 
-- [ ] **T040** [P] [US4] Write failing tests: an `RCTRL` rule yields a `warning`-severity finding; a criterion whose findings are all warnings shows as a warning, and neither the Open submit gate nor the Copy gate stops on it · packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.test.ts, packages/studio/src/criteria/resolveCriteria.test.ts, packages/studio/src/criteria/openRatchet.test.ts
+- [x] **T040** [P] [US4] Write failing tests: an `RCTRL` rule yields a `warning`-severity finding; a criterion whose findings are all warnings shows as a warning, and neither the Open submit gate nor the Copy gate stops on it · packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.test.ts, packages/studio/src/criteria/resolveCriteria.test.ts, packages/studio/src/criteria/openRatchet.test.ts
 
 ### Implementation
 
-- [ ] **T041** [US4] Implement the advisory check, replacing the stub, with `warning`-severity findings and wording that prefers an Alt-based placement (FR-004; wording for content review); list `KM_LINT_SIDED_CTRL_ADVISORY` in the implemented checks and gate coverage · packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts, packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts
-- [ ] **T042** [US4] Teach the criteria resolver and the Open submit gate that a criterion whose findings are all `warning` severity is a non-blocking warning (FR-004; no contracts change) · packages/studio/src/criteria/resolveCriteria.ts, packages/studio/src/criteria/openRatchet.ts
+- [x] **T041** [US4] Implement the advisory check, replacing the stub, with `warning`-severity findings and wording that prefers an Alt-based placement (FR-004; wording for content review); list `KM_LINT_SIDED_CTRL_ADVISORY` in the implemented checks and gate coverage · packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts, packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts
+- [x] **T042** [US4] Teach the criteria resolver and the Open submit gate that a criterion whose findings are all `warning` severity is a non-blocking warning (FR-004; no contracts change) · packages/studio/src/criteria/resolveCriteria.ts, packages/studio/src/criteria/openRatchet.ts
 
 **Checkpoint**: a keyboard with an `RCTRL` rule shows the advisory as a warning, and no gate stops on it.
 

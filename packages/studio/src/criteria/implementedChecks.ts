@@ -223,4 +223,6 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_TOUCH_SYMBOLS_LAYER",
   // §7.29 — no rule types content on Ctrl without Alt (spec 114).
   "KM_LINT_RAW_CTRL",
+  // §7.30 — advisory on sided Ctrl rules (spec 114).
+  "KM_LINT_SIDED_CTRL_ADVISORY",
 ]);

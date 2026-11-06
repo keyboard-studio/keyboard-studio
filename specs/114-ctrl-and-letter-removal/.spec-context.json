@@ -245,6 +245,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T09:49:09.065Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:59:44.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:59:44.270Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:59:44.552Z"
     }
   ],
   "decisions": [
@@ -262,6 +286,11 @@
       "decision": "moved UpgradeInput/UpgradeOffer to upgradeTypes.ts",
       "why": "depcruise no-circular between upgradePairs and rawCtrlUpgrade",
       "rejected": "inline import in fixer"
+    },
+    {
+      "decision": "FR-004 realised as explicit advisory set (advisoryChecks.ts) not all-warning rule",
+      "why": "every criteria finding is warning severity, so the all-warning rule would un-block every Layer C row",
+      "rejected": "per-check severity change; criteria data flag"
     }
   ],
   "step_summaries": {
@@ -343,7 +372,7 @@
       ]
     }
   },
-  "currentTask": "T037",
+  "currentTask": "T042",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -522,6 +551,33 @@
       "did": "warning on Mechanism gallery existing-method removal when last producer of a needed char",
       "files": [
         "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "tests for sided-Ctrl advisory, resolver and ratchet",
+      "files": [
+        "check-sided-ctrl-advisory.test.ts",
+        "resolveCriteria.test.ts",
+        "openRatchet.test.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "advisory check implemented and listed",
+      "files": [
+        "check-sided-ctrl-advisory.ts",
+        "implementedChecks.ts",
+        "gateCoverage.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "explicit advisory set; resolver and ratchet treat as non-blocking",
+      "files": [
+        "advisoryChecks.ts",
+        "resolveCriteria.ts",
+        "openRatchet.ts"
       ]
     }
   },

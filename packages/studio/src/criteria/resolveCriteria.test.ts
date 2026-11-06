@@ -82,7 +82,7 @@ describe("resolveCriteria — authored baseline", () => {
       // synthetic (no contextMissing), so implemented checks with no
       // findings resolve Met. The assembly test pins the real
       // contextMissing behavior.
-      met: 148,
+      met: 149,
       "not-met": 0,
       // The §19 twin rows (19.1b/19.2b) concern adaptations; the baseline
       // carries no adaptation signal, so they are Not applicable.
@@ -90,9 +90,9 @@ describe("resolveCriteria — authored baseline", () => {
       "needs-author": 34,
       "needs-human": 10,
       // 14 unimplemented - 1.1 (now implemented) = 13.
-      "not-yet-checkable": 14,
+      "not-yet-checkable": 13,
     });
-    expect(result.resolvedCount).toBe(150); // 148 met + 2 not-applicable
+    expect(result.resolvedCount).toBe(151); // 149 met + 2 not-applicable
   });
 
   it("gives every row exactly one status and bandCounts that agree with counts", () => {
@@ -112,8 +112,8 @@ describe("resolveCriteria — authored baseline", () => {
       expect(bandTotal).toBe(result.counts[status]);
     }
     expect(result.bandCounts["scaffolder-bake"].met).toBe(40);
-    expect(result.bandCounts["layer-c-enforce"].met).toBe(108);
-    expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(14); // 14 - 1.1 (now implemented)
+    expect(result.bandCounts["layer-c-enforce"].met).toBe(109);
+    expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(13); // 14 - 1.1 (now implemented)
     expect(result.bandCounts["yellow-survey"]["needs-author"]).toBe(34);
     expect(result.bandCounts["red-checklist"]["needs-human"]).toBe(10);
   });
@@ -136,7 +136,7 @@ describe("resolveCriteria — foreign baseline", () => {
       // no findings in the synthetic baseline (no contextMissing) —
       // including 1.5/2.1/2.2/2.6, which resolve via their lint checks
       // in foreign mode, plus the 5 consistency-batch checks, 7.28, 18.16, 18.17 and 18.18.
-      met: 112,
+      met: 113,
       "not-met": 0,
       // 2 §19 twin rows (no adaptation signal) + 40 scaffolder-bake rows,
       // which in foreign mode resolve Not applicable and name their lint
@@ -147,9 +147,9 @@ describe("resolveCriteria — foreign baseline", () => {
       "needs-author": 34,
       "needs-human": 10,
       // The 9 unimplemented layer-c rows only (was 49 with the 40 bake rows).
-      "not-yet-checkable": 10,
+      "not-yet-checkable": 9,
     });
-    expect(result.resolvedCount).toBe(154); // 112 met + 42 not-applicable
+    expect(result.resolvedCount).toBe(155); // 113 met + 42 not-applicable
     for (const row of result.rows) {
       expect(row.controls).toBeNull();
     }
@@ -266,9 +266,9 @@ describe("resolveCriteria — layer-c findings", () => {
     expect(evidence.lines).toContain(finding.hint);
 
     const result = resolveCriteria(makeInput({ lintFindings: [finding] }));
-    expect(result.counts.met).toBe(147); // 148 - 1 (the finding)
+    expect(result.counts.met).toBe(148); // 149 - 1 (the finding)
     expect(result.counts["not-met"]).toBe(1);
-    expect(result.resolvedCount).toBe(150); // 147 + 1 + 2
+    expect(result.resolvedCount).toBe(151); // 148 + 1 + 2
   });
 
   it("dedupes an identical finding reported twice (doc + engine)", () => {
@@ -321,8 +321,8 @@ describe("resolveCriteria — missing lint context", () => {
     ]);
 
     const result = resolveCriteria(input);
-    expect(result.counts.met).toBe(147); // 148 - 1 (inventory now missing)
-    expect(result.counts["not-yet-checkable"]).toBe(15); // 14 + 1
+    expect(result.counts.met).toBe(148); // 149 - 1 (inventory now missing)
+    expect(result.counts["not-yet-checkable"]).toBe(14); // 13 + 1
   });
 });
 
@@ -677,5 +677,34 @@ describe("resolveCriteria — copyright-year and PR-comment facts", () => {
     expect(row.evidence().lines).toContain(
       "This PR has 3 comment(s) on the diff, 1 conversation comment(s) and 2 review(s) requesting changes or commenting.",
     );
+  });
+});
+
+describe("resolveCriteria — advisory (sided Ctrl)", () => {
+  const finding = (code: string): LintFinding => ({
+    code,
+    severity: "warning",
+    layer: "C",
+    message: `m ${code}`,
+    location: { file: "source/k.kmn", line: 0 },
+    hint: "h",
+  });
+
+  it("flags the sided-Ctrl advisory row as advisory, and the raw-Ctrl row not", () => {
+    const input = makeInput({
+      lintFindings: [finding("KM_LINT_SIDED_CTRL_ADVISORY"), finding("KM_LINT_RAW_CTRL")],
+    });
+    const advisory = rowFor("7.30-sided-ctrl-advisory", input);
+    expect(advisory.status).toBe("not-met");
+    expect(advisory.advisory).toBe(true);
+    const raw = rowFor("7.29-no-raw-ctrl-rules", input);
+    expect(raw.status).toBe("not-met");
+    expect(raw.advisory).toBeUndefined();
+  });
+
+  it("does not flag the advisory row when it has no findings", () => {
+    const row = rowFor("7.30-sided-ctrl-advisory", makeInput());
+    expect(row.status).toBe("met");
+    expect(row.advisory).toBeUndefined();
   });
 });

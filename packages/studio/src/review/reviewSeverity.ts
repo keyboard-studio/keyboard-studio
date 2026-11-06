@@ -11,6 +11,7 @@
 //   hidden  — not shown in the report at all: scaffolder-bake rows (their
 //             twin carries the post-hoc check) and not-applicable rows.
 
+import { isAdvisoryRow } from "../criteria/advisoryChecks.ts";
 import type { ResolvedRow } from "../criteria/criteriaTypes.ts";
 
 export type ReviewSeverity = "met" | "warning" | "error" | "hidden";
@@ -22,6 +23,7 @@ export function severityForReviewRow(row: ResolvedRow): ReviewSeverity {
   if (row.status === "not-applicable") return "hidden";
   if (row.status === "met") return "met";
   if (row.status === "not-met") {
+    if (isAdvisoryRow(row)) return "warning";
     const code =
       row.criterion.band === "layer-c-enforce"
         ? (row.criterion.lintRuleId ?? "")
