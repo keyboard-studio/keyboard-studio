@@ -470,6 +470,23 @@ describe("renameFilesInVfs — CSS selector rewriting", () => {
     expect(out).not.toContain(".kmw-keyboard-sil_cameroon_qwerty {");
   });
 
+  it("rewrites kmw-keyboard-<id> when followed by : or another selector token (not \\b-only)", () => {
+    const vfs = createVirtualFS();
+    const css =
+      ".kmw-keyboard-sil_cameroon_qwerty:not(.desktop) .kmw-key{}\n" +
+      ".web .kmw-keyboard-sil_cameroon_qwerty #default-K_A{}\n" +
+      ".kmw-keyboard-sil_cameroon_qwerty_extra{}\n";
+    vfs.set("source/sil_cameroon_qwerty.css", css);
+
+    renameFilesInVfs(vfs, "sil_cameroon_qwerty", "bafut");
+
+    const out = vfs.get("source/bafut.css")!.content as string;
+    expect(out).toContain(".kmw-keyboard-bafut:not(.desktop)");
+    expect(out).toContain(".web .kmw-keyboard-bafut #default-K_A");
+    expect(out).toContain(".kmw-keyboard-sil_cameroon_qwerty_extra");
+    expect(out).not.toContain(".kmw-keyboard-sil_cameroon_qwerty:not");
+  });
+
   it("does not modify non-.css entries", () => {
     const vfs = createVirtualFS();
     const kmnContent = `c contains kmw-keyboard-base_id text\n`;

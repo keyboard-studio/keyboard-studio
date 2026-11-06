@@ -223,11 +223,15 @@ export function renameFilesInVfs(vfs: VirtualFS, startId: string, keyboardId: st
   }
 
   // Rewrite `.kmw-keyboard-<startId>` selectors in every *.css entry.
-  // Word-boundary anchor ensures we don't rewrite substrings that start with
-  // the base id followed by additional alphanumerics (e.g. `start_id_extra`).
+  // After the literal id, require a token boundary that does NOT treat `-` as a
+  // boundary (\b does — `r` and `-` are word vs non-word), so compound classes
+  // like `.kmw-keyboard-<id>-variant` are not half-rewritten. Still block
+  // `start_id_extra` (\w continues with `_`). Escaped `startId` avoids regex
+  // metacharacters in ids.
   // Iterated AFTER the file-rename pass so the matched *.css files already
   // live at their new <keyboardId>.css paths.
-  const cssBaseClassRe = new RegExp(`kmw-keyboard-${startId}\\b`, "g");
+  const escapedStart = escapeForRegex(startId);
+  const cssBaseClassRe = new RegExp(`kmw-keyboard-${escapedStart}(?![\\w-])`, "g");
   for (const cssPath of vfs.list("").filter((p) => p.endsWith(".css"))) {
     const cssEntry = vfs.get(cssPath);
     if (cssEntry === undefined || typeof cssEntry.content !== "string") continue;
