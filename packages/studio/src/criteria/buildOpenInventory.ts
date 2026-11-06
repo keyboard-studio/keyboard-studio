@@ -44,6 +44,8 @@ export interface OpenInventoryBuild {
   build: CriteriaInventoryBuild;
   /** How many listed languages had exemplar data (the view states this). */
   coverage: { withData: number; total: number; withoutData: readonly string[] };
+  /** Each expected character (single NFC code point) -> the listed languages that require it. */
+  sourcesByChar: Record<string, string[]>;
 }
 
 export function buildOpenCriteriaInventory(input: BuildOpenInventoryInput): OpenInventoryBuild {
@@ -57,18 +59,23 @@ export function buildOpenCriteriaInventory(input: BuildOpenInventoryInput): Open
 
   const withDataTags = tags.filter((t) => !union.withoutData.includes(t));
   if (withDataTags.length === 0) {
-    return { build: { kind: "skipped", missingTag: tags[0] ?? null }, coverage };
+    return { build: { kind: "skipped", missingTag: tags[0] ?? null }, coverage, sourcesByChar: {} };
   }
 
   const standardOnly = new Map<string, SourcedInventory | null>();
+  const sourcesByChar: Record<string, string[]> = {};
   for (const tag of withDataTags) {
     const inv = input.sourcedByTag.get(tag) ?? null;
-    standardOnly.set(
-      tag,
-      inv === null
-        ? null
-        : { ...inv, characters: inv.characters.filter((c) => c.tier === "main") },
-    );
+    const main = inv === null ? [] : inv.characters.filter((c) => c.tier === "main");
+    standardOnly.set(tag, inv === null ? null : { ...inv, characters: main });
+    // Per code point, as buildCriteriaInventory splits clusters, so a finding's
+    // character can be traced back to the languages that expect it.
+    for (const { char } of main) {
+      for (const ch of char.normalize("NFC")) {
+        const list = (sourcesByChar[ch] ??= []);
+        if (!list.includes(tag)) list.push(tag);
+      }
+    }
   }
 
   const build = buildCriteriaInventory({
@@ -77,5 +84,5 @@ export function buildOpenCriteriaInventory(input: BuildOpenInventoryInput): Open
     confirmed: { confirmedInventory: [] },
     sourcedByTag: standardOnly,
   });
-  return { build, coverage };
+  return { build, coverage, sourcesByChar };
 }

@@ -340,5 +340,13 @@ export interface CriteriaResult {
    * Open mode only (spec 111 FR-018a): how many of the keyboard's listed
    * languages had exemplar data for the expected-characters check.
    */
-  expectedCoverage?: { withData: number; total: number };
+  expectedCoverage?: ExpectedCoverage;
+}
+
+/** Open's expected-characters coverage (spec 111 FR-018a). */
+export interface ExpectedCoverage {
+  withData: number;
+  total: number;
+  /** Each expected character -> the listed languages that require it. */
+  sourcesByChar?: Readonly<Record<string, readonly string[]>>;
 }

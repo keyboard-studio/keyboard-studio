@@ -25,6 +25,7 @@ import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
 import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
 import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
 import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
+import { MissingLettersByLanguage } from "./MissingLettersByLanguage.tsx";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -108,6 +109,12 @@ export function CriteriaScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
     <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
+      {result.expectedCoverage?.sourcesByChar !== undefined && (
+        <MissingLettersByLanguage
+          missing={missingFixes.flatMap((f) => (f.action !== undefined ? [f.action.subject] : []))}
+          sourcesByChar={result.expectedCoverage.sourcesByChar}
+        />
+      )}
       <SuggestedFixesPanel
         extra={[...missingFixes, ...docFixes]}
         onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))} testId="criteria-suggested-fixes" />

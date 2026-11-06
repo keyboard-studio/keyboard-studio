@@ -81,6 +81,7 @@ import { useDocumentationFindings } from "./useDocumentationFindings.ts";
  * engine ever reports the same problem.
  */
 import { mergeLintFindings } from "../criteria/mergeFindings.ts";
+import type { ExpectedCoverage } from "../criteria/criteriaTypes.ts";
 export { mergeLintFindings };
 
 export interface CriteriaFindings {
@@ -118,7 +119,7 @@ export interface CriteriaFindings {
    * had exemplar data for the expected-characters check. Null on Copy, and
    * until the run settles.
    */
-  expectedCoverage: { withData: number; total: number } | null;
+  expectedCoverage: ExpectedCoverage | null;
 }
 
 interface EngineRun {
@@ -133,7 +134,7 @@ interface EngineRun {
   findings: LintFinding[];
   verifiedByCode: Map<string, string[]>;
   contextMissing: Record<string, string>;
-  expectedCoverage: { withData: number; total: number } | null;
+  expectedCoverage: ExpectedCoverage | null;
 }
 
 export function useCriteriaFindings(stage: Stage): CriteriaFindings {
@@ -294,7 +295,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
       // union of the keyboard's own languages, not the author's confirmed
       // decisions. Re-runs with this effect whenever the language list
       // (identity / decisions / projected .kps) changes.
-      let expectedCoverage: { withData: number; total: number } | null = null;
+      let expectedCoverage: ExpectedCoverage | null = null;
       let build;
       if (isOpenMode(instantiationMode)) {
         const open = buildOpenCriteriaInventory({
@@ -303,7 +304,11 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
           sourcedByTag,
         });
         build = open.build;
-        expectedCoverage = { withData: open.coverage.withData, total: open.coverage.total };
+        expectedCoverage = {
+          withData: open.coverage.withData,
+          total: open.coverage.total,
+          sourcesByChar: open.sourcesByChar,
+        };
       } else {
         build = buildCriteriaInventory({
           languageTags,
