@@ -73,7 +73,10 @@ export const definition = {
     paCopyrightHolder.definition.help_text +
     ". Leave this blank to credit the author named above. " +
     "If this keyboard is based on an existing one, the original author's copyright " +
-    "is kept automatically and does not need re-entering here.",
+    "is kept automatically and does not need re-entering here. " +
+    "If the original holder also holds the copyright on your version, choose them " +
+    "from the list below the box rather than typing the name, so the notice " +
+    "lists them once.",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validate(): required:false, because a blank means "same as the author"
@@ -84,6 +87,10 @@ export const definition = {
 // question confirms in ask mode. Returns undefined when the header carries
 // none.
 export function extractCopyrightHolder(ctx: ExtractContext): string | undefined {
+  // Live wiring: the parsed holder name — the exact string the selector offers
+  // and D4 dedupes on, so the adapt-track preselection IS a selector entry.
+  const parsed = ctx.startHolders?.[0];
+  if (parsed !== undefined) return parsed;
   const copyright = ctx.ir?.header.copyright;
   return copyright ? copyright : undefined;
 }
@@ -132,12 +139,13 @@ const mod: QuestionModule = {
   snapshotInputs: ["authoring-track"],
   extract: extractCopyrightHolder,
   // Spec 092 T022: the track-dependent seeding disposition, declared here
-  // rather than special-cased in the pass. Adapt: the extracted notice
-  // seeds the question (pre-filled, labelled with its source). Copy: NO
-  // seed and NO `offered` — the copied keyboard's notice is retained by
-  // the attribution machinery (D1 leaves the holder defaulting to the
-  // author), and offering it for re-entry is the D4 duplicate-holder
-  // hazard this module's help text exists to prevent.
+  // rather than special-cased in the pass. Adapt: the extracted holder
+  // seeds the question, which renders as the PRESELECTED entry of the
+  // starting-point holder selector (labelled with its source). Copy: NO
+  // seed and NO `offered` — nothing is preselected and blank stays the D1
+  // author default. The copied holder is still one click away in the
+  // selector, which records the exact extracted string (never a retype),
+  // so choosing it cannot trigger the D4 duplicate-holder hazard.
   seedWhen: (decisions) => decisions["authoring-track"]?.value === "adapt",
 };
 export default mod;

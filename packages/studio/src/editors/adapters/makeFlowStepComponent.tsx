@@ -219,6 +219,14 @@ export function makeFlowStepComponent<Extracted>(
       [],
     );
 
+    const getSeedOptions = useCallback(
+      options.seeds?.getSeedOptions
+        ? (questionId: string) => options.seeds!.getSeedOptions!(questionId, depsRef.current)
+        : (_questionId: string) => undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    );
+
     // C2.4 — completion wrapper: extract → guard → onComplete. The factory
     // performs NO store writes on completion (spec 089): the completion's
     // effects are the question modules' applies, run by StepHost's
@@ -253,6 +261,7 @@ export function makeFlowStepComponent<Extracted>(
         {...(options.seeds?.getSeedCaption ? { getSeedProvenance } : {})}
         {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
         {...(options.seeds?.getRequiredOverride ? { getRequiredOverride } : {})}
+        {...(options.seeds?.getSeedOptions ? { getSeedOptions } : {})}
         {...(options.usesFindings ? { findingsByQuestionId } : {})}
       />
     );

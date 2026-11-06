@@ -2839,6 +2839,8 @@
   "survey.punctuation.typeSectionAriaLabel": "Type your punctuation",
   "survey.questionField.autocomplete.codePlaceholder": "Search by name, autonym, or code…",
   "survey.questionField.autocomplete.namePlaceholder": "Type your language name in English…",
+  "survey.questionField.choices.someoneElse": "Someone else (type the name in the box above; leave it blank to credit the author)",
+  "survey.questionField.choices.startingPointHolders": "Or choose the starting point's copyright holder:",
   "survey.questionField.langtagsCombobox.loading": "Loading languages…",
   "survey.questionField.multiSelect.dynamicOptionsNotLoaded": "Dynamic options ({0}) not loaded in this build.",
   "survey.reproposal.cue": "Needs reconfirming — {reason}",

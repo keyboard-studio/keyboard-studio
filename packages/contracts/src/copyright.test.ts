@@ -459,3 +459,21 @@ describe("round-trip stability — parse(render(x)) === x (contract P7)", () => 
     }
   });
 });
+
+describe("choosing the starting point holder verbatim (copy-track selector)", () => {
+  it("emits ONE holder line, not two, when the exact extracted name is added", () => {
+    const parsed = parseCopyright("Copyright (c) 2016 SIL  International\n");
+    if (!parsed.ok) throw new Error("fixture must parse");
+    const chosen = parsed.block[0]!.name; // what the selector records
+    const block = addHolder(parsed.block, chosen, 2026);
+    expect(block).toHaveLength(1);
+    expect(block[0]!.years).toEqual([2016, 2026]);
+    expect(renderLicense(block).split("SIL  International")).toHaveLength(2); // exactly one occurrence
+  });
+
+  it("a retyped single-space variant is the hazard the selector avoids (two lines)", () => {
+    const parsed = parseCopyright("Copyright (c) 2016 SIL  International\n");
+    if (!parsed.ok) throw new Error("fixture must parse");
+    expect(addHolder(parsed.block, "SIL International", 2026)).toHaveLength(2);
+  });
+});

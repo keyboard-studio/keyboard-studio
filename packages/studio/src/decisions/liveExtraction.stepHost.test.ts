@@ -23,6 +23,8 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { runLiveExtractionFromStores } from "./liveExtraction.ts";
 
 const COPYRIGHT = "(c) 2009-2019 SIL International";
+// The seeded/offered value is the parsed holder NAME (what the selector offers and D4 dedupes on), not the raw header.
+const HOLDER = "SIL International";
 
 function catalogEntry(): StartKeyboard {
   return {
@@ -76,7 +78,7 @@ describe("live extraction at setup (real stores, real registry)", () => {
   it("(1) unanswered + extractable → seeded record { extracted, source: <keyboard id> } with inputs snapshot", () => {
     driveSetup({ copyright: COPYRIGHT, track: "adapt" });
     const record = useDecisionStore.getState().decisions["copyright-holder"];
-    expect(record?.value).toBe(COPYRIGHT);
+    expect(record?.value).toBe(HOLDER);
     expect(record?.provenance).toBe("extracted");
     expect(record?.source).toBe("basic_kbdfr");
     expect(record?.inputs).toEqual({
@@ -97,7 +99,7 @@ describe("live extraction at setup (real stores, real registry)", () => {
     const record = useDecisionStore.getState().decisions["copyright-holder"];
     expect(record?.value).toBe("My Own Holder");
     expect(record?.provenance).toBe("asked");
-    expect(record?.offered).toBe(COPYRIGHT);
+    expect(record?.offered).toBe(HOLDER);
   });
 
   it("(2b) copy track → no seed at all: the D1 default-to-author stands, the copied notice is not offered", () => {
@@ -129,7 +131,7 @@ describe("live extraction at setup (real stores, real registry)", () => {
     decisions.record({ id: "authoring-track", value: "adapt", provenance: "asked" });
     runLiveExtractionFromStores();
     const record = useDecisionStore.getState().decisions["copyright-holder"];
-    expect(record?.value).toBe(COPYRIGHT);
+    expect(record?.value).toBe(HOLDER);
     expect(record?.provenance).toBe("extracted");
     // The inputs snapshot carries only the facts recorded at pass time.
     expect(record?.inputs).toEqual({ "authoring-track": "adapt" });
@@ -146,7 +148,7 @@ describe("live extraction at setup (real stores, real registry)", () => {
     driveSetup({ copyright: COPYRIGHT, track: "adapt" });
     expect(useDecisionStore.getState().decisions["language-code"]).toBeUndefined();
     // The pass itself was not disabled wholesale: the holder still seeds.
-    expect(useDecisionStore.getState().decisions["copyright-holder"]?.value).toBe(COPYRIGHT);
+    expect(useDecisionStore.getState().decisions["copyright-holder"]?.value).toBe(HOLDER);
   });
 
   it("(7b) language-code unanswered → no record (copy)", () => {
