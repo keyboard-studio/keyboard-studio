@@ -3,8 +3,8 @@
   "specName": "Ctrl rules and removing needed letters",
   "branch": "114-ctrl-and-letter-removal",
   "unattended": true,
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "plan",
@@ -54,6 +54,29 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T08:40:09.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-06T09:03:59.214Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:05:27.192Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:05:27.460Z"
     }
   ],
   "decisions": [
@@ -146,5 +169,43 @@
         "T014"
       ]
     }
-  }
+  },
+  "currentTask": "T002",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added KM_LINT_RAW_CTRL and KM_LINT_SIDED_CTRL_ADVISORY criteria rows",
+      "files": [
+        "packages/contracts/data/criteria.json"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Stub raw-Ctrl and sided-Ctrl checks registered in runner and index",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts",
+        "packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts",
+        "packages/keyboard-lint/src/criteriaChecks.ts",
+        "packages/keyboard-lint/src/index.ts"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "typecheck",
+      "command": "pnpm typecheck",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 15.4,
+      "result": "packages/engine typecheck: Done · packages/studio typecheck$ tsc --noEmit · packages/studio typecheck: Done"
+    },
+    {
+      "what": "lint",
+      "command": "pnpm lint",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 40.7,
+      "result": "Reparsing as ES module because module syntax was detected. This incurs a performance overhead. · To eliminate this warning, add \"type\": \"module\" to C:\\Github\\keyboard-studio-114\\package.json. · (Use `node --trace-warnings ...` to show where the warning was created)"
+    }
+  ]
 }

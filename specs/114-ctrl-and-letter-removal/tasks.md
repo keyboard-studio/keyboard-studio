@@ -14,8 +14,8 @@ Owns the shared criteria data and the check registration. Each live check gets a
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T001** [P] Add two rows to the criteria data: `KM_LINT_RAW_CTRL` (FR-001) and `KM_LINT_SIDED_CTRL_ADVISORY` (FR-004). No rows for FR-005 or FR-007 until the owner rules on them (trigger: that ruling, recorded in spec.md). Finding and criterion wording is content-owned: mark it for content review · packages/contracts/data/criteria.json
-- [ ] **T002** [P] Create stub checks that return no findings, export them from the package index, and call both from the criteria check runner next to `checkCasedKeysDeclared`. Do not list them in `implementedChecks` or `gateCoverage` yet: the drift guard scans check sources for `code:` literals, which a stub lacks · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts, packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts, packages/keyboard-lint/src/criteriaChecks.ts, packages/keyboard-lint/src/index.ts
+- [x] **T001** [P] Add two rows to the criteria data: `KM_LINT_RAW_CTRL` (FR-001) and `KM_LINT_SIDED_CTRL_ADVISORY` (FR-004). No rows for FR-005 or FR-007 until the owner rules on them (trigger: that ruling, recorded in spec.md). Finding and criterion wording is content-owned: mark it for content review · packages/contracts/data/criteria.json
+- [x] **T002** [P] Create stub checks that return no findings, export them from the package index, and call both from the criteria check runner next to `checkCasedKeysDeclared`. Do not list them in `implementedChecks` or `gateCoverage` yet: the drift guard scans check sources for `code:` literals, which a stub lacks · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts, packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts, packages/keyboard-lint/src/criteriaChecks.ts, packages/keyboard-lint/src/index.ts
 
 **Checkpoint**: both ids resolve, both checks run from the criteria check runner as stubs, and the suite still passes.
 
