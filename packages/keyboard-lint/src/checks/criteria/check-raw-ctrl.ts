@@ -15,6 +15,7 @@ import {
   criteriaFinding,
   kmnPath,
 } from "./_shared.js";
+import { ALT_MODIFIERS, isBasicKeyboard } from "./_ctrl.js";
 
 /** One reported raw-Ctrl rule. */
 export interface RawCtrlRule {
@@ -28,13 +29,8 @@ export interface RawCtrlRule {
   plane: string;
   /** The literal characters the rule's output types, one entry per output element. */
   outputs: string[];
-}
-
-const ALT_MODIFIERS = new Set(["ALT", "LALT", "RALT"]);
-
-/** True when the keyboard is a basic_* (Windows reference) keyboard. */
-function isBasicKeyboard(keyboardId: string): boolean {
-  return keyboardId.toLowerCase().startsWith("basic_");
+  /** True when the rule's output also has non-character elements (deadkey, store index, and so on). */
+  hasOtherOutputs: boolean;
 }
 
 /** The raw-Ctrl rules of the keyboard, after the exemptions. Empty for basic_*. */
@@ -60,6 +56,7 @@ export function findRawCtrlRules(ir: KeyboardIR, keyboardId: string): RawCtrlRul
         key: vkey.name,
         plane: vkey.modifiers.join(" "),
         outputs,
+        hasOtherOutputs: rule.output.some((o) => o.kind !== "char"),
       });
     });
   });

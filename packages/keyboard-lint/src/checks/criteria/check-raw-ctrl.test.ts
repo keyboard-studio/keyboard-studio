@@ -75,3 +75,10 @@ describe("checkRawCtrl (7.29)", () => {
     expect(checkRawCtrl(ir("demo", group("main", [["K_A", [], "a"]])), "demo").findings).toEqual([]);
   });
 });
+
+describe("hasOtherOutputs", () => {
+  it("is false for a character-only rule", () => {
+    const k = ir("demo", group("main", [["K_A", ["CTRL"], "é"]]));
+    expect(findRawCtrlRules(k, "demo")[0]?.hasOtherOutputs).toBe(false);
+  });
+});

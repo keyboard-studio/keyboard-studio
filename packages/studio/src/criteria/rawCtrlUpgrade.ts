@@ -50,15 +50,23 @@ function describeChar(ch: string): string {
 }
 
 function describeRule(r: RawCtrlRule): string {
-  const out = [...r.outputs.join("")].map(describeChar).join(" ");
-  return `[${r.plane} ${r.key}] > ${out}`;
+  const out = [...r.outputs.join("")].map(describeChar);
+  if (r.hasOtherOutputs) out.push("(and other output)");
+  return `[${r.plane} ${r.key}] > ${out.join(" ")}`;
 }
 
 const TOUCH_NOTE =
   "Touch layouts are not changed. If this keyboard has a touch layer reached on Ctrl, it keeps working as before.";
 
 export async function buildRawCtrlOffer(input: UpgradeInput): Promise<UpgradeOffer | null> {
-  const startIr = parseKmn(input.kmnText, input.keyboardId).ir;
+  let startIr: ReturnType<typeof parseKmn>["ir"];
+  try {
+    startIr = parseKmn(input.kmnText, input.keyboardId).ir;
+  } catch (err) {
+    // A starting point the codec cannot parse gets no offer; this fix is optional.
+    console.warn("[WARN] Ctrl upgrade skipped: the keyboard could not be parsed.", err);
+    return null;
+  }
   const rules = findRawCtrlRules(startIr, input.keyboardId);
   if (rules.length === 0) return null;
 

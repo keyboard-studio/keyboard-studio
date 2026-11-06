@@ -12,13 +12,13 @@ import {
   criteriaFinding,
   kmnPath,
 } from "./_shared.js";
+import { ALT_MODIFIERS, isBasicKeyboard } from "./_ctrl.js";
 
-const ALT_MODIFIERS = new Set(["ALT", "LALT", "RALT"]);
 const SIDED_CTRL = new Set(["LCTRL", "RCTRL"]);
 
 /** The `[PLANE KEY]` labels of every sided-Ctrl rule (without Alt). */
 function sidedCtrlRules(ir: KeyboardIR, keyboardId: string): string[] {
-  if (keyboardId.toLowerCase().startsWith("basic_")) return [];
+  if (isBasicKeyboard(keyboardId)) return [];
   const found: string[] = [];
   for (const group of ir.groups) {
     for (const rule of group.rules) {

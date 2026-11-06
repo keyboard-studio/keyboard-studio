@@ -84,3 +84,21 @@ describe.skipIf(!existsSync(BUNONG))("raw-Ctrl fix on sil_bunong", () => {
     expect(await buildRawCtrlOffer(inputFor("sil_bunong", BUNONG))).toBeNull();
   });
 });
+
+describe("raw-Ctrl fix on unparseable text", () => {
+  it("degrades to no offer, with a console warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const file = "source/bad.kmn";
+    const kmnText = "\u0000\u0001 not a keyboard";
+    const offer = await buildRawCtrlOffer({
+      file,
+      kmnText,
+      keyboardId: "bad",
+      caps,
+      readText: () => kmnText,
+      paths: [file],
+    });
+    expect(offer).toBeNull();
+    warn.mockRestore();
+  });
+});
