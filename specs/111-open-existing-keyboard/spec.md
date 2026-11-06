@@ -259,7 +259,7 @@ The walk on Open:
 
 **Copy path**
 
-- **FR-030**: The Copy path's steps, prompts and output MUST be unchanged by this feature.
+- **FR-030** *(amended 2026-11-05)*: The Copy path's steps, prompts and output MUST be unchanged by this feature, with two owner-approved exceptions that Copy shares with Open: the touch caps layer follows the full Capsifesto behaviour (caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift, Shift-key labels), and `&CasedKeys` lists a key when its Caps output is its Shift output (so an AZERTY number row qualifies) and leaves out a key whose Caps does anything else. "Unchanged" is checked by Copy's outputs (the golden walk); walk order follows each step's inputs and outputs and is not pinned as a literal sequence.
 
 ### Key Entities
 
