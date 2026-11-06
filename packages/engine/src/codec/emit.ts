@@ -654,7 +654,7 @@ function orderStoreDeclarations(sites: GroupBodyItem[][]): void {
 type GroupBodyItem =
   | { kind: "store"; sourceLine: number; text: string; nodeId: string; name: string }
   | { kind: "rule";  sourceLine: number; text: string; nodeId: string }
-  | { kind: "frag";  sourceLine: number; text: string };
+  | { kind: "frag";  sourceLine: number; text: string; nodeId: string };
 
 /**
  * Attribute user stores to groups by source position.
@@ -813,6 +813,7 @@ function emitGroupBodyFaithful(
       kind: "frag",
       sourceLine: frag.sourceLine ?? Number.MAX_SAFE_INTEGER,
       text: frag.sourceText,
+      nodeId: frag.nodeId,
     });
   }
 
@@ -828,6 +829,13 @@ function emitGroupBodyFaithful(
 // ---------------------------------------------------------------------------
 // Main emit function
 // ---------------------------------------------------------------------------
+
+/** Result of {@link emit} with `{ lineMap: true }`. */
+export interface EmitWithLineMap {
+  readonly text: string;
+  /** 1-based line of `text` that emits each store, rule, group header, and raw fragment, by node id. */
+  readonly lineByNodeId: ReadonlyMap<string, number>;
+}
 
 /**
  * Emit canonical .kmn text from a KeyboardIR.
@@ -845,10 +853,38 @@ function emitGroupBodyFaithful(
  * reference lives in a fragment attributed to a different group are caught by a
  * post-group sweep that emits any remaining unsourced stores not yet output. (D9)
  *
+ * With `{ lineMap: true }` the result also carries `lineByNodeId`: the 1-based
+ * line of the emitted text that holds each store, rule, group header, and raw
+ * fragment (a multi-line fragment maps to its first line). The text is the same
+ * as the plain call's.
+ *
  * @param ir  The keyboard IR to serialize.
  * @returns   Canonical .kmn text with trailing newline.
  */
-export function emit(ir: KeyboardIR): string {
+export function emit(ir: KeyboardIR): string;
+export function emit(ir: KeyboardIR, options: { lineMap: true }): EmitWithLineMap;
+export function emit(ir: KeyboardIR, options?: { lineMap?: boolean }): string | EmitWithLineMap {
+  const entryIndexByNodeId = new Map<string, number>();
+  const lines = emitLines(ir, entryIndexByNodeId);
+  const text = lines.join("\n");
+  if (options?.lineMap !== true) return text;
+
+  // An entry of `lines` may itself span several physical lines (opaque
+  // fragments), so turn entry indexes into line numbers by prefix sum.
+  const startLine: number[] = [];
+  let line = 1;
+  for (const entry of lines) {
+    startLine.push(line);
+    line += entry.split("\n").length;
+  }
+  const lineByNodeId = new Map<string, number>();
+  for (const [nodeId, index] of entryIndexByNodeId) {
+    lineByNodeId.set(nodeId, startLine[index]!);
+  }
+  return { text, lineByNodeId };
+}
+
+function emitLines(ir: KeyboardIR, entryIndexByNodeId: Map<string, number>): string[] {
   const lines: string[] = [];
   const commentMap = buildCommentMap(ir.comments);
 
@@ -870,6 +906,7 @@ export function emit(ir: KeyboardIR): string {
     const store = sysMap.get(key);
     if (store) {
       pushLeadingComments(store.nodeId, commentMap, lines);
+      entryIndexByNodeId.set(store.nodeId, lines.length);
       lines.push(emitStore(store));
       sysMap.delete(key);
     }
@@ -877,6 +914,7 @@ export function emit(ir: KeyboardIR): string {
   // Remaining system stores not in the canonical list, alphabetical.
   const remainingSys = [...sysMap.values()].sort((a, b) => a.name.localeCompare(b.name));
   for (const store of remainingSys) {
+    entryIndexByNodeId.set(store.nodeId, lines.length);
     lines.push(emitStore(store));
   }
 
@@ -922,6 +960,7 @@ export function emit(ir: KeyboardIR): string {
         kind: "frag",
         sourceLine: frag.sourceLine ?? 0,
         text: frag.sourceText,
+        nodeId: frag.nodeId,
       });
     }
   }
@@ -1053,30 +1092,35 @@ export function emit(ir: KeyboardIR): string {
     for (const item of site) {
       if (item.kind !== "store") continue; // unreachable; these sites hold stores only
       pushLeadingComments(item.nodeId, commentMap, lines);
+      entryIndexByNodeId.set(item.nodeId, lines.length);
       lines.push(item.text);
     }
   };
   pushStoreSite(orphanSite);
   for (const item of preBeginSite) {
     lines.push("");
+    entryIndexByNodeId.set(item.nodeId, lines.length);
     lines.push(item.text);
   }
   lines.push("");
   lines.push(beginLine);
   ir.groups.forEach((group, gi) => {
     lines.push("");
+    entryIndexByNodeId.set(group.nodeId, lines.length);
     lines.push(groupHeaders[gi] ?? "");
     if (ir.raw.length > 0) {
       for (const item of groupSites[gi] ?? []) {
         if (item.kind === "store" || item.kind === "rule") {
           pushLeadingComments(item.nodeId, commentMap, lines);
         }
+        entryIndexByNodeId.set(item.nodeId, lines.length);
         lines.push(item.text);
       }
     } else {
       pushStoreSite(groupStoreSites[gi] ?? []);
       for (const rule of group.rules) {
         pushLeadingComments(rule.nodeId, commentMap, lines);
+        entryIndexByNodeId.set(rule.nodeId, lines.length);
         lines.push(emitRule(rule, group.usingKeys));
       }
     }
@@ -1084,5 +1128,5 @@ export function emit(ir: KeyboardIR): string {
   pushStoreSite(catchAllSite);
 
   lines.push(""); // trailing newline
-  return lines.join("\n");
+  return lines;
 }

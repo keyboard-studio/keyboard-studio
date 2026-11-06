@@ -29,6 +29,9 @@ export * from "./keyboardId";
 // in ./axes is its projection, never an independent measurement.
 export * from "./keyBudget";
 export * from "./keyboardIdentity";
+// Layout-tab edits and the `kmn-edits` decision value (spec 113).
+export * from "./kmnEdits";
+export * from "./layoutOps";
 export * from "./linguistInventory";
 export * from "./lintFinding";
 export * from "./pattern";

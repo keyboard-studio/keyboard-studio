@@ -321,8 +321,12 @@ export {
   formatCodePointLabel,
   DESKTOP_GEOMETRY,
   DESKTOP_GEOMETRY_WIDTH,
+  DESKTOP_ISO_GEOMETRY,
+  DESKTOP_ISO_ROW_COUNT,
+  DESKTOP_ISO_ROW_SPACE,
 } from "./layout-chart/index.js";
 export type {
+  DesktopIsoGeometryKey,
   KeyLegibilityKind,
   KeyLegibilityResult,
   ScriptCoverageRange,
@@ -1210,9 +1214,40 @@ export type {
 export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
 
 // Spec 113 (Layout tab): per-key attribution and the kmn-edits operations.
-// Both barrels are empty until Phase 2 fills them.
-export {} from "./layout-attribution/index.js";
-export {} from "./layout-ops/index.js";
+export {
+  attributeLayer,
+  classifyRule,
+  findShadowedRules,
+  isMnemonic,
+  listContexts,
+  listLayers,
+  parseBracketKey,
+  verifyCells,
+} from "./layout-attribution/index.js";
+export type {
+  CellStep,
+  FanoutTable,
+  FiredRuleCheck,
+  KeyCellAttribution,
+  KeyRef,
+  ReadOnlyReason,
+  RowAttribution,
+  RowShape,
+  RuleClassification,
+} from "./layout-attribution/index.js";
+export {
+  applyLayoutOp,
+  clearKeyLive,
+  invertEffect,
+  normaliseKmnEdits,
+  replayKmnEdits,
+} from "./layout-ops/index.js";
+export type {
+  ApplyLayoutOpResult,
+  KmnEditEffect,
+  ReplayMiss,
+  ReplayResult,
+} from "./layout-ops/index.js";
 
 // Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
 export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";

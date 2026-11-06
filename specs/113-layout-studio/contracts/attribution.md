@@ -17,7 +17,8 @@ type RowShape =
   | "opaque";                 // RawKmnFragment
 
 type ReadOnlyReason =
-  | "store-based" | "conditional" | "opaque" | "later-group-change"
+  | "store-based" | "conditional" | "opaque" | "readonly-group" | "later-group-change"
+  | "complex-output"          // beep, context(n) reordering, index() outside the fan-out shape
   | "never-fires" | "mnemonic" | "frame-key" | "not-compiled";
 
 interface RowAttribution {
@@ -28,6 +29,8 @@ interface RowAttribution {
   editable: boolean;
   readOnlyReason?: ReadOnlyReason;
   provenance: "hand-set" | "starting-point";
+  authorEdit?: "layout-tab" | "code-tab";  // which editor wrote the rule, when hand-set that way
+  fanoutIndex?: number;                    // deadkey-fanout rows: 0-based position of the key's base in the stores
 }
 
 interface KeyCellAttribution {
@@ -40,7 +43,7 @@ interface KeyCellAttribution {
 }
 
 function attributeLayer(ir: KeyboardIR, layer: LayerCombo, vkeys: readonly string[]): KeyCellAttribution[];
-function listLayers(ir: KeyboardIR): LayerCombo[];          // wraps collectLayerCombosInUse
+function listLayers(ir: KeyboardIR): LayerCombo[];          // [] first, then collectLayerCombosInUse
 function listContexts(ir: KeyboardIR): Array<{ context: LayoutContext; keyCount: number }>;
 function isMnemonic(ir: KeyboardIR): boolean;
 ```
@@ -69,9 +72,11 @@ function simulateEach(
 ## Studio: verification
 
 `useLayoutAttribution(layer, context?)` reads `rulesDemoArtifactStore` (the D3 artifact), runs
-`attributeLayer`, then `simulateEach` with an empty seed (or the chosen "after …" context), and
-demotes any editable row whose simulated output differs from its own output to
-`later-group-change`. Fired-rule identity is checked through `firedRuleMapping`. While the
+`attributeLayer`, then `simulateEach` with an empty seed (or the chosen "after …" context), and calls the engine's
+pure `verifyCells(cells, steps, firedRuleIs?)` (`layout-attribution/verifyCells.ts`), which demotes
+any editable plain or row whose simulated output differs from its own output to
+`later-group-change`. The corpus harness calls the same function. Fired-rule identity is checked
+through `firedRuleMapping`, passed in as the optional `firedRuleIs` callback. While the
 artifact is not ready, every cell is `not-compiled` and the last good result is shown stale
 (FR-018).
 

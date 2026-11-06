@@ -70,6 +70,15 @@ export const CORPUS_SET: readonly CorpusSetEntry[] = [
   { id: "enggano", category: "mnemonic", why: "store(&MnemonicLayout) \"1\"" },
 ];
 
+/**
+ * Picks whose `&TARGETS` names no web target (`'desktop'`, `'windows'`), so
+ * kmcmplib emits a `.kmx` and no `.js` and the simulator has nothing to run.
+ * The studio's preview has the same gap, so these exercise the Layout tab's
+ * unverified path. Suites that simulate skip exactly these and assert the
+ * list still matches what the compile produces.
+ */
+export const NO_WEB_TARGET: ReadonlySet<string> = new Set(["sil_yoruba8", "korean_phonetic", "cs_pinyin"]);
+
 const dirCache = new Map<string, string | null>();
 
 /** Absolute path of `release/<vendor>/<id>/source/<id>.kmn`, or null when absent. */

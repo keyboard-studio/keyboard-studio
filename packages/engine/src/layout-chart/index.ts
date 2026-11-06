@@ -41,7 +41,17 @@ import { renderKeycapSvg, renderSvgDocument } from "./svg.js";
 import { layoutChartFilename } from "./filename.js";
 
 export { layoutChartFilename, LAYOUT_CHART_PREFIX, isLayoutChartFilename, layoutChartPlatformFromFilename, sanitizeLayerIdForFilename } from "./filename.js";
-export { DESKTOP_GEOMETRY, DESKTOP_GEOMETRY_WIDTH } from "./geometry.js";
+export {
+  DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_WIDTH,
+  DESKTOP_ISO_GEOMETRY,
+  DESKTOP_ISO_ROW_COUNT,
+  DESKTOP_ISO_ROW_SPACE,
+  FORM_ONLY_KEYS,
+  FORM_ROWS,
+  isFrameKey,
+} from "./geometry.js";
+export type { DesktopGeometryKey, DesktopIsoGeometryKey, KeyCell, LdmlForm } from "./geometry.js";
 export {
   classifyKeyLegibility,
   FALLBACK_FONT_STACK,

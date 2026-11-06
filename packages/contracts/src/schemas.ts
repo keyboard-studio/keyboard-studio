@@ -69,6 +69,8 @@ import type {
 } from "./decisionRecord";
 import { DECISION_RECORD_FORMAT, DECISION_SUMMARY_LIMIT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
+import type { KmnEditsValue } from "./kmnEdits";
+import type { LayoutOperation, LayoutOutput, ModifierToken } from "./layoutOps";
 import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
   StartDocumentationProfile,
@@ -975,6 +977,77 @@ export const IRRuleOwnershipSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// Layout-tab edits (spec 113, contracts/layout-ops.md) — layoutOps.ts and
+// kmnEdits.ts mirrors. The `kmn-edits` decision persists with the decision set,
+// so a value this build writes must be one it can read back.
+// ---------------------------------------------------------------------------
+
+export const ModifierTokenSchema = z.enum([
+  "SHIFT",
+  "CAPS",
+  "NCAPS",
+  "ALT",
+  "RALT",
+  "LALT",
+  "CTRL",
+  "RCTRL",
+  "LCTRL",
+]);
+
+const LayerComboSchema = z.array(ModifierTokenSchema);
+
+const LayoutContextElementSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("text"), text: z.string().min(1) }),
+  z.object({ kind: z.literal("deadkey"), deadkeyId: z.string().min(1) }),
+]);
+
+const LayoutNulSchema = z.object({ kind: z.literal("nul") });
+
+export const LayoutOutputSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("text"), text: z.string().min(1) }),
+  z.object({ kind: z.literal("deadkey"), deadkeyId: z.string().min(1) }),
+  LayoutNulSchema,
+]);
+
+const LayoutContextSchema = z.array(LayoutContextElementSchema);
+
+const LayoutBecomesSchema = z.union([z.array(LayoutContextElementSchema), LayoutNulSchema]);
+
+const layoutOpBase = {
+  seq: z.number().int().nonnegative(),
+  at: z.number(),
+  vkey: z.string().min(1),
+  layer: LayerComboSchema,
+};
+
+export const LayoutOperationSchema = z.discriminatedUnion("op", [
+  z.object({ ...layoutOpBase, op: z.literal("set-key"), output: LayoutOutputSchema }),
+  z.object({ ...layoutOpBase, op: z.literal("clear-key") }),
+  z.object({
+    ...layoutOpBase,
+    op: z.literal("set-row"),
+    context: LayoutContextSchema,
+    becomes: LayoutBecomesSchema,
+  }),
+  z.object({ ...layoutOpBase, op: z.literal("remove-row"), context: LayoutContextSchema }),
+  z.object({ ...layoutOpBase, op: z.literal("decline-case-partner"), partner: z.string().min(1) }),
+]);
+
+export const KmnEditsValueSchema = z
+  .object({ entries: z.array(LayoutOperationSchema) })
+  .superRefine((value, ctx) => {
+    for (let i = 1; i < value.entries.length; i++) {
+      if (value.entries[i]!.seq <= value.entries[i - 1]!.seq) {
+        ctx.addIssue({
+          code: "custom",
+          message: "kmn-edits entries MUST have strictly increasing seq (spec 113, contracts/layout-ops.md).",
+          path: ["entries", i, "seq"],
+        });
+      }
+    }
+  });
+
+// ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
 // Each canonical schema's inferred type must stay assignable to the locked
@@ -1200,3 +1273,18 @@ type _DocFixProposalsGuard = Expect<
   AssignableTo<z.infer<typeof DocFixProposalsSchema>, DocFixProposals>
 >;
 type _DocLintInputGuard = Expect<AssignableTo<z.infer<typeof DocLintInputSchema>, DocLintInput>>;
+// Layout-tab edits (spec 113). The forward guards pin every field; the `op` /
+// `kind` key-set guards catch a union member added to the type but not the
+// schema (structural assignability cannot see a schema that is narrower).
+type _ModifierTokenGuard = Expect<Equal<z.infer<typeof ModifierTokenSchema>, ModifierToken>>;
+type _LayoutOutputGuard = Expect<AssignableTo<z.infer<typeof LayoutOutputSchema>, LayoutOutput>>;
+type _LayoutOutputKindsGuard = Expect<
+  Equal<z.infer<typeof LayoutOutputSchema>["kind"], LayoutOutput["kind"]>
+>;
+type _LayoutOperationGuard = Expect<
+  AssignableTo<z.infer<typeof LayoutOperationSchema>, LayoutOperation>
+>;
+type _LayoutOperationOpsGuard = Expect<
+  Equal<z.infer<typeof LayoutOperationSchema>["op"], LayoutOperation["op"]>
+>;
+type _KmnEditsValueGuard = Expect<AssignableTo<z.infer<typeof KmnEditsValueSchema>, KmnEditsValue>>;

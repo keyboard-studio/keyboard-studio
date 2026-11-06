@@ -68,22 +68,15 @@
  * combo.
  */
 
-import type { KeyboardIR, IRRule, StoreItem } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRRule, ModifierToken, StoreItem } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ModifierToken =
-  | "SHIFT"
-  | "CAPS"
-  | "NCAPS"
-  | "ALT"
-  | "RALT"
-  | "LALT"
-  | "CTRL"
-  | "RCTRL"
-  | "LCTRL";
+// Defined in contracts (spec 113: `LayerCombo` is persisted in `kmn-edits`);
+// re-exported so existing engine imports keep working.
+export type { ModifierToken };
 
 /**
  * Canonical emission order (spec-confirmed, compiler-irrelevant but must be

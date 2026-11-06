@@ -21,7 +21,11 @@ type KmnEdit = LayoutOperation | CodeEdit | ReviewKept;   // CodeEdit, ReviewKep
  *  contracts is the dependency root and cannot import the engine. */
 type LayerCombo = readonly ModifierToken[];          // e.g. [], ["SHIFT"], ["RALT"], ["SHIFT","RALT"], ["NCAPS"]
 
-/** What a key or row produces — literal text, a deadkey, or nothing. */
+/** What a key or row produces — literal text, a deadkey, or nothing.
+ *  `deadkeyId` (research R2, T003): the inner token of the emitted `dk(...)`. A numeric id is
+ *  four-digit lowercase hex as `fmtDk` writes it ("0001", "3001"); a named id keeps its verbatim
+ *  spelling ("acute"). A name is never all-hex, so the forms cannot collide. Compare numeric ids
+ *  by `parseInt(s, 16)` and names by `deadkeyNameKey`. */
 type LayoutOutput =
   | { kind: "text"; text: string }                   // one or more characters (FR-020, Q4)
   | { kind: "deadkey"; deadkeyId: string }           // a spec 083 deadkey, by stable id
@@ -71,10 +75,16 @@ Rules the op inserts are stamped `authorEdit: "layout-tab"` (an optional `IRRule
 effect), then applies the rest in order with `applyLayoutOp` / `applyIRChanges`. It returns
 `{ ir, misses }`. The live path does not replay: it applies one entry and records its
 `KmnEditEffect`, and a live `clear-key` restores the context-free rules for its `(vkey, layer)`
-from the IR built without the cleared `set-key`s — tested equal to what replay produces.
+from the IR built without the cleared `set-key`s — tested equal to what replay produces. As built,
+`clearKeyLive(ir, op, startIr, earlier)` takes the starting-point IR and the earlier entries, so
+the live `commitKmnEdit` for a `clear-key` needs both. It rebuilds the slot from
+`replayKmnEdits(startIr, [...earlier, op])`, and its effect records only the delta, so
+`invertEffect` undoes it.
 
 **Refusals (throw, caller shows the reason):** the target rule is inside a `readonly` group or a
-`RawKmnFragment`; the keyboard is mnemonic; the deadkey id is unknown.
+`RawKmnFragment`; the keyboard is mnemonic; the deadkey id is unknown. As built, a refusal during
+`replayKmnEdits` propagates as a throw, and `misses` stays empty. Whether replay turns a refusal
+into a miss is settled in Phase 6 (US8), where misses first carry entries.
 
 **Idempotence and order:** replaying the same log on the same IR yields the same IR; later ops on
 the same `(vkey, layer[, context])` win.

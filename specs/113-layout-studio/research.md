@@ -85,6 +85,64 @@ owner 2026-11-05, who ruled the fix into this spec: Code-tab edits are imported 
 **Rationale.** Reuse the lifecycle where it owns the shape (FR-027); use the layout log only for
 shapes the lifecycle does not model.
 
+### Phase A checks (T003, T004)
+
+**`deadkeyId` form (T003).** The IR names a deadkey two ways: `{ kind: "deadkey"; id: number }`
+for hex `dk(...)` tokens and `{ kind: "namedDeadkey"; name: string }` for every other token
+(`codec/parse.ts` `parseDk` / `parseNamedDk`; the boundary is contracts' `isNamedDeadkeyName`:
+all-hex is numeric, anything else is a name). `listDeadkeys` reports the same split (`id: number |
+null`, `name?`). **Decision:** `deadkeyId` is the inner token of the `dk(...)` the emitter writes.
+A numeric id is written as `emit.ts` `fmtDk` writes it, lowercase hex padded to four digits
+(`dk(1)` → `"0001"`, a studio id → `"3001"`), and a named id keeps its verbatim spelling
+(`"acute"`). The two forms cannot collide because a name is never all-hex, so the string itself
+says which IR element it is. Identity: a numeric id compares by `parseInt(s, 16)` (so `"1"` and
+`"0001"` are the same deadkey), a name by contracts' `deadkeyNameKey` (ASCII case fold, the
+compiler's own identity). Both round-trip through parse and emit: numeric ids by value, names
+verbatim. Spec 083's numeric `DeadkeyOperation.id` converts with the same four-digit hex.
+
+**(a) Display character (→ T075): negative.** `define.accentChar` is written only as the output
+of the escape rule `dk(id) + [trigger] > 'accent'` (`deadkey-lifecycle/mutations.ts`
+`defineDeadkey`). It cannot serve as the display character FR-028 requires:
+- Nothing reads it back. `DeadkeyInfo` has no accent field, and `cluster.ts` `matchEscapeRule`
+  is engine-internal and returns a boolean.
+- The escape rule is an ordinary combination row. The author can change or remove it in the table,
+  and `retargetDeadkey` moves only the trigger rule, so the escape key can differ from the trigger.
+- Imported deadkeys often have no escape rule (`maltese` defines `dk(1)`–`dk(4)` with fan-out
+  rules only), and `matchEscapeRule` takes numeric ids only, so named deadkeys never have one.
+  FR-028 says every deadkey has a display character.
+
+T075 applies: a `set-display` lifecycle op. The trigger rule's `@deadkey:<hex>` trailing comment
+(`setDeadkeyName`, which already carries `name=`) is the natural carrier for a stored `display=`.
+When a deadkey has no stored display character, reads may fall back to the escape rule's output,
+but only when its key equals the trigger key.
+
+**(b) Modifier-layer triggers (→ T076): negative.** `defineDeadkey` and `retargetDeadkey` take
+`triggerKey: string` and write `{ kind: "vkey", name: triggerKey, modifiers: [] }`, so every
+trigger they make is on the default layer. Contracts' `matchTriggerRule` also drops modifiers:
+`DeadkeyInfo.triggerKey` is the bare vkey name. So `[RALT K_QUOTE]` and `[K_QUOTE]` read as the
+same trigger, and `triggerOccupant` reports a false `trigger-in-use` between them. T076 applies:
+the trigger needs modifiers end to end (option, rule, `DeadkeyInfo`, occupancy check), or the gap
+is recorded and new deadkeys stay on the default and Shift layers.
+
+**(c) Undo of `remove-pair` (→ T074): holds.** `withRemovedDeadkeyPair` splices at `index`, and
+`withAddedDeadkeyPair` pushes to the end of both stores. Undoing a removal with `add-pair` puts
+the pair last, so the emitted store order (and the `.kmn` text) differs from before the edit, even
+though the keyboard behaves the same when bases are unique. SC-003 compares the emitted text, so
+T074 applies: `insert-pair { id, index, base, accented }`.
+
+**Keyboards with no web target (found by T011).** Three corpus picks set `&TARGETS` to
+`'desktop'` or `'windows'` (`sil_yoruba8`, `korean_phonetic`, `cs_pinyin`). kmcmplib then emits a
+`.kmx` and no `.js`. The simulator runs only the `.js`, and the studio's preview takes the same
+path (`useKeyboardArtifact` uses an empty script URL when there is no `.js`). So on such a
+keyboard the verification pass has nothing to run, and every cell would stay unverified. Forcing
+`&TARGETS 'any'` is not a general fix: `cs_pinyin` then fails to compile ("Virtual keys are not
+valid for mnemonic layouts" and KeymanWeb's unsupported virtual character keys), while
+`korean_phonetic` compiles. **Open for the product owner before Phase 3 (US1):** either show these
+keyboards read-only with the reason "not checked: this keyboard has no web build", or verify
+against a preview-only compile with a web target when that compile succeeds. Until that is
+decided, the corpus suites list these three in `NO_WEB_TARGET` and skip simulation for exactly
+those, asserting the list still matches what the compile produces.
+
 ## R3. Deadkey tables are store-based — an exemption FR-013 needs
 
 **Finding.** The studio's own deadkeys are **fan-out stores**: `dk(x) + any(bases) >
