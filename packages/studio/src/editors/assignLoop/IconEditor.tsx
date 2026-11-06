@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import {
   decodeIco,
@@ -434,6 +435,26 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     });
   };
 
+  // Footer nav (spec 081, #2527): Back / Continue publish to the footer
+  // instead of rendering in the in-body bar. Test ids match the StudioShell
+  // mock, so the tracks test keeps finding icon-continue in the footer.
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.icon.back", message: "Back" }),
+            onClick: onBack,
+            testId: "icon-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "editor.assignLoop.icon.continue", message: "Continue" }),
+      onClick: handleContinue,
+      testId: "icon-continue",
+    },
+  });
+
   const toolLabel = (id: ToolId): string => {
     switch (id) {
       case "pen":
@@ -772,44 +793,6 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div style={{ display: "flex", marginTop: 8 }}>
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={{
-              padding: "10px 20px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: "1px solid var(--app-border)",
-              background: "var(--app-surface)",
-              color: "var(--app-text)",
-              cursor: "pointer",
-            }}
-          >
-            {t({ id: "editor.assignLoop.icon.back", message: "Back" })}
-          </button>
-        )}
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          onClick={handleContinue}
-          style={{
-            padding: "10px 24px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: "1px solid var(--app-accent)",
-            background: "var(--app-accent-bg)",
-            color: "var(--app-text)",
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          {t({ id: "editor.assignLoop.icon.continue", message: "Continue" })}
-        </button>
       </div>
     </div>
   );
