@@ -16,6 +16,7 @@ import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { useDecisionLogStore } from "../../decisions/decisionLogStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { collectFailing } from "../../criteria/openRatchet.ts";
+import { addToInventory } from "../../lib/openInventory.ts";
 import { offerUpgrades, type UpgradeOffer } from "../../criteria/upgradePairs.ts";
 import { loadCapsEngine } from "../../lib/capsEngine.ts";
 import { findKmnPath } from "../../lib/findKmnPath.ts";
@@ -100,6 +101,7 @@ export function UpgradesRenderer({ onChange }: DecisionRendererProps<boolean>) {
       return;
     }
     setError(null);
+    if (offer.inventoryAdditions !== undefined) addToInventory(offer.inventoryAdditions);
     recordSuggestionDisposition(fix, "accepted");
   };
 

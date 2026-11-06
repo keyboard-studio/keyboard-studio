@@ -25,20 +25,20 @@ Files: packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts (+ test), pa
 
 ### Tests
 
-- [ ] **T010** [P] [US1] Write failing tests for the raw-Ctrl predicate: Ctrl without Alt reported; Ctrl+Space skipped; `basic_*` skipped; ASCII digit matching the base digit skipped; rules in deadkey and context groups reported · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.test.ts
-- [ ] **T011** [P] [US1] Write failing tests for the fix on ewe: Ctrl rules removed by splice, characters added to the inventory unplaced once each, not offered when projection fails · packages/studio/src/criteria/rawCtrlUpgrade.test.ts, packages/studio/src/criteria/upgradePairs.test.ts
+- [x] **T010** [P] [US1] Write failing tests for the raw-Ctrl predicate: Ctrl without Alt reported; Ctrl+Space skipped; `basic_*` skipped; ASCII digit matching the base digit skipped; rules in deadkey and context groups reported · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.test.ts
+- [x] **T011** [P] [US1] Write failing tests for the fix on ewe: Ctrl rules removed by splice, characters added to the inventory unplaced once each, not offered when projection fails · packages/studio/src/criteria/rawCtrlUpgrade.test.ts, packages/studio/src/criteria/upgradePairs.test.ts
 
 ### Implementation
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T012** [P] [US1] Implement the raw-Ctrl check and its finding wording (FR-001), replacing the stub, then list `KM_LINT_RAW_CTRL` in the implemented checks and gate coverage · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts, packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts
-- [ ] **T013** [P] [US1] Implement the fix: parse to IR, drop matching rules, `projectKmnText` back, and return the uncovered characters as the offer's inventory additions (FR-002). Per lead ruling 4: split each removed output with `charactersOf` (`lib/openInventory.ts`), skip characters still typed by a remaining `.kmn` rule, leave touch layouts unchanged, and list each removed rule's full output (with names for invisible characters) and a touch-layer note in the preview · packages/studio/src/criteria/rawCtrlUpgrade.ts
-- [ ] **T015** [P] [US1] Extend `UpgradeOffer` with optional inventory additions, and make the Upgrades step's accept path record them the way the Letters step's Add does (`lib/openInventory.ts`), so they survive the starting-point replay (Article III: state in plan.md how the addition maps to the decision set) · packages/studio/src/criteria/upgradePairs.ts, packages/studio/src/survey/openWalk/UpgradesStep.tsx
+- [x] **T012** [P] [US1] Implement the raw-Ctrl check and its finding wording (FR-001), replacing the stub, then list `KM_LINT_RAW_CTRL` in the implemented checks and gate coverage · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts, packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts
+- [x] **T013** [P] [US1] Implement the fix: parse to IR, drop matching rules, `projectKmnText` back, and return the uncovered characters as the offer's inventory additions (FR-002). Per lead ruling 4: split each removed output with `charactersOf` (`lib/openInventory.ts`), skip characters still typed by a remaining `.kmn` rule, leave touch layouts unchanged, and list each removed rule's full output (with names for invisible characters) and a touch-layer note in the preview · packages/studio/src/criteria/rawCtrlUpgrade.ts
+- [x] **T015** [P] [US1] Extend `UpgradeOffer` with optional inventory additions, and make the Upgrades step's accept path record them the way the Letters step's Add does (`lib/openInventory.ts`), so they survive the starting-point replay (Article III: state in plan.md how the addition maps to the decision set) · packages/studio/src/criteria/upgradePairs.ts, packages/studio/src/survey/openWalk/UpgradesStep.tsx
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T014** [US1] Register the `KM_LINT_RAW_CTRL` pair `{ lintRuleId, build }` with fix id `upgrade:KM_LINT_RAW_CTRL:<file>` · packages/studio/src/criteria/upgradePairs.ts
+- [x] **T014** [US1] Register the `KM_LINT_RAW_CTRL` pair `{ lintRuleId, build }` with fix id `upgrade:KM_LINT_RAW_CTRL:<file>` · packages/studio/src/criteria/upgradePairs.ts
 
 **Checkpoint**: on ewe the criterion reports, accepting the fix passes it, and each vowel sits once in the inventory (SC-002). sil_bunong reports nothing.
 

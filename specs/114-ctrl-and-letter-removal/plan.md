@@ -46,3 +46,7 @@ No violations; no Complexity Tracking.
 5. **Stubs** (FR-005, FR-007): criteria rows only, marked awaiting the owner.
 
 The spec's open questions are decided in research.md.
+
+## Article III mapping: inventory additions from the raw-Ctrl fix
+
+The fix's accept path writes the new `.kmn` through `replaceStartingPointAndReplay`, then records the returned characters with `addToInventory`, the same call the Letters step's Add uses. That writes `confirmedInventory` on the survey session record (phase B), which is outside the decision set the starting-point replay rebuilds, so the additions survive the replay. They are inventory entries with no key: the Mechanisms step places them.

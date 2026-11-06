@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -57,5 +57,32 @@ describe("&CasedKeys upgrade on the upstream basic_kbdus fixture (SC-007)", () =
     // that replace each NCAPS/CAPS quartet.
     for (const l of added) expect(l).toMatch(/CasedKeys|&VERSION|&version|^\+ \[(SHIFT )?K_[A-Z]\] > U\+/i);
     expect(removed.length).toBeGreaterThan(0);
+  });
+});
+
+describe("raw-Ctrl pair (spec 114)", () => {
+  const EWE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../keyboards/release/e/ewe/source/ewe.kmn");
+
+  it("registers KM_LINT_RAW_CTRL", () => {
+    expect(upgradePairFor("KM_LINT_RAW_CTRL")).toBeDefined();
+  });
+
+  it.skipIf(!existsSync(EWE))("offers the fix on ewe with inventory additions, via the registry", async () => {
+    const ewe = readFileSync(EWE, "utf8");
+    const [offer] = await offerUpgrades(["KM_LINT_RAW_CTRL"], {
+      file: "source/ewe.kmn",
+      kmnText: ewe,
+      keyboardId: "ewe",
+      caps,
+      readText: (p) => (p === "source/ewe.kmn" ? ewe : undefined),
+      paths: ["source/ewe.kmn"],
+    });
+    expect(offer).toBeDefined();
+    expect(offer!.fix.id).toBe("upgrade:KM_LINT_RAW_CTRL:source/ewe.kmn");
+    expect(offer!.inventoryAdditions?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("offers nothing when the rule is not failing", async () => {
+    expect(await offerUpgrades([], input)).toEqual([]);
   });
 });

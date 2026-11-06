@@ -77,6 +77,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T09:05:27.460Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:11:23.715Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:11:52.169Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:01.747Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:44.029Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:44.225Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T09:13:44.408Z"
     }
   ],
   "decisions": [
@@ -89,6 +137,11 @@
       "decision": "Report raw Ctrl in any group; warn once per char per session",
       "why": "collision is group-independent; removal is the author's call",
       "rejected": "main group only; repeat warnings"
+    },
+    {
+      "decision": "moved UpgradeInput/UpgradeOffer to upgradeTypes.ts",
+      "why": "depcruise no-circular between upgradePairs and rawCtrlUpgrade",
+      "rejected": "inline import in fixer"
     }
   ],
   "step_summaries": {
@@ -170,7 +223,7 @@
       ]
     }
   },
-  "currentTask": "T002",
+  "currentTask": "T014",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -187,6 +240,53 @@
         "packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts",
         "packages/keyboard-lint/src/criteriaChecks.ts",
         "packages/keyboard-lint/src/index.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Raw-Ctrl predicate tests",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Raw-Ctrl check implemented, listed in implementedChecks and gateCoverage",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts",
+        "packages/keyboard-lint/src/index.ts",
+        "packages/studio/src/criteria/implementedChecks.ts",
+        "packages/studio/src/test/gateCoverage.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Failing tests for raw-Ctrl fix on ewe and registry",
+      "files": [
+        "packages/studio/src/criteria/rawCtrlUpgrade.test.ts",
+        "packages/studio/src/criteria/upgradePairs.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Raw-Ctrl fix (IR drop, projectKmnText, inventory additions, preview)",
+      "files": [
+        "packages/studio/src/criteria/rawCtrlUpgrade.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "UpgradeOffer.inventoryAdditions and accept path addToInventory",
+      "files": [
+        "packages/studio/src/criteria/upgradePairs.ts",
+        "packages/studio/src/survey/openWalk/UpgradesStep.tsx"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Registered KM_LINT_RAW_CTRL pair",
+      "files": [
+        "packages/studio/src/criteria/upgradePairs.ts"
       ]
     }
   },
@@ -206,6 +306,12 @@
       "exitCode": 0,
       "durationSeconds": 40.7,
       "result": "Reparsing as ES module because module syntax was detected. This incurs a performance overhead. · To eliminate this warning, add \"type\": \"module\" to C:\\Github\\keyboard-studio-114\\package.json. · (Use `node --trace-warnings ...` to show where the warning was created)"
+    },
+    {
+      "what": "phase 3 gates",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint",
+      "result": "all green (studio 11408 pass)"
     }
-  ]
+  ],
+  "last_action": "phase 3 (US1) done"
 }
