@@ -580,15 +580,22 @@ export function OutputScreen() {
               aria-label={downloadAriaLabel}
               style={{
                 alignSelf: "flex-start",
-                padding: "6px 14px",
-                background: "transparent",
-                color: zipActionable ? "var(--app-text-subtle)" : "var(--app-text-disabled)",
-                border: "1px solid var(--app-border)",
+                // Secondary tier: .kmp's size and weight, outlined not filled.
+                // Accent border (3:1, 1.4.11) + accent text (4.5:1, 1.4.3) on
+                // --app-surface clear AA in both themes; the LDML export
+                // stays the quieter tertiary tier.
+                marginTop: 4,
+                padding: "9px 18px",
+                background: "var(--app-surface)",
+                color: zipActionable ? "var(--app-accent-text)" : "var(--app-text-disabled)",
+                border: `1px solid ${zipActionable ? "var(--app-accent)" : "var(--app-border)"}`,
                 borderRadius: 6,
-                fontSize: 12,
+                fontSize: 14,
+                fontWeight: 600,
                 cursor: zipActionable ? "pointer" : "not-allowed",
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-                transition: "background 0.15s",
+                // NOT transitioned: color/border flip with the same
+                // zipActionable change as the .kmp button above (#1477).
               }}
             >
               {downloading ? (

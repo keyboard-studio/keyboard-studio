@@ -150,6 +150,19 @@ afterEach(() => {
 });
 
 describe("OutputScreen — .kmp is the primary download", () => {
+  it("styles the source .zip as an outlined secondary peer of the .kmp", () => {
+    renderReady();
+    const kmp = screen.getByTestId("emit-download-kmp");
+    const zip = screen.getByTestId("emit-download");
+    expect(zip.style.padding).toBe(kmp.style.padding);
+    expect(zip.style.fontSize).toBe("14px");
+    expect(zip.style.fontWeight).toBe("600");
+    // Outlined, not filled: the .kmp keeps the accent fill.
+    expect(kmp.style.background).toContain("--app-accent)");
+    expect(zip.style.background).toContain("--app-surface");
+    expect(zip.style.borderColor || zip.style.border).toContain("--app-accent");
+  });
+
   it("offers the .kmp above the source .zip, and says how to install it", () => {
     renderReady();
 
