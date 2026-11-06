@@ -47,6 +47,7 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
+import type { LintContext } from "@keymanapp/keyboard-lint";
 
 import {
   applyInventoryOutcome,
@@ -98,6 +99,15 @@ export interface CriteriaFindings {
   /** The judged artifact's VFS (null until the stage is ready). */
   vfs: VirtualFS | null;
   /**
+   * The assembled lint context for the judged VFS (null until the run is
+   * current): the parsed keyboard IR, the .kps text and declared language
+   * tags, and the rest of CriteriaLintInput. The authored criteria
+   * assembly reads it to build the reviewer-source facts (names,
+   * language tags, document excerpts) the /review report already shows
+   * — same VFS, same context, same lines.
+   */
+  lintCtx: LintContext | null;
+  /**
    * The stage's compile result (Batch 1: the §§7.6/7.21 severity
    * mapping reads it via CriteriaInput.compileResult). Null until the
    * stage is ready — the resolver never sees a compile result for an
@@ -131,6 +141,8 @@ interface EngineRun {
    * is instantiated. */
   judgedVfs: VirtualFS;
   judgedKeyboardId: string;
+  /** The assembled lint context for the judged VFS, inventory folded in. */
+  lintCtx: LintContext;
   findings: LintFinding[];
   verifiedByCode: Map<string, string[]>;
   contextMissing: Record<string, string>;
@@ -340,6 +352,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
             forStageVfs: stageVfs,
             judgedVfs: vfs,
             judgedKeyboardId: keyboardId,
+            lintCtx: ctx,
             findings: engine.findings,
             verifiedByCode: engine.verifiedByCode,
             contextMissing,
@@ -354,6 +367,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
             forStageVfs: stageVfs,
             judgedVfs: vfs,
             judgedKeyboardId: keyboardId,
+            lintCtx: ctx,
             findings: [],
             verifiedByCode: new Map(),
             contextMissing,
@@ -398,6 +412,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     ready: readyStage !== null && runIsCurrent,
     keyboardId: runIsCurrent ? engineRun.judgedKeyboardId : null,
     vfs: runIsCurrent ? engineRun.judgedVfs : null,
+    lintCtx: runIsCurrent ? engineRun.lintCtx : null,
     compileResult: readyStage?.compileResult ?? null,
     assemblyVerdicts,
     instantiationMode: startKeyboard !== null ? instantiationMode : null,

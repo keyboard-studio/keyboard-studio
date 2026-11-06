@@ -252,9 +252,14 @@ export interface CriteriaInput {
    */
   licenseTextHints?: readonly string[];
   /**
-   * /review host only: source facts the yellow/red rows show the reviewer
-   * side by side (names, language tags, excerpts, PR scope). Text for
-   * evidence only; it never decides a status.
+   * Source facts the yellow/red rows show the reviewer side by side
+   * (names, language tags, excerpts, PR scope). Text for evidence only;
+   * it never decides a status — except the two positive copyright /
+   * history facts resolveCriteria derives from it (4.2, 4.8), which
+   * apply in both modes. The foreign judge builds it from the snapshot
+   * VFS; the authored assembly builds it from the judged output VFS.
+   * The PR-only halves (scope note, comment counts) are present only
+   * when a review context exists.
    */
   reviewerSource?: ReviewerSource;
   /**
@@ -336,9 +341,11 @@ export interface CriteriaResult {
   /** Rows with a definite verdict: met + not-met + not-applicable. */
   resolvedCount: number;
   /**
-   * /review only: the judged keyboard's file-inventory tree (required
-   * files with placement status, optionals, others). Set by the foreign
-   * judge; absent in authored mode.
+   * The judged keyboard's file-inventory tree (required files with
+   * placement status, optionals, others). Set by the foreign judge and
+   * by the authored assembly, both from the judged VFS; absent only
+   * when the host never built one. CriteriaPage renders it above the
+   * list when the host passes it through.
    */
   fileTree?: import("../review/fileTree.ts").FileTreeNode[];
   /**

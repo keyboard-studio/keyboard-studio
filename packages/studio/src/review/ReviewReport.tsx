@@ -3,14 +3,18 @@
 // Wraps the shared CriteriaPage in foreign mode (no record callbacks: every
 // foreign row carries controls: null) with the review chrome around it:
 // the pinned-snapshot header, the foreign-mode honesty banner, skipped-file
-// notes, and the read-only actions. Nothing here can stage, adapt, or submit
-// the keyboard — this screen imports no authoring store.
+// notes, and the read-only actions. The severity filter and the file
+// inventory live in CriteriaPage itself (shared with the authored
+// Criteria page); this host only supplies the foreign severity map and
+// the tree. Nothing here can stage, adapt, or submit the keyboard —
+// this screen imports no authoring store.
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
+import { ReportBanner } from "../criteria/ReportBanner.tsx";
 import {
   ACCENT,
   BG_CARD,
@@ -31,12 +35,6 @@ import {
   severityForReviewRow,
   type ReviewSeverity,
 } from "./reviewSeverity.ts";
-import { FileTree } from "./FileTree.tsx";
-import {
-  ERROR_TEXT,
-  SUCCESS_ACCENT,
-  WARNING,
-} from "../ui/theme.ts";
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -136,39 +134,18 @@ export function ReviewReport({
 
   // Classify rows into Met / Warning / Error; hide scaffolder-bake rows
   // (their twins carry the post-hoc check) and not-applicable rows.
-  const [severityFilter, setSeverityFilter] = useState<
-    "all" | "met" | "warning" | "error"
-  >("all");
-  const { displayResult, severityCounts, severityMap } = useMemo(() => {
+  // The filter itself lives in CriteriaPage; this host only builds the
+  // map over the full result.
+  const severityMap = useMemo(() => {
     const severities = new Map<string, ReviewSeverity>();
-    const kept = result.rows.filter((r) => {
-      const s = severityForReviewRow(r);
-      severities.set(r.criterion.id, s);
-      return s !== "hidden";
-    });
-    const counts = { met: 0, warning: 0, error: 0 };
-    for (const r of kept) {
-      const s = severities.get(r.criterion.id);
-      if (s === "met") counts.met++;
-      else if (s === "warning") counts.warning++;
-      else if (s === "error") counts.error++;
+    for (const r of result.rows) {
+      severities.set(r.criterion.id, severityForReviewRow(r));
     }
-    // Apply the severity filter for display.
-    const filtered =
-      severityFilter === "all"
-        ? kept
-        : kept.filter(
-            (r) => severities.get(r.criterion.id) === severityFilter,
-          );
-    return {
-      displayResult: { ...result, rows: filtered, total: filtered.length },
-      severityCounts: counts,
-      severityMap: Object.fromEntries(severities),
-    };
-  }, [result, severityFilter]);
+    return Object.fromEntries(severities);
+  }, [result]);
 
   const resultWithAuthor = useMemo(() => {
-    if (!authorInfo) return displayResult;
+    if (!authorInfo) return result;
     const authorLine = authorInfo.isFirstPr
       ? t({
           id: "review.report.authorFirstPr",
@@ -179,8 +156,8 @@ export function ReviewReport({
           message: `Author @${authorInfo.login}: ${authorInfo.prCount} PRs to this repo (not a first-time contributor).`,
         });
     return {
-      ...displayResult,
-      rows: displayResult.rows.map((row) =>
+      ...result,
+      rows: result.rows.map((row) =>
         row.criterion.id === NEW_AUTHOR_CRITERION_ID
           ? {
               ...row,
@@ -192,7 +169,7 @@ export function ReviewReport({
           : row,
       ),
     };
-  }, [displayResult, authorInfo, t]);
+  }, [result, authorInfo, t]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
@@ -213,99 +190,19 @@ export function ReviewReport({
         <Trans id="review.report.backToPicker">← Pick another keyboard</Trans>
       </button>
 
-      <div
-        style={{
-          background: "var(--sil-blue-dark)",
-          color: "var(--sil-white)",
-          borderRadius: 12,
-          padding: "14px 18px",
-        }}
-      >
-        <div style={{ fontFamily: CSS_FONT_MONO, fontSize: 12, opacity: 0.75 }}>
-          kbstudio.langtech.cloud/review
-        </div>
-        <h1 style={{ margin: "6px 0 4px", fontSize: 20 }}>
-          <Trans id="review.report.heading">Health report:</Trans>{" "}
-          <span style={{ fontFamily: CSS_FONT_MONO }}>{target.keyboardId}</span>
-        </h1>
-        <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>
-          {t({
-            id: "review.report.judgedMeta",
-            message: `${reviewTargetLabel(target)} · judged ${new Date(judgedAt).toLocaleString()} · ${result.total} criteria`,
-          })}
-        </p>
-      </div>
-
-      <div
-        role="group"
-        aria-label={t({ id: "review.report.severityFilter", message: "Filter results by severity" })}
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        {(
-          [
-            {
-              key: "all",
-              label: t({ id: "review.report.filterAll", message: "All" }),
-              color: "var(--app-text)",
-            },
-            {
-              key: "met",
-              label: t({
-                id: "review.report.filterMet",
-                message: `✓ ${severityCounts.met} met`,
-              }),
-              color: SUCCESS_ACCENT,
-            },
-            {
-              key: "warning",
-              label: t({
-                id: "review.report.filterWarnings",
-                message: `⚠ ${severityCounts.warning} warnings`,
-              }),
-              color: WARNING,
-            },
-            {
-              key: "error",
-              label: t({
-                id: "review.report.filterErrors",
-                message: `✖ ${severityCounts.error} errors`,
-              }),
-              color: ERROR_TEXT,
-            },
-          ] as const
-        ).map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setSeverityFilter(f.key)}
-            aria-pressed={severityFilter === f.key}
-            style={{
-              background:
-                severityFilter === f.key ? BG_INSET : BG_CARD,
-              color: f.color,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 8,
-              padding: "8px 14px",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: severityFilter === f.key ? 700 : 600,
-              fontFamily: FONT,
-              outline:
-                severityFilter === f.key
-                  ? `2px solid ${f.color}`
-                  : undefined,
-              outlineOffset: 1,
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <ReportBanner
+        eyebrow="kbstudio.langtech.cloud/review"
+        title={
+          <>
+            <Trans id="review.report.heading">Health report:</Trans>{" "}
+            <span style={{ fontFamily: CSS_FONT_MONO }}>{target.keyboardId}</span>
+          </>
+        }
+        meta={t({
+          id: "review.report.judgedMeta",
+          message: `${reviewTargetLabel(target)} · judged ${new Date(judgedAt).toLocaleString()} · ${result.total} criteria`,
+        })}
+      />
 
       <div
         role="note"
@@ -414,7 +311,6 @@ export function ReviewReport({
       </div>
 
       <div style={{ minHeight: 0, flex: 1 }}>
-        {result.fileTree !== undefined && <FileTree tree={result.fileTree} />}
         <CriteriaPage
           result={resultWithAuthor}
           mode="foreign"
@@ -422,6 +318,9 @@ export function ReviewReport({
           judgedNote={judgedNote}
           githubLink={{ owner: target.owner, repo: target.repo, sha: target.sha, path: target.path }}
           severityMap={severityMap}
+          {...(result.fileTree !== undefined
+            ? { fileTree: result.fileTree }
+            : {})}
         />
       </div>
     </div>

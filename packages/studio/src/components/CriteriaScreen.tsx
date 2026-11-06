@@ -12,7 +12,17 @@
 // result to show: a partially judged page would state verdicts the lint
 // run has not produced. The screen renders a stated not-ready notice
 // instead — absence as a statement, never false verdicts.
+//
+// The page is the /review report's sibling, not a plainer cousin: the
+// same banner card (adapted copy), the same file inventory, and the
+// same severity filter with the authored severity map — scaffolder-bake
+// rows classify as met (they are the guarantee here, not a twin's
+// shadow) and not-applicable rows have no bucket (shown under "All").
+// The attestation / confirmation controls stay authored-only, and the
+// GitHub file links stay /review-only: the author's files are not on
+// GitHub at a pinned sha.
 
+import { useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
@@ -29,6 +39,10 @@ import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
 import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
 import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
 import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
+import {
+  severityForAuthoredRow,
+  type AuthoredSeverity,
+} from "../review/reviewSeverity.ts";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { isOpenMode } from "../lib/openMode.ts";
@@ -93,6 +107,18 @@ export function CriteriaScreen() {
   const attestFontLicense = useCriteriaRecordStore((s) => s.attestFontLicense);
   const clearFontLicense = useCriteriaRecordStore((s) => s.clearFontLicense);
 
+  // The authored severity map: met / warning / error per row, with
+  // not-applicable rows left unmapped (shown under "All" only).
+  const severityMap = useMemo(() => {
+    if (result === null) return undefined;
+    const map: Record<string, AuthoredSeverity> = {};
+    for (const row of result.rows) {
+      const severity = severityForAuthoredRow(row);
+      if (severity !== undefined) map[row.criterion.id] = severity;
+    }
+    return map;
+  }, [result]);
+
   if (result === null) {
     return (
       <div style={containerStyle} data-testid="criteria-screen-not-ready">
@@ -116,8 +142,17 @@ export function CriteriaScreen() {
     );
   }
 
-  const keyboardLabel =
+  // Named `keyboard` deliberately: the banner reuses the
+  // criteria.keyboard message, and the macro `t` names the placeholder
+  // after the interpolated variable — CriteriaPage's call site
+  // interpolates `keyboard`, so this must too, or extraction fails on
+  // two different defaults for one id.
+  const keyboard =
     artifact.stage.kind === "ready" ? artifact.stage.keyboardId : undefined;
+  const judgedNote = t({
+    id: "criteria.judgedNote.authored",
+    message: "Judging the keyboard as it would be downloaded from Output.",
+  });
 
   // "Add character" fixes for expected characters the keyboard cannot type
   // (criterion 18.6 on Open, FR-018a): one per finding, routed to the
@@ -139,11 +174,19 @@ export function CriteriaScreen() {
     <CriteriaPage
       result={result}
       mode="authored"
-      {...(keyboardLabel !== undefined ? { keyboardLabel } : {})}
-      judgedNote={t({
-        id: "criteria.judgedNote.authored",
-        message: "Judging the keyboard as it would be downloaded from Output.",
-      })}
+      {...(keyboard !== undefined ? { keyboardLabel: keyboard } : {})}
+      banner={{
+        eyebrow: t({ id: "nav.wordmark", message: "Keyboard Studio" }),
+        title: <Trans id="criteria.title">Criteria</Trans>,
+        meta:
+          keyboard !== undefined
+            ? `${t({ id: "criteria.keyboard", message: `Keyboard: ${keyboard}` })} · ${judgedNote}`
+            : judgedNote,
+      }}
+      {...(severityMap !== undefined ? { severityMap } : {})}
+      {...(result.fileTree !== undefined
+        ? { fileTree: result.fileTree }
+        : {})}
       onAttest={attest}
       onClearAttestation={clearAttestation}
       onConfirm={confirm}
