@@ -4,23 +4,23 @@
 
 ## Summary
 
-Add a raw-Ctrl criterion (keyboard-lint check, `criteria.json` row) and a sided-Ctrl advisory, pair the raw-Ctrl criterion with an upgrade that splices the Ctrl rules out and returns their characters to the inventory unplaced, stop the galleries and touch editor from offering Ctrl planes or layers, and show a dismissable needed-letter warning on every removal path. FR-005 and FR-007 are stubbed only (criteria rows, no fixer) until the owner rules.
+Add a raw-Ctrl criterion (keyboard-lint check, `criteria.json` row) and a sided-Ctrl advisory, pair the raw-Ctrl criterion with an upgrade that splices the Ctrl rules out and returns their characters to the inventory unplaced, stop the galleries and touch editor from offering Ctrl planes or layers, and show a dismissable needed-letter warning on every removal path. FR-005 and FR-007 get no rows and no code until the owner rules.
 
-The work follows the existing seams: a check under `packages/keyboard-lint/src/checks/criteria/`, a pair in `packages/studio/src/criteria/upgradePairs.ts`, the needed set from `packages/studio/src/lib/carveNeededSet.ts`.
+The work follows the existing seams: a check under `packages/keyboard-lint/src/checks/criteria/`, a pair in `packages/studio/src/criteria/upgradePairs.ts`, the per-language needed-letter map from the per-tag exemplar data in `packages/studio/src/lib/openExpectedInventory.ts`.
 
 ## Project Structure
 
 ```text
-packages/contracts/data/criteria.json                     + 2 rows (raw Ctrl, sided Ctrl advisory); 2 stub rows (FR-005, FR-007)
+packages/contracts/data/criteria.json                     + 2 rows (raw Ctrl, sided Ctrl advisory)
 packages/keyboard-lint/src/checks/criteria/
-  check-raw-ctrl.ts (+ test)                              FR-001; also emits the FR-004 advisory
+  check-raw-ctrl.ts (+ test)                              FR-001 (the FR-004 advisory is its own check, check-sided-ctrl-advisory.ts)
 packages/studio/src/criteria/
   implementedChecks.ts, upgradePairs.ts                   register check and the FR-002 pair
   rawCtrlUpgrade.ts (+ test)                              IR edit, projectKmnText splice, inventory return
 packages/studio/src/test/gateCoverage.ts                  coverage rows for the new rule ids
 packages/studio/src/editors/assignLoop/                   MechanismGallery, TouchGallery, touchBuilder: no Ctrl plane/layer (FR-003)
 packages/studio/src/lib/irToCarveNodes.ts                 carve removal covers CTRL planes (FR-003, check only)
-packages/studio/src/lib/removalWarning.ts (+ hook/UI)     FR-006, built on carveNeededSet / useCarveNeededSet
+packages/studio/src/lib/removalWarning.ts (+ hook/UI)     FR-006, built on the per-tag exemplar data in openExpectedInventory.ts
 ```
 
 **Structure Decision**: no new package. The splice and warning UI stay in `studio` where the upgrade registry and galleries already live; the check is Layer C in `keyboard-lint`.

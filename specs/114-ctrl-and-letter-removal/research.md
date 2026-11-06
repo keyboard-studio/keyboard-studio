@@ -13,7 +13,7 @@
 **Decision**: warn once per character per session; a character the author already dismissed is not warned again. **Rationale**: the removal is the author's call (Art. X); repeating is noise.
 
 ## Needed-letter lookup
-**Decision**: reuse `resolveCarveNeededSet` / `useCarveNeededSet` for the CLDR/SLDR exemplar union and add a per-language map over the same data. Normalise to NFC both sides. **Rationale**: the spec says no new lookup.
+**Decision** *(revised 2026-11-06 after /speckit-analyze)*: build the per-language map (character to languages) from each listed language's main exemplar set, using the per-tag data in `openExpectedInventory.ts` (`standardExemplarChars`), shared by Copy and Open. Normalise to NFC both sides. **Rationale**: `resolveCarveNeededSet` / `useCarveNeededSet` covers one language and also unions tiered marks and the confirmed inventory, so it would warn on characters no listed language needs (fails SC-006) and miss the other listed languages.
 
 ## Fix shape
 **Decision**: parse to IR, drop the matching rules, `projectKmnText` back, add uncovered characters to the inventory as unplaced. Same pattern as `buildCasedKeysOffer`. Not offered when the projection fails.

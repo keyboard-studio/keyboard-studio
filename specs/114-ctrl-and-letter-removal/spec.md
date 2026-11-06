@@ -81,7 +81,7 @@ On both paths, removing a character that a listed language needs shows a warning
 
 `LCTRL` and `RCTRL` rules are allowed. Review shows an advisory that an Alt-based placement is preferred.
 
-**Independent Test**: a keyboard with an `RCTRL` rule shows the advisory and no failing finding.
+**Independent Test**: a keyboard with an `RCTRL` rule shows the advisory as a warning, and neither path's gate stops on it.
 
 ---
 
@@ -98,7 +98,8 @@ Also proposed: a touch upgrade renaming the 11 `basic_*` touch `ctrl` / `shift-c
 - A Ctrl rule on an ASCII digit that types the same digit the base keyboard would is not content on Ctrl; it is not reported (a likely false positive in the census).
 - esperanto_sava_eujao is a likely false positive in the census; planning checks it against the final rule.
 - A keyboard with both raw Ctrl and `CTRL ALT` rules: User Story 1 reports only the raw Ctrl ones.
-- Open for planning, not yet ruled: whether a raw Ctrl rule outside the main key group (a deadkey or context group) is reported, and whether the removal warning repeats for a character the author already chose to remove.
+- *(Ruled 2026-11-06)* A raw Ctrl rule outside the main key group (a deadkey or context group) is reported too. The removal warning shows once per character per session.
+- Open for planning: whether a "character" returned to the inventory by FR-002 is a code point or the rule's whole output (ewe's Ctrl rules type multi-code-point strings such as a combining mark plus a letter), and what happens to touch keys on a Ctrl layer whose only rules FR-002 removes.
 
 ## Requirements *(mandatory)*
 
@@ -106,12 +107,41 @@ Also proposed: a touch upgrade renaming the 11 `basic_*` touch `ctrl` / `shift-c
 
 - **FR-001** *(was spec 111 FR-035)*: Outside `basic_*` keyboards, a rule on unsided `CTRL` (without Alt) on a letter, number or punctuation key MUST be reported, recommending that it move off Ctrl and warning that the keyboard may not be accepted if it stays. Ctrl+Space (special spaces) is not reported. `basic_*` keyboards keep their Ctrl content and are never reported.
 - **FR-002** *(was FR-036)*: The fix MUST remove those Ctrl rules (a text splice) and return each character they typed to the inventory as unplaced, so the Mechanisms gallery, which follows Upgrades in the Open walk, is where the author gives it a new key. A character also typed elsewhere is not re-added.
-- **FR-003** *(was FR-037)*: On Copy, and in the Open galleries, no new content MAY be placed on a Ctrl layer, and no Ctrl layer MAY be added (physical or touch) where the keyboard has none. Existing Ctrl content on a copied `basic_*` keyboard is kept, unless the characters it types are carved: carving a character removes its Ctrl rules with its other rules.
-- **FR-004** *(was FR-038)*: `LCTRL` / `RCTRL` are allowed, with an advisory that an Alt-based placement is preferred.
-- **FR-005** *(was FR-039; proposed, awaiting the owner)*: Unsided `CTRL ALT` is AltGr in practice, so it is not raw Ctrl. It is offered an upgrade to `RALT` that converts every unsided Alt/Ctrl rule in the keyboard (mixing sided and unsided modifiers is not allowed), withheld unless a before/after simulation shows every AltGr key types the same.
+- **FR-003** *(was FR-037; scope ruled 2026-11-06)*: On Copy, and in the Open galleries, no new content MAY be placed on raw Ctrl (unsided `CTRL` without Alt), and no raw Ctrl layer MAY be added (physical or touch) where the keyboard has none. AltGr stays on offer and is written as `RALT`, never as `CTRL ALT`. Sided `LCTRL` / `RCTRL` stay on offer, with FR-004's advisory. Existing Ctrl content on a copied `basic_*` keyboard is kept, unless the characters it types are carved: carving a character removes its Ctrl rules with its other rules.
+- **FR-004** *(was FR-038; mechanism ruled 2026-11-06)*: `LCTRL` / `RCTRL` are allowed, with an advisory that an Alt-based placement is preferred. The advisory is a criterion whose findings have `warning` severity: Review shows it as a warning, and it never blocks (no review note is needed on Open, and the Copy gate does not stop on it). This needs no contracts change; the criteria resolver and the Open submit gate learn to treat a criterion whose findings are all warnings as non-blocking.
+- **FR-005** *(was FR-039; proposed, awaiting the owner; crew recommends deferring, see below)*: Unsided `CTRL ALT` is AltGr in practice, so it is not raw Ctrl. It is offered an upgrade to `RALT` that converts every unsided Alt/Ctrl rule in the keyboard (mixing sided and unsided modifiers is not allowed), withheld unless a before/after simulation shows every AltGr key types the same.
 - **FR-006** *(was FR-040)*: On both paths, removing a character that a listed language needs (its main CLDR/SLDR exemplar set; carve on Copy, the Remove tool and gallery deletions on Open) MUST show a warning naming the language or languages that need it. The warning is dismissable: the author can keep the removal. Composed and decomposed forms count as the same character.
-- **FR-007** *(was task T075; proposed, awaiting the owner)*: The 11 `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content MAY be offered a rename to `rightalt` / `rightalt-shift` (basic_kbdth0's to `leftctrl`), with their `nextlayer` references updated.
+- **FR-007** *(was task T075; proposed, awaiting the owner; crew recommends a verification first, see below)*: The `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content MAY be offered a rename to `rightalt` / `rightalt-shift` (basic_kbdth0's to `leftctrl`), with their `nextlayer` references updated.
 - **FR-008**: The criterion and the advisory (FR-001, FR-004) MUST be rows in `packages/contracts/data/criteria.json` with keyboard-lint checks, and the fixes (FR-002, FR-005) upgrade pairs, as spec 111 FR-025 requires of every upgrade.
+
+### Crew recommendation on FR-005 and FR-007 (km-lead, 2026-11-06; awaiting the owner)
+
+Reviewed by km-keyman (runtime semantics), km-author (upstream parity) and km-domain (typists). Neither requirement should be built as written.
+
+**FR-005: defer; if adopted later, change it.**
+
+- **The guarantee is false.** In Keyman core (`kmx_modifiers.cpp`), unsided `CTRL ALT` matches every Ctrl+Alt combination: AltGr, and also left Ctrl + left Alt. `RALT` matches right Alt, and matches Ctrl+Alt only when the user turns on Keyman's Simulate AltGr option. A conversion therefore drops the left Ctrl+Alt chord, and no simulation can show it to be output-identical. All three reviewers agree on this.
+- **"Mixing is not allowed" is guidance, not a compiler error.** help.keyman.com (virtual keys guide) says not to mix `RALT`, `CTRL ALT` and their sided variants in one keyboard. No kmcmplib error was found for it. That supports converting a whole keyboard at once when it is converted, but it does not require any conversion.
+- **Who loses.** 32 to 59 keyboards in `release/` use unsided `CTRL ALT` (the counts depend on the pattern used): sil_khmer, inuktitut_naqittaut, farsiman, el_dari_clra and others, mostly minority-language communities. Typists on laptops without a right Alt key lose their only chord unless they find the Simulate AltGr option. Behaviour on macOS, Linux and KeymanWeb is unverified.
+- **If adopted later:**
+  - make it an opt-in Open upgrade, per keyboard and never per rule;
+  - word it "AltGr kept; left Ctrl+Alt dropped (still reachable with Keyman's Simulate AltGr option)";
+  - require the author's explicit consent;
+  - never apply it on Copy.
+- **Triggers:**
+  - the Keyman team consultation already planned for upstream PRs;
+  - verified `RALT` behaviour on macOS, Linux (IBus) and KeymanWeb.
+- **Interaction with FR-003 (needs the owner).** A Copy of a keyboard that already uses `CTRL ALT`, with new AltGr placements written as `RALT`, would mix the two forms against the guidance. Recommended: write new AltGr placements in the copied keyboard's existing form (`CTRL ALT` if it already uses it), otherwise `RALT`.
+
+**FR-007: replace with a verification, then decide per keyboard.**
+
+- **The count is 14, not 11:** kbda1, kbda2, kbda3, kbdazel, kbdbr, kbdcr, kbddiv1, kbddiv2, kbdfa, kbdgeo, kbdinmal, kbdintam, kbdsf and kbdth0. basic_kbdsp also has `nextlayer: ctrl` references.
+- **Not every `ctrl` layer is AltGr.**
+  - basic_kbda1's carries real `SHIFT CTRL` content (ZWJ, ZWNJ), so it must not be renamed.
+  - basic_kbdfa has no `RALT` rules.
+  - basic_kbdth0 uses `LCTRL`.
+- **A rename can change touch output.** KeymanWeb is believed to derive a touch key's modifiers from its layer id, so renaming `ctrl` to `rightalt` changes which rules fire. That may fix touch, since the AltGr rules may be unreachable on touch today. It is a touch upgrade, which the `basic_*` freeze allows, but it is a behaviour change, not a relabel.
+- **Next step:** a verification per keyboard. Confirm KeymanWeb's layer-id-to-modifier mapping, then compare touch output under both ids. After that, offer the rename only where it is correct, as an Open upgrade for keyboards in the fork. Hold upstream PRs until the Keyman team confirms it maintains these keyboards and welcomes the change.
 
 ### Key Entities
 
@@ -150,4 +180,4 @@ Also proposed: a touch upgrade renaming the 11 `basic_*` touch `ctrl` / `shift-c
 
 - The census numbers come from `release/` in the keyboard-studio/keyboards fork as of 2026-11-05.
 - Spec 111's Open walk (Upgrades before Mechanisms) and its upgrade-pair registry are on the branch this spec builds on.
-- FR-005 and FR-007 are not planned for implementation until the owner rules; planning may stub their criteria rows.
+- FR-005 and FR-007 are not planned for implementation until the owner rules; they get no criteria rows until then.
