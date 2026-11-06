@@ -25,6 +25,7 @@ import {
 } from "../ui/useDismissablePopover.ts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { UnfinishedGalleryIndicator } from "./UnfinishedGalleryIndicator.tsx";
+import { OpenToolsMenu } from "./OpenToolsMenu.tsx";
 import { FontSwitcher } from "./FontSwitcher.tsx";
 import { LocaleSwitcher } from "./LocaleSwitcher.tsx";
 import { ThemeSwitcher } from "./ThemeSwitcher.tsx";
@@ -158,8 +159,11 @@ export function NavBar({
           minHeight: 44,
         }}
       >
-        <span
+        {/* The wordmark is the way back to the New-or-Open choice (spec 111). */}
+        <a
+          href="#start"
           style={{
+            textDecoration: "none",
             fontSize: 15,
             fontWeight: 700,
             // System tracking for a 15px title: the headline step of the
@@ -175,7 +179,7 @@ export function NavBar({
               (welcome.title, profile.accountKind.signedIn) — translators
               decide whether it transliterates, we don't decide for them. */}
           <Trans id="nav.wordmark">Keyboard Studio</Trans>
-        </span>
+        </a>
         {/* Narrow viewports hide the keyboard indicator — the slim bar keeps
             brand + overflow only (mobile adaptation, Phase 1). */}
         {!isNarrow && active !== "welcome" && <CurrentKeyboardIndicator />}
@@ -393,6 +397,7 @@ export function NavBar({
                   <Trans id="journeyContents.menuItem">Contents</Trans>
                 </button>
               )}
+              {active !== "welcome" && <OpenToolsMenu />}
               {active !== "welcome" && (
                 <UnfinishedGalleryIndicator
                   desktopCount={unfinishedDesktopCount}
@@ -419,6 +424,7 @@ export function NavBar({
             minHeight: 44,
           }}
         >
+          {active !== "welcome" && <OpenToolsMenu />}
           {active !== "welcome" && (
             <UnfinishedGalleryIndicator
               desktopCount={unfinishedDesktopCount}

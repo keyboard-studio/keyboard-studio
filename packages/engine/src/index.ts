@@ -60,7 +60,7 @@ export { parseKpjFlags } from "./compiler/parseKpjFlags.js";
 export type { CompilerOptions } from "./compiler/parseKpjFlags.js";
 
 // Issue #39 — release-tree source loader (proxy + VFS hydration).
-export { fetchKeyboardSourceToVfs } from "./loader/fetchKeyboardSourceToVfs.js";
+export { fetchKeyboardSourceToVfs, rewriteKpsBuildEntries } from "./loader/fetchKeyboardSourceToVfs.js";
 export type {
   FetchFn,
   FetchKeyboardSourceOptions,
@@ -94,6 +94,8 @@ export type {
 export {
   parse as parseKmn,
   emit as emitKmn,
+  emitRule,
+  emitStore,
   parseKvks,
   emitKvks,
   parseTouchLayout,
@@ -227,6 +229,8 @@ export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
   KpsFontDescriptorEntry,
+  OpenKpsOptions,
+  KpsLanguageEntry,
 } from "./package-descriptor/index.js";
 
 // spec 065 — help-docs rendering. The one implementation both the output
@@ -271,6 +275,7 @@ export {
   DOC_GENERATED_START,
   DOC_GENERATED_END,
   stripGeneratedBlocks,
+  replaceGeneratedBlock,
   escapeDocHtml,
   escapeDocMarkdown,
 } from "./shared/docSlots.js";
@@ -340,12 +345,14 @@ export {
 // must not import the engine).
 export {
   parseKps,
+  parseKpsLanguages,
   parseKpsFiles,
   parseKpsFontRefs,
   parseKpsPackageDetails,
 } from "./start-browser/kps-parser.js";
 export type {
   KpsMetadata,
+  KpsLanguage,
   KpsFileEntry,
   KpsFontRefs,
   KpsPackageDetails,
@@ -360,7 +367,8 @@ export {
   resolveInheritedHolders,
   packageAttributionFields,
 } from "./scaffolder/index.js";
-export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
+export { scaffoldIR, resetIdentity, casedKeysFloor } from "./scaffolder/scaffold-ir.js";
+export { detectStartLayoutFamily } from "./placement/filters.js";
 export {
   scaffoldTouchLayout,
   scaffoldTouchLayoutWithDiagnostics,
@@ -1213,3 +1221,11 @@ export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowD
 // Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
 export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
 export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";
+
+// Spec 111 - position-faithful .kmn text projection.
+export { diffIrToKmnEdits, spliceKmn, projectKmnText } from "./pattern-apply/spliceKmn.js";
+export type { KmnEdit, InsertAnchor, SpliceKmnResult } from "./pattern-apply/spliceKmn.js";
+// Spec 112 - shared cased-key derivation and key-scoped caps rewrite.
+export * from "./caps/index.js";
+// Spec 111 T059b/T059c - touch modifier-key and symbols-layer upgrade fixers.
+export * from "./touch-upgrades/index.js";

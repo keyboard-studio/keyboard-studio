@@ -260,21 +260,22 @@ describe.each(MAP_NODE_CASES)("map node $id", ({ id, writes, writePaths, inputPa
 });
 
 // The mechanisms -> touch_seed_source fork is pinned by name in buildStepGraph.test.ts.
-it("track's spine now runs to attribution; attribution is branch-defining: spine -> characters, fork -> project_name (#1901)", () => {
+it("track's spine now runs to attribution; attribution is branch-defining: a spine edge onward, fork -> project_name (#1901)", () => {
   const graph = buildManifestStepGraph();
   const fromTrack = graph.edges.filter((e) => e.from === "track");
   expect(fromTrack.find((e) => e.kind === "spine")?.to).toBe("attribution");
   // The copy-track fork used to leave from track; since #1901 it leaves
   // from the attribution step (asked on both tracks, after the choice).
   const fromAttribution = graph.edges.filter((e) => e.from === "attribution");
-  expect(fromAttribution.find((e) => e.kind === "spine")?.to).toBe("characters");
+  // The spine edge leaves for the next ungated screen (Open's first page, gated off on Copy).
+  expect(fromAttribution.find((e) => e.kind === "spine")?.to).toBe(graph.nodes.find((n) => n.id === "open_languages")?.id);
   expect(fromAttribution.find((e) => e.kind === "fork")?.to).toBe("project_name");
 });
 
 // The two side-trails (spine:false) fork off the spine and join back; in the
 // rendered projection their edges are dashed "default" edges, never "linear".
 describe.each([
-  { id: "project_name", joinTarget: "characters" },
+  { id: "project_name", joinTarget: "open_languages" },
   { id: "touch_seed_source", joinTarget: "touch" },
 ])("side-trail $id", ({ id, joinTarget }) => {
   const stepGraph = buildManifestStepGraph();

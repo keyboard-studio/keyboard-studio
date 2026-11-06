@@ -28,7 +28,14 @@ export function makeGalleryStepHost<V>(
   module: GalleryModule<V>,
   decisionId: DecisionId,
   stepId: string,
+  /**
+   * The renderer to host in place of the module's own, for a page whose
+   * component cannot be imported by the module without an import cycle through
+   * the registry (the module keeps a placeholder).
+   */
+  renderer?: GalleryModule<V>["renderer"],
 ): ComponentType<EditorStepProps> {
+  const hosted: GalleryModule<V> = renderer === undefined ? module : { ...module, renderer };
   const Host: ComponentType<EditorStepProps> = ({
     onComplete,
     onBack,
@@ -37,7 +44,7 @@ export function makeGalleryStepHost<V>(
     const deps = useMemo(buildGalleryHostDeps, []);
     return (
       <GalleryHost
-        module={module}
+        module={hosted}
         record={record}
         stepId={stepId}
         deps={deps}

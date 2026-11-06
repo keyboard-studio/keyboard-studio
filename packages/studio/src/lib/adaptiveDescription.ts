@@ -37,7 +37,12 @@ export function prefill(ctx: AdaptiveDescriptionContext): string | undefined {
  * replace is one action, never blocked by a "required" gate on a field that
  * already has something in it), `true` otherwise. Re-derives from `prefill`
  * rather than caching so the two can never disagree.
+ *
+ * Open (`adapt-existing`) never requires it, even with nothing to prefill from:
+ * the keyboard's own documents are kept as they are, and every Open step must
+ * offer Continue (spec 111 FR-031). A blank answer writes nothing.
  */
 export function requiredWhen(ctx: AdaptiveDescriptionContext): boolean {
+  if (ctx.instantiationMode === "adapt-existing") return false;
   return prefill(ctx) === undefined;
 }

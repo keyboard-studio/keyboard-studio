@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseKps, parseKpsFontRefs, parseKpsFiles, parseKpsPackageDetails } from "./kps-parser.js";
+import { parseKps, parseKpsLanguages, parseKpsFontRefs, parseKpsFiles, parseKpsPackageDetails } from "./kps-parser.js";
 
 const BASIC_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <Package>
@@ -446,5 +446,19 @@ describe("parseKpsPackageDetails", () => {
         <DisplayFont>d.ttf</DisplayFont>
       </Keyboard></Keyboards>`);
     expect(d.fontSelected).toBe("d.ttf");
+  });
+});
+
+describe("parseKpsLanguages", () => {
+  it("keeps tag and decoded name in source order", () => {
+    const xml =
+      '<Keyboard><Languages>\r\n<Language ID="bas">Basaa</Language>\r\n<Language ID="ewo">Ew&amp;ondo</Language>\r\n</Languages></Keyboard>';
+    expect(parseKpsLanguages(xml)).toEqual([
+      { tag: "bas", name: "Basaa" },
+      { tag: "ewo", name: "Ew&ondo" },
+    ]);
+  });
+  it("is empty without a Languages block", () => {
+    expect(parseKpsLanguages("<Keyboard></Keyboard>")).toEqual([]);
   });
 });

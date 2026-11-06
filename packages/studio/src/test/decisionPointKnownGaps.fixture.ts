@@ -7,7 +7,7 @@ import { DECISION_POINTS, type DecisionPoint } from "./decisionPointBases.ts";
 import type { GateId } from "./consistencyGates.ts";
 
 /** What each gap is waiting on. */
-export type Owner = "US5" | "US6" | "#2361" | "#2400";
+export type Owner = "US6" | "#2361" | "#2400";
 
 export interface Gap {
   gate: GateId;
@@ -23,17 +23,10 @@ export interface Gap {
 }
 
 // Measured, not assumed: a gate that already passes on a fixture has no row,
-// even where the spec names a story for it (G2 on basic_kbdus / basic_kbdfr and
-// G5 passes on the harness walk records; copy-track keyboards whose starting
-// rules carry case pairs outside the layout-family &CasedKeys floor fail until
-// US5 derives the store in projection (chechen_latin: ç/Ç on K_COLON).
+// even where the spec names a story for it (G2 on basic_kbdus / basic_kbdfr).
+// G5 passes on every base, chechen_latin included (ç/Ç on K_COLON), since the
+// store is derived in projection (spec 112).
 export const KNOWN_GAPS: readonly Gap[] = [
-  {
-    gate: "G5",
-    owner: "US5",
-    bases: ["chechen_latin"],
-    points: ["tolerance"],
-  },
   // E5: contexts are not tolerant (camqwerty has one gap).
   { gate: "G2", owner: "US6", bases: ["sil_cameroon_qwerty"], points: ["tolerance"] },
   // E5: contexts are not tolerant (camazerty has 17 measured gaps). #2363's

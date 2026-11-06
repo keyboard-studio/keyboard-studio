@@ -62,6 +62,12 @@ export function surveyAdvance(page: Page) {
  * takes effect on documents created after it is registered) — it cannot live
  * inside driveIdentityLite, which runs post-goto.
  *
+ * A returning visitor with no draft lands on the New-or-Open start screen (spec
+ * 111), so the script also points an empty hash at `#survey`: the walks below
+ * start at identity as before, with no track recorded, so the track step still
+ * asks (Copy only). The start screen itself is covered by
+ * open-existing-keyboard.spec.ts.
+ *
  * This is draft-safe: it only sets the visited flag, unlike clicking
  * WelcomeScreen's "Continue as guest" button, which additionally clears any resumable
  * draft (see WelcomeScreen.tsx). Explicit navigation to `#welcome` still
@@ -76,6 +82,7 @@ export async function seedReturningVisitor(page: Page): Promise<void> {
     } catch {
       // Quota / private-mode — the welcome-gate fallback is harmless here too.
     }
+    if (location.hash === "") history.replaceState(history.state, "", "#survey");
   });
 }
 
@@ -296,16 +303,11 @@ export async function pickStartKeyboard(
   await confirm.click();
 }
 
-/**
- * Choose the "Copy" / "Adapt" track (Track 1) and advance.
- *
- * The track step renders as a survey radio question (track_choice).
- * For Track 1 adapt flow, select the copy/adapt radio option.
- */
-export async function chooseAdaptTrack(page: Page): Promise<void> {
-  // Track 1 "adapt" option has data-testid="track-adapt"
-  await page.getByTestId("track-adapt").check();
-  await surveyAdvance(page).click();
+/** Retired: the track step no longer offers Open (spec 111). Kept so old callers fail with a reason. */
+export async function chooseAdaptTrack(_page: Page): Promise<void> {
+  // Spec 111 removed the mid-walk Open option: an update starts from the start
+  // screen's "Open an existing keyboard" (see open-existing-keyboard.spec.ts).
+  throw new Error("chooseAdaptTrack: the track step no longer offers Open (spec 111); open the keyboard from the start screen");
 }
 
 /**
@@ -1145,21 +1147,6 @@ export async function driveCssEditorStep(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("css-continue");
   const continueByName = page.getByRole("button", { name: "Continue" });
   // Wait for either locator to be visible.
-  await Promise.race([
-    continueBtn.waitFor({ state: "visible", timeout: 60_000 }),
-    continueByName.waitFor({ state: "visible", timeout: 60_000 }),
-  ]);
-  if (await continueBtn.isVisible().catch(() => false)) {
-    await continueBtn.click({ timeout: 30_000 });
-  } else {
-    await continueByName.click({ timeout: 30_000 });
-  }
-}
-
-/** Optional HTML editor step (after help): skip and continue with empty HTML. */
-export async function driveHtmlEditorStep(page: Page): Promise<void> {
-  const continueBtn = page.getByTestId("html-continue");
-  const continueByName = page.getByRole("button", { name: "Continue" });
   await Promise.race([
     continueBtn.waitFor({ state: "visible", timeout: 60_000 }),
     continueByName.waitFor({ state: "visible", timeout: 60_000 }),

@@ -59,6 +59,10 @@
 //                         generated; after 2 so they see assignment rules,
 //                         before 2.7 because that step repoints the entry group
 //   2.7 Context tolerance — applyContextToleranceOverlay (spec 078)
+//   2.8 Caps handling  — the recorded caps-handling decision (spec 112): the
+//                         derived &CasedKeys store and the copied keyboard's
+//                         CAPS/NCAPS rules (research R10). After 2.7 so the
+//                         set is derived from the keyboard as the author left it
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
@@ -81,6 +85,7 @@
 // The function mutates `vfs` in-place. Callers that need the original VFS
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
+import { applyCustomCssToVfs } from "./customCss.ts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
@@ -107,6 +112,7 @@ import {
   parseTouchKeyAddress,
   parseKmn,
   emitKmn,
+  projectKmnText,
   resetIdentity,
   renameFilesInVfs,
   parseSlotId,
@@ -115,11 +121,15 @@ import {
   applyIdentityToKps,
   applyContextToleranceOverlay,
   applyMarkGuards,
+  replaceCapsRules,
+  syncTouchCapsLayerRaw,
+  writeCasedKeysStore,
+  removeCasedKeysStore,
   removedTouchKeyRuleIds,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
-import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
+import type { OpenKpsOptions, PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
 import {
   applyCarveMutate,
@@ -132,6 +142,8 @@ import { readVfsText } from "./vfsText.ts";
 import { markAttachmentsFromWorklist } from "./markAttachments.ts";
 import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
 import { claimedInputRuleIds } from "./claimedInputs.ts";
+import { deriveCasedKeys } from "./casedKeysDerivation.ts";
+import type { CapsHandlingValue } from "../decisions/decisionTypes.ts";
 
 /** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
 function safeFormViolations(
@@ -152,6 +164,21 @@ import {
   type DerivedRuleAdditions,
 } from "../survey/rules/ruleAdditions.ts";
 import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
+
+/** Every vkey that appears in a rule testing CAPS or NCAPS (step 2.8's `none` mode). */
+function allCapsRuleKeys(ir: KeyboardIR): Set<string> {
+  const keys = new Set<string>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      for (const el of rule.context) {
+        if (el.kind === "vkey" && (el.modifiers.includes("CAPS") || el.modifiers.includes("NCAPS"))) {
+          keys.add(el.name);
+        }
+      }
+    }
+  }
+  return keys;
+}
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
 const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
@@ -282,6 +309,12 @@ export interface ProjectWorkingCopyVfsInput {
    * (step 4) operate on the Phase E layout rather than the base VFS's layout.
    */
   touchLayoutJson?: string | null;
+  /**
+   * The author's OSK stylesheet from the CSS step, written at step 0b. Omit or
+   * pass `null` to leave the start keyboard's own stylesheet as-is; "" removes
+   * it (and its `&KMW_EMBEDCSS` store line).
+   */
+  customCss?: string | null;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
@@ -327,6 +360,12 @@ export interface ProjectWorkingCopyVfsInput {
    */
   contextToleranceOverlay?: ContextToleranceOverlay | null;
   /**
+   * The recorded caps-handling decision (spec 112), applied by step 2.8.
+   * Absent or `null` when not asked (a caseless alphabet, or no decision
+   * yet): the copied keyboard's caps handling is left exactly as it was.
+   */
+  capsHandling?: CapsHandlingValue | null;
+  /**
    * The rules survey step's additions (spec 082: pack install, guard
    * synthesis, Narrow exceptions), pre-derived by the caller with
    * `deriveRuleAdditions(workingIr, startIr)`. Spliced into the
@@ -338,6 +377,25 @@ export interface ProjectWorkingCopyVfsInput {
    * `.kmn`, never rewrite the no-edit fast path.
    */
   ruleAdditions?: DerivedRuleAdditions;
+  /**
+   * Open mode (a keyboard opened for update, spec 111). Present only on the
+   * Open track; absent for Copy, whose projection is unchanged.
+   *
+   * - The `.kmn` edit paths splice the changed nodes into the current text
+   *   (`projectKmnText`) instead of re-emitting the whole file.
+   * - The identity stub writes `&KEYBOARDVERSION` after `&VERSION` when absent.
+   * - The package descriptor is patched in place (`kps`), never regenerated.
+   */
+  openMode?: {
+    /** In-place descriptor options (author's language list, edited name/description). */
+    kps: OpenKpsOptions;
+    /**
+     * The author agreed to a full re-emit of a file whose change cannot be
+     * placed precisely. Without it such a file is left as it was and named in
+     * the result's `reformatRequired`.
+     */
+    consentedReemit?: boolean;
+  };
 }
 
 /** Step 2.6's input: the marks completion payload (buffer-start behaviour is per mark on the worklist, issue #2374). */
@@ -410,6 +468,12 @@ export interface ProjectWorkingCopyVfsResult {
    * in, or they will look for the pre-rename filename and fail to find it.
    */
   effectiveKeyboardId?: string;
+  /**
+   * Open mode: the `.kmn` files a change could not be placed into precisely.
+   * They were left unchanged, awaiting the author's consent to a full re-emit.
+   * Absent when there are none (and always on Copy).
+   */
+  reformatRequired?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -466,13 +530,46 @@ export function projectWorkingCopyVfs(
     getPattern,
     identity,
     touchLayoutJson,
+    customCss = null,
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
+    capsHandling = null,
     ruleAdditions,
   } = input;
 
   const warnings: string[] = [];
+  const openMode = input.openMode;
+  const reformatRequired: string[] = [];
+
+  // Writes a changed `.kmn`: a splice into the current text on Open (FR-008),
+  // a full emit otherwise. `currentText`/`currentIr` are the file as the VFS
+  // holds it right now, so node ids and line spans agree by construction.
+  const writeKmn = (
+    path: string,
+    currentText: string,
+    currentIr: KeyboardIR,
+    nextIr: KeyboardIR,
+  ): void => {
+    if (openMode === undefined) {
+      vfs.set(path, emitKmn(nextIr), false);
+      return;
+    }
+    const projected = projectKmnText(currentText, currentIr, nextIr);
+    if (projected.ok) {
+      vfs.set(path, projected.text, false);
+      return;
+    }
+    if (openMode.consentedReemit === true) {
+      vfs.set(path, emitKmn(nextIr), false);
+      warnings.push(`[open] ${path} was reformatted with the author's agreement (${projected.reason})`);
+      return;
+    }
+    reformatRequired.push(path);
+    warnings.push(
+      `[open] ${path} cannot be updated in place (${projected.reason}); it needs the author's agreement to be reformatted and was left unchanged`,
+    );
+  };
 
   // Step 0: Touch layout injection — write the Phase E touch layout JSON into
   // `source/<keyboardId>.keyman-touch-layout` before any other projection step.
@@ -482,12 +579,20 @@ export function projectWorkingCopyVfs(
   // Previously serializeWorkingCopy injected this inline before calling this helper;
   // centralizing it here is the fix that makes the OSK preview equivalent to the ZIP.
   if (touchLayoutJson !== null && touchLayoutJson !== undefined) {
-    vfs.set(
-      `source/${keyboardId}.keyman-touch-layout`,
-      tabulateTouchLayoutJson(touchLayoutJson),
-      false,
-    );
+    const touchPath = `source/${keyboardId}.keyman-touch-layout`;
+    // Open (spec 111 FR-010): a layout the author did not change is the file's
+    // own text, not a re-serialization of it.
+    const unchangedOnOpen =
+      openMode !== undefined && readVfsText(vfs, touchPath) === touchLayoutJson;
+    if (!unchangedOnOpen) {
+      vfs.set(touchPath, tabulateTouchLayoutJson(touchLayoutJson), false);
+    }
   }
+
+  // Step 0b: OSK stylesheet — the CSS step's text becomes the keyboard's
+  // `&KMW_EMBEDCSS` file. Before the identity pass so a Track-1 id rename
+  // carries the file and its store line along with the other siblings.
+  warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss));
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //
@@ -681,9 +786,18 @@ export function projectWorkingCopyVfs(
       additions !== undefined
         ? spliceRuleAdditions(seamIr, additions, allWholeNodeIds)
         : seamIr;
-    carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
-      irRewritten: true,
-    });
+    if (openMode !== undefined) {
+      // Open (spec 111 FR-008): the carved IR reaches the text as a splice of
+      // the changed nodes into the file as it stands, never a whole re-emit.
+      const carveKmnPath = `source/${keyboardId}.kmn`;
+      const carveKmnText = readVfsText(vfs, carveKmnPath);
+      if (carveKmnText !== undefined) writeKmn(carveKmnPath, carveKmnText, startIr, mergedSeamIr);
+      carveResult = { warnings: [] };
+    } else {
+      carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
+        irRewritten: true,
+      });
+    }
   } else {
     // Legacy path without suppression — unchanged pre-T015 behavior:
     // slot-item nul-rewrites first, then whole-node deletions inside
@@ -870,7 +984,7 @@ export function projectWorkingCopyVfs(
           renameOps,
         );
         if (renameResult.changed) {
-          vfs.set(kmnPathForRename, emitKmn(renameResult.ir), false);
+          writeKmn(kmnPathForRename, kmnTextForRename, parsedForRename.ir, renameResult.ir);
         }
         warnings.push(...renameResult.warnings);
       } catch (err: unknown) {
@@ -1001,7 +1115,9 @@ export function projectWorkingCopyVfs(
     a.mechanisms.some((m) => m.patternId === "modifier_as_layer_switch"),
   );
   const hasLayerSwitchInStartIr = collectLayerCombosInUse(startIr).length > 0;
-  if (hasLayerSwitchAssignment || hasLayerSwitchInStartIr) {
+  // Open (spec 111 FR-010): a combo layer the keyboard already carries is the
+  // file's own business; only a combo this session adds reaches the layout.
+  if (hasLayerSwitchAssignment || (hasLayerSwitchInStartIr && openMode === undefined)) {
     const touchLayoutPath = findTouchLayoutPath(vfs);
     if (touchLayoutPath !== undefined) {
       const touchEntry = vfs.get(touchLayoutPath);
@@ -1056,7 +1172,7 @@ export function projectWorkingCopyVfs(
           marksGuards.backspace ?? "peel",
           marksGuards.stacks ?? [],
         );
-        if (guarded.ir !== parsedForGuards) vfs.set(kmnPathForGuards, emitKmn(guarded.ir), false);
+        if (guarded.ir !== parsedForGuards) writeKmn(kmnPathForGuards, kmnTextForGuards, parsedForGuards, guarded.ir);
         if (guarded.guardHopSkipped === true) {
           warnings.push(
             "[project-working-copy] mark guards not reached: the entry group's match rule already ends in another use()",
@@ -1090,7 +1206,7 @@ export function projectWorkingCopyVfs(
           parsedForTolerance,
           contextToleranceOverlay,
         );
-        vfs.set(kmnPathForTolerance, emitKmn(replay.ir), false);
+        writeKmn(kmnPathForTolerance, kmnTextForTolerance, parsedForTolerance, replay.ir);
         warnings.push(
           ...replay.warnings.map((w) => `[project-working-copy] ${w}`),
         );
@@ -1099,6 +1215,59 @@ export function projectWorkingCopyVfs(
         warnings.push(
           `[project-working-copy] context-tolerance projection skipped: ${msg}`,
         );
+      }
+    }
+  }
+
+  // Step 2.8: Caps handling (spec 112, research R10). The caps-handling
+  // decision is the only thing that decides the &CasedKeys store and the
+  // copy's CAPS/NCAPS rules; the scaffolder no longer touches them. The key
+  // set is derived here, from the .kmn as it now stands (assignments
+  // included), so a key assigned later is covered without re-deciding.
+  //   cased-keys     store written, rules rewritten on the set's keys
+  //   explicit-rules rules and any declared store kept as copied; none written
+  //   none           no store, every CAPS/NCAPS rule rewritten
+  // A failure here warns and leaves the .kmn as the earlier steps made it.
+  if (capsHandling !== null) {
+    const kmnPathForCaps = `source/${keyboardId}.kmn`;
+    const kmnTextForCaps = readVfsText(vfs, kmnPathForCaps);
+    if (kmnTextForCaps !== undefined) {
+      try {
+        const parsedForCaps = parseKmn(kmnTextForCaps, keyboardId).ir;
+        const bcp47 = identity?.bcp47 !== undefined && identity.bcp47 !== "" ? identity.bcp47 : undefined;
+        if (capsHandling.mode === "cased-keys") {
+          const set = deriveCasedKeys(parsedForCaps, { ...(bcp47 !== undefined ? { bcp47 } : {}) });
+          writeCasedKeysStore(parsedForCaps, set.keys);
+          replaceCapsRules(parsedForCaps, new Set(set.keys));
+        } else if (capsHandling.mode === "none") {
+          removeCasedKeysStore(parsedForCaps);
+          replaceCapsRules(parsedForCaps, allCapsRuleKeys(parsedForCaps));
+        }
+        // explicit-rules leaves the copy exactly as it was: nothing to emit.
+        if (capsHandling.mode !== "explicit-rules") {
+          vfs.set(kmnPathForCaps, emitKmn(parsedForCaps), false);
+        }
+        // Touch caps: the same decision gives the touch layout its caps layer
+        // (R8). Runs on the projected touch file, after the clean-touch clone
+        // and the assignment propagation, so a letter assigned after
+        // scaffolding is uppercase on caps too.
+        if (capsHandling.mode === "cased-keys") {
+          const touchPathForCaps = findTouchLayoutPath(vfs);
+          const touchEntryForCaps = touchPathForCaps !== undefined ? vfs.get(touchPathForCaps) : undefined;
+          if (
+            touchPathForCaps !== undefined &&
+            touchEntryForCaps !== undefined &&
+            typeof touchEntryForCaps.content === "string"
+          ) {
+            const synced = syncTouchCapsLayerRaw(touchEntryForCaps.content, {
+              ...(bcp47 !== undefined ? { bcp47 } : {}),
+            });
+            if (synced.changed) vfs.set(touchPathForCaps, synced.json, false);
+          }
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] caps handling projection skipped: ${msg}`);
       }
     }
   }
@@ -1136,7 +1305,11 @@ export function projectWorkingCopyVfs(
 
     if (Object.keys(identityArg).length > 0) {
       try {
-        applyIdentityStubMutation(vfs, keyboardId, identityArg);
+        if (openMode !== undefined) {
+          applyIdentityStubMutation(vfs, keyboardId, identityArg, { open: true });
+        } else {
+          applyIdentityStubMutation(vfs, keyboardId, identityArg);
+        }
       } catch (err: unknown) {
         // The stub mutator throws if the file is missing (e.g. carve removed all
         // rules and the file was never written). Warn rather than abort.
@@ -1223,6 +1396,8 @@ export function projectWorkingCopyVfs(
       // it, so the pre-rename (base) id must not appear in them.
       targetKeyboardId ?? keyboardId,
       input.packageFonts,
+      [],
+      openMode?.kps,
     );
     warnings.push(...kpsResult.warnings);
   }
@@ -1276,6 +1451,7 @@ export function projectWorkingCopyVfs(
   return {
     warnings,
     ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
+    ...(reformatRequired.length > 0 ? { reformatRequired } : {}),
   };
 }
 

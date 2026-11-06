@@ -20,6 +20,11 @@
       "browser": "./dist/context-tolerance/index.js",
       "import": "./dist/context-tolerance/index.js"
     },
+    "./caps": {
+      "types": "./dist/caps/browser.d.ts",
+      "browser": "./dist/caps/browser.js",
+      "import": "./dist/caps/browser.js"
+    },
     "./pattern-schema": {
       "types": "./dist/pattern-library/patternSchema.d.ts",
       "import": "./dist/pattern-library/patternSchema.js"

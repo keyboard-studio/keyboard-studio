@@ -44,5 +44,7 @@ export default defineConfig({
     // test then aborts mid-import and poisons sibling tests' one-shot mocks.
     // Fake-timer tests are unaffected (the timeout counts real time).
     testTimeout: 30_000,
+    // Same cost lands in a beforeEach that dynamically imports the stores.
+    hookTimeout: 30_000,
   },
 });

@@ -1,6 +1,6 @@
 # criteria.md triage summary
 
-> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (149; 40/67/32/10) is **descriptive and expected to grow**; tests enforce schema-validity of every row and the four-band partition invariant (sum equals total, no orphans), **not the literal cardinality**. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
+> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (208; 40/124/34/10) is **descriptive and expected to grow**; tests enforce schema-validity of every row and the four-band partition invariant (sum equals total, no orphans), **not the literal cardinality**. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
 
 This document records the triage outcome for all criteria drawn from `docs/criteria.md`, performed as part of Day-1 issue #6. Each criterion was assigned to one of four enforcement bands defined in spec.md Section 14, Decision D4: `scaffolder-bake` (enforced at scaffold time), `layer-c-enforce` (blocked by the lint engine), `yellow-survey` (surfaced as a plain-language survey question), and `red-checklist` (manual pre-submit checklist item). The result is encoded in `packages/contracts/data/criteria.json` as a `Criterion[]` array conforming to the interface in `packages/contracts/src/criteria.ts`, as described in spec.md Section 11's example triage table.
 
@@ -8,11 +8,15 @@ This document records the triage outcome for all criteria drawn from `docs/crite
 
 | Band | Count | % of total |
 |------|-------|-----------|
-| scaffolder-bake | 40 | 27% |
-| layer-c-enforce | 67 | 45% |
-| yellow-survey | 32 | 21% |
-| red-checklist | 10 | 7% |
-| **Total** | **149** | **100%** |
+| scaffolder-bake | 40 | 19% |
+| layer-c-enforce | 124 | 60% |
+| yellow-survey | 34 | 16% |
+| red-checklist | 10 | 5% |
+| **Total** | **208** | **100%** |
+
+Recompute of 2026-11-06: refreshed again (206; 40/122/34/10 to 208; 40/124/34/10) for the two raw-Ctrl `layer-c-enforce` rows added by spec 114 (the raw-Ctrl finding and the sided-Ctrl advisory).
+
+Recompute of 2026-11-05: the table above was refreshed from `criteria.json` (it still read 149; 40/67/32/10). Growth since the original triage is `layer-c-enforce` and `yellow-survey` rows added by later specs, most recently 7.28 and 18.16 (spec 112) and the touch upgrade rows `18.17-touch-modifier-keys-consistent` and `18.18-touch-symbols-layer-linked` (spec 111 T059b/T059c), each paired with a suggested fix on the Open path.
 
 Counts recomputed directly from `criteria.json` array length and per-band occurrence counts. 133 of the original 145 are the original repo-hygiene criteria, accounting for all 133 colored criterion spans in `docs/criteria.md` (the 136-span count cited in earlier passes included the 3 legend-definition spans at lines 6-8, which are not criteria; see "Omitted rows" below). The remaining 12 are the **section-18 "Design heuristics (DISCUS)"** rows added to operationalize the keyboard-design principles in [docs/keyboard-design-principles.md](../../../docs/keyboard-design-principles.md) — 7 `layer-c-enforce` (auto-checkable on the first-draft touch layout / output coverage, at Day-1 lock), 3 `yellow-survey` (judgement-dependent), and 2 `red-checklist` (inherently human). The total was **148** following the issue #120 re-review (146 after that re-review's 7.7a split + re-banding, plus two section-19 import-output criteria: 19.1 PR-body attribution block, 19.2 HISTORY.md attribution bullet, D14 mandatory carrier), and is now **149** with the addition of `1.10b-kpj-format-adapted` (`KM_LINT_KPJ_FORMAT_OUTDATED`) — the v1.1.0 adaptation path left an imported keyboard's `.kpj` format uncovered, since `1.10-kpj-current-format` (scaffolder-bake) only guarantees the format on newly scaffolded keyboards. (The spec-046 `18.13-mark-normalization-uniform` row / `KM_LINT_MARK_NORMALIZATION_UNIFORM` was added post-lock and later removed — the team handles that concern without a validator warning.) See [docs/discus-principles-integration.md](../../../docs/discus-principles-integration.md) for the full DISCUS → programmability mapping.
 
@@ -45,9 +49,9 @@ All four automation-hook fields are now fully populated across every entry:
 
 | Band | Field | Populated / Total |
 |------|-------|-------------------|
-| `layer-c-enforce` | `lintRuleId` | 67 / 67 |
+| `layer-c-enforce` | `lintRuleId` | 124 / 124 |
 | `scaffolder-bake` | `scaffolderRule` | 40 / 40 |
-| `yellow-survey` | `surveyQuestionId` | 32 / 32 |
+| `yellow-survey` | `surveyQuestionId` | 34 / 34 |
 | `red-checklist` | `preSubmitChecklistText` | 10 / 10 |
 
 `lintRuleId` values for sections 1–17 use the `KM_LINT_*` prefix (Layer C hygiene, no upstream kmcmplib equivalent). Section-18 DISCUS heuristics use `KM_WARN_*` to signal warning-grade rather than error-grade severity. `scaffolderRule` values use kebab-case action slugs. `surveyQuestionId` values use kebab-case descriptors. The rule identifiers are contracts — implementations in the lint engine, scaffolder, and survey surface must register against these IDs.

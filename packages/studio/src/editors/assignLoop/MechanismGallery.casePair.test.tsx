@@ -12,6 +12,7 @@ import { screen, fireEvent, act, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
 import { installMechanismGalleryHooks } from "../../test/mechanismGallery/mocks.tsx";
@@ -118,6 +119,52 @@ describe("MechanismGallery — case-pair companion proposal", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Pre-accepted companion under cased keys (spec 112): Apply records the pair,
+// the banner stays up, and Undo takes the companion back out.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — pre-accepted companion under cased keys (spec 112)", () => {
+  async function applyTheta() {
+    instantiateWorkingCopy();
+    seedInventory(["θ", "Θ"]);
+    useDecisionStore.getState().recordAll([
+      { id: "character-inventory", value: { chars: ["θ", "Θ"] }, provenance: "asked" },
+      { id: "caps-handling", value: { mode: "cased-keys" }, provenance: "default" },
+    ]);
+    await act(async () => {
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+  }
+
+  const physical = () =>
+    useWorkingCopyStore.getState().session.assignments.filter((a) => a.modality === "physical");
+
+  it("records the companion with the placement and keeps the banner visible", async () => {
+    await applyTheta();
+    expect(physical().map((a) => a.target).sort()).toEqual(["Θ", "θ"]);
+    expect(screen.getByRole("status", { name: /companion added/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Remove Θ from the same key/i })).toBeTruthy();
+  });
+
+  it("Undo removes the companion and leaves the author's own placement", async () => {
+    await applyTheta();
+    fireEvent.click(screen.getByRole("button", { name: /Remove Θ from the same key/i }));
+    expect(physical().map((a) => a.target)).toEqual(["θ"]);
+    expect(screen.queryByRole("status", { name: /companion added/i })).toBeNull();
+  });
+
+  it("Keep it closes the banner and keeps the companion", async () => {
+    await applyTheta();
+    fireEvent.click(screen.getByRole("button", { name: /Keep Θ on the same key/i }));
+    expect(physical()).toHaveLength(2);
+    expect(screen.queryByRole("status", { name: /companion added/i })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // P1/P2 regression — companion proposal tracked by assignment identity, not
 // by re-matching target/scope, and invalidated when the base assignment it
 // refers to is removed. Reproduces: swap-assign a caps-handling key (banner
@@ -180,7 +227,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     expect(raltAssignment).toBeDefined();
     expect(raltAssignment?.target).toBe("θ");
     expect(raltAssignment?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[ALT K_W]",
+      "[RALT K_W]",
     );
 
     const quadAssignment = assignments.find(

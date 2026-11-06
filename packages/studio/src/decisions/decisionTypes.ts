@@ -144,6 +144,7 @@ export type DecisionId =
   // modules (spec 090) and ordered by the same orderByDependencies as the
   // questions.
   | "windows-layout"
+  | "caps-handling"
   | "base-keyboard"
   | "marks-treatment"
   | "punctuation-inventory"
@@ -155,10 +156,24 @@ export type DecisionId =
   | "physical-layout"
   | "osk-layout"
   | "touch-seed-source"
+  | "language-list"
+  | "open-issues"
+  | "open-basic-keyboard"
+  | "missing-letters-review"
+  | "upgrades-review"
   | "touch-layout"
   | "custom-css"
   | "help-docs"
   | "welcome-htm";
+
+/**
+ * The `caps-handling` decision value (spec 112): how the copied keyboard
+ * treats Caps Lock. The derived key set is never stored; projection step 2.8
+ * recomputes it from the working copy.
+ */
+export interface CapsHandlingValue {
+  mode: "cased-keys" | "explicit-rules" | "none";
+}
 
 /**
  * Where a decision's value came from.
@@ -397,6 +412,9 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   // Wizard-step decisions: editor steps write through their own declared
   // `writes` (steps/editorMutate.ts), not through a decision -> IR mapping.
   "windows-layout": [],
+  // spec 112: caps handling is derived at projection step 2.8, never
+  // written into the working IR.
+  "caps-handling": [],
   "base-keyboard": [],
   "punctuation-inventory": [],
   "invisibles-inventory": [],
@@ -411,6 +429,13 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "physical-layout": [],
   "osk-layout": [],
   "touch-seed-source": [],
+  "language-list": [],
+  // spec 111 Open walk: the baseline's problem kinds (derived) and the two
+  // reviewed marks; none of them reach the IR.
+  "open-issues": [],
+  "open-basic-keyboard": [],
+  "missing-letters-review": [],
+  "upgrades-review": [],
   "touch-layout": [],
   "custom-css": [],
   "help-docs": [],

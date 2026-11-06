@@ -111,14 +111,22 @@ export function checkInventoryCoverage(
   // buildProducedSet already handles this via single-element run flush (a lone
   // combining mark NFC-normalizes to itself).
 
+  // Composed and decomposed forms are equivalent: also count every code point
+  // of each produced character's canonical decomposition, so a precomposed é
+  // covers a required U+0301, and require only that each code point of the
+  // inventory character's decomposition be producible, so a keyboard typing
+  // e then a separate combining acute covers é.
+  const producible = new Set<string>(emittable);
+  for (const p of emittable) for (const cp of p.normalize("NFD")) producible.add(cp);
+
   const inventoryChars = linguistInventoryChars(inventory);
   const findings: LintFinding[] = [];
 
   for (const ch of inventoryChars) {
-    // NFC-normalize the inventory char before lookup so precomposed codepoints
-    // match when the keyboard also emits the NFC form.
     const chNFC = ch.normalize("NFC");
-    if (!emittable.has(chNFC)) {
+    const covered =
+      producible.has(chNFC) || [...chNFC.normalize("NFD")].every((cp) => producible.has(cp));
+    if (!covered) {
       const codePoint = chNFC.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0") ?? "?";
       findings.push({
         code: "KM_LINT_INVENTORY_UNCOVERED",

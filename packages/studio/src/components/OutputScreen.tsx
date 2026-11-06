@@ -54,6 +54,8 @@ import { isLdmlLintCode } from "../lint/ldmlFindings.ts";
 import { useRouteStepIds } from "../lib/routeStepIds.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
+import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
+import { buildReviewInput } from "../criteria/openPrBlocks.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -66,6 +68,7 @@ import { jumpToLocation } from "../lib/jumpToLocation.ts";
 import { unreachableReasonLabel } from "../decisions/progressDots.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
+import { ReformatConsentDialog } from "./ReformatConsentDialog.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { LdmlDownloadPanel } from "./output/LdmlDownloadPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
@@ -132,6 +135,8 @@ export function OutputScreen() {
   // second pipeline instance, and the card is informational only: like
   // DocumentationChecklist it never gates download or submit.
   const criteriaResult = useAuthoredCriteria(artifact.stage);
+  // Open (spec 111): the ratchet over this same result. Null on Copy.
+  const openRatchet = useOpenRatchet(criteriaResult, artifact.stage.kind === "error");
   // spec 102 FR-034: the checklist says when the inherited docs made the
   // generated typing guide redundant. A memoised derivation, no timer (D3).
   const docsPreview = useDocsPreview();
@@ -1004,6 +1009,18 @@ export function OutputScreen() {
                 outputBlocked={submitBlocker !== undefined}
                 {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
                 prefill={submitPrefill}
+                openRatchet={
+                  openRatchet !== null && criteriaResult !== null
+                    ? {
+                        gate: openRatchet.gate,
+                        review: buildReviewInput(
+                          criteriaResult,
+                          openRatchet.baseline,
+                          openRatchet.notes,
+                        ),
+                      }
+                    : null
+                }
                 lintResults={{
                   criteria:
                     criteriaResult?.rows.map((r) => ({
@@ -1024,6 +1041,7 @@ export function OutputScreen() {
       </section>
 
       {narrow ? detailsPane : null}
+      <ReformatConsentDialog {...artifact.reformatConsent} />
     </div>
   );
 }

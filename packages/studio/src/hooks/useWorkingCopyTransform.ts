@@ -77,7 +77,7 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
-import { marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
+import { capsHandlingFromDecisions, marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -194,6 +194,13 @@ export interface UseWorkingCopyTransformOptions {
     touchLayoutJson: string | null;
     keyEditOps: readonly KeyEditOperation[];
   };
+
+  /**
+   * The CSS step's in-progress stylesheet, used INSTEAD OF the store's
+   * `customCss` (a string; null = untouched, "" = cleared). Omit to read the
+   * store's committed value. A primitive, so it keys the memo directly.
+   */
+  liveCss?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +229,9 @@ export function useWorkingCopyTransform(
   // the store's own touchLayoutJson field and an empty key-edit overlay. See
   // the option's doc comment (UseWorkingCopyTransformOptions.liveLayoutOverride).
   const liveLayoutOverride = opts?.liveLayoutOverride;
+  const liveCss = opts?.liveCss;
+  const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
+  const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
@@ -289,6 +299,12 @@ export function useWorkingCopyTransform(
   // station), so the memo keys on the guard input's content, not the value.
   const marksTreatment = useDecisionStore(
     (s) => s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined,
+  );
+  // spec 112: the caps-handling decision step 2.8 applies. Read through the
+  // same gate the download uses (a caseless alphabet is not asked), keyed on
+  // the mode so an unrelated re-record never rebuilds the projection.
+  const capsHandlingMode = useDecisionStore(
+    (s) => capsHandlingFromDecisions(s.decisions)?.mode ?? null,
   );
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
@@ -513,6 +529,7 @@ export function useWorkingCopyTransform(
             deadkeyOverlay: { ops: deadkeyOps },
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
+            customCss,
           },
           {
             vfs,
@@ -522,6 +539,7 @@ export function useWorkingCopyTransform(
             getPattern: (id) => patternMap?.get(id),
             identity: identityArg,
             marksTreatment,
+            capsHandling: capsHandlingMode === null ? undefined : { mode: capsHandlingMode },
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
@@ -555,5 +573,7 @@ export function useWorkingCopyTransform(
     deadkeyOpsKey,
     storeContextToleranceOverlay,
     marksGuardsKey,
+    capsHandlingMode,
+    customCss,
   ]);
 }

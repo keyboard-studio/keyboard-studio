@@ -29,6 +29,7 @@ export {
 } from "./build.js";
 export type { PackageDescriptorIdentity, KpsFontDescriptorEntry } from "./build.js";
 export { applyIdentityToKps } from "./patch.js";
+export type { OpenKpsOptions, KpsLanguageEntry } from "./patch.js";
 export type { ApplyIdentityToKpsResult } from "./patch.js";
 
 /**

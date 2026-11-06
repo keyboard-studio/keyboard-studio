@@ -20,12 +20,12 @@ import {
 
 describe("questionRegistry", () => {
   // 9 Phase A + 47 Phase B + 27 Phase F + 3 Phase G + 31 Reserve = 117 question
-  // modules, + 17 gallery decision modules (spec 090 T008; +custom-css, +help-docs,
-  // +welcome-htm on the css/html editor steps) = 134 total
-  // (re-verified 2026-11-03 — update this count in the same change that adds
+  // modules, + 21 gallery decision modules (spec 090 T008; +custom-css, +help-docs,
+  // +welcome-htm on the css/html editor steps; +language-list, spec 111; +caps-handling, spec 112; +missing-letters-review, +upgrades-review, spec 111) = 138 total
+  // (re-verified 2026-11-04 — update this count in the same change that adds
   // or removes a questionRegistry entry.)
-  it("has exactly the verified inventory of 134 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(134);
+  it("has exactly the verified inventory of 138 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(138);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

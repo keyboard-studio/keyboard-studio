@@ -57,7 +57,7 @@ import type {
   WelcomeFolderImage,
 } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
-import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
+import { classifyRemovalCapabilities, parseKpsLanguages, rewriteKpsBuildEntries } from "@keyboard-studio/engine";
 import type { KeyEditOverlay, StartDocCssText } from "@keyboard-studio/engine";
 import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -417,6 +417,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     touchKeyIdentity: s.touchKeyIdentity,
     startDocProfile: s.startDocProfile,
     baselineDocFindings: s.baselineDocFindings,
+    startSource: s.startSource,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -434,6 +435,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     desktopLocked: s.desktopLocked,
     sequenceFlaggedChars: s.sequenceFlaggedChars,
     touchLayoutJson: s.touchLayoutJson,
+    customCss: s.customCss,
     touchDraft: s.touchDraft,
     galleryIntrosSeen: s.galleryIntrosSeen,
     staleSteps: [...s.staleSteps],
@@ -592,6 +594,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     touchKeyIdentity: snapshot.touchKeyIdentity ?? null,
     startDocProfile: snapshot.startDocProfile ?? null,
     baselineDocFindings: snapshot.baselineDocFindings ?? null,
+    // Absent from a draft saved before the source choice existed.
+    startSource: snapshot.startSource ?? null,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),
@@ -611,6 +615,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // an absent value must not clobber the store default with undefined.
     sequenceFlaggedChars: snapshot.sequenceFlaggedChars ?? [],
     touchLayoutJson: snapshot.touchLayoutJson,
+    // Drafts saved before the CSS step wrote a value carry no key.
+    customCss: snapshot.customCss ?? null,
     touchDraft: snapshot.touchDraft,
     galleryIntrosSeen: snapshot.galleryIntrosSeen,
     staleSteps: new Set(snapshot.staleSteps),
@@ -743,4 +749,80 @@ export function rehydrateWorkingCopyFromSession(): boolean {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Old Adapt drafts (spec 111): bring the keyboard's own package descriptor in
+// ---------------------------------------------------------------------------
+
+/** What {@link repairOpenDraftDescriptor} did, for the caller to surface. */
+export interface OpenDraftRepairReport {
+  /** True when the descriptor was fetched and added to the working copy. */
+  restored: boolean;
+  /** Why nothing was restored, when `restored` is false and a restore was due. */
+  reason?: string;
+  /**
+   * Documentation files the earlier Adapt output regenerated from slices and
+   * that now travel as the keyboard's own text instead. The draft does not
+   * store a regenerated copy (output is built on demand), so there is nothing
+   * to revert, only these to keep as carried.
+   */
+  carriedFiles: string[];
+}
+
+/**
+ * A draft saved before Open carried the `.kps` holds the starting files
+ * without it. Fetch it for the draft's starting keyboard, rewrite its
+ * `..\build\` entries to the studio's build paths, add it to the working
+ * copy's starting files and seed the language list from it, so output patches
+ * the keyboard's own descriptor in place. A fetch failure leaves the draft
+ * as it was (the earlier Adapt behaviour) and reports why.
+ *
+ * Fetches from the proxy's default branch: the starting commit is not
+ * recorded on a draft that predates Open.
+ */
+export async function repairOpenDraftDescriptor(deps?: {
+  fetchImpl?: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>;
+  proxyBase?: string;
+}): Promise<OpenDraftRepairReport> {
+  const state = useWorkingCopyStore.getState();
+  const { instantiationMode, startKeyboard, startVfs } = state;
+  const none: OpenDraftRepairReport = { restored: false, carriedFiles: [] };
+  if (instantiationMode !== "adapt-existing" || startKeyboard === null || startVfs === null) return none;
+  const kpsPath = `source/${startKeyboard.id}.kps`;
+  if (startVfs.get(kpsPath) !== undefined) return none;
+
+  const proxyBase = deps?.proxyBase ?? "/kbd-proxy";
+  const fetchImpl = deps?.fetchImpl ?? ((url: string) => globalThis.fetch(url));
+  let text: string;
+  try {
+    const response = await fetchImpl(`${proxyBase}/${startKeyboard.path}/${kpsPath}`);
+    if (!response.ok) return { ...none, reason: "the package descriptor could not be fetched" };
+    text = await response.text();
+  } catch {
+    return { ...none, reason: "the package descriptor could not be fetched" };
+  }
+
+  // The author may have switched keyboards while the fetch ran.
+  const current = useWorkingCopyStore.getState();
+  if (current.startKeyboard?.id !== startKeyboard.id || current.startVfs === null) return none;
+
+  const vfs = createVirtualFS(current.startVfs.entries());
+  vfs.set(kpsPath, rewriteKpsBuildEntries(text, startKeyboard.id), false);
+  const languages = parseKpsLanguages(text).map((l) => ({ tag: l.tag, name: l.name }));
+  const identity = current.identity;
+  useWorkingCopyStore.setState({
+    startVfs: vfs,
+    ...(identity !== null && identity.languages === undefined && languages.length > 0
+      ? { identity: { ...identity, languages } }
+      : {}),
+  });
+
+  const carriedFiles: string[] = [];
+  if (current.startReadmeMdText !== null) carriedFiles.push("README.md");
+  if (current.startWelcomeHtmText !== null) {
+    carriedFiles.push(current.startWelcomeConvention === "flat" ? "source/welcome.htm" : "source/welcome/welcome.htm");
+  }
+  if (current.startHelpPhpText !== null) carriedFiles.push(`source/help/${startKeyboard.id}.php`);
+  return { restored: true, carriedFiles };
 }

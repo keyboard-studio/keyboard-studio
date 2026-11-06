@@ -1,0 +1,3 @@
+# Upstream copies must stay byte-exact (BOM, line endings): no normalisation.
+upstream_basic_kbdus/* -text
+upstream_basic_kbdfr/*.kmn -text

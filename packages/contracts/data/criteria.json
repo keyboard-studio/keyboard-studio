@@ -1398,11 +1398,39 @@
     "lintRuleId": "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE"
   },
   {
+    "id": "7.28-cased-script-declares-casedkeys",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "A keyboard that produces cased letters (Latin, Cyrillic, Greek, …) declares `store(&CasedKeys)` covering every key with a case pair, so Caps Lock shifts its letter keys, instead of relying on per-key CAPS/NCAPS rules or ignoring Caps Lock. Mnemonic layouts are exempt (`&CasedKeys` is not supported with `&MNEMONICLAYOUT`)",
+    "lintRuleId": "KM_LINT_CASEDKEYS_MISSING"
+  },
+  {
     "id": "18.14-touch-layers-carry-bksp-enter",
     "section": "18. Design heuristics (DISCUS)",
     "band": "layer-c-enforce",
     "description": "Every touch layer (including shift/RALT/alt variants) includes the required control keys (`K_LOPT`, `K_BKSP`, `K_ENTER`); standard control keys use canonical `K_` IDs, not touch-only `T_` IDs",
     "lintRuleId": "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS"
+  },
+  {
+    "id": "18.16-touch-caps-layer-complete",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "description": "A keyboard that produces cased letters has a touch `caps` layer, reached by double-tapping Shift on `default`, carrying the uppercase of every cased letter on `default`; its character keys do not switch layers. The right-alt and ctrl shift layers have caps layers too, character keys on other layers return to `default` after one tap (one-shot Shift), and Shift keys are labelled `*Shifted*` / `*ShiftedLock*` and return to the unshifted layer",
+    "lintRuleId": "KM_LINT_TOUCH_CAPS_LAYER"
+  },
+  {
+    "id": "18.17-touch-modifier-keys-consistent",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "description": "Ctrl and RAlt keys on touch layers are consistent: id `K_RALT`, labels `*Ctrl*` / `*RAlt*` instead of legacy spellings (`ctrl`, `RALT`, `*Alt*`, `default`), each opening the right Ctrl or RAlt layer (or the shift/caps variant), and shown as the active special key on the layer they opened",
+    "lintRuleId": "KM_LINT_TOUCH_MODIFIER_KEYS"
+  },
+  {
+    "id": "18.18-touch-symbols-layer-linked",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "description": "A touch layout has a `symbol` layer, reached from every other layer by a `K_SYMBOLS` link key (`symbol-caps` from the caps layers), so punctuation and symbols are reachable on touch",
+    "lintRuleId": "KM_LINT_TOUCH_SYMBOLS_LAYER"
   },
   {
     "id": "18.15-touch-desktop-output-parity",
@@ -1424,5 +1452,19 @@
     "band": "layer-c-enforce",
     "description": "All files in the keyboard folder follow the filename convention: lowercase extensions, and names containing only alphanumerics, `-`, `_`, `+`, `.`",
     "lintRuleId": "KM_LINT_FILENAME_CONVENTION"
+  },
+  {
+    "id": "7.29-no-raw-ctrl-rules",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "[content review] No rule uses Ctrl without Alt (a raw Ctrl modifier) to produce a character; those characters belong on a Shift or Alt-based layer so Ctrl keeps its application-shortcut meaning. Ctrl+Space and `basic_*` keyboards are exempt",
+    "lintRuleId": "KM_LINT_RAW_CTRL"
+  },
+  {
+    "id": "7.30-sided-ctrl-advisory",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "[content review] Advisory: a rule that uses a left- or right-sided Ctrl modifier is reported as a warning, with a suggestion to prefer an Alt-based placement",
+    "lintRuleId": "KM_LINT_SIDED_CTRL_ADVISORY"
   }
 ]

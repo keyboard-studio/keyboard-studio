@@ -188,36 +188,9 @@ Each story phase ends with the same three gate tasks:
 
 ---
 
-## Phase 7: User Story 5 — Caps handling decision (P2)
+## Phase 7: User Story 5 — Caps handling decision (moved)
 
-**Goal**: FR-050 to FR-055. **Independent test**: G5 passes on every fixture at `caps`; the NCAPS WASM check is green on the four bases; the sil_cameroon_qwerty adapt offer compiles with zero warnings. **Branch**: `km/106-caps-handling`.
-
-- [ ] T042 [P] [US5] Write tests in `packages/studio/src/survey/questions/gallery/capsHandling.test.ts`:
-  - the casing gate (a caseless alphabet gives mode none, not asked);
-  - the copy default with QWERTY and AZERTY floors;
-  - the union with a non-letter key carrying ŋ/Ŋ on base/shift and on RAlt/Shift+RAlt.
-  - The four decision-point fixtures cannot show the US5 gap (all are copy-track bases that already carry `&CasedKeys`). Add a synthetic fixture with ŋ/Ŋ on a non-letter key and a caseless base, and extend G5 to read store-routed pairs (`any(altgrKeys) > index(...)`), so G5 fails before T048 and passes after it.
-- [ ] T043 [P] [US5] Write adapt-track tests:
-  - an explicit CAPS/NCAPS start IR is offered only when the simulator outputs under {none, SHIFT, CAPS, SHIFT+CAPS} match for every key;
-  - otherwise the offer is withheld with a reason;
-  - `&CasedKeys` already present is extracted.
-- [ ] T044 [US5] Add the `caps-handling` decision id to `packages/studio/src/decisions/decisionTypes.ts`. Add the `CapsHandlingValue` type and its zod mirror (if decision values are schema-validated) next to the module.
-- [ ] T045 [US5] Write the module `packages/studio/src/survey/questions/gallery/capsHandling.ts`:
-  - `screen: "layout"`, `requires: ["character-inventory","windows-layout"]`, `apply: () => ({})`;
-  - `lookupDefault` for copy and `extract` for adapt;
-  - register it in `survey/questions/registry.ts` (Art. IX).
-- [ ] T046 [US5] Write the renderer `packages/studio/src/survey/caps/CapsHandlingStep.tsx`:
-  - provenance shown;
-  - the key set listed;
-  - an adapt offer with before/after evidence;
-  - auto-complete as `not-asked` for caseless scripts, following the `ConvenienceCharsStep` :250-267 precedent;
-  - en/fr i18n;
-  - accessibility per spec 056.
-- [ ] T047 [US5] Remove the `ensureCasedKeysStore` call from `scaffoldIR` in `packages/engine/src/scaffolder/scaffold-ir.ts` (:274) and export the family key constants. Update the scaffolder tests that expected the silent store.
-- [ ] T048 [US5] Add projection step 2.8 to `packages/studio/src/lib/projectWorkingCopyVfs.ts`, after 2.7 and before 3. It writes or removes `store(&CasedKeys)` from the decision plus the assigned keys that carry a pair. When the adapt simplification is accepted, it also strips the CAPS/NCAPS rules. Wire it through `projectionInputFromState`.
-- [ ] T049 [US5] Companion pre-accept: in `packages/studio/src/editors/assignLoop/casePairCompanion.ts` and `MechanismGallery.tsx` (:5219, :3630), Apply includes the companion when the key is in the derived set and the counterpart is in the alphabet. The banner stays visible and dismissible.
-- [ ] T050 [P] [US5] Add a touch parity test in `packages/engine/src/scaffolder/cleanTouchLayout.test.ts`: every cased letter on `default` is on `shift` and `caps`, and `caps` keys carry no `nextlayer`.
-- [ ] T051 [US5] Gate. Commit `feat(studio): caps handling as a decision with &CasedKeys`, push, and open a PR.
+T042–T051 moved to [specs/112-cased-keys](../112-cased-keys/spec.md) (2026-11-03). None were started.
 
 ---
 

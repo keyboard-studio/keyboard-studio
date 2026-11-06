@@ -19,6 +19,9 @@ vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShel
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
+vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
+vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
+vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -73,43 +76,19 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → osk → touch → css → help → html → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
-    // track is now a real manifest step (P0 fix); project_name is a derived side trail.
-    // attribution (#1901) is spine: every author walks it after the track choice.
-    const spineIds = manifest
-      .filter((s) => STEP_TRAILS.get(s.id)?.spine !== false)
-      .map((s) => s.id);
-    expect(spineIds).toEqual([
-      "identity",
-      "layout",
-      "choose_base",
-      "track",
-      "attribution",
-      "characters",
-      "marks",
-      "punctuation",
-      "invisibles",
-      "convenience",
-      "carve",
-      "deadkeys",
-      "rules",
-      "mechanisms",
-      "osk",
-      "touch",
-      "css",
-      "help",
-      "html",
-      "package",
-    ]);
-  });
+  // The spine order is not pinned here: steps/manifest.test.ts checks the manifest
+  // against the derived screens, the first and last step, and the ordering rules
+  // that matter.
 
-  it("project_name is a derived side trail (gated) rejoining at 'characters' (M4b, P0 fix)", () => {
+  it("project_name is a derived side trail (gated) rejoining the next spine step after it (M4b, P0 fix)", () => {
     const projName = manifest.find((s) => s.id === "project_name");
     expect(projName).toBeDefined();
     // Spec 091 T014/T015: steps no longer carry gatedBy — the gate is the
     // derived screen gate published as screenGates by steps/manifest.ts.
     expect(screenGates.get("project_name")).toBeDefined();
-    expect(STEP_TRAILS.get("project_name")).toEqual({ spine: false, joinTarget: "characters" });
+    const after = manifest.slice(manifest.findIndex((s) => s.id === "project_name") + 1);
+    const join = after.find((s) => STEP_TRAILS.get(s.id)?.spine !== false);
+    expect(STEP_TRAILS.get("project_name")).toEqual({ spine: false, joinTarget: join?.id });
   });
 
   it("manifest has exactly one lock:physical and one lock:touch, in that order (M3)", () => {
@@ -243,9 +222,18 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("track-adapt"));
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
-    // Must land on prefill (characters step), not project-name.
+    // Spec 111: adapt is Open, so the language list comes next, then Letters and the
+    // Mechanisms gallery (a non-basic keyboard), then the on-screen keyboard; the
+    // character survey is hidden on Open, and project-name never shows.
     fireEvent.click(screen.getByTestId("survey-advance"));
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-open-missing-letters")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 

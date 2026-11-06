@@ -131,28 +131,9 @@ The Bafut fixture compiles with zero unreachable-rule hints.
 
 ---
 
-### User Story 5 - Caps Lock does the right thing (Priority: P2)
+### User Story 5 - Caps Lock does the right thing (moved)
 
-Caps handling is a visible decision. For a script with casing, Copy-track keyboards default to
-`&CasedKeys` covering every key that carries a cased pair. Adapt-track keyboards get a strong
-suggestion that is applied only when it provably changes no output. Caseless scripts get nothing.
-
-**Why this priority**: E7. A Caps Lock that produces half-cased output is a top user complaint, and
-today the setting is a silent scaffold side-effect.
-
-**Independent Test**: In the "after caps" fixtures:
-
-- QWERTY and AZERTY stores have the expected text, including a non-letter key carrying `ŋ`/`Ŋ`.
-- A caseless base produces no store.
-- `sil_cameroon_qwerty` adapt is offered the simplification, and it compiles with zero warnings.
-- The NCAPS consistency check is green on all four #2302 bases.
-
-**Acceptance Scenarios**:
-
-1. **Given** a cased alphabet on the Copy track, **When** caps is reached, **Then** `cased-keys` is pre-set (provenance default) with the union of the family list and every key whose planes form a case pair.
-2. **Given** an Adapt start with explicit CAPS/NCAPS rules, **When** caps is reached, **Then** the simplification is offered only if outputs under {none, SHIFT, CAPS, SHIFT+CAPS} are identical before and after; otherwise it is withheld with the reason.
-3. **Given** a caseless alphabet, **When** caps is reached, **Then** mode = none and the step auto-completes.
-4. **Given** the target key is in `&CasedKeys` and the counterpart is in the alphabet, **When** a letter is placed, **Then** the case-pair companion is pre-accepted (visible, dismissible).
+Moved to [specs/112-cased-keys](../112-cased-keys/spec.md) (2026-11-03), which unifies it with criterion 7.28 and the Open-path upgrade.
 
 ---
 
@@ -258,13 +239,7 @@ accepted, and all 32 cases pass the consistency gates.
 - **FR-042**: Suggested discards MUST be recorded as default-provenance removals on the first carve visit and approved by Continue. Keep and Discard-all remain overrides.
 - **FR-043**: Overwriting an always-keep punctuation character MUST raise the demotion proposal. A decline MUST be recorded as a decision.
 
-**Caps (US5)**
-- **FR-050**: A `caps-handling` decision (mode: cased-keys | explicit-rules | none; keys) MUST exist on the layout screen. It requires the character inventory and the Windows layout.
-- **FR-051**: The decision MUST be proposed only when the confirmed alphabet has at least one case pair. Otherwise mode = none and the step auto-completes.
-- **FR-052**: On the Copy track the decision MUST default to cased-keys. The key set is the union of the layout-family list and every key, on every assigned modifier plane, whose outputs form a case pair. The store MUST be derived in the projection, and the scaffold MUST NOT insert it silently.
-- **FR-053**: On the Adapt track, the simplification to cased-keys MUST be offered only when it compiles and the simulator outputs for every key under {none, SHIFT, CAPS, SHIFT+CAPS} are identical before and after. Otherwise the offer MUST be withheld with the reason. Declining keeps the author's rules.
-- **FR-054**: The case-pair companion MUST be pre-accepted when the key is in the derived set and the counterpart is in the alphabet.
-- **FR-055**: Touch `caps` layers MUST carry every cased letter that is on `default`, and they MUST have no `nextlayer`.
+**Caps (US5)**: FR-050–FR-055 moved to [specs/112-cased-keys](../112-cased-keys/spec.md) (FR-004–FR-012).
 
 **Tolerance (US6)**
 - **FR-060**: The normalization step MUST be default-accepted (provenance default) when the tolerance report has gap findings.

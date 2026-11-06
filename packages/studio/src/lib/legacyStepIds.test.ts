@@ -129,6 +129,11 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
     for (const id of MAIN_STEP_IDS_AT_18E63AA4) {
       const loc: Location = { route: "survey", step: id as never };
       const result = resolveLocation(loc, ctx);
+      // The track step is gated off once a track is recorded (spec 111 start screen).
+      if (id === "track") {
+        expect(result.kind, id).toBe("degraded");
+        continue;
+      }
       expect(result.kind, id).toBe("reachable");
       if (result.kind === "reachable") {
         expect(result.location.step, id).toBe(resolveLegacyStepId(id));

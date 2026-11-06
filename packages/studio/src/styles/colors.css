@@ -106,9 +106,12 @@
        --sil-yellow-dark #D99408 on white -> 2.56:1   (fails; was the value)
        --sil-orange-dark #C24F00 on white -> 4.76:1   (passes)
      The fill/border warning tokens below still use the yellow ramp — yellow is
-     fine as a background or a rule, just not as a glyph. Navy keeps its own
+     fine as a background or a rule, just not as a glyph. The text token is a
+     darker orange (#A84400) than --sil-orange-dark because it is also drawn on
+     --app-warning-bg (#FFF8E8), where #C24F00 is 4.50:1 (a hair under AA) and
+     #A84400 is 5.68:1. Navy keeps its own
      lighter amber (#ECC26A), which works there because the ground is dark. */
-  --app-warning-text:     var(--sil-orange-dark);
+  --app-warning-text:     #A84400;
   --app-warning-border:   var(--sil-yellow-20);
   --app-warning-bg:       var(--sil-yellow-10);
 

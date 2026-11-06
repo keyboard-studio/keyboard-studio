@@ -138,12 +138,12 @@ function sourceFiles(dir: string, srcRoot = dir): string[] {
 }
 
 describe("reset() call sites (FR-033)", () => {
-  it("are exactly StudioShell's start-over and WelcomeScreen's new project", () => {
+  it("are exactly StudioShell's start-over and the fresh session (guest and New)", () => {
     const srcRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
     const callers = sourceFiles(srcRoot)
       .filter((f) => readFileSync(f, "utf8").includes("useSurveyAnswerStore.getState().reset()"))
       .map((f) => relative(srcRoot, f).split(sep).join("/"))
       .sort();
-    expect(callers).toEqual(["StudioShell.tsx", "components/WelcomeScreen.tsx"]);
+    expect(callers).toEqual(["StudioShell.tsx", "lib/freshSession.ts"]);
   });
 });

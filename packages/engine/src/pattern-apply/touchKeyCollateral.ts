@@ -312,6 +312,7 @@ function collectDiscardTargets(
       return [];
 
     case "move":
+    case "moveToLayer":
       // A move relocates the EXISTING node — both appliers splice it rather
       // than rebuilding it, precisely so nothing is discarded (FR-021). The
       // key keeps its id, its output and every sub-key, so there is no

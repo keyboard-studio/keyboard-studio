@@ -31,6 +31,22 @@ export default defineConfig({
   // editor workers via `?worker` imports (see touchBuilder/monacoSetup.ts) —
   // same ES-worker requirement, no CDN workers.
   worker: { format: "es" },
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // tsc's top-level `this && this.__decorate` helper in the vendored Keyman
+        // engine has no sourcemap mapping, so Rollup reports its (already ignored)
+        // THIS_IS_UNDEFINED warning as an unmappable "Error when using sourcemap".
+        if (
+          warning.code === "SOURCEMAP_ERROR" &&
+          warning.id?.includes("/simulator/vendor/keyman/")
+        ) {
+          return;
+        }
+        warn(warning);
+      },
+    },
+  },
   plugins: [
     // The Lingui macro transform runs via Babel; @vitejs/plugin-react only
     // spins up Babel when given plugins, so this is the one place dev-server

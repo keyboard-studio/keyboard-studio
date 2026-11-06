@@ -40,6 +40,21 @@
 // help-doc-language. No order, trail, lock or edge changes: the new
 // modules chain inside the help screen via their own requires.
 
+//
+// AMENDMENT (spec 111, same rule -- a deliberate decision, not a
+// regeneration): Open adds an "open_languages" side trail (the editable
+// language list, shown on the adapt track only). BASELINE_ORDER gains it
+// after project_name; BASELINE_SIDE_TRAILS gains open_languages ->
+// characters; BASELINE_MEMBERSHIP gains its one decision; the Flow Map
+// gains a fork from attribution and a join back at characters. The Copy
+// walk and every other entry are unchanged.
+//
+// AMENDMENT (spec 111 Phase 12, same rule -- a deliberate decision, not a
+// regeneration): the Open walk adds two more gated side trails after
+// open_languages, "open_missing_letters" and "open_upgrades" (each shown only
+// for the problem kind the baseline recorded). Both rejoin at characters, gain
+// one membership entry each and a Flow Map fork and join. Nothing else moves.
+
 import { describe, expect, it } from "vitest";
 import { manifest, screenTrails } from "./manifest.ts";
 import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
@@ -55,6 +70,9 @@ const BASELINE_ORDER = [
   "track",
   "attribution",
   "project_name",
+  "open_languages",
+  "open_missing_letters",
+  "open_upgrades",
   "characters",
   "marks",
   "punctuation",
@@ -75,7 +93,9 @@ const BASELINE_ORDER = [
 
 /** Side-trail step -> the step it rejoins (the old spine:false + joinTarget). */
 const BASELINE_SIDE_TRAILS: Readonly<Record<string, string>> = {
-  project_name: "characters",
+  // spec 111 Phase 12 amendment: Open's three pages are gated SPINE screens (their
+  // gates are false on Copy), so project_name now rejoins at the first of them.
+  project_name: "open_languages",
   touch_seed_source: "touch",
 };
 
@@ -89,9 +109,12 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["layout", "choose_base", "spine"],
   ["choose_base", "track", "spine"],
   ["track", "attribution", "spine"],
-  ["attribution", "characters", "spine"],
+  ["attribution", "open_languages", "spine"],
   ["attribution", "project_name", "fork"],
-  ["project_name", "characters", "join"],
+  ["project_name", "open_languages", "join"],
+  ["open_languages", "open_missing_letters", "spine"],
+  ["open_missing_letters", "open_upgrades", "spine"],
+  ["open_upgrades", "characters", "spine"],
   ["characters", "marks", "spine"],
   ["marks", "punctuation", "spine"],
   ["punctuation", "invisibles", "spine"],
@@ -113,12 +136,15 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
 const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
-  layout: ["windows-layout"],
+  layout: ["windows-layout", "caps-handling"],
   choose_base: ["base-keyboard"],
   track: ["authoring-track"],
   // #1901 amendment: the author trio's membership, moved from identity.
   attribution: ["author-name", "author-email", "copyright-holder"],
   project_name: ["project-display-name", "project-keyboard-id"],
+  open_languages: ["language-list"],
+  open_missing_letters: ["missing-letters-review"],
+  open_upgrades: ["upgrades-review"],
   characters: ["existing-keyboards", "co-installed-keyboards", "discovery-intro", "text-sample", "text-sample-review", "linguist-confirm", "picker-confirm", "standard-letters", "typing-approach", "special-letters-wanted", "special-letters", "special-letters-notes", "latin-digraphs-wanted", "latin-digraphs-list", "punctuation-wanted", "punctuation-list", "digit-set", "char-count", "latin-qwerty-branch", "spare-keys-qwerty", "latin-azerty-branch", "azerty-qz-swap", "spare-keys-azerty", "non-roman-branch", "indic-conjuncts-wanted", "indic-virama", "indic-vowels-separate", "indic-pre-base-vowels", "indic-nukta-wanted", "indic-nukta-detail", "indic-onset-vowels-wanted", "indic-onset-vowels-list", "sea-medials", "sea-stacked-consonants", "rtl-direction-confirm", "rtl-short-vowels", "rtl-special-letters", "syllabic-note", "syllabic-grid", "syllabic-finals-wanted", "syllabic-finals-list", "other-free-entry", "contact-language", "legacy-encoding", "use-case", "additional-methods", "character-inventory"],
   marks: ["marks-treatment"],
   punctuation: ["punctuation-inventory"],
@@ -185,7 +211,12 @@ const mustPrecede = (a: string, b: string): boolean => {
   const sb = screenById.get(b);
   if (sa === undefined || sb === undefined) return false;
   const aModules = new Set(sa.moduleIds);
-  return sb.moduleIds.some((id) =>
+  // An intra-step member (spec 112: caps-handling on the layout screen) forms
+  // no ordering edge, as in deriveScreens: only screen owners order a screen.
+  return sb.moduleIds.filter((id) => {
+    const m = byModuleId.get(id);
+    return !(m !== undefined && typeof m.renderer === "function" && m.group !== undefined);
+  }).some((id) =>
     [...requiresReach(id)].some((provider) => aModules.has(provider)),
   );
 };
@@ -285,11 +316,22 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //     base-keyboard, track -> attribution via authoring-track) once
     //     il_author_name's target-script edge is a screenRequires like
     //     the others (#1901 reclassification).
+    //   - open_languages (spec 111 amendment) is a gated side trail with only
+    //     the track gate, so it is a tie-break against every other screen.
+    //   - open_missing_letters and open_upgrades (spec 111 Phase 12) are chained
+    //     after open_languages (and each other) by screenRequires, and the
+    //     Mechanisms screen screen-requires the Upgrades page, so all three Open pages
+    //     precede mechanisms and everything after it (which orders attribution before them
+    //     too, through the language list). They stay tie-breaks only
+    //     against the character-survey and trim screens that Open hides.
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
       ["layout", "track"],
       ["layout", "attribution"],
       ["layout", "project_name"],
+      ["layout", "open_languages"],
+      ["layout", "open_missing_letters"],
+      ["layout", "open_upgrades"],
       ["layout", "characters"],
       ["layout", "marks"],
       ["layout", "punctuation"],
@@ -304,13 +346,33 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["attribution", "carve"],
       ["attribution", "deadkeys"],
       ["attribution", "rules"],
-      ["attribution", "mechanisms"],
-      ["attribution", "osk"],
-      ["attribution", "touch_seed_source"],
-      ["attribution", "touch"],
-      ["attribution", "css"],
-      ["attribution", "help"],
-      ["attribution", "html"],
+      ["project_name", "open_languages"],
+      ["project_name", "open_missing_letters"],
+      ["project_name", "open_upgrades"],
+      ["open_languages", "characters"],
+      ["open_languages", "marks"],
+      ["open_languages", "punctuation"],
+      ["open_languages", "invisibles"],
+      ["open_languages", "convenience"],
+      ["open_languages", "carve"],
+      ["open_languages", "deadkeys"],
+      ["open_languages", "rules"],
+      ["open_missing_letters", "characters"],
+      ["open_missing_letters", "marks"],
+      ["open_missing_letters", "punctuation"],
+      ["open_missing_letters", "invisibles"],
+      ["open_missing_letters", "convenience"],
+      ["open_missing_letters", "carve"],
+      ["open_missing_letters", "deadkeys"],
+      ["open_missing_letters", "rules"],
+      ["open_upgrades", "characters"],
+      ["open_upgrades", "marks"],
+      ["open_upgrades", "punctuation"],
+      ["open_upgrades", "invisibles"],
+      ["open_upgrades", "convenience"],
+      ["open_upgrades", "carve"],
+      ["open_upgrades", "deadkeys"],
+      ["open_upgrades", "rules"],
       ["marks", "punctuation"],
       ["marks", "invisibles"],
       ["marks", "convenience"],

@@ -109,13 +109,13 @@ When the package is being installed, Keyman shows `readme.htm`. It now shows, in
 
 ---
 
-### User Story 5 - An adapted keyboard's README is regenerated (Priority: P2)
+### User Story 5 - An updated keyboard's README is regenerated (Priority: P2)
 
-When an author adapts an existing keyboard (Track 2), the generated README replaces the original README. If the author did not write a new description, the original description is reused.
+When an author updates an existing keyboard they opened (Track 2), the generated README replaces the original README. If the author did not write a new description, the original description is reused.
 
 **Why this priority**: Without it, an adapted keyboard keeps a stale hand-written README that may not reflect its changes. The user chose replacement over appending.
 
-**Independent Test**: Adapt a keyboard whose `.kps` has a description and whose README has hand-written prose. Produce output without answering the description question. The README is the generated template, and its description is the `.kps` description.
+**Independent Test**: Update a keyboard whose `.kps` has a description and whose README has hand-written prose. Produce output without answering the description question. The README is the generated template, and its description is the `.kps` description.
 
 **Acceptance Scenarios**:
 

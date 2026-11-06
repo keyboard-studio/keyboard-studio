@@ -17,6 +17,13 @@
     },
     "provenance": "asked"
   },
+  "caps-handling": {
+    "id": "caps-handling",
+    "value": {
+      "mode": "cased-keys"
+    },
+    "provenance": "default"
+  },
   "carved-layout": {
     "id": "carved-layout",
     "value": {

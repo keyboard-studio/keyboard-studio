@@ -22,11 +22,20 @@ import type { I18n, MessageDescriptor } from "@lingui/core";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
+  parseKvks,
+  emitKvks,
   oskContinueResult,
   DESKTOP_GEOMETRY,
 } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
+import { isOpenMode } from "../../lib/openMode.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
+
+/** Open mode: the `.kvks` path in the opened keyboard's files. */
+function openKvksFilePath(keyboardId: string): string {
+  return `source/${keyboardId}.kvks`;
+}
 
 // The Code tab pane. Lazy-loaded so the Monaco bundle never lands in the
 // main chunk (same discipline as TouchCodePane).
@@ -123,15 +132,37 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const kbdname = useWorkingCopyStore((s) => s.ir?.header.name ?? "keyboard");
 
-  // Base KvksIR generated from the IR (the "reset" baseline).
+  const mode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  // Open mode (spec 111 FR-009): edit the keyboard's existing `.kvks`; generate
+  // one only when the file is missing.
+  const openKvksPath =
+    isOpenMode(mode) && startKeyboard !== null
+      ? openKvksFilePath(startKeyboard.id)
+      : null;
+  const openKvksText =
+    openKvksPath !== null && startVfs !== null
+      ? readVfsText(startVfs, openKvksPath)
+      : undefined;
+
+  // Base KvksIR: the existing file on Open, otherwise generated from the IR
+  // (the "reset" baseline).
   const baseKvks = useMemo<KvksIR | null>(() => {
+    if (openKvksText !== undefined) {
+      try {
+        return parseKvks(openKvksText);
+      } catch {
+        return null;
+      }
+    }
     if (!ir) return null;
     try {
       return generateKvksFromIR(ir, kbdname);
     } catch {
       return null;
     }
-  }, [ir, kbdname]);
+  }, [ir, kbdname, openKvksText]);
 
   // Current (edited) KvksIR + undo history.
   const [kvks, setKvks] = useState<KvksIR | null>(baseKvks);
@@ -158,13 +189,19 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         <div style={{ padding: 24, color: TEXT_DIM }}>
           {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
         </div>
-        {/* Footer with Continue so the step can be skipped when no Kvks is available. */}
+        {/* Footer with Continue so the step can be skipped when no Kvks is available.
+            Pinned to the bottom bar (sticky) so nav stays reachable. */}
         <div
           style={{
             display: "flex",
             gap: 8,
-            padding: 16,
+            margin: "auto -24px -24px",
+            padding: "16px 24px",
             borderTop: `1px solid ${BORDER}`,
+            background: BG_CANVAS,
+            position: "sticky",
+            bottom: 0,
+            zIndex: 10,
           }}
         >
           {onBack && (
@@ -218,6 +255,10 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     setHistory((h) => [...h, effectiveKvks]);
     setKvks(next);
     setError(null);
+    // Open: an edit lands in the existing file (a missing file is not created).
+    if (openKvksPath !== null && openKvksText !== undefined) {
+      useWorkingCopyStore.getState().replaceStartingPointFromText(openKvksPath, emitKvks(next));
+    }
   };
 
   const undo = () => {
@@ -227,6 +268,9 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       if (prev) {
         setKvks(prev);
         setError(null);
+        if (openKvksPath !== null && openKvksText !== undefined) {
+          useWorkingCopyStore.getState().replaceStartingPointFromText(openKvksPath, emitKvks(prev));
+        }
       }
       return h.slice(0, -1);
     });
@@ -342,7 +386,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       }}
     >
       <h1 style={{ margin: 0, fontSize: 20, color: TEXT_MAIN }}>
-        {t({ id: "editor.assignLoop.osk.title", message: "On-Screen Keyboard" })}
+        {t({ id: "editor.assignLoop.osk.title", message: "OnScreen Keyboard Label Editors" })}
       </h1>
       <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
         {t({
@@ -619,14 +663,19 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       </>
       )}
 
-      {/* Footer: undo + nav */}
+      {/* Bottom bar: nav pinned to the viewport bottom (sticky) so Back /
+          Continue stay reachable while the key grid scrolls. */}
       <div
         style={{
           display: "flex",
           gap: 8,
-          marginTop: "auto",
-          paddingTop: 16,
+          margin: "auto -24px -24px",
+          padding: "16px 24px",
           borderTop: `1px solid ${BORDER}`,
+          background: BG_CANVAS,
+          position: "sticky",
+          bottom: 0,
+          zIndex: 10,
         }}
       >
         {onBack && (

@@ -103,6 +103,7 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   collectModifierTokensInUse,
+  collectLayerCombosInUse,
   collectCharContributors,
   sliceContributorDescriptors,
   collectCompositionMethod,
@@ -122,6 +123,8 @@ import {
   useTreatmentFilteredChars,
 } from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
+import { useRemovalWarning } from "../../hooks/useRemovalWarning.ts";
+import { RemovalWarningNotice } from "../../components/RemovalWarningNotice.tsx";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
 } from "../../survey/placementSeeds.ts";
@@ -139,7 +142,7 @@ import {
   isLoneCombiningMark,
   reflectCharInput,
 } from "../../lib/charInput.ts";
-import { useCasePairCompanion } from "./casePairCompanion.ts";
+import { useCasePairCompanion, type CasePairProposal } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { useDisplacementProposal } from "./useDisplacementProposal.ts";
 import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
@@ -500,14 +503,27 @@ const AUTO_DEFAULT_EXCLUDED: ReadonlySet<ModifierToken> = new Set(["CAPS"]);
  */
 function computeModifierPool(
   inUse: ReadonlySet<ModifierToken>,
+  ctrlAltInUse: boolean,
 ): ModifierToken[] {
   // Alt: generic ALT only until the keyboard already uses a chiral alt
   // token; once RALT or LALT is in use, offer both chiral options.
+  // A keyboard with no Alt-family rule yet is offered the sided pair (RALT
+  // first, so a new AltGr placement defaults to RALT); one that already uses
+  // generic ALT (or CTRL ALT) keeps that form.
   const altFamily: ModifierToken[] =
-    inUse.has("RALT") || inUse.has("LALT") ? ["RALT", "LALT"] : ["ALT"];
+    inUse.has("RALT") || inUse.has("LALT") || !inUse.has("ALT")
+      ? ["RALT", "LALT"]
+      : ["ALT"];
   // Ctrl mirrors Alt.
+  // Raw (unsided) Ctrl is never offered as new content; generic CTRL stays
+  // only when the keyboard already writes AltGr as `CTRL ALT`, so the author
+  // can rebuild that form (the combo then carries Alt).
   const ctrlFamily: ModifierToken[] =
-    inUse.has("RCTRL") || inUse.has("LCTRL") ? ["LCTRL", "RCTRL"] : ["CTRL"];
+    inUse.has("RCTRL") || inUse.has("LCTRL")
+      ? ["LCTRL", "RCTRL"]
+      : ctrlAltInUse
+        ? ["CTRL"]
+        : [];
   return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS"];
 }
 
@@ -2017,9 +2033,20 @@ export function MechanismGallery({
         : new Set<ModifierToken>(),
     [workingIr],
   );
+  // True when the keyboard already writes AltGr as unsided `CTRL ALT`.
+  const ctrlAltInUse = useMemo<boolean>(
+    () =>
+      workingIr !== null &&
+      collectLayerCombosInUse(workingIr).some(
+        (c) =>
+          c.includes("CTRL") &&
+          c.some((t) => t === "ALT" || t === "RALT" || t === "LALT"),
+      ),
+    [workingIr],
+  );
   const modifierPool = useMemo<ModifierToken[]>(
-    () => computeModifierPool(modifierTokensInUse),
-    [modifierTokensInUse],
+    () => computeModifierPool(modifierTokensInUse, ctrlAltInUse),
+    [modifierTokensInUse, ctrlAltInUse],
   );
   // First-slot default — the alt-family entry the pool leads with: generic
   // ALT until the keyboard already uses a chiral alt token, at which point
@@ -2534,14 +2561,19 @@ export function MechanismGallery({
       // helps — it stays a selectable dropdown option, just never the default.
       // If no eligible option is in use, the slot falls back to unselected ("")
       // until the author picks one (canApply blocks Apply meanwhile).
-      if (prev.length === 0) return [...prev, raltDefaultToken];
+      if (prev.length === 0) {
+        // The keyboard's AltGr form is `CTRL ALT`: the first layer is both.
+        return ctrlAltInUse && modifierPool.includes("CTRL") && modifierPool.includes("ALT")
+          ? ["CTRL", "ALT"]
+          : [...prev, raltDefaultToken];
+      }
       const available = optionsForRaltSlot(modifierPool, prev, prev.length);
       const inUseDefault = available.find(
         (tok) => !AUTO_DEFAULT_EXCLUDED.has(tok) && modifierTokensInUse.has(tok),
       );
       return [...prev, inUseDefault ?? ""];
     });
-  }, [raltDefaultToken, modifierPool, modifierTokensInUse]);
+  }, [raltDefaultToken, modifierPool, modifierTokensInUse, ctrlAltInUse]);
 
   const handleRemoveRaltSlot = useCallback((index: number) => {
     // No minimum — the combined card's zero-layer state is valid (a plain
@@ -2629,8 +2661,49 @@ export function MechanismGallery({
     [resetMethodState, currentChar, proposeCompanion, sessionAssignments],
   );
 
+  // Spec 112: a pre-accepted companion (the key is a cased key) is recorded
+  // with the placement. The banner stays up; Undo restores the assignments as
+  // they were before the companion went in. `acceptedCompanion` remembers
+  // which proposal was recorded so the effect runs once per proposal.
+  const [acceptedCompanion, setAcceptedCompanion] = useState<{
+    proposal: CasePairProposal;
+    before: MechanismAssignment[];
+    after: MechanismAssignment[];
+  } | null>(null);
+  const acceptedProposalRef = useRef<CasePairProposal | null>(null);
+  useEffect(() => {
+    if (pendingCompanion === null || pendingCompanion.preAccepted !== true) return;
+    if (acceptedProposalRef.current === pendingCompanion) return;
+    const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
+    if (next === null) return;
+    // Marked before the write: the store update re-renders synchronously, ahead
+    // of the state update below, and must not find this proposal unhandled.
+    acceptedProposalRef.current = pendingCompanion;
+    recordAssignments(next);
+    setAcceptedCompanion({ proposal: pendingCompanion, before: sessionAssignments, after: next });
+  }, [pendingCompanion, sessionAssignments, recordAssignments]);
+  const isCompanionAccepted = acceptedCompanion !== null && acceptedCompanion.proposal === pendingCompanion;
+
+  const handleCompanionUndo = useCallback(() => {
+    if (acceptedCompanion === null) return;
+    const { before, after } = acceptedCompanion;
+    const unchanged =
+      sessionAssignments.length === after.length && sessionAssignments.every((a, i) => a === after[i]);
+    // Nothing else moved since: put the assignments back exactly. Otherwise
+    // drop only what the companion added.
+    recordAssignments(unchanged ? before : sessionAssignments.filter((a) => !after.includes(a) || before.includes(a)));
+    setAcceptedCompanion(null);
+    clearCompanion();
+  }, [acceptedCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
+    // Already recorded with the placement: Keep it just closes the banner.
+    if (isCompanionAccepted) {
+      setAcceptedCompanion(null);
+      clearCompanion();
+      return;
+    }
     // The touch mechanism confirms in its own gallery.
     if (pendingCompanion.mechanism === "touch") return;
     // What confirming records — the parallel combo, the RAlt / shift
@@ -2640,7 +2713,7 @@ export function MechanismGallery({
     const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
     if (next !== null) recordAssignments(next);
     clearCompanion();
-  }, [pendingCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+  }, [pendingCompanion, isCompanionAccepted, sessionAssignments, recordAssignments, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // Displacement (demotion) — confirm handler (#2300, gate G3)
@@ -3036,6 +3109,11 @@ export function MechanismGallery({
     currentCharBadge,
   ]);
 
+  // Characters whose last existing method was removed here (FR-006 warning).
+  const [removedCharsForWarning, setRemovedCharsForWarning] = useState<string[]>([]);
+  const { warnings: removalWarnings, dismiss: dismissRemovalWarning } =
+    useRemovalWarning(removedCharsForWarning);
+
   const handleRemoveExistingMethod = useCallback(
     (row: ExistingMethodRow) => {
       if (!row.deletable) return;
@@ -3049,8 +3127,18 @@ export function MechanismGallery({
       } else if (row.kind === "slot") {
         cascadeDelete([], [row.id]);
       }
+      // FR-006: the character is gone from the keyboard only when no other
+      // method still produces it; then a needed letter warns (dismissably).
+      if (
+        currentChar !== null &&
+        !existingMethods.some((m) => m.id !== row.id && !m.isUsed)
+      ) {
+        setRemovedCharsForWarning((prev) =>
+          prev.includes(currentChar) ? prev : [...prev, currentChar],
+        );
+      }
     },
-    [cascadeDelete],
+    [cascadeDelete, currentChar, existingMethods],
   );
 
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
@@ -3960,7 +4048,8 @@ export function MechanismGallery({
               <CasePairProposalBanner
                 proposal={pendingCompanion}
                 onConfirm={handleCompanionConfirm}
-                onDismiss={dismissCompanion}
+                onDismiss={isCompanionAccepted ? handleCompanionUndo : dismissCompanion}
+                accepted={isCompanionAccepted}
               />
             )}
 
@@ -4127,6 +4216,9 @@ export function MechanismGallery({
                   rows are built and removed, and NonDeletableMethodChip
                   (parts/RemovableChipRow.tsx) for the shared static-chip
                   palette. */}
+            {removalWarnings.length > 0 && (
+              <RemovalWarningNotice warnings={removalWarnings} onDismiss={dismissRemovalWarning} />
+            )}
             {currentChar !== null && existingMethods.length > 0 && (
               <div>
                 <p

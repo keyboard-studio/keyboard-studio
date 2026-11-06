@@ -49,11 +49,12 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
     compileResult,
     assemblyVerdicts,
     instantiationMode,
+    expectedCoverage,
   } = findings;
 
   return useMemo(() => {
     if (!ready || vfs === null) return null;
-    return resolveCriteria({
+    const resolved = resolveCriteria({
       criteria: ALL_CRITERIA,
       mode: "authored",
       lintFindings,
@@ -76,6 +77,7 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
       // mentions. Never decides the row (fontLicense.ts).
       licenseTextHints: licenseTextHints(readVfsText(vfs, "LICENSE.md")),
     });
+    return expectedCoverage !== null ? { ...resolved, expectedCoverage } : resolved;
   }, [
     ready,
     vfs,
@@ -88,5 +90,6 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
     instantiationMode,
     contrastiveAttestation,
     fontLicenseAttestations,
+    expectedCoverage,
   ]);
 }

@@ -18,7 +18,21 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useOpenRatchet } from "../hooks/useOpenRatchet.ts";
+import { navigateTo } from "../lib/navigate.ts";
+import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { ALL_CRITERIA } from "@keyboard-studio/contracts";
+import { MISSING_LETTERS_RULE } from "../criteria/openIssues.ts";
+import { upgradePairFor } from "../criteria/upgradePairs.ts";
+import { useRouteSuggestedFix } from "../hooks/useRouteSuggestedFix.ts";
+import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
+import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
+import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
+import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { isOpenMode } from "../lib/openMode.ts";
+import { Button } from "../ui/Button.tsx";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
 const containerStyle: React.CSSProperties = {
@@ -39,10 +53,32 @@ const noticeStyle: React.CSSProperties = {
   color: TEXT_DIM,
 };
 
+/**
+ * Where a finding's "open editor" goes on Open: missing letters (18.6) to the Letters
+ * step, a criterion with a registered upgrade to the Upgrades step, anything else to the
+ * walk where it stands.
+ */
+function openEditorFor(criterionId: string): void {
+  const criterion = ALL_CRITERIA.find((c) => c.id === criterionId);
+  const rule = criterion !== undefined && "lintRuleId" in criterion ? criterion.lintRuleId : undefined;
+  const step =
+    rule === MISSING_LETTERS_RULE ? "open_missing_letters" : rule !== undefined && upgradePairFor(rule) !== undefined ? "open_upgrades" : null;
+  if (step !== null && jumpToLocation({ route: "survey", step }).kind !== "refused") return;
+  navigateTo("survey");
+}
+
 export function CriteriaScreen() {
   const { t } = useLingui();
   const artifact = usePreviewArtifact();
   const result = useAuthoredCriteria(artifact.stage);
+
+  const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
+  const routeFix = useRouteSuggestedFix();
+  const docFixes = useDocRegenerationFixes();
+  // Review is the Open walk's last step: Continue hands over to Output (spec 111 FR-031).
+  const isOpen = isOpenMode(useWorkingCopyStore((s) => s.instantiationMode));
+  const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
+  const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
   const attest = useCriteriaRecordStore((s) => s.attest);
   const clearAttestation = useCriteriaRecordStore((s) => s.clearAttestation);
@@ -83,7 +119,23 @@ export function CriteriaScreen() {
   const keyboardLabel =
     artifact.stage.kind === "ready" ? artifact.stage.keyboardId : undefined;
 
+  // "Add character" fixes for expected characters the keyboard cannot type
+  // (criterion 18.6 on Open, FR-018a): one per finding, routed to the
+  // mechanisms gallery. Offers only; nothing is applied here.
+  const missingFixes = ratchet !== null
+    ? missingCharacterFixes(
+        result.rows.flatMap((r) => (r.status === "not-met" ? (r.evidence().findings ?? []) : [])),
+      )
+    : [];
+
   return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
+      <SuggestedFixesPanel
+        extra={[...missingFixes, ...docFixes]}
+        onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))} testId="criteria-suggested-fixes" />
+    </div>
+    <div style={{ flex: 1, minHeight: 0 }}>
     <CriteriaPage
       result={result}
       mode="authored"
@@ -100,6 +152,29 @@ export function CriteriaScreen() {
       onClearContrastive={clearContrastiveRegion}
       onAttestFontLicense={attestFontLicense}
       onClearFontLicense={clearFontLicense}
+      {...(ratchet !== null
+        ? {
+            openRatchet: {
+              baseline: ratchet.baseline,
+              notes: ratchet.notes,
+              onSaveNote: (key, criterionId, text) =>
+                setReviewNote({ key, criterionId, text }),
+              onRemoveNote: removeReviewNote,
+              // The walk is where a failing item is edited; per-fix links
+              // arrive with the suggested-fix work.
+              onOpenEditor: (criterionId) => openEditorFor(criterionId),
+            },
+          }
+        : {})}
     />
+    </div>
+    {isOpen && (
+      <div style={{ flex: "none", display: "flex", justifyContent: "flex-end", padding: "8px 24px", borderTop: `1px solid ${BORDER}` }}>
+        <Button variant="primary" onClick={() => navigateTo("output")} data-testid="criteria-continue">
+          <Trans id="criteria.continueToOutput">Continue to Output</Trans>
+        </Button>
+      </div>
+    )}
+    </div>
   );
 }

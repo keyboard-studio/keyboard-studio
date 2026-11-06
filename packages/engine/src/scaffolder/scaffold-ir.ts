@@ -8,8 +8,6 @@
 import type {
   KeyboardIR,
   IRStore,
-  IRRule,
-  ContextElement,
   StoreItem,
   RoutingGroup,
 } from "@keyboard-studio/contracts";
@@ -30,6 +28,7 @@ export interface ScaffoldIRIdentity {
 
 export interface ScaffoldIROptions {
   identity: ScaffoldIRIdentity;
+  /** Routing group of the copy. No longer read by scaffoldIR (caps handling moved to the studio's projection); kept for callers. */
   group: RoutingGroup;
 }
 
@@ -55,7 +54,7 @@ function stringToStoreItems(s: string): StoreItem[] {
   return [...s].map((ch) => ({ kind: "char", value: ch }) satisfies StoreItem);
 }
 
-/** Shared lookup used by setSystemStore/hasSystemStore/getSystemStoreString below. */
+/** Shared lookup used by setSystemStore/getSystemStoreString below. */
 function findSystemStore(ir: KeyboardIR, name: string): IRStore | undefined {
   const upper = name.toUpperCase();
   return ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === upper);
@@ -73,10 +72,6 @@ function setSystemStore(ir: KeyboardIR, name: string, value: string): void {
     isSystem: true,
     items: stringToStoreItems(value),
   });
-}
-
-function hasSystemStore(ir: KeyboardIR, name: string): boolean {
-  return findSystemStore(ir, name) !== undefined;
 }
 
 /** Read a system store's char-run value back into a plain string, or null. */
@@ -201,72 +196,30 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   rewriteSiblingPathStores(ir, identity.keyboardId, startKeyboardId);
 }
 
-function ruleHasModifier(rule: IRRule, modifier: string): boolean {
-  for (const el of rule.context) {
-    if (el.kind === "vkey" && el.modifiers.includes(modifier)) return true;
-  }
-  return false;
-}
+/** Family floors for the `&CasedKeys` store, as key arrays. */
+export const CASED_KEYS_FLOOR_QWERTY: readonly string[] = Array.from(
+  { length: 26 },
+  (_, i) => `K_${String.fromCharCode(65 + i)}`,
+);
+export const CASED_KEYS_FLOOR_AZERTY: readonly string[] = [
+  ...CASED_KEYS_FLOOR_QWERTY,
+  ...Array.from({ length: 10 }, (_, i) => `K_${i}`),
+  "K_HYPHEN",
+  "K_EQUAL",
+  "K_LBRKT",
+  "K_RBRKT",
+  "K_BKSLASH",
+  "K_QUOTE",
+  "K_COMMA",
+  "K_PERIOD",
+  "K_SLASH",
+  "K_COLON",
+];
 
-/**
- * Strip rules whose context relies on the NCAPS or CAPS modifier — these
- * carry the legacy "caps-aware" behaviour the new keyboard replaces with a
- * &CasedKeys directive. Matches the v1.0 line-based filter behaviour
- * (`[CAPS …]` rules removed; the NCAPS keyword used to be stripped before
- * the line filter, so NCAPS-prefixed rules are dropped too).
- */
-export function stripCapsRules(ir: KeyboardIR): void {
-  for (const group of ir.groups) {
-    if (group.readonly) continue;
-    group.rules = group.rules.filter(
-      (r) => !ruleHasModifier(r, "CAPS") && !ruleHasModifier(r, "NCAPS")
-    );
-  }
-}
-
-/**
- * Remove any residual `CAPS` / `NCAPS` modifier tokens from vkey context
- * elements. The rule-removal pass in {@link stripCapsRules} catches whole
- * rules; this pass cleans any vkey element that happens to carry a CAPS
- * modifier alongside other state (defensive — should be a no-op after
- * stripCapsRules in practice).
- */
-export function removeCapsContextElements(ir: KeyboardIR): void {
-  for (const group of ir.groups) {
-    if (group.readonly) continue;
-    for (const rule of group.rules) {
-      rule.context = rule.context.map((el): ContextElement => {
-        if (el.kind !== "vkey") return el;
-        const modifiers = el.modifiers.filter(
-          (m) => m !== "CAPS" && m !== "NCAPS"
-        );
-        return { ...el, modifiers };
-      });
-    }
-  }
-}
-
-const CASED_KEYS_QWERTY = "[K_A]..[K_Z]";
-const CASED_KEYS_AZERTY =
-  "[K_A]..[K_Z] [K_0]..[K_9] [K_HYPHEN] [K_EQUAL] [K_LBRKT] [K_RBRKT] [K_BKSLASH] [K_QUOTE] [K_COMMA] [K_PERIOD] [K_SLASH] [K_COLON]";
-
-/**
- * Insert a `&CasedKeys` system store if missing. Skipped for non-Roman
- * keyboards (caps state is meaningless there). Per spec §14 Decision 2,
- * AZERTY keyboards get the extended range; QWERTY/QWERTZ get A–Z only.
- */
-export function ensureCasedKeysStore(ir: KeyboardIR, group: RoutingGroup): void {
-  if (group === "non-roman") return;
-  if (hasSystemStore(ir, "CASEDKEYS")) return;
-
-  const value = group === "azerty" ? CASED_KEYS_AZERTY : CASED_KEYS_QWERTY;
-  const store: IRStore = {
-    nodeId: "store:CasedKeys",
-    name: "CasedKeys",
-    isSystem: true,
-    items: [{ kind: "raw", text: value }],
-  };
-  ir.stores.push(store);
+/** The family floor for a routing group; `[]` for `non-roman`. */
+export function casedKeysFloor(group: RoutingGroup): readonly string[] {
+  if (group === "non-roman") return [];
+  return group === "azerty" ? CASED_KEYS_FLOOR_AZERTY : CASED_KEYS_FLOOR_QWERTY;
 }
 
 /**
@@ -287,9 +240,9 @@ export function pruneUnusedDeadkeysInPlace(ir: KeyboardIR): void {
  * contract that the scaffolder is an IR→IR transform.
  */
 export function scaffoldIR(ir: KeyboardIR, opts: ScaffoldIROptions): KeyboardIR {
-  stripCapsRules(ir);
-  removeCapsContextElements(ir);
-  ensureCasedKeysStore(ir, opts.group);
+  // Caps handling is not the scaffolder's: the copied keyboard's CAPS/NCAPS
+  // rules and `&CasedKeys` are left exactly as copied. The studio's
+  // caps-handling decision rewrites them at projection step 2.8.
   pruneUnusedDeadkeysInPlace(ir);
   resetIdentity(ir, opts.identity);
   return ir;

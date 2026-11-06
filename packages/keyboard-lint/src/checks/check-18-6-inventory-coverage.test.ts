@@ -265,4 +265,30 @@ describe("checkInventoryCoverage (18.6 KM_LINT_INVENTORY_UNCOVERED)", () => {
     const inv = makeInventory(["à"]);
     expect(checkInventoryCoverage(ir, inv, KMN_PATH)).toEqual([]);
   });
+
+  it("treats composed and decomposed as equivalent across separate keystrokes", () => {
+    // "e" and a combining acute from separate rules (base key, then a
+    // diacritic key): a precomposed é in the inventory is typable.
+    const rule = (id: string, value: string) => ({ nodeId: id, context: [], output: [{ kind: "char" as const, value }] });
+    const ir = makeIR([
+      { nodeId: "g1", name: "main", usingKeys: true, readonly: false, rules: [rule("r1", "e"), rule("r2", "́")] },
+    ]);
+    expect(checkInventoryCoverage(ir, makeInventory(["é"]), KMN_PATH)).toEqual([]);
+    // Missing either piece still reports the composed character.
+    const noMark = makeIR([{ nodeId: "g1", name: "main", usingKeys: true, readonly: false, rules: [rule("r1", "e")] }]);
+    expect(checkInventoryCoverage(noMark, makeInventory(["é"]), KMN_PATH)).toHaveLength(1);
+  });
+
+  it("counts a precomposed output as producing its combining mark", () => {
+    const ir = makeIR([
+      {
+        nodeId: "g1",
+        name: "main",
+        usingKeys: true,
+        readonly: false,
+        rules: [{ nodeId: "r1", context: [], output: [{ kind: "char", value: "é" }] }],
+      },
+    ]);
+    expect(checkInventoryCoverage(ir, makeInventory(["́"]), KMN_PATH)).toEqual([]);
+  });
 });

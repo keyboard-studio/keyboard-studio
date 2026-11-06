@@ -51,14 +51,52 @@ export interface CasePairProposalBannerProps {
   proposal: CasePairProposal;
   onConfirm: () => void;
   onDismiss: () => void;
+  /**
+   * Spec 112: the companion was recorded with the placement (the key is a
+   * cased key). The banner stays up, saying so, with Keep / Undo in place of
+   * Map it / No thanks, so the choice is still visible and reversible.
+   */
+  accepted?: boolean;
 }
 
 export function CasePairProposalBanner({
   proposal,
   onConfirm,
   onDismiss,
+  accepted = false,
 }: CasePairProposalBannerProps) {
   const { t, i18n } = useLingui();
+
+  if (accepted) {
+    return (
+      <ProposalBanner
+        // Polite live region: the companion was added as a side effect of Apply.
+        role="status"
+        ariaLabel={t({
+          id: "editor.assignLoop.companion.accepted.ariaLabel",
+          message: "Case-pair companion added",
+        })}
+        message={
+          <Trans id="editor.assignLoop.companion.accepted.prompt">
+            {proposal.originalChar} has an uppercase form, {proposal.counterpart}. It was added
+            to the same key as well, because Caps Lock covers this key.
+          </Trans>
+        }
+        confirmLabel={<Trans id="editor.assignLoop.companion.accepted.keepButton">Keep it</Trans>}
+        confirmAriaLabel={t({
+          id: "editor.assignLoop.companion.accepted.keepAriaLabel",
+          message: `Keep ${proposal.counterpart} on the same key`,
+        })}
+        onConfirm={onConfirm}
+        declineLabel={<Trans id="editor.assignLoop.companion.accepted.undoButton">Undo</Trans>}
+        declineAriaLabel={t({
+          id: "editor.assignLoop.companion.accepted.undoAriaLabel",
+          message: `Remove ${proposal.counterpart} from the same key`,
+        })}
+        onDismiss={onDismiss}
+      />
+    );
+  }
 
   return (
     <ProposalBanner

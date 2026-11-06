@@ -17,13 +17,20 @@
 
 import { useEffect, useRef } from "react";
 import { Trans } from "@lingui/react/macro";
+import type { CrashSendState } from "../crash/send.ts";
 
 export interface CrashRecoveryScreenProps {
   /** URL of the filed issue, once the report has landed. */
   issueUrl?: string;
+  /**
+   * Where the send stands. The screen only claims "a report has been sent" once
+   * it has: the send is fire-and-forget and a failure is otherwise invisible
+   * (FR-078), so an unconditional claim would be false whenever it failed.
+   */
+  status?: CrashSendState["status"];
 }
 
-export function CrashRecoveryScreen({ issueUrl }: CrashRecoveryScreenProps) {
+export function CrashRecoveryScreen({ issueUrl, status }: CrashRecoveryScreenProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -40,9 +47,19 @@ export function CrashRecoveryScreen({ issueUrl }: CrashRecoveryScreenProps) {
       </h1>
 
       <p>
-        <Trans id="crash.report.sent.notice">
-          Something went wrong. A report has been sent so this can be fixed.
-        </Trans>
+        {status === "sent" ? (
+          <Trans id="crash.report.sent.notice">
+            Something went wrong. A report has been sent so this can be fixed.
+          </Trans>
+        ) : status === "failed" ? (
+          <Trans id="crash.report.failed.notice">
+            Something went wrong. The report could not be sent. Reloading the page may help.
+          </Trans>
+        ) : (
+          <Trans id="crash.report.pending.notice">
+            Something went wrong. Sending a report so this can be fixed.
+          </Trans>
+        )}
       </p>
 
       {issueUrl !== undefined && (

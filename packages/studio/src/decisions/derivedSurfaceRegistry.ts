@@ -98,6 +98,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "setStartDocCssTexts",
       "setStartPackageFonts",
       "setBaselineDocFindings",
+      "setStartSource",
       "setStartDocProfile",
     ],
     fields: [
@@ -119,6 +120,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "startPackageFonts",
       "startDocProfile",
       "baselineDocFindings",
+      "startSource",
       "removalCapabilities",
     ],
     decisionIds: ["base-keyboard"],
@@ -342,6 +344,18 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "inventory-carve-deadkeys.md §A.0: carveTouchKeepInert has no value field (D-090-31) and no live writer — dormant, registered under carve",
     ],
   },
+  {
+    id: "custom-css",
+    label: "Custom CSS step (OSK stylesheet text)",
+    phase: 6,
+    status: "pending",
+    storeActions: ["setCustomCss"],
+    fields: ["customCss"],
+    decisionIds: [],
+    evidence: [
+      "CssEditor's Continue writes the stylesheet text to workingCopyStore.customCss, which projectWorkingCopyVfs step 0b projects into the VFS; no decision module records it yet (NO-DECISION-SOURCE)",
+    ],
+  },
 ];
 
 /**
@@ -385,6 +399,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   touchKeyIdentity: { kind: "field", class: "EDITOR-AUTHORED" },
   startDocProfile: { kind: "field", class: "STARTING-POINT" },
   baselineDocFindings: { kind: "field", class: "STARTING-POINT" },
+  startSource: { kind: "field", class: "STARTING-POINT" },
   ir: { kind: "field", class: "DECISION-DERIVED" },
   removalCapabilities: { kind: "field", class: "STARTING-POINT" },
   deletedNodeIds: { kind: "field", class: "DECISION-DERIVED" },
@@ -406,6 +421,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   desktopLocked: { kind: "field", class: "SURVEY-SLOT" },
   sequenceFlaggedChars: { kind: "field", class: "SURVEY-SLOT" },
   touchLayoutJson: { kind: "field", class: "SURVEY-SLOT" },
+  customCss: { kind: "field", class: "EDITOR-AUTHORED" },
   touchDraft: { kind: "field", class: "EDITOR-AUTHORED" },
   galleryIntrosSeen: { kind: "field", class: "EPHEMERAL" },
   keyEditOverlay: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -446,6 +462,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   lockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   unlockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   setTouchLayoutJson: { kind: "action", class: "SURVEY-SLOT" },
+  setCustomCss: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchDraft: { kind: "action", class: "EDITOR-AUTHORED" },
   markGalleryIntroSeen: { kind: "action", class: "EPHEMERAL" },
   commitKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },
@@ -460,6 +477,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   reset: { kind: "action", class: "EPHEMERAL" },
   instantiateFromStart: { kind: "action", class: "STARTING-POINT" },
   instantiateFromExisting: { kind: "action", class: "STARTING-POINT" },
+  // Open mode (spec 111 FR-009): swaps a starting-point file and startIr together.
+  replaceStartingPointFromText: { kind: "action", class: "STARTING-POINT" },
   setIdentity: { kind: "action", class: "OVERLAY-CHANNEL" },
   setAttribution: { kind: "action", class: "OVERLAY-CHANNEL" },
   setLicenseUnparseable: { kind: "action", class: "STARTING-POINT" },
@@ -483,6 +502,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   setTouchKeyIdentity: { kind: "action", class: "EDITOR-AUTHORED" },
   setStartDocProfile: { kind: "action", class: "STARTING-POINT" },
   setBaselineDocFindings: { kind: "action", class: "STARTING-POINT" },
+  setStartSource: { kind: "action", class: "STARTING-POINT" },
   isInstantiated: { kind: "action", class: "STARTING-POINT" },
   markStale: { kind: "action", class: "EPHEMERAL" },
   clearStale: { kind: "action", class: "EPHEMERAL" },

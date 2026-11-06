@@ -236,6 +236,8 @@ Required test vectors:
 
 ## R7. Caps (US5)
 
+*US5 moved to [specs/112-cased-keys](../112-cased-keys/spec.md); this research note stays as its code survey.*
+
 - **Module**: new gallery module `survey/questions/gallery/capsHandling.ts`. It has the
   `windowsLayout.ts` shape: `provides: ["caps-handling"]`, `screen: "layout"`,
   `requires: ["character-inventory", "windows-layout"]`, `apply: () => ({})`. The store is projected,

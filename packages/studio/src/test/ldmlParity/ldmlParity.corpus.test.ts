@@ -33,7 +33,8 @@ import type { LdmlBaseLayout, LdmlClassification, LdmlClassifyInput } from "@key
 import type { DecisionSet } from "../../decisions/decisionTypes.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../../lib/projectWorkingCopyVfs.ts";
-import { projectionInputFromState } from "../../lib/projectionInput.ts";
+import { capsHandlingFromDecisions, projectionInputFromState } from "../../lib/projectionInput.ts";
+import { getDecisionSnapshot } from "../../stores/decisionStore.ts";
 import { projectWorkingCopyForOutput } from "../../lib/serializeWorkingCopy.ts";
 import { physicalAssignmentsOf } from "../../lib/physicalAssignments.ts";
 import { getMarksTreatmentValue } from "../../survey/marks/marksValue.ts";
@@ -140,6 +141,7 @@ async function previewProjection(): Promise<{ vfs: VirtualFS; keyboardId: string
         getPattern: (id) => patterns.get(id),
         identity: displayName !== undefined && displayName !== "" ? { displayName } : null,
         marksTreatment: getMarksTreatmentValue(),
+        capsHandling: capsHandlingFromDecisions(getDecisionSnapshot()),
         baseDisplayName: startKeyboard.displayName,
       },
     ),
