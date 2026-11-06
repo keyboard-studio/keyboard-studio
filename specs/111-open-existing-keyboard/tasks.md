@@ -221,3 +221,16 @@ Polish (T048–T051) after the last story shipped in this spec
 - [x] T060 [US8] Review step: the criteria view as the walk's last step on Open, Continue to Output with the FR-027 gate; Documentation is the existing help step (FR-029)
 - [x] T061 [US8] Tests: the Open walk order with and without each problem kind (`advance.open.test.ts`); a Continue-only e2e walk of basic_kbdus to Output
 
+## Phase 13: Ctrl (FR-035..FR-039; added 2026-11-05)
+
+**Goal**: report raw Ctrl outside `basic_*` keyboards, move its characters back to the Mechanisms gallery when the author accepts, and stop new Ctrl content and layers on both paths.
+
+**Independent test**: open ewe (accented vowels on Ctrl+1-9) and accept the fix: the Ctrl rules are gone, the vowels appear unplaced in the Mechanisms gallery, and Review no longer reports raw Ctrl. Open sil_bunong (thin space on Ctrl+Space): nothing is reported. Copy a `basic_*` keyboard with Ctrl rules: they survive, and no gallery offers a Ctrl placement.
+
+- [ ] T070 [US6] Criterion row (`packages/contracts/data/criteria.json`) and keyboard-lint check for unsided `CTRL` (no Alt) on letter, number and punctuation keys, not Space, skipped for `basic_*` keyboards; message recommends moving and warns the keyboard may not be accepted
+- [ ] T071 [US6] Upgrade pair: remove the reported Ctrl rules by splice and return their characters to the inventory unplaced (skipping characters typed elsewhere); register in `packages/studio/src/criteria/upgradePairs.ts`
+- [ ] T072 [US6] Galleries (mechanisms, touch) on both paths never offer a Ctrl plane or layer for new content, and the touch layer editor cannot add a Ctrl layer the keyboard lacks; existing `basic_*` Ctrl content is kept on Copy
+- [ ] T073 [US6] Advisory criterion for `LCTRL` / `RCTRL`: allowed, Alt-based placement preferred
+- [ ] T074 [US6] (awaiting owner: FR-039) `CTRL ALT` to `RALT` upgrade with whole-keyboard modifier conversion and a before/after AltGr simulation
+- [ ] T075 [US6] (proposed) Touch upgrade: rename the 11 `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content to `rightalt` / `rightalt-shift` (and basic_kbdth0's to `leftctrl`), with their `nextlayer` references
+
