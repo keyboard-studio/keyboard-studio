@@ -38,6 +38,7 @@ import { UpgradesRenderer } from "./UpgradesStep.tsx";
 import { GalleryStepContext } from "../../steps/galleryHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useDecisionLogStore } from "../../decisions/decisionLogStore.ts";
+import { STANDALONE_STEP_ID, useStepNavStore } from "../../stores/stepNavStore.ts";
 import { seedInstantiatedWorkingCopy } from "../../test/workingCopy.ts";
 
 function mount(onComplete = vi.fn(), onChange = vi.fn()) {
@@ -82,7 +83,9 @@ describe("UpgradesStep", () => {
   it("Continue records the page as reviewed and completes the step", async () => {
     const { onComplete, onChange } = mount();
     await screen.findByText("Use the test upgrade");
-    fireEvent.click(screen.getByRole("button", { name: /^Continue$/ }));
+    const forward = useStepNavStore.getState().entries[STANDALONE_STEP_ID]?.spec.forward;
+    expect(forward).toBeDefined();
+    forward!.onClick();
     expect(onChange).toHaveBeenCalledWith(true);
     expect(onComplete).toHaveBeenCalled();
   });
