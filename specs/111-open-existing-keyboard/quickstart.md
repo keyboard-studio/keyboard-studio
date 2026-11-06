@@ -34,7 +34,7 @@ Expect: submit is blocked exactly when one of the first three is present.
 
 ## 5. Manual walk (Playwright CLI, `pnpm dev`)
 
-1. Welcome → **Open an existing keyboard** → search "Cameroon" → open. Expect the criteria view within 3 interactions (SC-009), with every finding marked pre-existing.
+1. Welcome → **Open an existing keyboard** → search "Cameroon" → open. Expect the Languages step within 3 interactions (SC-009). Review later lists every finding as pre-existing.
 2. Open the `.kmn` code view. Expect the original comments in place. Edit a comment and apply; the output diff shows that line only.
 3. Add a character to touch only, then apply. Expect suggestions for the physical keys and the docs; skip both.
 4. Open upstream `basic_kbdus` (choose keymanapp/keyboards). Expect the cased-keys finding with a fix (needs criterion 7.28 merged). Accept it; expect the criterion to pass.
