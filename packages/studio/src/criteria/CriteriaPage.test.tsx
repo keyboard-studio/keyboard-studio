@@ -21,6 +21,7 @@ import { EMPTY_CRITERIA_RECORD } from "./criteriaTypes.ts";
 import type { CriteriaFacts, CriteriaInput } from "./criteriaTypes.ts";
 import { resolveCriteria } from "./resolveCriteria.ts";
 import { CriteriaPage } from "./CriteriaPage.tsx";
+import type { FileTreeNode } from "../review/fileTree.ts";
 
 afterEach(cleanup);
 
@@ -606,5 +607,161 @@ describe("CriteriaPage expected-characters coverage (spec 111 FR-018a)", () => {
     expect(screen.getByTestId("criteria-expected-coverage").textContent).toContain(
       "3 of 5 had exemplar data",
     );
+  });
+});
+
+describe("CriteriaPage — severity filter and file inventory (/review parity)", () => {
+  // The fixture's authored statuses: bake met, history not-met (hard),
+  // unimplemented not-yet-checkable, yellow needs-author, red
+  // needs-human, numeric met, font needs-human. The map is the
+  // authored mapping: bake met, hard failure error, needs-* warning,
+  // font hidden (the twin-style exclusion, exercised here as a map
+  // value, not a mode rule).
+  const SEVERITY_MAP = {
+    "fix.1-bake": "met",
+    "fix.2-history-order": "error",
+    "fix.3-unimplemented": "warning",
+    "fix.4-yellow": "warning",
+    "fix.5-red": "warning",
+    "fix.6-numeric-region": "met",
+    "fix.7-font-license": "hidden",
+  } as const;
+
+  it("with no severity map there is no filter and every row renders", () => {
+    const result = resolveCriteria(fixtureInput());
+    render(<CriteriaPage result={result} mode="authored" />);
+    expect(screen.queryByTestId("criteria-severity-filter")).toBeNull();
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(7);
+    expect(screen.queryByTestId("file-tree")).toBeNull();
+  });
+
+  it("the filter counts per severity, narrows the list, and the summary counts the rows shown", () => {
+    const result = resolveCriteria(fixtureInput());
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        severityMap={{ ...SEVERITY_MAP }}
+      />,
+    );
+
+    // Counts from the map: met 2, warning 3, error 1; hidden is uncounted.
+    expect(screen.getByText("All")).toBeTruthy();
+    expect(screen.getByText("✓ 2 met")).toBeTruthy();
+    expect(screen.getByText("⚠ 3 warnings")).toBeTruthy();
+    expect(screen.getByText("✖ 1 errors")).toBeTruthy();
+
+    // All: every non-hidden row; the summary counts those six.
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(6);
+    expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
+      "3 of 6 criteria resolved",
+    );
+
+    // Errors: the one hard failure; the summary follows the list.
+    fireEvent.click(screen.getByText("✖ 1 errors"));
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(1);
+    expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
+      "1 of 1 criteria resolved",
+    );
+    expect(
+      screen.getByTestId("criteria-summary-count-not-met").textContent,
+    ).toContain("Not met: 1");
+    expect(
+      screen.getByTestId("criteria-summary-count-met").textContent,
+    ).toContain("Met: 0");
+
+    // Met: the bake guarantee and the numeric pass.
+    fireEvent.click(screen.getByText("✓ 2 met"));
+    const descriptions = screen
+      .getAllByTestId("criteria-row-description")
+      .map((d) => d.textContent);
+    expect(descriptions).toEqual([
+      "Fixture bake criterion",
+      "Fixture numeric region criterion",
+    ]);
+  });
+
+  it("rows with no map entry show only under All", () => {
+    const result = resolveCriteria(fixtureInput());
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        severityMap={{ "fix.2-history-order": "error" }}
+      />,
+    );
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(7);
+    fireEvent.click(screen.getByText("✖ 1 errors"));
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(1);
+  });
+
+  it("the file inventory renders above the list when passed", () => {
+    const tree: FileTreeNode[] = [
+      {
+        name: "fixkb",
+        path: "",
+        status: "other",
+        detail: "The keyboard folder as published.",
+        children: [
+          {
+            name: "README.md",
+            path: "README.md",
+            status: "ok",
+            detail: "Present at README.md.",
+            criterionId: "fix.2-history-order",
+          },
+          {
+            name: "HISTORY.md",
+            path: "HISTORY.md",
+            status: "missing",
+            detail: "Missing — reported by fix.2-history-order.",
+            criterionId: "fix.2-history-order",
+          },
+        ],
+      },
+    ];
+    const result = resolveCriteria(fixtureInput());
+    render(<CriteriaPage result={result} mode="authored" fileTree={tree} />);
+    expect(screen.getByTestId("file-tree")).toBeTruthy();
+    expect(screen.getByTestId("file-tree").textContent).toContain("File inventory");
+    expect(screen.getByTestId("file-tree").textContent).toContain("README.md");
+  });
+
+  it("the banner replaces the plain heading block", () => {
+    const result = resolveCriteria(fixtureInput());
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        keyboardLabel="fixkb"
+        judgedNote="This judged note stays out of the banner page."
+        banner={{
+          eyebrow: "Keyboard Studio",
+          title: "Criteria banner title",
+          meta: "Keyboard: fixkb · Judging the keyboard as it would be downloaded.",
+        }}
+      />,
+    );
+    expect(screen.getByText("Criteria banner title")).toBeTruthy();
+    expect(screen.queryByTestId("criteria-judged-note")).toBeNull();
+    expect(screen.queryByTestId("criteria-keyboard")).toBeNull();
+    // The list itself is untouched by the banner.
+    expect(screen.getAllByTestId("criteria-row")).toHaveLength(7);
+  });
+
+  it("without a banner the plain heading block renders as before", () => {
+    const result = resolveCriteria(fixtureInput());
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        keyboardLabel="fixkb"
+        judgedNote="Judging the keyboard as it would be downloaded."
+      />,
+    );
+    expect(screen.getByTestId("criteria-judged-note").textContent).toContain(
+      "Judging the keyboard as it would be downloaded.",
+    );
+    expect(screen.getByTestId("criteria-keyboard").textContent).toContain("fixkb");
   });
 });
