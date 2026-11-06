@@ -3,11 +3,39 @@
  * fixers (engine) and their lint checks (keyboard-lint), so a check and the
  * fixer that repairs it cannot drift apart.
  *
- * The rules follow the owner's `processTouch.py` (Template Cleanup): layer ids
- * are `default`, `shift`, `caps`, and `rightalt` / `ctrl` with a `-shift` or
- * `-caps` suffix. All functions are pure and accept the wire form (strings) or
- * the IR form (numbers) of `sp`.
+ * The rules follow the owner's `processTouch.py` (Template Cleanup), with layer
+ * ids as Keyman names them: only Keyman's standard modifier layer ids are
+ * modifier-aware (a key on them types with those modifiers), so Ctrl+Shift is
+ * `shift-ctrl`, never `ctrl-shift`. All functions are pure and accept the wire
+ * form (strings) or the IR form (numbers) of `sp`.
  */
+
+/**
+ * Keyman's modifier layer naming (TIKE layoutbuilder `constants.ts`,
+ * `getModifierCombinationName`): the modifiers present, in this order, joined
+ * by `-`; no modifiers is `default`.
+ */
+const KEYMAN_LAYER_MODIFIER_ORDER = [
+  "leftctrl", "rightctrl", "leftalt", "rightalt", "shift", "ctrl", "alt", "caps",
+] as const;
+
+type LayerModifier = (typeof KEYMAN_LAYER_MODIFIER_ORDER)[number];
+
+/** Keyman's layer id for a set of modifiers. */
+export function keymanModifierLayerId(mods: Iterable<LayerModifier>): string {
+  const set = new Set(mods);
+  const id = KEYMAN_LAYER_MODIFIER_ORDER.filter((m) => set.has(m)).join("-");
+  return id === "" ? "default" : id;
+}
+
+/** The modifier combinations the touch layout editor offers, without Caps (TIKE `validModifierCombinations`). */
+const KEYMAN_LAYER_COMBINATIONS: ReadonlyArray<readonly LayerModifier[]> = [
+  [], ["leftctrl"], ["rightctrl"], ["leftalt"], ["leftctrl", "leftalt"], ["rightalt"],
+  ["rightctrl", "rightalt"], ["shift"], ["leftctrl", "shift"], ["leftalt", "shift"],
+  ["leftctrl", "leftalt", "shift"], ["rightctrl", "shift"], ["rightalt", "shift"],
+  ["rightctrl", "rightalt", "shift"], ["ctrl"], ["ctrl", "shift"], ["alt"], ["ctrl", "alt"],
+  ["shift", "alt"], ["shift", "ctrl", "alt"],
+];
 
 /** A key's `sp` as a number, or undefined when absent or not numeric. */
 export function touchSpValue(sp: string | number | undefined | null): number | undefined {
@@ -26,12 +54,16 @@ export function isTouchShiftLayerId(id: string): boolean {
   return id.toLowerCase().includes("shift");
 }
 
-/** The caps layer built from a shift layer: shift, rightalt-shift, ctrl-shift. */
-export const TOUCH_CAPS_FROM_SHIFT: ReadonlyArray<readonly [shift: string, caps: string]> = [
-  ["shift", "caps"],
-  ["rightalt-shift", "rightalt-caps"],
-  ["ctrl-shift", "ctrl-caps"],
-];
+/**
+ * The caps layer built from each standard shift layer: Caps in place of Shift,
+ * named as Keyman names it (`shift` -> `caps`, `rightalt-shift` ->
+ * `rightalt-caps`, `shift-ctrl` -> `ctrl-caps`).
+ */
+export const TOUCH_CAPS_FROM_SHIFT: ReadonlyArray<readonly [shift: string, caps: string]> =
+  KEYMAN_LAYER_COMBINATIONS.filter((c) => c.includes("shift")).map((c) => [
+    keymanModifierLayerId(c),
+    keymanModifierLayerId([...c.filter((m) => m !== "shift"), "caps"]),
+  ]);
 
 /**
  * The layer a shift or caps layer's Shift key returns to: `shift` and `caps`
@@ -53,7 +85,10 @@ export function unshiftedTouchLayerId(id: string, layerIds: ReadonlySet<string>)
 
 /** The caps layer a double-tap on Shift reaches from `id`, when that layer exists. */
 export function touchDoubleTapTarget(id: string, layerIds: ReadonlySet<string>): string | undefined {
-  const target = id === "default" ? "caps" : id === "rightalt" ? "rightalt-caps" : id === "ctrl" ? "ctrl-caps" : undefined;
+  // The caps layer whose Caps-less form is `id`: default -> caps, rightalt -> rightalt-caps.
+  const target = TOUCH_CAPS_FROM_SHIFT.find(([, caps]) =>
+    (caps === "caps" ? "default" : caps.replace(/-caps$/, "")) === id,
+  )?.[1];
   return target !== undefined && layerIds.has(target) ? target : undefined;
 }
 
@@ -117,7 +152,7 @@ export function touchModifierKeyPatch(
   const state = shiftStateOf(layerId);
   const want: TouchModifierKeyPatch = {};
   const opens = (family: "ctrl" | "rightalt"): string => {
-    const variant = state === "default" ? undefined : `${family}-${state}`;
+    const variant = state === "default" ? undefined : keymanModifierLayerId([family, state]);
     return variant !== undefined && layerIds.has(variant) ? variant : family;
   };
   const home = state; // the non-modifier layer of the same shift state

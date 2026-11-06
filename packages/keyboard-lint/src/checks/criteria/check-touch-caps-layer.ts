@@ -12,7 +12,7 @@
 //
 // The full Capsifesto behaviour (the owner's `processTouch.py`) adds: a
 // `rightalt-caps` / `ctrl-caps` layer beside each `rightalt-shift` /
-// `ctrl-shift`, double-tap Shift on `rightalt` / `ctrl`, character keys on
+// `shift-ctrl`, double-tap Shift on `rightalt` / `ctrl`, character keys on
 // other layers returning to `default` (one-shot Shift), and Shift keys
 // labelled `*Shifted*` / `*ShiftedLock*` returning to the unshifted layer.
 // `syncTouchCapsLayerRaw` (engine) is the fixer; both read the layer rules

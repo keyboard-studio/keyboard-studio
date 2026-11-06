@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   isTouchOneShotKey,
+  keymanModifierLayerId,
+  TOUCH_CAPS_FROM_SHIFT,
   touchDoubleTapTarget,
   touchModifierKeyPatch,
   unshiftedTouchLayerId,
@@ -10,12 +12,12 @@ const ids = (...l: string[]) => new Set(l);
 
 describe("unshiftedTouchLayerId", () => {
   it("maps shift and caps layers to the layer Shift returns to", () => {
-    const all = ids("default", "shift", "caps", "rightalt", "rightalt-shift", "rightalt-caps", "ctrl", "ctrl-shift");
+    const all = ids("default", "shift", "caps", "rightalt", "rightalt-shift", "rightalt-caps", "ctrl", "shift-ctrl", "ctrl-caps");
     expect(unshiftedTouchLayerId("shift", all)).toBe("default");
     expect(unshiftedTouchLayerId("caps", all)).toBe("default");
     expect(unshiftedTouchLayerId("rightalt-shift", all)).toBe("rightalt");
     expect(unshiftedTouchLayerId("rightalt-caps", all)).toBe("rightalt");
-    expect(unshiftedTouchLayerId("ctrl-shift", all)).toBe("ctrl");
+    expect(unshiftedTouchLayerId("shift-ctrl", all)).toBe("ctrl");
   });
 
   it("is undefined for other layers and for a target that does not exist", () => {
@@ -68,5 +70,25 @@ describe("touchModifierKeyPatch", () => {
       text: "*Ctrl*",
       nextlayer: "ctrl",
     });
+  });
+});
+
+describe("Keyman layer ids", () => {
+  it("names modifier layers in Keyman's order", () => {
+    expect(keymanModifierLayerId([])).toBe("default");
+    expect(keymanModifierLayerId(["ctrl", "shift"])).toBe("shift-ctrl");
+    expect(keymanModifierLayerId(["caps", "rightalt"])).toBe("rightalt-caps");
+  });
+
+  it("pairs each standard shift layer with its caps layer", () => {
+    const pairs = new Map(TOUCH_CAPS_FROM_SHIFT);
+    expect(pairs.get("shift")).toBe("caps");
+    expect(pairs.get("rightalt-shift")).toBe("rightalt-caps");
+    expect(pairs.get("shift-ctrl")).toBe("ctrl-caps");
+    expect(pairs.has("ctrl-shift")).toBe(false);
+  });
+
+  it("double-tap from ctrl reaches ctrl-caps", () => {
+    expect(touchDoubleTapTarget("ctrl", new Set(["ctrl", "ctrl-caps"]))).toBe("ctrl-caps");
   });
 });

@@ -115,11 +115,11 @@ describe("checkTouchCapsLayer (18.16) full Capsifesto requirements", () => {
   it("reports a missing rightalt-caps and ctrl-caps", () => {
     const ir = layout((l) => {
       delete l["rightalt-caps"];
-      l["ctrl-shift"] = [k("K_Q", "Q", { nextlayer: "default" })];
+      l["shift-ctrl"] = [k("K_Q", "Q", { nextlayer: "default" })];
     });
     const msg = MESSAGES(checkTouchCapsLayer(ir, PATH));
     expect(msg).toContain("no rightalt-caps layer although rightalt-shift exists");
-    expect(msg).toContain("no ctrl-caps layer although ctrl-shift exists");
+    expect(msg).toContain("no ctrl-caps layer although shift-ctrl exists");
   });
 
   it("reports a missing double-tap on rightalt", () => {

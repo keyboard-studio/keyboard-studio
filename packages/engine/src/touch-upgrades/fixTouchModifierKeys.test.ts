@@ -58,11 +58,11 @@ describe("fixTouchModifierKeysRaw", () => {
         default: [{ id: "K_LCONTROL", text: "ctrl", sp: "1", nextlayer: "default" }],
         shift: [{ id: "K_LCONTROL", text: "ctrl", sp: "1" }],
         ctrl: [{ id: "K_LCONTROL", text: "default", sp: "1", nextlayer: "default" }],
-        "ctrl-shift": [{ id: "K_Q", text: "Q" }],
+        "shift-ctrl": [{ id: "K_Q", text: "Q" }],
       }),
     );
     expect(keysOf(res.json, "default")[0]).toMatchObject({ text: "*Ctrl*", nextlayer: "ctrl" });
-    expect(keysOf(res.json, "shift")[0]).toMatchObject({ text: "*Ctrl*", nextlayer: "ctrl-shift" });
+    expect(keysOf(res.json, "shift")[0]).toMatchObject({ text: "*Ctrl*", nextlayer: "shift-ctrl" });
     expect(keysOf(res.json, "ctrl")[0]).toMatchObject({ text: "*Ctrl*", sp: 2, nextlayer: "default" });
   });
 

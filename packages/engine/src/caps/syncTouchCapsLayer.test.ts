@@ -121,7 +121,7 @@ describe("syncTouchCapsLayerRaw full Capsifesto behaviour", () => {
     clone("rightalt", "default");
     clone("rightalt-shift", "shift");
     clone("ctrl", "default");
-    clone("ctrl-shift", "shift");
+    clone("shift-ctrl", "shift");
     return raw;
   }
   const run = (raw: Raw): Raw =>
@@ -129,9 +129,9 @@ describe("syncTouchCapsLayerRaw full Capsifesto behaviour", () => {
 
   it("builds rightalt-caps and ctrl-caps from their shift layers", () => {
     const out = run(withModifierLayers());
-    for (const id of ["rightalt-caps", "ctrl-caps"]) {
-      expect(layerOf(out, id)).toBeDefined();
-      expect(keysOf(layerOf(out, id)).length).toBe(keysOf(layerOf(out, id.replace("caps", "shift"))).length);
+    for (const [caps, shift] of [["rightalt-caps", "rightalt-shift"], ["ctrl-caps", "shift-ctrl"]] as const) {
+      expect(layerOf(out, caps)).toBeDefined();
+      expect(keysOf(layerOf(out, caps)).length).toBe(keysOf(layerOf(out, shift)).length);
     }
   });
 
@@ -181,7 +181,7 @@ describe("syncTouchCapsLayerRaw full Capsifesto behaviour", () => {
     expect(shiftKey("caps")).toMatchObject({ text: "*ShiftedLock*", nextlayer: "default" });
     expect(shiftKey("rightalt-shift")).toMatchObject({ text: "*Shifted*", nextlayer: "rightalt" });
     expect(shiftKey("rightalt-caps")).toMatchObject({ text: "*ShiftedLock*", nextlayer: "rightalt" });
-    expect(shiftKey("ctrl-shift")).toMatchObject({ text: "*Shifted*", nextlayer: "ctrl" });
+    expect(shiftKey("shift-ctrl")).toMatchObject({ text: "*Shifted*", nextlayer: "ctrl" });
     expect(shiftKey("ctrl-caps")).toMatchObject({ text: "*ShiftedLock*", nextlayer: "ctrl" });
   });
 
