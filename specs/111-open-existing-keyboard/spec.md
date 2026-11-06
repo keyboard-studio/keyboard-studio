@@ -255,7 +255,7 @@ The walk on Open:
 - **FR-031**: Opening MUST start a walk: Languages, Missing letters, Upgrades, On-screen keyboard, Touch, Documentation, Review, Output (Story 8). Every step MUST offer Continue.
 - **FR-032**: Missing letters, Upgrades and Documentation MUST appear only when the opened keyboard has that kind of problem. Which kinds it has MUST be recorded as a decision when the baseline is taken, so the walk's pages depend on recorded decisions only (Constitution: screens derive from decisions).
 - **FR-033**: Missing letters MUST group each missing letter under every listed language that expects it, and offer to add the letter or remove the language. Composed and decomposed forms MUST count as the same letter.
-- **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28) and the touch caps layer (18.16). Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
+- **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28), the touch caps layer (18.16, the full Capsifesto behaviour: caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift), consistent Ctrl/RAlt touch keys, and a symbols layer. Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
 
 **Copy path**
 
