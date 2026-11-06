@@ -42,6 +42,21 @@ describe("repairOpenDraftDescriptor", () => {
     expect(state.identity?.languages).toEqual([{ tag: "bas", name: "Basaa" }]);
   });
 
+  it("fetches the descriptor from the copy chosen at Open, at its pinned commit", async () => {
+    openDraftWithoutKps();
+    useWorkingCopyStore
+      .getState()
+      .setStartSource({ owner: "keymanapp", repo: "keyboards", commit: "abc123", path: KB.path, alternative: null });
+    const urls: string[] = [];
+    await repairOpenDraftDescriptor({
+      fetchImpl: async (url) => {
+        urls.push(url);
+        return { ok: true, text: async () => KPS };
+      },
+    });
+    expect(urls).toEqual(["/review-proxy/keymanapp/keyboards/abc123/release/k/kb/source/kb.kps"]);
+  });
+
   it("leaves the draft alone and says why when the descriptor cannot be fetched", async () => {
     openDraftWithoutKps();
     const report = await repairOpenDraftDescriptor({ fetchImpl: async () => ({ ok: false, text: async () => "" }) });

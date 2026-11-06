@@ -37,6 +37,10 @@ import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT, galleryForwardBtnStyle } fr
  */
 export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef | null = null): boolean {
   const confirmed = confirmStartKeyboard(keyboard, (value) => {
+    // The repository choice is a starting-point fact, recorded with the working
+    // copy rather than as a decision (data-model: Source choice). Set before the
+    // decisions so the source load can never start without it.
+    useWorkingCopyStore.getState().setStartSource(source);
     const decisions = useDecisionStore.getState();
     decisions.recordAll([
       { id: "base-keyboard", value, provenance: "asked", step: "open" },
@@ -47,9 +51,6 @@ export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef 
     ]);
   });
   if (confirmed === null) return false;
-  // The repository choice is a starting-point fact, recorded with the working
-  // copy rather than as a decision (data-model: Source choice).
-  useWorkingCopyStore.getState().setStartSource(source);
   useSurveySessionStore.getState().setLocalStart(keyboard);
   // The identity-first screens are gated off on Open (registry.ts
   // `openHiddenScreens`), so the walk starts at its first page, the Languages
