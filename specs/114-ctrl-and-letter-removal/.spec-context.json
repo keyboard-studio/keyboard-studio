@@ -269,6 +269,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T09:59:44.552Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T10:02:45.975Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T10:02:46.173Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T10:02:55.153Z"
     }
   ],
   "decisions": [
@@ -372,7 +396,7 @@
       ]
     }
   },
-  "currentTask": "T042",
+  "currentTask": "T054",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -578,6 +602,27 @@
         "advisoryChecks.ts",
         "resolveCriteria.ts",
         "openRatchet.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "recomputed criteria count and band split to 208 (40/124/34/10) from criteria.json",
+      "files": [
+        "packages/contracts/data/criteria-summary.md"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "raw-Ctrl census over release (39 reported of 920 parsed) recorded with differences",
+      "files": [
+        "specs/114-ctrl-and-letter-removal/census.md"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Documented the 14 basic_* ctrl/shift-ctrl layers (AltGr vs Ctrl vs LCTRL), KeymanWeb layer-id modifier derivation with source cites, and output under ctrl vs rightalt",
+      "files": [
+        "specs/114-ctrl-and-letter-removal/fr-007-verification.md"
       ]
     }
   },

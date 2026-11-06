@@ -112,10 +112,10 @@ Files: packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts (
 
 FR-005 and FR-007 are deferred out of this spec (lead rulings 1 and 3). T054 gathers FR-007's evidence; it changes no code.
 
-- [ ] **T050** Recompute the criteria count and band split in the criteria summary from the data (don't hard-code the result) · packages/contracts/data/criteria-summary.md
+- [x] **T050** Recompute the criteria count and band split in the criteria summary from the data (don't hard-code the result) · packages/contracts/data/criteria-summary.md
 - [x] **T051** Add keyboard-index rows for any keyboard this feature newly references and the index lacks. Done when the spec was written: ewe, sil_bunong and esperanto_sava_eujao added; basic_kbdurdu, basic_kbdfr and basic_kbdth0 were already present · docs/keyboard-index.md
-- [ ] **T052** Run the raw-Ctrl census over `../keyboards/release`, record each difference from the spec's census and why, for SC-001 · specs/114-ctrl-and-letter-removal/census.md
-- [ ] **T054** [P] FR-007 evidence, read-only: for the 14 `basic_*` keyboards with a touch `ctrl` / `shift-ctrl` layer (and basic_kbdsp's `nextlayer: ctrl` references), record each layer's real content (AltGr, genuine Ctrl as in basic_kbda1, or `LCTRL` as in basic_kbdth0), whether KeymanWeb derives a touch key's modifiers from its layer id (cite the source), and the touch output under the current id and under `rightalt`, as a table for the owner · specs/114-ctrl-and-letter-removal/fr-007-verification.md
+- [x] **T052** Run the raw-Ctrl census over `../keyboards/release`, record each difference from the spec's census and why, for SC-001 · specs/114-ctrl-and-letter-removal/census.md
+- [x] **T054** [P] FR-007 evidence, read-only: for the 14 `basic_*` keyboards with a touch `ctrl` / `shift-ctrl` layer (and basic_kbdsp's `nextlayer: ctrl` references), record each layer's real content (AltGr, genuine Ctrl as in basic_kbda1, or `LCTRL` as in basic_kbdth0), whether KeymanWeb derives a touch key's modifiers from its layer id (cite the source), and the touch output under the current id and under `rightalt`, as a table for the owner · specs/114-ctrl-and-letter-removal/fr-007-verification.md
 - [ ] **T053** Validate against Success Criteria SC-001..SC-006: run `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, and the Copy golden walk e2e (`packages/studio/e2e/golden-walk.spec.ts`, SC-003), and report any red result verbatim · (suite run; no file)
 
 ## Dependencies & Execution Order
