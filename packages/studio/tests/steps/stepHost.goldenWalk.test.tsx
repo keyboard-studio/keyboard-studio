@@ -199,6 +199,30 @@ vi.mock("../../src/editors/assignLoop/HtmlEditor.tsx", async () => {
     },
   };
 });
+vi.mock("../../src/editors/assignLoop/IconEditor.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    IconEditor: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { iconIcoBase64: string; iconPngDataUrl: string }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "icon-back", onClick: onBack, testId: "icon-back" } }
+          : {}),
+        forward: {
+          label: "icon-continue",
+          onClick: () => onComplete({ iconIcoBase64: "", iconPngDataUrl: "" }),
+          testId: "icon-continue",
+        },
+      });
+      return <div data-testid="stage-icon" />;
+    },
+  };
+});
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
   import("../../src/test/studioShellMocks/UnsupportedScriptStub.tsx"),
 );
@@ -605,6 +629,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "css", testId: "css-continue", async: true },
     { stepId: "help", testId: "survey-advance", async: true },
     { stepId: "html", testId: "html-continue", async: true },
+    { stepId: "icon", testId: "icon-continue", async: true },
   ]);
 }
 
@@ -637,6 +662,7 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },
+
   ]);
 }
 

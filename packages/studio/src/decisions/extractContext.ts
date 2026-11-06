@@ -80,6 +80,14 @@ export interface ExtractContext {
    * loaded) langtags dataset; undefined when not loaded or unknown.
    */
   resolveLanguageName?: (subtag: string) => string | undefined;
+  /**
+   * The starting point's copyright holder names, parsed from its
+   * LICENSE.md / &COPYRIGHT by the live wiring (lib/startCopyrightHolders.ts —
+   * question modules import nothing from lib/ or engine). Each is the exact
+   * `CopyrightHolder.name` the D4 dedupe keys on. Absent outside the live
+   * wiring; il_copyright_holder's extract then falls back to the raw header.
+   */
+  startHolders?: readonly string[];
   /** Spec 092: Phase F seed inputs (live wiring only — see PhaseFSeedInputs). */
   phaseF?: PhaseFSeedInputs;
   /**

@@ -868,6 +868,14 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "icon": {
+          // Keyboard icon — fixtures carry no icon edits; advance with the
+          // template icon unchanged (keep-template: the editor starts from
+          // the base keyboard's icon and Continue ships it unedited).
+          result = undefined;
+          break;
+        }
+
         case "help": {
           const answers = answerMapFromGroup(group, "help");
           const walked = walkFlowFromAnswers(STEP_FLOW_IDS["help"]!, surveyContext, answers);

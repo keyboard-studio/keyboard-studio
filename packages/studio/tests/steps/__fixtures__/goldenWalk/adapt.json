@@ -150,8 +150,6 @@
     ],
     "workingCopyMutations": [],
     "decisionMutations": [],
-    "navigateTo": [
-      "criteria"
-    ]
+    "navigateTo": []
   }
 ]

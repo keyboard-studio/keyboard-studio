@@ -104,3 +104,15 @@ export const DESKTOP_GEOMETRY: readonly DesktopGeometryKey[] = [
 
 /** Widest row extent (in key-width units) across {@link DESKTOP_GEOMETRY} — every row sums to this. */
 export const DESKTOP_GEOMETRY_WIDTH = 15;
+
+/**
+ * ISO variant of {@link DESKTOP_GEOMETRY}: the bottom row gains the 102nd key
+ * (`K_oE2`) between Left Shift and `K_Z`, and Left Shift narrows to make room.
+ * Opt-in for the OSK editor; the ANSI table above (and every consumer of it,
+ * such as the layout chart) is untouched. Every row still sums to
+ * {@link DESKTOP_GEOMETRY_WIDTH}.
+ */
+export const DESKTOP_GEOMETRY_ISO: readonly DesktopGeometryKey[] = [
+  ...DESKTOP_GEOMETRY.map((k) => (k.id === "K_SHIFT" ? { ...k, width: 1.25 } : k)),
+  { id: "K_oE2", row: DESKTOP_ROW_BOTTOM, x: 1.25, width: 1 },
+];

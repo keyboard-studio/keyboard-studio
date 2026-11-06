@@ -49,6 +49,12 @@ vi.mock("@keyboard-studio/engine", () => ({
     { id: "K_B", row: 3, x: 6.25, width: 1 },
     { id: "K_C", row: 3, x: 4.25, width: 1 },
   ],
+  DESKTOP_GEOMETRY_ISO: [
+    { id: "K_A", row: 2, x: 1.75, width: 1 },
+    { id: "K_B", row: 3, x: 6.25, width: 1 },
+    { id: "K_C", row: 3, x: 4.25, width: 1 },
+    { id: "K_oE2", row: 3, x: 1.25, width: 1 },
+  ],
   oskContinueResult: (kvks: { kbdname?: string } | null) =>
     kvks === null ? undefined : { kvksXml: "<visualkeyboard/>" },
 }));
@@ -148,6 +154,37 @@ describe("OskEditor", () => {
     expect(underlying.checked).toBe(true);
     fireEvent.click(key102);
     expect(key102.checked).toBe(true);
+  });
+
+  it("display-underlying draws the base-keyboard character on each cap, and undo removes it", () => {
+    renderEditor();
+    expect(screen.queryByTestId("osk-underlying-K_A")).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Display underlying characters" }));
+    expect(screen.getByTestId("osk-underlying-K_A").textContent).toBe("a");
+    expect(screen.getByTestId("osk-underlying-K_B").textContent).toBe("b");
+    // Shift layer reads the base keyboard's shift layer.
+    fireEvent.click(screen.getByRole("tab", { name: "Shift" }));
+    expect(screen.getByTestId("osk-underlying-K_A").textContent).toBe("A");
+    fireEvent.click(screen.getByRole("tab", { name: "Default" }));
+    fireEvent.click(screen.getByTestId("osk-undo"));
+    expect(screen.queryByTestId("osk-underlying-K_A")).toBeNull();
+  });
+
+  it("include-102nd-key adds an ISO K_oE2 cap, unticking and undo remove it", () => {
+    renderEditor();
+    const capCount = () => screen.getAllByRole("button", { pressed: false }).filter(
+      (b) => (b.getAttribute("aria-label") ?? "").includes("K_oE2"),
+    ).length;
+    expect(capCount()).toBe(0);
+    const key102 = screen.getByRole("checkbox", { name: "Include 102nd key (ISO)" });
+    fireEvent.click(key102);
+    expect(capCount()).toBe(1);
+    fireEvent.click(key102);
+    expect(capCount()).toBe(0);
+    fireEvent.click(key102);
+    expect(capCount()).toBe(1);
+    fireEvent.click(screen.getByTestId("osk-undo"));
+    expect(capCount()).toBe(0);
   });
 
   it("calls onComplete on Continue", () => {

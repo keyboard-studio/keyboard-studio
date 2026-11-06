@@ -131,6 +131,16 @@ export interface FlowStepOptions<Extracted = unknown> {
      * that has no conditionally-required question (the common case).
      */
     getRequiredOverride?: (questionId: string, deps: FlowStepDeps) => boolean | undefined;
+    /**
+     * Optional per-question DYNAMIC options (forwarded to SurveyRunner's
+     * `getSeedOptions`). A free-text question that receives options renders
+     * them as a choice beneath the box (il_copyright_holder's starting-point
+     * holders). Return undefined/[] for no options.
+     */
+    getSeedOptions?: (
+      questionId: string,
+      deps: FlowStepDeps,
+    ) => import("../../survey/types.ts").FlowOption[] | undefined;
   };
   /**
    * When true, the factory reads findingsByQuestionId from workingCopyStore

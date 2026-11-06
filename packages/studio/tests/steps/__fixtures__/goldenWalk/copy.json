@@ -288,6 +288,16 @@
     ],
     "workingCopyMutations": [],
     "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "icon",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": [
       "output"
     ]

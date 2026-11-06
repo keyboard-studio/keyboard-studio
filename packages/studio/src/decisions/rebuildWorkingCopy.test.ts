@@ -289,11 +289,11 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
     // The extracted record was superseded by a re-extraction against the
     // new bundle, naming the NEW source; the asked record stands whole.
     const decisions = useDecisionStore.getState().decisions;
-    expect(decisions["copyright-holder"]?.value).toBe("(c) NEW BASE");
+    expect(decisions["copyright-holder"]?.value).toBe("NEW BASE");
     expect(decisions["copyright-holder"]?.source).toBe("basic_kbdfr");
     expect(decisions["author-name"]?.value).toBe("Test Author");
     // The rebuilt working copy was installed from the recalculated set.
-    expect(useWorkingCopyStore.getState().attribution?.copyrightHolder).toBe("(c) NEW BASE");
+    expect(useWorkingCopyStore.getState().attribution?.copyrightHolder).toBe("NEW BASE");
   });
 
   it("recalculateForStartingPointChangeFromStores is a no-op before a starting point exists", () => {

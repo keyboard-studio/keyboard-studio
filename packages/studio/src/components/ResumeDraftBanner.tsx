@@ -52,6 +52,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], MessageDescriptor> = {
   css: msg({ id: "editor.assignLoop.css.title", message: "Custom CSS" }),
   help: msg({ id: "resumeDraft.steps.help", message: "help & docs" }),
   html: msg({ id: "editor.assignLoop.html.title", message: "Documentation" }),
+  icon: msg({ id: "editor.assignLoop.icon.title", message: "Keyboard icon" }),
   done: msg({ id: "resumeDraft.steps.done", message: "the final step" }),
   unsupported: msg({ id: "resumeDraft.steps.unsupported", message: "an unsupported script" }),
 };

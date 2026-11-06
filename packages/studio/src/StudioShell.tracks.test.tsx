@@ -23,6 +23,7 @@ vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellM
 vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
 vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
 vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
+vi.mock("./editors/assignLoop/IconEditor.tsx", () => import("./test/studioShellMocks/IconEditor.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -78,9 +79,15 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
     });
     expect(screen.getByTestId("stage-html")).toBeTruthy();
 
-    // Complete the html step → done → navigateTo('output').
+    // Complete the html step → icon.
     await act(async () => {
       fireEvent.click(screen.getByTestId("html-continue"));
+    });
+    expect(screen.getByTestId("stage-icon")).toBeTruthy();
+
+    // Complete the icon step → done → navigateTo('output').
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("icon-continue"));
     });
 
     // navigateTo should have been called with 'output'.

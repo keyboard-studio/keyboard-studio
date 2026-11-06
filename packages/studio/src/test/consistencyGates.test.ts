@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { CompilerDiagnostic, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import type { CompilerDiagnostic, KeyboardIR, TouchLayoutIR, VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { checkConsistencyGates, type GateId, type GateInput, type GateResult } from "./consistencyGates.ts";
@@ -226,6 +226,20 @@ describe("G6: no lost touch letters", () => {
     JSON.stringify({
       phone: { layer: [{ id: "default", row: [{ key: texts.map((text) => ({ text })) }] }] },
     });
+  const startTouchWithDefaultTexts = (texts: string[]): TouchLayoutIR => ({
+    platforms: [
+      {
+        id: "phone",
+        layers: [
+          {
+            id: "default",
+            rows: [{ keys: texts.map((text, i) => ({ id: `K_${i}`, nodeId: `n${i}`, text })) }],
+          },
+        ],
+      },
+    ],
+    nodeIds: [],
+  });
   const alphabet = setOf(decision("character-inventory", { chars: ["a", "ŋ", "A"] }));
   it("passes when every owed letter is on the default layer", async () => {
     const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a", "ŋ"]) });
@@ -235,6 +249,27 @@ describe("G6: no lost touch letters", () => {
   it("fails when a letter is missing from the default layer", async () => {
     const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a"]) });
     const r = await gate("G6", { vfs, decisions: alphabet, includeTouch: true });
+    expect(r).toMatchObject({ applicable: true, pass: false });
+    expect(r.detail.join(" ")).toContain("ŋ");
+  });
+  it("when start touch is known, does not fail for letters the starting default layer never showed", async () => {
+    const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a"]) });
+    const r = await gate("G6", {
+      vfs,
+      decisions: alphabet,
+      includeTouch: true,
+      startTouchIr: startTouchWithDefaultTexts(["a"]),
+    });
+    expect(r).toMatchObject({ applicable: true, pass: true });
+  });
+  it("when start touch is known, fails if a letter present on the starting default layer disappears", async () => {
+    const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a"]) });
+    const r = await gate("G6", {
+      vfs,
+      decisions: alphabet,
+      includeTouch: true,
+      startTouchIr: startTouchWithDefaultTexts(["a", "ŋ"]),
+    });
     expect(r).toMatchObject({ applicable: true, pass: false });
     expect(r.detail.join(" ")).toContain("ŋ");
   });

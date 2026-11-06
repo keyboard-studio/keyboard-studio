@@ -112,7 +112,7 @@ function seedKeyModeFixture(opts: {
 }
 
 describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)", () => {
-  it("renders a tablist with three tabs, 'By character' selected by default", async () => {
+  it("renders a tablist with three tabs, 'Place Letters' selected by default", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
@@ -129,6 +129,8 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     expect(charTab.getAttribute("aria-selected")).toBe("true");
     expect(keyTab.getAttribute("aria-selected")).toBe("false");
     expect(codeTab.getAttribute("aria-selected")).toBe("false");
+    expect(charTab.textContent).toBe("Place Letters");
+    expect(keyTab.textContent).toBe("Manage Layout");
     expect(codeTab.textContent).toBe("Code");
   });
 
@@ -162,7 +164,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     expect(screen.getByText("Touch preview")).toBeTruthy();
   });
 
-  it("clicking the 'By key' tab switches to the editable schematic grid, labelled 'for editing', with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
+  it("clicking the 'Manage Layout' tab switches to the editable schematic grid, labelled 'for editing', with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });

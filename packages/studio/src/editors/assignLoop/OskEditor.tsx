@@ -26,12 +26,36 @@ import {
   emitKvks,
   oskContinueResult,
   DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_ISO,
 } from "@keyboard-studio/engine";
+import { lookupHostOutput, DEADKEY, type BaseLayoutId } from "../../lib/referenceBaseLayouts.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
+
+/**
+ * The base keyboard (the OS layout) whose characters "Display underlying"
+ * shows. The studio cannot see the typist's machine, so the US layout stands in,
+ * as Keyman Developer does.
+ */
+const BASE_UNDERLYING_LAYOUT: BaseLayoutId = "us";
+
+/** Kvks shift code ("S", "CA", ...) to the modifier tokens the reference tables key on. */
+function baseModifiersForShift(shift: string): string[] {
+  const mods: string[] = [];
+  if (shift.includes("S")) mods.push("SHIFT");
+  if (shift.includes("C")) mods.push("CTRL");
+  if (shift.includes("A")) mods.push("ALT");
+  return mods;
+}
+
+/** Base-keyboard character for a key on a layer, or "" when unknown / a deadkey. */
+function baseUnderlyingChar(vkey: string, shift: string): string {
+  const cell = lookupHostOutput(BASE_UNDERLYING_LAYOUT, vkey, baseModifiersForShift(shift));
+  return cell === undefined || cell === DEADKEY ? "" : cell;
+}
 
 /** Open mode: the `.kvks` path in the opened keyboard's files. */
 function openKvksFilePath(keyboardId: string): string {
@@ -175,9 +199,14 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Geometry lookup for the active layer's keys (before early return).
-  const geomById = useMemo(() => {
+  const geomAnsi = useMemo(() => {
     const m = new Map<string, { row: number; x: number; width: number }>();
     for (const g of DESKTOP_GEOMETRY) m.set(g.id, g);
+    return m;
+  }, []);
+  const geomIso = useMemo(() => {
+    const m = new Map<string, { row: number; x: number; width: number }>();
+    for (const g of DESKTOP_GEOMETRY_ISO) m.set(g.id, g);
     return m;
   }, []);
 
@@ -367,8 +396,17 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     [],
     [],
   ];
+  const showUnderlying = effectiveKvks.displayUnderlying === true;
+  const showKey102 = effectiveKvks.key102 === true;
+  const geomById = showKey102 ? geomIso : geomAnsi;
   if (activeLayer) {
-    for (const k of activeLayer.keys) {
+    // The ISO 102nd key always has a slot when ticked, even if the layer
+    // carries no entry for it (a blank cap, as in Keyman Developer).
+    const layerKeys =
+      showKey102 && !activeLayer.keys.some((k) => k.vkey === "K_oE2")
+        ? [...activeLayer.keys, { vkey: "K_oE2", label: "" }]
+        : activeLayer.keys;
+    for (const k of layerKeys) {
       const g = geomById.get(k.vkey);
       if (!g) continue;
       const row = rows[g.row];
@@ -473,6 +511,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         {rows.map((rowKeys, ri) => (
           <div key={ri} style={{ display: "flex", gap: 4, marginBottom: 4 }}>
             {rowKeys.map(({ vkey, label, width }) => {
+              const underlying = showUnderlying ? baseUnderlyingChar(vkey, effectiveShift) : "";
               const isSelected =
                 selected?.vkey === vkey && selected?.shift === effectiveShift;
               const isBlank = label === "";
@@ -503,8 +542,26 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
+                    position: "relative",
                   }}
                 >
+                  {underlying !== "" && (
+                    <span
+                      aria-hidden="true"
+                      data-testid={`osk-underlying-${vkey}`}
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: 4,
+                        fontSize: 10,
+                        lineHeight: 1,
+                        color: TEXT_DIM,
+                        opacity: 0.7,
+                      }}
+                    >
+                      {underlying}
+                    </span>
+                  )}
                   {isBlank ? "" : label}
                 </button>
               );

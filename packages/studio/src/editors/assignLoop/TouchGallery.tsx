@@ -7847,14 +7847,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         id: "character",
         label: t({
           id: "editor.assignLoop.touch.mode.characterTab",
-          message: "By character",
+          message: "Place Letters",
         }),
       },
       {
         id: "key",
         label: t({
           id: "editor.assignLoop.touch.mode.keyTab",
-          message: "By key",
+          message: "Manage Layout",
         }),
       },
       {

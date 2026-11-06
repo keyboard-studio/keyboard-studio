@@ -36,15 +36,24 @@ vi.mock("../../hooks/useOpenWalkCriteria.ts", () => ({
 
 import { UpgradesRenderer } from "./UpgradesStep.tsx";
 import { GalleryStepContext } from "../../steps/galleryHost.tsx";
+import { StepNavCluster } from "../../components/StepNavCluster.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useDecisionLogStore } from "../../decisions/decisionLogStore.ts";
+import { STANDALONE_STEP_ID, useStepNavStore } from "../../stores/stepNavStore.ts";
 import { seedInstantiatedWorkingCopy } from "../../test/workingCopy.ts";
 
 function mount(onComplete = vi.fn(), onChange = vi.fn()) {
   render(
-    <GalleryStepContext.Provider value={{ onComplete }}>
-      <UpgradesRenderer value={undefined} onChange={onChange} decisionId="upgrades-review" provenance="asked" />
-    </GalleryStepContext.Provider>,
+    <>
+      <GalleryStepContext.Provider value={{ onComplete }}>
+        <UpgradesRenderer value={undefined} onChange={onChange} decisionId="upgrades-review" provenance="asked" />
+      </GalleryStepContext.Provider>
+      {/* WalkNav publishes this step's Continue to the footer (spec 081
+          FR-001, #2551): the button under test lives in the cluster, not
+          the body. No StepNavContext is provided, so the publish lands
+          under the standalone id. */}
+      <StepNavCluster stepId={STANDALONE_STEP_ID} />
+    </>,
   );
   return { onComplete, onChange };
 }
@@ -82,7 +91,9 @@ describe("UpgradesStep", () => {
   it("Continue records the page as reviewed and completes the step", async () => {
     const { onComplete, onChange } = mount();
     await screen.findByText("Use the test upgrade");
-    fireEvent.click(screen.getByRole("button", { name: /^Continue$/ }));
+    const forward = useStepNavStore.getState().entries[STANDALONE_STEP_ID]?.spec.forward;
+    expect(forward).toBeDefined();
+    forward!.onClick();
     expect(onChange).toHaveBeenCalledWith(true);
     expect(onComplete).toHaveBeenCalled();
   });

@@ -62,6 +62,7 @@ vi.mock("../steps/registerEditorSteps.ts", () => ({
   cssStep: trivialStep("css"),
   helpStep: trivialStep("help"),
   htmlStep: trivialStep("html"),
+  iconStep: trivialStep("icon"),
   packageStep: trivialStep("package"),
 }));
 

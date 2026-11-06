@@ -13,6 +13,7 @@ import type {
   KeyboardIR,
   OutputElement,
   StoreItem,
+  TouchLayoutIR,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { parseKmn, confirmedCaseCounterpart, normalizationFormForOutputForm } from "@keyboard-studio/engine";
@@ -49,6 +50,13 @@ export interface GateInput {
    * verdict into generated (enforced) and starting (known gap) stores.
    */
   startIr?: KeyboardIR;
+  /**
+   * Starting keyboard's parsed touch layout (when present). G6 uses it to split
+   * "inherited default-layer gaps" from regressions: a letter missing from the
+   * projected default layer is only a failure when the starting layout already
+   * had that letter labeled on the default layer.
+   */
+  startTouchIr?: TouchLayoutIR;
   /** A second projection of the same inputs, for G7. */
   repeatVfs?: VirtualFS;
   /** G6 reads the touch layout; fixtures do not reproduce the touch step, so it is opt-in. */
@@ -254,6 +262,24 @@ function g5(input: GateInput, ir: KeyboardIR | undefined): GateResult {
 
 type TouchLayoutJson = Record<string, { layer?: { id: string; row?: { key?: { text?: string }[] }[] }[] }>;
 
+/** NFC-normalized `text` of each key on each platform's default layer (G6 surface). */
+function defaultLayerPresentTextsFromTouchIr(touch: TouchLayoutIR | undefined): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
+  if (touch === undefined) return m;
+  for (const p of touch.platforms) {
+    const layer = p.layers.find((l) => l.id === "default");
+    if (layer === undefined) continue;
+    const texts = new Set<string>();
+    for (const row of layer.rows) {
+      for (const k of row.keys) {
+        if (k.text !== undefined && k.text !== "") texts.add(k.text.normalize("NFC"));
+      }
+    }
+    m.set(p.id, texts);
+  }
+  return m;
+}
+
 function g6(input: GateInput): GateResult {
   if (input.includeTouch !== true) return notApplicable("G6", "walk-only: the fixtures do not reproduce the touch step");
   if (!atOrAfter(input.point, "assignments")) return notApplicable("G6", "applies at assignments and later");
@@ -270,6 +296,8 @@ function g6(input: GateInput): GateResult {
     return !(pair !== null && pair.direction === "toLower");
   });
   const layout = JSON.parse(text) as TouchLayoutJson;
+  const startDefaultTexts = defaultLayerPresentTextsFromTouchIr(input.startTouchIr);
+  const hasStartSplit = input.startTouchIr !== undefined;
   const problems: string[] = [];
   for (const [platform, def] of Object.entries(layout)) {
     const layer = def.layer?.find((l) => l.id === "default");
@@ -277,7 +305,16 @@ function g6(input: GateInput): GateResult {
     const present = new Set(
       (layer.row ?? []).flatMap((r) => (r.key ?? []).map((k) => (k.text ?? "").normalize("NFC"))),
     );
-    const missing = owed.filter((c) => !present.has(c.normalize("NFC")));
+    const inherited =
+      platform === "phone" || platform === "tablet" || platform === "desktop"
+        ? (startDefaultTexts.get(platform) ?? new Set<string>())
+        : new Set<string>();
+    const missing = owed.filter((c) => {
+      const n = c.normalize("NFC");
+      if (present.has(n)) return false;
+      if (!hasStartSplit) return true;
+      return inherited.has(n);
+    });
     if (missing.length > 0) problems.push(`${platform} default layer lacks: ${missing.join(" ")}`);
   }
   return result("G6", problems);

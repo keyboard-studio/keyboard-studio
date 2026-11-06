@@ -35,6 +35,7 @@ import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
 import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
 import { MissingLettersHost } from "../survey/openWalk/MissingLettersHost.tsx";
 import { UpgradesHost } from "../survey/openWalk/UpgradesHost.tsx";
+import { IconEditor } from "../editors/assignLoop/IconEditor.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -418,6 +419,26 @@ export const htmlStep: EditorStep = step({
   layout: "full",
   component: HtmlEditor,
   specRef: ["specs/html-editor"],
+  persistence: "working-copy",
+});
+
+/**
+ * Icon editor step: design the keyboard's icon (after Documentation).
+ *
+ * A modern reimagining of TIKE's bitmap editor (not a port): import-first
+ * (SVG/PNG/ICO), pixel editing at 256×256, low-res-friendly text tool,
+ * live 16/32/48px previews, hand-rolled ICO codec.
+ *
+ * Unskippable per Matthew's ruling (2026-11-03): the author must pass
+ * through, but changing nothing keeps the template keyboard's icon, which
+ * is loaded as the starting point from the base VFS snapshot.
+ */
+export const iconStep: EditorStep = step({
+  id: "icon",
+  title: "Keyboard icon",
+  layout: "full",
+  component: IconEditor,
+  specRef: ["specs/icon-editor"],
   persistence: "working-copy",
 });
 

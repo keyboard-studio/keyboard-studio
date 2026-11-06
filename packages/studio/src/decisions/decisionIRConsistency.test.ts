@@ -108,6 +108,9 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "help-usage-tip-3",
   "help-usage-tip-4",
   "help-usage-tip-5",
+  // #2485: the icon gallery module's apply is a no-op — the .ico is written
+  // by the output pipeline from the step's own payload, never via IR paths.
+  "icon",
   "indic-conjuncts-wanted",
   "indic-nukta-detail",
   "indic-nukta-wanted",

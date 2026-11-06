@@ -67,6 +67,9 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   css: ["touch-layout"],
   help: ["physical-layout", "fallback-policy", "touch-layout", "custom-css"],
   html: ["help-docs"],
+  // #2485: the icon step follows the html step and needs its welcome-htm
+  // decision recorded first (mirrors the icon gallery module's requires).
+  icon: ["welcome-htm"],
 };
 
 /**
@@ -81,8 +84,8 @@ const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the twenty-two gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling; issue #2539 adds fallback-policy)", () => {
-    expect(SETTLES.size).toBe(22);
+  it("the derived settles set is exactly the twenty-three gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling, issue #2539 fallback-policy and #2485 icon)", () => {
+    expect(SETTLES.size).toBe(23);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "caps-handling",
@@ -92,6 +95,8 @@ describe("gallery module coverage (FR-002)", () => {
       "deadkeys-defined",
       "fallback-policy",
       "help-docs",
+      // #2485: the icon editor step settles the keyboard icon.
+      "icon",
       "invisibles-inventory",
       "language-list",
       "marks-treatment",
