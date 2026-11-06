@@ -46,7 +46,7 @@ Issues filed for what was not fixed here:
 - #2396 exemplar seeding ignores the target script;
 - #2397 dead rule after carving a whole `any()` store. Fixed on main by `089eb37a` (merged here):
   G1 holds on bj_cree_woods and its KNOWN_GAPS row is removed. The issue can close;
-- #2400 G6 vs touch reachability (owns the walkOnly G6 row);
+- #2400 G6 vs touch reachability (split starting vs generated default-layer labels; walkOnly KNOWN_GAPS row removed when fixed);
 - #2403 synthesized kvks breaks the schema;
 - #2404 eo_plus `outs()` order;
 - #2405 parseKps script default;
@@ -60,8 +60,8 @@ Issues filed for what was not fixed here:
   the punctuation step keeps seeding the draft after `character-inventory` is recorded.
 - **camazerty tolerance.** The product publishes `failed` and continues (no throw); the author
   mirrors it, and G2 is owned by `#2363`.
-- **KNOWN_GAPS rows added by the author.** G1 bj_cree_woods (#2397, since removed); G6 on touch-bearing keyboards
-  (#2400). The G6 row is `walkOnly` (`ownerOf(..., { walked: false })` in the decision-point replay).
+- **KNOWN_GAPS rows added by the author.** G1 bj_cree_woods (#2397, since removed). The former G6 `walkOnly` row for
+  #2400 is removed once G6 attributes inherited default-layer gaps via the starting touch layout.
 - **Sweep `too-large` skip.** `MAX_SWEEP_RULE_COUNT = 2000` (measured; excludes 9 of 921), only in
   the `latin`/`eligible` tiers.
 - **Sweep hangs.** The report is rewritten before and after each case, and a killed shard reports
