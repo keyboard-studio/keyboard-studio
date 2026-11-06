@@ -99,7 +99,7 @@ Also proposed: a touch upgrade renaming the 11 `basic_*` touch `ctrl` / `shift-c
 - esperanto_sava_eujao is a likely false positive in the census; planning checks it against the final rule.
 - A keyboard with both raw Ctrl and `CTRL ALT` rules: User Story 1 reports only the raw Ctrl ones.
 - *(Ruled 2026-11-06)* A raw Ctrl rule outside the main key group (a deadkey or context group) is reported too. The removal warning shows once per character per session.
-- Open for planning: whether a "character" returned to the inventory by FR-002 is a code point or the rule's whole output (ewe's Ctrl rules type multi-code-point strings such as a combining mark plus a letter), and what happens to touch keys on a Ctrl layer whose only rules FR-002 removes.
+- *(Ruled 2026-11-06, lead ruling 4)* FR-002 returns characters in the inventory's unit (NFC, split by `charactersOf`), and leaves touch Ctrl layers unchanged, with a note in the preview.
 
 ## Requirements *(mandatory)*
 
@@ -107,11 +107,11 @@ Also proposed: a touch upgrade renaming the 11 `basic_*` touch `ctrl` / `shift-c
 
 - **FR-001** *(was spec 111 FR-035)*: Outside `basic_*` keyboards, a rule on unsided `CTRL` (without Alt) on a letter, number or punctuation key MUST be reported, recommending that it move off Ctrl and warning that the keyboard may not be accepted if it stays. Ctrl+Space (special spaces) is not reported. `basic_*` keyboards keep their Ctrl content and are never reported.
 - **FR-002** *(was FR-036)*: The fix MUST remove those Ctrl rules (a text splice) and return each character they typed to the inventory as unplaced, so the Mechanisms gallery, which follows Upgrades in the Open walk, is where the author gives it a new key. A character also typed elsewhere is not re-added.
-- **FR-003** *(was FR-037; scope ruled 2026-11-06)*: On Copy, and in the Open galleries, no new content MAY be placed on raw Ctrl (unsided `CTRL` without Alt), and no raw Ctrl layer MAY be added (physical or touch) where the keyboard has none. AltGr stays on offer and is written as `RALT`, never as `CTRL ALT`. Sided `LCTRL` / `RCTRL` stay on offer, with FR-004's advisory. Existing Ctrl content on a copied `basic_*` keyboard is kept, unless the characters it types are carved: carving a character removes its Ctrl rules with its other rules.
+- **FR-003** *(was FR-037; scope ruled 2026-11-06)*: On Copy, and in the Open galleries, no new content MAY be placed on raw Ctrl (unsided `CTRL` without Alt), and no raw Ctrl layer MAY be added (physical or touch) where the keyboard has none. AltGr stays on offer, in the Alt form the keyboard already uses, and as `RALT` when it has none (lead ruling 2). Sided `LCTRL` / `RCTRL` stay on offer, with FR-004's advisory. Existing Ctrl content on a copied `basic_*` keyboard is kept, unless the characters it types are carved: carving a character removes its Ctrl rules with its other rules.
 - **FR-004** *(was FR-038; mechanism ruled 2026-11-06)*: `LCTRL` / `RCTRL` are allowed, with an advisory that an Alt-based placement is preferred. The advisory is a criterion whose findings have `warning` severity: Review shows it as a warning, and it never blocks (no review note is needed on Open, and the Copy gate does not stop on it). This needs no contracts change; the criteria resolver and the Open submit gate learn to treat a criterion whose findings are all warnings as non-blocking.
-- **FR-005** *(was FR-039; proposed, awaiting the owner; crew recommends deferring, see below)*: Unsided `CTRL ALT` is AltGr in practice, so it is not raw Ctrl. It is offered an upgrade to `RALT` that converts every unsided Alt/Ctrl rule in the keyboard (mixing sided and unsided modifiers is not allowed), withheld unless a before/after simulation shows every AltGr key types the same.
+- **FR-005** *(was FR-039; deferred out of this spec by lead ruling 1, see below)*: Unsided `CTRL ALT` is AltGr in practice, so it is not raw Ctrl. It is offered an upgrade to `RALT` that converts every unsided Alt/Ctrl rule in the keyboard (mixing sided and unsided modifiers is not allowed), withheld unless a before/after simulation shows every AltGr key types the same.
 - **FR-006** *(was FR-040)*: On both paths, removing a character that a listed language needs (its main CLDR/SLDR exemplar set; carve on Copy, the Remove tool and gallery deletions on Open) MUST show a warning naming the language or languages that need it. The warning is dismissable: the author can keep the removal. Composed and decomposed forms count as the same character.
-- **FR-007** *(was task T075; proposed, awaiting the owner; crew recommends a verification first, see below)*: The `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content MAY be offered a rename to `rightalt` / `rightalt-shift` (basic_kbdth0's to `leftctrl`), with their `nextlayer` references updated.
+- **FR-007** *(was task T075; deferred out of this spec by lead ruling 3, see below; T054 verifies)*: The `basic_*` touch `ctrl` / `shift-ctrl` layers that carry the keyboard's RALT content MAY be offered a rename to `rightalt` / `rightalt-shift` (basic_kbdth0's to `leftctrl`), with their `nextlayer` references updated.
 - **FR-008**: The criterion and the advisory (FR-001, FR-004) MUST be rows in `packages/contracts/data/criteria.json` with keyboard-lint checks, and the fixes (FR-002, FR-005) upgrade pairs, as spec 111 FR-025 requires of every upgrade.
 
 ### Crew recommendation on FR-005 and FR-007 (km-lead, 2026-11-06; awaiting the owner)
@@ -142,6 +142,19 @@ Reviewed by km-keyman (runtime semantics), km-author (upstream parity) and km-do
   - basic_kbdth0 uses `LCTRL`.
 - **A rename can change touch output.** KeymanWeb is believed to derive a touch key's modifiers from its layer id, so renaming `ctrl` to `rightalt` changes which rules fire. That may fix touch, since the AltGr rules may be unreachable on touch today. It is a touch upgrade, which the `basic_*` freeze allows, but it is a behaviour change, not a relabel.
 - **Next step:** a verification per keyboard. Confirm KeymanWeb's layer-id-to-modifier mapping, then compare touch output under both ids. After that, offer the rename only where it is correct, as an Open upgrade for keyboards in the fork. Hold upstream PRs until the Keyman team confirms it maintains these keyboards and welcomes the change.
+
+### Lead rulings on the four open items (km-lead, 2026-11-06)
+
+Made on the owner's instruction to have the crew rule consistently. Evidence: km-keyman, km-author and km-domain (cycle 1); km-keyman on ewe and three raw-Ctrl samples, and km-frontend on the inventory and gallery code (cycle 2). The owner can overturn any of them.
+
+1. **FR-005 is deferred out of spec 114.** No criterion row, no fixer, no task. It comes back only after both the Keyman team consultation and a verified account of `RALT` on macOS, Linux (IBus) and KeymanWeb. If it is revived, it must have the shape in the crew recommendation above.
+2. **AltGr form (amends FR-003).** A new AltGr placement uses the Alt form the keyboard already uses (`CTRL ALT`, `RALT`/`LALT`, or `ALT`). It is written as `RALT` only when the keyboard has no Alt-family rules yet. This follows Keyman's guidance not to mix forms in one keyboard, and keeps the owner's `RALT` default for fresh keyboards. The gallery already follows the form in use for `ALT` versus `RALT`/`LALT` (`computeModifierPool`, `raltDefaultToken` in `MechanismGallery.tsx`); `CTRL ALT` is added the same way, detected with `collectLayerCombosInUse`.
+3. **FR-007 is deferred out of spec 114, with a verification task.** One read-only task (T054) records, for each of the 14 keyboards: the layer's real content, whether KeymanWeb derives modifiers from the touch layer id, and the touch output under both ids. The owner rules per keyboard from that table. No rename is built in this spec.
+4. **FR-002's unit, and touch Ctrl layers.**
+   - **Unit:** characters go back to the inventory in the inventory's own unit. Each removed rule's output is NFC-normalised and split by `charactersOf` (`lib/openInventory.ts`), the same path the Letters step's Add uses. A character any remaining `.kmn` rule types is not re-added. No new multi-code-point inventory unit is introduced.
+   - **Why not whole strings:** the inventory has no grapheme unit, and placement compares single NFC entries. ewe's two cluster rules (`ewe.kmn:27-28`) output the combining macron before the base letter, so as clusters they are suspect anyway. For ewe this returns á é í ó ú ā ē ō ū and the combining macron; ɛ and ɔ are already typed elsewhere.
+   - **Showing what was removed:** the fix's preview and finding list each removed rule's full output (with names for invisible characters such as ZWJ, ZWNJ, LRM and RLM), so the author can rebuild a sequence with a key sequence or a mark.
+   - **Touch:** the fix changes only `.kmn` rules. A touch Ctrl layer stays as it is. ewe's `ctrl` touch keys carry explicit `text`, so they keep typing the same characters, and touch keys never count as "typed elsewhere". The preview notes that the touch Ctrl layer still types characters the hardware keyboard no longer does, so the Mechanisms placement can be mirrored on touch. Renaming or removing touch layers is out of scope (FR-007).
 
 ### Key Entities
 
@@ -180,4 +193,4 @@ Reviewed by km-keyman (runtime semantics), km-author (upstream parity) and km-do
 
 - The census numbers come from `release/` in the keyboard-studio/keyboards fork as of 2026-11-05.
 - Spec 111's Open walk (Upgrades before Mechanisms) and its upgrade-pair registry are on the branch this spec builds on.
-- FR-005 and FR-007 are not planned for implementation until the owner rules; they get no criteria rows until then.
+- FR-005 and FR-007 are deferred out of this spec (lead rulings 1 and 3); they get no criteria rows. T054 gathers the evidence for FR-007.

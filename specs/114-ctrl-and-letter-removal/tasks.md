@@ -33,7 +33,7 @@ Files: packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts (+ test), pa
 **Wave 1 — independent (different files):**
 
 - [ ] **T012** [P] [US1] Implement the raw-Ctrl check and its finding wording (FR-001), replacing the stub, then list `KM_LINT_RAW_CTRL` in the implemented checks and gate coverage · packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts, packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts
-- [ ] **T013** [P] [US1] Implement the fix: parse to IR, drop matching rules, `projectKmnText` back, and return the uncovered characters as the offer's inventory additions (FR-002). Settle the spec's open edge case first: code point or whole rule output, and what happens to touch keys on a Ctrl layer whose rules all go · packages/studio/src/criteria/rawCtrlUpgrade.ts
+- [ ] **T013** [P] [US1] Implement the fix: parse to IR, drop matching rules, `projectKmnText` back, and return the uncovered characters as the offer's inventory additions (FR-002). Per lead ruling 4: split each removed output with `charactersOf` (`lib/openInventory.ts`), skip characters still typed by a remaining `.kmn` rule, leave touch layouts unchanged, and list each removed rule's full output (with names for invisible characters) and a touch-layer note in the preview · packages/studio/src/criteria/rawCtrlUpgrade.ts
 - [ ] **T015** [P] [US1] Extend `UpgradeOffer` with optional inventory additions, and make the Upgrades step's accept path record them the way the Letters step's Add does (`lib/openInventory.ts`), so they survive the starting-point replay (Article III: state in plan.md how the addition maps to the decision set) · packages/studio/src/criteria/upgradePairs.ts, packages/studio/src/survey/openWalk/UpgradesStep.tsx
 
 **⟶ Wait for Wave 1 to finish, then:**
@@ -48,7 +48,7 @@ Files: packages/studio/src/editors/assignLoop/MechanismGallery.tsx, mechanismPla
 
 ### Tests
 
-- [ ] **T020** [P] [US2] Write failing tests: the Mechanism gallery offers no raw Ctrl combination on Copy or Open, still offers AltGr and writes it as `RALT`, and still offers `LCTRL` / `RCTRL` · packages/studio/src/editors/assignLoop/MechanismGallery.noCtrl.test.tsx
+- [ ] **T020** [P] [US2] Write failing tests: the Mechanism gallery offers no raw Ctrl combination on Copy or Open, still offers AltGr in the keyboard's existing Alt form (`CTRL ALT`, `RALT`/`LALT` or `ALT`) and as `RALT` when it has none, and still offers `LCTRL` / `RCTRL` · packages/studio/src/editors/assignLoop/MechanismGallery.noCtrl.test.tsx
 - [ ] **T026** [P] [US2] Write failing tests: the Touch gallery offers no raw Ctrl plane, and the touch layer editor cannot add a Ctrl layer the keyboard lacks · packages/studio/src/editors/assignLoop/TouchGallery.noCtrl.test.tsx, packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.test.ts
 - [ ] **T021** [P] [US2] Write failing tests: carving a character typed on Ctrl removes its Ctrl rules with its other rules; a basic_kbdurdu Copy with nothing carved keeps every Ctrl rule (SC-004) · packages/studio/src/lib/irToCarveNodes.removal.test.ts
 
@@ -56,7 +56,7 @@ Files: packages/studio/src/editors/assignLoop/MechanismGallery.tsx, mechanismPla
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T022** [P] [US2] Drop unsided `CTRL` without Alt from the gallery's modifier pool (`computeModifierPool`), and make `canonicalizeCombo` write Ctrl+RAlt as `RALT` rather than `CTRL ALT` (FR-003). `mechanismPlacement.ts` has no Ctrl code; change it only if a test shows it must · packages/studio/src/editors/assignLoop/MechanismGallery.tsx
+- [ ] **T022** [P] [US2] Drop unsided `CTRL` without Alt from the gallery's modifier pool (`computeModifierPool`), and write new AltGr placements in the keyboard's existing Alt form, `RALT` when it has none (FR-003, lead ruling 2): extend `computeModifierPool` / `raltDefaultToken` to detect `CTRL ALT` with `collectLayerCombosInUse`, and check the hard-coded `RALT` fallbacks in `assignmentFromSuggestion.ts`. `mechanismPlacement.ts` has no Ctrl code; change it only if a test shows it must · packages/studio/src/editors/assignLoop/MechanismGallery.tsx
 - [ ] **T023** [P] [US2] Filter Ctrl planes out of the Touch gallery (FR-003) · packages/studio/src/editors/assignLoop/TouchGallery.tsx
 - [ ] **T024** [P] [US2] Stop the touch layer editor adding a Ctrl layer where the keyboard has none (FR-003) · packages/studio/src/editors/assignLoop/touchBuilder/TouchBuilderPane.tsx, packages/studio/src/editors/assignLoop/touchBuilder/touchBuilderModel.ts
 - [ ] **T025** [P] [US2] Verify carve removal covers CTRL planes on basic_kbdurdu; change the file only if T021 fails · packages/studio/src/lib/irToCarveNodes.ts
@@ -110,11 +110,12 @@ Files: packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts (
 
 ## Phase 7: Polish
 
-FR-005 and FR-007 have no rows and no tasks until the owner rules (see spec.md).
+FR-005 and FR-007 are deferred out of this spec (lead rulings 1 and 3). T054 gathers FR-007's evidence; it changes no code.
 
 - [ ] **T050** Recompute the criteria count and band split in the criteria summary from the data (don't hard-code the result) · packages/contracts/data/criteria-summary.md
 - [x] **T051** Add keyboard-index rows for any keyboard this feature newly references and the index lacks. Done when the spec was written: ewe, sil_bunong and esperanto_sava_eujao added; basic_kbdurdu, basic_kbdfr and basic_kbdth0 were already present · docs/keyboard-index.md
 - [ ] **T052** Run the raw-Ctrl census over `../keyboards/release`, record each difference from the spec's census and why, for SC-001 · specs/114-ctrl-and-letter-removal/census.md
+- [ ] **T054** [P] FR-007 evidence, read-only: for the 14 `basic_*` keyboards with a touch `ctrl` / `shift-ctrl` layer (and basic_kbdsp's `nextlayer: ctrl` references), record each layer's real content (AltGr, genuine Ctrl as in basic_kbda1, or `LCTRL` as in basic_kbdth0), whether KeymanWeb derives a touch key's modifiers from its layer id (cite the source), and the touch output under the current id and under `rightalt`, as a table for the owner · specs/114-ctrl-and-letter-removal/fr-007-verification.md
 - [ ] **T053** Validate against Success Criteria SC-001..SC-006: run `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, and the Copy golden walk e2e (`packages/studio/e2e/golden-walk.spec.ts`, SC-003), and report any red result verbatim · (suite run; no file)
 
 ## Dependencies & Execution Order
