@@ -63,11 +63,14 @@ export function MissingLettersByLanguage({
   missing,
   sourcesByChar,
   onAdd,
+  added,
 }: {
   missing: readonly string[];
   sourcesByChar: Readonly<Record<string, readonly string[]>>;
   /** When given, each letter carries an Add button that calls it with that letter. */
   onAdd?: (char: string) => void;
+  /** Letters already added to the character inventory; they show as added instead of offering Add. */
+  added?: ReadonlySet<string>;
 }) {
   const { t } = useLingui();
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -117,6 +120,11 @@ export function MissingLettersByLanguage({
                   chars.map((ch) => (
                     <span key={ch} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 8 }}>
                       <span lang={tag}>{ch}</span>
+                      {added?.has(ch.normalize("NFC")) ? (
+                        <span style={{ color: TEXT_DIM }}>
+                          <Trans id="missingLetters.added">added</Trans>
+                        </span>
+                      ) : (
                       <Button
                         size="compact"
                         onClick={() => onAdd(ch)}
@@ -127,6 +135,7 @@ export function MissingLettersByLanguage({
                       >
                         <Trans id="missingLetters.add">Add</Trans>
                       </Button>
+                      )}
                     </span>
                   ))
                 )}

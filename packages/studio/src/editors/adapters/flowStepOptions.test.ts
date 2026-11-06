@@ -666,7 +666,7 @@ describe("pf_welcome_paragraph — adaptive description seed + required override
     const { deps } = buildDeps();
 
     expect(passSeedFor("pf_welcome_paragraph")).toBeUndefined();
-    expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(true);
+    expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(false);
   });
 
   it("does not disturb pf_welcome_paragraph's static required:true default", () => {

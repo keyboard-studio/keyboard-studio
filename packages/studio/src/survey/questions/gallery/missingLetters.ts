@@ -1,7 +1,7 @@
-// Gallery module: the Open walk's Missing letters page (spec 111 FR-033). The
-// screen is shown only when the baseline recorded the problem (open-issues,
-// registry.ts declared gate); the decision it settles is just that the author
-// went through it.
+// Gallery module: the Open walk's Letters page (spec 111 FR-031, FR-033). The
+// screen is always walked for a keyboard that is not basic, and for a basic one only
+// when the baseline recorded missing letters (registry.ts declared gate); the
+// decision it settles is just that the author went through it.
 
 import type { GalleryModule } from "../../types.ts";
 import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
@@ -9,8 +9,8 @@ import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
 export const definition = {
   id: "missingLetters",
   type: "notice" as const,
-  prompt: "Which letters can this keyboard not type yet?",
-  audit_label: "Missing letters",
+  prompt: "Which letters and characters should this keyboard have?",
+  audit_label: "Letters",
 };
 
 const missingLetters: GalleryModule<boolean> = {

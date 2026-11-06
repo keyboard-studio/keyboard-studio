@@ -98,6 +98,12 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studio
 vi.mock("../../src/survey/languageList/LanguageListHost.tsx", () =>
   import("../../src/test/studioShellMocks/LanguageListHost.tsx"),
 );
+vi.mock("../../src/survey/openWalk/MissingLettersHost.tsx", () =>
+  import("../../src/test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })),
+);
+vi.mock("../../src/survey/openWalk/UpgradesHost.tsx", () =>
+  import("../../src/test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })),
+);
 vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 // CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
 // the barrel), so the shallow stubs must be registered for the files too.
@@ -615,11 +621,13 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "track", testId: "track-adapt" },
     { stepId: "attribution", testId: "survey-advance" },
     // Open (spec 111): the editable language list rides the adapt track only.
-    { stepId: "open_languages", testId: "survey-advance", settleFor: "osk-continue" },
     // Open (spec 111) hides the character survey, punctuation, invisibles, carve,
-    // deadkeys, rules, mechanisms and touch_seed_source screens; the language list
-    // goes straight to osk. Missing letters, Upgrades, help and html appear only when
-    // the baseline recorded that problem, which this walk (no baseline) did not.
+    // deadkeys and rules; Letters and the Mechanisms gallery are walked (a non-basic
+    // keyboard). Upgrades, help and html appear only when the baseline recorded that
+    // problem, which this walk (no baseline) did not.
+    { stepId: "open_languages", testId: "survey-advance" },
+    { stepId: "open_missing_letters", testId: "survey-advance", settleFor: "mechanisms-continue" },
+    { stepId: "mechanisms", testId: "mechanisms-continue", settleFor: "osk-continue" },
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },

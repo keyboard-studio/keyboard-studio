@@ -18,6 +18,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
+import { isBasicKeyboard } from "../lib/basicKeyboard.ts";
 import {
   forkIsNewer,
   replacesCuratedCopy,
@@ -40,6 +41,9 @@ export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef 
     decisions.recordAll([
       { id: "base-keyboard", value, provenance: "asked", step: "open" },
       { id: "authoring-track", value: "adapt", provenance: "asked", step: "open" },
+      // Whether the keyboard is a basic one decides which walk pages apply (its physical
+      // layout is fixed); gates read this decision, never the keyboard itself.
+      { id: "open-basic-keyboard", value: isBasicKeyboard(keyboard), provenance: "derived", step: "open" },
     ]);
   });
   if (confirmed === null) return false;

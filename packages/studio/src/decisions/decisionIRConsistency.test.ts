@@ -40,6 +40,7 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "language-list",
   // spec 111 Open walk: the baseline's problem kinds and the two reviewed marks.
   "open-issues",
+  "open-basic-keyboard",
   "missing-letters-review",
   "upgrades-review",
   "reserve-desktop-notice",

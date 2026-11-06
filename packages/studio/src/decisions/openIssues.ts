@@ -28,6 +28,32 @@ function isOpen(decisions: DecisionSet): boolean {
   return decisions["authoring-track"]?.value === "adapt";
 }
 
+/**
+ * True when the opened keyboard is a basic keyboard (lib/basicKeyboard.ts), recorded
+ * when the keyboard is opened. Absent counts as not basic.
+ */
+export function isOpenBasicKeyboard(decisions: DecisionSet): boolean {
+  return decisions["open-basic-keyboard"]?.value === true;
+}
+
+/**
+ * The Letters page: always walked on Open for a keyboard that is not basic (its
+ * author may add characters, or letters, beyond the base set); for a basic keyboard,
+ * only when the baseline found letters its languages need that it cannot type.
+ */
+export function openLettersGate(decisions: DecisionSet): boolean {
+  if (!isOpen(decisions)) return false;
+  return !isOpenBasicKeyboard(decisions) || hasOpenIssue(decisions, "missing-letters");
+}
+
+/**
+ * The Mechanisms gallery on Open: walked for a keyboard that is not basic. A basic
+ * keyboard's physical layout never changes, so its added characters can only go on touch.
+ */
+export function openMechanismsGate(decisions: DecisionSet): boolean {
+  return !isOpen(decisions) || !isOpenBasicKeyboard(decisions);
+}
+
 /** The gate of a walk page that shows on Open only, and only when the baseline found `kind`. */
 export function openIssueGate(kind: OpenIssueKind): (decisions: DecisionSet) => boolean {
   return (decisions) => isOpen(decisions) && hasOpenIssue(decisions, kind);

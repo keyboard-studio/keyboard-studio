@@ -221,21 +221,6 @@ function stepById(stepId: string): Step | undefined {
 
 const isOpenWalk = (ctx: AdvanceContext): boolean => ctx.decisions?.["authoring-track"]?.value === "adapt";
 
-/**
- * The Open walk's conditional pages, in walk order. After the language list the
- * walk takes the first one whose derived gate passes (spec 111 FR-031/FR-032),
- * else it rejoins the main line.
- */
-const OPEN_WALK_PAGES = ["open_missing_letters", "open_upgrades"] as const;
-
-function nextOpenWalkPage(after: ActiveStepId, ctx: AdvanceContext): ActiveStepId {
-  const start = after === "open_languages" ? 0 : OPEN_WALK_PAGES.indexOf(after as (typeof OPEN_WALK_PAGES)[number]) + 1;
-  for (const id of OPEN_WALK_PAGES.slice(start)) {
-    if (stepApplies(stepById(id), ctx)) return id;
-  }
-  return nextMainLineStepAfter("open_languages", ctx);
-}
-
 export function advance(
   completedStepId: ActiveStepId,
   result: unknown,
@@ -281,16 +266,11 @@ function advanceStep(
           // Copy-track: project_name side-trail (gated on the copy track).
           return { next: "project_name" };
         }
-        if (stepApplies(stepById("open_languages"), ctx)) {
-          // Open: the editable language list is asked before the walk proper.
-          return { next: "open_languages" };
-        }
-        // Update-track: skip the project_name side trail → characters.
-        // Also signals host to call setCharactersSubStage("prefill") post-advance.
-        return {
-          next: nextMainLineStepAfter("attribution", ctx),  // characters
-          setCharactersSubStage: "prefill",
-        };
+        // Skip the project_name side trail. Open's pages follow from the derived order
+        // and their gates; Copy rejoins at characters, which also signals the host to
+        // call setCharactersSubStage("prefill") post-advance.
+        const after = nextMainLineStepAfter("attribution", ctx);
+        return after === "characters" ? { next: after, setCharactersSubStage: "prefill" } : { next: after };
       } else {
         // Invariant violation: selectedTrack is null here, but the track
         // step's completion recorded the authoring-track decision before
@@ -308,16 +288,20 @@ function advanceStep(
       }
 
     case "project_name":
-      // The side trail rejoins at "characters"; advance there directly.
-      // Also signals host to call setCharactersSubStage("prefill") post-advance.
-      return { next: "characters", setCharactersSubStage: "prefill" };
+      // The side trail rejoins the main line at the next screen that applies (Open's pages
+      // are gated off on Copy, so that is characters, which also signals the host to call
+      // setCharactersSubStage("prefill") post-advance).
+      {
+        const after = nextMainLineStepAfter("project_name", ctx);
+        return after === "characters" ? { next: after, setCharactersSubStage: "prefill" } : { next: after };
+      }
 
     case "open_languages":
     case "open_missing_letters":
     case "open_upgrades":
-      // Open: Languages, then Missing letters and Upgrades when the baseline found
-      // those problems, then the main line (the character survey is hidden on Open).
-      return { next: nextOpenWalkPage(completedStepId, ctx) };
+      // Open's pages are gated spine screens: the next one is whichever follows in the
+      // derived order and still applies (spec 111 FR-031, FR-032).
+      return { next: nextMainLineStepAfter(completedStepId, ctx) };
 
     case "characters":
       return { next: nextMainLineStepAfter("characters", ctx) }; // marks (spec 071)
@@ -365,12 +349,7 @@ function advanceStep(
       return { next: nextMainLineStepAfter("rules", ctx) }; // mechanisms
 
     case "mechanisms":
-      // Open: the Missing letters page sends an Add here; coming back lands on it so
-      // the remaining letters, then Upgrades, are not skipped.
-      if (isOpenWalk(ctx) && stepApplies(stepById("open_missing_letters"), ctx)) {
-        return { next: "open_missing_letters" };
-      }
-      return { next: "osk" };
+      return { next: nextMainLineStepAfter("mechanisms", ctx) };
 
     case "osk":
       // Same touch-seed fork as the former post-mechanisms hop (spec 035 R4/R12).

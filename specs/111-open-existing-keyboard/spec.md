@@ -166,12 +166,13 @@ The help step asks only about documentation that is missing or fails a criterion
 The walk on Open:
 
 1. **Languages** (always): the package's language list.
-2. **Missing letters** (only when the keyboard can't type letters its languages need): grouped by language. The author adds a letter, or removes a language the keyboard isn't meant to support. Replaces the character survey.
-3. **Upgrades** (only when an upgrade criterion fails): one entry per upgrade, each with a preview and Apply or Skip. Upgrades may be structural. The first two are cased keys (criterion 7.28: remove the CAPS rules and add the cased-keys declaration in the source) and the touch caps layer (criterion 18.16, following Keyman's Capsifesto: add a caps layer reached by double-tapping Shift).
-4. **On-screen keyboard** and **Touch** (always): edit the existing files, or generate them when missing.
-5. **Documentation** (only when documentation is missing or fails its criteria; Story 7).
-6. **Review** (always): the criteria view, with pre-existing and new findings, review notes and the submit gate.
-7. **Output**.
+2. **Letters** (always for a keyboard that is not basic; for a basic keyboard only when it can't type letters its languages need): shows the characters the keyboard types, read from what it produces, for the author to confirm. An author may add characters, or even letters, beyond the base set, so the page always shows for a non-basic keyboard. Letters the listed languages need but the keyboard can't type are grouped by language, and the author adds a letter or removes a language the keyboard isn't meant to support. Adding puts the character in the character inventory; it places nothing. Replaces the character survey.
+3. **Upgrades** (only when an upgrade criterion fails), before the galleries so authors edit the upgraded keyboard: one entry per upgrade, each with a preview and Apply or Skip. Upgrades may be structural. The first two are cased keys (criterion 7.28: remove the CAPS rules and add the cased-keys declaration in the source) and the touch caps layer (criterion 18.16, following Keyman's Capsifesto: add a caps layer reached by double-tapping Shift).
+4. **Mechanisms** (every keyboard except a basic one, whose physical layout never changes): the Mechanisms gallery, where added characters get their keys, as on Copy. Marks, sequences and rules stay opt-in tools.
+5. **On-screen keyboard** and **Touch** (always): edit the existing files, or generate them when missing. Touch is the touch gallery, where unplaced characters get touch keys, on basic keyboards too.
+6. **Documentation** (only when documentation is missing or fails its criteria; Story 7).
+7. **Review** (always): the criteria view, with pre-existing and new findings, review notes and the submit gate.
+8. **Output**.
 
 **Why this priority**: Without it an opened keyboard has no path from the criteria view to submission.
 
@@ -252,8 +253,8 @@ The walk on Open:
 
 **The Open walk** *(added 2026-11-05)*
 
-- **FR-031**: Opening MUST start a walk: Languages, Missing letters, Upgrades, On-screen keyboard, Touch, Documentation, Review, Output (Story 8). Every step MUST offer Continue.
-- **FR-032**: Missing letters, Upgrades and Documentation MUST appear only when the opened keyboard has that kind of problem. Which kinds it has MUST be recorded as a decision when the baseline is taken, so the walk's pages depend on recorded decisions only (Constitution: screens derive from decisions).
+- **FR-031**: Opening MUST start a walk: Languages, Letters, Upgrades, Mechanisms, On-screen keyboard, Touch, Documentation, Review, Output (Story 8). Every step MUST offer Continue. The order MUST follow from what each page requires and provides, not from a hand-kept sequence; the only positional rule is that the walk ends at Review.
+- **FR-032**: Upgrades and Documentation MUST appear only when the opened keyboard has that kind of problem. Letters MUST appear for every keyboard that is not basic, and for a basic keyboard only when it has missing letters. Mechanisms MUST appear only for a keyboard that is not basic. Which problem kinds it has MUST be recorded as a decision when the baseline is taken, and whether it is basic MUST be recorded when it is opened, so the walk's pages depend on recorded decisions only (Constitution: screens derive from decisions).
 - **FR-033**: Missing letters MUST group each missing letter under every listed language that expects it, and offer to add the letter or remove the language. Composed and decomposed forms MUST count as the same letter.
 - **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28), the touch caps layer (18.16, the full Capsifesto behaviour: caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift), consistent Ctrl/RAlt touch keys, and a symbols layer. Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
 

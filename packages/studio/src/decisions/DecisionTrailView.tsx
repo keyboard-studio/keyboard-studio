@@ -341,7 +341,7 @@ export function DecisionTrailView({
       case "open_languages":
         return t({ id: "trail.stage.name.openLanguages", message: "Keyboard languages" });
       case "open_missing_letters":
-        return t({ id: "trail.stage.name.openMissingLetters", message: "Missing letters" });
+        return t({ id: "trail.stage.name.openMissingLetters", message: "Letters" });
       case "open_upgrades":
         return t({ id: "trail.stage.name.openUpgrades", message: "Upgrades" });
       case "characters":

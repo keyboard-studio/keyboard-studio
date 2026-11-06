@@ -90,10 +90,10 @@ const JOURNEYS: readonly JourneyCase[] = [
   {
     name: "bj-cree-woods-track2",
     summary: "replays the Track 2 adapt spine through the syllabic Phase B branch (US1, T012)",
-    // Adapt track (Open, spec 111) skips project_name and the feature galleries,
-    // and visits the Open-only language list.
-    visits: ["open_languages"],
-    skips: ["project_name", "carve", "mechanisms"],
+    // Adapt track (Open, spec 111) skips project_name and the opt-in galleries, and
+    // visits the Open-only language list, Letters and (a non-basic keyboard) Mechanisms.
+    visits: ["open_languages", "open_missing_letters", "mechanisms"],
+    skips: ["project_name", "carve"],
     endsAtDone: true,
     lastEdge: "css->done",
   },
