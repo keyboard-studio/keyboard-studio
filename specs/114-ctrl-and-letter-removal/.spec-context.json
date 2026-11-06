@@ -3,8 +3,8 @@
   "specName": "Ctrl rules and removing needed letters",
   "branch": "114-ctrl-and-letter-removal",
   "unattended": true,
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "plan",
@@ -33,6 +33,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-06T08:38:32.707Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-06T08:38:59.891Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:40:08.816Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-06T08:40:09.818Z"
     }
   ],
   "decisions": [
@@ -51,7 +72,79 @@
     "plan": {
       "summary": "Plan: check, upgrade, no-new-Ctrl limits, removal warning; FR-005/007 stubbed",
       "key_finding": "All pieces reuse existing seams (upgradePairs, carveNeededSet, criteria.json)"
+    },
+    "tasks": {
+      "summary": "53 tasks across Foundational, US1-US4 and Polish; 3 waves of parallel work, one sequencing exception at T037"
     }
   },
-  "approach": "Add a keyboard-lint raw-Ctrl check and advisory with criteria rows, an IR-splice upgrade returning characters to the inventory, gallery/touch limits against Ctrl, and a dismissable needed-letter warning reusing carveNeededSet."
+  "approach": "Add a keyboard-lint raw-Ctrl check and advisory with criteria rows, an IR-splice upgrade returning characters to the inventory, gallery/touch limits against Ctrl, and a dismissable needed-letter warning reusing carveNeededSet.",
+  "coverage": {
+    "FR-001": {
+      "title": "Outside basic_* keyboards, a rule on unsided CTRL (without Alt) on a letter, number or punctuation key is reported with a move-off-Ctrl recommendation and a may-not-be-accepted warning",
+      "tasks": [
+        "T010",
+        "T012"
+      ]
+    },
+    "FR-002": {
+      "title": "The fix removes those Ctrl rules by text splice and returns each typed character to the inventory as unplaced, without re-adding characters typed elsewhere",
+      "tasks": [
+        "T011",
+        "T013",
+        "T014"
+      ]
+    },
+    "FR-003": {
+      "title": "No new Ctrl content or Ctrl layer on Copy or in the Open galleries; existing basic_* Ctrl content kept unless carved",
+      "tasks": [
+        "T020",
+        "T021",
+        "T022",
+        "T023",
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-004": {
+      "title": "LCTRL and RCTRL allowed, with an advisory that an Alt-based placement is preferred",
+      "tasks": [
+        "T002",
+        "T040",
+        "T041"
+      ]
+    },
+    "FR-005": {
+      "title": "Unsided CTRL ALT offered an RALT upgrade, withheld unless a before/after AltGr simulation matches (stub, awaiting owner)",
+      "tasks": [
+        "T001"
+      ]
+    },
+    "FR-006": {
+      "title": "Removing a needed letter on Copy or Open shows a dismissable warning naming the languages that need it; composed and decomposed forms match",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T035",
+        "T036",
+        "T037"
+      ]
+    },
+    "FR-007": {
+      "title": "basic_* touch ctrl and shift-ctrl layers may be renamed to rightalt and rightalt-shift (stub, awaiting owner)",
+      "tasks": [
+        "T001"
+      ]
+    },
+    "FR-008": {
+      "title": "The criterion and advisory are criteria.json rows with keyboard-lint checks; the fixes are upgrade pairs",
+      "tasks": [
+        "T001",
+        "T002",
+        "T014"
+      ]
+    }
+  }
 }
