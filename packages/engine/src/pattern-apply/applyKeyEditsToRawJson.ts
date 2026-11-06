@@ -128,6 +128,7 @@ import type {
   AddKeyOp,
   KeyEditOperation,
   MoveKeyOp,
+  MoveToLayerOp,
   RemoveKeyOp,
   SubKeyLocation,
   SubKeyRef,
@@ -393,6 +394,7 @@ function applyMove(resolved: ResolvedMainKey, direction: MoveKeyOp["direction"])
 }
 
 function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
+
   const removedWidth = toWireNumber(resolved.key["width"]);
   resolved.row.keys.splice(resolved.keyIndex, 1);
 
@@ -407,6 +409,87 @@ function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
   for (const key of remaining) {
     const current = toWireNumber(key["width"]) ?? 0;
     key["width"] = current + share;
+  }
+}
+
+/**
+ * Case B's `moveToLayer` — the twin of `applyKeyEditsToLayout.ts`'s
+ * `moveToLayer` case, held to the same rules by `applyKeyEdits.twin.test.ts`:
+ * splice the EXISTING wire object (never rebuild — Case B fidelity), refuse
+ * on id collision, anchor before/after when it resolves on the target layer,
+ * else append to the last row.
+ */
+function applyMoveToLayer(
+  view: RawLayoutView,
+  resolved: ResolvedMainKey,
+  op: MoveToLayerOp,
+  warnings: string[],
+): void {
+  if (op.scope === "family") {
+    warnUnresolved(
+      warnings,
+      op,
+      'scope "family" has no shared referent across a layer family for a moveToLayer',
+    );
+    return;
+  }
+  const srcParts = parseTouchKeyAddress(op.address);
+  if (srcParts === undefined) {
+    warnUnresolved(warnings, op, "malformed source address");
+    return;
+  }
+  const platform = view.platforms.find((p) => p.id === srcParts.platform);
+  if (platform === undefined) {
+    warnUnresolved(warnings, op, `platform "${srcParts.platform}" not found`);
+    return;
+  }
+  const targetLayer = platform.layers.find((l) => l.id === op.toLayer);
+  if (targetLayer === undefined) {
+    warnUnresolved(warnings, op, `target layer "${op.toLayer}" not found`);
+    return;
+  }
+  if (resolved.layerRows === targetLayer.rows) {
+    warnUnresolved(warnings, op, `target layer "${op.toLayer}" is the key's own layer — no change`);
+    return;
+  }
+  const collides = targetLayer.rows.some((r) =>
+    r.keys.some((k) => k.id === resolved.key.id),
+  );
+  if (collides) {
+    warnUnresolved(
+      warnings,
+      op,
+      `target layer "${op.toLayer}" already has a key with id "${resolved.key.id}"`,
+    );
+    return;
+  }
+  // Splice out first, so a stale anchor pointing at the moved key itself
+  // falls back to append instead of inserting the key next to itself.
+  const [moved] = resolved.row.keys.splice(resolved.keyIndex, 1);
+  if (moved === undefined) {
+    warnUnresolved(warnings, op, "source key not found");
+    return;
+  }
+  let inserted = false;
+  if (op.anchorAddress !== undefined) {
+    const anchor = resolveMainRawKey(view, op.anchorAddress);
+    if (anchor !== undefined && anchor.layerRows === targetLayer.rows) {
+      const at = anchor.keyIndex + (op.position === "after" ? 1 : 0);
+      anchor.row.keys.splice(at, 0, moved);
+      inserted = true;
+    } else {
+      warnings.push(
+        `[key-edit-apply-raw] op #${op.seq} (moveToLayer) at "${op.address}": anchor "${op.anchorAddress}" did not resolve on layer "${op.toLayer}" — appended instead`,
+      );
+    }
+  }
+  if (!inserted) {
+    const lastRow = targetLayer.rows[targetLayer.rows.length - 1];
+    if (lastRow === undefined) {
+      targetLayer.rows.push({ keys: [moved] });
+    } else {
+      lastRow.keys.push(moved);
+    }
   }
 }
 
@@ -545,6 +628,10 @@ export function applyKeyEditsToRawJson(
           // A boundary, not a failure — see the IR twin's own comment.
           warnUnresolved(warnings, op, `no room to move "${op.direction}"`);
         }
+        break;
+      }
+      case "moveToLayer": {
+        applyMoveToLayer(view, resolved, op, warnings);
         break;
       }
       case "setSubKey": {

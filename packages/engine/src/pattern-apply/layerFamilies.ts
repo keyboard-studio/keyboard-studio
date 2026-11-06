@@ -658,6 +658,7 @@ export function keyEditAffectsFamilyParallelism(
     }
     case "add":
     case "move":
+    case "moveToLayer":
     case "rename":
     case "setSubKey":
     case "removeSubKey":

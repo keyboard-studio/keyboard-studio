@@ -19,6 +19,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useIsNarrow } from "../../../hooks/useViewport.ts";
 import {
   createKeyOccurrenceCounter,
+  parseTouchKeyAddress,
   touchKeyAddress,
   type TouchKeyIR,
   type TouchLayoutIR,
@@ -252,6 +253,17 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     xscale: number;
   } | null>(null);
   const dragSrcRef = useRef<string | null>(null);
+  // Item 4: dragging a key over a layer tab dwells, then the display jumps
+  // to that layer so the key can be dropped there. One timer at a time;
+  // leaving the tab (or dropping) cancels it.
+  const layerDwellTimer = useRef<{ id: string; timer: number } | null>(null);
+  const clearLayerDwell = (): void => {
+    if (layerDwellTimer.current !== null) {
+      clearTimeout(layerDwellTimer.current.timer);
+      layerDwellTimer.current = null;
+    }
+  };
+  useEffect(() => clearLayerDwell, []);
 
   const openPlacement = (letter: string, address: string): void => {
     if (layout === null) return;
@@ -441,11 +453,39 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     }
   };
 
-  // -- drag reorder → direction-step `move` ops ------------------------------
+  // -- move key to another layer (item 2) -------------------------------------
+  const handleMoveKeyToLayer = (toLayer: string): void => {
+    if (selectedOnActiveLayer === undefined || selectedKeyAddress === null) return;
+    if (toLayer === activeLayerId) return;
+    // `commitKeyEditOp` follows the selection to the moved key (TouchGallery).
+    commitOp({ address: selectedKeyAddress, kind: "moveToLayer", toLayer });
+  };
+
+  // -- drag reorder → direction-step `move` ops, or `moveToLayer` --------------
   const handleDropOnKey = (targetAddress: string): void => {
     const srcAddress = dragSrcRef.current;
     dragSrcRef.current = null;
+    clearLayerDwell();
     if (srcAddress === null || srcAddress === targetAddress) return;
+    const srcParts = parseTouchKeyAddress(srcAddress);
+    const dstParts = parseTouchKeyAddress(targetAddress);
+    // Cross-layer drop (after a layer-tab dwell switch, item 4): the key
+    // moves to the target layer anchored at the drop key. Identity, subkeys
+    // and provenance travel with it — `moveToLayer` splices, never rebuilds.
+    if (
+      srcParts !== undefined &&
+      dstParts !== undefined &&
+      (srcParts.platform !== dstParts.platform || srcParts.layerId !== dstParts.layerId)
+    ) {
+      commitOp({
+        address: srcAddress,
+        kind: "moveToLayer",
+        toLayer: dstParts.layerId,
+        anchorAddress: targetAddress,
+        position: "before",
+      });
+      return;
+    }
     const flat = rowViews.flat();
     const srcIdx = flat.findIndex((v) => v.address === srcAddress);
     const dstIdx = flat.findIndex((v) => v.address === targetAddress);
@@ -478,6 +518,40 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     for (const direction of steps) {
       commitOp({ address: srcAddress, kind: "move", direction });
     }
+  };
+
+  // -- layer-tab dwell + drop (item 4) ----------------------------------------
+  // Holding a dragged key over a layer tab switches the display to that
+  // layer after a short dwell, so the key can be dropped where wanted.
+  // Dropping directly on the tab moves the key to that layer (appended).
+  const handleLayerTabDragOver = (e: React.DragEvent, id: string): void => {
+    if (dragSrcRef.current === null) return; // no key drag in flight
+    if (id === activeLayerId) {
+      clearLayerDwell();
+      return;
+    }
+    e.preventDefault();
+    if (layerDwellTimer.current?.id === id) return;
+    clearLayerDwell();
+    layerDwellTimer.current = {
+      id,
+      timer: window.setTimeout(() => {
+        layerDwellTimer.current = null;
+        onSelectLayer(id);
+      }, 600),
+    };
+  };
+  const handleLayerTabDrop = (e: React.DragEvent, id: string): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearLayerDwell();
+    const srcAddress = dragSrcRef.current;
+    dragSrcRef.current = null;
+    if (srcAddress === null) return;
+    const srcParts = parseTouchKeyAddress(srcAddress);
+    if (srcParts === undefined) return;
+    if (srcParts.layerId === id && srcParts.platform === activePlatformId) return;
+    commitOp({ address: srcAddress, kind: "moveToLayer", toLayer: id });
   };
 
   // -- resize (east handle) → `set` {width} ----------------------------------
@@ -541,6 +615,255 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           e.kind === "flick" ? e.ref.id === subSel.id : e.key.id === subSel.id,
         )
       : undefined;
+
+  // Key canvas as a render function so the wide folder-tab layout (item 6)
+  // can place it beside the vertical layer tabs.
+  const renderCanvas = (folderTabs: boolean): React.ReactNode => (
+    <>
+          {/* Key canvas — TIKE geometry: 100 units/row, default width 100,
+              keyMargin 15 gap, widest row sets the scale. */}
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- background click deselects; keyboard users use Escape on the selected key */}
+          <div
+            data-testid="touch-builder-canvas"
+            role="group"
+            aria-label={t({
+              id: "editor.assignLoop.touch.builder.canvasLabel",
+              message: "Touch layout canvas",
+            })}
+            onClick={() => onSelectKey(null)}
+            style={{
+              background: BG_CANVAS,
+              border: `1px solid ${BORDER}`,
+              borderRadius: folderTabs ? "0 8px 8px 8px" : 8,
+              padding: 12,
+              overflowX: "auto",
+            }}
+          >
+            {rowViews.map((row, r) => (
+              <div key={r} style={{ display: "flex", alignItems: "stretch" }}>
+                {row.map(({ key, address }) => {
+                  const isSelected = address === selectedKeyAddress;
+                  const colors = spColor(key.sp);
+                  const isSpacer = (key.sp ?? 0) === 10;
+                  const widthUnits =
+                    resizeDrag !== null && resizeDrag.address === address
+                      ? resizeDrag.previewWidthUnits
+                      : (key.width ?? BUILDER_DEFAULT_KEY_WIDTH) + (stretchUnits.get(address) ?? 0);
+                  const widthPx = Math.max(8, widthUnits * scale.xscale);
+                  // Touch-drag drop target: the key under the finger lights up so
+                  // the landing spot is obvious while the ghost floats above.
+                  const isDropTarget = dropHoverAddress === address;
+                  return (
+                    <div
+                      key={address}
+                      role="button"
+                      tabIndex={0}
+                      data-testid="touch-builder-key"
+                      data-address={address}
+                      aria-label={key.text || key.id}
+                      aria-pressed={isSelected}
+                      draggable
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (trayLetter !== null) {
+                          openPlacement(trayLetter, address);
+                        } else {
+                          onSelectKey(address);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        // Double-click with nextlayer jumps to that layer —
+                        // navigation only (TIKE `selectLayerByName`).
+                        const target = key.nextlayer;
+                        if (target !== undefined && target !== "" && layerIds.includes(target)) {
+                          onSelectLayer(target);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectKey(address);
+                        }
+                      }}
+                      onDragStart={(e) => {
+                        dragSrcRef.current = address;
+                        e.dataTransfer.effectAllowed = "move";
+                        try {
+                          e.dataTransfer.setData("text/plain", address);
+                        } catch {
+                          /* some browsers restrict setData to specific types */
+                        }
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDropOnKey(address);
+                      }}
+                      onDragEnd={() => {
+                        dragSrcRef.current = null;
+                      }}
+                      style={{
+                        position: "relative",
+                        flex: "0 0 auto",
+                        width: `${widthPx}px`,
+                        height: `${BUILDER_ROW_HEIGHT * scale.yscale}px`,
+                        marginLeft: `${padUnits(key) * scale.xscale}px`,
+                        marginTop: `${BUILDER_KEY_MARGIN * scale.yscale}px`,
+                        background: isSpacer ? "transparent" : colors.bg,
+                        color: colors.fg,
+                        border: isSelected
+                          ? `2px solid ${ACCENT}`
+                          : `1px ${isSpacer ? "dashed" : "solid"} ${colors.border}`,
+                        borderRadius: 6,
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        opacity: isSpacer ? 0.45 : 1,
+                        outline: isDropTarget ? `3px solid ${ACCENT}` : "none",
+                        outlineOffset: isDropTarget ? 1 : 0,
+                        fontFamily: FONT,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: TEXT_DIM,
+                          maxWidth: "100%",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {key.id}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 600,
+                          fontFamily: keycapFont,
+                          maxWidth: "100%",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {key.text || " "}
+                      </span>
+                      {key.hint !== undefined && key.hint !== "" && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            right: 3,
+                            bottom: 2,
+                            fontSize: 9,
+                            color: TEXT_DIM,
+                          }}
+                        >
+                          {key.hint}
+                        </span>
+                      )}
+                      {/* TIKE corner badges: subkey annotations. */}
+                      <span
+                        style={{ position: "absolute", left: 3, top: 2, fontSize: 9, color: TEXT_DIM }}
+                        title={[
+                          (key.sk?.length ?? 0) > 0
+                            ? t({
+                                id: "editor.assignLoop.touch.builder.hasLongpress",
+                                message: "Has longpress keys",
+                              })
+                            : "",
+                          key.flick !== undefined && Object.keys(key.flick).length > 0
+                            ? t({
+                                id: "editor.assignLoop.touch.builder.hasFlick",
+                                message: "Has flick keys",
+                              })
+                            : "",
+                          (key.multitap?.length ?? 0) > 0
+                            ? t({
+                                id: "editor.assignLoop.touch.builder.hasMultitap",
+                                message: "Has multitap keys",
+                              })
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      >
+                        {(key.sk?.length ?? 0) > 0 ? "◈" : ""}
+                        {key.flick !== undefined && Object.keys(key.flick).length > 0 ? "✥" : ""}
+                        {(key.multitap?.length ?? 0) > 0 ? "⋯" : ""}
+                      </span>
+                      {/* East resize handle (TIKE `makeKeyResizable`) — on the
+                          selected key only, like TIKE. */}
+                      {isSelected && !isSpacer && (
+                        <div
+                          role="separator"
+                          aria-orientation="vertical"
+                          aria-label={t({
+                            id: "editor.assignLoop.touch.builder.resizeHandleLabel",
+                            message: "Resize key",
+                          })}
+                          data-testid="touch-builder-resize-handle"
+                          onPointerDown={(e) => handleResizePointerDown(e, address, key)}
+                          onPointerMove={handleResizePointerMove}
+                          onPointerUp={handleResizePointerUp}
+                          onPointerCancel={() => setResizeDrag(null)}
+                          style={{
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: 8,
+                            cursor: "ew-resize",
+                            background: "transparent",
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+    </>
+  );
+
+  // One layer tab button. `folderTab` renders the wide-screen folder-tab
+  // look (item 6); otherwise the compact horizontal tab. Both carry the
+  // drag-dwell handlers (item 4): holding a dragged key over a tab switches
+  // the display to that layer, and dropping on the tab moves the key there.
+  const renderLayerTab = (id: string, folderTab: boolean): React.ReactNode => {
+    const active = id === activeLayerId;
+    return (
+      <button
+        key={id}
+        type="button"
+        role="tab"
+        aria-selected={active}
+        data-testid={`touch-builder-layer-${id}`}
+        onClick={() => onSelectLayer(id)}
+        onDragOver={(e) => handleLayerTabDragOver(e, id)}
+        onDragLeave={clearLayerDwell}
+        onDrop={(e) => handleLayerTabDrop(e, id)}
+        style={folderTab ? folderTabStyle(active) : tabStyle(active)}
+      >
+        {id}
+      </button>
+    );
+  };
+
+  const layerAriaLabel = t({
+    id: "editor.assignLoop.touch.builder.layerLabel",
+    message: "Layer",
+  });
 
   return (
     <div
@@ -606,315 +929,125 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
         </button>
       </div>
 
-      {/* Layer switcher — switching only (Q1: no structural layer ops). */}
-      <div
-        role="tablist"
-        aria-label={t({
-          id: "editor.assignLoop.touch.builder.layerLabel",
-          message: "Layer",
-        })}
-        style={{ display: "flex", gap: 4, flexWrap: "wrap" }}
-      >
-        {layerIds.map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={id === activeLayerId}
-            data-testid={`touch-builder-layer-${id}`}
-            onClick={() => onSelectLayer(id)}
-            style={tabStyle(id === activeLayerId)}
-          >
-            {id}
-          </button>
-        ))}
-      </div>
-
-      {/* Key canvas — TIKE geometry: 100 units/row, default width 100,
-          keyMargin 15 gap, widest row sets the scale. */}
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- background click deselects; keyboard users use Escape on the selected key */}
-      <div
-        data-testid="touch-builder-canvas"
-        role="group"
-        aria-label={t({
-          id: "editor.assignLoop.touch.builder.canvasLabel",
-          message: "Touch layout canvas",
-        })}
-        onClick={() => onSelectKey(null)}
-        style={{
-          background: BG_CANVAS,
-          border: `1px solid ${BORDER}`,
-          borderRadius: 8,
-          padding: 12,
-          overflowX: "auto",
-        }}
-      >
-        {rowViews.map((row, r) => (
-          <div key={r} style={{ display: "flex", alignItems: "stretch" }}>
-            {row.map(({ key, address }) => {
-              const isSelected = address === selectedKeyAddress;
-              const colors = spColor(key.sp);
-              const isSpacer = (key.sp ?? 0) === 10;
-              const widthUnits =
-                resizeDrag !== null && resizeDrag.address === address
-                  ? resizeDrag.previewWidthUnits
-                  : (key.width ?? BUILDER_DEFAULT_KEY_WIDTH) + (stretchUnits.get(address) ?? 0);
-              const widthPx = Math.max(8, widthUnits * scale.xscale);
-              // Touch-drag drop target: the key under the finger lights up so
-              // the landing spot is obvious while the ghost floats above.
-              const isDropTarget = dropHoverAddress === address;
-              return (
-                <div
-                  key={address}
-                  role="button"
-                  tabIndex={0}
-                  data-testid="touch-builder-key"
-                  data-address={address}
-                  aria-label={key.text || key.id}
-                  aria-pressed={isSelected}
-                  draggable
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (trayLetter !== null) {
-                      openPlacement(trayLetter, address);
-                    } else {
-                      onSelectKey(address);
-                    }
-                  }}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    // Double-click with nextlayer jumps to that layer —
-                    // navigation only (TIKE `selectLayerByName`).
-                    const target = key.nextlayer;
-                    if (target !== undefined && target !== "" && layerIds.includes(target)) {
-                      onSelectLayer(target);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectKey(address);
-                    }
-                  }}
-                  onDragStart={(e) => {
-                    dragSrcRef.current = address;
-                    e.dataTransfer.effectAllowed = "move";
-                    try {
-                      e.dataTransfer.setData("text/plain", address);
-                    } catch {
-                      /* some browsers restrict setData to specific types */
-                    }
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleDropOnKey(address);
-                  }}
-                  onDragEnd={() => {
-                    dragSrcRef.current = null;
-                  }}
-                  style={{
-                    position: "relative",
-                    flex: "0 0 auto",
-                    width: `${widthPx}px`,
-                    height: `${BUILDER_ROW_HEIGHT * scale.yscale}px`,
-                    marginLeft: `${padUnits(key) * scale.xscale}px`,
-                    marginTop: `${BUILDER_KEY_MARGIN * scale.yscale}px`,
-                    background: isSpacer ? "transparent" : colors.bg,
-                    color: colors.fg,
-                    border: isSelected
-                      ? `2px solid ${ACCENT}`
-                      : `1px ${isSpacer ? "dashed" : "solid"} ${colors.border}`,
-                    borderRadius: 6,
-                    boxSizing: "border-box",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    opacity: isSpacer ? 0.45 : 1,
-                    outline: isDropTarget ? `3px solid ${ACCENT}` : "none",
-                    outlineOffset: isDropTarget ? 1 : 0,
-                    fontFamily: FONT,
-                    overflow: "hidden",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: TEXT_DIM,
-                      maxWidth: "100%",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {key.id}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 600,
-                      fontFamily: keycapFont,
-                      maxWidth: "100%",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {key.text || " "}
-                  </span>
-                  {key.hint !== undefined && key.hint !== "" && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 3,
-                        bottom: 2,
-                        fontSize: 9,
-                        color: TEXT_DIM,
-                      }}
-                    >
-                      {key.hint}
-                    </span>
-                  )}
-                  {/* TIKE corner badges: subkey annotations. */}
-                  <span
-                    style={{ position: "absolute", left: 3, top: 2, fontSize: 9, color: TEXT_DIM }}
-                    title={[
-                      (key.sk?.length ?? 0) > 0
-                        ? t({
-                            id: "editor.assignLoop.touch.builder.hasLongpress",
-                            message: "Has longpress keys",
-                          })
-                        : "",
-                      key.flick !== undefined && Object.keys(key.flick).length > 0
-                        ? t({
-                            id: "editor.assignLoop.touch.builder.hasFlick",
-                            message: "Has flick keys",
-                          })
-                        : "",
-                      (key.multitap?.length ?? 0) > 0
-                        ? t({
-                            id: "editor.assignLoop.touch.builder.hasMultitap",
-                            message: "Has multitap keys",
-                          })
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  >
-                    {(key.sk?.length ?? 0) > 0 ? "◈" : ""}
-                    {key.flick !== undefined && Object.keys(key.flick).length > 0 ? "✥" : ""}
-                    {(key.multitap?.length ?? 0) > 0 ? "⋯" : ""}
-                  </span>
-                  {/* East resize handle (TIKE `makeKeyResizable`) — on the
-                      selected key only, like TIKE. */}
-                  {isSelected && !isSpacer && (
-                    <div
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label={t({
-                        id: "editor.assignLoop.touch.builder.resizeHandleLabel",
-                        message: "Resize key",
-                      })}
-                      data-testid="touch-builder-resize-handle"
-                      onPointerDown={(e) => handleResizePointerDown(e, address, key)}
-                      onPointerMove={handleResizePointerMove}
-                      onPointerUp={handleResizePointerUp}
-                      onPointerCancel={() => setResizeDrag(null)}
-                      style={{
-                        position: "absolute",
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 8,
-                        cursor: "ew-resize",
-                        background: "transparent",
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {/* Key toolbar — one op per commit (TIKE `saveOnce` semantics). */}
-      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
-        <KeyToolbar
-          address={selectedKeyAddress!}
-          targetKey={selectedKey}
-          layerIds={layerIds}
-          layerOverrideOptions={_layerOverrideOptions}
-          fieldEpoch={fieldEpoch}
-          onInvalid={() => setFieldEpoch((n) => n + 1)}
-          commitOp={commitOp}
-          keycapFont={keycapFont}
-        />
-      )}
-
-      {/* Subkey panel — longpress / flick compass / multitap. */}
-      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
-        <SubkeyPanel
-          address={selectedKeyAddress!}
-          targetKey={selectedKey}
-          layerIds={layerIds}
-          layerOverrideOptions={_layerOverrideOptions}
-          selection={subSel}
-          onSelect={setSubSel}
-          fieldEpoch={fieldEpoch}
-          onInvalid={() => setFieldEpoch((n) => n + 1)}
-          commitOp={commitOp}
-          layout={layout}
-          keycapFont={keycapFont}
-          applyPanelDrop={applyPanelDrop}
-          panelDropHover={panelDropHover}
-        />
-      )}
-
-      {/* Wedge controls (TIKE add-key-left/right, delete) — below the key
-          and longpress sections. */}
-      {selectedOnActiveLayer !== undefined && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            data-testid="touch-builder-add-left"
-            onClick={() => handleAddKey("before")}
-            style={ghostBtn}
-          >
-            {t({
-              id: "editor.assignLoop.touch.builder.addKeyLeft",
-              message: "Add key left",
-            })}
-          </button>
-          <button
-            type="button"
-            data-testid="touch-builder-add-right"
-            onClick={() => handleAddKey("after")}
-            style={ghostBtn}
-          >
-            {t({
-              id: "editor.assignLoop.touch.builder.addKeyRight",
-              message: "Add key right",
-            })}
-          </button>
-          <button
-            type="button"
-            data-testid="touch-builder-delete-key"
-            onClick={handleDeleteKey}
-            style={ghostBtn}
-          >
-            {t({
-              id: "editor.assignLoop.touch.builder.deleteKey",
-              message: "Delete key",
-            })}
-          </button>
+      {/* Layer switcher — folder tabs on wide screens (item 6), a horizontal
+          tab row on narrow ones. Drag-dwell (item 4) lives on the tabs. */}
+      {isNarrow ? (
+        <div
+          role="tablist"
+          aria-label={layerAriaLabel}
+          style={{ display: "flex", gap: 4, flexWrap: "wrap" }}
+        >
+          {layerIds.map((id) => renderLayerTab(id, false))}
         </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "stretch" }}>
+          <div
+            role="tablist"
+            aria-label={layerAriaLabel}
+            aria-orientation="vertical"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              paddingTop: 14,
+              zIndex: 1,
+            }}
+          >
+            {layerIds.map((id) => renderLayerTab(id, true))}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>{renderCanvas(true)}</div>
+        </div>
+      )}
+      {isNarrow && renderCanvas(false)}
+
+      {/* Key section — fields, wedge controls, move-to-layer, and the nested
+          subkey child block. One op per commit (TIKE `saveOnce` semantics). */}
+      {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
+        <section
+          aria-label={t({
+            id: "editor.assignLoop.touch.builder.keySection",
+            message: "Key",
+          })}
+          style={sectionStyle}
+        >
+          <KeyToolbar
+            address={selectedKeyAddress!}
+            targetKey={selectedKey}
+            layerIds={layerIds}
+            layerOverrideOptions={_layerOverrideOptions}
+            fieldEpoch={fieldEpoch}
+            onInvalid={() => setFieldEpoch((n) => n + 1)}
+            commitOp={commitOp}
+            keycapFont={keycapFont}
+          />
+
+          {/* Wedge controls (TIKE add-key-left/right, delete) — item 1: at
+              the bottom of the Key section's own box, no longer disconnected
+              below it. */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              data-testid="touch-builder-add-left"
+              onClick={() => handleAddKey("before")}
+              style={ghostBtn}
+            >
+              {t({
+                id: "editor.assignLoop.touch.builder.addKeyLeft",
+                message: "Add key left",
+              })}
+            </button>
+            <button
+              type="button"
+              data-testid="touch-builder-add-right"
+              onClick={() => handleAddKey("after")}
+              style={ghostBtn}
+            >
+              {t({
+                id: "editor.assignLoop.touch.builder.addKeyRight",
+                message: "Add key right",
+              })}
+            </button>
+            <button
+              type="button"
+              data-testid="touch-builder-delete-key"
+              onClick={handleDeleteKey}
+              style={ghostBtn}
+            >
+              {t({
+                id: "editor.assignLoop.touch.builder.deleteKey",
+                message: "Delete key",
+              })}
+            </button>
+          </div>
+
+          {/* Move key to another layer — item 2. */}
+          <MoveKeyToLayer
+            currentLayerId={activeLayerId}
+            layerIds={layerIds}
+            onMove={handleMoveKeyToLayer}
+          />
+
+          {/* Subkeys — item 3: a visually nested child of the Key section,
+              the three groups side by side. */}
+          <div style={nestedChildStyle}>
+            <SubkeyPanel
+              address={selectedKeyAddress!}
+              targetKey={selectedKey}
+              layerIds={layerIds}
+              layerOverrideOptions={_layerOverrideOptions}
+              selection={subSel}
+              onSelect={setSubSel}
+              fieldEpoch={fieldEpoch}
+              onInvalid={() => setFieldEpoch((n) => n + 1)}
+              commitOp={commitOp}
+              layout={layout}
+              keycapFont={keycapFont}
+              applyPanelDrop={applyPanelDrop}
+              panelDropHover={panelDropHover}
+              nested
+            />
+          </div>
+        </section>
       )}
 
       {templateOpen && (
@@ -975,15 +1108,11 @@ function KeyToolbar(props: {
     }
   };
 
+  // Renders the field grid only — the surrounding Key <section> (with the
+  // wedge controls, move-to-layer, and nested subkey child block) is
+  // composed by the caller (items 1–3).
   return (
-    <section
-      aria-label={t({
-        id: "editor.assignLoop.touch.builder.keySection",
-        message: "Key",
-      })}
-      style={sectionStyle}
-    >
-      <div style={fieldGridStyle}>
+    <div style={fieldGridStyle}>
         <LabeledInput
           label={t({ id: "editor.assignLoop.touch.builder.textLabel", message: "Keycap text" })}
           testId="touch-builder-field-text"
@@ -1095,7 +1224,6 @@ function KeyToolbar(props: {
           </select>
         </label>
       </div>
-    </section>
   );
 }
 
@@ -1135,6 +1263,72 @@ function LabeledInput(props: {
 }
 
 // ---------------------------------------------------------------------------
+// Move key to another layer (item 2)
+// ---------------------------------------------------------------------------
+
+function MoveKeyToLayer(props: {
+  currentLayerId: string;
+  layerIds: readonly string[];
+  onMove: (toLayer: string) => void;
+}) {
+  const { t } = useLingui();
+  const { currentLayerId, layerIds, onMove } = props;
+  const [target, setTarget] = useState("");
+  // The dropdown resets whenever the selected key's layer changes.
+  useEffect(() => setTarget(""), [currentLayerId]);
+  const options = layerIds.filter((id) => id !== currentLayerId);
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={labelStyle}>
+        {t({
+          id: "editor.assignLoop.touch.builder.moveKeyToLabel",
+          message: "Move key to…",
+        })}
+      </span>
+      <select
+        data-testid="touch-builder-move-layer-select"
+        aria-label={t({
+          id: "editor.assignLoop.touch.builder.moveKeyToLabel",
+          message: "Move key to…",
+        })}
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
+        style={selectStyle}
+      >
+        <option value="">
+          {t({
+            id: "editor.assignLoop.touch.builder.moveKeyToPlaceholder",
+            message: "Select layer",
+          })}
+        </option>
+        {options.map((id) => (
+          <option key={id} value={id}>
+            {id}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        data-testid="touch-builder-move-layer-apply"
+        disabled={target === ""}
+        onClick={() => onMove(target)}
+        style={ghostBtn}
+      >
+        {t({ id: "editor.assignLoop.touch.builder.moveKeyToApply", message: "Apply" })}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Subkey panel
 // ---------------------------------------------------------------------------
 
@@ -1155,12 +1349,17 @@ function SubkeyPanel(props: {
   applyPanelDrop: (source: SubkeyDropSource, spec: PanelDropSpec) => void;
   /** Serialized panel spec under the finger during a header tray drag. */
   panelDropHover?: string | null | undefined;
+  /**
+   * Render as the Key section's nested child (item 3): no outer card, the
+   * three groups side by side. The caller provides the nesting chrome.
+   */
+  nested?: boolean;
 }) {
   const { t } = useLingui();
   const {
     address, targetKey: key, layerIds, layerOverrideOptions: _layerOverrideOptions,
     selection, onSelect, fieldEpoch, onInvalid, commitOp, layout, keycapFont,
-    applyPanelDrop, panelDropHover,
+    applyPanelDrop, panelDropHover, nested,
   } = props;
   const entries = subKeyEntriesOf(key);
 
@@ -1292,13 +1491,22 @@ function SubkeyPanel(props: {
             : selection.kind === e.kind && e.key.id === selection.id,
         );
 
-  return (
-    <section
-      aria-label={t({
-        id: "editor.assignLoop.touch.builder.subkeySection",
-        message: "Subkeys",
-      })}
-      style={sectionStyle}
+  const subkeyAriaLabel = t({
+    id: "editor.assignLoop.touch.builder.subkeySection",
+    message: "Subkeys",
+  });
+
+  // Item 3: nested mode renders no outer card — the caller nests this block
+  // inside the Key section — and the three groups sit side by side (wrapping
+  // on narrow widths) instead of stacked.
+  const groupsEl = (
+    <div
+      style={{
+        display: "flex",
+        gap: 16,
+        flexWrap: "wrap",
+        alignItems: "flex-start",
+      }}
     >
       {/* Longpress group — chips reorder via drag; tray letters append. */}
       <SubkeyGroup
@@ -1408,7 +1616,12 @@ function SubkeyPanel(props: {
           renderChip(e, e.key.text || e.key.id, { kind: "multitap", index: i }, `mt:${i}`),
         )}
       </SubkeyGroup>
+    </div>
+  );
 
+  // The selected-subkey editor + drag ghost are shared by both modes.
+  const selectedSubkeyEl = (
+    <>
       {/* Selected subkey fields */}
       {selectedEntry !== undefined && (
         <div style={{ ...sectionStyle, marginTop: 8 }} data-testid="touch-builder-subkey-fields">
@@ -1549,6 +1762,36 @@ function SubkeyPanel(props: {
           {subkeyDragLabel(subDrag.ghost.payload)}
         </div>
       )}
+    </>
+  );
+
+  if (nested === true) {
+    // Item 3: the caller's nested child block carries the visual nesting;
+    // this renders the groups + selected-subkey editor directly under the
+    // shared "Subkeys" label.
+    return (
+      <div aria-label={subkeyAriaLabel}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: TEXT_MAIN,
+            fontFamily: FONT,
+            marginBottom: 8,
+          }}
+        >
+          {subkeyAriaLabel}
+        </div>
+        {groupsEl}
+        {selectedSubkeyEl}
+      </div>
+    );
+  }
+
+  return (
+    <section aria-label={subkeyAriaLabel} style={sectionStyle}>
+      {groupsEl}
+      {selectedSubkeyEl}
     </section>
   );
 }
@@ -1773,6 +2016,25 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   fontWeight: active ? 600 : 400,
 });
 
+// Wide-screen folder tabs (item 6): the active tab shares the canvas's
+// background and overlaps its left border by 1px so the two read as one
+// connected surface, like a folder tab.
+const folderTabStyle = (active: boolean): React.CSSProperties => ({
+  fontFamily: FONT,
+  fontSize: 12,
+  padding: "10px 14px",
+  borderRadius: "8px 0 0 8px",
+  border: `1px solid ${active ? BORDER : "transparent"}`,
+  borderRight: active ? `1px solid ${BG_CANVAS}` : undefined,
+  background: active ? BG_CANVAS : "transparent",
+  color: active ? TEXT_MAIN : TEXT_DIM,
+  cursor: "pointer",
+  fontWeight: active ? 600 : 400,
+  marginRight: active ? -1 : 0,
+  textAlign: "left",
+  whiteSpace: "nowrap",
+});
+
 const ghostBtn: React.CSSProperties = {
   fontFamily: FONT,
   fontSize: 12,
@@ -1819,6 +2081,18 @@ const sectionStyle: React.CSSProperties = {
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
   padding: 12,
+};
+
+// Item 3: the subkey child block — visually nested inside the Key section via
+// the accent left border + inset surface, so the parent/child relationship
+// reads at a glance.
+const nestedChildStyle: React.CSSProperties = {
+  marginTop: 12,
+  background: BG_CANVAS,
+  border: `1px solid ${BORDER}`,
+  borderLeft: `3px solid ${ACCENT}`,
+  borderRadius: 6,
+  padding: 10,
 };
 
 const fieldGridStyle: React.CSSProperties = {
