@@ -21,6 +21,7 @@ import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 // silently desync from).
 export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
+import { pinnedProxyBase, pinnedSourceFor } from "../lib/openSourceChoice.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
@@ -640,7 +641,7 @@ export function useKeyboardArtifact(
   // transform-change effect below to skip the initial render.
   const hasFetchedRef = useRef(false);
   // Value key of the last full fetch→compile run started by the effect below
-  // (`<base id>|<scaffold keyboardId>|<scaffold displayName>`). The effect
+  // (`<base id>|<scaffold keyboardId>|<scaffold displayName>|<Open commit>`). The effect
   // compares by VALUE, not object identity: callers re-derive scaffoldSpec
   // on every render (see decisions/identitySelectors.ts, called bare in
   // StudioShell), so an equal spec arrives as a fresh object each render.
@@ -653,6 +654,10 @@ export function useKeyboardArtifact(
   // A genuinely different base or scaffold target changes the key and runs;
   // retry() calls run() directly and is unaffected.
   const lastFullRunKeyRef = useRef<string | null>(null);
+  // Open (spec 111 US4): the repository copy chosen at Open. Re-opening the
+  // same keyboard from the other repository is a new starting point, so its
+  // pinned commit is part of the run key above.
+  const startSource = useWorkingCopyStore((s) => s.startSource);
   // Value key of the last transform re-apply+recompile performed by the
   // transformVersion effect below (`<transformVersion>|<base id>|<scaffold
   // keyboardId>|<scaffold displayName>`) — the same value-not-identity
@@ -1202,13 +1207,18 @@ export function useKeyboardArtifact(
         // Open-base path — fetch existing keyboard source. Bounded by a
         // timeout so a stalled proxy/network request surfaces a retryable
         // error instead of an indefinite "Loading keyboard source..." overlay.
+        const isOpen = peekDecision("authoring-track")?.value === "adapt";
+        // Open (spec 111 US4): load the repository copy the author chose, at
+        // the commit pinned then. LOCAL_PROXY_BASE serves keyboard-studio's
+        // copy, so without this an upstream choice silently loaded the fork's.
+        const openSource = isOpen ? pinnedSourceFor(kb, useWorkingCopyStore.getState().startSource) : null;
         const fetchResult = await withTimeout(
           engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
-            proxyBase: LOCAL_PROXY_BASE,
+            proxyBase: openSource !== null ? pinnedProxyBase(openSource) : LOCAL_PROXY_BASE,
             // Open (spec 111): the keyboard is updated in place, so its own
             // descriptor and documentation files come into the working copy.
             // Copy never reaches this branch with the adapt track recorded.
-            ...(peekDecision("authoring-track")?.value === "adapt" ? { keepKps: true } : {}),
+            ...(isOpen ? { keepKps: true } : {}),
           }),
           FETCH_TIMEOUT_MS,
           "Loading keyboard source",
@@ -1435,7 +1445,8 @@ export function useKeyboardArtifact(
     // Value-key guard (see lastFullRunKeyRef): a re-render whose base and
     // scaffold target are unchanged must not restart the fetch→compile
     // cycle — the in-flight (or settled) run for this key already owns it.
-    const runKey = `${startKeyboard.id}|${scaffoldSpec?.keyboardId ?? ""}|${scaffoldSpec?.displayName ?? ""}`;
+    const openCommit = pinnedSourceFor(startKeyboard, startSource)?.commit ?? "";
+    const runKey = `${startKeyboard.id}|${scaffoldSpec?.keyboardId ?? ""}|${scaffoldSpec?.displayName ?? ""}|${openCommit}`;
     if (lastFullRunKeyRef.current === runKey) return;
     lastFullRunKeyRef.current = runKey;
 
@@ -1444,7 +1455,7 @@ export function useKeyboardArtifact(
     setTransformVersion(0);
     const thisRunId = ++runId.current;
     void run(startKeyboard, thisRunId);
-  }, [startKeyboard, scaffoldSpec, run]);
+  }, [startKeyboard, scaffoldSpec, startSource, run]);
 
   // When the vfsTransform changes after the initial fetch (i.e. the user
   // records an assignment), restore the clean base VFS snapshot, re-apply the

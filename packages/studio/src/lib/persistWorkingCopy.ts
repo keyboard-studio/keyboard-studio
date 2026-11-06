@@ -63,6 +63,7 @@ import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { pinnedProxyBase, pinnedSourceFor } from "./openSourceChoice.ts";
 import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 
 // ---------------------------------------------------------------------------
@@ -778,8 +779,9 @@ export interface OpenDraftRepairReport {
  * the keyboard's own descriptor in place. A fetch failure leaves the draft
  * as it was (the earlier Adapt behaviour) and reports why.
  *
- * Fetches from the proxy's default branch: the starting commit is not
- * recorded on a draft that predates Open.
+ * Fetches from the copy chosen at Open, at its pinned commit, when the draft
+ * records one; otherwise from the proxy's default branch, since a draft that
+ * predates Open records no starting commit.
  */
 export async function repairOpenDraftDescriptor(deps?: {
   fetchImpl?: (url: string) => Promise<{ ok: boolean; text(): Promise<string> }>;
@@ -792,7 +794,8 @@ export async function repairOpenDraftDescriptor(deps?: {
   const kpsPath = `source/${startKeyboard.id}.kps`;
   if (startVfs.get(kpsPath) !== undefined) return none;
 
-  const proxyBase = deps?.proxyBase ?? "/kbd-proxy";
+  const pinned = pinnedSourceFor(startKeyboard, state.startSource);
+  const proxyBase = deps?.proxyBase ?? (pinned !== null ? pinnedProxyBase(pinned) : "/kbd-proxy");
   const fetchImpl = deps?.fetchImpl ?? ((url: string) => globalThis.fetch(url));
   let text: string;
   try {
