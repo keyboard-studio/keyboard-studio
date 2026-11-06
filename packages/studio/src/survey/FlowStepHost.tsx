@@ -17,7 +17,7 @@
 import type { DecisionProposalSource, LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { surveyPageColumn, phaseHeading } from "./surveyStyles.ts";
-import type { FlowDef, SurveyContext } from "./types.ts";
+import type { FlowDef, FlowOption, SurveyContext } from "./types.ts";
 
 export interface FlowStepHostProps {
   /** Pre-loaded flow (factory calls loadFlowSourceDef(source)). */
@@ -47,6 +47,8 @@ export interface FlowStepHostProps {
    * doc for the override contract.
    */
   getRequiredOverride?: (questionId: string) => boolean | undefined;
+  /** Optional dynamic per-question options. Forwarded to SurveyRunner. */
+  getSeedOptions?: (questionId: string) => FlowOption[] | undefined;
   /** Optional per-question lint findings (phase_f). Forwarded to SurveyRunner. */
   findingsByQuestionId?: Record<string, LintFinding[]>;
 }
@@ -67,6 +69,7 @@ export function FlowStepHost({
   onAnswerCommit,
   findingsByQuestionId,
   getRequiredOverride,
+  getSeedOptions,
 }: FlowStepHostProps) {
   // Spec 089 T020: the spec-087 mutateDeps seam is retired with the
   // `mutate` contract itself — it had no production injector (the factory
@@ -91,6 +94,7 @@ export function FlowStepHost({
           : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
         {...(getRequiredOverride !== undefined ? { getRequiredOverride } : {})}
+        {...(getSeedOptions !== undefined ? { getSeedOptions } : {})}
       />
     </div>
   );

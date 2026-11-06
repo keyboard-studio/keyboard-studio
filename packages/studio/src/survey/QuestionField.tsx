@@ -109,31 +109,75 @@ const QUESTION_PROMPT_STYLE: React.CSSProperties = {
 // ---------------------------------------------------------------------------
 
 function TextFieldControl({ question, value, onChange }: FieldProps) {
+  const { t } = useLingui();
   const isMultiLine = question.type === "text";
   const strVal = stringValue(value);
-  if (isMultiLine) {
+  // A free-text question that also carries `options` (injected per-render by
+  // the host's getSeedOptions) offers them as a choice beneath the box: each
+  // entry records its EXACT string, so there is no retyping path (the D4
+  // exact-match dedupe hazard on il_copyright_holder). The box is the "someone
+  // else" path. No options -> no selector (hidden, not disabled).
+  const choices = question.options ?? [];
+  const hasChoices = choices.length > 0;
+  const chosen = hasChoices && choices.some((o) => o.value === strVal) ? strVal : null;
+  // While a choice is selected the box shows empty: the choice IS the answer,
+  // and mirroring it into the box would read as something typed to keep.
+  const boxVal = chosen !== null ? "" : strVal;
+  const labelId = `choices-label-${question.id}`;
+  // Sentinel for the "someone else" radio; never emitted as an answer.
+  const SOMEONE_ELSE = "__someone_else__";
+  const control = isMultiLine ? (
     // `type: "text"` questions are the survey's genuinely open-ended fields
     // (long-form description prompts, e.g. phase_f_helpdocs) — the exact case
     // Textarea reserves `resize="vertical"` for (#536). Opt in explicitly so
     // these keep the resize handle they had before the resize:none default.
-    return (
-      <Textarea
-        id={question.id}
-        aria-required={question.required === true}
-        value={strVal}
-        onChange={(e) => onChange(e.target.value)}
-        rows={4}
-        resize="vertical"
-      />
-    );
-  }
-  return (
+    <Textarea
+      id={question.id}
+      aria-required={question.required === true}
+      value={boxVal}
+      onChange={(e) => onChange(e.target.value)}
+      rows={4}
+      resize="vertical"
+    />
+  ) : (
     <TextField
       id={question.id}
       aria-required={question.required === true}
-      value={strVal}
+      value={boxVal}
       onChange={(e) => onChange(e.target.value)}
     />
+  );
+  if (!hasChoices) return control;
+  const radioOptions: RadioOption[] = [
+    ...choices.map((o) => ({ value: o.value, label: o.label })),
+    {
+      value: SOMEONE_ELSE,
+      label: t({
+        id: "survey.questionField.choices.someoneElse",
+        message: "Someone else (type the name in the box above; leave it blank to credit the author)",
+      }),
+    },
+  ];
+  return (
+    <>
+      {control}
+      <div style={{ marginTop: 12 }}>
+        <div id={labelId} style={helpText}>
+          {t({
+            id: "survey.questionField.choices.startingPointHolders",
+            message: "Or choose the starting point's copyright holder:",
+          })}
+        </div>
+        <RadioGroup
+          mode="list"
+          name={`${question.id}-choices`}
+          value={chosen ?? SOMEONE_ELSE}
+          options={radioOptions}
+          onChange={(v) => onChange(v === SOMEONE_ELSE ? "" : v)}
+          ariaLabelledby={labelId}
+        />
+      </div>
+    </>
   );
 }
 

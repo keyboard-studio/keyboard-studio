@@ -2839,6 +2839,8 @@
   "survey.punctuation.typeSectionAriaLabel": "Saisissez vos signes de ponctuation",
   "survey.questionField.autocomplete.codePlaceholder": "Rechercher par nom, autonyme ou code…",
   "survey.questionField.autocomplete.namePlaceholder": "Saisissez le nom de votre langue en anglais…",
+  "survey.questionField.choices.someoneElse": "Quelqu’un d’autre (saisissez le nom dans la zone ci-dessus ; laissez vide pour créditer l’auteur)",
+  "survey.questionField.choices.startingPointHolders": "Ou choisissez le titulaire des droits d’auteur du point de départ :",
   "survey.questionField.langtagsCombobox.loading": "Chargement des langues…",
   "survey.questionField.multiSelect.dynamicOptionsNotLoaded": "Options dynamiques ({0}) non chargées dans cette version.",
   "survey.reproposal.cue": "À confirmer — {reason}",

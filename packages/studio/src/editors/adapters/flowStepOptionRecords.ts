@@ -36,6 +36,7 @@ import type { ExtractContext } from "../../decisions/extractContext.ts";
 import type { QuestionModule } from "../../survey/types.ts";
 import ilAuthorNameModule from "../../survey/questions/a/il_author_name.ts";
 import ilAuthorEmailModule from "../../survey/questions/a/il_author_email.ts";
+import { startCopyrightHolders } from "../../lib/startCopyrightHolders.ts";
 import ilCopyrightHolderModule from "../../survey/questions/a/il_copyright_holder.ts";
 
 /** A recorded decision's string value, or undefined when absent/non-string. */
@@ -256,7 +257,9 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 //     and read the declared default back. A profile with no name seeds
 //     nothing — ASK rather than substitute the login handle, which is
 //     not a copyright holder.
-//   - Copyright holder: NO caller seed on either track. On the update
+//   - Copyright holder: the starting point's parsed holder(s) are offered
+//     as a selector under the text box (getSeedOptions) on both tracks.
+//     NO caller seed on either track. On the update
 //     track the live extraction pass has already seeded the decision
 //     from the base keyboard (il_copyright_holder's `seedWhen`), and
 //     SurveyRunner's record-first seeding renders it pre-filled with
@@ -335,6 +338,15 @@ export const attributionOptions: FlowStepOptions<AttributionPayload> = {
       if (askedAnswer(deps, questionId) !== undefined) return undefined;
       const source = profileDefault(deps, questionId)?.source;
       return source !== undefined ? (source as DecisionProposalSource) : undefined;
+    },
+    // il_copyright_holder's selector: the starting point's parsed holder(s),
+    // on BOTH tracks (adapt preselects via the seeded decision; copy leaves
+    // it unselected). Hidden when the starting point has no parseable holder.
+    getSeedOptions(questionId: string) {
+      if (questionId !== ilCopyrightHolderModule.definition.id) return undefined;
+      const wc = useWorkingCopyStore.getState();
+      const holders = startCopyrightHolders(wc.startLicenseText, wc.startHolderOverride, wc.startIr);
+      return holders.map((name) => ({ value: name, label: name }));
     },
   },
 

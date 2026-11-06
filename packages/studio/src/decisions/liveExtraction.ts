@@ -28,6 +28,7 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
 import type { ExtractContext } from "./extractContext.ts";
+import { startCopyrightHolders } from "../lib/startCopyrightHolders.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { filterGated, orderDecisions } from "./orderDecisions.ts";
 import { deriveSurveyContext } from "./identitySelectors.ts";
@@ -249,6 +250,11 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
 export function buildLiveExtractContext(): ExtractContext {
   const wc = useWorkingCopyStore.getState();
   const ctx = buildExtractContext(wc.startIr, wc.startKeyboard);
+  ctx.startHolders = startCopyrightHolders(
+    wc.startLicenseText,
+    wc.startHolderOverride,
+    wc.startIr,
+  );
   // Spec 092 (T036): Phase F's derivations read working-copy slices and
   // two identity-derived values that are not part of the bundle — supply
   // them from the same stores the old PHASE_F_SEEDS readers read, so the
