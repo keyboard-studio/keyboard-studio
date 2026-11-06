@@ -113,6 +113,83 @@ function galleryWriteBanRule(identifiers) {
   ];
 }
 
+// Spec 081 FR-001 enforcement (#2527): a step's Back / Continue / Skip /
+// Done buttons belong in the footer — published through usePublishStepNav
+// and rendered by StepNavCluster — never as JSX buttons in the step body.
+// A step that keeps its own in-body bar drifts (the OSK / CSS / HTML
+// editors did exactly this, each "fixing" it by pinning the bar sticky
+// instead of moving it to the footer).
+//
+// What is flagged — a <button> (or the shared <Button>, onClick only) when
+// either is true:
+//   - its onClick is, or directly calls, the step's onBack / onComplete
+//     props (the shared <Button> is covered on onClick only — StepNavCluster
+//     owns it, and no step renders nav through it today); or
+//   - its subtree carries a nav label: a t() message of Back / Continue /
+//     Next / Skip / Done, or a t()/Trans id ending .back / .continue /
+//     .skip / backButton / continueButton / nextButton.
+// The label net also catches local walk handlers (handleBack,
+// handleContinue) whose buttons carry a nav label but never name onBack.
+// A plain-text JSX child ("Back" with no t()) is NOT caught — every shipped
+// nav label is localized, so that net would be dead weight.
+//
+// What is NOT flagged:
+//   - StepNavCluster.tsx / StudioFooter.tsx (the footer itself).
+//   - `label:` properties in a usePublishStepNav spec — those are the
+//     correct path; only JSX button elements are flagged.
+//   - A real in-body exception carries an inline
+//     `// eslint-disable-next-line no-restricted-syntax -- <why this is not
+//     step nav>` (MarksTextSamplePrompt's sub-prompt Back/Skip,
+//     DeadkeyDefineForm's "Back to inventory", PrivacyScreen's history-back
+//     link). Same justification style as the jsx-a11y FR-002 disables.
+//
+// Named export for the fixture test (scripts/step-nav-lint.test.mjs),
+// which runs the same selectors through the Linter API.
+export const stepNavSelectors = [
+  {
+    selector:
+      "JSXOpeningElement[name.name='button'] > JSXAttribute[name.name='onClick'] > JSXExpressionContainer > Identifier[name='onBack']",
+    message:
+      "Step-nav button in the body: onClick calls the step's onBack — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='button'] > JSXAttribute[name.name='onClick'] > JSXExpressionContainer > Identifier[name='onComplete']",
+    message:
+      "Step-nav button in the body: onClick calls the step's onComplete — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='onClick'] > JSXExpressionContainer > Identifier[name='onBack']",
+    message:
+      "Step-nav button in the body: onClick calls the step's onBack — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='onClick'] > JSXExpressionContainer > Identifier[name='onComplete']",
+    message:
+      "Step-nav button in the body: onClick calls the step's onComplete — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+  {
+    selector:
+      "JSXElement:has(> JSXOpeningElement[name.name='button']) CallExpression[callee.name='t'] > ObjectExpression > Property[key.name='message'] > Literal[value=/^(Back|Continue|Next|Skip|Done)$/]",
+    message:
+      "Step-nav button in the body: its label is a step-nav label — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+  {
+    selector:
+      "JSXElement:has(> JSXOpeningElement[name.name='button']) CallExpression[callee.name='t'] > ObjectExpression > Property[key.name='id'] > Literal[value=/\\.(back|continue|skip)$|backButton$|continueButton$|nextButton$/]",
+    message:
+      "Step-nav button in the body: its label id is a step-nav id — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+  {
+    selector:
+      "JSXElement:has(> JSXOpeningElement[name.name='button']) JSXOpeningElement[name.name='Trans'] > JSXAttribute[name.name='id'] > Literal[value=/\\.(back|continue|skip)$|backButton$|continueButton$|nextButton$/]",
+    message:
+      "Step-nav button in the body: its Trans id is a step-nav id — publish it to the footer with usePublishStepNav (spec 081 FR-001, #2527).",
+  },
+];
+
 export default [
   {
     ignores: [
@@ -217,6 +294,21 @@ export default [
     ignores: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "no-restricted-syntax": galleryWriteBanRule(["usePhaseBDraftStore"]),
+    },
+  },
+  {
+    // Spec 081 FR-001 enforcement (#2527): no step-nav button in a step
+    // body. Selectors live in `stepNavSelectors` above (exported for the
+    // fixture test); the footer itself and tests are out of scope.
+    files: ["packages/studio/src/**/*.tsx"],
+    ignores: [
+      "**/*.test.tsx",
+      "**/test/**",
+      "packages/studio/src/components/StepNavCluster.tsx",
+      "packages/studio/src/components/StudioFooter.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": ["error", ...stepNavSelectors],
     },
   },
   {

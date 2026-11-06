@@ -26,6 +26,7 @@ import {
   DESKTOP_GEOMETRY,
 } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 
 // The Code tab pane. Lazy-loaded so the Monaco bundle never lands in the
@@ -152,64 +153,78 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   // Sync when base regenerates (e.g. IR changes).
   const effectiveKvks = kvks ?? baseKvks;
 
+  const undo = () => {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      if (prev) {
+        setKvks(prev);
+        setError(null);
+      }
+      return h.slice(0, -1);
+    });
+  };
+
+  // Footer nav (spec 081, #2527): Back / Undo / Continue publish to the
+  // footer instead of rendering in a sticky in-body bar. Called before the
+  // no-keyboard early return, with the spec for the current render state —
+  // the fallback has no Undo, so it publishes Back + Continue only. Undo
+  // is the secondary slot, so it renders to the RIGHT of Back and Continue
+  // (ruling 2026-11-06) and its appearing never moves them. Test ids are
+  // unchanged, so e2e keeps finding osk-continue in the footer.
+  usePublishStepNav(
+    effectiveKvks === null
+      ? {
+          ...(onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "editor.assignLoop.osk.back", message: "Back" }),
+                  onClick: onBack,
+                  testId: "osk-back",
+                },
+              }
+            : {}),
+          forward: {
+            label: t({ id: "editor.assignLoop.osk.continue", message: "Continue" }),
+            onClick: () => {
+              onComplete(oskContinueResult(null));
+            },
+            testId: "osk-continue",
+          },
+        }
+      : {
+          ...(onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "editor.assignLoop.osk.back", message: "Back" }),
+                  onClick: onBack,
+                  testId: "osk-back",
+                },
+              }
+            : {}),
+          secondary: {
+            label: t({ id: "editor.assignLoop.osk.undo", message: "Undo" }),
+            onClick: undo,
+            testId: "osk-undo",
+            disabled: history.length === 0,
+          },
+          forward: {
+            label: t({ id: "editor.assignLoop.osk.continue", message: "Continue" }),
+            onClick: () => {
+              // The customized KvksIR emitted to .kvks XML (the lifted
+              // product seam — the headless author calls the same function).
+              onComplete(oskContinueResult(effectiveKvks));
+            },
+            testId: "osk-continue",
+          },
+        },
+  );
+
   if (!effectiveKvks) {
     return (
       <div>
         <div style={{ padding: 24, color: TEXT_DIM }}>
           {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
-        </div>
-        {/* Footer with Continue so the step can be skipped when no Kvks is available.
-            Pinned to the bottom bar (sticky) so nav stays reachable. */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            margin: "auto -24px -24px",
-            padding: "16px 24px",
-            borderTop: `1px solid ${BORDER}`,
-            background: BG_CANVAS,
-            position: "sticky",
-            bottom: 0,
-            zIndex: 10,
-          }}
-        >
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              style={{
-                padding: "10px 20px",
-                fontSize: 14,
-                borderRadius: 6,
-                border: `1px solid ${BORDER}`,
-                background: BG_CARD,
-                color: TEXT_MAIN,
-                cursor: "pointer",
-              }}
-            >
-              {t({ id: "editor.assignLoop.osk.back", message: "Back" })}
-            </button>
-          )}
-          <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            data-testid="osk-continue"
-            onClick={() => {
-              onComplete(oskContinueResult(null));
-            }}
-            style={{
-              padding: "10px 24px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: `1px solid ${ACCENT}`,
-              background: ACCENT_BG,
-              color: TEXT_MAIN,
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {t({ id: "editor.assignLoop.osk.continue", message: "Continue" })}
-          </button>
         </div>
       </div>
     );
@@ -224,18 +239,6 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     setHistory((h) => [...h, effectiveKvks]);
     setKvks(next);
     setError(null);
-  };
-
-  const undo = () => {
-    setHistory((h) => {
-      if (h.length === 0) return h;
-      const prev = h[h.length - 1];
-      if (prev) {
-        setKvks(prev);
-        setError(null);
-      }
-      return h.slice(0, -1);
-    });
   };
 
   const handleSelectKey = (vkey: string) => {
@@ -624,79 +627,6 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       </div>
       </>
       )}
-
-      {/* Bottom bar: nav pinned to the viewport bottom (sticky) so Back /
-          Continue stay reachable while the key grid scrolls. */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          margin: "auto -24px -24px",
-          padding: "16px 24px",
-          borderTop: `1px solid ${BORDER}`,
-          background: BG_CANVAS,
-          position: "sticky",
-          bottom: 0,
-          zIndex: 10,
-        }}
-      >
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={{
-              padding: "10px 20px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: `1px solid ${BORDER}`,
-              background: BG_CARD,
-              color: TEXT_MAIN,
-              cursor: "pointer",
-            }}
-          >
-            {t({ id: "editor.assignLoop.osk.back", message: "Back" })}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={undo}
-          disabled={history.length === 0}
-          style={{
-            padding: "10px 20px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: `1px solid ${BORDER}`,
-            background: BG_CARD,
-            color: TEXT_MAIN,
-            cursor: history.length === 0 ? "not-allowed" : "pointer",
-            opacity: history.length === 0 ? 0.5 : 1,
-          }}
-        >
-          {t({ id: "editor.assignLoop.osk.undo", message: "Undo" })}
-        </button>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="osk-continue"
-          onClick={() => {
-            // The customized KvksIR emitted to .kvks XML (the lifted
-            // product seam — the headless author calls the same function).
-            onComplete(oskContinueResult(effectiveKvks));
-          }}
-          style={{
-            padding: "10px 24px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: `1px solid ${ACCENT}`,
-            background: ACCENT_BG,
-            color: TEXT_MAIN,
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          {t({ id: "editor.assignLoop.osk.continue", message: "Continue" })}
-        </button>
-      </div>
     </div>
   );
 }

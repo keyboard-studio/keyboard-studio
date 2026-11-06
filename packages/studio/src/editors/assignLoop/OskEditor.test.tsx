@@ -56,7 +56,9 @@ vi.mock("@keyboard-studio/engine", () => ({
 function renderEditor(props: { onComplete?: (r: unknown) => void; onBack?: () => void } = {}) {
   const onComplete = props.onComplete ?? vi.fn();
   const onBack = props.onBack ?? vi.fn();
-  render(<OskEditor onComplete={onComplete} onBack={onBack} />);
+  // Nav lives in the footer (spec 081, #2527): render the cluster so the
+  // footer Back / Undo / Continue are on screen under their test ids.
+  render(<OskEditor onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
   return { onComplete, onBack };
 }
 

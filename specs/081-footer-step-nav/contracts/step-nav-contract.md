@@ -27,7 +27,14 @@ and the rationale for each rule is in [../research.md](../research.md).
 4. **Omit Back when there is nowhere to go.** If neither a local walk position nor `onBack`
    exists, leave out `back` (FR-015, A-3).
 5. **Remove the body button in the same change.** A step never renders a nav button both in the
-   body and in the footer (FR-001, US3).
+   body and in the footer (FR-001, US3). Enforced by the step-nav lint
+   (`stepNavSelectors` in `eslint.config.mjs`, #2527), which fails `pnpm lint`
+   on a JSX Back / Continue / Skip / Done button in a step body.
+6. **Back and Continue never move.** The cluster renders `back`, then
+   `forward`, then every extra (`secondary`, revision Discard) to the right
+   of both (ruling 2026-11-06, superseding the Nov 3 "Undo between Back and
+   Continue" placement): an extra appearing or disappearing must never
+   shift Back or Continue.
 6. **Warnings and hints stay in the body.** Pass their ids through `ariaDescribedBy` only while
    they are mounted (FR-016, FR-033).
 
@@ -53,7 +60,7 @@ argument (see the `startOverStore` note).
 <footer aria-label="Project and progress" class="ks-studio-footer">
   <div role="group" aria-label="Step navigation" data-testid="step-nav"
        key={activeStepId}>                      <!-- absent when there are no slots -->
-    [back] [secondary] [forward]                <!-- Button size="compact"; only present slots -->
+    [back] [forward] [secondary] [revision-discard]  <!-- Button size="compact"; only present slots -->
   </div>
   <span>Project: …</span>                        <!-- flex-shrink 1; ellipsis, then hidden (FR-022) -->
   <div data-testid="progress-dot-row">…dots…</div>   <!-- flex 1, margin-left auto, overflow-x auto -->

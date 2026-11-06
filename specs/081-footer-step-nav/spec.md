@@ -57,12 +57,12 @@ An author working through the survey finds Back on the left of the footer on eve
 
 **Why this priority**: This is the reported problem (#1778) and the whole of the feature's value. Every other story protects this one.
 
-**Independent Test**: Walk the golden path (both tracks) from the first question to the output step. On each page, confirm that the page body contains no Back, Skip or forward progress button, and that the footer's left cluster contains them in the order Back, secondary, primary.
+**Independent Test**: Walk the golden path (both tracks) from the first question to the output step. On each page, confirm that the page body contains no Back, Skip or forward progress button, and that the footer's left cluster contains them in the order Back, primary, secondary — extras sit to the right of Back and Continue, so they never move (ruling 2026-11-06).
 
 **Acceptance Scenarios**:
 
 1. **Given** any in-scope survey page (Appendix A), **When** it is shown, **Then** its progress buttons appear in the footer's nav cluster and nowhere in the page body.
-2. **Given** a page with a Back, a Skip and a Continue (Carve), **When** it is shown, **Then** the footer shows them left to right in that order, before the project label and the dots.
+2. **Given** a page with a Back, a Skip and a Continue (Carve), **When** it is shown, **Then** the footer shows them left to right in the order Back, Continue, Skip, before the project label and the dots.
 3. **Given** a page with a forward action only, or a Back only (the gallery empty state), **When** it is shown, **Then** the footer shows exactly those buttons and leaves no empty placeholder slot.
 4. **Given** any page, **When** the footer renders, **Then** the dot row is right-aligned, scrolls horizontally on overflow, and keeps the current mark visible (057 FR-047, 079 contract §6).
 
@@ -114,7 +114,7 @@ A keyboard user who answers a question can reach Continue quickly. The footer bu
 
 **Acceptance Scenarios**:
 
-1. **Given** the author has answered the last field on a page, **When** they press Tab, **Then** the next focus stops are the footer nav buttons (Back, secondary, primary), before the project label and the dots.
+1. **Given** the author has answered the last field on a page, **When** they press Tab, **Then** the next focus stops are the footer nav buttons (Back, primary, secondary), before the project label and the dots.
 2. **Given** Continue is disabled because of a blocking condition (marks, mechanisms, touch completion gate), **When** a screen reader reaches the button, **Then** the reason text, which stays in the step body, is announced as the button's description.
 3. **Given** the author presses the footer Next within a multi-question step, **When** the next question renders, **Then** focus stays on the footer Next, as it does today within a step.
 4. **Given** the footer publishes a jump refusal or a re-proposal notice, **When** it is announced, **Then** it comes from the footer's single existing status region. The nav cluster adds no second live region.
@@ -215,7 +215,7 @@ The inheritance-posture step is built but not yet mounted in production. When it
 ### D. Accessibility
 
 - **FR-030**: The footer MUST keep exactly one `role="status"` live region, shared as in 079 contract §9. The nav cluster MUST NOT add a live region.
-- **FR-031**: Tab order MUST run from the step content to the footer nav cluster (Back, secondary, primary), then the project label, then the dots. Enter-to-advance MUST be kept wherever it exists today. This feature adds no skip link and no primary-action shortcut. A follow-up issue MUST be filed to consider either one; it would also advance tracker row 2.4.1.
+- **FR-031**: Tab order MUST run from the step content to the footer nav cluster (Back, primary, secondary), then the project label, then the dots. Enter-to-advance MUST be kept wherever it exists today. This feature adds no skip link and no primary-action shortcut. A follow-up issue MUST be filed to consider either one; it would also advance tracker row 2.4.1.
 - **FR-032**: Focus MUST behave as it does today. Within a step, the footer button that was pressed keeps focus across screen changes. On a step change, the footer's nav buttons MUST remount, so focus is not carried into the next step and Enter cannot be repeated onto a step the author has not seen. *Rationale*: this matches current behaviour, where the in-body button unmounts with its step. Moving focus to the new step's heading is a separate improvement and is out of scope.
 - **FR-033**: A disabled forward button's "why blocked" reason (marks, mechanism gallery, touch completion gate) MUST stay in the step body and MUST be referenced by the footer button's `aria-describedby`. The question-flow progress description MUST stay mounted, with a unique id, and stay referenced by the footer Next.
 - **FR-034**: The nav cluster MUST be a labelled group (for example "Step navigation", via the catalog) inside the footer landmark, so its buttons are identifiable as a set (3.2.3, 3.2.4).

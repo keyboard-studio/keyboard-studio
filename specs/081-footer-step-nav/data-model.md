@@ -31,7 +31,9 @@ Invariants:
 
 - A slot that is absent renders nothing. There is no placeholder (US1 scenario 3).
 - An empty spec (`{}`) is legal and renders no cluster.
-- Order is fixed at `back`, `secondary`, `forward`, both in the DOM and visually (FR-002).
+- Order is fixed at `back`, `forward`, `secondary`, both in the DOM and visually (FR-002).
+  Extras (`secondary`, revision Discard) render to the right of Back and
+  Continue, so one appearing or disappearing never moves them (ruling 2026-11-06).
 
 The gallery `ForwardButtonSpec` and `TouchForwardButtonSpec` map onto `forward` field for field.
 

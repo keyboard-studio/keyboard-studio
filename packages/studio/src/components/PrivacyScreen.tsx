@@ -90,6 +90,7 @@ export function PrivacyScreen() {
           else navigateTo("survey");
         }}
       >
+        {/* eslint-disable-next-line no-restricted-syntax -- not step nav: this standalone screen's history-back link, no step walk is mounted here. */}
         <Trans id="privacy.back">← Back</Trans>
       </button>
 

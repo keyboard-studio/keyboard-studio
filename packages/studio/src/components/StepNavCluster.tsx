@@ -14,8 +14,13 @@ import { Button, type ButtonVariant } from "../ui/Button.tsx";
 
 const SLOT_VARIANTS = [
   ["back", "back"],
-  ["secondary", "secondary"],
   ["forward", "primary"],
+  // Extras render AFTER Back and Continue, never between or before them
+  // (ruling 2026-11-06, superseding the Nov 3 "Undo between Back and
+  // Continue" placement): a secondary button appearing or disappearing must
+  // never move Back or Continue. Back is slot 1, forward is slot 2, and
+  // anything extra grows to the right of both.
+  ["secondary", "secondary"],
 ] as const satisfies ReadonlyArray<readonly [string, ButtonVariant]>;
 
 export function StepNavCluster({ stepId }: { stepId: string }) {
@@ -58,16 +63,6 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
         overflowY: "hidden",
       }}
     >
-      {revision !== null && (
-        <Button
-          variant="secondary"
-          size="compact"
-          data-testid="step-revision-discard"
-          onClick={revision.onDiscard}
-        >
-          {t({ id: "step.revision.discard", message: "Discard changes and go back" })}
-        </Button>
-      )}
       {SLOT_VARIANTS.map(([slot, variant]) => {
         const stepAction: NavAction | undefined = spec?.[slot];
         if (stepAction === undefined) return null;
@@ -100,6 +95,19 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
           </Button>
         );
       })}
+      {/* Revision Discard is an extra button too: it renders AFTER Back and
+          Continue (ruling 2026-11-06), so opening a revision never shifts
+          them. It used to render first, which moved both. */}
+      {revision !== null && (
+        <Button
+          variant="secondary"
+          size="compact"
+          data-testid="step-revision-discard"
+          onClick={revision.onDiscard}
+        >
+          {t({ id: "step.revision.discard", message: "Discard changes and go back" })}
+        </Button>
+      )}
     </div>
   );
 }

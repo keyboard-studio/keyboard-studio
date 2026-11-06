@@ -16,11 +16,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { readKeyboardCss } from "../../lib/customCss.ts";
-import { galleryForwardBtnStyle, galleryGhostBtn, BORDER, TEXT_DIM } from "../../lib/galleryTheme.ts";
+import { galleryGhostBtn, TEXT_DIM } from "../../lib/galleryTheme.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
@@ -82,6 +83,27 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
     onComplete({ css: applied ?? seedText ?? "" });
   };
 
+  // Footer nav (spec 081, #2527): Back / Continue publish to the footer
+  // instead of rendering in the sticky in-body bar. The "Discard changes"
+  // button stays in the body — it is an editor action, not step nav.
+  // Test id is unchanged, so e2e keeps finding css-continue in the footer.
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.css.back", message: "Back" }),
+            onClick: onBack,
+            testId: "css-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "editor.assignLoop.css.continue", message: "Continue" }),
+      onClick: handleContinue,
+      testId: "css-continue",
+    },
+  });
+
   const leftContent = (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, height: "100%", boxSizing: "border-box" }}>
       <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
@@ -119,31 +141,6 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
       >
         {t({ id: "editor.assignLoop.css.discard", message: "Discard changes" })}
       </button>
-
-      {/* Bottom bar, as on the OSK step: Back / Continue stay reachable while the editor scrolls. */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          margin: "auto -16px -16px",
-          padding: "12px 16px",
-          borderTop: `1px solid ${BORDER}`,
-          background: "var(--app-surface)",
-          position: "sticky",
-          bottom: 0,
-          zIndex: 10,
-        }}
-      >
-        {onBack && (
-          <button type="button" onClick={onBack} style={galleryGhostBtn}>
-            {t({ id: "editor.assignLoop.css.back", message: "Back" })}
-          </button>
-        )}
-        <div style={{ flex: 1 }} />
-        <button type="button" data-testid="css-continue" onClick={handleContinue} style={galleryForwardBtnStyle}>
-          {t({ id: "editor.assignLoop.css.continue", message: "Continue" })}
-        </button>
-      </div>
     </div>
   );
 

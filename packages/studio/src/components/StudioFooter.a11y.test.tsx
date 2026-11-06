@@ -662,14 +662,16 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     expect(group.querySelectorAll("button")).toHaveLength(3);
   });
 
-  it("orders back, secondary, forward, then the project label, then the dot row", () => {
+  it("orders back, forward, secondary, then the project label, then the dot row", () => {
     publishNav(FULL_SPEC);
     const { container } = render(<StudioFooter />);
     const footer = container.querySelector("footer")!;
+    // Extras (secondary) sit to the right of Back and Continue (ruling
+    // 2026-11-06), so Back and Continue never move when one appears.
     const order = [
       screen.getByTestId("demo-back"),
-      screen.getByTestId("demo-skip"),
       screen.getByTestId("demo-continue"),
+      screen.getByTestId("demo-skip"),
       screen.getByText(/^Project: French$/),
       screen.getByTestId("progress-dot-row"),
     ];
@@ -749,9 +751,9 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     await user.tab();
     expect(document.activeElement).toBe(screen.getByTestId("demo-back"));
     await user.tab();
-    expect(document.activeElement).toBe(screen.getByTestId("demo-skip"));
-    await user.tab();
     expect(document.activeElement).toBe(screen.getByTestId("demo-continue"));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-skip"));
     await user.tab();
     const row = screen.getByTestId("progress-dot-row");
     expect(row.contains(document.activeElement)).toBe(true);
@@ -910,9 +912,9 @@ describe("StudioFooter — narrow viewport contents button", () => {
 // Skip-link target: the shell's "Skip to step navigation" anchor points at
 // this cluster. The cluster carries the matching id and is programmatically
 // focusable (`tabIndex={-1}`), so activating the link lands focus on the
-// navigation itself — the forward button is the next Tab stop from there.
-// The link itself is rendered by the shell; StudioShell.test.tsx pins the
-// pairing through the mounted shell.
+// navigation itself — Back is the next Tab stop from there, then Continue,
+// then the secondary. The link itself is rendered by the shell;
+// StudioShell.test.tsx pins the pairing through the mounted shell.
 // ---------------------------------------------------------------------------
 
 describe("StudioFooter — skip-link target", () => {
@@ -927,7 +929,7 @@ describe("StudioFooter — skip-link target", () => {
     expect(document.activeElement).toBe(group);
   });
 
-  it("the forward button is the cluster's last Tab stop after the target", async () => {
+  it("the secondary is the cluster's last Tab stop after the target", async () => {
     publishNav(FULL_SPEC);
     const user = userEvent.setup();
     render(<StudioFooter />);
@@ -936,7 +938,8 @@ describe("StudioFooter — skip-link target", () => {
     await user.tab();
     expect(document.activeElement).toBe(screen.getByTestId("demo-back"));
     await user.tab();
-    await user.tab();
     expect(document.activeElement).toBe(screen.getByTestId("demo-continue"));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-skip"));
   });
 });
