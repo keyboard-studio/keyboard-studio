@@ -24,7 +24,7 @@ describe("caps driver (help step)", () => {
   it("completes the flow with the product defaults, a placeholder description, and the coverage gate open", async () => {
     expect(deriveInventoryCoverageGate(useWorkingCopyStore.getState()).blocked).toBe(false);
 
-    const report = createRunReport("store-default");
+    const report = createRunReport();
     const result = (await capsDrivers["help"]!({
       case: {} as Case,
       startIr: useWorkingCopyStore.getState().startIr as never,

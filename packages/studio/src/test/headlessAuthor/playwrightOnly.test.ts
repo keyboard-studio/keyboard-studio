@@ -13,7 +13,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 describe("Playwright-only table", () => {
   it("is reported as notCovered on every run report", () => {
-    expect(createRunReport("store-default").report.notCovered).toEqual(NOT_COVERED);
+    expect(createRunReport().report.notCovered).toEqual(NOT_COVERED);
   });
 
   it("has unique rules, each with a component and a reason", () => {

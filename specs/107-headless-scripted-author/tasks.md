@@ -101,7 +101,7 @@ reporting a missing lift. Stop and lift (FR-040) or list it (FR-042); never writ
 - [X] T031 [P] [US1] Convenience and carve drivers in `HA/stepDrivers/convenience.ts` and `HA/stepDrivers/carve.ts`: `computeConvenienceGate`, `deriveCarveNeededSet`, `recommendedRemovalChars`, `suggestionFingerprintOf`, `isUntouchedSuggestion`, then T018's `continueCarve`
 - [X] T032 [US1] Mechanism and displacement drivers in `HA/stepDrivers/mechanism.ts` and `HA/stepDrivers/displacement.ts`: `buildPlacementSeeds`, `getRankedSuggestionsForChar`, T019's order (top suggestion = first chip), `proposeS02TriggerKey`/T020, `orthographyTier`/`displacedFor` with T021's action order, T022's companion acceptance; overrides (`overwriteChar`/`overwriteKey`) applied as "Assign to a key"
 - [X] T033 [P] [US1] Phase F/help driver in `HA/stepDrivers/caps.ts` (the file keeps its name). No `caps-handling` step exists in this build, so the module default applies. The driver covers the phase-F metadata questions (`proposeProjectUrl`, `proposeProvenanceBasis` in `lib/phaseFSeeds.ts:59`/`:71`; `proposeTroubleshooting` in `lib/troubleshootingProposal.ts:115`) through their registry questions **As built**: no `caps-handling` step exists in this build, so the module default applies; the phase-F metadata proposals reach the walk through live extraction, which records them as decisions the policy takes as prefilled values.
-- [X] T034 [US1] Report `fallbackPolicy` (store default) in every run report and write it nowhere else (FR-060)
+- [X] T034 [US1] Report `fallbackPolicy` (store default) in every run report and write it nowhere else (FR-060) -- superseded by #2366: recorded as the `fallback-policy` decision, report entry removed
 
 ### Tests for US1
 

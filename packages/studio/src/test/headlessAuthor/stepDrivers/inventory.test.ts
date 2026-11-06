@@ -39,7 +39,7 @@ function seedIdentity(code: string): void {
 }
 
 function drive(step: string, sampleText: string) {
-  const report = createRunReport("store-default");
+  const report = createRunReport();
   const run = async () =>
     (await inventoryDrivers[step]!({
       case: { sampleText } as unknown as Case,
