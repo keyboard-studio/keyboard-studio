@@ -37,6 +37,8 @@ type ActiveStepId =
   | "attribution"
   | "project_name"
   | "open_languages"
+  | "open_missing_letters"
+  | "open_upgrades"
   | "characters"
   | "carve"
   | "deadkeys"
@@ -109,7 +111,7 @@ export interface AdvanceOutcome {
    * Set ONLY when the advance reaches the "done" terminal — signals the host
    * to call navigateTo("output") after session.advance(next).
    */
-  readonly navigate?: "output";
+  readonly navigate?: "output" | "criteria";
   /**
    * Set when the advance outcome requires setCharactersSubStage("prefill") to
    * fire AFTER session.advance(next). Used for adapt-track and project_name so
@@ -217,7 +219,36 @@ function stepById(stepId: string): Step | undefined {
 // has no per-step advance branching.
 // ---------------------------------------------------------------------------
 
+const isOpenWalk = (ctx: AdvanceContext): boolean => ctx.decisions?.["authoring-track"]?.value === "adapt";
+
+/**
+ * The Open walk's conditional pages, in walk order. After the language list the
+ * walk takes the first one whose derived gate passes (spec 111 FR-031/FR-032),
+ * else it rejoins the main line.
+ */
+const OPEN_WALK_PAGES = ["open_missing_letters", "open_upgrades"] as const;
+
+function nextOpenWalkPage(after: ActiveStepId, ctx: AdvanceContext): ActiveStepId {
+  const start = after === "open_languages" ? 0 : OPEN_WALK_PAGES.indexOf(after as (typeof OPEN_WALK_PAGES)[number]) + 1;
+  for (const id of OPEN_WALK_PAGES.slice(start)) {
+    if (stepApplies(stepById(id), ctx)) return id;
+  }
+  return nextMainLineStepAfter("open_languages", ctx);
+}
+
 export function advance(
+  completedStepId: ActiveStepId,
+  result: unknown,
+  ctx: AdvanceContext,
+): AdvanceOutcome {
+  const outcome = advanceStep(completedStepId, result, ctx);
+  // Open ends at Review (the criteria view), then Output (spec 111 FR-031): the
+  // walk's last step hands over to Review rather than the done panel.
+  if (isOpenWalk(ctx) && outcome.next === "done") return { next: "done", navigate: "criteria" };
+  return outcome;
+}
+
+function advanceStep(
   completedStepId: ActiveStepId,
   _result: unknown,
   ctx: AdvanceContext,
@@ -282,8 +313,11 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "open_languages":
-      // The side trail rejoins at "characters" (mirrors project_name).
-      return { next: "characters", setCharactersSubStage: "prefill" };
+    case "open_missing_letters":
+    case "open_upgrades":
+      // Open: Languages, then Missing letters and Upgrades when the baseline found
+      // those problems, then the main line (the character survey is hidden on Open).
+      return { next: nextOpenWalkPage(completedStepId, ctx) };
 
     case "characters":
       return { next: nextMainLineStepAfter("characters", ctx) }; // marks (spec 071)
@@ -331,6 +365,11 @@ export function advance(
       return { next: nextMainLineStepAfter("rules", ctx) }; // mechanisms
 
     case "mechanisms":
+      // Open: the Missing letters page sends an Add here; coming back lands on it so
+      // the remaining letters, then Upgrades, are not skipped.
+      if (isOpenWalk(ctx) && stepApplies(stepById("open_missing_letters"), ctx)) {
+        return { next: "open_missing_letters" };
+      }
       return { next: "osk" };
 
     case "osk":
@@ -350,8 +389,10 @@ export function advance(
       return { next: nextMainLineStepAfter("css", ctx) }; // help
 
     case "help":
-      return ctx.allCharactersImplemented
-        ? { next: nextMainLineStepAfter("help") } // html
+      // Open does not hold the walk on unfinished letters: they are the Missing
+      // letters page's and the submit gate's concern, not a block here.
+      return ctx.allCharactersImplemented || isOpenWalk(ctx)
+        ? { next: nextMainLineStepAfter("help", ctx) } // html
         : { next: "help" };
 
     case "html":

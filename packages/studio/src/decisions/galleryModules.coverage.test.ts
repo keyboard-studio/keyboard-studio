@@ -47,6 +47,9 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   layout: ["language-code"],
   // spec 111: the Open language list orders by its screenRequires, not requires.
   open_languages: [],
+  // spec 111 Open walk: the two conditional pages order by screenRequires too.
+  open_missing_letters: [],
+  open_upgrades: [],
   choose_base: ["language-code", "target-script"],
   characters: ["target-script", "authoring-track", "project-keyboard-id"],
   marks: ["character-inventory"],
@@ -77,8 +80,8 @@ const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the nineteen gallery decisions (spec 111 adds language-list, spec 112 caps-handling)", () => {
-    expect(SETTLES.size).toBe(19);
+  it("the derived settles set is exactly the twenty-one gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling)", () => {
+    expect(SETTLES.size).toBe(21);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "caps-handling",
@@ -90,6 +93,7 @@ describe("gallery module coverage (FR-002)", () => {
       "invisibles-inventory",
       "language-list",
       "marks-treatment",
+      "missing-letters-review",
       "osk-layout",
       "physical-layout",
       "punctuation-inventory",
@@ -97,6 +101,7 @@ describe("gallery module coverage (FR-002)", () => {
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "upgrades-review",
       "welcome-htm",
       "windows-layout",
     ]);

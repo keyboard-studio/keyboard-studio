@@ -24,7 +24,7 @@
 import type { GalleryModule, QuestionModule } from "../types.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
-import { openHelpStepWanted } from "./openHelpGaps.ts";
+import { hasOpenIssue, openIssueGate } from "../../decisions/openIssues.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
 import capsHandlingModule from "./gallery/capsHandling.ts";
@@ -41,6 +41,8 @@ import physicalLayoutModule from "./gallery/physicalLayout.ts";
 import oskLayoutModule from "./gallery/oskLayout.ts";
 import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
 import languageListModule from "./gallery/languageList.ts";
+import missingLettersModule from "./gallery/missingLetters.ts";
+import upgradesModule from "./gallery/upgrades.ts";
 import touchLayoutModule from "./gallery/touchLayout.ts";
 import customCssModule from "./gallery/customCss.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
@@ -109,6 +111,8 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   capsHandlingModule,
   startKeyboardModule,
   languageListModule,
+  missingLettersModule,
+  upgradesModule,
   characterInventoryModule,
   marksTreatmentModule,
   punctuationInventoryModule,
@@ -189,6 +193,8 @@ export const openHiddenScreens: ReadonlySet<string> = new Set([
   "layout",
   "choose_base",
   "track",
+  // The character survey: Open's Missing letters page replaces it (spec 111 FR-031).
+  "characters",
   "marks",
   "punctuation",
   "invisibles",
@@ -233,6 +239,10 @@ export const declaredScreenGates: ReadonlyMap<
   ["project_name", (d) => d["authoring-track"]?.value === "copy"],
   // Spec 111: the language list is asked on Open only.
   ["open_languages", (d) => d["authoring-track"]?.value === "adapt"],
+  // Spec 111 FR-032: the conditional walk pages show only for the problem kinds the
+  // baseline recorded (the `open-issues` decision), and only on Open.
+  ["open_missing_letters", openIssueGate("missing-letters")],
+  ["open_upgrades", openIssueGate("upgrades")],
   [
     "touch_seed_source",
     // Open (spec 111 FR-009): the keyboard's own touch layout is edited as it
@@ -268,9 +278,11 @@ export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => bo
     // The start screen records the track (New = copy, Open = adapt), so the track
     // step only asks a walk that has none yet: a draft from before the start screen.
     ["track", (d) => d["authoring-track"] === undefined],
-    // Spec 111 FR-029: on Open the help step is asked only when a help document
-    // is missing or fails its criteria. Copy always asks it.
-    ["help", (d) => notOpen(d) || openHelpStepWanted()],
+    // Spec 111 FR-029/FR-032: on Open the help step is asked only when the baseline
+    // recorded a help document that is missing or fails its criteria. Copy always asks it.
+    ["help", (d) => notOpen(d) || hasOpenIssue(d, "docs")],
+    // The welcome-page editor follows the help step: asked on Open only with it.
+    ["html", (d) => notOpen(d) || hasOpenIssue(d, "docs")],
   ]);
 
 /**

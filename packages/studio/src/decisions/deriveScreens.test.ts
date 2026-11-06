@@ -295,6 +295,9 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "project_name",
       // spec 111: the Open language list, a gated side trail.
       "open_languages",
+      // spec 111 Open walk: the conditional pages, gated on the open-issues decision.
+      "open_missing_letters",
+      "open_upgrades",
       "characters",
       "marks",
       "punctuation",
@@ -359,7 +362,15 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
 
   it("every other screen is an ungated spine screen", () => {
     for (const s of screens) {
-      if (s.id === "project_name" || s.id === "touch_seed_source" || s.id === "open_languages") continue;
+      if (
+        s.id === "project_name" ||
+        s.id === "touch_seed_source" ||
+        s.id === "open_languages" ||
+        s.id === "open_missing_letters" ||
+        s.id === "open_upgrades"
+      ) {
+        continue;
+      }
       expect(s.spine, s.id).toBe(true);
       expect(s.gatedBy, s.id).toBeUndefined();
       expect(s.joinTarget, s.id).toBeUndefined();

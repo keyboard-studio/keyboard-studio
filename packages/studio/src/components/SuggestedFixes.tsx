@@ -20,6 +20,8 @@ import {
 } from "../lib/suggestionDispositions.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useSuggestedFixesStore } from "../stores/suggestedFixesStore.ts";
+import { useBasicKeyboardOpen } from "../hooks/useBasicKeyboardOpen.ts";
+import { withoutPhysicalFixes } from "../lib/basicKeyboard.ts";
 import { Button } from "../ui/Button.tsx";
 import { BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -70,9 +72,11 @@ export interface SuggestedFixesProps {
   onSkip: (fix: SuggestedFix) => void;
   /** Heading level context; the list names itself through its heading. */
   testId?: string;
+  /** "apply" words the affirmative button Apply (an upgrade) instead of Accept. */
+  mode?: "accept" | "apply";
 }
 
-export function SuggestedFixes({ fixes, onAccept, onSkip, testId }: SuggestedFixesProps) {
+export function SuggestedFixes({ fixes, onAccept, onSkip, testId, mode = "accept" }: SuggestedFixesProps) {
   const { t } = useLingui();
   if (fixes.length === 0) return null;
   return (
@@ -97,12 +101,17 @@ export function SuggestedFixes({ fixes, onAccept, onSkip, testId }: SuggestedFix
               variant="primary"
               size="compact"
               onClick={() => onAccept(fix)}
-              aria-label={t({
-                id: "suggestedFixes.accept.label",
-                message: `Accept: ${fix.title}`,
-              })}
+              aria-label={
+                mode === "apply"
+                  ? t({ id: "suggestedFixes.apply.label", message: `Apply: ${fix.title}` })
+                  : t({ id: "suggestedFixes.accept.label", message: `Accept: ${fix.title}` })
+              }
             >
-              <Trans id="suggestedFixes.accept">Accept</Trans>
+              {mode === "apply" ? (
+                <Trans id="suggestedFixes.apply">Apply</Trans>
+              ) : (
+                <Trans id="suggestedFixes.accept">Accept</Trans>
+              )}
             </Button>
             <Button
               size="compact"
@@ -157,9 +166,11 @@ export function SuggestedFixesPanel({ extra = [], onAccept, testId }: SuggestedF
   const settle = useSuggestedFixesStore((s) => s.settle);
   const record = useDecisionLogStore((s) => s.record);
   const decided = decidedSuggestions(record);
+  // A basic keyboard's physical layout never changes: no suggestion may route to the physical keys.
+  const basicOpen = useBasicKeyboardOpen();
 
   const seen = new Set<string>();
-  const fixes = [...offered, ...extra].filter((f) => {
+  const fixes = withoutPhysicalFixes([...offered, ...extra], basicOpen).filter((f) => {
     if (decided.has(f.id) || seen.has(f.id)) return false;
     seen.add(f.id);
     return true;

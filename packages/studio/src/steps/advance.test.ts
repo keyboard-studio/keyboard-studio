@@ -30,12 +30,12 @@ import {
 // ---------------------------------------------------------------------------
 
 type WalkStep =
-  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "characters"
+  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "open_languages" | "characters"
   | "carve" | "deadkeys" | "rules" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "osk" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
-): { sequence: WalkStep[]; navigateAtEnd: "output" | undefined } {
+): { sequence: WalkStep[]; navigateAtEnd: "output" | "criteria" | undefined } {
   // Spec 088 T020 (fixture construction only): the gate set is a DecisionSet
   // literal matching the context's track — advance() reads gates from it.
   const fullCtx = {
@@ -55,7 +55,7 @@ function walkSpine(
   };
   const sequence: WalkStep[] = ["identity"];
   let current: WalkStep = "identity";
-  let navigateAtEnd: "output" | undefined;
+  let navigateAtEnd: "output" | "criteria" | undefined;
   for (let guard = 0; guard < 50; guard++) {
     const outcome = advance(current, undefined, fullCtx);
     sequence.push(outcome.next as WalkStep);
@@ -208,10 +208,11 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "attribution", "open_languages", "characters", "osk", "touch", "css", "help", "html", "done",
+      "identity", "attribution", "open_languages", "osk", "touch", "css", "done",
     ]);
     expect(sequence).not.toContain("project_name");
-    expect(navigateAtEnd).toBe("output");
+    // Open ends at Review (the criteria view), whose Continue opens Output.
+    expect(navigateAtEnd).toBe("criteria");
   });
 
   it("SR-5: the physical -> touch -> docs tail is never reordered (touch after osk, css after touch, help after css)", () => {
@@ -354,10 +355,10 @@ describe("advance: attribution — adapt fork (US2)", () => {
     expect(next).toBe("open_languages");
   });
 
-  it("adapt track carries setCharactersSubStage:'prefill' on the hop into characters (spec 111)", () => {
+  it("adapt track leaves the language list for the on-screen keyboard; the character survey is hidden on Open (spec 111 FR-031)", () => {
     const outcome = advance("open_languages", undefined, adaptCtx);
-    expect(outcome.next).toBe("characters");
-    expect(outcome.setCharactersSubStage).toBe("prefill");
+    expect(outcome.next).toBe("osk");
+    expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
 
@@ -699,8 +700,9 @@ describe("spec 091 T021 — derived screens in the walk", () => {
     // The characters screen has no entry in the derived screen gates (its
     // members' gates are per-question routing), so advance lands on it and
     // walks through it on BOTH tracks.
-    expect(advance("open_languages", undefined, adaptCtx).next).toBe("characters");
-    // Open (spec 111) hides the marks gallery; the characters screen is still walked.
+    expect(advance("project_name", undefined, copyCtx).next).toBe("characters");
+    // Open (spec 111) hides the character survey, so the language list goes straight on.
+    expect(advance("open_languages", undefined, adaptCtx).next).toBe("osk");
     expect(advance("characters", undefined, adaptCtx).next).toBe("osk");
     expect(advance("characters", undefined, copyCtx).next).toBe("marks");
   });

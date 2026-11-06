@@ -49,6 +49,8 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
 vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
+vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
+vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -156,8 +158,8 @@ describe("SurveyView — right pane gating on the characters step", () => {
     // Now advance into "characters" — the same discoveryMethod value gates
     // the pane swap on ONLY once activeRightPane flips to "character-map".
     // (#1901: the attribution step sits between track and characters.)
-    // (Spec 111: track-adapt is Open, whose language list sits before characters.)
-    fireEvent.click(screen.getByTestId("track-adapt"));
+    // (Spec 111: Open hides the character survey, so this takes the Copy path.)
+    fireEvent.click(screen.getByTestId("track-copy"));
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByLabelText("Character map")).toBeTruthy();

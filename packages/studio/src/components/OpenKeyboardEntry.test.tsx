@@ -30,16 +30,16 @@ beforeEach(() => {
 });
 
 describe("openExistingKeyboard", () => {
-  it("records base-keyboard and authoring-track=adapt, previews the keyboard and lands on the criteria page", () => {
+  it("records base-keyboard and authoring-track=adapt, previews the keyboard and lands on the Languages step", () => {
     expect(openExistingKeyboard(KB)).toBe(true);
     const decisions = useDecisionStore.getState().decisions;
     expect(decisions["authoring-track"]?.value).toBe("adapt");
     expect(decisions["base-keyboard"]?.value).toEqual({ id: KB.id, name: KB.displayName });
     expect(useSurveySessionStore.getState().localStart?.id).toBe(KB.id);
-    // The working copy is instantiated by the walk's pipeline; the criteria page follows it.
+    // The working copy is instantiated by the walk's pipeline; the walk starts at Languages.
     expect(navigateTo).toHaveBeenCalledWith("survey");
     expect(navigateTo).not.toHaveBeenCalledWith("criteria");
-    expect(useSurveySessionStore.getState().activeStepId).toBe("attribution");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("open_languages");
     expect(useWorkingCopyStore.getState().startSource).toBeNull();
   });
 

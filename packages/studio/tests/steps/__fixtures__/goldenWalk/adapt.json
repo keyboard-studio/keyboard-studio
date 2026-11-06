@@ -76,39 +76,9 @@
     "stepId": "open_languages",
     "applyStepCompletion": [],
     "storeMutations": [
-      "advance",
-      "setCharactersSubStage"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "characters/prefill",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "record",
-      "record",
-      "setCharactersSubStage"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record",
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "characters/B",
-    "applyStepCompletion": [
-      "characters"
-    ],
-    "storeMutations": [
       "advance"
     ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
+    "workingCopyMutations": [],
     "decisionMutations": [],
     "navigateTo": []
   },
@@ -143,39 +113,10 @@
     "storeMutations": [
       "advance"
     ],
-    "workingCopyMutations": [
-      "setHistoryEntryState"
-    ],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "help",
-    "applyStepCompletion": [
-      "help"
-    ],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "html",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "advance"
-    ],
     "workingCopyMutations": [],
     "decisionMutations": [],
     "navigateTo": [
-      "output"
+      "criteria"
     ]
   }
 ]

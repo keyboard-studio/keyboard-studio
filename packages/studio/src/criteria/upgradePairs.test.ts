@@ -13,14 +13,15 @@ const FIXTURE = resolve(
   "../../../engine/src/caps/__fixtures__/upstream_basic_kbdus/basic_kbdus.kmn",
 );
 const kmnText = readFileSync(FIXTURE, "utf8");
+const FILE = "source/basic_kbdus.kmn";
 const input = {
-  file: "source/basic_kbdus.kmn",
+  file: FILE,
   kmnText,
   keyboardId: "basic_kbdus",
   bcp47: "en",
   caps,
-  readText: (p: string) => (p === "source/basic_kbdus.kmn" ? kmnText : undefined),
-  paths: ["source/basic_kbdus.kmn"],
+  readText: (path: string) => (path === FILE ? kmnText : undefined),
+  paths: [FILE],
 };
 
 describe("upgradePairs registry", () => {
@@ -40,7 +41,7 @@ describe("&CasedKeys upgrade on the upstream basic_kbdus fixture (SC-007)", () =
     expect(offer).toBeDefined();
     expect(offer!.fix.kind).toBe("upgrade");
     expect(offer!.fix.status).toBe("pending");
-    expect(offer!.file).toBe("source/basic_kbdus.kmn");
+    expect(offer!.file).toBe(FILE);
     const after = offer!.afterText;
     expect(after).toMatch(/store\(&CasedKeys\)/i);
 

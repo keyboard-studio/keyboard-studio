@@ -93,7 +93,7 @@ import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
-import { useOpenHelpGaps } from "./hooks/useOpenHelpGaps.ts";
+import { useOpenInventorySeed } from "./hooks/useOpenInventorySeed.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
@@ -1221,8 +1221,8 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // so they render, publish, and classify exactly like every other finding.
   // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
   const documentationFindings = useDocumentationFindings();
-  // Spec 111 FR-029: on Open the help step is asked only about documents that are missing or fail.
-  useOpenHelpGaps();
+  // Spec 111: an opened keyboard's Touch step walks an inventory the skipped character survey would have built.
+  useOpenInventorySeed();
   // The sole-source oe2 Layer C warning rides the same findings array on
   // the same terms (memoised synchronous hook, no second timer): it is
   // owned by the mechanisms step via the lintToQuestion mapping for its

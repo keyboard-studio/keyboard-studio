@@ -20,6 +20,8 @@ vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMoc
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
 vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
+vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
+vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -175,7 +177,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 //     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
 
 describe("SurveyView — Track 2 (adapt) routing", () => {
-  it("clicking track-adapt advances through attribution to prefill, skipping project-name", async () => {
+  it("clicking track-adapt advances through attribution and the language list to the on-screen keyboard, skipping project-name", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -192,11 +194,13 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
     expect(screen.queryByTestId("stage-track")).toBeNull();
 
-    // Advance through attribution and the Open language list (spec 111) to prefill.
+    // Advance through attribution and the Open language list (spec 111) to the
+    // on-screen keyboard: Open hides the character survey.
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 
@@ -231,41 +235,26 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 // landing on PhaseB. This test proves the adapt-track path (which skips
 // project_name) converges on the same carve-back behavior as the copy-track path.
 
-describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)", () => {
-  it("adapt-track: selects adapt → skips project_name → prefill-continue → stage-B → charlist-done → osk (Open hides carve) → back lands on stage-B (not prefill)", async () => {
+describe("SurveyView — Open walk back-navigation (spec 111)", () => {
+  it("adapt-track: attribution -> language list -> osk, and osk's back returns to the language list", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Drive to track stage, then select adapt (skips project_name).
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-adapt"));
-
-    // Adapt-track lands on attribution (#1901), then prefill (no
-    // project-name).
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
-    expect(screen.queryByTestId("stage-project-name")).toBeNull();
-
-    // Confirm prefill → PhaseB visible.
-    fireEvent.click(screen.getByTestId("prefill-continue"));
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
-
-    // Open (spec 111) hides marks, punctuation, invisibles, carve and the other
-    // feature galleries, so PhaseB hands straight to the OSK step. Its back
-    // must re-enter PhaseB (not prefill).
-    fireEvent.click(screen.getByTestId("charlist-done"));
+    // Open hides the character survey, marks, punctuation, invisibles, carve and the
+    // other feature galleries, so the language list hands straight to the OSK step.
     expect(await screen.findByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
 
     fireEvent.click(screen.getByTestId("osk-back"));
-
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
-    expect(screen.queryByTestId("stage-carve")).toBeNull();
-    expect(screen.queryByTestId("stage-prefill")).toBeNull();
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
   });
 });
 

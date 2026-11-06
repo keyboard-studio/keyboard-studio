@@ -234,7 +234,7 @@ describe("section marks — one per non-active manifest step", () => {
     // open_languages is Open-only (spec 111), and the track step is gated off once
     // the start screen records the track — every OTHER on-path step has a mark.
     const onPathIds = manifest
-      .filter((s) => s.id !== "open_languages" && s.id !== "track" && s.id !== "package")
+      .filter((s) => !s.id.startsWith("open_") && s.id !== "track" && s.id !== "package")
       .map((s) => s.id);
     for (const id of onPathIds) {
       expect(dots.some((d) => d.id === id || d.location.step === id)).toBe(true);

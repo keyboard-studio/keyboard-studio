@@ -543,8 +543,8 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // records "help" (or wherever `advance` left it), so returning to Studio
     // resumes the walk rather than restarting it. No extra state is stashed
     // here: the position is already the store's job (FR-001).
-    if (outcome.navigate === "output") {
-      navigateTo("output");
+    if (outcome.navigate !== undefined) {
+      navigateTo(outcome.navigate);
     }
   }
 
