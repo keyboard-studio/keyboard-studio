@@ -77,6 +77,8 @@ import { checkCasedKeysDeclared, isMnemonicLayout } from "./checks/criteria/chec
 import { checkDeprecatedHeaders } from "./checks/criteria/check-deprecated-headers.js";
 import { checkTouchRequiredKeys } from "./checks/criteria/check-touch-required-keys.js";
 import { checkTouchCapsLayer } from "./checks/criteria/check-touch-caps-layer.js";
+import { checkTouchModifierKeys } from "./checks/criteria/check-touch-modifier-keys.js";
+import { checkTouchSymbolsLayer } from "./checks/criteria/check-touch-symbols-layer.js";
 import { checkFilenameConvention } from "./checks/criteria/check-filename-convention.js";
 import {
   checkTargetsAnyAlone,
@@ -280,6 +282,10 @@ export function runCriteriaChecks(
         ...(input.kpsLanguages[0] !== undefined ? { bcp47: input.kpsLanguages[0] } : {}),
       }),
     );
+    // 18.17 — consistent Ctrl/RAlt touch keys.
+    collect(checkTouchModifierKeys(touchLayout, touchLayoutPath(keyboardId)));
+    // 18.18 — a symbol layer reached by K_SYMBOLS link keys.
+    collect(checkTouchSymbolsLayer(touchLayout, touchLayoutPath(keyboardId)));
   }
 
   // 8.12 / 9.6 — package font scans over .kps facts + the VFS inventory.

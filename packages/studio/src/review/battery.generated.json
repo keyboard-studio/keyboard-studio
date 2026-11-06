@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-11-04T19:35:34.578Z",
- "catalogSize": 204,
+ "generatedAt": "2026-11-06T03:53:30.895Z",
+ "catalogSize": 206,
  "byBand": {
-  "layer-c-enforce": 120,
+  "layer-c-enforce": 122,
   "scaffolder-bake": 40,
   "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 113,
+ "implementedCount": 115,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -2591,7 +2591,7 @@
    "id": "18.16-touch-caps-layer-complete",
    "band": "layer-c-enforce",
    "section": "18. Design heuristics (DISCUS)",
-   "description": "A keyboard that produces cased letters has a touch `caps` layer, reached by double-tapping Shift on `default`, carrying the uppercase of every cased letter on `default`; its character keys do not switch layers",
+   "description": "A keyboard that produces cased letters has a touch `caps` layer, reached by double-tapping Shift on `default`, carrying the uppercase of every cased letter on `default`; its character keys do not switch layers. The right-alt and ctrl shift layers have caps layers too, character keys on other layers return to `default` after one tap (one-shot Shift), and Shift keys are labelled `*Shifted*` / `*ShiftedLock*` and return to the unshifted layer",
    "hook": {
     "kind": "lintRuleId",
     "id": "KM_LINT_TOUCH_CAPS_LAYER"
@@ -2600,6 +2600,36 @@
    "precertified": false,
    "checkFiles": [
     "packages/keyboard-lint/src/checks/criteria/check-touch-caps-layer.ts"
+   ]
+  },
+  {
+   "id": "18.17-touch-modifier-keys-consistent",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Ctrl and RAlt keys on touch layers are consistent: id `K_RALT`, labels `*Ctrl*` / `*RAlt*` instead of legacy spellings (`ctrl`, `RALT`, `*Alt*`, `default`), each opening the right Ctrl or RAlt layer (or the shift/caps variant), and shown as the active special key on the layer they opened",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_MODIFIER_KEYS"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-touch-modifier-keys.ts"
+   ]
+  },
+  {
+   "id": "18.18-touch-symbols-layer-linked",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "A touch layout has a `symbol` layer, reached from every other layer by a `K_SYMBOLS` link key (`symbol-caps` from the caps layers), so punctuation and symbols are reachable on touch",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_TOUCH_SYMBOLS_LAYER"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-touch-symbols-layer.ts"
    ]
   },
   {

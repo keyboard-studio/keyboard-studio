@@ -48,6 +48,22 @@ Check `keyboard-lint/src/checks/criteria/check-touch-caps-layer.ts`, one finding
 | missing uppercase | "caps layer lacks: Ŋ (K_LBRKT), …" |
 | switching keys | "caps-layer keys switch layer after typing: K_A, …" |
 
+**Amended by spec 111 T059a (the owner's full Capsifesto behaviour, `processTouch.py`).** The row's
+description now also requires, and the check also reports (in `touchLayerRules` terms, shared with the
+fixer `syncTouchCapsLayerRaw`):
+
+| Problem | Finding |
+|---|---|
+| `rightalt-shift` / `ctrl-shift` without `rightalt-caps` / `ctrl-caps` | "no rightalt-caps layer although rightalt-shift exists" |
+| `rightalt-caps` / `ctrl-caps` keys switching layer | "rightalt-caps keys switch layer after typing: …" |
+| no double-tap Shift on `rightalt` / `ctrl` | "Shift on rightalt has no double-tap to rightalt-caps" |
+| character keys on a non-default, non-caps layer stay on it | "shift character keys stay on the layer after typing: …" |
+| Shift on a shift/caps layer not `*Shifted*` / `*ShiftedLock*` returning to the unshifted layer | "Shift on shift is not *Shifted* returning to default" |
+
+This lifts research R8's exclusion of `rightalt-caps`. Two sibling rows were added with it:
+`18.17-touch-modifier-keys-consistent` (`KM_LINT_TOUCH_MODIFIER_KEYS`) and
+`18.18-touch-symbols-layer-linked` (`KM_LINT_TOUCH_SYMBOLS_LAYER`).
+
 Not applicable (pass with reason): no touch layout; no cased letters on `default`; mnemonic.
 
 Registering the row moves the band counts and the studio criteria tests the way 7.28 did

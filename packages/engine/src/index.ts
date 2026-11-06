@@ -1226,3 +1226,5 @@ export { diffIrToKmnEdits, spliceKmn, projectKmnText } from "./pattern-apply/spl
 export type { KmnEdit, InsertAnchor, SpliceKmnResult } from "./pattern-apply/spliceKmn.js";
 // Spec 112 - shared cased-key derivation and key-scoped caps rewrite.
 export * from "./caps/index.js";
+// Spec 111 T059b/T059c - touch modifier-key and symbols-layer upgrade fixers.
+export * from "./touch-upgrades/index.js";
