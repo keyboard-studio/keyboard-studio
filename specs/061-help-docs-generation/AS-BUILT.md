@@ -9,7 +9,7 @@
 - Phase F documentation answers now drive the shipped documentation files: `README.md`, `source/readme.htm`, `source/welcome.htm`, `source/help/<keyboardId>.php`.
 - Adaptation merges the copied keyboard's existing welcome and help text with the author's answers instead of overwriting it.
 - The author's project home URL lands in the `.kps` as `<Info><WebSite>`.
-- The Documentation step is the only place to read and edit the generated docs — its file selector shows all six doc members, seeded from the current working copy (PR #2569). The Help & Tips step no longer carries a preview panel (issue #2531, PR #2577): the author reads the docs where they can edit them.
+- The Documentation step is the only place to read and edit the generated docs — its file selector shows all six doc members, seeded from the current working copy (PR #2569). The Help & Tips step no longer carries a preview panel (issue #2531, PR #2580): the author reads the docs where they can edit them.
 - An opt-in "additional detail" battery of Phase F questions appends sections in a fixed order.
 
 ## Public contracts
