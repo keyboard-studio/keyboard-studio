@@ -91,18 +91,22 @@
  * ## Geometry (`remove`)
  *
  * `width`/`pad` are absent from `EditableKeyFields` — geometry is
- * read-only this increment (contract §3). `remove`'s `"reflow"` outcome
- * writes nothing: the row simply has one fewer key, and its stretched
- * final key absorbs the remainder at RENDER time (the KMW polyfill; see
- * research.md "Geometry, for the record"), never authored here. Its
- * `"redistribute"` outcome is the one place this module writes `width` as
- * a CONSEQUENCE of the edit: the removed key's own `width` (when present)
- * is split evenly across every remaining key in the row; a removed key
- * with no `width`, or a row left with no remaining keys, has nothing to
- * redistribute, so nothing is written. Mirrors
- * `applyKeyEditsToLayout.ts`'s `redistributeFreedWidth` exactly (no
- * implicit `DEFAULT_KEY_WIDTH` fallback on either side) for the same
- * twin-equivalence reason above.
+ * read-only this increment (contract §3). `remove` writes geometry only
+ * as a CONSEQUENCE of the edit, in two ways. Its `"redistribute"` outcome
+ * is the one place this module writes `width` as a CONSEQUENCE: the
+ * removed key's own `width` (when present) is split evenly across every
+ * remaining key in the row; a removed key with no `width`, or a row left
+ * with no remaining keys, has nothing to redistribute, so nothing is
+ * written. Mirrors `applyKeyEditsToLayout.ts`'s `redistributeFreedWidth`
+ * exactly (no implicit `DEFAULT_KEY_WIDTH` fallback on either side) for
+ * the same twin-equivalence reason above. Its `"reflow"` outcome leaves
+ * the freed width as trailing padding — a `T_SPACER` key at the end of
+ * the row carrying the removed key's `width`/`pad` (#2360: deleting a key
+ * used to leave the row under-full, and every renderer stretches the
+ * last key of an under-full row to the layer maximum, so the last key
+ * came out long). Mirrors `applyKeyEditsToLayout.ts`'s
+ * `leaveTrailingPadding` exactly, including growing an existing trailing
+ * spacer instead of appending a second one.
  *
  * ## Resolution failures
  *
@@ -139,6 +143,7 @@ import type {
 import {
   applyFieldSemantics,
   applySuppressSemantics,
+  proposeSuppressFields,
   resolveKeyAddress,
   resolveSubKeyEntry,
 } from "./keyEditOps.js";
@@ -396,10 +401,23 @@ function applyMove(resolved: ResolvedMainKey, direction: MoveKeyOp["direction"])
 function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
 
   const removedWidth = toWireNumber(resolved.key["width"]);
+  const removedPad = toWireNumber(resolved.key["pad"]);
   resolved.row.keys.splice(resolved.keyIndex, 1);
 
-  // "reflow": no width writes. Redistribute needs a removed width to free —
-  // no implicit default (mirrors applyKeyEditsToLayout.ts's
+  // "reflow": leave the freed width as trailing padding (#2360) — mirrors
+  // applyKeyEditsToLayout.ts's leaveTrailingPadding exactly; see its own
+  // comment for why a spacer, why it grows, and why a blank is never grown.
+  if (op.outcome === "reflow") {
+    leaveTrailingPadding(resolved.row, removedWidth, removedPad);
+    return;
+  }
+
+  // "drop": nothing — the row simply has one fewer key (the Code tab
+  // diff's scaffolding outcome; see RemoveKeyOp).
+  if (op.outcome === "drop") return;
+
+  // "redistribute": no width writes without a removed width to free — no
+  // implicit default (mirrors applyKeyEditsToLayout.ts's
   // redistributeFreedWidth exactly; see module docstring).
   if (op.outcome !== "redistribute" || !removedWidth) return;
 
@@ -410,6 +428,44 @@ function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
     const current = toWireNumber(key["width"]) ?? 0;
     key["width"] = current + share;
   }
+}
+
+/**
+ * Case B's twin of `applyKeyEditsToLayout.ts`'s `leaveTrailingPadding`
+ * (#2360): append a `T_SPACER` key carrying the removed key's `width`/`pad`
+ * at the end of the row — or grow the trailing spacer already there — so
+ * the row keeps its total width and no remaining key stretches. Only the
+ * removed key's EXPLICIT geometry is written; an absent width/pad still
+ * contributes its default at render time, exactly as the removed key did.
+ * A no-op when the row is left empty. The `sp`/`id` pairing comes from
+ * {@link proposeSuppressFields} (`"spacer"`), never a hand-rolled literal.
+ */
+function leaveTrailingPadding(
+  row: RawKeyRow,
+  width: number | undefined,
+  pad: number | undefined,
+): void {
+  const remaining = row.keys;
+  if (remaining.length === 0) return;
+  const { spClass, sentinelId } = proposeSuppressFields("spacer");
+  const last = remaining[remaining.length - 1]!;
+  if (toWireNumber(last["sp"]) === spClass) {
+    last["width"] =
+      (toWireNumber(last["width"]) ?? DEFAULT_KEY_WIDTH_PCT) +
+      (width ?? DEFAULT_KEY_WIDTH_PCT);
+    last["pad"] =
+      (toWireNumber(last["pad"]) ?? DEFAULT_KEY_PAD_PCT) +
+      (pad ?? DEFAULT_KEY_PAD_PCT);
+    return;
+  }
+  const spacer: RawKey = { id: sentinelId };
+  spacer["sp"] = spClass;
+  // No `text`: a spacer renders nothing, and the parser leaves `text`
+  // undefined when the wire value is absent — so Case A's IR twin (which
+  // writes no `text` either) re-parses to the same key.
+  if (width !== undefined) spacer["width"] = width;
+  if (pad !== undefined) spacer["pad"] = pad;
+  remaining.push(spacer);
 }
 
 /**

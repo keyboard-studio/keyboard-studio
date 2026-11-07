@@ -521,7 +521,12 @@ function diffRow(
     if (i === anchorIdx) continue;
     // Removing a duplicated id would shift occurrences under replay.
     if (dupIds.has(k.id)) return dupReject(k.id);
-    ops.push({ address: addr(k.id), kind: "remove", outcome: "reflow" });
+    // A whole-row replacement removes the old keys as scaffolding — the
+    // replacement keys bring their own width, so the removal must leave
+    // nothing behind (`"drop"`): a `"reflow"` here would park the old
+    // row's width as trailing padding and double the row (#2360). A
+    // genuine deletion (any paired key survives) keeps `"reflow"`.
+    ops.push({ address: addr(k.id), kind: "remove", outcome: allNew ? "drop" : "reflow" });
   }
 
   // 2. Renames. Guard: the target id must not already exist in the layer —
@@ -730,14 +735,16 @@ function diffRow(
   // 6. The withheld all-new-row anchor is removed last — but only when the
   //    anchor trick actually ran (adds anchored on it). A renamed anchor, or
   //    a row whose leftovers became renames instead of adds, needs no
-  //    cleanup remove.
+  //    cleanup remove. The anchor is scaffolding for the replacement, so it
+  //    goes with `"drop"`, not `"reflow"` — the replacement keys already
+  //    carry the row's width (see step 1).
   if (anchorIdx >= 0 && anchorUsed) {
     const anchorId = beforeKeys[anchorIdx]!.id;
     if (dupIds.has(anchorId)) return dupReject(anchorId);
     ops.push({
       address: addr(anchorId),
       kind: "remove",
-      outcome: "reflow",
+      outcome: "drop",
     });
   }
 

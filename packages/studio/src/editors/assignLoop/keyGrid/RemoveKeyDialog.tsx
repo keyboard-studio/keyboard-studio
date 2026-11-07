@@ -558,7 +558,7 @@ export function RemoveKeyDialog({
         return t({
           id: "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.note",
           message:
-            "The row closes up; its stretched last key absorbs the freed width unevenly.",
+            "The key is gone; the freed space stays as padding at the end of the row, so the remaining keys keep their widths.",
         });
       case "redistribute":
         return t({

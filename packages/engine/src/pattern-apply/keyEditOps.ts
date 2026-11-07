@@ -179,9 +179,29 @@ export interface AddKeyOp extends KeyEditOperationBase {
   readonly key: NewKeySpec;
 }
 
+/**
+ * Remove a key from its row.
+ *
+ * - `"reflow"` — the key is gone and the freed width stays as trailing
+ *   padding at the end of the row, so the row keeps its total width and no
+ *   remaining key stretches (#2360).
+ * - `"redistribute"` — the key is gone and its freed width is shared
+ *   evenly across the row's remaining keys.
+ * - `"drop"` — the key is gone and its width goes with it: the row simply
+ *   has one fewer key and closes up. This is the OLD `reflow` behaviour,
+ *   kept as its own outcome for exactly one caller — the Code tab's diff
+ *   (`touchCodeDiff.ts`), whose whole-row-replacement anchor trick removes
+ *   keys as scaffolding, not as author deletions: the replacement keys
+ *   bring their own width, so leaving the old keys' width behind as
+ *   padding would double the row. No author-facing surface offers
+ *   `"drop"` (the RemoveKeyDialog's three-way choice is unchanged, and
+ *   the touch builder's Delete commits `"reflow"`), so a row only ever
+ *   shrinks through the diff's scaffolding — never through an author
+ *   deleting a key.
+ */
 export interface RemoveKeyOp extends KeyEditOperationBase {
   readonly kind: "remove";
-  readonly outcome: "reflow" | "redistribute";
+  readonly outcome: "reflow" | "redistribute" | "drop";
 }
 
 /**
