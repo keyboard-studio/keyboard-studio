@@ -364,6 +364,7 @@ export type { StartBrowserServiceWithDocProfile } from "./start-browser/index.js
 export {
   createScaffolderService,
   renameFilesInVfs,
+  rewriteKmwKeyboardSelectors,
   generateStubs,
   resolveInheritedHolders,
   packageAttributionFields,

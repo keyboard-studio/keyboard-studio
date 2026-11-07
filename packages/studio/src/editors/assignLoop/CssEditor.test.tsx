@@ -15,6 +15,9 @@ vi.mock("./CssCodePane.tsx", () => ({
       <button type="button" data-testid="apply-new" onClick={() => onApply(".new { color: blue; }")}>
         apply
       </button>
+      <button type="button" data-testid="apply-relinked" onClick={() => onApply(".kmw-keyboard-newkb .kmw-key { top: 0; }")}>
+        apply relinked
+      </button>
       <button type="button" data-testid="apply-empty" onClick={() => onApply("")}>
         apply empty
       </button>
@@ -37,8 +40,13 @@ function seedStore(customCss: string | null) {
   useWorkingCopyStore.setState({
     startKeyboard: { id: "t", displayName: "T" } as never,
     startVfs,
+    identity: null,
     customCss,
   });
+}
+
+function renameTo(keyboardId: string) {
+  useWorkingCopyStore.setState({ identity: { keyboardId, displayName: "T" } as never });
 }
 
 describe("CssEditor", () => {
@@ -114,5 +122,27 @@ describe("CssEditor", () => {
     seedStore(".left { top: 1px; }");
     render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect((await screen.findByTestId("seed")).textContent).toBe(".left { top: 1px; }");
+  });
+
+  it("shows the start stylesheet relinked to the author's new keyboard id", async () => {
+    useWorkingCopyStore.getState().startVfs?.set("source/kb.css", ".kmw-keyboard-t .kmw-key { color: red; }", false);
+    renameTo("newkb");
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect((await screen.findByTestId("seed")).textContent).toBe(".kmw-keyboard-newkb .kmw-key { color: red; }");
+  });
+
+  it("reopens an earlier result relinked to the current keyboard id", async () => {
+    seedStore(".kmw-keyboard-t .left { top: 1px; }");
+    renameTo("newkb");
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect((await screen.findByTestId("seed")).textContent).toBe(".kmw-keyboard-newkb .left { top: 1px; }");
+  });
+
+  it("stores the applied text under the start id so a later rename still relinks it", async () => {
+    renameTo("newkb");
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("apply-relinked"));
+    fireEvent.click(screen.getByTestId("css-continue"));
+    expect(useWorkingCopyStore.getState().customCss).toBe(".kmw-keyboard-t .kmw-key { top: 0; }");
   });
 });
