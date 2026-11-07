@@ -148,9 +148,11 @@ phases:
 - The step that adds the OSK and touch layout must also widen `&TARGETS` to a web target, or
   kmcmplib still emits no `.js`. Checked in Phase 3: no studio or engine code writes
   `header.targets` or `&TARGETS` today. The docs preview and the output bundle only read them
-  (`useDocsPreview.ts`, `buildOutputBundle.ts`). So a `'windows'`-only keyboard stays without a
-  web build after its touch layout is generated. That gap belongs to the OSK/touch step, not to
-  this spec; until it closes, such keyboards show the not-compiled state in the Layout tab.
+  (`useDocsPreview.ts`, `buildOutputBundle.ts`). **Closed (product owner ruling, 2026-11-07):**
+  every produced keyboard targets `'any'`, because desktop and touch are both required and both
+  adapt per OS. The projection's step 3.1 (`applyTargetsAnyMutation`) writes
+  `store(&TARGETS) 'any'` for the preview and both outputs, so every working copy has a web build
+  for the Layout tab to verify.
 - A keyboard such as `cs_pinyin`, whose rules do not compile for the web, fails at that step
   whatever the Layout tab does. That is the OSK/touch step's error to report, not this tab's.
 
