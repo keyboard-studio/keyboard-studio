@@ -52,6 +52,12 @@ const PRE_REORDER_STEP_IDS = [
   "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "package",
 ];
 
+// Step ids a pre-reordering draft may name that the current manifest no
+// longer lists: "track" was retired with the track question (#2568). The
+// loader restores them verbatim (see the loadDraft test below); they are
+// known-retired, not unknown.
+const RETIRED_STEP_IDS = ["track"];
+
 describe("pre-reordering draft loads on the current build", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -69,7 +75,7 @@ describe("pre-reordering draft loads on the current build", () => {
     // pre-reordering id still exists, so a draft persisted before any of
     // these changes names only known (or legacy-mapped) steps.
     expect([...STEP_ORDER].sort()).toEqual(
-      [...PRE_REORDER_STEP_IDS.filter((id) => id !== "track"), "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon", "fallback_policy"].sort(),
+      [...PRE_REORDER_STEP_IDS.filter((id) => !RETIRED_STEP_IDS.includes(id)), "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon", "fallback_policy"].sort(),
     );
   });
 

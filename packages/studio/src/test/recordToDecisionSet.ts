@@ -10,7 +10,7 @@
 import { effectiveEntries } from "@keyboard-studio/contracts";
 import type { DecisionRecord } from "@keyboard-studio/contracts";
 import { parseDecisionRecord } from "@keyboard-studio/engine";
-import { questionRegistry, RETIRED_QUESTION_DECISIONS } from "../survey/questions/registry.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { DECISION_POINTS, type DecisionPoint } from "./decisionPointBases.ts";
 
@@ -24,7 +24,6 @@ const MARKS_IDS: readonly string[] = [
   "author-name",
   "author-email",
   "copyright-holder",
-  "authoring-track",
   "project-display-name",
   "project-keyboard-id",
   "windows-layout",
@@ -91,18 +90,14 @@ export function recordToDecisionSet(
       // that owns the question and `provides` the decision. Answers with no
       // such module (the marks series' own sub-answers, invisibles, phase B
       // bookkeeping) are carried by their composite decision entry instead.
-      // A retired question whose answer still maps onto a live decision
-      // resolves through RETIRED_QUESTION_DECISIONS instead — `track_choice`
-      // was removed with the track step (#2568), but a record's answer is
-      // the only record of an "adapt" walk, and orphaning it would replay
-      // that walk on the copy track (same rule as the v1 draft migration).
-      // A record with no track answer at all replays with no authoring-track:
-      // the replay reproduces what the record contains — "copy defaults
-      // where unrecorded" is a live-walk rule (StudioShell), not a replay
-      // default, and defaulting it here would inject a decision the record
-      // never had (and break parity comparisons of minimal records).
+      // Retired questions with no registry module do not replay a decision.
+      // The authoring track is recorded by the start screen, not derived
+      // from the record's retired `track_choice` answer.
+      // The replay reproduces the decisions the record contains — "copy
+      // defaults where unrecorded" is a live-walk rule (StudioShell), not
+      // a replay default.
       const mod = questionRegistry[p.questionId];
-      const provides = mod?.provides ?? RETIRED_QUESTION_DECISIONS[p.questionId] ?? [];
+      const provides = mod?.provides ?? [];
       for (const id of provides) {
         if (allowed.has(id)) out[id] = asDecision(id, p.value);
       }

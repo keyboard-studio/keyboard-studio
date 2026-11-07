@@ -191,13 +191,11 @@ function captureFromReplayState(state: ReplayState): DerivedCapture {
  * is not exercised here: no carved-layout decision is recorded.
  */
 function manualFold(startingPointIR: KeyboardIR, decisions: DecisionSet): ReplayState {
-  // The authoring-track provider is a system module, deliberately NOT in
-  // questionRegistry (#2568: the track question is gone, but the decision
-  // still orders the walk) — yet characterInventory requires it, so the
-  // fold's module list must include it or decisionOrderFor throws
-  // "unresolved decision". The real rebuild reads decisionModules, which
-  // has it; the manual fold appends it here to match.
-  const modules = [...Object.values(questionRegistry), authoringTrackProviderModule] as QuestionModule[];
+  // The same module list the live rebuild folds (rebuildWorkingCopy.ts):
+  // the registry plus the authoring-track provider, which is deliberately
+  // not a registry module (no flow renders it) but must be present or the
+  // sort throws on the characterInventory module's authoring-track edge.
+  const modules = [...Object.values(questionRegistry), authoringTrackProviderModule];
   const order = decisionOrderFor(modules);
   const providerFor = providerFromModules(modules);
   let state: ReplayState = { ir: startingPointIR, overlay: emptyOverlay() };

@@ -160,8 +160,12 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("rules")).toBe("mechanisms");
   });
 
-  it("mechanisms → fallback_policy (#2549: the fallback-policy step sits between mechanisms and osk)", () => {
+  it("mechanisms → fallback_policy (#2539: fallback policy step sits after mechanisms, before OSK)", () => {
     expect(nextMainLineStepAfter("mechanisms")).toBe("fallback_policy");
+  });
+
+  it("fallback_policy → osk", () => {
+    expect(nextMainLineStepAfter("fallback_policy")).toBe("osk");
   });
 
   it("osk → touch (skips touch_seed_source which is a derived side trail)", () => {
@@ -223,12 +227,14 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-5: the physical -> touch -> docs tail is never reordered (touch after osk, css after touch, help after css)", () => {
     const { sequence } = walkSpine(copyCtx);
     const mech = sequence.indexOf("mechanisms");
+    const fallback = sequence.indexOf("fallback_policy");
     const osk = sequence.indexOf("osk");
     const touch = sequence.indexOf("touch");
     const css = sequence.indexOf("css");
     const help = sequence.indexOf("help");
     expect(mech).toBeGreaterThan(-1);
-    expect(osk).toBeGreaterThan(mech);
+    expect(fallback).toBeGreaterThan(mech);
+    expect(osk).toBeGreaterThan(fallback);
     expect(touch).toBeGreaterThan(osk);
     expect(css).toBeGreaterThan(touch);
     expect(help).toBeGreaterThan(css);
@@ -249,7 +255,7 @@ describe("spec 034 SR-3 — osk advances to touch, never past it", () => {
     expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
 
-  it("advance(mechanisms) always lands on fallback_policy first (#2549)", () => {
+  it("advance(mechanisms) always lands on fallback_policy first (then osk)", () => {
     expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
     expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
   });
@@ -411,11 +417,11 @@ describe("advance: spine hops", () => {
     expect(advance("rules", undefined, copyCtx).next).toBe("mechanisms");
   });
 
-  it("mechanisms → fallback_policy (#2549)", () => {
+  it("mechanisms → fallback_policy (#2539)", () => {
     expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
   });
 
-  it("fallback_policy → osk (#2549)", () => {
+  it("fallback_policy → osk", () => {
     expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
   });
 

@@ -6,6 +6,12 @@
 // holds that step's decisions. Ids are named literally here so a future
 // rename or removal breaks this test loudly instead of stranding a
 // pre-091 deep link or draft silently.
+//
+// Amendments to the frozen inventory, each a deliberate merged change:
+//   - fallback_policy ADDED (#2549, spec 109): the map gained the identity
+//     entry, so the inventory gains it too.
+//   - track RETIRED (#2568, track_choice removal): old track ids map to
+//     choose_base, where the authoring-track decision now lives.
 
 import { describe, it, expect } from "vitest";
 import { LEGACY_STEP_ID_MAP, resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
@@ -15,12 +21,11 @@ import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
 import { resolveLocation, type ResolveContext } from "./resolveLocation.ts";
 
-/** The 18 step ids on `main` at 18e63aa4 (research.md inventory). */
+/** The 18 step ids on `main` at 18e63aa4 (research.md inventory), as amended above. */
 const MAIN_STEP_IDS_AT_18E63AA4 = [
   "identity",
   "layout",
   "choose_base",
-  "track",
   "project_name",
   "characters",
   "marks",
@@ -31,6 +36,7 @@ const MAIN_STEP_IDS_AT_18E63AA4 = [
   "deadkeys",
   "rules",
   "mechanisms",
+  "fallback_policy",
   "touch_seed_source",
   "touch",
   "help",
@@ -61,11 +67,11 @@ function ctxAllWalked(): ResolveContext {
 }
 
 describe("SC-005 inventory — every pre-091 step id resolves to its screen", () => {
-  it("the frozen map covers exactly the 18 inventoried ids plus fallback_policy", () => {
-    // #2549 added the fallback_policy step after the 18e63aa4 inventory;
-    // it maps to itself like every other current step.
+  it("the frozen map covers the inventoried ids and the retired track alias", () => {
+    // fallback_policy replaced the removed track id in the current step set;
+    // the legacy track id remains as an alias to choose_base.
     expect(Object.keys(LEGACY_STEP_ID_MAP).sort()).toEqual(
-      [...MAIN_STEP_IDS_AT_18E63AA4, "fallback_policy"].sort(),
+      [...MAIN_STEP_IDS_AT_18E63AA4, "track"].sort(),
     );
   });
 
@@ -92,7 +98,6 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
       identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
       layout: ["windows-layout"],
       choose_base: ["base-keyboard"],
-      track: ["authoring-track"],
       project_name: ["project-display-name", "project-keyboard-id"],
       characters: ["existing-keyboards", "co-installed-keyboards", "discovery-intro", "text-sample", "text-sample-review", "linguist-confirm", "picker-confirm", "standard-letters", "typing-approach", "special-letters-wanted", "special-letters", "special-letters-notes", "latin-digraphs-wanted", "latin-digraphs-list", "punctuation-wanted", "punctuation-list", "digit-set", "char-count", "latin-qwerty-branch", "spare-keys-qwerty", "latin-azerty-branch", "azerty-qz-swap", "spare-keys-azerty", "non-roman-branch", "indic-conjuncts-wanted", "indic-virama", "indic-vowels-separate", "indic-pre-base-vowels", "indic-nukta-wanted", "indic-nukta-detail", "indic-onset-vowels-wanted", "indic-onset-vowels-list", "sea-medials", "sea-stacked-consonants", "rtl-direction-confirm", "rtl-short-vowels", "rtl-special-letters", "syllabic-note", "syllabic-grid", "syllabic-finals-wanted", "syllabic-finals-list", "other-free-entry", "contact-language", "legacy-encoding", "use-case", "additional-methods", "character-inventory"],
       marks: ["marks-treatment"],
@@ -103,6 +108,10 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
       deadkeys: ["deadkeys-defined"],
       rules: ["rule-set"],
       mechanisms: ["physical-layout"],
+      // fallback_policy holds no DecisionSet decisions: the policy is an
+      // author-set working-copy setting (derivedSurfaceRegistry
+      // "fallback-policy" surface has decisionIds: []).
+      fallback_policy: [],
       touch_seed_source: ["touch-seed-source"],
       touch: ["touch-layout"],
       help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
@@ -131,20 +140,22 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
     for (const id of MAIN_STEP_IDS_AT_18E63AA4) {
       const loc: Location = { route: "survey", step: id as never };
       const result = resolveLocation(loc, ctx);
-      // #2568: the track step is gone; its decision lives on choose_base,
-      // so an old "track" deep link lands on choose_base instead of
-      // degrading (the pre-#2568 behaviour was step-not-in-build).
-      if (id === "track") {
-        expect(result.kind, id).toBe("reachable");
-        if (result.kind === "reachable") {
-          expect(result.location.step, id).toBe("choose_base");
-        }
-        continue;
-      }
       expect(result.kind, id).toBe("reachable");
       if (result.kind === "reachable") {
         expect(result.location.step, id).toBe(resolveLegacyStepId(id));
       }
+    }
+  });
+
+  it("a pre-091 deep link to the retired track step resolves to choose_base", () => {
+    // The track step is gone; its authoring-track decision now lives on
+    // choose_base, so old links land on the step that replaced it.
+    const ctx = ctxAllWalked();
+    const loc: Location = { route: "survey", step: "track" as never };
+    const result = resolveLocation(loc, ctx);
+    expect(result.kind).toBe("reachable");
+    if (result.kind === "reachable") {
+      expect(result.location.step).toBe("choose_base");
     }
   });
 

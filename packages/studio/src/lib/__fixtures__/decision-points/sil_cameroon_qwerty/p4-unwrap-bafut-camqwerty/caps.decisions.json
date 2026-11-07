@@ -4,11 +4,6 @@
     "value": "Walk Author",
     "provenance": "asked"
   },
-  "authoring-track": {
-    "id": "authoring-track",
-    "value": "copy",
-    "provenance": "asked"
-  },
   "base-keyboard": {
     "id": "base-keyboard",
     "value": {

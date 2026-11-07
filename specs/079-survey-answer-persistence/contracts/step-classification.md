@@ -26,7 +26,7 @@ Part I). The "After 079" column is the target this feature must reach.
 | deadkeys | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
 | rules | compliant: the demo pane is a read-only view of the compiled working copy (spec 082 Track A); the step records no answers — Continue carries `undefined` like the galleries | F-10 | `working-copy` | compliant |
 | mechanisms | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
-| fallback_policy | new step (#2549: fallback policy for keys the template does not define, asked after Assign Mechanisms, before the OSK step); the step records `fallback-policy` in the working copy | #2549 | `working-copy` | compliant |
+| fallback_policy | new step (#2539: fallback policy for keys the template does not define, asked after mechanisms, before OSK); the author-set policy is written to the working copy on Continue | #2539 | `working-copy` | compliant |
 | osk | believed compliant (working copy); the OSK editor step records `osk-layout` via `completeOskStep` on Continue | F-10 | `working-copy` | compliant |
 | touch_seed_source | believed compliant (session slot `touchSeedSource`) | agent sweep | `working-copy` | compliant — revisit test `TouchSeedSourcePanel.test.tsx` "a NON-default recorded choice survives an unmount/remount with the same evidence" |
 | touch | compliant: every action saved immediately | F-10 | `working-copy` | compliant |

@@ -34,7 +34,6 @@ describe("recordToDecisionSet on the p1 record", () => {
   it("marks keeps identity, inventory and layout decisions only", () => {
     expect(ids("marks")).toEqual([
       "author-name",
-      "authoring-track",
       "base-keyboard",
       "character-inventory",
       "language-autonym",
@@ -59,14 +58,19 @@ describe("recordToDecisionSet on the p1 record", () => {
   });
 
   it("never keeps a decision past its point", () => {
-    expect(DECISION_POINTS.map((p) => ids(p).length)).toEqual([14, 15, 18, 18, 18]);
+    expect(DECISION_POINTS.map((p) => ids(p).length)).toEqual([13, 14, 17, 17, 17]);
   });
 
   it("maps survey answers onto the decisions their module provides", () => {
     const set = recordToDecisionSet(record, "marks");
     expect(set["language-name"]?.value).toBe("Bafut");
     expect(set["language-code"]?.value).toBe("bfd");
-    expect(set["authoring-track"]?.value).toBe("copy");
+    // #2568: the track question is gone, so the record's track_choice
+    // answer maps onto no decision — the track is recorded by the start
+    // screen now, not derived from the record. The headless-author parity
+    // suite relies on this: author and recorded sides both carry no
+    // authoring-track, so their values still match.
+    expect(set["authoring-track"]).toBeUndefined();
     expect(set["project-keyboard-id"]?.value).toBe("bafut");
   });
 
