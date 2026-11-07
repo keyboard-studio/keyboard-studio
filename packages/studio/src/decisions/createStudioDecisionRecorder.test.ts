@@ -7,8 +7,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SurveyAnswer } from "@keyboard-studio/contracts";
 import { createStudioDecisionRecorder } from "./createStudioDecisionRecorder.ts";
-import { useDecisionLogStore } from "./decisionLogStore.ts";
+import { snapshotDecisionRecord, useDecisionLogStore } from "./decisionLogStore.ts";
 import type { SavedAnswer } from "../steps/answerTypes.ts";
+import { completeFallbackPolicyStep } from "../lib/fallbackPolicyStepCompletion.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 type Saved = Pick<SavedAnswer, "answerType" | "proposal">;
@@ -18,6 +20,7 @@ function recorderWith(saved: Record<string, Record<string, Saved>>) {
     getWorkingCopyState: () => useWorkingCopyStore.getState(),
     snapshotter: { captureAtBoundary: () => Promise.resolve(null), reset: () => {} },
     getSavedAnswer: (stepId, questionId) => saved[stepId]?.[questionId],
+    getDecisions: () => useDecisionStore.getState().decisions,
   });
 }
 
@@ -36,6 +39,7 @@ function complete(recorder: ReturnType<typeof recorderWith>, answers: SurveyAnsw
 beforeEach(() => {
   useDecisionLogStore.getState().reset();
   useWorkingCopyStore.getState().reset();
+  useDecisionStore.getState().reset();
 });
 
 describe("createStudioDecisionRecorder — saved survey proposals", () => {
@@ -78,5 +82,25 @@ describe("createStudioDecisionRecorder — saved survey proposals", () => {
     const recorder = recorderWith({});
     complete(recorder, [{ questionId: "pf_scope_variety", answerType: "text", value: "For Hausa." }]);
     expect(provenanceOf("pf_scope_variety")).toEqual({ agency: "hand-set" });
+  });
+});
+
+describe("createStudioDecisionRecorder — fallback-policy step completion (issue #2366)", () => {
+  it("the step's Continue writes the non-default policy into the decision record", () => {
+    const recorder = recorderWith({});
+    useWorkingCopyStore.getState().setFallbackPolicy("pass-through");
+    completeFallbackPolicyStep();
+    recorder({ stepId: "fallback_policy", result: undefined });
+    const entry = snapshotDecisionRecord().entries.find(
+      (e) => e.payload.kind === "decision" && e.payload.decisionId === "fallback-policy",
+    );
+    expect(entry?.payload).toEqual(
+      expect.objectContaining({
+        kind: "decision",
+        decisionId: "fallback-policy",
+        value: "pass-through",
+      }),
+    );
+    expect(entry?.provenance).toEqual({ agency: "hand-set" });
   });
 });
