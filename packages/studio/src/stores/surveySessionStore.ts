@@ -930,6 +930,20 @@ export function expectedBackTarget(
 }
 
 /**
+ * Collapse consecutive duplicate entries: two adjacent positions that map
+ * to the same screen are one position — Back through the second is a
+ * visible no-op. (A rename in the legacy map is what creates them: two
+ * retired steps landing on one screen.)
+ */
+function collapseConsecutive(ids: readonly ActiveStepId[]): ActiveStepId[] {
+  const out: ActiveStepId[] = [];
+  for (const id of ids) {
+    if (out[out.length - 1] !== id) out.push(id);
+  }
+  return out;
+}
+
+/**
  * Patch a `TraversalSnapshot` directly into the survey-session store.
  * `TraversalSnapshot` is exactly the non-action slice of `SurveySessionState`,
  * so this is a direct `setState` — no field-by-field mapping needed, EXCEPT
@@ -947,16 +961,21 @@ export function applyTraversalSnapshot(snapshot: TraversalSnapshot): void {
   // the screens that now hold those steps' decisions. Current ids map to
   // themselves, so a current draft is untouched.
   const activeStepId = resolveLegacyStepId(snapshot.activeStepId) as ActiveStepId;
-  const history = snapshot.history.map(
-    (id) => resolveLegacyStepId(id) as ActiveStepId,
+  // The legacy map can collapse two historical positions onto one screen
+  // (#2568: the retired "track" step and "choose_base" both land on
+  // choose_base). Consecutive duplicates are a no-op Back hop, so collapse
+  // them; visited is a set-like list, so dedupe it preserving first order.
+  const history = collapseConsecutive(
+    snapshot.history.map((id) => resolveLegacyStepId(id) as ActiveStepId),
   );
   const mapped: TraversalSnapshot = {
     ...snapshot,
     activeStepId,
     history,
     ...(snapshot.visited !== undefined && {
-      visited: snapshot.visited.map(
-        (id) => resolveLegacyStepId(id) as ActiveStepId,
+      visited: withVisited(
+        [],
+        ...snapshot.visited.map((id) => resolveLegacyStepId(id) as ActiveStepId),
       ),
     }),
   };

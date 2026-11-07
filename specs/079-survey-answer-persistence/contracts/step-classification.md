@@ -12,7 +12,6 @@ Part I). The "After 079" column is the target this feature must reach.
 | identity | non-compliant: survives leaving, not reload (D-5) | F-5 | `answer-store` | compliant |
 | layout | new step (spec 076 A4); every pick saved per question | spec 076 A4 | `answer-store` | compliant |
 | choose_base | believed compliant (working copy) | spec Assumptions | `working-copy` | compliant — revisit test `StepHost.test.tsx` "an unmount/remount at choose_base with the same evidence leaves baseKeyboard/baseIr unchanged" |
-| track | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | attribution | new step (#1901: author/copyright questions moved post-track); answers recorded as decisions keyed by question id, as they were under identity | #1901 | `answer-store` | compliant |
 | project_name | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | open_languages | new step (spec 111, Open only); the author's edited language list is written to the working copy on every change | spec 111 | `working-copy` | compliant |
@@ -27,6 +26,7 @@ Part I). The "After 079" column is the target this feature must reach.
 | deadkeys | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
 | rules | compliant: the demo pane is a read-only view of the compiled working copy (spec 082 Track A); the step records no answers — Continue carries `undefined` like the galleries | F-10 | `working-copy` | compliant |
 | mechanisms | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
+| fallback_policy | new step (#2549: fallback policy for keys the template does not define, asked after Assign Mechanisms, before the OSK step); the step records `fallback-policy` in the working copy | #2549 | `working-copy` | compliant |
 | osk | believed compliant (working copy); the OSK editor step records `osk-layout` via `completeOskStep` on Continue | F-10 | `working-copy` | compliant |
 | touch_seed_source | believed compliant (session slot `touchSeedSource`) | agent sweep | `working-copy` | compliant — revisit test `TouchSeedSourcePanel.test.tsx` "a NON-default recorded choice survives an unmount/remount with the same evidence" |
 | touch | compliant: every action saved immediately | F-10 | `working-copy` | compliant |

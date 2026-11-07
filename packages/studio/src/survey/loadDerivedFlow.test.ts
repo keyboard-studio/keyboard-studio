@@ -29,7 +29,7 @@ describe("loadDerivedFlowDef", () => {
 
   it("throws when a provenance module is not in the flow's modules", () => {
     expect(() =>
-      loadDerivedFlowDef("x", "A", flowModules.track, flowModules.project_name),
+      loadDerivedFlowDef("x", "A", flowModules.identity_lite, flowModules.project_name),
     ).toThrowError(/is not in modules/);
   });
 });
