@@ -271,6 +271,11 @@ export type {
 // spec 102 — documentation forms: the renderer, the slot vocabulary, the
 // per-file escapers and the markers around Track 2's generated sections.
 export { renderDocForm, parseDocForm, DocFormParseError } from "./shared/renderDocForm.js";
+// spec 064 FR-004 / serialize step 5d — the LICENSE.md body
+// `ensurePackageFiles` writes when the package has none; the Documentation
+// step's read-only preview renders the same text (holder-less MIT body)
+// instead of showing an empty preview.
+export { licenseMd } from "./shared/packageDocs.js";
 export {
   DOC_SLOT_IDS,
   DOC_GENERATED_START,

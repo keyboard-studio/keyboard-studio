@@ -12,10 +12,19 @@
  * Features:
  * - TipTap WYSIWYG as primary mode (lazy-loaded, never in the main chunk)
  * - Monaco code as secondary mode; read-only preview as a third view
+ * - File chooser: a narrow folder-grouped tree at the left on desktop
+ *   (tabs on narrow viewports, via `useIsNarrow(tabletMax)` — a two-pane
+ *   layout that needs the room); the tree groups the `source/` files and
+ *   lists the root files below.
  * - Per-file seeding: copy/adapt seed from the live preview
  *   (`useDocsPreview`), open seeds from the carried VFS text, else the
  *   `start*` slice, else the preview. Never blank on adapt/open; copy
  *   never inherits base prose (ruling A).
+ * - HISTORY.md and LICENSE.md always ship (serialize steps 5c/5d +
+ *   `ensurePackageFiles`), so they never render "(absent)" even on Open,
+ *   where the loader keeps them out of the VFS — their preview falls back
+ *   to the start slice, then to the generated render (`renderHistoryMd` /
+ *   `licenseMd`, the same renderers the download uses).
  * - Edits are written to the working-copy store's authored-* fields on
  *   Continue (and when switching files), and recorded as the `welcome-htm`
  *   decision — the output pipeline applies them at projection step 0b
@@ -24,9 +33,18 @@
  *   is unchanged for an untouched step.
  */
 
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
+import {
+  licenseMd,
+  renderHistoryMd,
+  resolvePublishVersion,
+  type HistoryLineage,
+} from "@keyboard-studio/engine";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
+import { useHasTestBuilds } from "../../stores/testingStore.ts";
+import { BREAKPOINTS } from "../../ui/breakpoints.ts";
 import { useDocsPreview } from "../../hooks/useDocsPreview.ts";
 import { useDocMemberStates } from "../../hooks/useDocMemberStates.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -72,6 +90,7 @@ const SELECTOR_MEMBERS: readonly SelectorMember[] = [
   "license-md",
 ];
 
+/* eslint-disable lingui/no-unlocalized-strings -- VFS paths, not UI copy. */
 const MEMBER_PATH: Record<SelectorMember, string> = {
   "welcome-htm": "source/welcome/welcome.htm",
   "readme-htm": "source/readme.htm",
@@ -80,6 +99,7 @@ const MEMBER_PATH: Record<SelectorMember, string> = {
   "history-md": "HISTORY.md",
   "license-md": "LICENSE.md",
 };
+/* eslint-enable lingui/no-unlocalized-strings */
 
 const EDITABLE: ReadonlySet<SelectorMember> = new Set(["welcome-htm", "readme-htm", "readme-md", "help-php"]);
 
@@ -106,6 +126,11 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
   const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
   const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
   const startReadmeMdText = useWorkingCopyStore((s) => s.startReadmeMdText);
+  const startHistoryMdText = useWorkingCopyStore((s) => s.startHistoryMdText);
+  const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
+  const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const testBuildsExist = useHasTestBuilds();
   const authoredWelcomeHtm = useWorkingCopyStore((s) => s.authoredWelcomeHtm);
   const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
   const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
@@ -149,6 +174,7 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
         authoredReadmeHtm ?? (isOpen ? (openText("source/readme.htm") ?? preview.readmeHtm) : preview.readmeHtm),
       "readme-md":
         authoredReadmeMd ??
+        // eslint-disable-next-line lingui/no-unlocalized-strings -- VFS path, not UI copy.
         (isOpen ? (openText("README.md") ?? startReadmeMdText ?? preview.readmeMd) : preview.readmeMd),
       "help-php":
         authoredHelpPhp ??
@@ -183,11 +209,23 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   // -- Presence (projected VFS) ----------------------------------------------
-  // Non-open runs always ship every member (generation fills any gap).
-  // On Open the projection carries files unchanged, so a member absent from
-  // the opened VFS with no start slice is genuinely absent — shown as
-  // absent, never offered as a dead file.
+  // HISTORY.md and LICENSE.md ship in every package, so they never render
+  // "(absent)" — even on Open, where the loader deliberately keeps them out
+  // of the VFS (LICENSE.md lives only in the `startLicenseText` slice;
+  // HISTORY.md in the `startHistoryMdText` slice). Presence is therefore:
+  // carried VFS text, or the start slice, or the generated render — and the
+  // last of those always holds: serialize step 5c renders HISTORY.md on
+  // every production, and step 5d + `ensurePackageFiles` write LICENSE.md
+  // when absent. The VFS text and slices are still the preview's first
+  // sources (see `readOnlyText` below); only presence never depends on them.
+  // Any other member on Open: absent from the opened VFS with no start
+  // slice is genuinely absent — shown as absent, never offered as a dead file.
   const present = (member: SelectorMember): boolean => {
+    if (member === "history-md" || member === "license-md") {
+      if (startVfs !== null && readVfsText(startVfs, MEMBER_PATH[member]) !== undefined) return true;
+      if (member === "history-md" ? startHistoryMdText !== null : startLicenseText !== null) return true;
+      return true; // generated render — serialize steps 5c/5d
+    }
     if (!isOpen) return true;
     if (startVfs === null) return false;
     const path =
@@ -340,10 +378,57 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
   const selectedState = memberStates.find((s) => s.member === (selected as DocMemberId));
   const codeOnly = isEditable(selected) ? codeOnlyReason(selected) : null;
   const effectiveMode: EditorMode = codeOnly !== null && mode === "rich" ? "code" : mode;
-  const readOnlyText =
-    !isEditable(selected) && startVfs !== null
-      ? (readVfsText(startVfs, MEMBER_PATH[selected]) ?? null)
-      : null;
+
+  // -- Read-only text (HISTORY.md / LICENSE.md) -------------------------------
+  // Carried VFS text first, then the start slice (the loader's
+  // fetch-don't-write path — on Open these files live ONLY there), then the
+  // generated render, reusing the exact renderers serialize calls so the
+  // preview cannot disagree with the download: `renderHistoryMd` with the
+  // same inputs as serialize step 5c (mirroring
+  // `useDocumentationFindings`' version derivation), and `licenseMd` with
+  // a null holder, exactly as `ensurePackageFiles` writes it when no base
+  // license exists (serialize step 5d).
+  const isAdaptation = instantiationMode === "adapt-existing";
+  const rawVersion = startIr?.header.version?.trim() || "1.0";
+  const publishVersion = resolvePublishVersion({
+    mode: isAdaptation ? "adapt-existing" : "new-from-base",
+    rawVersion,
+    hasTestBuilds: testBuildsExist,
+  });
+  const readOnlyText = useMemo((): string | null => {
+    if (isEditable(selected)) return null;
+    const vfsText = startVfs !== null ? readVfsText(startVfs, MEMBER_PATH[selected]) : undefined;
+    if (selected === "history-md") {
+      if (vfsText !== undefined) return vfsText;
+      if (startHistoryMdText !== null) return startHistoryMdText;
+      const lineage: HistoryLineage = {
+        kind: isOpen ? "updated" : isAdaptation ? "adapted" : "created",
+        id: keyboardId,
+        version: rawVersion,
+      };
+      return renderHistoryMd(historyEntryState, {
+        version: publishVersion,
+        dateIso: new Date().toISOString().slice(0, 10),
+        lineage,
+        startHistoryText: null,
+      });
+    }
+    // license-md
+    if (vfsText !== undefined) return vfsText;
+    if (startLicenseText !== null) return startLicenseText;
+    return licenseMd(null, new Date().getFullYear());
+  }, [
+    selected,
+    startVfs,
+    startHistoryMdText,
+    startLicenseText,
+    historyEntryState,
+    isOpen,
+    isAdaptation,
+    keyboardId,
+    rawVersion,
+    publishVersion,
+  ]);
 
   const previewHtml = (): string => {
     if (!isEditable(selected)) return readOnlyText ?? "";
@@ -352,62 +437,159 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
     return splitHtmlDocument(currentText(selected)).body;
   };
 
-  return (
+  // -- File chooser -----------------------------------------------------------
+  // Desktop: a narrow folder-grouped tree at the left. Narrow viewports
+  // (width <= tabletMax — a two-pane layout that needs the room, per the
+  // `useViewport` vocabulary): the tab row, unchanged. Both render the same
+  // buttons (`data-testid="html-file-<member>"`), so tests and e2e keep
+  // finding them.
+  const showTree = !useIsNarrow(BREAKPOINTS.tabletMax);
+  const readOnlyLabel = t({ id: "editor.assignLoop.html.files.readOnly", message: "read-only" });
+  const absentLabel = t({ id: "editor.assignLoop.html.files.absent", message: "absent" });
+  const filesLabel = t({ id: "editor.assignLoop.html.files.label", message: "Documentation files" });
+
+  // Path as shipped in the package. The tree groups by folder, so the
+  // `source/` files show their path below the folder and the root files
+  // show their full path.
+  /* eslint-disable lingui/no-unlocalized-strings -- VFS paths, not UI copy. */
+  const memberDisplayPath = (member: SelectorMember): string => {
+    switch (member) {
+      case "welcome-htm":
+        return "welcome/welcome.htm";
+      case "readme-htm":
+        return "readme.htm";
+      case "help-php":
+        return `help/${keyboardId}.php`;
+      case "readme-md":
+        return "README.md";
+      case "history-md":
+        return "HISTORY.md";
+      case "license-md":
+        return "LICENSE.md";
+    }
+  };
+  /* eslint-enable lingui/no-unlocalized-strings */
+
+  const fileButton = (
+    member: SelectorMember,
+    role: "tab" | "treeitem",
+    children: ReactNode,
+    style: CSSProperties,
+  ) => {
+    const isPresent = present(member);
+    return (
+      <button
+        key={member}
+        type="button"
+        role={role}
+        aria-selected={selected === member}
+        disabled={!isPresent}
+        onClick={() => selectMember(member)}
+        data-testid={`html-file-${member}`}
+        style={{
+          padding: "6px 12px",
+          fontSize: 13,
+          borderRadius: 6,
+          border: `1px solid ${selected === member ? "var(--app-accent)" : "var(--app-border)"}`,
+          background: selected === member ? "var(--app-accent-bg)" : "var(--app-surface)",
+          color: isPresent ? "var(--app-text)" : "var(--app-text-muted)",
+          cursor: isPresent ? "pointer" : "not-allowed",
+          ...style,
+        }}
+      >
+        {children}
+      </button>
+    );
+  };
+
+  const fileSuffixes = (member: SelectorMember) => (
+    <>
+      {!isEditable(member) && ` (${readOnlyLabel})`}
+      {!present(member) && ` (${absentLabel})`}
+    </>
+  );
+
+  const treeRow = (member: SelectorMember, indented: boolean) =>
+    fileButton(
+      member,
+      "treeitem",
+      <>
+        <span
+          style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {memberDisplayPath(member)}
+        </span>
+        <span style={{ display: "block", fontSize: 12, color: "var(--app-text-muted)" }}>
+          {memberName(member)}
+          {fileSuffixes(member)}
+        </span>
+      </>,
+      {
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        border: `1px solid ${selected === member ? "var(--app-accent)" : "transparent"}`,
+        background: selected === member ? "var(--app-accent-bg)" : "transparent",
+        padding: "6px 8px",
+        ...(indented ? { marginLeft: 12 } : {}),
+      },
+    );
+
+  const treeSelector = (
     <div
+      role="tree"
+      aria-label={filesLabel}
       style={{
+        flex: "0 0 240px",
+        alignSelf: "flex-start",
+        position: "sticky",
+        top: 0,
+        border: "1px solid var(--app-border)",
+        borderRadius: 8,
+        background: "var(--app-surface)",
+        padding: 8,
         display: "flex",
         flexDirection: "column",
-        gap: 16,
-        padding: 24,
-        height: "100%",
-        overflowY: "auto",
+        gap: 2,
       }}
     >
-      <h1 style={{ margin: 0, fontSize: 20, color: "var(--app-text)" }}>
-        {t({ id: "editor.assignLoop.html.title", message: "Documentation" })}
-      </h1>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }}>
-        {t({
-          id: "editor.assignLoop.html.description",
-          message:
-            "Edit the user documentation for your keyboard. Your edits override the generated pages in the downloaded package.",
-        })}
-      </p>
-
-      {/* File selector: all six doc members; absent shown absent, never as a dead file */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="tablist" aria-label={t({ id: "editor.assignLoop.html.files.label", message: "Documentation files" })}>
-        {SELECTOR_MEMBERS.map((member) => {
-          const isPresent = present(member);
-          const isReadOnly = !isEditable(member);
-          return (
-            <button
-              key={member}
-              type="button"
-              role="tab"
-              aria-selected={selected === member}
-              disabled={!isPresent}
-              onClick={() => selectMember(member)}
-              data-testid={`html-file-${member}`}
-              style={{
-                padding: "6px 12px",
-                fontSize: 13,
-                borderRadius: 6,
-                border: `1px solid ${selected === member ? "var(--app-accent)" : "var(--app-border)"}`,
-                background: selected === member ? "var(--app-accent-bg)" : "var(--app-surface)",
-                color: isPresent ? "var(--app-text)" : "var(--app-text-muted)",
-                cursor: isPresent ? "pointer" : "not-allowed",
-              }}
-            >
-              {memberName(member)}
-              {isReadOnly &&
-                ` (${t({ id: "editor.assignLoop.html.files.readOnly", message: "read-only" })})`}
-              {!isPresent &&
-                ` (${t({ id: "editor.assignLoop.html.files.absent", message: "absent" })})`}
-            </button>
-          );
-        })}
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--app-text-muted)", padding: "4px 8px 2px" }}>
+        source/
       </div>
+      {treeRow("welcome-htm", true)}
+      {treeRow("readme-htm", true)}
+      {treeRow("help-php", true)}
+      {treeRow("readme-md", false)}
+      {treeRow("history-md", false)}
+      {treeRow("license-md", false)}
+    </div>
+  );
 
+  const tabSelector = (
+    <div
+      style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+      role="tablist"
+      aria-label={filesLabel}
+    >
+      {SELECTOR_MEMBERS.map((member) =>
+        fileButton(
+          member,
+          "tab",
+          <>
+            {memberName(member)}
+            {fileSuffixes(member)}
+          </>,
+          {},
+        ),
+      )}
+    </div>
+  );
+
+  // Warnings, mode toggle, and editor/preview for the selected file. Rendered
+  // in the right column next to the tree on desktop, or full-width below the
+  // tab row on narrow viewports.
+  const bodyContent = (
+    <>
       {selectedState !== undefined && selectedState.warnings.length > 0 && (
         <p style={{ margin: 0, fontSize: 12, color: "var(--app-warning)" }}>{selectedState.warnings.join(" ")}</p>
       )}
@@ -534,6 +716,54 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
           </div>
         )}
       </div>
+    </>
+  );
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        padding: 24,
+        height: "100%",
+        overflowY: "auto",
+      }}
+    >
+      <h1 style={{ margin: 0, fontSize: 20, color: "var(--app-text)" }}>
+        {t({ id: "editor.assignLoop.html.title", message: "Documentation" })}
+      </h1>
+      <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }}>
+        {t({
+          id: "editor.assignLoop.html.description",
+          message:
+            "Edit the user documentation for your keyboard. Your edits override the generated pages in the downloaded package.",
+        })}
+      </p>
+
+      {/* File chooser: narrow tree at the left on desktop, tab row on narrow viewports */}
+      {showTree ? (
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flex: 1, minHeight: 0 }}>
+          {treeSelector}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              minHeight: 0,
+            }}
+          >
+            {bodyContent}
+          </div>
+        </div>
+      ) : (
+        <>
+          {tabSelector}
+          {bodyContent}
+        </>
+      )}
     </div>
   );
 }

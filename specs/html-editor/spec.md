@@ -133,6 +133,39 @@ An absent member must be shown as absent, never offered as a dead file.
 Presence is read from the projected VFS / `useDocMemberStates` — the
 selector lists what the package actually ships.
 
+### File chooser: narrow tree on desktop, tabs on narrow (2026-11-07 follow-up)
+
+On desktop the selector is a narrow (~240px) folder-grouped tree at the
+left, sticky while the editor scrolls, with the editor + mode toggle on the
+right: `source/` groups `welcome/welcome.htm`, `readme.htm`, and
+`help/<keyboardId>.php`; `README.md`, `HISTORY.md`, and `LICENSE.md` list
+below as root files. Each row shows the path as shipped plus the friendly
+member name, the read-only badge where it applies, and the absent badge
+where a member is genuinely absent. On narrow viewports (width ≤
+`BREAKPOINTS.tabletMax` — a two-pane layout that needs the room, per the
+`useViewport` vocabulary) the tree collapses back to the tab row. Both
+render the same buttons (`data-testid="html-file-<member>"`).
+
+### HISTORY.md / LICENSE.md presence (2026-11-07 follow-up — root cause)
+
+On the Open track both files rendered disabled "(absent)" with an empty
+preview, although the package always ships both. Root cause:
+`HtmlEditor.present()` checked only the opened VFS for them, with no
+fallback to the start slices — and the loader deliberately never puts
+`LICENSE.md` into the VFS (it lives only in the `startLicenseText` slice;
+`HISTORY.md` likewise in `startHistoryMdText`). Fixed: presence for those
+two members is carried VFS text, or the start slice, or the generated
+render — the last of which always holds (serialize step 5c renders
+`HISTORY.md` on every production; step 5d + `ensurePackageFiles` write
+`LICENSE.md` when absent), so they never render "(absent)". Their preview
+falls back the same way: VFS text, then the start slice, then the
+generated render, reusing the exact renderers the download uses
+(`renderHistoryMd` with serialize step 5c's inputs, mirroring
+`useDocumentationFindings`' version derivation; `licenseMd` with a null
+holder, exactly as `ensurePackageFiles` writes it). `licenseMd` is newly
+exported from `@keyboard-studio/engine` for this. Regression tests cover
+both the slices-only and the nothing-carried cases on the Open track.
+
 ### HISTORY.md and LICENSE.md are read-only in this step
 
 - `HISTORY.md` is rendered on **every** production from

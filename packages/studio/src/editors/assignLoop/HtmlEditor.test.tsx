@@ -169,4 +169,75 @@ describe("HtmlEditor", () => {
     expect(useWorkingCopyStore.getState().authoredWelcomeHtm).toBeNull();
     expect(onComplete).toHaveBeenCalledWith({});
   });
+
+  it("shows a narrow folder-grouped tree on desktop, with the tabs gone", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect(screen.getByRole("tree")).toBeTruthy();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByText("source/")).toBeTruthy();
+    const welcome = screen.getByTestId("html-file-welcome-htm");
+    expect(welcome.textContent).toContain("welcome/welcome.htm");
+    expect(welcome.textContent).toContain("Welcome page");
+    expect(welcome.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("html-file-help-php").textContent).toContain("help/t.php");
+    expect(screen.getByTestId("html-file-readme-md").textContent).toContain("README.md");
+    expect(screen.getByTestId("html-file-history-md").textContent).toContain("HISTORY.md");
+    expect(screen.getByTestId("html-file-license-md").textContent).toContain("LICENSE.md");
+    // Selecting a tree row moves the selection and the editor follows.
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    expect(screen.getByTestId("html-file-readme-md").getAttribute("aria-selected")).toBe("true");
+    expect((await screen.findByTestId("rich-seed")).textContent).toContain("Generated readme.");
+  });
+
+  it("falls back to the tab row on narrow viewports", () => {
+    Object.defineProperty(window, "innerWidth", { value: 400, configurable: true });
+    try {
+      render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+      expect(screen.queryByRole("tree")).toBeNull();
+      expect(screen.getByRole("tablist")).toBeTruthy();
+      expect(screen.getByTestId("html-file-welcome-htm")).toBeTruthy();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { value: 1024, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+    }
+  });
+
+  it("on the open track, history and license carried only as slices are present, not absent", async () => {
+    const startVfs = createVirtualFS();
+    startVfs.set("source/t.kps", "<Package></Package>", false);
+    seedStore({
+      instantiationMode: "adapt-existing",
+      startVfs,
+      startHistoryMdText: "# History from slice",
+      startLicenseText: "License from slice",
+    });
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    const history = await screen.findByTestId("html-file-history-md");
+    const license = screen.getByTestId("html-file-license-md");
+    expect((history as HTMLButtonElement).disabled).toBe(false);
+    expect((license as HTMLButtonElement).disabled).toBe(false);
+    expect(history.textContent).not.toContain("absent");
+    expect(license.textContent).not.toContain("absent");
+    fireEvent.click(history);
+    expect(screen.getByText("# History from slice", { exact: false })).toBeTruthy();
+    fireEvent.click(license);
+    expect(screen.getByText("License from slice", { exact: false })).toBeTruthy();
+  });
+
+  it("on the open track with nothing carried, history and license preview the generated render", async () => {
+    const startVfs = createVirtualFS();
+    startVfs.set("source/t.kps", "<Package></Package>", false);
+    seedStore({ instantiationMode: "adapt-existing", startVfs });
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    const history = await screen.findByTestId("html-file-history-md");
+    const license = screen.getByTestId("html-file-license-md");
+    expect((history as HTMLButtonElement).disabled).toBe(false);
+    expect((license as HTMLButtonElement).disabled).toBe(false);
+    expect(history.textContent).not.toContain("absent");
+    expect(license.textContent).not.toContain("absent");
+    fireEvent.click(history);
+    expect(screen.getByText("Updated via keyboard-studio.", { exact: false })).toBeTruthy();
+    fireEvent.click(license);
+    expect(screen.getByText("MIT License", { exact: false })).toBeTruthy();
+  });
 });
