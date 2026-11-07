@@ -437,6 +437,10 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     sequenceFlaggedChars: s.sequenceFlaggedChars,
     touchLayoutJson: s.touchLayoutJson,
     customCss: s.customCss,
+    authoredWelcomeHtm: s.authoredWelcomeHtm,
+    authoredReadmeHtm: s.authoredReadmeHtm,
+    authoredReadmeMd: s.authoredReadmeMd,
+    authoredHelpPhp: s.authoredHelpPhp,
     touchDraft: s.touchDraft,
     galleryIntrosSeen: s.galleryIntrosSeen,
     staleSteps: [...s.staleSteps],
@@ -618,6 +622,11 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     touchLayoutJson: snapshot.touchLayoutJson,
     // Drafts saved before the CSS step wrote a value carry no key.
     customCss: snapshot.customCss ?? null,
+    // Drafts saved before the Documentation step wrote a value carry no key.
+    authoredWelcomeHtm: snapshot.authoredWelcomeHtm ?? null,
+    authoredReadmeHtm: snapshot.authoredReadmeHtm ?? null,
+    authoredReadmeMd: snapshot.authoredReadmeMd ?? null,
+    authoredHelpPhp: snapshot.authoredHelpPhp ?? null,
     touchDraft: snapshot.touchDraft,
     galleryIntrosSeen: snapshot.galleryIntrosSeen,
     staleSteps: new Set(snapshot.staleSteps),

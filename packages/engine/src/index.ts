@@ -243,6 +243,7 @@ export {
   renderHelpPhp,
   // spec 080 FR-003 — the standard help-site header a fresh help page opens with.
   helpSiteHeader,
+  leadingPhpBlock,
   helpSitePageName,
   helpPhpStub,
   // spec 080 FR-004/FR-006 — the welcome page's layout section and the pure

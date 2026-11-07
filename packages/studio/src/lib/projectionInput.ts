@@ -59,6 +59,10 @@ export type ProjectionState = Pick<
   | "contextToleranceOverlay"
   | "touchLayoutJson"
   | "customCss"
+  | "authoredWelcomeHtm"
+  | "authoredReadmeHtm"
+  | "authoredReadmeMd"
+  | "authoredHelpPhp"
 > & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
@@ -149,6 +153,12 @@ export function projectionInputFromState(
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
+    authoredDocs: {
+      authoredWelcomeHtm: state.authoredWelcomeHtm,
+      authoredReadmeHtm: state.authoredReadmeHtm,
+      authoredReadmeMd: state.authoredReadmeMd,
+      authoredHelpPhp: state.authoredHelpPhp,
+    },
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     capsHandling: capsHandling ?? null,

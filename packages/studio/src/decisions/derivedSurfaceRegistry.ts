@@ -356,13 +356,30 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "CssEditor's Continue writes the stylesheet text to workingCopyStore.customCss, which projectWorkingCopyVfs step 0b projects into the VFS; no decision module records it yet (NO-DECISION-SOURCE)",
     ],
   },
+  {
+    id: "authored-docs",
+    label: "Documentation step (authored doc-member overrides)",
+    phase: 6,
+    status: "pending",
+    storeActions: [
+      "setAuthoredWelcomeHtm",
+      "setAuthoredReadmeHtm",
+      "setAuthoredReadmeMd",
+      "setAuthoredHelpPhp",
+    ],
+    fields: ["authoredWelcomeHtm", "authoredReadmeHtm", "authoredReadmeMd", "authoredHelpPhp"],
+    decisionIds: ["welcome-htm"],
+    evidence: [
+      "HtmlEditor writes the edited doc text to workingCopyStore.authored* fields, which projectWorkingCopyVfs step 0b projects into the VFS and serializeWorkingCopy step 5c re-applies after regeneration (specs/html-editor); the welcome-htm decision records the step's completion (lib/htmlStepCompletion.ts)",
+    ],
+  },
 ];
 
 /**
  * Every member of WorkingCopyState, classified by its backbone source.
- * Transcribed exactly from inventory-store-backbone.md §1 (130 members:
- * 56 fields + 74 actions; class counts STARTING-POINT 33,
- * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 24,
+ * Transcribed exactly from inventory-store-backbone.md §1 (138 members:
+ * 60 fields + 78 actions; class counts STARTING-POINT 33,
+ * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 32,
  * SURVEY-SLOT 15, EPHEMERAL 18, UNCLASSIFIED 6). The gate's census arm
  * verifies these keys against the live interface, so a transcription
  * slip — or a new store member — fails loudly.
@@ -422,6 +439,10 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   sequenceFlaggedChars: { kind: "field", class: "SURVEY-SLOT" },
   touchLayoutJson: { kind: "field", class: "SURVEY-SLOT" },
   customCss: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredWelcomeHtm: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredReadmeHtm: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredReadmeMd: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredHelpPhp: { kind: "field", class: "EDITOR-AUTHORED" },
   touchDraft: { kind: "field", class: "EDITOR-AUTHORED" },
   galleryIntrosSeen: { kind: "field", class: "EPHEMERAL" },
   keyEditOverlay: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -463,6 +484,10 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   unlockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   setTouchLayoutJson: { kind: "action", class: "SURVEY-SLOT" },
   setCustomCss: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredWelcomeHtm: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredReadmeHtm: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredReadmeMd: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredHelpPhp: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchDraft: { kind: "action", class: "EDITOR-AUTHORED" },
   markGalleryIntroSeen: { kind: "action", class: "EPHEMERAL" },
   commitKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },

@@ -86,6 +86,7 @@
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
 import { applyCustomCssToVfs } from "./customCss.ts";
+import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
@@ -315,6 +316,12 @@ export interface ProjectWorkingCopyVfsInput {
    * it (and its `&KMW_EMBEDCSS` store line).
    */
   customCss?: string | null;
+  /**
+   * The Documentation step's authored overrides (specs/html-editor), written
+   * at step 0b beside the custom CSS. Omit or pass all-null to leave the
+   * generated/carried docs as-is.
+   */
+  authoredDocs?: AuthoredDocs;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
@@ -531,6 +538,7 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     customCss = null,
+    authoredDocs,
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
@@ -593,6 +601,11 @@ export function projectWorkingCopyVfs(
   // `&KMW_EMBEDCSS` file. Before the identity pass so a Track-1 id rename
   // carries the file and its store line along with the other siblings.
   warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss));
+
+  // Step 0b-ii: Documentation overrides — the author's edited doc files
+  // replace the generated/carried text in the projected VFS, so the OSK
+  // preview and the zip read the same text. Untouched members change nothing.
+  if (authoredDocs !== undefined) applyAuthoredDocsToVfs(vfs, keyboardId, authoredDocs);
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //

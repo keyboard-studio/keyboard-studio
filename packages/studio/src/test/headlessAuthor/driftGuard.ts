@@ -55,6 +55,7 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "completeStep", module: "lib/completeStep.ts", callers: ["components/StepHost.tsx"] },
   { fn: "createStudioReducerDeps", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
   { fn: "completeOskStep", module: "lib/oskStepCompletion.ts", callers: ["editors/adapters/oskAdapter.tsx"] },
+  { fn: "completeHtmlStep", module: "lib/htmlStepCompletion.ts", callers: ["editors/assignLoop/HtmlEditor.tsx"] },
   { fn: "oskContinueResult", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "generateKvksFromIR", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "createStudioRecordDecision", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
