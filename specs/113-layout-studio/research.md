@@ -410,6 +410,25 @@ T080 may record `deadkeys-defined` at each Layout-tab deadkey confirm. `recalcul
 **`LAYOUT_WRITES`.** `applyMutatePatch` treats an array as a leaf, so the patch leaf is `groups`
 itself; the declared path is `irPath("groups")` (the whole array), not `groups[].rules`.
 
+### R12 addendum -- replay cost (T063, ruled 2026-11-07)
+
+Quiet 60-run re-measure (`rebuildPerf.measure`, sil_euro_latin, mnemonic store stripped,
+medians [min-max]):
+
+| | edit (warm) | resume (cold) |
+|---|---|---|
+| 0 edits | 17.4 [16.0-21.6] | 16.9 [15.7-18.5] |
+| 20 edits, no new characters | 22.0 [20.1-30.0] | 21.0 [19.9-22.6] |
+| 20 edits, 20 new characters | 22.7 [20.7-27.3] | 22.0 [20.4-40.5] |
+
+The mechanism costs ~4.7 ms per edit pass: the two replays this design makes (the module's
+`apply` in the rebuild and projection step 2.2), ~2.6 ms; step 2.2's parse and re-emit, ~2 ms;
+`applyMutatePatch`'s clone of the groups patch, ~1.4 ms; step 2.5 touch propagation on edited
+keys, ~0.6 ms. New characters add ~1 ms (docs). The 20-edit medians sit above the 0-edit range,
+so the original noise-band gate failed. Ruling 8 replaces it with a ≤ 30 ms median budget for
+20 entries, which these figures meet; the cost is accepted, and spec 093's proposed thresholds
+(< 300 ms edit / < 2 s resume) are an order of magnitude away.
+
 ## R13. Code-tab import (ruling 7, 2026-11-05)
 
 **Finding.**

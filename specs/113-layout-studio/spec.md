@@ -74,6 +74,16 @@ Mechanical Gallery and use it, not when the component exists.
    blocked** (nothing is recorded) and **inconsistencies are flagged for review**. Ships as its
    own phase after User Story 3, so the first PR stays at US1–US3.
 
+## Rulings (Matthew, 2026-11-07)
+
+8. **The `kmn-edits` replay gate is an absolute budget, not a noise band.** T063's comparison
+   against the spec 093 / 105 baselines (7.20 ms warm, 9.58 ms cold) is retired: those predate
+   the README/docs generation every projection now runs, so a 0-edit run already measures
+   ~17 ms. The gate is: with 20 `kmn-edits` entries on sil_euro_latin (`rebuildPerf.measure`),
+   the warm-edit and cold-resume medians are each **≤ 30 ms**. The design's ~4.7 ms replay cost
+   (two replays per R12, step 2.2's parse and re-emit) is accepted as measured (research R12,
+   "Replay cost"); one-replay and no-re-parse designs are not pursued in this spec.
+
 ## Clarifications
 
 ### Session 2026-11-04
