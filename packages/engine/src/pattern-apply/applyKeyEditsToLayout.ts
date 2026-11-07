@@ -56,15 +56,22 @@
  * ## Geometry stays read-only, with one documented consequence
  *
  * `width`/`pad` are absent from `EditableKeyFields` (see keyEditOps.ts) — no
- * operation authors them directly. `remove`'s `"redistribute"` outcome is the
- * ONE place this applier writes `width`: the removed key's own width (if any)
- * is split evenly across the remaining keys in its row (contracts/
+ * operation authors them directly. `remove` writes geometry only as a
+ * CONSEQUENCE of removing a key, never as a field an operation authors
+ * directly, in two ways: `"redistribute"` splits the removed key's own
+ * width (if any) evenly across the remaining keys in its row (contracts/
  * key-edit-overlay.md §3; research.md R3c "remove, then redistribute the
- * freed width"). A removed key with no width, or a row left with no
- * remaining keys, has nothing to redistribute, so no width is written.
- * `"reflow"` writes nothing at all — a row's stretched final key absorbing
- * the slack unevenly is the Keyman Web runtime's own rendering behaviour, not
- * a data change this applier is responsible for.
+ * freed width"); `"reflow"` leaves the freed width as trailing padding —
+ * a `T_SPACER` key at the end of the row carrying the removed key's
+ * `width`/`pad` (#2360: deleting a key used to leave the row under-full,
+ * and every renderer stretches the last key of an under-full row to the
+ * layer maximum, so the last key came out long) — except when the row's
+ * last remaining key is a modifier key, which may absorb freed width up
+ * to (but not reaching) 3x a regular key's width, with only the excess
+ * beyond that cap going into the trailing spacer (PR #2583 follow-up;
+ * the cap is computed by keyEditOps' shared `modifierReflowSpacerWidth`).
+ * A removed key with no width, or a row left with no remaining keys, has
+ * nothing to redistribute or pad, so no width is written in either case.
  *
  * ## `scope: "family"` is not fanned out here
  *
@@ -80,6 +87,8 @@ import { NodeIdMinter } from "../shared/node-ids.js";
 import {
   applyFieldSemantics,
   applySuppressSemantics,
+  modifierReflowSpacerWidth,
+  proposeSuppressFields,
   resolveKeyAddress,
   resolveSubKeyEntry,
   type AddressableLayoutLike,
@@ -301,9 +310,23 @@ export function applyKeyEditsToLayout(
 
       case "remove": {
         const [removedKey] = row.keys.splice(keyIndex, 1);
-        if (op.outcome === "redistribute" && removedKey) {
+        if (removedKey === undefined) break;
+        if (op.outcome === "redistribute") {
           redistributeFreedWidth(row, removedKey.width);
+        } else if (op.outcome === "reflow") {
+          // The layer maximum the modifier cap measures against comes from
+          // the layer's OTHER rows, in live state — see
+          // modifierReflowSpacerWidth's doc for why the row's own total
+          // cannot serve as the reference.
+          leaveTrailingPadding(
+            row,
+            removedKey,
+            minter,
+            state.workingRows.filter((_, i) => i !== rowIndex).map((r) => r.keys),
+          );
         }
+        // "drop": nothing — the row simply has one fewer key (the Code
+        // tab diff's scaffolding outcome; see RemoveKeyOp).
         break;
       }
 
@@ -713,6 +736,110 @@ function redistributeFreedWidth(row: { keys: TouchKeyIR[] }, freedWidth: number 
     const { widthWire: _staleWidthWire, ...rest } = k;
     return { ...rest, width };
   });
+}
+
+// ---------------------------------------------------------------------------
+// `remove` + `"reflow"` — leave the freed width as trailing padding (#2360)
+// ---------------------------------------------------------------------------
+
+/**
+ * Leave a reflowed-out key's freed width as trailing padding at the end of
+ * its row, so the row keeps its total width and no remaining key stretches
+ * to absorb the slack (issue #2360: "deleting keys entirely makes the last
+ * key stretch" — every renderer stretches the last key of an under-full row
+ * to the layer maximum: KeyGrid per FR-012 / ADR 0002, the builder canvas
+ * on narrow viewports, Keyman Web itself).
+ *
+ * The padding is a `T_SPACER` (`sp: 10`) key carrying the removed key's
+ * `width`/`pad` — the `sp`/`id` pairing comes from
+ * {@link proposeSuppressFields} (`"spacer"`), never a hand-rolled literal,
+ * and only the removed key's EXPLICIT geometry is written: an absent
+ * width/pad still contributes its default at render time, exactly as the
+ * removed key did, so the row total is preserved either way. When the row
+ * already ends in a spacer, that spacer grows instead of appending a
+ * second one, so repeated deletions accumulate one pad, not one spacer
+ * per deletion. A `sp: 9` blank is deliberately NOT grown — it renders a
+ * keycap outline, so widening it would widen a visible keycap, not a gap.
+ *
+ * One exception (PR #2583 follow-up to #2360, Matthew's ruling: "When the
+ * last button is a modifier key, it can be larger, as long as it's less
+ * than 3x a regular key"): when the row's last remaining key is a modifier
+ * key, that key may absorb freed width up to — but not reaching — 3x a
+ * regular key's width, and only the excess beyond the cap goes into the
+ * trailing spacer (which then carries the excess as `width` with an
+ * explicit `pad: 0`, so its row-total contribution is exactly the excess —
+ * an absent pad would add the 15 default). When the freed width fits
+ * under the cap, no spacer is left at all. The cap itself is computed by
+ * the shared {@link modifierReflowSpacerWidth}; this function only
+ * decides the spacer's shape. A row whose last key is a spacer still
+ * grows that spacer in full — the modifier behind it cannot stretch, so
+ * the cap has nothing to say.
+ *
+ * A no-op when the row is left empty — there are no remaining keys to
+ * protect from the stretch (the RemoveKeyDialog's `keepRow` default covers
+ * that case on the dialog path).
+ */
+function leaveTrailingPadding(
+  row: { keys: TouchKeyIR[] },
+  removedKey: TouchKeyIR,
+  minter: NodeIdMinter,
+  otherRowsKeys: readonly (readonly TouchKeyIR[])[],
+): void {
+  if (row.keys.length === 0) return;
+  const { spClass, sentinelId } = proposeSuppressFields("spacer");
+  const lastIndex = row.keys.length - 1;
+  const last = row.keys[lastIndex]!;
+  if (last.sp === spClass) {
+    // Grow the existing trailing pad. #2216: the geometry moved, so the
+    // retained wire hints would emit the pre-growth source values — drop
+    // them, exactly as `redistributeFreedWidth` does for `widthWire`.
+    const { widthWire: _staleWidthWire, padWire: _stalePadWire, ...rest } = last;
+    row.keys[lastIndex] = {
+      ...rest,
+      width: (last.width ?? DEFAULT_KEY_WIDTH_PCT) + (removedKey.width ?? DEFAULT_KEY_WIDTH_PCT),
+      pad: (last.pad ?? DEFAULT_KEY_PAD_PCT) + (removedKey.pad ?? DEFAULT_KEY_PAD_PCT),
+    };
+    return;
+  }
+  const modifierSpacer = modifierReflowSpacerWidth(row.keys, removedKey, otherRowsKeys);
+  if (modifierSpacer !== undefined) {
+    if (modifierSpacer > 0) {
+      const spacer: TouchKeyIR = {
+        nodeId: minter.mint("touchKey"),
+        id: sentinelId,
+        // Materialized explicitly, matching what parsing this key back out
+        // of a `.keyman-touch-layout` file would always produce for an
+        // absent wire value (FR-009) — the same reason `add` sets it above.
+        provenance: DEFAULT_TOUCH_PROVENANCE,
+        sp: spClass,
+        // No `text`: a spacer renders nothing, and the parser leaves `text`
+        // undefined when the wire value is absent — so Case B's raw-JSON twin
+        // (which writes no `text` either) re-parses to the same key.
+        // `pad: 0` is explicit, not absent: the spacer must contribute
+        // exactly `modifierSpacer` to the row total, and an absent pad
+        // would add the 15 default (see modifierReflowSpacerWidth).
+        width: modifierSpacer,
+        pad: 0,
+      };
+      row.keys.push(spacer);
+    }
+    return;
+  }
+  const spacer: TouchKeyIR = {
+    nodeId: minter.mint("touchKey"),
+    id: sentinelId,
+    // Materialized explicitly, matching what parsing this key back out of
+    // a `.keyman-touch-layout` file would always produce for an absent
+    // wire value (FR-009) — the same reason `add` sets it above.
+    provenance: DEFAULT_TOUCH_PROVENANCE,
+    sp: spClass,
+    // No `text`: a spacer renders nothing, and the parser leaves `text`
+    // undefined when the wire value is absent — so Case B's raw-JSON twin
+    // (which writes no `text` either) re-parses to the same key.
+    ...(removedKey.width !== undefined ? { width: removedKey.width } : {}),
+    ...(removedKey.pad !== undefined ? { pad: removedKey.pad } : {}),
+  };
+  row.keys.push(spacer);
 }
 
 // ---------------------------------------------------------------------------

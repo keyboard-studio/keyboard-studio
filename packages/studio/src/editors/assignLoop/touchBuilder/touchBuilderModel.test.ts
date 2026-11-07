@@ -209,13 +209,21 @@ describe("operation parity (gesture → KeyEditOperation → replay)", () => {
     expect(added.pad).toBe(15);
   });
 
-  it("remove {reflow}: key gone, row kept", () => {
+  it("remove {reflow}: key gone, freed width stays as trailing padding (#2360)", () => {
     const ops: PendingKeyEditOperation[] = [
       { address: "phone:default:K_B", kind: "remove", outcome: "reflow" },
     ];
     const out = replay(parityLayout(), ops);
     const row = keyAt(out, "phone", "default", "K_A").row;
-    expect(row.keys.map((k) => k.id)).toEqual(["K_A", "K_C"]);
+    expect(row.keys.map((k) => k.id)).toEqual(["K_A", "K_C", "T_SPACER"]);
+    const pad = row.keys[2]!;
+    expect(pad.sp).toBe(10);
+    // The removed key carried no explicit geometry, so none is written —
+    // the spacer still holds the default 100/15 at render time, exactly
+    // as the removed key did, so the row keeps its total width and no
+    // remaining key stretches.
+    expect(pad.width).toBeUndefined();
+    expect(pad.pad).toBeUndefined();
   });
 
   it("move: direction steps, never no-ops", () => {

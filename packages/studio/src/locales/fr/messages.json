@@ -896,7 +896,7 @@
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.redistribute.label": "Retirer et redistribuer",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.redistribute.note": "L'espace ainsi libéré est réparti entre les touches restantes de la rangée, ce qui offre à chacune d'entre elles une surface tactile réellement plus grande.",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.label": "Retirer et refaire la soudure",
-  "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.note": "La ligne se referme ; sa dernière touche, étirée, absorbe de manière inégale l'espace ainsi libéré.",
+  "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.note": "La touche disparaît ; l'espace libéré reste en marge à la fin de la ligne, pour que les autres touches gardent leur largeur. Une touche modificatrice en fin de ligne fait exception : elle peut s'élargir jusqu'à un peu moins de 3 fois la largeur d'une touche ordinaire.",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.suppress.label": "Supprimer sur place",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.suppress.note": "Les positions restent identiques à tous les niveaux ; la zone tactile ne change pas.",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcomeLabel": "Que faut-il faire de l'espace ainsi libéré ?",

@@ -6,7 +6,9 @@
 //  2. Round-trip: replaying the ops through the REAL Case A applier yields a
 //     layout equal to the edited one (modulo the documented normalizations:
 //     nodeIds are minted per parse; add materializes default geometry; new
-//     subkeys default sp to 0).
+//     subkeys default sp to 0; a `remove`+`"reflow"` leaves the freed width
+//     as trailing padding, so a key deletion replays to the edited row PLUS
+//     a `T_SPACER` — see "decomposes a key removal into a remove op").
 //  3. Structural edits → named rejections, never silent drops.
 //  4. Empty diff → no ops.
 
@@ -193,7 +195,23 @@ describe("diffTouchLayouts", () => {
     expect(diffOk(before, after)).toEqual([
       { address: "phone:default:K_W", kind: "remove", outcome: "reflow" },
     ]);
-    expectRoundTrip(before, after);
+    // No exact round-trip here: replaying the `reflow` leaves the freed
+    // width as trailing padding (#2360), so the replayed row is the edited
+    // row plus a `T_SPACER` — the author's JSON did not write one, and the
+    // applier's defined behaviour adds it. K_W carried no explicit
+    // geometry, so the spacer carries none either (it still holds the
+    // default 100/15 at render time).
+    const ops = diffOk(before, after);
+    const result = applyKeyEditsToLayout(
+      before,
+      ops.map((op, i) => ({ ...op, seq: i }) as KeyEditOperation),
+    );
+    expect(result.orphaned).toEqual([]);
+    const row = result.layout.platforms[0]!.layers[0]!.rows[0]!;
+    expect(row.keys.map((k) => k.id)).toEqual(["K_Q", "K_E", "T_SPACER"]);
+    expect(row.keys[2]!.sp).toBe(10);
+    expect(row.keys[2]!.width).toBeUndefined();
+    expect(row.keys[2]!.pad).toBeUndefined();
   });
 
   it("decomposes a key insertion into add (+ geometry set when authored)", () => {
