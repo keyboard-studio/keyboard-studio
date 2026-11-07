@@ -16,6 +16,16 @@
  * already there). The row keeps its total width, so no remaining key
  * stretches. Both appliers implement it identically; the twin
  * comparison below holds them to that.
+ *
+ * PR #2583 follow-up (Matthew's ruling: "When the last button is a
+ * modifier key, it can be larger, as long as it's less than 3x a regular
+ * key"): when the row's last remaining key is a modifier key, it may
+ * absorb freed width up to — but not reaching — 3x a regular key's width,
+ * and only the excess beyond that cap goes into the trailing spacer (as
+ * `width` with an explicit `pad: 0`); when the freed width fits under the
+ * cap, no spacer is left at all. The cap is measured against the layer
+ * maximum from the layer's other rows, so it holds across repeated
+ * reflows in one overlay. Non-modifier-last rows are unchanged.
  */
 
 import { describe, expect, it } from "vitest";
@@ -46,6 +56,48 @@ const LAYOUT_JSON = `{
 
 const layout = (): TouchLayoutIR => parseTouchLayout(LAYOUT_JSON);
 
+// --- PR #2583 follow-up fixtures: rows ending in a modifier key. ---
+
+const SHIFT_KEY_JSON = `{ "id": "K_SHIFT", "text": "*Shift*", "sp": "1", "width": "100", "pad": "15", "nextlayer": "shift" }`;
+// A T_ modifier: no modifier id, but its nextlayer opens a modifier layer.
+const RALT_TOGGLE_KEY_JSON = `{ "id": "T_ks_rightalt_toggle", "text": "*RAlt*", "sp": "1", "width": "100", "pad": "15", "nextlayer": "rightalt" }`;
+// A frame key, NOT a modifier — rows ordinarily end in one of these.
+const BKSP_KEY_JSON = `{ "id": "K_BKSP", "text": "*BkSp*", "sp": "1", "width": "100", "pad": "15" }`;
+
+/** Nine regular keys plus the given last key — still 10 × 115 = 1150 total. */
+function rowJsonWithLastKey(prefix: string, lastKeyJson: string): string {
+  const keys = Array.from(
+    { length: 9 },
+    (_, i) =>
+      `{ "id": "${prefix}${i}", "text": "${prefix}${i}", "width": "100", "pad": "15" }`,
+  ).join(",\n");
+  return `{ "id": 1, "key": [${keys},\n${lastKeyJson}] }`;
+}
+
+const MODIFIER_LAYOUT_JSON = `{
+  "phone": { "layer": [
+    { "id": "default", "row": [ ${rowJsonWithLastKey("A", SHIFT_KEY_JSON)}, ${rowJson("B")} ] }
+  ] }
+}`;
+
+const RALT_LAYOUT_JSON = `{
+  "phone": { "layer": [
+    { "id": "default", "row": [ ${rowJsonWithLastKey("A", RALT_TOGGLE_KEY_JSON)}, ${rowJson("B")} ] }
+  ] }
+}`;
+
+const BKSP_LAYOUT_JSON = `{
+  "phone": { "layer": [
+    { "id": "default", "row": [ ${rowJsonWithLastKey("A", BKSP_KEY_JSON)}, ${rowJson("B")} ] }
+  ] }
+}`;
+
+const SINGLE_MODIFIER_ROW_JSON = `{
+  "phone": { "layer": [
+    { "id": "default", "row": [ ${rowJsonWithLastKey("A", SHIFT_KEY_JSON)} ] }
+  ] }
+}`;
+
 function rowTotal(row: { keys: readonly { width?: number; pad?: number; sp?: number }[] }): number {
   return computeRowMetrics(row.keys, "phone").rowTotal;
 }
@@ -59,6 +111,20 @@ function slackOf(result: TouchLayoutIR, rowIndex: number): number {
 
 function reflowOp(address: string, seq = 0): KeyEditOperation {
   return { seq, kind: "remove", address, outcome: "reflow" };
+}
+
+/** The first row of `json` after running `ops` through Case B (raw JSON), re-parsed. */
+function caseBFirstRow(json: string, ops: KeyEditOperation[]) {
+  const caseB = applyKeyEditsToRawJson(json, ops);
+  expect(caseB.warnings).toEqual([]);
+  return parseTouchLayout(caseB.json).platforms[0]!.layers[0]!.rows[0]!;
+}
+
+/** A row's keys stripped to the fields the twins must agree on. */
+function stripRow(row: {
+  keys: readonly { id: string; sp?: number; width?: number; pad?: number; text?: string }[];
+}) {
+  return row.keys.map(({ id, sp, width, pad, text }) => ({ id, sp, width, pad, text }));
 }
 
 describe("issue #2360: remove + reflow leaves padding at the end", () => {
@@ -188,5 +254,119 @@ describe("issue #2360: remove + reflow leaves padding at the end", () => {
         row.keys.map(({ id, sp, width, pad, text }) => ({ id, sp, width, pad, text })),
       );
     expect(strip(caseBAsIR)).toEqual(strip(caseA.layout));
+  });
+});
+
+describe("PR #2583 follow-up: a trailing modifier key may stretch, under 3x", () => {
+  it("freed width under the cap: no spacer, the modifier absorbs it all", () => {
+    const op = reflowOp(touchKeyAddress("phone", "default", "A4"));
+    const { layout: out, orphaned } = applyKeyEditsToLayout(
+      parseTouchLayout(MODIFIER_LAYOUT_JSON),
+      [op],
+    );
+    expect(orphaned).toEqual([]);
+
+    const row = out.platforms[0]!.layers[0]!.rows[0]!;
+    expect(row.keys.map((k) => k.id)).toEqual([
+      "A0", "A1", "A2", "A3", "A5", "A6", "A7", "A8", "K_SHIFT",
+    ]);
+    // The row total drops by the freed 115 — that slack now renders onto
+    // the modifier: declared 100, rendered 215, under 3x a regular key.
+    expect(rowTotal(row)).toBe(1035);
+    expect(slackOf(out, 0)).toBe(115);
+    const last = row.keys.at(-1)!;
+    expect(last.id).toBe("K_SHIFT");
+    expect(last.width).toBe(100);
+
+    // Case B agrees.
+    expect(stripRow(caseBFirstRow(MODIFIER_LAYOUT_JSON, [op]))).toEqual(stripRow(row));
+  });
+
+  it("freed width over the cap: a partial spacer caps absorption just under 3x", () => {
+    const ops = [
+      reflowOp(touchKeyAddress("phone", "default", "A4"), 0),
+      reflowOp(touchKeyAddress("phone", "default", "A5"), 1),
+    ];
+    const { layout: out, orphaned } = applyKeyEditsToLayout(
+      parseTouchLayout(MODIFIER_LAYOUT_JSON),
+      ops,
+    );
+    expect(orphaned).toEqual([]);
+
+    const row = out.platforms[0]!.layers[0]!.rows[0]!;
+    expect(row.keys.map((k) => k.id)).toEqual([
+      "A0", "A1", "A2", "A3", "A6", "A7", "A8", "K_SHIFT", "T_SPACER",
+    ]);
+    // The first reflow absorbed 115 (rendered 215); the second may absorb
+    // only 84 more before the modifier would reach 3x — so a 31-wide
+    // spacer carries the rest, capping the rendered width at 299.
+    const pad = row.keys.at(-1)!;
+    expect(pad.id).toBe("T_SPACER");
+    expect(pad.sp).toBe(10);
+    expect(pad.width).toBe(31);
+    expect(pad.pad).toBe(0);
+    expect(rowTotal(row)).toBe(951);
+    expect(slackOf(out, 0)).toBe(199);
+
+    // Case B agrees.
+    expect(stripRow(caseBFirstRow(MODIFIER_LAYOUT_JSON, ops))).toEqual(stripRow(row));
+  });
+
+  it("a T_ modifier (nextlayer opens a modifier layer) narrows the same way", () => {
+    const op = reflowOp(touchKeyAddress("phone", "default", "A4"));
+    const { layout: out, orphaned } = applyKeyEditsToLayout(
+      parseTouchLayout(RALT_LAYOUT_JSON),
+      [op],
+    );
+    expect(orphaned).toEqual([]);
+
+    const row = out.platforms[0]!.layers[0]!.rows[0]!;
+    expect(row.keys.map((k) => k.id)).toEqual([
+      "A0", "A1", "A2", "A3", "A5", "A6", "A7", "A8", "T_ks_rightalt_toggle",
+    ]);
+    expect(rowTotal(row)).toBe(1035);
+    expect(slackOf(out, 0)).toBe(115);
+
+    // Case B agrees.
+    expect(stripRow(caseBFirstRow(RALT_LAYOUT_JSON, [op]))).toEqual(stripRow(row));
+  });
+
+  it("a trailing frame key (K_BKSP) is not a modifier: full spacer, unchanged", () => {
+    const op = reflowOp(touchKeyAddress("phone", "default", "A4"));
+    const { layout: out } = applyKeyEditsToLayout(parseTouchLayout(BKSP_LAYOUT_JSON), [op]);
+    const row = out.platforms[0]!.layers[0]!.rows[0]!;
+    expect(row.keys.map((k) => k.id)).toEqual([
+      "A0", "A1", "A2", "A3", "A5", "A6", "A7", "A8", "K_BKSP", "T_SPACER",
+    ]);
+    expect(rowTotal(row)).toBe(1150);
+    expect(slackOf(out, 0)).toBe(0);
+    const pad = row.keys.at(-1)!;
+    expect(pad.width).toBe(100);
+    expect(pad.pad).toBe(15);
+
+    // Case B agrees.
+    expect(stripRow(caseBFirstRow(BKSP_LAYOUT_JSON, [op]))).toEqual(stripRow(row));
+  });
+
+  it("a modifier-last row that IS the layer maximum never needs a spacer", () => {
+    const ops = [
+      reflowOp(touchKeyAddress("phone", "default", "A4"), 0),
+      reflowOp(touchKeyAddress("phone", "default", "A5"), 1),
+    ];
+    const { layout: out } = applyKeyEditsToLayout(
+      parseTouchLayout(SINGLE_MODIFIER_ROW_JSON),
+      ops,
+    );
+    const row = out.platforms[0]!.layers[0]!.rows[0]!;
+    expect(row.keys.map((k) => k.id)).toEqual([
+      "A0", "A1", "A2", "A3", "A6", "A7", "A8", "K_SHIFT",
+    ]);
+    expect(rowTotal(row)).toBe(920);
+    // The row is the layer maximum, so its last key never stretches — the
+    // modifier renders at its declared 100 whatever is reflowed out.
+    expect(slackOf(out, 0)).toBe(0);
+
+    // Case B agrees.
+    expect(stripRow(caseBFirstRow(SINGLE_MODIFIER_ROW_JSON, ops))).toEqual(stripRow(row));
   });
 });

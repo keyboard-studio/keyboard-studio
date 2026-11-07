@@ -896,7 +896,7 @@
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.redistribute.label": "Remove and redistribute",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.redistribute.note": "The freed width is shared across the row's remaining keys, giving each a genuinely larger touch target.",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.label": "Remove and reflow",
-  "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.note": "The key is gone; the freed space stays as padding at the end of the row, so the remaining keys keep their widths.",
+  "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.note": "The key is gone; the freed space stays as padding at the end of the row, so the remaining keys keep their widths. A trailing modifier key is the exception: it may grow to just under 3x a regular key.",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.suppress.label": "Suppress in place",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcome.suppress.note": "Positions stay identical across every layer; the touchable area does not change.",
   "editor.assignLoop.keyGrid.removeKeyDialog.outcomeLabel": "What should happen to the freed space?",

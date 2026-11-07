@@ -27,6 +27,7 @@ import {
 import {
   applyFieldSemantics,
   applySuppressSemantics,
+  isTouchModifierKey,
   proposeSuppressFields,
   resolveKeyAddress,
   resolveSubKeyEntry,
@@ -554,5 +555,51 @@ describe("replayKeyEditOverlay", () => {
     expect(second.layout).toEqual(first.layout);
     expect(second.orphaned).toEqual(first.orphaned);
     expect(second.warnings).toEqual(first.warnings);
+  });
+});
+
+describe("isTouchModifierKey (PR #2583 follow-up to #2360)", () => {
+  it("matches the Shift/Ctrl/Alt family by id, including alias spellings", () => {
+    for (const id of [
+      "K_SHIFT",
+      "K_LSHIFT",
+      "K_RSHIFT",
+      "K_CONTROL",
+      "K_LCONTROL",
+      "K_RCONTROL",
+      "K_CTRL",
+      "K_LCTRL",
+      "K_RCTRL",
+      "K_ALT",
+      "K_LALT",
+      "K_RALT",
+      "K_ALTGR",
+      "K_LMENU",
+      "K_RMENU",
+      "K_CAPS",
+    ]) {
+      expect(isTouchModifierKey({ id })).toBe(true);
+    }
+    // Case-insensitive, as isTouchFrameKey does.
+    expect(isTouchModifierKey({ id: "k_shift" })).toBe(true);
+  });
+
+  it("matches T_ modifiers by behaviour: nextlayer opens a modifier layer", () => {
+    expect(
+      isTouchModifierKey({ id: "T_ks_rightalt_toggle", nextlayer: "rightalt" }),
+    ).toBe(true);
+    expect(isTouchModifierKey({ id: "T_UPPER", nextlayer: "caps" })).toBe(true);
+    expect(isTouchModifierKey({ id: "T_ks_specials", nextlayer: "rightalt-shift" })).toBe(true);
+  });
+
+  it("does not match frame or layer-switch keys", () => {
+    for (const id of ["K_BKSP", "K_ENTER", "K_SPACE", "K_TAB", "K_NUMLOCK", "K_SYMBOLS"]) {
+      expect(isTouchModifierKey({ id })).toBe(false);
+    }
+    // A nextlayer alone is not enough: numeric/symbol switches are not modifiers.
+    expect(isTouchModifierKey({ id: "K_NUMLOCK", nextlayer: "numeric" })).toBe(false);
+    expect(isTouchModifierKey({ id: "K_LOWER", nextlayer: "default" })).toBe(false);
+    // Neither is a frame class on its own: sp says nothing here.
+    expect(isTouchModifierKey({ id: "K_BKSP" })).toBe(false);
   });
 });
