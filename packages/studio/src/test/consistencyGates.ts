@@ -18,7 +18,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { parseKmn, confirmedCaseCounterpart, normalizationFormForOutputForm } from "@keyboard-studio/engine";
 import { casedKeySet, declaredCasedKeys, keyPlaneOutputs } from "@keyboard-studio/contracts";
-import { computeContextTolerance } from "@keyboard-studio/engine/context-tolerance";
+import { computeContextTolerance, NORMALIZATION_STORE_PREFIX } from "@keyboard-studio/engine/context-tolerance";
 import { lintContextTolerance } from "@keymanapp/keyboard-lint";
 import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
@@ -205,8 +205,19 @@ function g4(input: GateInput, ir: KeyboardIR | undefined): GateResult {
       for (const run of outputRuns(r.output)) check(`${g.name} rule ${r.nodeId}`, run, starting);
     }
   }
+  // The normalization step's stores are its internal lookup tables, not
+  // output content: the head stores hold the pasted alternates (the
+  // keyboard's other form) so the step can match them, and the produced-form
+  // stores repackage the keyboard's own output repertoire -- which G4 already
+  // polices at its source (starting rules are reported, not failed; session
+  // rules are checked via their outputs). The step cannot satisfy G4
+  // strictly: it must reproduce the keyboard's own produced clusters,
+  // including a starting rule's precomposed output, so its stores are exempt
+  // as a whole. (US6: the default-accepted step otherwise fails G4 on every
+  // NFD-output keyboard the moment it applies.)
   for (const s of ir.stores) {
     if (s.isSystem) continue;
+    if (s.name.toLowerCase().startsWith(NORMALIZATION_STORE_PREFIX)) continue;
     const wholeStore = start.stores.has(storeKey(s.name, s.items));
     // Per item: a carve trims a starting store without making what is left generated.
     const startHeld = new Set((start.storeItems.get(s.name) ?? []).map((i) => JSON.stringify(i)));

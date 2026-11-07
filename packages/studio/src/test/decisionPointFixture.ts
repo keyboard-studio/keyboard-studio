@@ -43,6 +43,7 @@ import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { analyseWorkingCopyContextTolerance } from "../lib/contextToleranceRun.ts";
 import { applyContextToleranceDecision } from "../lib/contextToleranceApply.ts";
 import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
+import { decisionFromProposal, defaultToleranceDecision, NORMALIZATION_STEP_SITE, toleranceProposalFor } from "../survey/marks/contextToleranceProposal.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
@@ -183,6 +184,17 @@ function installUnreplayedSlices(decisions: DecisionSet, override: FallbackPolic
 }
 
 /**
+ * A step decision's fingerprint is `site|gap-rules|step-content`. The accept
+ * still covers the same gaps when the site and gap-rules components match,
+ * even if the step content moved with the repertoire.
+ */
+function stepGapFingerprintMatches(decisionFingerprint: string, analysisFingerprint: string): boolean {
+  const d = decisionFingerprint.split("|");
+  const a = analysisFingerprint.split("|");
+  return d.length === 3 && a.length === 3 && d[0] === a[0] && d[1] === a[1];
+}
+
+/**
  * The context-tolerance overlay cannot be derived from the decision value: it is
  * the product of an async compile and simulation against the keyboard as
  * projected so far. Mirrors useContextToleranceApply.
@@ -199,10 +211,40 @@ async function installToleranceOverlay(decisions: DecisionSet): Promise<string[]
 
   const analysed = await analyseWorkingCopyContextTolerance(ir, () => true);
   if (analysed === null) return undefined;
+  const analysis = { status: "ready" as const, runId: 0, ...analysed };
+  // A pre-US6 record carries no decision, so the cut records the deferred
+  // default (spec 106 FR-060: `origin: "default"`, empty sites/fingerprint).
+  // Derive the concrete decision from this analysis — the same derivation the
+  // station performs on Continue — instead of applying a decision with no
+  // sites. No fixable rules means no proposal and nothing to apply.
+  //
+  // A mid-walk step accept needs the same treatment when only the step
+  // content moved: the fingerprint is `site|gap-rules|step-content`, and
+  // later decisions that grow the repertoire change the step content even
+  // though the gap rules the accept covers are unchanged — so the accept
+  // goes stale at replay while the author's intent (accept the step) still
+  // stands. When the site and gap-rule components still match and this
+  // analysis offers the step, re-derive the step for the current keyboard
+  // instead of dropping it. A gap-rule change is genuinely stale and is not
+  // re-derived.
+  let effectiveDecision = decision;
+  if (decision.origin === "default" && decision.fingerprint === "") {
+    const proposal = toleranceProposalFor(analysis);
+    if (proposal === null) return undefined;
+    effectiveDecision = defaultToleranceDecision(proposal, analysis.fingerprint);
+  } else if (
+    decision.decision === "accept" &&
+    decision.acceptedSiteIds.includes(NORMALIZATION_STEP_SITE) &&
+    analysis.normalizationStep !== undefined &&
+    stepGapFingerprintMatches(decision.fingerprint, analysis.fingerprint)
+  ) {
+    const proposal = toleranceProposalFor(analysis);
+    if (proposal !== null) effectiveDecision = decisionFromProposal(proposal, analysis.fingerprint);
+  }
   const engine = await loadContextToleranceEngine();
   const outcome = await applyContextToleranceDecision(
-    decision,
-    { status: "ready", runId: 0, ...analysed },
+    effectiveDecision,
+    analysis,
     { engine, applyFacetTransform },
   );
   // The product drops a decision whose fingerprint no longer matches the keyboard

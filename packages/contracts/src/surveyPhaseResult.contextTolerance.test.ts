@@ -60,6 +60,19 @@ describe("MarksContextToleranceDecisionSchema (spec 078)", () => {
     expect(result.success).toBe(true);
     if (result.success) expect(result.data).toEqual(value);
   });
+
+  it("round-trips a default-accepted decision (spec 106 FR-060)", () => {
+    const value = {
+      decision: "accept",
+      acceptedSiteIds: ["normalization-step"],
+      proposedSiteIds: ["normalization-step"],
+      fingerprint: "abc123",
+      origin: "default",
+    };
+    const result = MarksContextToleranceDecisionSchema.safeParse(value);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toEqual(value);
+  });
 });
 
 describe("DecisionProposalSourceSchema — analysis member (spec 078)", () => {

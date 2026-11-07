@@ -27,13 +27,14 @@ export interface Gap {
 // G5 passes on every base, chechen_latin included (ç/Ç on K_COLON), since the
 // store is derived in projection (spec 112).
 export const KNOWN_GAPS: readonly Gap[] = [
-  // E5: contexts are not tolerant (camqwerty has one gap).
-  { gate: "G2", owner: "US6", bases: ["sil_cameroon_qwerty"], points: ["tolerance"] },
-  // E5: contexts are not tolerant (camazerty has 17 measured gaps). #2363's
+  // E5: contexts are not tolerant (camazerty has 16 measured gaps after US6,
+  // down from 17: the default-accepted normalization step fixed one). #2363's
   // crash is fixed -- the analysis runs and skips the 13 touch-only T_ rules
   // with a not-analysed reason -- but the remaining gaps are genuine
-  // canonical-equivalence gaps the pre-US6 walk never normalised, so the row
-  // moves from the engine bug to the story that fixes them.
+  // canonical-equivalence gaps the pre-US6 walk never normalised. The step
+  // the default accepts does not cover them: every remaining finding is a
+  // rule matching precomposed `è` followed by a second mark, a
+  // normalization-coverage follow-up, not a default-accept gap.
   { gate: "G2", owner: "US6", bases: ["sil_cameroon_azerty"], points: ["tolerance"] },
   // nul/beep inside starting stores is deferred to keymanapp/keyboards#4181.
   { gate: "G8-start", owner: "#2361", bases: ["sil_cameroon_qwerty", "sil_cameroon_azerty"], points: DECISION_POINTS },

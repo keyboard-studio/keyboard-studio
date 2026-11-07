@@ -104,10 +104,33 @@ afterEach(() => {
 });
 
 describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
-  it("confirming the pre-filled proposal completes the series with an accept decision and its answer", () => {
+  it("pressing Continue on the pre-accepted normalization completes the series with a default accept decision (spec 106 FR-060)", () => {
     useWorkingCopyStore.getState().setContextTolerance(ready());
     const onComplete = renderSeries();
     walkToStation();
+    expect(screen.getByTestId("context-tolerance-station").getAttribute("data-default")).toBe("accepted");
+    fireEvent.click(screen.getByTestId("marks-continue"));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const result = onComplete.mock.calls[0]![0] as SurveyPhaseResult;
+    expect(result.marksContextTolerance).toEqual({
+      decision: "accept",
+      acceptedSiteIds: ["site-r10"],
+      proposedSiteIds: ["site-r10"],
+      fingerprint: FINGERPRINT,
+      origin: "default",
+    });
+    // Every station's answers ride completion (spec 079); these are the decision's own.
+    expect(toleranceAnswers(result)).toEqual([
+      { questionId: "marks.context_tolerance", answerType: "select", value: "accept" },
+    ]);
+  });
+
+  it("changing the pre-accepted normalization and confirming completes with an asked accept decision", () => {
+    useWorkingCopyStore.getState().setContextTolerance(ready());
+    const onComplete = renderSeries();
+    walkToStation();
+    fireEvent.click(screen.getByRole("button", { name: "Change this decision" }));
     fireEvent.click(screen.getByRole("button", { name: "Add these rules" }));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -117,8 +140,8 @@ describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
       acceptedSiteIds: ["site-r10"],
       proposedSiteIds: ["site-r10"],
       fingerprint: FINGERPRINT,
+      origin: "asked",
     });
-    // Every station's answers ride completion (spec 079); these are the decision's own.
     expect(toleranceAnswers(result)).toEqual([
       { questionId: "marks.context_tolerance", answerType: "select", value: "accept" },
     ]);
