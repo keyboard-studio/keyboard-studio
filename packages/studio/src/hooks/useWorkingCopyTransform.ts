@@ -541,6 +541,7 @@ export function useWorkingCopyTransform(
             marksTreatment,
             capsHandling: capsHandlingMode === null ? undefined : { mode: capsHandlingMode },
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
+            ...(storeStartKeyboardId !== null ? { startKeyboardId: storeStartKeyboardId } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
         ),

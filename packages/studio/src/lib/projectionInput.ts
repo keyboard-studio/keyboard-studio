@@ -77,6 +77,7 @@ export interface ProjectionExtras {
    */
   capsHandling: CapsHandlingValue | undefined;
   baseDisplayName?: string;
+  startKeyboardId?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
   /** Open mode only (spec 111); see ProjectWorkingCopyVfsInput.openMode. */
