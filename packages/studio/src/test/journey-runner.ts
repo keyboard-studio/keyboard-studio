@@ -870,8 +870,8 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
         case "icon": {
           // Keyboard icon — fixtures carry no icon edits; advance with the
-          // template icon unchanged (keep-template: the editor starts from
-          // the base keyboard's icon and Continue ships it unedited).
+          // template icon unchanged (the default option is Keep, so an
+          // untouched walk ships the template's icon as-is).
           result = undefined;
           break;
         }
