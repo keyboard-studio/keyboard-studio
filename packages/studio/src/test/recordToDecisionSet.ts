@@ -96,24 +96,17 @@ export function recordToDecisionSet(
       // was removed with the track step (#2568), but a record's answer is
       // the only record of an "adapt" walk, and orphaning it would replay
       // that walk on the copy track (same rule as the v1 draft migration).
+      // A record with no track answer at all replays with no authoring-track:
+      // the replay reproduces what the record contains — "copy defaults
+      // where unrecorded" is a live-walk rule (StudioShell), not a replay
+      // default, and defaulting it here would inject a decision the record
+      // never had (and break parity comparisons of minimal records).
       const mod = questionRegistry[p.questionId];
       const provides = mod?.provides ?? RETIRED_QUESTION_DECISIONS[p.questionId] ?? [];
       for (const id of provides) {
         if (allowed.has(id)) out[id] = asDecision(id, p.value);
       }
     }
-  }
-
-  // Copy defaults where unrecorded (#2568): a record with no track answer
-  // at all is a copy walk by construction — the track question only ever
-  // existed to choose, and StudioShell defaults the live walk the same way
-  // (provenance "default", step "choose_base" there; here the replay cut).
-  if (allowed.has("authoring-track") && out["authoring-track"] === undefined) {
-    out["authoring-track"] = {
-      id: "authoring-track",
-      value: "copy",
-      provenance: "default",
-    } as Decision<unknown>;
   }
   return out;
 }
