@@ -2,7 +2,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, cleanup, fireEvent } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
-import { PreviewButton } from "./PreviewButton.tsx";
+import { PreviewButton, PREVIEW_BUTTON_CLEARANCE } from "./PreviewButton.tsx";
 
 afterEach(cleanup);
 
@@ -57,6 +57,35 @@ describe("PreviewButton", () => {
     // Only the button takes taps, and it sits in the flow of the wrapper.
     expect(button.style.position).toBe("static");
     expect(button.style.pointerEvents).toBe("auto");
+  });
+
+  it("float placement sits 12px above its containing block, with no footer-height term (#2570)", () => {
+    // The footer is in normal flow BELOW the content area, so every
+    // containing block already ends at the footer's top edge. The old
+    // `calc(12px + var(--studio-footer-h))` double-counted the bar and
+    // lifted the button 52px too high on a coarse pointer.
+    render(<PreviewButton label="Preview" ariaLabel="Show preview" onClick={() => {}} />);
+    const button = screen.getByRole("button", { name: "Show preview" });
+    expect(button.style.bottom).toBe("12px");
+  });
+
+  it("sticky placement pins its wrapper 12px above the scroll container's bottom (#2570)", () => {
+    render(
+      <PreviewButton
+        label="Preview"
+        ariaLabel="Show preview"
+        onClick={() => {}}
+        placement="sticky"
+      />,
+    );
+    const wrapper = screen
+      .getByRole("button", { name: "Show preview" })
+      .parentElement as HTMLElement;
+    expect(wrapper.style.bottom).toBe("12px");
+  });
+
+  it("scroll clearance is 72px, with no footer-height term (#2570)", () => {
+    expect(PREVIEW_BUTTON_CLEARANCE).toBe("72px");
   });
 
   it.each([["keyboard" as const], ["grid" as const]])(

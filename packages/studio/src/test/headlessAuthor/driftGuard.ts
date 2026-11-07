@@ -56,6 +56,7 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "createStudioReducerDeps", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
   { fn: "completeOskStep", module: "lib/oskStepCompletion.ts", callers: ["editors/adapters/oskAdapter.tsx"] },
   { fn: "completeHtmlStep", module: "lib/htmlStepCompletion.ts", callers: ["editors/assignLoop/HtmlEditor.tsx"] },
+  { fn: "completeFallbackPolicyStep", module: "lib/fallbackPolicyStepCompletion.ts", callers: ["editors/adapters/fallbackPolicyAdapter.tsx"] },
   { fn: "oskContinueResult", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "generateKvksFromIR", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "createStudioRecordDecision", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
@@ -78,7 +79,7 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "snapshotDecisionRecord", module: "decisions/decisionLogStore.ts", callers: ["lib/serializeWorkingCopy.ts", "lib/draftPersistence.ts"] },
   { fn: "parseDecisionRecord", module: "@keyboard-studio/engine", callers: ["lib/draftPersistence.ts"] },
   // --- Parity normalisation (parity.ts, research R8) ---
-  { fn: "effectiveEntries", module: "@keyboard-studio/contracts", callers: ["decisions/historyProposalSeed.ts"] },
+  { fn: "effectiveEntries", module: "@keyboard-studio/contracts", callers: ["decisions/progressDots.ts"] },
   { fn: "suggestionFingerprintOf", module: "survey/carve/carveValue.ts", callers: ["editors/carve/CarveGalleryV2.tsx"] },
   ...PROPOSAL_INVENTORY,
 ];

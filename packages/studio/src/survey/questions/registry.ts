@@ -38,6 +38,7 @@ import carvedLayoutModule from "./gallery/carvedLayout.ts";
 import deadkeysDefinedModule from "./gallery/deadkeysDefined.ts";
 import ruleSetModule from "./gallery/ruleSet.ts";
 import physicalLayoutModule from "./gallery/physicalLayout.ts";
+import fallbackPolicyModule from "./gallery/fallbackPolicy.ts";
 import oskLayoutModule from "./gallery/oskLayout.ts";
 import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
 import languageListModule from "./gallery/languageList.ts";
@@ -49,8 +50,8 @@ import helpDocsModule from "./gallery/helpDocs.ts";
 import welcomeHtmModule from "./gallery/welcomeHtm.ts";
 import iconModule from "./gallery/icon.ts";
 
-import { flowModules, demotedPhaseFModules } from "./flowModules.ts";
-export { flowModules, demotedPhaseFModules };
+import { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS } from "./flowModules.ts";
+export { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS };
 import pb_mark_input_order from "./reserve/pb_mark_input_order.ts";
 
 
@@ -123,6 +124,7 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   deadkeysDefinedModule,
   ruleSetModule,
   physicalLayoutModule,
+  fallbackPolicyModule,
   oskLayoutModule,
   touchSeedSourceModule,
   touchLayoutModule,

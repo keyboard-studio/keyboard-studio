@@ -108,6 +108,16 @@
     "navigateTo": []
   },
   {
+    "stepId": "fallback_policy",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "osk",
     "applyStepCompletion": [],
     "storeMutations": [

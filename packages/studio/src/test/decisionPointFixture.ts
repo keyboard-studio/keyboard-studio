@@ -7,9 +7,10 @@
 // VFS the author downloads. It never calls projectWorkingCopyVfs with
 // hand-built options, so a fixture cannot drift from the product.
 //
-// `fallbackPolicy` is in no decision value (survey/carve/carveValue.ts), so a
-// spec carries it separately. A spec that omits it runs with the store default,
-// which is what every recorded walk before this field ran with.
+// The keyboard-wide `fallbackPolicy` is its own decision (`fallback-policy`), so a
+// replay restores it from the DecisionSet like any other. A record without that
+// decision (every walk before it existed) replays with DEFAULT_FALLBACK_POLICY.
+// `spec.fallbackPolicy` is an explicit override for tests that vary the policy.
 
 import { makeStartKeyboard, type StartKeyboard } from "@keyboard-studio/contracts";
 import type {
@@ -44,6 +45,7 @@ import { applyContextToleranceDecision } from "../lib/contextToleranceApply.ts";
 import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { checkConsistencyGates, type GateResult } from "./consistencyGates.ts";
 import type { DecisionPoint } from "./decisionPointBases.ts";
@@ -69,7 +71,10 @@ export interface DecisionPointFixtureSpec {
    * G6 is evaluated on the bundle; absent, G6 stays walk-only.
    */
   touchLayoutJson?: string | null;
-  /** The keyboard-wide carve fallback policy the walk ended with. Default: the store's. */
+  /**
+   * Overrides the replayed `fallback-policy` decision. Default: the decision's value,
+   * else DEFAULT_FALLBACK_POLICY.
+   */
   fallbackPolicy?: FallbackPolicy;
 }
 
@@ -154,7 +159,7 @@ export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
  * Install the slices the replay does not put where the projection reads them.
  * The carve slice is not one of them: replay installs it from `carved-layout`.
  */
-function installUnreplayedSlices(decisions: DecisionSet): void {
+function installUnreplayedSlices(decisions: DecisionSet, override: FallbackPolicy | undefined): void {
   const store = useWorkingCopyStore.getState();
 
   // The replay applies the deadkey ops to the IR, but the projection replays the
@@ -169,6 +174,12 @@ function installUnreplayedSlices(decisions: DecisionSet): void {
   const assignments = (decisions["physical-layout"]?.value as { assignments?: MechanismAssignment[] } | undefined)
     ?.assignments;
   if (assignments !== undefined) store.recordAssignments(assignments);
+
+  // The fallback policy lives in the store only; a record without the decision
+  // (or with a value this build does not know) means the default.
+  store.setFallbackPolicy(
+    override ?? migrateFallbackPolicy({ fallbackPolicy: decisions["fallback-policy"]?.value }),
+  );
 }
 
 /**
@@ -220,9 +231,8 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
   rebuildWorkingCopyFromStores(Object.keys(spec.decisions) as DecisionId[]);
 
   // 5. install what replay leaves elsewhere.
-  installUnreplayedSlices(spec.decisions);
+  installUnreplayedSlices(spec.decisions, spec.fallbackPolicy);
   if (spec.touchLayoutJson !== undefined) useWorkingCopyStore.getState().setTouchLayoutJson(spec.touchLayoutJson);
-  if (spec.fallbackPolicy !== undefined) useWorkingCopyStore.getState().setFallbackPolicy(spec.fallbackPolicy);
   const toleranceStaleSiteIds = spec.point === "tolerance" ? await installToleranceOverlay(spec.decisions) : undefined;
 
   // 6. the real download path.

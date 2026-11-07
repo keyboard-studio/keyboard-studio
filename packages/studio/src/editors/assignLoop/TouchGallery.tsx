@@ -6829,7 +6829,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           <PublishStepNav
             spec={{
               back: {
-                label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
                 onClick: onBack,
                 testId: "touch-back",
                 ariaLabel: t({
@@ -6894,7 +6894,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               ...(currentChar !== null && touchLettersToAdd.includes(currentChar)
                 ? {
                     back: {
-                      label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                      label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
                       onClick: handleBack,
                       testId: "touch-back",
                       ariaLabel:
@@ -7536,7 +7536,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       <PublishStepNav
         spec={{
           back: {
-            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
             onClick: onBack,
             testId: "touch-key-mode-back",
             ariaLabel: t({
@@ -7797,7 +7797,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         <PublishStepNav
           spec={{
             back: {
-              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
               onClick: onBack,
               testId: "touch-code-back",
               ariaLabel: t({

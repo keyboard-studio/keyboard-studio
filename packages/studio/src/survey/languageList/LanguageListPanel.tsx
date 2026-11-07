@@ -10,7 +10,14 @@ import { useLingui } from "@lingui/react/macro";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
+import { Button } from "../../ui/Button.tsx";
+import { TextField } from "../../ui/TextField.tsx";
+import { TEXT_DIM } from "../../ui/theme.ts";
+import {
+  phaseHeading,
+  surveyCard,
+  surveyPageColumn,
+} from "../surveyStyles.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 export type LanguageEntry = { tag: string; name?: string };
@@ -37,17 +44,6 @@ export function moveLanguage(list: LanguageListValue, index: number, delta: -1 |
   next.splice(target, 0, moved);
   return next;
 }
-
-const smallBtn = {
-  padding: "2px 8px",
-  fontSize: 12,
-  fontFamily: FONT,
-  color: TEXT_MAIN,
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  cursor: "pointer",
-} as const;
 
 export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<LanguageListValue>) {
   const { t } = useLingui();
@@ -84,83 +80,85 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
   );
   usePublishStepNav(navSpec);
 
+  // Same composition as the survey steps (Prefill): left-aligned column,
+  // display title above the accent-topped card — not the old centred card
+  // with hand-rolled buttons this page used to render.
   return (
-    <section
-      aria-labelledby="open-languages-heading"
-      style={{ maxWidth: 560, margin: "24px auto", padding: 20, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, fontFamily: FONT, color: TEXT_MAIN }}
-    >
-      <h2 id="open-languages-heading" style={{ margin: "0 0 8px", fontSize: 18 }}>
+    <div style={surveyPageColumn}>
+      <h2 id="open-languages-heading" style={phaseHeading}>
         {t({ id: "open.languages.title", message: "Languages this keyboard supports" })}
       </h2>
-      <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.6, color: TEXT_DIM }}>
-        {t({
-          id: "open.languages.intro",
-          message: "These are written to the keyboard's package exactly as listed. Add, remove or reorder them.",
-        })}
-      </p>
-      {list.length === 0 ? (
-        <p style={{ fontSize: 13, color: TEXT_DIM }}>
-          {t({ id: "open.languages.empty", message: "No languages are listed yet." })}
+      <section aria-labelledby="open-languages-heading" style={surveyCard}>
+        <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.6, color: TEXT_DIM }}>
+          {t({
+            id: "open.languages.intro",
+            message: "These are written to the keyboard's package exactly as listed. Add, remove or reorder them.",
+          })}
         </p>
-      ) : (
-        <ol style={{ margin: "0 0 12px", paddingLeft: 20 }}>
-          {list.map((l, i) => (
-            <li key={`${l.tag}-${i}`} style={{ marginBottom: 6 }}>
-              <span>{l.name !== undefined ? `${l.name} (${l.tag})` : l.tag}</span>{" "}
-              <button
-                type="button"
-                style={smallBtn}
-                disabled={i === 0}
-                onClick={() => commit(moveLanguage(list, i, -1))}
-                aria-label={t({ id: "open.languages.moveUp", message: `Move ${{ tag: l.tag }} up` })}
-              >
-                {"↑"}
-              </button>{" "}
-              <button
-                type="button"
-                style={smallBtn}
-                disabled={i === list.length - 1}
-                onClick={() => commit(moveLanguage(list, i, 1))}
-                aria-label={t({ id: "open.languages.moveDown", message: `Move ${{ tag: l.tag }} down` })}
-              >
-                {"↓"}
-              </button>{" "}
-              <button
-                type="button"
-                style={smallBtn}
-                onClick={() => commit(removeLanguage(list, i))}
-                aria-label={t({ id: "open.languages.remove", message: `Remove ${{ tag: l.tag }}` })}
-              >
-                {t({ id: "open.languages.removeButton", message: "Remove" })}
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const next = addLanguage(list, tag, name);
-          if (next !== list) commit(next);
-          setTag("");
-          setName("");
-        }}
-        style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end", marginBottom: 12 }}
-      >
-        <label style={{ fontSize: 13 }}>
-          {t({ id: "open.languages.tagLabel", message: "Language tag (BCP 47)" })}
-          <br />
-          <input value={tag} onChange={(e) => setTag(e.target.value)} style={{ fontFamily: FONT }} />
-        </label>
-        <label style={{ fontSize: 13 }}>
-          {t({ id: "open.languages.nameLabel", message: "Name (optional)" })}
-          <br />
-          <input value={name} onChange={(e) => setName(e.target.value)} style={{ fontFamily: FONT }} />
-        </label>
-        <button type="submit" style={smallBtn} disabled={tag.trim() === ""}>
-          {t({ id: "open.languages.add", message: "Add language" })}
-        </button>
-      </form>
-    </section>
+        {list.length === 0 ? (
+          <p style={{ fontSize: 13, color: TEXT_DIM }}>
+            {t({ id: "open.languages.empty", message: "No languages are listed yet." })}
+          </p>
+        ) : (
+          <ol style={{ margin: "0 0 12px", paddingLeft: 20 }}>
+            {list.map((l, i) => (
+              <li key={`${l.tag}-${i}`} style={{ marginBottom: 6 }}>
+                <span>{l.name !== undefined ? `${l.name} (${l.tag})` : l.tag}</span>{" "}
+                <Button
+                  type="button"
+                  size="compact"
+                  disabled={i === 0}
+                  onClick={() => commit(moveLanguage(list, i, -1))}
+                  aria-label={t({ id: "open.languages.moveUp", message: `Move ${{ tag: l.tag }} up` })}
+                >
+                  {"↑"}
+                </Button>{" "}
+                <Button
+                  type="button"
+                  size="compact"
+                  disabled={i === list.length - 1}
+                  onClick={() => commit(moveLanguage(list, i, 1))}
+                  aria-label={t({ id: "open.languages.moveDown", message: `Move ${{ tag: l.tag }} down` })}
+                >
+                  {"↓"}
+                </Button>{" "}
+                <Button
+                  type="button"
+                  size="compact"
+                  onClick={() => commit(removeLanguage(list, i))}
+                  aria-label={t({ id: "open.languages.remove", message: `Remove ${{ tag: l.tag }}` })}
+                >
+                  {t({ id: "open.languages.removeButton", message: "Remove" })}
+                </Button>
+              </li>
+            ))}
+          </ol>
+        )}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const next = addLanguage(list, tag, name);
+            if (next !== list) commit(next);
+            setTag("");
+            setName("");
+          }}
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end", marginBottom: 12 }}
+        >
+          <label style={{ fontSize: 13, flex: "1 1 140px" }}>
+            {t({ id: "open.languages.tagLabel", message: "Language tag (BCP 47)" })}
+            <br />
+            <TextField value={tag} onChange={(e) => setTag(e.target.value)} />
+          </label>
+          <label style={{ fontSize: 13, flex: "1 1 140px" }}>
+            {t({ id: "open.languages.nameLabel", message: "Name (optional)" })}
+            <br />
+            <TextField value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <Button type="submit" size="compact" disabled={tag.trim() === ""}>
+            {t({ id: "open.languages.add", message: "Add language" })}
+          </Button>
+        </form>
+      </section>
+    </div>
   );
 }

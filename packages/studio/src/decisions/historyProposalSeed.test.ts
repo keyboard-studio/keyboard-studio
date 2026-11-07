@@ -160,6 +160,15 @@ describe("buildHistoryProposalSeed", () => {
     expect(seed.mechanismsAssigned).toEqual(["tone-vowels"]);
   });
 
+  it("caps the merged mechanism_edit sample so huge keyboards stay bounded", () => {
+    const sample = Array.from({ length: 300 }, (_, i) => `x${i}`);
+    const rec = record([entry("mechanisms", editorAction("mechanism_edit", { sample }))]);
+    const seed = buildHistoryProposalSeed(NO_FACTS, rec);
+    expect(seed.mechanismsAssigned).toHaveLength(200);
+    expect(seed.mechanismsAssigned[0]).toBe("x0");
+    expect(seed.mechanismsAssigned[199]).toBe("x199");
+  });
+
   it("does not feed touch_edit into mechanismsAssigned", () => {
     const rec = record([entry("touch", editorAction("touch_edit", { sample: ["K_A"] }))]);
     expect(buildHistoryProposalSeed(NO_FACTS, rec).mechanismsAssigned).toEqual([]);

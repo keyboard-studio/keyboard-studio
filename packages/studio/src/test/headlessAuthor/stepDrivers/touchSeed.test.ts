@@ -32,7 +32,7 @@ function seedStart(touchLayoutJson?: string): void {
 }
 
 function ctx() {
-  const report = createRunReport("store-default");
+  const report = createRunReport();
   return { report, drive: { case: {} as Case, startIr: makeTestIR([]), report } };
 }
 

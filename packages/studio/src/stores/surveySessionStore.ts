@@ -123,6 +123,7 @@ export type ActiveStepId =
   | "invisibles"
   | "convenience"
   | "mechanisms"
+  | "fallback_policy"
   | "osk"
   | "touch_seed_source"
   | "touch"

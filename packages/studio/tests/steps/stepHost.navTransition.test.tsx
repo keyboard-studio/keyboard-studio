@@ -39,6 +39,9 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
 );
+vi.mock("../../src/editors/adapters/fallbackPolicyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/FallbackPolicyAdapter.tsx"),
+);
 vi.mock("../../src/editors/adapters/oskAdapter.tsx", async () => {
   const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
   return {
@@ -190,6 +193,7 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["deadkeys-continue"] },
   { testIds: ["rules-continue"] },
   { testIds: ["mechanisms-continue"] },
+  { testIds: ["fallback-policy-continue"] },
   { testIds: ["osk-continue"] },
   { testIds: ["seed-source-confirm"] },
 ];

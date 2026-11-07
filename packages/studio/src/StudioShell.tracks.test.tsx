@@ -16,6 +16,7 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/fallbackPolicyAdapter.tsx", () => import("./test/studioShellMocks/FallbackPolicyAdapter.tsx"));
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
@@ -133,7 +134,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 
     // The chooser's own Back (not TouchGallery's) pops the walked-history —
     // which reaches "osk" (the step genuinely visited immediately before
-    // touch_seed_source; the osk editor sits between mechanisms and touch).
+    // touch_seed_source; fallback_policy sits before osk on the spine).
     fireEvent.click(screen.getByTestId("seed-source-back"));
 
     expect(screen.getByTestId("stage-osk")).toBeTruthy();
@@ -184,7 +185,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 //     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
 
 describe("SurveyView — Track 2 (adapt) routing", () => {
-  it("clicking track-adapt advances through attribution and the language list to the on-screen keyboard, skipping project-name", async () => {
+  it("clicking track-adapt advances through attribution and the language list to fallback policy then the on-screen keyboard, skipping project-name", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -201,8 +202,8 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
     expect(screen.queryByTestId("stage-track")).toBeNull();
 
-    // Advance through attribution and the Open language list (spec 111) to the
-    // on-screen keyboard: Open hides the character survey.
+    // Advance through attribution and the Open language list (spec 111) to
+    // fallback policy then the OSK: Open hides the character survey.
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -210,6 +211,8 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     expect(screen.getByTestId("stage-open-missing-letters")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
     expect(screen.getByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
@@ -247,7 +250,7 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 // project_name) converges on the same carve-back behavior as the copy-track path.
 
 describe("SurveyView — Open walk back-navigation (spec 111)", () => {
-  it("adapt-track: after the language list, Letters and Mechanisms precede the osk, and osk's back returns to Mechanisms", async () => {
+  it("adapt-track: after the language list, Letters and Mechanisms precede fallback policy and the osk, and osk's back returns to fallback policy", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -263,11 +266,15 @@ describe("SurveyView — Open walk back-navigation (spec 111)", () => {
     expect(await screen.findByTestId("stage-open-missing-letters")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(await screen.findByTestId("mechanisms-continue"));
+    expect(await screen.findByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
     expect(await screen.findByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
 
     fireEvent.click(screen.getByTestId("osk-back"));
+    expect(screen.getByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-back"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
   });
 });

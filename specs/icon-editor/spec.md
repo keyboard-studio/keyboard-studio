@@ -24,28 +24,31 @@ gallery decision module is `icon` (`provides: ["icon"]`,
 onComplete on Continue. The module's `apply` is a no-op — the icon data
 lands in the decision record for downstream serialization paths.
 
-## Decisions (Matthew, 2026-11-03)
+## Decisions (Matthew, 2026-11-03, revised 2026-11-06)
 
-- Unskippable step; changing nothing keeps the template's icon.
-- The base keyboard's icon is the starting point, loaded from the start
-  VFS snapshot; when it carries no usable `.ico`, a generated default icon
-  (from the keyboard name) is used instead.
-- Import-first: drag-drop or pick SVG/PNG/ICO, rasterized to the working
-  canvas. SVG `<text>` rasterizes as-is.
+- Unskippable step; three options, chosen up front — Keep is the default
+  when the template has an icon. Keep passes the template's `.ico`
+  through byte-for-byte; Edit source icon loads it into the pixel
+  editor; Create icon starts from a blank white canvas. When the
+  template has no usable `.ico`, only Create is offered.
+- Big pixel editor at 48×48 — the largest size an `.ico` entry ever
+  needs — shown large with hard pixels (what you draw is what ships).
+  No high-res working canvas.
+- Import-first for Edit/Create: drag-drop or pick SVG/PNG/ICO,
+  rasterized to the working canvas. SVG `<text>` rasterizes as-is.
 - Hand-rolled ICO codec (`icoCodec.ts`), no new dependencies.
 
 ## Scope
 
-- Pixel editor at 256×256 — shown large with hard pixels (what you draw is
-  what ships).
+- Pixel editor at 48×48 — shown 480px with hard pixels.
 - Tools: pen, eraser, line, fill, box, boxFill, circle, circleFill, text,
   picker. Text tool uses a low-res-friendly monospace font, crisp at 16×16.
 - Live multi-size preview (16 / 32 / 48 px).
 - 1-bit transparency via the alpha channel + AND mask on ICO encode.
 - Undo history capped at 30 snapshots.
-- Import: SVG, PNG, ICO (decoded and resampled to 256px).
+- Import: SVG, PNG, ICO (decoded and resampled to 48px).
 - On Continue: passes `{ iconIcoBase64, iconPngDataUrl }` via onComplete —
-  the ICO is encoded at 16 / 32 / 48 / 256 px, the PNG data URL is the
-  256px canvas. Continue with no pixels is a no-op.
+  Keep passes the source `.ico` bytes through with a 48px PNG; Edit/Create
+  encode the working canvas at 16 / 32 / 48 with a 48px PNG.
 - Out of scope: bitmap export beyond the `.ico` + PNG payload, dotted-circle
   diacritic base handling.

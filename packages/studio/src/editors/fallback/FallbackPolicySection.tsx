@@ -4,15 +4,14 @@
 // ONE setting for the whole keyboard: when a key isn't in the keyboard, does
 // it do nothing, or fall through to the computer's own layout? It replaces
 // the retired per-carve Allow/Block control; it is never shown in the carve
-// gallery. Interim host: the bottom of the Assign Mechanisms step (the
-// Behaviours step that will own it has not landed).
+// gallery.
 //
 // Copy rules (A2, binding): each option states its OWN risk; neither is
 // framed as recommended. Host output is a best guess from reference layouts,
 // never sight of the typists' machines ("unknown" where the data has no
 // cell). Deadkey suppression is stated as a rule, not offered as a choice.
 
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { FallbackPolicy } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -24,11 +23,19 @@ import type { BaseLayoutId } from "../../lib/referenceBaseLayouts.ts";
 const SAMPLE_KEY = { key: "K_Q", modifiers: [] as string[], label: "Q" };
 
 export interface FallbackPolicySectionProps {
-  /** Start with the disclosure open. Default closed (the section sits under the gallery). */
+  /**
+   * embedded — legacy host under another step (collapsed `details`).
+   * full — its own manifest step; always open, no disclosure wrapper (issue #2539).
+   */
+  variant?: "embedded" | "full";
+  /** Start with the disclosure open (embedded only). */
   defaultOpen?: boolean;
 }
 
-export function FallbackPolicySection({ defaultOpen = false }: FallbackPolicySectionProps) {
+export function FallbackPolicySection({
+  defaultOpen = false,
+  variant = "embedded",
+}: FallbackPolicySectionProps) {
   const { t } = useLingui();
   const policy = useWorkingCopyStore((s) => s.fallbackPolicy);
   const setFallbackPolicy = useWorkingCopyStore((s) => s.setFallbackPolicy);
@@ -38,9 +45,6 @@ export function FallbackPolicySection({ defaultOpen = false }: FallbackPolicySec
   const bcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
   const { hosts } = useLikelyBaseLayouts(bcp47);
 
-  // The representative undefined key: the first carved key that resolves to a
-  // physical key (a carved key IS an undefined key afterwards), else a fixed
-  // sample. The label names it so the table is never anonymous.
   const representative = useMemo(() => {
     if (startIr !== null) {
       const combo = resolveCarvedCombos(startIr, [...deletedNodeIds, ...deletedItemIds]).find(
@@ -71,33 +75,21 @@ export function FallbackPolicySection({ defaultOpen = false }: FallbackPolicySec
   });
   const keyLabel = representative.label;
 
-  return (
-    <details
-      data-testid="fallback-policy-section"
-      {...(defaultOpen ? { open: true } : {})}
-      style={{
-        borderTop: "1px solid var(--app-border)",
-        background: "var(--app-surface)",
-        color: "var(--app-text)",
-        fontFamily: "var(--app-font)",
-        padding: "8px 22px",
-      }}
-    >
-      <summary className="ks-focus-ring" style={{ cursor: "pointer", font: "600 13px var(--app-font)" }}>
-        <Trans id="fallback.section.summary">When a key isn't in your keyboard</Trans>
-        {": "}
-        <span
-          data-testid="fallback-policy-current"
-          style={{ fontWeight: 400, color: "var(--app-text-muted)" }}
-        >
-          {policy === "swallow" ? doNothingLabel : passThroughLabel}
-        </span>
-      </summary>
+  const legendEmbedded = t({
+    id: "fallback.policy.legend",
+    message: "When a key isn't in your keyboard",
+  });
+  const legendFull = t({
+    id: "fallback.step.fieldsetLegend",
+    message: "Undefined keys: allow or block",
+  });
 
-      <fieldset style={{ border: "none", margin: "10px 0 0", padding: 0 }}>
-        <legend style={{ font: "600 13px var(--app-font)", padding: 0, marginBottom: 6 }}>
-          <Trans id="fallback.policy.legend">When a key isn't in your keyboard</Trans>
-        </legend>
+  const legendStyle: CSSProperties = { font: "600 13px var(--app-font)", padding: 0, marginBottom: 6 };
+
+  const body = (
+    <>
+      <fieldset style={{ border: "none", margin: variant === "full" ? 0 : "10px 0 0", padding: 0 }}>
+        <legend style={legendStyle}>{variant === "full" ? legendFull : legendEmbedded}</legend>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -230,6 +222,48 @@ export function FallbackPolicySection({ defaultOpen = false }: FallbackPolicySec
           </Trans>
         </p>
       </div>
+    </>
+  );
+
+  if (variant === "full") {
+    return (
+      <div
+        data-testid="fallback-policy-section"
+        style={{
+          background: "var(--app-surface)",
+          color: "var(--app-text)",
+          fontFamily: "var(--app-font)",
+          padding: 0,
+        }}
+      >
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <details
+      data-testid="fallback-policy-section"
+      {...(defaultOpen ? { open: true } : {})}
+      style={{
+        borderTop: "1px solid var(--app-border)",
+        background: "var(--app-surface)",
+        color: "var(--app-text)",
+        fontFamily: "var(--app-font)",
+        padding: "8px 22px",
+      }}
+    >
+      <summary className="ks-focus-ring" style={{ cursor: "pointer", font: "600 13px var(--app-font)" }}>
+        <Trans id="fallback.section.summary">When a key isn't in your keyboard</Trans>
+        {": "}
+        <span
+          data-testid="fallback-policy-current"
+          style={{ fontWeight: 400, color: "var(--app-text-muted)" }}
+        >
+          {policy === "swallow" ? doNothingLabel : passThroughLabel}
+        </span>
+      </summary>
+      {body}
     </details>
   );
 }

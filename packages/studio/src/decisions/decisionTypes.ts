@@ -154,6 +154,7 @@ export type DecisionId =
   | "deadkeys-defined"
   | "rule-set"
   | "physical-layout"
+  | "fallback-policy"
   | "osk-layout"
   | "touch-seed-source"
   | "language-list"
@@ -428,6 +429,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   // additions into the groups/stores subtrees.
   "rule-set": [["groups"], ["stores"]],
   "physical-layout": [],
+  "fallback-policy": [],
   "osk-layout": [],
   "touch-seed-source": [],
   "language-list": [],

@@ -171,7 +171,7 @@ describe("BaseResolution — Back in every render state (spec 081 FR-015)", () =
     const nav = screen.getByRole("group", { name: "Step navigation" });
     const back = screen.getByTestId("base-back");
     expect(nav.contains(back)).toBe(true);
-    expect(back.textContent).toBe("← Back");
+    expect(back.textContent).toBe("Back");
     expect(screen.queryByTestId("base-confirm")).toBeNull();
     fireEvent.click(back);
     expect(onBack).toHaveBeenCalledTimes(1);

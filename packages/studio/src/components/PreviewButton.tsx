@@ -33,19 +33,27 @@ export interface PreviewButtonProps {
 }
 
 /**
- * How far the button sits above the bottom of its column. The journey footer
- * is a solid bar at the bottom of the shell column, so the offset adds the
- * bar's height — `--studio-footer-h` is 0 when no footer is mounted
- * (index.css).
+ * How far the button sits above the bottom of its column: 12px above the
+ * footer's top edge. The footer sits in the shell's normal column flow
+ * BELOW the content area (StudioShell root: NavBar, content flex: 1,
+ * StudioFooter), so every containing block this button floats in already
+ * ends at the footer's top — adding `--studio-footer-h` here double-counted
+ * the bar and lifted the button 52px too high on a coarse pointer (#2570).
+ * That +footer term was a leftover from the frosted-glass era, when the
+ * footer overlapped the content column; #2079 moved the bars into normal
+ * flow and the term should have gone with the overlap. No safe-area inset:
+ * 12px above the footer top is already clear of the home-indicator zone.
  */
-const BUTTON_OFFSET = "calc(12px + var(--studio-footer-h, 0px))";
+const BUTTON_OFFSET = "12px";
 
 /**
  * Bottom padding a scroll container needs so its last line can scroll clear
- * of the floating button and the footer beneath it (button height + offset +
- * a little air).
+ * of the floating button (button height + 12px offset + a little air). The
+ * footer needs no room here: it sits in normal flow below the scroll
+ * container, not under it — the old `+ var(--studio-footer-h)` term
+ * double-counted it (#2570).
  */
-export const PREVIEW_BUTTON_CLEARANCE = "calc(72px + var(--studio-footer-h, 0px))";
+export const PREVIEW_BUTTON_CLEARANCE = "72px";
 
 const BUTTON_STYLE: CSSProperties = {
   position: "absolute",

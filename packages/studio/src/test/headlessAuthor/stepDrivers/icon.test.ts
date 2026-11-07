@@ -1,11 +1,13 @@
-// The icon step driver (spec 107 T016): keeps the template icon — the base
-// .ico re-encoded — or the generated default when the base has none.
+// The icon step driver (spec 107 T016): mirrors the UI's three options.
+// Default is Keep when the template carries a usable .ico — the source
+// bytes pass through unchanged; with no source icon it is Create — the
+// blank white 48×48 canvas re-encoded as [16, 32, 48].
 
 import { unzlibSync } from "fflate";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import { decodeIco, encodeIco, base64ToIco } from "../../../editors/assignLoop/icoCodec.ts";
+import { decodeIco, encodeIco, base64ToIco, icoToBase64 } from "../../../editors/assignLoop/icoCodec.ts";
 import { useDecisionStore } from "../../../stores/decisionStore.ts";
 import { useSurveySessionStore } from "../../../stores/surveySessionStore.ts";
 import { bindManifest, useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
@@ -81,22 +83,19 @@ describe("encodePngDataUrl", () => {
 });
 
 describe("icon driver", () => {
-  it("keeps the base .ico: re-encodes it and pairs it with a 256px PNG", async () => {
-    const red = new Uint8ClampedArray(48 * 48 * 4);
-    for (let i = 0; i < red.length; i += 4) {
-      red[i] = 200;
-      red[i + 3] = 255;
-    }
-    seedStart(encodeIco({ width: 48, height: 48, pixels: red }, [48]));
+  it("with no source icon: creates a blank white canvas (16/32/48 + 48px PNG)", async () => {
+    seedStart();
     const result = (await iconDrivers["icon"]!(ctx())) as {
       iconIcoBase64: string;
       iconPngDataUrl: string;
     };
-    const decoded = await decodeIco(base64ToIco(result.iconIcoBase64));
-    expect(decoded.width).toBe(256);
-    expect(decoded.height).toBe(256);
-    expect(decoded.pixels[0]).toBe(200); // the base red survives the round trip
-    expect(decoded.pixels[3]).toBe(255);
+    const icoBytes = base64ToIco(result.iconIcoBase64);
+    // Exactly three entries: 16, 32, 48 — no 256px entry.
+    expect(new DataView(icoBytes.buffer, icoBytes.byteOffset).getUint16(4, true)).toBe(3);
+    const decoded = await decodeIco(icoBytes);
+    expect(decoded.width).toBe(48);
+    expect(decoded.height).toBe(48);
+    expect([...decoded.pixels.subarray(0, 4)]).toEqual([255, 255, 255, 255]); // white
     const png = Uint8Array.from(
       atob(result.iconPngDataUrl.slice("data:image/png;base64,".length)),
       (c) => c.charCodeAt(0),
@@ -104,19 +103,47 @@ describe("icon driver", () => {
     const chunks = pngChunks(png);
     const ihdr = chunks[0]![1]!;
     const view = new DataView(ihdr.buffer, ihdr.byteOffset);
-    expect(view.getUint32(0)).toBe(256);
-    expect(view.getUint32(4)).toBe(256);
+    expect(view.getUint32(0)).toBe(48);
+    expect(view.getUint32(4)).toBe(48);
   });
 
-  it("falls back to the generated default when the base has no .ico", async () => {
-    seedStart();
+  it("with a source icon: keeps the template's .ico byte-for-byte (default Keep)", async () => {
+    const red = new Uint8ClampedArray(48 * 48 * 4);
+    for (let i = 0; i < red.length; i += 4) {
+      red[i] = 200;
+      red[i + 3] = 255;
+    }
+    const seed = encodeIco({ width: 48, height: 48, pixels: red }, [48]);
+    seedStart(seed);
     const result = (await iconDrivers["icon"]!(ctx())) as {
       iconIcoBase64: string;
       iconPngDataUrl: string;
     };
-    expect(result.iconIcoBase64.length).toBeGreaterThan(0);
-    expect(result.iconPngDataUrl.startsWith("data:image/png;base64,")).toBe(true);
+    // The .ico passes through unchanged — not re-encoded.
+    expect(result.iconIcoBase64).toBe(icoToBase64(seed));
+    // The PNG is the source icon at 48px (red, not white).
+    const png = Uint8Array.from(
+      atob(result.iconPngDataUrl.slice("data:image/png;base64,".length)),
+      (c) => c.charCodeAt(0),
+    );
+    const chunks = pngChunks(png);
+    const ihdr = chunks[0]![1]!;
+    const view = new DataView(ihdr.buffer, ihdr.byteOffset);
+    expect(view.getUint32(0)).toBe(48);
+    expect(view.getUint32(4)).toBe(48);
+    const raw = unzlibSync(chunks[1]![1]!);
+    expect([...raw.subarray(0, 5)]).toEqual([0, 200, 0, 0, 255]);
+  });
+
+  it("with an undecodable .ico: falls back to the blank white canvas", async () => {
+    seedStart(new Uint8Array([1, 2, 3, 4]));
+    const result = (await iconDrivers["icon"]!(ctx())) as {
+      iconIcoBase64: string;
+      iconPngDataUrl: string;
+    };
     const decoded = await decodeIco(base64ToIco(result.iconIcoBase64));
-    expect(decoded.width).toBe(256);
+    expect(decoded.width).toBe(48);
+    expect(decoded.pixels[0]).toBe(255); // white, not the base bytes
+    expect(decoded.pixels[3]).toBe(255);
   });
 });

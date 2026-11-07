@@ -16,6 +16,7 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/fallbackPolicyAdapter.tsx", () => import("./test/studioShellMocks/FallbackPolicyAdapter.tsx"));
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
@@ -116,7 +117,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → osk → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → fallback_policy → osk → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -188,8 +189,12 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("rules-continue"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → osk (the OSK editor step sits between mechanisms and touch)
+    // → fallback_policy (#2539: keyboard-wide policy after mechanisms, before OSK)
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("fallback-policy-continue")).toBeTruthy();
+
+    // → osk (the OSK editor step sits after fallback_policy)
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
     expect(screen.getByTestId("osk-continue")).toBeTruthy();
 
     // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
@@ -232,6 +237,8 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
     expect(screen.getByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();

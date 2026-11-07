@@ -88,6 +88,7 @@ import { marksDrivers } from "./stepDrivers/marks.ts";
 import { convenienceDrivers } from "./stepDrivers/convenience.ts";
 import { carveDrivers } from "./stepDrivers/carve.ts";
 import { mechanismDrivers } from "./stepDrivers/mechanism.ts";
+import { fallbackPolicyDrivers } from "./stepDrivers/fallbackPolicy.ts";
 import { startShipsUsableTouch, touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
 import { oskDrivers } from "./stepDrivers/osk.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
@@ -122,6 +123,7 @@ const DRIVERS: StepDrivers = {
   ...convenienceDrivers,
   ...carveDrivers,
   ...mechanismDrivers,
+  ...fallbackPolicyDrivers,
   ...oskDrivers,
   ...touchSeedDrivers,
   ...customCssDrivers,
@@ -208,7 +210,7 @@ function withTouchApplicability(g: GateResult, hasShippedTouch: boolean): GateRe
 
 export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promise<AuthorRun> {
   resetAuthorStores();
-  const report = createRunReport(useWorkingCopyStore.getState().fallbackPolicy);
+  const report = createRunReport();
   const base = { caseId: c.id, gates: [], report: report.report };
 
   try {

@@ -119,6 +119,8 @@ export async function advanceToMechanisms() {
 export async function advanceToTouchSeedSource() {
   await advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-continue"));
+  await screen.findByTestId("fallback-policy-continue");
+  fireEvent.click(screen.getByTestId("fallback-policy-continue"));
   await screen.findByTestId("osk-continue");
   fireEvent.click(screen.getByTestId("osk-continue"));
 }

@@ -78,6 +78,7 @@ import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@k
 import { selectStrategy, deriveCarveNeededSet, generateKvksFromIR, oskContinueResult } from "@keyboard-studio/engine";
 import { completeOskStep } from "../lib/oskStepCompletion.ts";
 import { completeHtmlStep } from "../lib/htmlStepCompletion.ts";
+import { completeFallbackPolicyStep } from "../lib/fallbackPolicyStepCompletion.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -789,6 +790,12 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "fallback_policy": {
+          completeFallbackPolicyStep();
+          result = undefined;
+          break;
+        }
+
         case "osk": {
           // Mirror OskEditorAdapter: record osk-layout from generated kvks.
           const ir = useWorkingCopyStore.getState().ir;
@@ -872,8 +879,8 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
         case "icon": {
           // Keyboard icon — fixtures carry no icon edits; advance with the
-          // template icon unchanged (keep-template: the editor starts from
-          // the base keyboard's icon and Continue ships it unedited).
+          // template icon unchanged (the default option is Keep, so an
+          // untouched walk ships the template's icon as-is).
           result = undefined;
           break;
         }
