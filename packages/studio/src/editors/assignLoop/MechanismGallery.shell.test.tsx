@@ -95,7 +95,7 @@ describe("MechanismGallery — no inventory", () => {
     const onBack = vi.fn();
     render(<MechanismGallery selectedStartKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true });
     // The guard path renders a Back button when onBack is given.
-    const btn = screen.getByRole("button", { name: /← back/i });
+    const btn = screen.getByRole("button", { name: "Back" });
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(onBack).toHaveBeenCalledOnce();
