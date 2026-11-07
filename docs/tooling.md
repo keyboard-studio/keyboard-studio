@@ -329,8 +329,10 @@ npx playwright install chromium                       # once per version bump
 
 E2E stays out of the unit CI lanes (vitest and tsc both exclude `e2e/**`), but CI runs it in its
 own **non-blocking** `e2e` job in [ci.yml](../.github/workflows/ci.yml) (`continue-on-error`, not a
-required check): it checks out the pinned corpus, builds studio's workspace dependencies,
-installs Chromium, and runs `test:e2e` with the spec filters listed under
+required check): it runs inside the `mcr.microsoft.com/playwright` container image (browsers and
+system libraries preinstalled — no apt install; see [PR CI budget](#pr-ci-budget)), checks out the
+pinned corpus, builds studio's workspace dependencies, installs Chromium, and runs `test:e2e` with
+the spec filters listed under
 [PR CI budget](#pr-ci-budget) — Playwright's positional args are
 file filters, so widening the lane is adding a spec name there. On failure the HTML report and
 traces (`playwright-report/`, `test-results/`, CI-only) upload as the `playwright-report`
@@ -352,6 +354,19 @@ run on the schedule, not on pull requests.
 | Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity`, narrowed by `--grep "boot-smoke|decision-store-reload|spec 104 walk 1:"`; one command, so one results summary) | about 3 min |
 | Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks) | about 17 min |
 
+- **Playwright container image.** The three e2e jobs (`e2e-desktop`, `e2e-mobile`,
+  `e2e-golden`) run in `mcr.microsoft.com/playwright:v1.61.1-noble` with
+  `--ipc=host --init` (Playwright's documented recommendation for Chromium in Docker:
+  `--ipc=host` keeps Chromium off the container's 64 MB /dev/shm, `--init` reaps zombie
+  browser processes). The image ships the
+  browsers and their system libraries, so the jobs never run apt: on #2542 the old
+  `npx playwright install --with-deps chromium` step stalled 13 minutes while apt fetched
+  18.9 MB from the Ubuntu mirror at 24.5 kB/s, taking that PR's CI to ~16 minutes. The
+  image tag MUST track the Playwright version pinned in `pnpm-lock.yaml` (1.61.1) — bump
+  both in one PR. If they drift, the plain `npx playwright install chromium` step
+  downloads the matching browser from the CDN (seconds) instead of failing; each install
+  is bounded at 5 minutes (`timeout-minutes: 5` on the standalone steps, `timeout 300`
+  on the inline install inside the golden-walk capture step).
 - **Path gate.** On a pull request `e2e desktop` is skipped unless the `changes` job's `e2e`
   output is true: any non-markdown change under `packages/studio/` or `packages/glottolog/`, any
   change that turns the `golden` gate on (`packages/engine/`, `packages/contracts/`, `ci.yml`,
