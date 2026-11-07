@@ -15,11 +15,12 @@
 
 import "./touchBuilder/monacoSetup.ts";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { emitKmn, parseKmn } from "@keyboard-studio/engine";
+import { findRawCtrlRules } from "@keymanapp/keyboard-lint";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
@@ -29,6 +30,7 @@ import {
 } from "../../lib/replaceStartingPoint.ts";
 import {
   lintKmnCodeText,
+  rawCtrlRuleKey,
   type KmnCodeMarker,
   type KmnCodeMarkerSeverity,
 } from "./kmnCodeLint.ts";
@@ -78,6 +80,17 @@ export function KmnCodePane() {
   // The canonical text for the current IR (Open: the file's text, verbatim).
   const canonical = ir === null ? null : (openText ?? emitKmn(ir));
 
+  // Raw-Ctrl baseline (issue #2359): the rules already in the working copy
+  // never block Apply — only rules the edited text ADDS do. Content-keyed,
+  // so editing an unrelated rule never reclassifies one as new.
+  const baselineRawCtrl = useMemo(
+    () =>
+      ir === null
+        ? new Set<string>()
+        : new Set(findRawCtrlRules(ir, keyboardId).map(rawCtrlRuleKey)),
+    [ir, keyboardId],
+  );
+
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
   const textRef = useRef<string | null>(null);
@@ -115,7 +128,10 @@ export function KmnCodePane() {
 
   const runLint = (nextText: string) => {
     const id = keyboardIdRef.current;
-    const result = lintKmnCodeText(nextText, (t) => parseKmn(t, id));
+    const result = lintKmnCodeText(nextText, (t) => parseKmn(t, id), {
+      keyboardId: id,
+      baselineRawCtrl,
+    });
     setMarkers(result.markers);
     setParsed(result.parsed);
     applyMarkersToModel(result.markers);
@@ -199,7 +215,13 @@ export function KmnCodePane() {
     if (current === null || canonical === null) return;
     const id = keyboardIdRef.current;
     // Synchronous gate: the debounced lint state may lag behind the text.
-    if (!lintKmnCodeText(current, (t) => parseKmn(t, id)).parsed) return;
+    if (
+      !lintKmnCodeText(current, (t) => parseKmn(t, id), {
+        keyboardId: id,
+        baselineRawCtrl,
+      }).parsed
+    )
+      return;
     let after: ReturnType<typeof parseKmn>;
     try {
       after = parseKmn(current, id);
