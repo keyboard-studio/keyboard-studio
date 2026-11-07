@@ -6,13 +6,27 @@
 // way to keep a displaced character typeable). The panel writes only through the working-copy
 // store's `commitKmnEdit`; it never touches .kmn text or the compiler (decision D3: it starts no
 // timer). Content-team copy (FR-041).
+//
+// The deadkey option (spec 113 US3, FR-027) makes the key start a deadkey. A NEW deadkey goes
+// through spec 083's lifecycle (`commitLayoutDeadkeyOp`, a `define` op, with its disclosure of
+// what the key does on the likely base keyboards); when the key already types something, the
+// lifecycle puts the new trigger ahead of that rule, so one confirm is one undo step and the
+// trigger keeps its authorship marker. An EXISTING deadkey is a `set-key` entry with a deadkey
+// output. Either way the confirm
+// records `deadkeys-defined` with the current op list (an edit is a decision; recording does not
+// rebuild, research R12 addendum).
 
 import { useId, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { allocateDeadkeyId, listDeadkeys } from "@keyboard-studio/contracts";
 import type { KmnEdit, LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { CommitKmnEditResult, KmnEditInput, KmnEditRefusal } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { completeDeadkeysStep } from "../../lib/mechanismStepCompletion.ts";
+import { referenceBases } from "../../lib/referenceBases/index.ts";
+import { BaseDisclosure } from "../deadkey/BaseDisclosure.tsx";
+import { deadkeyRefOf, hexId } from "./deadkeyTable.ts";
 import { selectDesktopAssignments } from "../../lib/unimplementedInventory.ts";
 import { buildSlotOccupancy, slotKeyFor } from "../../survey/slotOccupancy.ts";
 import { codepointLabel } from "../../survey/codepointLabel.ts";
@@ -28,15 +42,18 @@ export interface KeyEditPanelProps {
   onViewInCode: (nodeId: string) => void;
   /** Called after an edit was committed. */
   onCommitted?: (result: Extract<CommitKmnEditResult, { ok: true }>) => void;
+  /** A new deadkey was defined on this key: open its table with the space row proposed. */
+  onDeadkeyDefined?: (deadkeyId: string) => void;
 }
 
+const NEW_DEADKEY = "__new__";
 const NO_ENTRIES: readonly KmnEdit[] = [];
 const NO_STRINGS: readonly string[] = [];
 
-export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelProps) {
+export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined }: KeyEditPanelProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
-  const ids = { text: useId(), inventory: useId(), nothing: useId(), partner: useId(), keep: useId() };
+  const ids = { text: useId(), inventory: useId(), nothing: useId(), partner: useId(), keep: useId(), deadkey: useId(), target: useId(), display: useId() };
 
   const ir = useWorkingCopyStore((s) => s.ir);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -54,10 +71,31 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
   const [keepDisplaced, setKeepDisplaced] = useState(true);
   const [refusal, setRefusal] = useState<KmnEditRefusal | null>(null);
   const [confirmOverride, setConfirmOverride] = useState(false);
+  const [deadkeyMode, setDeadkeyMode] = useState(false);
+  const [target, setTarget] = useState(NEW_DEADKEY);
+  const [displayText, setDisplayText] = useState("");
 
   const layer: LayerCombo = cell.layer;
   const incoming = text.normalize("NFC");
-  const hasInput = nothing || incoming !== "";
+  const existingDeadkeys = useMemo(
+    () =>
+      ir === null
+        ? []
+        : listDeadkeys(ir).flatMap((info) => {
+            const ref = deadkeyRefOf(info);
+            return ref === null ? [] : [{ ref, label: info.displayChar ?? ref }];
+          }),
+    [ir],
+  );
+  // The proposed display character: what the key types now, when that is one character.
+  const proposedDisplay = cell.display !== null && Array.from(cell.display).length === 1 ? cell.display : "";
+  const displayChar = (displayText !== "" ? displayText : proposedDisplay).normalize("NFC");
+  const makesNew = deadkeyMode && target === NEW_DEADKEY;
+  const hasInput = deadkeyMode ? !makesNew || displayChar !== "" : nothing || incoming !== "";
+  const hosts = useMemo(
+    () => (makesNew ? referenceBases({ key: cell.vkey, modifiers: [...layer] }) : null),
+    [makesNew, cell.vkey, layer],
+  );
 
   const displacement = useMemo(
     () =>
@@ -100,7 +138,51 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
       : `${displacement.displaced.char} (${codepointLabel(displacement.displaced.char).title})`;
   }
 
+  function commitDeadkey(): void {
+    const store = useWorkingCopyStore.getState();
+    let ref = target;
+    if (makesNew) {
+      const current = store.ir;
+      if (current === null) {
+        setRefusal("no-working-copy");
+        return;
+      }
+      const id = allocateDeadkeyId(current);
+      ref = hexId(id);
+      const defined = store.commitLayoutDeadkeyOp({
+        kind: "define",
+        triggerKey: cell.vkey,
+        ...(layer.length > 0 ? { triggerModifiers: [...layer] } : {}),
+        id,
+        accentChar: displayChar,
+      });
+      if (!defined.ok) {
+        setRefusal(defined.reason);
+        return;
+      }
+      completeDeadkeysStep();
+      setRefusal(null);
+      setDeadkeyMode(false);
+      setDisplayText("");
+      onDeadkeyDefined?.(ref);
+      return;
+    }
+    const result = store.commitKmnEdit({ op: "set-key", vkey: cell.vkey, layer, output: { kind: "deadkey", deadkeyId: ref } });
+    if (!result.ok) {
+      setRefusal(result.reason);
+      return;
+    }
+    completeDeadkeysStep();
+    setRefusal(null);
+    setDeadkeyMode(false);
+    onCommitted?.(result);
+  }
+
   function commit(): void {
+    if (deadkeyMode) {
+      commitDeadkey();
+      return;
+    }
     const op: KmnEditInput = nothing
       ? { op: "set-key", vkey: cell.vkey, layer, output: { kind: "nul" } }
       : { op: "set-key", vkey: cell.vkey, layer, output: { kind: "text", text: incoming } };
@@ -141,7 +223,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
   }
 
   function onConfirm(): void {
-    if (overridesAssignment && !confirmOverride) {
+    if (overridesAssignment && !confirmOverride && !deadkeyMode) {
       setConfirmOverride(true);
       return;
     }
@@ -185,7 +267,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
         id={ids.text}
         type="text"
         value={text}
-        disabled={nothing}
+        disabled={nothing || deadkeyMode}
         onChange={(e) => {
           setText(e.target.value);
           setConfirmOverride(false);
@@ -226,13 +308,81 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
           id={ids.nothing}
           type="checkbox"
           checked={nothing}
+          disabled={deadkeyMode}
           onChange={(e) => setNothing(e.target.checked)}
           data-testid="key-edit-nothing"
         />
         {t({ id: "editor.layout.edit.nothingLabel", message: "Make this key type nothing" })}
       </label>
 
-      {hasInput && (
+      <label htmlFor={ids.deadkey} style={checkLabelStyle}>
+        <input
+          id={ids.deadkey}
+          type="checkbox"
+          checked={deadkeyMode}
+          onChange={(e) => setDeadkeyMode(e.target.checked)}
+          data-testid="key-edit-deadkey"
+        />
+        {t({ id: "editor.layout.edit.deadkeyLabel", message: "Make this key a deadkey" })}
+      </label>
+
+      {deadkeyMode && (
+        <div style={noteStyle} data-testid="key-edit-deadkey-options">
+          <label htmlFor={ids.target} style={labelStyle}>
+            {t({ id: "editor.layout.edit.deadkeyWhich", message: "Which deadkey" })}
+          </label>
+          <select
+            id={ids.target}
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            data-testid="key-edit-deadkey-target"
+            className="ks-focus-ring"
+            style={inputStyle}
+          >
+            <option value={NEW_DEADKEY}>{t({ id: "editor.layout.edit.deadkeyNew", message: "A new deadkey" })}</option>
+            {existingDeadkeys.map((d) => (
+              <option key={d.ref} value={d.ref}>
+                {t({ id: "editor.layout.edit.deadkeyExisting", message: `${{ label: d.label }} (dk ${{ id: d.ref }})` })}
+              </option>
+            ))}
+          </select>
+          {makesNew && (
+            <>
+              <label htmlFor={ids.display} style={labelStyle}>
+                {t({ id: "editor.layout.edit.deadkeyDisplay", message: "Display character (the accent this key types when pressed twice)" })}
+              </label>
+              <input
+                id={ids.display}
+                type="text"
+                value={displayText !== "" ? displayText : proposedDisplay}
+                onChange={(e) => setDisplayText(e.target.value)}
+                data-testid="key-edit-deadkey-display"
+                className="ks-focus-ring"
+                style={inputStyle}
+              />
+              {hosts !== null && <BaseDisclosure hosts={hosts} />}
+            </>
+          )}
+        </div>
+      )}
+
+      {deadkeyMode && hasInput && (
+        <div data-testid="key-edit-preview" role="status" style={noteStyle}>
+          <p style={{ margin: 0 }}>
+            {makesNew
+              ? t({
+                  id: "editor.layout.edit.previewNewDeadkey",
+                  message: `Key ${{ key: cell.keyLabel }} (${{ layer: layerName }}) will start a new deadkey shown as ${{ text: displayChar }}. Pressing it twice types ${{ text: displayChar }}.`,
+                })
+              : t({
+                  id: "editor.layout.edit.previewExistingDeadkey",
+                  message: `Key ${{ key: cell.keyLabel }} (${{ layer: layerName }}) will start the deadkey ${{ id: target }}.`,
+                })}
+          </p>
+        </div>
+      )}
+
+      {!deadkeyMode && hasInput && (
         <div data-testid="key-edit-preview" role="status" style={noteStyle}>
           <p style={{ margin: 0 }}>
             {nothing
@@ -262,7 +412,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
         </div>
       )}
 
-      {displacement !== null && displacement.alreadyTypedAt.length > 0 && (
+      {!deadkeyMode && displacement !== null && displacement.alreadyTypedAt.length > 0 && (
         <p style={noteStyle} data-testid="key-edit-duplicate">
           {t({
             id: "editor.layout.edit.duplicate",
@@ -271,7 +421,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
         </p>
       )}
 
-      {lostNow && (
+      {!deadkeyMode && lostNow && (
         <div style={noteStyle} data-testid="key-edit-displacement">
           <p style={{ margin: 0 }}>
             {t({
@@ -294,7 +444,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
         </div>
       )}
 
-      {partner !== null && partner.kind === "offer" && (
+      {!deadkeyMode && partner !== null && partner.kind === "offer" && (
         <label htmlFor={ids.partner} style={checkLabelStyle} data-testid="key-edit-partner">
           <input
             id={ids.partner}
@@ -318,7 +468,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
         </p>
       )}
 
-      {overridesAssignment && (
+      {overridesAssignment && !deadkeyMode && (
         <p style={warnStyle} role="alert" data-testid="key-edit-override-warning">
           {t({
             id: "editor.layout.edit.overrideWarning",
@@ -351,9 +501,11 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted }: KeyEditPanelPr
         className="ks-focus-ring ks-hit-target ks-press"
         style={confirmStyle}
       >
-        {overridesAssignment && confirmOverride
-          ? t({ id: "editor.layout.edit.confirmOverride", message: "Replace the Assign tab assignment" })
-          : t({ id: "editor.layout.edit.confirm", message: "Change this key" })}
+        {deadkeyMode
+          ? t({ id: "editor.layout.edit.confirmDeadkey", message: "Make this key a deadkey" })
+          : overridesAssignment && confirmOverride
+            ? t({ id: "editor.layout.edit.confirmOverride", message: "Replace the Assign tab assignment" })
+            : t({ id: "editor.layout.edit.confirm", message: "Change this key" })}
       </button>
     </section>
   );

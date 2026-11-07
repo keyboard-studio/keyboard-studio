@@ -15,6 +15,7 @@ import {
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import {
   contextToSeed,
+  deadkeyOrdinals,
   layerToSimInput,
   useLayoutAttribution,
   type SimulateEach,
@@ -165,6 +166,19 @@ describe("contextToSeed", () => {
       text: "a",
       pendingDeadkeys: [{ id: 16, position: 1 }],
     });
+  });
+  it("seeds the compiler's number for a deadkey, which counts the source's first mentions from 0", () => {
+    const ir = parseKmn(
+      ["store(&VERSION) '10.0'", "store(&NAME) 'o'", "store(&TARGETS) 'any'", "begin Unicode > use(main)", "group(main) using keys", "+ [K_E] > dk(3000)", "+ [K_A] > dk(005e)", "dk(005e) + [K_B] > 'b'"].join(String.fromCharCode(10)) + String.fromCharCode(10),
+      "o",
+    ).ir;
+    const ordinals = deadkeyOrdinals(ir);
+    expect([...ordinals]).toEqual([[0x3000, 0], [0x5e, 1]]);
+    expect(contextToSeed([{ kind: "deadkey", deadkeyId: "005e" }], ordinals)).toEqual({
+      text: "",
+      pendingDeadkeys: [{ id: 1, position: 0 }],
+    });
+    expect(contextToSeed([{ kind: "deadkey", deadkeyId: "9999" }], ordinals)).toBeNull();
   });
   it("cannot seed a named deadkey (no number until the compiler assigns one)", () => {
     expect(contextToSeed([{ kind: "deadkey", deadkeyId: "acute" }])).toBeNull();

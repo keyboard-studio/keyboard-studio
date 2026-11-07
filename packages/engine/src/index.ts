@@ -1151,6 +1151,7 @@ export {
   renameDeadkey,
   deleteDeadkey,
   retargetDeadkey,
+  setDeadkeyDisplay,
 } from "./deadkey-lifecycle/index.js";
 export type {
   DeadkeyConflict,
@@ -1160,6 +1161,7 @@ export type {
   DeleteDeadkeyOptions,
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
+  SetDeadkeyDisplayOptions,
 } from "./deadkey-lifecycle/index.js";
 export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
 export type { RgbaImage } from "./icon/icoEncoder.js";

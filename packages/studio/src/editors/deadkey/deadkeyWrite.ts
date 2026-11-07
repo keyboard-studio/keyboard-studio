@@ -201,6 +201,38 @@ export function withAddedDeadkeyPair(
 }
 
 /**
+ * Insert one base→accented pair at `index` in both fan-out stores (lockstep).
+ * `index` may equal the current length (append). Undoing a `remove-pair`
+ * with this restores the stores' order exactly, where `withAddedDeadkeyPair`
+ * would put the pair last. Throws when the stores are missing or the index is
+ * out of range.
+ */
+export function withInsertedDeadkeyPair(
+  ir: KeyboardIR,
+  baseStoreName: string,
+  outputStoreName: string,
+  index: number,
+  base: string,
+  accented: string,
+): KeyboardIR {
+  const next = structuredClone(ir);
+  const bases = storeByName(next, baseStoreName);
+  const outputs = storeByName(next, outputStoreName);
+  if (!bases || !outputs) {
+    throw new Error(
+      `withInsertedDeadkeyPair: fan-out stores not found ("${baseStoreName}", "${outputStoreName}")`,
+    );
+  }
+  const limit = Math.min(bases.items.length, outputs.items.length);
+  if (!Number.isInteger(index) || index < 0 || index > limit) {
+    throw new Error(`withInsertedDeadkeyPair: pair index ${index} out of range`);
+  }
+  bases.items.splice(index, 0, { kind: "char", value: base });
+  outputs.items.splice(index, 0, { kind: "char", value: accented });
+  return next;
+}
+
+/**
  * Remove the pair at `index` (zipped position across the two fan-out
  * stores). Throws when the index is out of range.
  */

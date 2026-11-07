@@ -6,11 +6,12 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { attributeLayer, emitKmn, parseKmn } from "@keyboard-studio/engine";
+import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { KmnEditsValue, LayerCombo, MechanismAssignment } from "@keyboard-studio/contracts";
 import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { makeReadyRulesDemoArtifact, useRulesDemoArtifactStore } from "../../stores/rulesDemoArtifactStore.ts";
+import { makeIdleRulesDemoArtifact, makeReadyRulesDemoArtifact, useRulesDemoArtifactStore } from "../../stores/rulesDemoArtifactStore.ts";
 import { buildDesktopGridViewModel } from "./desktopGridViewModel.ts";
 import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
 import { KeyEditPanel } from "./KeyEditPanel.tsx";
@@ -35,7 +36,7 @@ dk(0001) + [K_A] > U+00E1
 
 function seed(): void {
   const ir = parseKmn(KMN, "kep").ir;
-  useWorkingCopyStore.setState({ ir, startIr: ir, undoStack: [], desktopLocked: false, phaseResults: [], displacedDeclined: [] });
+  useWorkingCopyStore.setState({ ir, startIr: ir, undoStack: [], desktopLocked: false, phaseResults: [], displacedDeclined: [], deadkeyOverlay: { ops: [] } });
   useDecisionStore.getState().reset();
   useRulesDemoArtifactStore.getState().setArtifact(makeReadyRulesDemoArtifact("blob:kep", "kep"));
 }
@@ -180,5 +181,83 @@ describe("KeyEditPanel", () => {
     fireEvent.click(screen.getByTestId("key-edit-confirm"));
     expect(screen.getByTestId("key-edit-refusal")).toBeTruthy();
     expect(logged()).toBeUndefined();
+  });
+  describe("the deadkey option (spec 113 US3)", () => {
+    const deadkeysDefined = () =>
+      useDecisionStore.getState().decisions["deadkeys-defined"]?.value as { ops: Array<{ kind: string }> } | undefined;
+
+    it("a new deadkey on an unhandled key goes through the spec 083 define op with its disclosure", () => {
+      const onDeadkeyDefined = vi.fn();
+      render(<KeyEditPanel cell={cellFor("K_RBRKT")} onViewInCode={vi.fn()} onDeadkeyDefined={onDeadkeyDefined} />);
+      fireEvent.click(screen.getByTestId("key-edit-deadkey"));
+      // The base-keyboard disclosure (spec 083) is shown before the author confirms.
+      expect(screen.getByText(/best guess, not sight/i)).toBeTruthy();
+      fireEvent.change(screen.getByTestId("key-edit-deadkey-display"), { target: { value: "´" } });
+      expect(screen.getByTestId("key-edit-preview").textContent).toContain("new deadkey");
+      fireEvent.click(screen.getByTestId("key-edit-confirm"));
+
+      const ops = useWorkingCopyStore.getState().deadkeyOverlay.ops;
+      expect(ops).toHaveLength(1);
+      expect(ops[0]).toMatchObject({ kind: "define", triggerKey: "K_RBRKT", accentChar: "´" });
+      expect(text()).toContain("@deadkey:");
+      expect(deadkeysDefined()?.ops).toHaveLength(1);
+      expect(onDeadkeyDefined).toHaveBeenCalledTimes(1);
+    });
+
+    it("a new deadkey on a key that types something goes ahead of that rule, in one undo step, keeping its authorship marker", () => {
+      const before = text();
+      render(<KeyEditPanel cell={cellFor("K_N")} onViewInCode={vi.fn()} />);
+      fireEvent.click(screen.getByTestId("key-edit-deadkey"));
+      fireEvent.change(screen.getByTestId("key-edit-deadkey-display"), { target: { value: "~" } });
+      fireEvent.click(screen.getByTestId("key-edit-confirm"));
+      const state = useWorkingCopyStore.getState();
+      expect(state.deadkeyOverlay.ops[0]).toMatchObject({ kind: "define", triggerKey: "K_N" });
+      expect(logged()).toBeUndefined();
+      expect(state.undoStack.map((e) => e.k)).toEqual(["ld"]);
+      const after = text();
+      expect(after.indexOf("@deadkey:")).toBeGreaterThan(-1);
+      expect(after.indexOf("> dk(")).toBeLessThan(after.indexOf("+ [K_N] > U+006E"));
+      expect(listDeadkeys(state.ir!).find((d) => d.triggerKey === "K_N")?.origin).toBe("studio");
+      useWorkingCopyStore.getState().undoKmnEdit();
+      expect(text()).toBe(before);
+      expect(useWorkingCopyStore.getState().undoStack).toEqual([]);
+    });
+
+    it("a new deadkey on a modifier layer defines the trigger on that layer", () => {
+      render(<KeyEditPanel cell={cellFor("K_RBRKT", ["RALT"])} onViewInCode={vi.fn()} />);
+      fireEvent.click(screen.getByTestId("key-edit-deadkey"));
+      fireEvent.change(screen.getByTestId("key-edit-deadkey-display"), { target: { value: "^" } });
+      fireEvent.click(screen.getByTestId("key-edit-confirm"));
+      expect(useWorkingCopyStore.getState().deadkeyOverlay.ops[0]).toMatchObject({
+        kind: "define",
+        triggerKey: "K_RBRKT",
+        triggerModifiers: ["RALT"],
+      });
+    });
+
+    it("an existing deadkey is a set-key entry with a deadkey output, and records deadkeys-defined", () => {
+      render(<KeyEditPanel cell={cellFor("K_RBRKT")} onViewInCode={vi.fn()} />);
+      fireEvent.click(screen.getByTestId("key-edit-deadkey"));
+      fireEvent.change(screen.getByTestId("key-edit-deadkey-target"), { target: { value: "0001" } });
+      expect(screen.queryByTestId("key-edit-deadkey-display")).toBeNull();
+      fireEvent.click(screen.getByTestId("key-edit-confirm"));
+      expect(logged()?.entries[0]).toMatchObject({
+        op: "set-key",
+        vkey: "K_RBRKT",
+        output: { kind: "deadkey", deadkeyId: "0001" },
+      });
+      expect(text()).toContain("+ [K_RBRKT] > dk(0001)");
+      expect(deadkeysDefined()).toBeDefined();
+    });
+
+    it("refuses, writing nothing, when the keyboard has not compiled", () => {
+      useRulesDemoArtifactStore.getState().setArtifact(makeIdleRulesDemoArtifact());
+      render(<KeyEditPanel cell={cellFor("K_RBRKT")} onViewInCode={vi.fn()} />);
+      fireEvent.click(screen.getByTestId("key-edit-deadkey"));
+      fireEvent.change(screen.getByTestId("key-edit-deadkey-display"), { target: { value: "´" } });
+      fireEvent.click(screen.getByTestId("key-edit-confirm"));
+      expect(screen.getByTestId("key-edit-refusal")).toBeTruthy();
+      expect(useWorkingCopyStore.getState().deadkeyOverlay.ops).toHaveLength(0);
+    });
   });
 });

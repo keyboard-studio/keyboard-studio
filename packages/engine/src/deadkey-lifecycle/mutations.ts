@@ -38,6 +38,7 @@ import {
   isPlusSeparator,
   listDeadkeys,
   scanDeadkeyRefs,
+  setDeadkeyDisplay as setRuleDisplay,
   setDeadkeyName,
 } from "@keyboard-studio/contracts";
 import type {
@@ -46,8 +47,10 @@ import type {
   IRRule,
   IRStore,
   KeyboardIR,
+  LayerCombo,
 } from "@keyboard-studio/contracts";
 import { entryGroupOf, insertBlockBeforeTerminalRules } from "../pattern-apply/ir-insert.js";
+import { ruleIsContextFreeOn } from "../layout-ops/ruleMatch.js";
 import {
   describeRule,
   findContextRules,
@@ -63,6 +66,7 @@ import type {
   DeleteDeadkeyOptions,
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
+  SetDeadkeyDisplayOptions,
 } from "./types.js";
 
 function hex4(id: number): string {
@@ -83,17 +87,34 @@ function triggerOccupant(
   ir: KeyboardIR,
   triggerKey: string,
   exceptId: number,
+  modifiers: readonly string[] = [],
 ): DeadkeyInfo | undefined {
+  const want = modifierKey(modifiers);
   return listDeadkeys(ir).find(
-    (d) => d.triggerKey === triggerKey && d.id !== exceptId,
+    (d) =>
+      d.triggerKey === triggerKey &&
+      d.id !== exceptId &&
+      modifierKey(d.triggerModifiers ?? []) === want,
   );
+}
+
+/** Order-insensitive identity of a modifier set. */
+function modifierKey(modifiers: readonly string[]): string {
+  return [...modifiers].sort().join(" ");
+}
+
+/** Human label for a trigger: `[RALT K_QUOTE]`-style key text without brackets. */
+function triggerLabel(triggerKey: string, modifiers: readonly string[]): string {
+  return modifiers.length > 0 ? `${modifiers.join(" ")} ${triggerKey}` : triggerKey;
 }
 
 function triggerInUseConflict(
   triggerKey: string,
   occupant: DeadkeyInfo,
   action: string,
+  modifiers: readonly string[] = [],
 ): DeadkeyConflict {
+  const label = triggerLabel(triggerKey, modifiers);
   const occupantRef =
     occupant.id !== null
       ? `dk(${hex4(occupant.id)})`
@@ -101,9 +122,9 @@ function triggerInUseConflict(
   return {
     kind: "trigger-in-use",
     message:
-      `Cannot ${action}: trigger key ${triggerKey} already triggers ` +
+      `Cannot ${action}: trigger key ${label} already triggers ` +
       `${occupantRef}. The author must choose: merge into it, move it, or pick another key.`,
-    keys: [triggerKey],
+    keys: [label],
     ...(occupant.id !== null ? { ids: [occupant.id] } : {}),
     ...(occupant.name !== undefined ? { names: [occupant.name] } : {}),
   };
@@ -156,6 +177,7 @@ export function defineDeadkey(
   options: DefineDeadkeyOptions,
 ): DeadkeyMutationResult {
   const { triggerKey, authorName, accentChar } = options;
+  const triggerModifiers = [...(options.triggerModifiers ?? [])];
   if (accentChar.length === 0) {
     throw new Error("defineDeadkey: accentChar must be a non-empty string");
   }
@@ -171,9 +193,11 @@ export function defineDeadkey(
       ids: [id],
     });
   }
-  const occupant = triggerOccupant(ir, triggerKey, id);
+  const occupant = triggerOccupant(ir, triggerKey, id, triggerModifiers);
   if (occupant !== undefined) {
-    conflicts.push(triggerInUseConflict(triggerKey, occupant, "define"));
+    conflicts.push(
+      triggerInUseConflict(triggerKey, occupant, "define", triggerModifiers),
+    );
   }
   // Guard the class renameDeadkey already guards: a pre-existing orphaned
   // store with the same conventional name is invisible to allocateDeadkeyId
@@ -220,7 +244,7 @@ export function defineDeadkey(
 
   const triggerRule: IRRule = {
     nodeId: `dk-${hex}-trigger`,
-    context: [{ kind: "vkey", name: triggerKey, modifiers: [] }],
+    context: [{ kind: "vkey", name: triggerKey, modifiers: [...triggerModifiers] }],
     output: [{ kind: "deadkey", id }],
   };
   // Authorship marker — always written, even unnamed (origin "studio").
@@ -244,17 +268,28 @@ export function defineDeadkey(
     context: [
       { kind: "deadkey", id },
       { kind: "raw", text: "+" },
-      { kind: "vkey", name: triggerKey, modifiers: [] },
+      { kind: "vkey", name: triggerKey, modifiers: [...triggerModifiers] },
     ],
     output: [{ kind: "char", value: accentChar }],
   };
 
   const group = ensureEntryGroup(next);
-  group.rules = insertBlockBeforeTerminalRules(group.rules, [
-    fanoutRule,
-    escapeRule,
-    triggerRule,
-  ]);
+  const block = [fanoutRule, escapeRule, triggerRule];
+  // A key that already types something has a context-free rule on the slot; the first rule that
+  // matches wins, so the cluster goes ahead of it, or the new trigger would never fire (the old
+  // rule stays as shadowed source, and undoing the define restores the key exactly).
+  const shadowing = group.rules.findIndex((r) =>
+    ruleIsContextFreeOn(r, triggerKey, triggerModifiers as LayerCombo),
+  );
+  if (shadowing >= 0) {
+    group.rules = [
+      ...group.rules.slice(0, shadowing),
+      ...block,
+      ...group.rules.slice(shadowing),
+    ];
+  } else {
+    group.rules = insertBlockBeforeTerminalRules(group.rules, block);
+  }
 
   const deadkey = listDeadkeys(next).find((d) => d.id === id);
   if (deadkey === undefined) {
@@ -565,9 +600,10 @@ export function deleteDeadkey(
 /**
  * Move a deadkey to a different trigger key.
  *
- * Rewrites ONLY the trigger rule's context element → the new vkey (plain,
- * no modifiers — retarget always writes a vkey context, even when the old
- * trigger was a char literal). Id, stores, pairs, and the name token are
+ * Rewrites ONLY the trigger rule's context element → the new vkey (with
+ * `newTriggerModifiers` for a modifier-layer trigger, plain otherwise —
+ * retarget always writes a vkey context, even when the old trigger was a
+ * char literal). Id, stores, pairs, and the name token are
  * untouched (id/trigger decoupling — the move never re-identifies the
  * deadkey).
  *
@@ -583,6 +619,7 @@ export function retargetDeadkey(
   options: RetargetDeadkeyOptions,
 ): DeadkeyMutationResult {
   const { id, newTriggerKey } = options;
+  const newTriggerModifiers = [...(options.newTriggerModifiers ?? [])];
   const hex = hex4(id);
 
   const triggers = findTriggerRules(ir, id);
@@ -591,11 +628,13 @@ export function retargetDeadkey(
       `retargetDeadkey: no trigger rule for dk(${hex}) in this IR — list it with listDeadkeys first`,
     );
   }
-  const occupant = triggerOccupant(ir, newTriggerKey, id);
+  const occupant = triggerOccupant(ir, newTriggerKey, id, newTriggerModifiers);
   if (occupant !== undefined) {
     return {
       ok: false,
-      conflicts: [triggerInUseConflict(newTriggerKey, occupant, "retarget")],
+      conflicts: [
+        triggerInUseConflict(newTriggerKey, occupant, "retarget", newTriggerModifiers),
+      ],
     };
   }
 
@@ -608,13 +647,59 @@ export function retargetDeadkey(
         `retargetDeadkey: internal error — trigger rule lost its context element`,
       );
     }
-    rule.context[idx] = { kind: "vkey", name: newTriggerKey, modifiers: [] };
+    rule.context[idx] = {
+      kind: "vkey",
+      name: newTriggerKey,
+      modifiers: [...newTriggerModifiers],
+    };
   }
 
   const deadkey = listDeadkeys(next).find((d) => d.id === id);
   if (deadkey === undefined) {
     throw new Error(
       `retargetDeadkey: internal error — retargeted cluster for dk(${hex}) not recognized by listDeadkeys`,
+    );
+  }
+  return { ok: true, ir: next, deadkey };
+}
+
+// ---------------------------------------------------------------------------
+// setDeadkeyDisplay
+// ---------------------------------------------------------------------------
+
+/**
+ * Store (or clear) a deadkey's display character(s).
+ *
+ * The display rides on the trigger rule's `@deadkey:<hexid>` comment token as
+ * a `display=` attribute (beside `name=`), so it survives emit/parse and is
+ * read back by `listDeadkeys` as `displayChar`. It is deliberately separate
+ * from the escape rule's output: that rule is an ordinary combination row the
+ * author may change or remove, and imported deadkeys often have none.
+ * Id, trigger, stores and pairs are untouched. An unknown id throws (a
+ * programmer error, as in the other lifecycle mutations).
+ */
+export function setDeadkeyDisplay(
+  ir: KeyboardIR,
+  options: SetDeadkeyDisplayOptions,
+): DeadkeyMutationResult {
+  const { id, display } = options;
+  const hex = hex4(id);
+  if (display !== undefined && display.length === 0) {
+    throw new Error("setDeadkeyDisplay: display must be a non-empty string or undefined");
+  }
+  if (findTriggerRules(ir, id).length === 0) {
+    throw new Error(
+      `setDeadkeyDisplay: no trigger rule for dk(${hex}) in this IR — list it with listDeadkeys first`,
+    );
+  }
+  const next = structuredClone(ir);
+  for (const { rule } of findTriggerRules(next, id)) {
+    setRuleDisplay(rule, display);
+  }
+  const deadkey = listDeadkeys(next).find((d) => d.id === id);
+  if (deadkey === undefined) {
+    throw new Error(
+      `setDeadkeyDisplay: internal error — dk(${hex}) not recognized by listDeadkeys after the write`,
     );
   }
   return { ok: true, ir: next, deadkey };

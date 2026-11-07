@@ -199,10 +199,146 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-07T18:11:30.861Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.129Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.402Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.670Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.942Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:58.229Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:58.517Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:51:41.559Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:57.680Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:58.071Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:58.433Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:58.776Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T082",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:59.103Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T083",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:59.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T084",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:02:21.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T085",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:02:21.423Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T086",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:02:21.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T087",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:10:03.800Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T069",
+  "currentTask": "T087",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -352,6 +488,142 @@
       "files": [
         "packages/studio/src/locales/fr/messages.json",
         "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "insert-pair restore-order tests",
+      "files": [
+        "packages/studio/src/editors/deadkey/deadkeyWrite.test.ts"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "modifier-layer define/retarget tests",
+      "files": [
+        "packages/engine/src/deadkey-lifecycle/deadkey-lifecycle.test.ts"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "insert-pair and set-display op tests",
+      "files": [
+        "packages/studio/src/lib/deadkeyOps.test.ts",
+        "packages/engine/src/deadkey-lifecycle/deadkey-lifecycle.test.ts"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "insert-pair DeadkeyOperation + withInsertedDeadkeyPair",
+      "files": [
+        "packages/studio/src/survey/deadkeys/deadkeyOps.ts",
+        "packages/studio/src/editors/deadkey/deadkeyWrite.ts"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "set-display op, engine setDeadkeyDisplay, display= token, DeadkeyInfo.displayChar",
+      "files": [
+        "packages/contracts/src/ir/deadkeys.ts",
+        "packages/engine/src/deadkey-lifecycle/mutations.ts",
+        "packages/studio/src/survey/deadkeys/deadkeyOps.ts"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "modifier-layer triggers end to end: options, rules, DeadkeyInfo.triggerModifiers, occupancy",
+      "files": [
+        "packages/contracts/src/ir/deadkeys.ts",
+        "packages/engine/src/deadkey-lifecycle/mutations.ts",
+        "packages/engine/src/deadkey-lifecycle/types.ts"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "store: commitLayoutDeadkeyOp + undo kind ld (multi-op, inverse ops), modifier triggers on define/retarget ops, tests",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/stores/workingCopyStore.kmnEdits.test.ts",
+        "packages/studio/src/lib/deadkeyInverse.ts",
+        "packages/studio/src/survey/deadkeys/deadkeyOps.ts",
+        "packages/studio/src/lib/deadkeyOps.test.ts"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "DeadkeyTablePanel tests: both row shapes, add/change/remove, read-only store rows, space proposal, chain link, empty flag",
+      "files": [
+        "packages/studio/src/editors/layout/DeadkeyTablePanel.test.tsx"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "AfterContextView tests: pendingDeadkeys-seeded simulateEach, no-row fallback, chains, named deadkey, not compiled",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.test.tsx"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "KeyEditPanel deadkey option: new (define op + 083 disclosure, replaces occupied rule) and existing (set-key deadkey); records deadkeys-defined",
+      "files": [
+        "packages/studio/src/editors/layout/KeyEditPanel.tsx",
+        "packages/studio/src/editors/layout/KeyEditPanel.test.tsx"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "DeadkeyTablePanel + deadkeyTable model; ld undo kind in workingCopyStore; space-row proposal",
+      "files": [
+        "packages/studio/src/editors/layout/DeadkeyTablePanel.tsx",
+        "packages/studio/src/editors/layout/deadkeyTable.ts",
+        "packages/studio/src/stores/workingCopyStore.ts"
+      ]
+    },
+    "T082": {
+      "status": "DONE",
+      "did": "AfterContextView deadkey mode via useLayoutAttribution(layer, context); toolbar select and table switch in LayoutPane",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T083": {
+      "status": "DONE",
+      "did": "DeadkeyList in LayoutPane (place/delete, no-combinations flag, one entry per deadkey) with tests",
+      "files": [
+        "packages/studio/src/editors/layout/DeadkeyList.tsx",
+        "packages/studio/src/editors/layout/DeadkeyList.test.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T084": {
+      "status": "DONE",
+      "did": "SC-007 deadkey half: every editable deadkey-context row matches simulateEach seeded with its deadkey on the 23 corpus keyboards (compiler numbers deadkeys by first mention)",
+      "files": [
+        "packages/engine/src/layout-attribution/layout-attribution.corpus.test.ts"
+      ]
+    },
+    "T085": {
+      "status": "DONE",
+      "did": "SC-008 MSKLC parity: four shift states, ligatures and two deadkeys with tables and space rows built from kmn-edits and spec 083 ops only, compiled and typed",
+      "files": [
+        "packages/studio/src/editors/layout/msklcParity.test.ts"
+      ]
+    },
+    "T086": {
+      "status": "DONE",
+      "did": "Phase 5 i18n: messages:extract, 66 French strings, i18n-catalog-lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T087": {
+      "status": "DONE",
+      "did": "US3 E2E row runs green: new deadkey on a typed key with disclosure, three rows plus space row, after-this-deadkey via simulator, download carries the rules",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
       ]
     }
   }

@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { parseKmn, emitKmn } from "@keyboard-studio/engine";
 import type { KmnEditsValue } from "@keyboard-studio/contracts";
+import type { DeadkeysDefinedValue } from "../lib/deadkeyOps.ts";
 import { useWorkingCopyStore } from "./workingCopyStore.ts";
 import { useDecisionStore } from "./decisionStore.ts";
 import {
@@ -141,5 +142,156 @@ describe("undoKmnEdit", () => {
     expect(text()).toBe(before);
     expect(logged()?.entries).toHaveLength(1);
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(1);
+  });
+});
+
+// Spec 113 T079: undo kind `ld` -- a Layout-tab deadkey lifecycle edit (spec 083 ops).
+describe("commitLayoutDeadkeyOp / undo kind ld", () => {
+  const define = { kind: "define", triggerKey: "K_D", id: 0x3000, accentChar: "\u00b4" } as const;
+  const recorded = (): DeadkeysDefinedValue | undefined =>
+    useDecisionStore.getState().decisions["deadkeys-defined"]?.value as DeadkeysDefinedValue | undefined;
+  const ops = () => useWorkingCopyStore.getState().deadkeyOverlay.ops;
+  const top = () => {
+    const stack = useWorkingCopyStore.getState().undoStack;
+    return stack[stack.length - 1];
+  };
+
+  beforeEach(() => useWorkingCopyStore.setState({ deadkeyOverlay: { ops: [] } }));
+
+  it("applies the op, appends it to the overlay, records deadkeys-defined, and pushes an ld entry", () => {
+    const result = useWorkingCopyStore.getState().commitLayoutDeadkeyOp(define);
+    expect(result.ok).toBe(true);
+    expect(text()).toContain("dk(3000)");
+    expect(ops()).toEqual([define]);
+    expect(recorded()?.ops).toEqual([define]);
+    expect(useDecisionStore.getState().decisions["deadkeys-defined"]?.provenance).toBe("asked");
+    expect(top()).toEqual({ k: "ld", inverse: [{ kind: "delete", id: 0x3000 }] });
+  });
+
+  it("add-pair undoes with remove-pair; remove-pair undoes with insert-pair at its index; emitted text is restored", () => {
+    const store = useWorkingCopyStore.getState();
+    store.commitLayoutDeadkeyOp(define);
+    store.commitLayoutDeadkeyOp({ kind: "add-pair", id: 0x3000, base: "a", accented: "\u00e1" });
+    store.commitLayoutDeadkeyOp({ kind: "add-pair", id: 0x3000, base: "e", accented: "\u00e9" });
+    store.commitLayoutDeadkeyOp({ kind: "add-pair", id: 0x3000, base: "i", accented: "\u00ed" });
+    expect(top()).toEqual({ k: "ld", inverse: [{ kind: "remove-pair", id: 0x3000, index: 2 }] });
+
+    const before = text();
+    store.commitLayoutDeadkeyOp({ kind: "remove-pair", id: 0x3000, index: 1 });
+    expect(text()).not.toBe(before);
+    expect(top()).toEqual({
+      k: "ld",
+      inverse: [{ kind: "insert-pair", id: 0x3000, index: 1, base: "e", accented: "\u00e9" }],
+    });
+
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(text()).toBe(before);
+    // The overlay is append-only: undo appends the inverse and records the longer list.
+    expect(ops().at(-1)).toMatchObject({ kind: "insert-pair", index: 1 });
+    expect(recorded()?.ops).toHaveLength(6);
+
+    // Undoing the three adds then restores the text from before the first of them.
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(text()).toContain("dk(3000)");
+    expect(text()).not.toContain("\u00e1");
+  });
+
+  it("several ops in one confirm are one undo step and none applies when one is refused", () => {
+    const store = useWorkingCopyStore.getState();
+    store.commitLayoutDeadkeyOp([define, { kind: "add-pair", id: 0x3000, base: "a", accented: "\u00e1" }]);
+    const before = text();
+    const depth = useWorkingCopyStore.getState().undoStack.length;
+    // A changed combination: remove the pair and insert its replacement at the same index.
+    store.commitLayoutDeadkeyOp([
+      { kind: "remove-pair", id: 0x3000, index: 0 },
+      { kind: "insert-pair", id: 0x3000, index: 0, base: "a", accented: "\u00e0" },
+    ]);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(depth + 1);
+    expect(text()).toContain("\u00e0");
+    store.undoKmnEdit();
+    expect(text()).toBe(before);
+
+    const refusedAt = text();
+    const refused = store.commitLayoutDeadkeyOp([
+      { kind: "add-pair", id: 0x3000, base: "e", accented: "\u00e9" },
+      { kind: "remove-pair", id: 0x3000, index: 9 },
+    ]);
+    expect(refused).toEqual({ ok: false, reason: "refused" });
+    expect(text()).toBe(refusedAt);
+  });
+
+  it("undoing a define removes the deadkey and the emitted .kmn equals the text before it", () => {
+    const before = text();
+    useWorkingCopyStore.getState().commitLayoutDeadkeyOp(define);
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(text()).toBe(before);
+    expect(top()).toBeUndefined();
+  });
+
+  it("set-display undoes to the previous display", () => {
+    const store = useWorkingCopyStore.getState();
+    store.commitLayoutDeadkeyOp(define);
+    const before = text();
+    store.commitLayoutDeadkeyOp({ kind: "set-display", id: 0x3000, display: "Z" });
+    expect(text()).toContain("display=");
+    store.undoKmnEdit();
+    expect(text()).toBe(before);
+  });
+
+  it("an op with no faithful inverse (delete) is committed without an undo entry", () => {
+    const store = useWorkingCopyStore.getState();
+    store.commitLayoutDeadkeyOp(define);
+    const depth = useWorkingCopyStore.getState().undoStack.length;
+    expect(store.commitLayoutDeadkeyOp({ kind: "delete", id: 0x3000 }).ok).toBe(true);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(depth);
+    expect(text()).not.toContain("dk(3000)");
+  });
+
+  it("undoDelete routes an ld entry to the same undo", () => {
+    const before = text();
+    useWorkingCopyStore.getState().commitLayoutDeadkeyOp(define);
+    useWorkingCopyStore.getState().undoDelete();
+    expect(text()).toBe(before);
+  });
+
+  it("is refused, writing nothing, when locked, not compiled, or the lifecycle refuses", () => {
+    const store = useWorkingCopyStore.getState();
+    useWorkingCopyStore.setState({ desktopLocked: true });
+    expect(store.commitLayoutDeadkeyOp(define)).toEqual({ ok: false, reason: "locked" });
+    useWorkingCopyStore.setState({ desktopLocked: false });
+    useRulesDemoArtifactStore.getState().setArtifact(makeIdleRulesDemoArtifact());
+    expect(store.commitLayoutDeadkeyOp(define)).toEqual({ ok: false, reason: "not-compiled" });
+    useRulesDemoArtifactStore.getState().setArtifact(makeReadyRulesDemoArtifact("blob:x", "wc-kmn-edits"));
+    expect(store.commitLayoutDeadkeyOp({ kind: "add-pair", id: 0x9999, base: "a", accented: "b" })).toEqual({
+      ok: false,
+      reason: "refused",
+    });
+    expect(ops()).toEqual([]);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([]);
+    expect(recorded()).toBeUndefined();
+  });
+
+  it("filling an empty combination table is allowed while the keyboard does not compile (an empty table is why)", () => {
+    const store = useWorkingCopyStore.getState();
+    store.commitLayoutDeadkeyOp(define);
+    useRulesDemoArtifactStore.getState().setArtifact(makeIdleRulesDemoArtifact());
+    expect(store.commitLayoutDeadkeyOp({ kind: "add-pair", id: 0x3000, base: "a", accented: "á" }).ok).toBe(true);
+    // Once the table has a row, the not-compiled refusal applies again.
+    expect(store.commitLayoutDeadkeyOp({ kind: "add-pair", id: 0x3000, base: "e", accented: "é" })).toEqual({
+      ok: false,
+      reason: "not-compiled",
+    });
+  });
+
+  it("a modifier-layer define round-trips through undo", () => {
+    const before = text();
+    useWorkingCopyStore
+      .getState()
+      .commitLayoutDeadkeyOp({ kind: "define", triggerKey: "K_QUOTE", triggerModifiers: ["RALT"], id: 0x3001, accentChar: "\u00b4" });
+    expect(text()).toContain("RALT");
+    useWorkingCopyStore.getState().undoKmnEdit();
+    expect(text()).toBe(before);
   });
 });

@@ -44,7 +44,7 @@ export type {
   DeadkeyOverlay,
   DeadkeysDefinedValue,
 } from "../survey/deadkeys/deadkeyOps.ts";
-export { applyDeadkeyOpsToIr } from "../survey/deadkeys/deadkeyOps.ts";
+export { applyDeadkeyOp, applyDeadkeyOpsToIr } from "../survey/deadkeys/deadkeyOps.ts";
 // ---------------------------------------------------------------------------
 // Replay
 // ---------------------------------------------------------------------------

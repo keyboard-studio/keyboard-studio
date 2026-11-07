@@ -102,18 +102,54 @@ export function layerToSimInput(vkey: string, layer: LayerCombo): SimKeyInput {
 }
 
 /**
+ * The number the compiler gives each deadkey, by the deadkey's id in the working copy. The
+ * compiled keyboard does not keep the ids a source writes: it numbers its deadkeys 0, 1, ... in
+ * the order the source first mentions them (a rule's context, then its output; named deadkeys take
+ * a number too), and the simulator is seeded with those numbers. Verified against the observed
+ * numbering of the corpus keyboards (the attribution corpus suite).
+ */
+export function deadkeyOrdinals(ir: KeyboardIR): Map<number, number> {
+  const seen = new Map<string, number>();
+  const ordinals = new Map<number, number>();
+  const note = (el: { kind: string; id?: number; name?: string }): void => {
+    if (el.kind === "deadkey" && el.id !== undefined) {
+      if (!ordinals.has(el.id)) {
+        const n = seen.size;
+        seen.set(`d:${el.id}`, n);
+        ordinals.set(el.id, n);
+      }
+    } else if (el.kind === "namedDeadkey" && el.name !== undefined) {
+      const key = `n:${el.name.toLowerCase()}`;
+      if (!seen.has(key)) seen.set(key, seen.size);
+    }
+  };
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (!("context" in rule)) continue;
+      for (const el of rule.context) note(el);
+      if ("output" in rule) for (const el of rule.output) note(el);
+    }
+  }
+  return ordinals;
+}
+
+/**
  * The simulator seed for a context ("what came before the keystroke"), or null when it cannot
  * be seeded: a named deadkey has no number until the compiler assigns one, so rows after it stay
- * unverified (the static pass stands) rather than being guessed.
+ * unverified (the static pass stands) rather than being guessed. `ordinals` maps a deadkey's id
+ * to the compiled number (`deadkeyOrdinals`); without it the id itself is used.
  */
-export function contextToSeed(context: LayoutContext): SimulatorContextSeed | null {
+export function contextToSeed(context: LayoutContext, ordinals?: ReadonlyMap<number, number>): SimulatorContextSeed | null {
   let text = "";
   const pendingDeadkeys: Array<{ id: number; position: number }> = [];
   for (const el of context) {
     if (el.kind === "text") text += el.text;
     else {
       if (!/^[0-9a-f]+$/i.test(el.deadkeyId)) return null;
-      pendingDeadkeys.push({ id: parseInt(el.deadkeyId, 16), position: Array.from(text).length });
+      const id = parseInt(el.deadkeyId, 16);
+      const compiled = ordinals === undefined ? id : ordinals.get(id);
+      if (compiled === undefined) return null;
+      pendingDeadkeys.push({ id: compiled, position: Array.from(text).length });
     }
   }
   return pendingDeadkeys.length > 0 ? { text, pendingDeadkeys } : { text };
@@ -198,8 +234,9 @@ export function computeLayerAttribution(args: {
   }
 
   const steps: CellStep[] = [];
+  const ordinals = deadkeyOrdinals(ir);
   for (const { context, vkeys: keys } of contexts.values()) {
-    const seed = contextToSeed(context);
+    const seed = contextToSeed(context, ordinals);
     if (seed === null) continue;
     const ordered = [...keys];
     const simulated = simulateEach(

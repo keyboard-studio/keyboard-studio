@@ -28,12 +28,14 @@ import {
   deleteDeadkey,
   renameDeadkey,
   retargetDeadkey,
+  setDeadkeyDisplay,
 } from "@keyboard-studio/engine";
 import {
   deleteNamedDeadkey,
   retargetNamedDeadkey,
   withAddedDeadkeyPair,
   withDeadkeyAuthorName,
+  withInsertedDeadkeyPair,
   withMergedDeadkeyPairs,
   withRemovedDeadkeyPair,
   withRepairedDuplicateTriggerIds,
@@ -60,6 +62,8 @@ export type DeadkeyOperation =
   | {
       kind: "define";
       triggerKey: string;
+      /** Modifier names for a modifier-layer trigger; omitted = default layer. */
+      triggerModifiers?: readonly string[];
       id: number;
       accentChar: string;
       authorName?: string;
@@ -69,13 +73,27 @@ export type DeadkeyOperation =
   /** deleteDeadkey: whole-entity removal. */
   | { kind: "delete"; id: number }
   /** retargetDeadkey: trigger-key move, id untouched. */
-  | { kind: "retarget"; id: number; newTriggerKey: string }
+  | {
+      kind: "retarget";
+      id: number;
+      newTriggerKey: string;
+      /** Modifier names for a modifier-layer trigger; omitted = default layer. */
+      newTriggerModifiers?: readonly string[];
+    }
   /** withAddedDeadkeyPair: one base→accented pair appended to the fan-out stores. */
   | { kind: "add-pair"; id: number; base: string; accented: string }
+  /**
+   * withInsertedDeadkeyPair: one pair spliced in at the zipped `index`. The
+   * inverse of remove-pair, so an undo restores the stores' order exactly
+   * (add-pair appends and would reorder the emitted stores).
+   */
+  | { kind: "insert-pair"; id: number; index: number; base: string; accented: string }
   /** withRemovedDeadkeyPair: the pair at the zipped index removed. */
   | { kind: "remove-pair"; id: number; index: number }
   /** withDeadkeyAuthorName: the @deadkey:<hex> name=<name> comment token. */
   | { kind: "set-name"; id: number; name: string | undefined }
+  /** setDeadkeyDisplay: the `display=` attribute on the same comment token. */
+  | { kind: "set-display"; id: number; display: string | undefined }
   /** withMergedDeadkeyPairs: fromId's pairs appended onto toId's stores. */
   | { kind: "merge-pairs"; fromId: number; toId: number }
   /**
@@ -151,6 +169,7 @@ export function applyDeadkeyOp(ir: KeyboardIR, op: DeadkeyOperation): KeyboardIR
     case "define": {
       const result = defineDeadkey(ir, {
         triggerKey: op.triggerKey,
+        ...(op.triggerModifiers !== undefined ? { triggerModifiers: op.triggerModifiers } : {}),
         id: op.id,
         accentChar: op.accentChar,
         ...(op.authorName !== undefined ? { authorName: op.authorName } : {}),
@@ -191,6 +210,9 @@ export function applyDeadkeyOp(ir: KeyboardIR, op: DeadkeyOperation): KeyboardIR
       const result = retargetDeadkey(ir, {
         id: op.id,
         newTriggerKey: op.newTriggerKey,
+        ...(op.newTriggerModifiers !== undefined
+          ? { newTriggerModifiers: op.newTriggerModifiers }
+          : {}),
       });
       if (!result.ok) {
         throw new Error(
@@ -203,6 +225,17 @@ export function applyDeadkeyOp(ir: KeyboardIR, op: DeadkeyOperation): KeyboardIR
       const stores = fanoutStores(ir, op.id, "add-pair");
       return withAddedDeadkeyPair(ir, stores.bases, stores.outputs, op.base, op.accented);
     }
+    case "insert-pair": {
+      const stores = fanoutStores(ir, op.id, "insert-pair");
+      return withInsertedDeadkeyPair(
+        ir,
+        stores.bases,
+        stores.outputs,
+        op.index,
+        op.base,
+        op.accented,
+      );
+    }
     case "remove-pair": {
       const stores = fanoutStores(ir, op.id, "remove-pair");
       return withRemovedDeadkeyPair(ir, stores.bases, stores.outputs, op.index);
@@ -210,6 +243,16 @@ export function applyDeadkeyOp(ir: KeyboardIR, op: DeadkeyOperation): KeyboardIR
     case "set-name": {
       assertDeadkeyPresent(ir, op.id, "set-name");
       return withDeadkeyAuthorName(ir, op.id, op.name);
+    }
+    case "set-display": {
+      assertDeadkeyPresent(ir, op.id, "set-display");
+      const result = setDeadkeyDisplay(ir, { id: op.id, display: op.display });
+      if (!result.ok) {
+        throw new Error(
+          `set-display refused: ${result.conflicts.map((c) => c.message).join(" ")}`,
+        );
+      }
+      return result.ir;
     }
     case "merge-pairs": {
       return withMergedDeadkeyPairs(ir, op.fromId, op.toId);

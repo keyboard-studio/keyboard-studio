@@ -17,6 +17,7 @@ import {
   allocateDeadkeyId,
   listDeadkeys,
   scanDeadkeyRefs,
+  setDeadkeyName,
   validateDeadkeyLifecycle,
 } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -27,6 +28,7 @@ import {
   deleteDeadkey,
   renameDeadkey,
   retargetDeadkey,
+  setDeadkeyDisplay,
 } from "./index.js";
 import type { DeadkeyMutationResult } from "./index.js";
 
@@ -94,6 +96,20 @@ function clusterKmn(
 // ---------------------------------------------------------------------------
 
 describe("defineDeadkey", () => {
+  it("puts the cluster ahead of a rule that already types on the trigger key, so the trigger can fire", () => {
+    const ir = parseKmn(`${BASE_KMN}
++ [K_N] > 'n'
++ [K_M] > 'm'
+`);
+    const result = expectOk(defineDeadkey(ir, { triggerKey: "K_N", accentChar: "~" }));
+    const out = emit(result.ir);
+    expect(out.indexOf("@deadkey:")).toBeGreaterThan(-1);
+    expect(out.indexOf("@deadkey:")).toBeLessThan(out.indexOf("+ [K_N] > U+006E"));
+    expect(out.indexOf("+ [K_N] > U+006E")).toBeLessThan(out.indexOf("+ [K_M]"));
+    expect(result.deadkey.origin).toBe("studio");
+    expectLifecycleClean(result.ir);
+  });
+
   it("emits the canonical cluster recognized by listDeadkeys, with authorship marker, name, and validator clean", () => {
     const ir = parseKmn(BASE_KMN);
     const before = JSON.stringify(ir);
@@ -502,5 +518,165 @@ describe("retargetDeadkey", () => {
     );
     expect(result.deadkey.triggerKey).toBe("K_QUOTE");
     expectLifecycleClean(result.ir);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Modifier-layer triggers (spec 113 T076)
+// ---------------------------------------------------------------------------
+
+describe("modifier-layer triggers", () => {
+  it("defineDeadkey on [RALT K_QUOTE] writes the modifier into trigger and escape rules and round-trips", () => {
+    const ir = parseKmn(BASE_KMN);
+    const result = expectOk(
+      defineDeadkey(ir, {
+        triggerKey: "K_QUOTE",
+        triggerModifiers: ["RALT"],
+        accentChar: "\u0301",
+      }),
+    );
+    const hex = (result.deadkey.id as number).toString(16).padStart(4, "0");
+    const kmn = emit(result.ir);
+    expect(kmn).toContain(`+ [RALT K_QUOTE] > dk(${hex})`);
+    expect(kmn).toContain(`dk(${hex}) + [RALT K_QUOTE] > U+0301`);
+
+    const reparsed = listDeadkeys(parseKmn(kmn)).find((d) => d.id === result.deadkey.id);
+    expect(reparsed?.triggerKey).toBe("K_QUOTE");
+    expect(reparsed?.triggerModifiers).toEqual(["RALT"]);
+    expectLifecycleClean(result.ir);
+  });
+
+  it("defineDeadkey on [SHIFT K_6] works and a default-layer deadkey carries no triggerModifiers", () => {
+    const ir = parseKmn(BASE_KMN);
+    const shifted = expectOk(
+      defineDeadkey(ir, { triggerKey: "K_6", triggerModifiers: ["SHIFT"], accentChar: "^" }),
+    );
+    expect(shifted.deadkey.triggerModifiers).toEqual(["SHIFT"]);
+    const plain = expectOk(defineDeadkey(ir, { triggerKey: "K_6", accentChar: "^" }));
+    expect(plain.deadkey.triggerModifiers).toBeUndefined();
+  });
+
+  it("[RALT K_QUOTE] and [K_QUOTE] do not occupy each other; the same modifier set does", () => {
+    const base = expectOk(
+      defineDeadkey(parseKmn(BASE_KMN), { triggerKey: "K_QUOTE", accentChar: "\u0301" }),
+    ).ir;
+    // Different layer: allowed.
+    const ralt = expectOk(
+      defineDeadkey(base, { triggerKey: "K_QUOTE", triggerModifiers: ["RALT"], accentChar: "\u0300" }),
+    );
+    // Same layer again: refused, naming the modified key.
+    const again = defineDeadkey(ralt.ir, {
+      triggerKey: "K_QUOTE",
+      triggerModifiers: ["RALT"],
+      accentChar: "\u0302",
+    });
+    expect(conflictKinds(again)).toEqual(["trigger-in-use"]);
+    if (!again.ok) expect(again.conflicts[0]?.keys).toEqual(["RALT K_QUOTE"]);
+    // Plain layer is still occupied by the first deadkey.
+    expect(
+      conflictKinds(defineDeadkey(ralt.ir, { triggerKey: "K_QUOTE", accentChar: "x" })),
+    ).toEqual(["trigger-in-use"]);
+  });
+
+  it("retargetDeadkey moves a trigger onto a modifier layer and back, id untouched", () => {
+    const made = expectOk(
+      defineDeadkey(parseKmn(BASE_KMN), { triggerKey: "K_QUOTE", accentChar: "\u0301" }),
+    );
+    const id = made.deadkey.id as number;
+    const moved = expectOk(
+      retargetDeadkey(made.ir, { id, newTriggerKey: "K_6", newTriggerModifiers: ["SHIFT"] }),
+    );
+    expect(moved.deadkey.triggerKey).toBe("K_6");
+    expect(moved.deadkey.triggerModifiers).toEqual(["SHIFT"]);
+    expect(moved.deadkey.id).toBe(id);
+    expect(emit(moved.ir)).toContain("[SHIFT K_6] > dk(");
+
+    const back = expectOk(retargetDeadkey(moved.ir, { id, newTriggerKey: "K_QUOTE" }));
+    expect(back.deadkey.triggerModifiers).toBeUndefined();
+    expectLifecycleClean(back.ir);
+  });
+
+  it("retargetDeadkey onto an occupied modifier-layer key conflicts; the bare key does not", () => {
+    const a = expectOk(
+      defineDeadkey(parseKmn(BASE_KMN), {
+        triggerKey: "K_QUOTE",
+        triggerModifiers: ["RALT"],
+        accentChar: "\u0301",
+      }),
+    );
+    const b = expectOk(defineDeadkey(a.ir, { triggerKey: "K_A", accentChar: "\u0300" }));
+    const idB = b.deadkey.id as number;
+    expect(
+      conflictKinds(
+        retargetDeadkey(b.ir, { id: idB, newTriggerKey: "K_QUOTE", newTriggerModifiers: ["RALT"] }),
+      ),
+    ).toEqual(["trigger-in-use"]);
+    expectOk(retargetDeadkey(b.ir, { id: idB, newTriggerKey: "K_QUOTE" }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setDeadkeyDisplay (spec 113 T075)
+// ---------------------------------------------------------------------------
+
+describe("setDeadkeyDisplay", () => {
+  it("stores the display on the trigger token, reads back as displayChar, keeps name, and round-trips", () => {
+    const made = expectOk(
+      defineDeadkey(parseKmn(BASE_KMN), {
+        triggerKey: "K_QUOTE",
+        accentChar: "x",
+        authorName: "acute",
+      }),
+    );
+    const id = made.deadkey.id as number;
+    const set = expectOk(setDeadkeyDisplay(made.ir, { id, display: "\u00b4" }));
+    expect(set.deadkey.displayChar).toBe("\u00b4");
+    expect(set.deadkey.authorName).toBe("acute");
+
+    const reparsed = listDeadkeys(parseKmn(emit(set.ir))).find((d) => d.id === id);
+    expect(reparsed?.displayChar).toBe("\u00b4");
+    expect(reparsed?.authorName).toBe("acute");
+    expectLifecycleClean(set.ir);
+  });
+
+  it("renaming the deadkey (set-name) keeps the stored display", () => {
+    const made = expectOk(
+      defineDeadkey(parseKmn(BASE_KMN), { triggerKey: "K_QUOTE", accentChar: "x" }),
+    );
+    const id = made.deadkey.id as number;
+    const set = expectOk(setDeadkeyDisplay(made.ir, { id, display: "\u00b4" }));
+    const rule = set.ir.groups.flatMap((g) => g.rules).find((r) => r.output[0]?.kind === "deadkey");
+    setDeadkeyName(rule!, "acute");
+    expect(listDeadkeys(set.ir).find((d) => d.id === id)?.displayChar).toBe("\u00b4");
+  });
+
+  it("falls back to the escape rule's output only until a display is stored; undefined clears", () => {
+    const made = expectOk(
+      defineDeadkey(parseKmn(BASE_KMN), { triggerKey: "K_QUOTE", accentChar: "\u0301" }),
+    );
+    const id = made.deadkey.id as number;
+    expect(made.deadkey.displayChar).toBe("\u0301");
+    const set = expectOk(setDeadkeyDisplay(made.ir, { id, display: "A" }));
+    expect(set.deadkey.displayChar).toBe("A");
+    const cleared = expectOk(setDeadkeyDisplay(set.ir, { id, display: undefined }));
+    expect(cleared.deadkey.displayChar).toBe("\u0301");
+  });
+
+  it("an imported deadkey with no escape rule has no displayChar until one is set", () => {
+    const ir = parseKmn(
+      BASE_KMN + `store(b) 'a'\nstore(o) 'á'\n+ [K_COLON] > dk(0001)\ndk(0001) + any(b) > index(o, 2)\n`,
+    );
+    expect(listDeadkeys(ir)[0]?.displayChar).toBeUndefined();
+    const set = expectOk(setDeadkeyDisplay(ir, { id: 1, display: "\u00a8" }));
+    expect(set.deadkey.displayChar).toBe("\u00a8");
+  });
+
+  it("throws for an unknown id and for an empty display", () => {
+    const ir = parseKmn(BASE_KMN);
+    expect(() => setDeadkeyDisplay(ir, { id: 99, display: "x" })).toThrow();
+    const made = expectOk(defineDeadkey(ir, { triggerKey: "K_A", accentChar: "x" }));
+    expect(() =>
+      setDeadkeyDisplay(made.ir, { id: made.deadkey.id as number, display: "" }),
+    ).toThrow();
   });
 });

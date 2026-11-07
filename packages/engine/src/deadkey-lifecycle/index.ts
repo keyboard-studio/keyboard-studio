@@ -5,6 +5,7 @@ export {
   renameDeadkey,
   deleteDeadkey,
   retargetDeadkey,
+  setDeadkeyDisplay,
 } from "./mutations.js";
 export type {
   DeadkeyConflict,
@@ -14,4 +15,5 @@ export type {
   DeleteDeadkeyOptions,
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
+  SetDeadkeyDisplayOptions,
 } from "./types.js";

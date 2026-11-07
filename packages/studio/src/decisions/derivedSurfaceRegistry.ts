@@ -150,7 +150,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     // so there is no pending gap to close; phase 0 as survey-decision-replay.
     phase: 0,
     status: "equivalence-proven",
-    storeActions: ["commitKmnEdit", "undoKmnEdit"],
+    storeActions: ["commitKmnEdit", "undoKmnEdit", "commitLayoutDeadkeyOp"],
     // No field of its own: the live IR half goes through setWorkingIR's `ir` (claimed by the
     // deadkeys surface); the undo entries ride the shared undoStack (claimed by carve).
     fields: [],
@@ -471,6 +471,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   commitKeyEditBatch: { kind: "action", class: "EDITOR-AUTHORED" },
   undoKeyEditBatch: { kind: "action", class: "EDITOR-AUTHORED" },
   commitDeadkeyOp: { kind: "action", class: "EDITOR-AUTHORED" },
+  commitLayoutDeadkeyOp: { kind: "action", class: "EDITOR-AUTHORED" },
   commitKmnEdit: { kind: "action", class: "EDITOR-AUTHORED" },
   undoKmnEdit: { kind: "action", class: "EDITOR-AUTHORED" },
   commitTouchKeyRename: { kind: "action", class: "EDITOR-AUTHORED" },

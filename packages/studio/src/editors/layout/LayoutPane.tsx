@@ -12,6 +12,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { listContexts } from "@keyboard-studio/engine";
+import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePickedWindowsLayouts } from "../../lib/layoutFamily.ts";
@@ -24,6 +25,10 @@ import { baseFallbackCells } from "./baseFallbackCells.ts";
 import { buildDesktopGridViewModel } from "./desktopGridViewModel.ts";
 import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
 import { AddLayerDialog } from "./AddLayerDialog.tsx";
+import { AfterContextView } from "./AfterContextView.tsx";
+import { DeadkeyList } from "./DeadkeyList.tsx";
+import { DeadkeyTablePanel } from "./DeadkeyTablePanel.tsx";
+import { deadkeyRefOf } from "./deadkeyTable.ts";
 import { DesktopKeyGrid } from "./DesktopKeyGrid.tsx";
 import { KeyDetailPanel } from "./KeyDetailPanel.tsx";
 import { KeyEditPanel } from "./KeyEditPanel.tsx";
@@ -47,13 +52,18 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   // carve and touch entries, which their own tabs undo).
   const canUndoEdit = useWorkingCopyStore((st) => {
     const top = st.undoStack[st.undoStack.length - 1];
-    return top !== undefined && (top.k === "l" || top.k === "lb");
+    return top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld");
   });
 
   const [addedLayers, setAddedLayers] = useState<readonly LayerCombo[]>([]);
   const [layerId, setLayerId] = useState<string>(DEFAULT_LAYER_KEY);
   const [selectedVkey, setSelectedVkey] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  // The deadkey whose table is open, the one the grid is switched to "after", and the one just
+  // made (its space row is proposed). All three are ids as contexts name them (`0001`).
+  const [openDeadkey, setOpenDeadkey] = useState<string | null>(null);
+  const [afterDeadkey, setAfterDeadkey] = useState<string | null>(null);
+  const [newDeadkey, setNewDeadkey] = useState<string | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const layers = useMemo(() => listAvailableLayers(startIr, ir, addedLayers), [startIr, ir, addedLayers]);
@@ -70,6 +80,16 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
     [ir, layerId, bases],
   );
   const contexts = useMemo(() => (ir === null ? [] : listContexts(ir)), [ir]);
+  const deadkeys = useMemo(
+    () =>
+      ir === null
+        ? []
+        : listDeadkeys(ir).flatMap((info) => {
+            const ref = deadkeyRefOf(info);
+            return ref === null ? [] : [{ ref, label: info.displayChar ?? ref }];
+          }),
+    [ir],
+  );
 
   const cells = useMemo((): DesktopCellViewModel[] => {
     const built = buildDesktopGridViewModel({
@@ -264,6 +284,25 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         >
           {t({ id: "editor.layout.pane.addLayer", message: "Add layer" })}
         </button>
+        {deadkeys.length > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            {t({ id: "editor.layout.pane.afterLabel", message: "Show keys after" })}
+            <select
+              value={afterDeadkey ?? ""}
+              onChange={(e) => setAfterDeadkey(e.target.value === "" ? null : e.target.value)}
+              data-testid="layout-after-select"
+              className="ks-focus-ring"
+              style={addButtonStyle}
+            >
+              <option value="">{t({ id: "editor.layout.pane.afterNone", message: "Nothing (the plain grid)" })}</option>
+              {deadkeys.map((d) => (
+                <option key={d.ref} value={d.ref}>
+                  {t({ id: "editor.layout.pane.afterDeadkey", message: `Deadkey ${{ label: d.label }}` })}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           onClick={() => useWorkingCopyStore.getState().undoKmnEdit()}
@@ -286,24 +325,70 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         </p>
       )}
 
-      <DesktopKeyGrid
-        cells={cells}
-        selectedVkey={selectedVkey}
-        onSelectVkey={setSelectedVkey}
-        label={t({
-          id: "editor.layout.pane.gridLabel",
-          message: `Desktop layout, ${{ layer: copy.layerName(layer) }} layer`,
-        })}
-      />
+      {afterDeadkey !== null ? (
+        <AfterContextView
+          key={`${afterDeadkey}|${layerId}`}
+          deadkeyId={afterDeadkey}
+          layer={layer}
+          {...(deadkeys.find((d) => d.ref.toLowerCase() === afterDeadkey.toLowerCase()) !== undefined
+            ? { displayChar: deadkeys.find((d) => d.ref.toLowerCase() === afterDeadkey.toLowerCase())!.label }
+            : {})}
+          onFollow={setAfterDeadkey}
+          onViewInCode={onViewInCode}
+          onClose={() => setAfterDeadkey(null)}
+        />
+      ) : (
+        <>
+          <DesktopKeyGrid
+            cells={cells}
+            selectedVkey={selectedVkey}
+            onSelectVkey={setSelectedVkey}
+            label={t({
+              id: "editor.layout.pane.gridLabel",
+              message: `Desktop layout, ${{ layer: copy.layerName(layer) }} layer`,
+            })}
+          />
 
-      <KeyDetailPanel
-        cell={selected}
-        onViewInCode={onViewInCode}
-        editSlot={
-          selected !== null && selected.editable ? (
-            <KeyEditPanel key={`${selected.vkey}|${layerId}`} cell={selected} onViewInCode={onViewInCode} />
-          ) : undefined
-        }
+          <KeyDetailPanel
+            cell={selected}
+            onViewInCode={onViewInCode}
+            editSlot={
+              selected !== null && selected.editable ? (
+                <KeyEditPanel
+                  key={`${selected.vkey}|${layerId}`}
+                  cell={selected}
+                  onViewInCode={onViewInCode}
+                  onDeadkeyDefined={(id) => {
+                    setNewDeadkey(id);
+                    setOpenDeadkey(id);
+                  }}
+                />
+              ) : undefined
+            }
+          />
+        </>
+      )}
+
+      {openDeadkey !== null && (
+        <DeadkeyTablePanel
+          key={openDeadkey}
+          deadkeyId={openDeadkey}
+          layers={layers}
+          onViewInCode={onViewInCode}
+          onShowAfter={setAfterDeadkey}
+          proposeSpaceRow={newDeadkey === openDeadkey}
+        />
+      )}
+
+      <DeadkeyList
+        layers={layers}
+        openId={openDeadkey}
+        selectedCell={selected}
+        onOpen={setOpenDeadkey}
+        onDeleted={(id) => {
+          if (openDeadkey === id) setOpenDeadkey(null);
+          if (afterDeadkey === id) setAfterDeadkey(null);
+        }}
       />
 
       <AddLayerDialog

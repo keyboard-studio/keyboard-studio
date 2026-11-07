@@ -21,7 +21,7 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import { DEFAULT_FALLBACK_POLICY } from "@keyboard-studio/contracts";
+import { DEFAULT_FALLBACK_POLICY, listDeadkeys } from "@keyboard-studio/contracts";
 import type {
   Attribution,
   AxisFill,
@@ -71,6 +71,8 @@ import type {
 import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
+import { applyDeadkeyOp } from "../lib/deadkeyOps.ts";
+import { inverseDeadkeyOp } from "../lib/deadkeyInverse.ts";
 import type {
   ContextVariantsResult,
   ToleranceClassification,
@@ -89,7 +91,7 @@ import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { useDecisionStore } from "./decisionStore.ts";
 import { useRulesDemoArtifactStore } from "./rulesDemoArtifactStore.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
-import { LAYOUT_WRITES } from "../steps/editorMutate.ts";
+import { DEADKEY_WRITES, LAYOUT_WRITES } from "../steps/editorMutate.ts";
 import {
   emptyCharacterInventoryValue,
   emptyInventoryDecisionValue,
@@ -241,7 +243,12 @@ export type UndoEntry =
   // Spec 113: one Layout-tab edit (`l`) or one edit plus its accepted case partner (`lb`). The
   // effect is what the edit did to the live IR, so undo is a local inverse, never a rebuild.
   | { k: "l"; seq: number; effect: KmnEditEffect }
-  | { k: "lb"; seqs: number[]; effects: KmnEditEffect[] };
+  | { k: "lb"; seqs: number[]; effects: KmnEditEffect[] }
+  // Spec 113: one Layout-tab deadkey lifecycle edit (spec 083; one confirm, one undo step). Holds
+  // the inverse `DeadkeyOperation`s in the order undo applies them, each captured from the IR
+  // before its op ran; undo applies them and appends them to the (append-only) deadkey overlay, so
+  // the emitted .kmn after undo equals the text before the edit.
+  | { k: "ld"; inverse: DeadkeyOperation[] };
 
 /** A Layout-tab edit as the caller states it; the store assigns `seq` and `at` at commit. */
 export type KmnEditInput = DistributiveOmit<KmnEdit, "seq" | "at">;
@@ -1212,9 +1219,21 @@ export interface WorkingCopyState {
    * Deliberately NOT on the shared undoStack: deadkey lifecycle edits are
    * immediate F-10 commits (define/rename/delete/retarget/pairs), and
    * undoing them is out of scope for spec 083. The overlay is append-only
-   * within a session; reset/instantiation clears it.
+   * within a session; reset/instantiation clears it. (The Layout tab's
+   * `commitLayoutDeadkeyOp` is the undoable path.)
    */
   commitDeadkeyOp: (op: DeadkeyOperation) => void;
+  /**
+   * Commit a deadkey lifecycle op from the Layout tab (spec 113 US3, FR-027, FR-029b): refused,
+   * writing nothing, when there is no working copy, the step is locked, the artifact is not
+   * compiled, or the lifecycle refuses the op. Otherwise applies `op` to the live IR through the
+   * deadkey write seam, appends it to the deadkey overlay, records `deadkeys-defined` with the
+   * current op list (an edit is a decision; recording does not rebuild, research R12 addendum),
+   * and pushes one `ld` undo entry holding the inverse when every op has one. Several ops given
+   * together (a changed combination is a remove plus an insert) are one confirm and one undo step,
+   * and none is applied when any is refused.
+   */
+  commitLayoutDeadkeyOp: (op: DeadkeyOperation | readonly DeadkeyOperation[]) => CommitKmnEditResult;
   /**
    * Commit a Layout-tab edit (spec 113, research R12): applies `op` (and the accepted case
    * `partner`, same confirm) to the live IR through `applyMutatePatch` / `LAYOUT_WRITES`, then
@@ -1866,6 +1885,7 @@ export type WorkingCopyData = Omit<
   | "undoKeyEditBatch"
   | "commitDeadkeyOp"
   | "commitKmnEdit"
+  | "commitLayoutDeadkeyOp"
   | "undoKmnEdit"
   | "commitTouchKeyRename"
   | "setTouchEditorMode"
@@ -2025,10 +2045,78 @@ function commitKmnEditImpl(
   return { ok: true, seqs };
 }
 
+function recordDeadkeysDefined(ops: readonly DeadkeyOperation[]): void {
+  useDecisionStore.getState().record({
+    id: "deadkeys-defined",
+    value: { ops: [...ops] },
+    provenance: "asked",
+  });
+}
+
+function applyDeadkeyOpLive(ir: KeyboardIR, op: DeadkeyOperation): KeyboardIR {
+  const next = applyDeadkeyOp(ir, op);
+  return applyMutatePatch(ir, { groups: next.groups, stores: next.stores, raw: next.raw }, DEADKEY_WRITES);
+}
+
+function commitLayoutDeadkeyOpImpl(
+  get: StoreGet,
+  set: StoreSet,
+  given: DeadkeyOperation | readonly DeadkeyOperation[],
+): CommitKmnEditResult {
+  const list: readonly DeadkeyOperation[] = Array.isArray(given) ? given : [given as DeadkeyOperation];
+  const s = get();
+  if (s.ir === null) return { ok: false, reason: "no-working-copy" };
+  if (s.desktopLocked) return { ok: false, reason: "locked" };
+  // A deadkey with an empty combination table does not compile (an empty any() store), so pair ops
+  // that fill such a table are the way out of a not-compiled state and must not be refused by it.
+  const fillsEmptyTable = list.every((op) => {
+    if (op.kind !== "add-pair" && op.kind !== "insert-pair") return false;
+    const info = listDeadkeys(s.ir!).find((d) => d.id === op.id);
+    const bases = info?.baseStore == null ? undefined : s.ir!.stores.find((st) => st.name === info.baseStore);
+    return bases !== undefined && bases.items.length === 0;
+  });
+  if (!fillsEmptyTable && useRulesDemoArtifactStore.getState().artifact.status !== "ready") {
+    return { ok: false, reason: "not-compiled" };
+  }
+  let ir: KeyboardIR = s.ir;
+  const inverses: DeadkeyOperation[] = [];
+  let undoable = true;
+  try {
+    for (const op of list) {
+      const inverse = inverseDeadkeyOp(ir, op);
+      if (inverse === null) undoable = false;
+      else inverses.unshift(inverse);
+      ir = applyDeadkeyOpLive(ir, op);
+    }
+  } catch {
+    return { ok: false, reason: "refused" };
+  }
+  const ops = [...s.deadkeyOverlay.ops, ...list];
+  set((cur) => ({
+    ir,
+    deadkeyOverlay: { ops },
+    undoStack: undoable ? [...cur.undoStack, { k: "ld", inverse: inverses }] : cur.undoStack,
+  }));
+  recordDeadkeysDefined(ops);
+  return { ok: true, seqs: [] };
+}
+
 function undoKmnEditImpl(get: StoreGet, set: StoreSet): boolean {
   const s = get();
   const top = s.undoStack[s.undoStack.length - 1];
-  if (top === undefined || (top.k !== "l" && top.k !== "lb") || s.ir === null) return false;
+  if (top === undefined || (top.k !== "l" && top.k !== "lb" && top.k !== "ld") || s.ir === null) return false;
+  if (top.k === "ld") {
+    let ir: KeyboardIR = s.ir;
+    try {
+      for (const inverse of top.inverse) ir = applyDeadkeyOpLive(ir, inverse);
+    } catch {
+      return false;
+    }
+    const ops = [...s.deadkeyOverlay.ops, ...top.inverse];
+    set((cur) => ({ ir, deadkeyOverlay: { ops }, undoStack: cur.undoStack.slice(0, -1) }));
+    recordDeadkeysDefined(ops);
+    return true;
+  }
   const effects = top.k === "l" ? [top.effect] : top.effects;
   const seqs = top.k === "l" ? [top.seq] : top.seqs;
 
@@ -2108,7 +2196,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // A Layout-tab edit (spec 113) is undone through its own action: it also records the
     // `kmn-edits` decision without the entry, which this store's set() cannot do.
     const top = get().undoStack[get().undoStack.length - 1];
-    if (top !== undefined && (top.k === "l" || top.k === "lb")) {
+    if (top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld")) {
       get().undoKmnEdit();
       return;
     }
@@ -2162,7 +2250,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -n) },
           undoStack: s.undoStack.slice(0, -1),
         };
-      } else if (last.k === "l" || last.k === "lb") {
+      } else if (last.k === "l" || last.k === "lb" || last.k === "ld") {
         // Handled by undoKmnEdit above; unreachable through this action.
         return s;
       } else {
@@ -2203,6 +2291,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   },
 
   commitKmnEdit: (op, options) => commitKmnEditImpl(get, set, op, options),
+  commitLayoutDeadkeyOp: (op) => commitLayoutDeadkeyOpImpl(get, set, op),
 
   undoKmnEdit: () => undoKmnEditImpl(get, set),
 

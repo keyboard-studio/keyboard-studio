@@ -5,7 +5,7 @@
 // empty context, and verify the cells against it. Asserts the honesty rule
 // (SC-001, SC-002) and prints per-keyboard cell counts by class.
 import { beforeAll, describe, expect, it } from "vitest";
-import type { LayerCombo } from "@keyboard-studio/contracts";
+import type { LayerCombo, LayoutContext, SimulationStep, SimulatorContextSeed } from "@keyboard-studio/contracts";
 import { DESKTOP_ISO_GEOMETRY } from "../layout-chart/geometry.js";
 import { simulateEach } from "../simulator/node.js";
 import { chordToSimKeyInput } from "../validator/layer-a-prime.js";
@@ -13,7 +13,7 @@ import { buildCorpusKeyboard } from "./__fixtures__/compileCorpus.js";
 import type { CorpusKeyboardBuild } from "./__fixtures__/compileCorpus.js";
 import { CORPUS_SET, NO_WEB_TARGET, RELEASE_ROOT, corpusAvailable } from "./__fixtures__/corpusSet.js";
 import { attributeLayer, isMnemonic, listLayers, verifyCells } from "./index.js";
-import type { CellStep, KeyCellAttribution } from "./index.js";
+import type { CellStep, KeyCellAttribution, RowAttribution } from "./index.js";
 
 const VKEYS = DESKTOP_ISO_GEOMETRY.map((k) => k.id);
 
@@ -36,6 +36,43 @@ function gridSteps(build: CorpusKeyboardBuild, layer: LayerCombo): CellStep[] {
   if (inputs.some((i) => i === null)) return [];
   const steps = simulateEach(build.compiled, inputs as NonNullable<(typeof inputs)[number]>[]);
   return steps.map((step, i) => ({ vkey: VKEYS[i]!, layer, step }));
+}
+
+/**
+ * The simulator seed for a context. A named deadkey has no number until the compiler assigns
+ * one, so `ids` carries the numbers observed by simulating the keys that produce each deadkey;
+ * a numbered one falls back to its own hex id. Null when a deadkey cannot be placed.
+ */
+function seedFor(context: LayoutContext, ids: ReadonlyMap<string, number>): SimulatorContextSeed | null {
+  let text = "";
+  const pendingDeadkeys: Array<{ id: number; position: number }> = [];
+  for (const el of context) {
+    if (el.kind === "text") {
+      text += el.text;
+      continue;
+    }
+    const id = ids.get(el.deadkeyId.toLowerCase()) ?? (/^[0-9a-f]+$/i.test(el.deadkeyId) ? parseInt(el.deadkeyId, 16) : undefined);
+    if (id === undefined) return null;
+    pendingDeadkeys.push({ id, position: Array.from(text).length });
+  }
+  return pendingDeadkeys.length > 0 ? { text, pendingDeadkeys } : { text };
+}
+
+/** What a row says its context plus keystroke become, as text and a pending-deadkey count. */
+function rowWants(row: RowAttribution): { text: string; deadkeys: number } | null {
+  const out = row.output;
+  if (out === null) return null;
+  if (!Array.isArray(out)) {
+    const o = out as { kind: string; text?: string };
+    return o.kind === "text" ? { text: o.text ?? "", deadkeys: 0 } : o.kind === "nul" ? { text: "", deadkeys: 0 } : { text: "", deadkeys: 1 };
+  }
+  let text = "";
+  let deadkeys = 0;
+  for (const el of out as LayoutContext) {
+    if (el.kind === "text") text += el.text;
+    else deadkeys += 1;
+  }
+  return { text, deadkeys };
 }
 
 describe("layout attribution corpus: precondition", () => {
@@ -96,6 +133,86 @@ for (const entry of CORPUS_SET) {
       console.info(`[INFO] ${entry.id}: ${layers.length} layers; ${summary.join(" ")}`);
       expect(dishonest).toEqual([]);
       expect(unexplained).toEqual([]);
+    });
+
+    // SC-007 (deadkey half): every editable row whose context holds a deadkey, after the
+    // verification pass, types exactly what the row says when the simulator is seeded with that
+    // deadkey (and any text before it) and the row's keystroke is pressed. Checked here against
+    // the simulator directly, not through verifyCells, so a demotion bug cannot hide a mismatch.
+    it("every editable deadkey-context row matches the simulator seeded with its context (SC-007)", () => {
+      if (NO_WEB_TARGET.has(entry.id)) return;
+      const layers = listLayers(build.ir);
+      const ids = new Map<string, number>();
+      for (const layer of layers) {
+        const cells = attributeLayer(build.ir, layer, VKEYS);
+        const steps = gridSteps(build, layer);
+        for (const cell of cells) {
+          const out = cell.plain?.output;
+          if (out === null || out === undefined || Array.isArray(out) || !("kind" in out) || out.kind !== "deadkey") continue;
+          const step = steps.find((s) => s.vkey === cell.vkey)?.step;
+          const first = step?.pendingDeadkeys[0];
+          if (first !== undefined) ids.set(out.deadkeyId.toLowerCase(), first.id);
+        }
+      }
+      // kmcmplib numbers named deadkeys 0, 1, ... in order of first mention in the source; use that for the ones no key produces directly,
+      // and assert it agrees with every observed id.
+      const order = new Map<string, number>();
+      for (const m of build.kmn.replace(/^[ \t]*c([ \t].*)?$/gim, "").matchAll(/\b(?:dk|deadkey)\(\s*([^)\s]+)\s*\)/gi)) {
+        const name = m[1]!.toLowerCase();
+        if (!order.has(name)) order.set(name, order.size);
+      }
+      const disagree = [...ids].filter(([name, id]) => order.has(name) && order.get(name) !== id).map(([name, id]) => `${name}: observed ${id}, order ${order.get(name)}`);
+      expect(disagree, "source-order numbering must agree with the observed compiler numbering").toEqual([]);
+      for (const [name, id] of order) if (!ids.has(name)) ids.set(name, id);
+      let checked = 0;
+      let unseedable = 0;
+      let hasDeadkeyRows = false;
+      const mismatches: string[] = [];
+      for (const layer of layers) {
+        const cells = attributeLayer(build.ir, layer, VKEYS);
+        const seeded: Array<{ ci: number; ri: number; seed: SimulatorContextSeed }> = [];
+        cells.forEach((cell, ci) => {
+          cell.rows.forEach((row, ri) => {
+            if (!row.context.some((el) => el.kind === "deadkey")) return;
+            hasDeadkeyRows = true;
+            if (!row.editable) return;
+            const seed = seedFor(row.context, ids);
+            if (seed === null) unseedable += 1;
+            else seeded.push({ ci, ri, seed });
+          });
+        });
+        const modifiers = layer.filter((m) => m !== "NCAPS");
+        const flat: CellStep[] = [];
+        const typed = new Map<string, SimulationStep>();
+        for (const { ci, ri, seed } of seeded) {
+          const cell = cells[ci]!;
+          const row = cell.rows[ri]!;
+          const input = chordToSimKeyInput({ vkey: cell.vkey, modifiers: [...modifiers] });
+          if (input === null) continue;
+          const step = simulateEach(build.compiled, [input], seed)[0]!;
+          typed.set(`${ci}:${ri}`, step);
+          flat.push({ vkey: cell.vkey, layer, context: row.context, step });
+        }
+        // Rows the verification pass keeps editable must match the simulator on their own terms.
+        const verified = verifyCells(cells, flat);
+        for (const { ci, ri } of seeded) {
+          const cell = verified[ci]!;
+          const row = cell.rows[ri]!;
+          const step = typed.get(`${ci}:${ri}`);
+          const want = rowWants(row);
+          if (!row.editable || step === undefined || want === null) continue;
+          checked += 1;
+          if (step.outputAfter !== want.text || step.pendingDeadkeys.length !== want.deadkeys) {
+            mismatches.push(`[${[...layer, cell.vkey].join(" ")}] ${JSON.stringify(row.context)}: row ${JSON.stringify(want)}, typed ${JSON.stringify(step.outputAfter)}+${step.pendingDeadkeys.length}dk`);
+          }
+        }
+      }
+      console.info(`[INFO] ${entry.id}: SC-007 deadkey rows checked=${checked} unseedable=${unseedable}`);
+      expect(mismatches).toEqual([]);
+      if (entry.category === "deadkey-fanout" || entry.category === "deadkey-keystroke") {
+        expect(hasDeadkeyRows, `${entry.id} has no deadkey-context rows`).toBe(true);
+        expect(checked, `${entry.id}: no deadkey row was actually simulated`).toBeGreaterThan(0);
+      }
     });
   });
 }

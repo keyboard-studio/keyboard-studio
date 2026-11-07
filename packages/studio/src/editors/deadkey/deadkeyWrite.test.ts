@@ -10,7 +10,10 @@ import {
 import { parseKmn } from "@keyboard-studio/engine";
 import {
   deleteNamedDeadkey,
+  readDeadkeyPairs,
   retargetNamedDeadkey,
+  withInsertedDeadkeyPair,
+  withRemovedDeadkeyPair,
   withRepairedDuplicateTriggerIds,
 } from "./deadkeyWrite.ts";
 
@@ -257,5 +260,37 @@ describe("retargetNamedDeadkey — typed era (#2238)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.ir.raw[0]?.sourceText).toBe("+ [K_Y] > dk(acute)");
+  });
+});
+
+describe("withInsertedDeadkeyPair", () => {
+  const KMN =
+    BASE_KMN +
+    `store(b) 'aei'\nstore(o) 'x'\n+ [K_COLON] > dk(3000)\ndk(3000) + any(b) > index(o, 2)\n`;
+
+  it("removing then re-inserting a pair at its index restores the stores' order exactly", () => {
+    const ir = parseIr(
+      BASE_KMN +
+        `store(b) 'aei'\nstore(o) 'AEI'\n+ [K_COLON] > dk(3000)\ndk(3000) + any(b) > index(o, 2)\n`,
+    );
+    for (let index = 0; index < 3; index++) {
+      const pair = readDeadkeyPairs(ir, "b", "o")[index]!;
+      const removed = withRemovedDeadkeyPair(ir, "b", "o", index);
+      const restored = withInsertedDeadkeyPair(
+        removed, "b", "o", index, pair.base, pair.accented,
+      );
+      expect(readDeadkeyPairs(restored, "b", "o")).toEqual(readDeadkeyPairs(ir, "b", "o"));
+      expect(restored.stores).toEqual(ir.stores);
+    }
+  });
+
+  it("does not mutate its input and rejects an out-of-range index or missing stores", () => {
+    const ir = parseIr(KMN);
+    const before = JSON.stringify(ir);
+    expect(() => withInsertedDeadkeyPair(ir, "b", "o", 9, "q", "Q")).toThrow(/out of range/);
+    expect(() => withInsertedDeadkeyPair(ir, "b", "o", -1, "q", "Q")).toThrow(/out of range/);
+    expect(() => withInsertedDeadkeyPair(ir, "nope", "o", 0, "q", "Q")).toThrow(/not found/);
+    withInsertedDeadkeyPair(ir, "b", "o", 0, "q", "Q");
+    expect(JSON.stringify(ir)).toBe(before);
   });
 });

@@ -1,4 +1,4 @@
-// E2E: spec 113 (Layout Studio) T048 — US1 row.
+// E2E: spec 113 (Layout Studio) T048 — US1 row; US2 (T070) and US3 (T087) rows below.
 //
 // Copy a simple positional keyboard, open Mechanical Gallery -> Layout, and check that:
 //   - the default-layer cells show the copied keyboard's characters, labelled "from the starting
@@ -183,5 +183,65 @@ test.describe("spec 113 Layout tab - US2", () => {
     await page.getByTestId("layout-cell-K_Q").click();
     await page.getByTestId("layout-undo").waitFor();
     await expect(page.getByTestId("layout-undo")).toBeDisabled();
+  });
+});
+
+test.describe("spec 113 Layout tab - US3", () => {
+  test.setTimeout(600_000);
+
+  test("make a key a deadkey, add three rows and the proposed space row; after-this-deadkey, the simulator and the download agree", async ({ page }) => {
+    await reachMechanicalGallery(page, "basic_kbdus", "en", "é");
+    await openLayoutTab(page);
+
+    // The backquote key already types a character: the new trigger must still fire.
+    await page.getByTestId("layout-cell-K_BKQUOTE").click();
+    await page.getByTestId("key-edit-deadkey").check();
+    // The spec 083 disclosure of what the key does on likely host layouts is shown.
+    await expect(page.getByRole("region", { name: "What this trigger key does on likely host layouts" })).toBeVisible();
+    await page.getByTestId("key-edit-confirm").click();
+
+    // The new deadkey's table opens with the space row proposed.
+    await expect(page.getByTestId("deadkey-table-panel")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId("deadkey-table-space-proposal")).toBeVisible();
+
+    for (const [base, result] of [
+      ["e", "è"],
+      ["a", "à"],
+      ["o", "ò"],
+    ] as const) {
+      await page.getByTestId("deadkey-table-add-base").fill(base);
+      await page.getByTestId("deadkey-table-add-result").fill(result);
+      await page.getByTestId("deadkey-table-add").click();
+    }
+    await page.getByTestId("deadkey-table-space-confirm").click();
+    await expect(page.getByTestId("deadkey-table-fanout-row")).toHaveCount(4);
+
+    // "After this deadkey" shows the rows, as the simulator types them (one validation cycle).
+    await page.getByTestId("deadkey-table-show-after").click();
+    const after = page.getByTestId("after-context-view");
+    await expect(after).toBeVisible();
+    const typed = async (vkey: string): Promise<string> =>
+      (await after.locator(`[data-vkey="${vkey}"] [data-testid="after-context-result"]`).first().textContent({ timeout: 60_000 })) ?? "";
+    await expect.poll(() => typed("K_E"), { timeout: 60_000 }).toContain("è");
+    expect(await typed("K_A")).toContain("à");
+    expect(await typed("K_O")).toContain("ò");
+    expect(await typed("K_SPACE")).toContain("`");
+
+    // The download carries the rules. Output opens once the Mechanisms step is finished.
+    await page.getByTestId("editor-view-tab-assign").click();
+    const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
+    if (await startButton.isVisible().catch(() => false)) await startButton.click();
+    await driveMechanismsGallery(page, {});
+    await navigateToOutput(page);
+    const download = await triggerDownload(page);
+    const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
+    const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "the download carries a .kmn").toBeDefined();
+    const kmnText = new TextDecoder().decode(kmn![1]);
+    expect(kmnText).toContain("@deadkey:");
+    expect(kmnText).toMatch(/dk\([0-9a-f]{4}\) \+ any\(dk_[0-9a-f]{4}_bases\)/i);
+    // The combination table: bases e, a, o and Space, giving è, à, ò and the accent itself.
+    expect(kmnText).toMatch(/store\(dk_[0-9a-f]{4}_bases\) 'eao '/);
+    expect(kmnText).toMatch(/store\(dk_[0-9a-f]{4}_output\) 'èàò`'/);
   });
 });
