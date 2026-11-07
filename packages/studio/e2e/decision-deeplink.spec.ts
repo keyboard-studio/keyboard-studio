@@ -9,21 +9,40 @@
  * FR-015/supersession (053 FR-015, unchanged by this feature): the trail
  * shows the old entry marked replaced, alongside the new one.
  *
- * TARGET QUESTION, AND WHY: this spec's target used to be the "track" step
- * (question `track_choice`, audit label "Authoring approach"), chosen
- * deliberately because it was a SINGLE-question step. Landing "on the
- * step" and landing "on the question" are the same event for it, which
- * sidesteps an open architecture gap this feature does not close: no shared
- * store today records which question a MULTI-question step (e.g. "identity")
- * was showing, so a deep link that also names a `question` can only
- * guarantee the right STEP, not necessarily the right sub-question inside a
- * multi-question flow (see decisions/progressDots.ts's own comment on this
- * same gap). A single-question step has no such ambiguity to paper over.
  *
- * The track question is GONE (removed: the start screen records the track,
- * or it defaults to copy), so this spec is skipped until it is retargeted
- * at another single-question step. The skipped test below still walks the
- * old target; do not un-skip it without retargeting.
+ * TARGET QUESTION, AND WHY: the attribution step's first question,
+ * `il_author_name`. Its trail label is its prompt — "Who should be credited
+ * as the author of this keyboard?" — because the question declares no
+ * `audit_label` (decisions/lookupQuestionLabel.ts falls back audit_label ->
+ * prompt).
+ *
+ * The original target was the track step's `track_choice`, chosen because
+ * it is a SINGLE-question step. The track question is gone (removed by
+ * #2568: the start screen records the track, or it defaults to copy), so
+ * that target is gone too. `il_author_name` is the retarget (issue #2521;
+ * ruling in ~/workspace/keyboard-studio-notes/2521-ruling.md):
+ *
+ * - It is the first question of the attribution step, so landing "on the
+ *   step" and landing "on the question" are the same event for it.
+ * - The multi-question gap the old header cited is closed: lib/stepWalk.ts
+ *   closes the "CURRENT QUESTION" gap, and SurveyRunner honours a jump's
+ *   parked question cursor on mount, so a deep link naming a question lands
+ *   on that question even in a completed multi-question step.
+ * - The "both paths" half of #2521's ask is not satisfiable as written:
+ *   the Open walk contains no survey-question step at all (galleries and
+ *   editors only), so no single-question step is walked by both real paths.
+ *   The deeplink machinery under test is path-independent, so this
+ *   Copy-walk retarget restores the lost coverage; Open-side deeplink
+ *   coverage is a separate follow-up.
+ *
+ * The authoring-track entry is gone entirely on this branch: #2568
+ * removed the question and step that used to record it, and the track
+ * decision is now recorded in the decision store only (start screen, or
+ * StudioShell's copy default) — never appended to the decision log the
+ * trail renders. So the #2521 oddity (trail records the choice as the
+ * tool's suggestion, no jump link) is mooted, not fixed: there is no
+ * entry to pin. The retired "Authoring approach" label survives only for
+ * entries recorded by older drafts.
  *
  * STALENESS, AND WHY THIS SPEC DOES NOT ASSERT A VISIBLE CUE FOR IT: SC-008
  * asks that a deep-linked revision "mark the same steps stale as the
@@ -60,12 +79,12 @@ const FIXTURE = {
   targetScript: "other",
 };
 
-/** The audit label the authoring-track decision entries render under (FR-008)
- * — the retired-decision label ("Authoring approach"), kept for the trail
- * even though the track question is gone. Used to locate the entry without
- * depending on the internal entryId sequence, which shifts with how many
- * identity sub-answers happened to get recorded this run. */
-const TRACK_QUESTION_LABEL = /Authoring approach/i;
+/** The trail label `il_author_name`'s decision entries render under: its
+ * prompt (no `audit_label` declared) — content/i18n/en/flowQuestions.json's
+ * `il_author_name.prompt`. Used to locate the entry without depending on
+ * the internal entryId sequence, which shifts with how many identity
+ * sub-answers happened to get recorded this run. */
+const AUTHOR_QUESTION_LABEL = /Who should be credited as the author/i;
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -84,9 +103,7 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     await page.goto("/");
   });
 
-  // The track step is skipped on every path now (the trail records its answer as the tool's
-  // suggestion, with no jump link), so the single-question target this walk revises is gone.
-  test.skip("activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions", async ({
+  test("activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions", async ({
     page,
   }) => {
     // ---- Walk far enough to have a real, multi-step decision record -------
@@ -103,52 +120,57 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     // Past the base choice now, so the prefill summary is the phase boundary landmark.
     await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 30_000 });
 
-    // ---- Open Decisions and find the early "track" answer ------------------
+    // ---- Open Decisions and find the author-name answer --------------------
     await switchTab(page, "trail");
     await expectNoSeriousAxeViolations(page, "trail (before revision)", {
       exclude: KNOWN_CONTRAST_DEBT,
     });
 
-    const trackEntry = page
+    const authorEntry = page
       .locator('[data-testid="decision-entry"]')
-      .filter({ hasText: TRACK_QUESTION_LABEL })
+      .filter({ hasText: AUTHOR_QUESTION_LABEL })
       .first();
-    await expect(trackEntry).toBeVisible({ timeout: 15_000 });
+    await expect(authorEntry).toBeVisible({ timeout: 15_000 });
     // Nothing superseded yet — this is the entry the revision below creates.
-    await expect(trackEntry.getByTestId("decision-entry-superseded")).toHaveCount(0);
+    await expect(authorEntry.getByTestId("decision-entry-superseded")).toHaveCount(0);
 
     // ---- Activate the jump --------------------------------------------------
-    await trackEntry.getByTestId("decision-entry-jump").click();
+    await authorEntry.getByTestId("decision-entry-jump").click();
 
-    // FR-030/FR-031: arrives on the "track" step with the recorded answer
-    // ("copy") still shown. A single-question step, so "on the step" and
-    // "on the question" are the same landing — see the module header.
-    const copyRadio = page.getByRole("radio", { name: /^Copy/i });
-    await expect(copyRadio).toBeVisible({ timeout: 15_000 });
-    await expect(copyRadio).toBeChecked();
+    // FR-030/FR-031: arrives on the attribution step's first question with
+    // the recorded answer ("Test Author") still shown. The jump names the
+    // question and the runner honours the parked cursor, so "on the step"
+    // and "on the question" are the same landing — see the module header.
+    const nameField = page.locator("#il_author_name");
+    await expect(nameField).toBeVisible({ timeout: 15_000 });
+    await expect(nameField).toHaveValue("Test Author");
 
     // FR-034/Q3: the revise-and-return banner is up, with its explicit
     // opt-out — the choice is offered, not forced, and not a modal prompt.
     await expect(page.getByTestId("step-deep-link-return-banner")).toBeVisible();
     await expect(page.getByTestId("step-deep-link-continue-instead")).toBeVisible();
-    await expectNoSeriousAxeViolations(page, "survey: track (deep-link arrival)", {
+    await expectNoSeriousAxeViolations(page, "survey: attribution (deep-link arrival)", {
       exclude: KNOWN_CONTRAST_DEBT,
     });
 
     // ---- Revise the answer ---------------------------------------------------
-    await confirmCopyTrack(page);
+    // Re-drive the attribution step with a different author name; the email
+    // and copyright questions are unchanged, so their re-submission records
+    // nothing (identical revisit). Step completion returns to Decisions
+    // (FR-034's default, Q3) rather than onward through the walk.
+    await driveAttributionStep(page, { authorName: "Revised Author" });
 
     // FR-034's default (Q3): confirming returns the author to where the link
     // was activated, not onward through the ordinary walk.
     await expect(page).toHaveURL(/#trail$/, { timeout: 15_000 });
 
     // ---- The trail shows the supersession, exactly once ---------------------
-    const trackEntriesAfter = page
+    const authorEntriesAfter = page
       .locator('[data-testid="decision-entry"]')
-      .filter({ hasText: TRACK_QUESTION_LABEL });
-    await expect(trackEntriesAfter).toHaveCount(2, { timeout: 15_000 });
+      .filter({ hasText: AUTHOR_QUESTION_LABEL });
+    await expect(authorEntriesAfter).toHaveCount(2, { timeout: 15_000 });
 
-    const supersededCount = await trackEntriesAfter.getByTestId("decision-entry-superseded").count();
+    const supersededCount = await authorEntriesAfter.getByTestId("decision-entry-superseded").count();
     expect(supersededCount).toBe(1);
 
     await expectNoSeriousAxeViolations(page, "trail (after revision)", {
