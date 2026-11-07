@@ -13,7 +13,7 @@ import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
-import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, isTouchOnlyTriggerRule, ASCII_LETTER_RE } from './irToCarveNodes.ts';
+import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, charProducerCandidates, isNotAForwardTypingPath, isTouchOnlyTriggerRule, ASCII_LETTER_RE } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
 import { codepointLabel } from '../survey/codepointLabel.ts';
 
@@ -224,6 +224,7 @@ export function irToCharacterView(
   // a single key nobody can name. That is the second half of the clause, and a
   // trailing pass could never fix it (the char is already `seen`).
   const touchOnly = touchOnlyProducedChars(ir);
+  const producerCandidates = charProducerCandidates(ir);
 
   const consider = (rawCh: string, keys: string[], source: CharacterSource, strategy: string | undefined) => {
     const stripped = rawCh.startsWith('◌') ? rawCh.slice(1) : rawCh;
@@ -243,7 +244,7 @@ export function irToCharacterView(
     // (first) producer so it never disagrees with the details panel's first
     // list entry; falls back to the caller-supplied `keys` when no producer
     // resolved at all (e.g. a store-only character with no rule producer).
-    const waysToType = charProducers(ir, ch);
+    const waysToType = charProducers(ir, ch, producerCandidates);
     const primarySteps = waysToType[0]?.steps;
     seen.set(ch, {
       ch,

@@ -1229,8 +1229,21 @@ function primaryChordLabel(el: ContextElement, owningRule: IRRule): string | und
  * pattern, so skipping owned rules would make its own trigger unfindable.
  * Display-only; never mutates ownership.
  */
-function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement; rule: IRRule } | undefined {
-  const candidates: { el: ContextElement; rule: IRRule }[] = [];
+/** A deadkey's trigger: the single key (or char) rule that outputs it. */
+type DeadkeyTrigger = { el: ContextElement; rule: IRRule };
+
+/** Memo of {@link findDeadkeyTrigger} results for one IR, by deadkey id. */
+export type DeadkeyTriggerCache = Map<number, DeadkeyTrigger | undefined>;
+
+function findDeadkeyTrigger(ir: KeyboardIR, dkId: number, cache?: DeadkeyTriggerCache): DeadkeyTrigger | undefined {
+  if (cache?.has(dkId)) return cache.get(dkId);
+  const found = scanDeadkeyTrigger(ir, dkId);
+  cache?.set(dkId, found);
+  return found;
+}
+
+function scanDeadkeyTrigger(ir: KeyboardIR, dkId: number): DeadkeyTrigger | undefined {
+  const candidates: DeadkeyTrigger[] = [];
   for (const group of ir.groups) {
     if (group.name === 'deadkeys') continue;
     for (const rule of group.rules) {
@@ -1287,6 +1300,7 @@ export function keySequenceLabel(
   rule: IRRule,
   ir: KeyboardIR,
   resolvedStartLabel?: string,
+  triggerCache?: DeadkeyTriggerCache,
 ): string[] | undefined {
   const ctx = rule.context;
 
@@ -1294,7 +1308,7 @@ export function keySequenceLabel(
     const dkEl = ctx.find((el) => el.kind === 'deadkey');
     if (dkEl !== undefined && dkEl.kind === 'deadkey') {
       // S-02/S-06 deadkey body: trigger THEN base.
-      const trigger = findDeadkeyTrigger(ir, dkEl.id);
+      const trigger = findDeadkeyTrigger(ir, dkEl.id, triggerCache);
       if (trigger === undefined) return undefined;
       const triggerLabel = primaryChordLabel(trigger.el, trigger.rule);
       return triggerLabel !== undefined ? [triggerLabel, resolvedStartLabel] : undefined;
@@ -1368,7 +1382,7 @@ export function keySequenceLabel(
     const steps: string[] = [];
     for (const el of effCtx) {
       if (el.kind !== 'deadkey') continue; // narrows for TS; guaranteed by the `every` above
-      const trigger = findDeadkeyTrigger(ir, el.id);
+      const trigger = findDeadkeyTrigger(ir, el.id, triggerCache);
       if (trigger === undefined) return undefined;
       const label = primaryChordLabel(trigger.el, trigger.rule);
       if (label === undefined) return undefined;
@@ -1526,6 +1540,7 @@ function resolveStoreSlotSteps(
   el: OutputElement,
   slotIndex: number,
   storeMap: ReadonlyMap<string, IRStore>,
+  triggerCache?: DeadkeyTriggerCache,
 ): string[] | undefined {
   if (isParallelIndexFanOut(rule)) {
     const inputAnyEl = rule.context.find((c) => c.kind === 'any');
@@ -1533,7 +1548,7 @@ function resolveStoreSlotSteps(
     const baseLabel = slotItemLabel(inputStore?.items[slotIndex]);
     if (baseLabel === undefined) return undefined;
     const hasDeadkey = rule.context.some((c) => c.kind === 'deadkey');
-    return hasDeadkey ? keySequenceLabel(rule, ir, baseLabel) : [baseLabel];
+    return hasDeadkey ? keySequenceLabel(rule, ir, baseLabel, triggerCache) : [baseLabel];
   }
 
   if (el.kind === 'index') {
@@ -1542,7 +1557,7 @@ function resolveStoreSlotSteps(
     if (baseEl !== undefined && baseEl.kind === 'any') {
       const baseStore = storeMap.get(baseEl.storeRef);
       const baseLabel = slotItemLabel(baseStore?.items[slotIndex]);
-      if (baseLabel !== undefined) return keySequenceLabel(rule, ir, baseLabel);
+      if (baseLabel !== undefined) return keySequenceLabel(rule, ir, baseLabel, triggerCache);
     }
   }
 
@@ -1602,12 +1617,59 @@ export function isTouchOnlyTriggerRule(rule: IRRule): boolean {
 }
 
 /**
+ * Per-IR lookups for asking `charProducers` about many characters: the rules it may match for
+ * each character (NFC), in IR order, and a memo of deadkey triggers filled as they are resolved.
+ */
+export interface CharProducerCandidates {
+  readonly rulesByChar: ReadonlyMap<string, readonly IRRule[]>;
+  readonly deadkeyTriggers: DeadkeyTriggerCache;
+}
+
+/**
+ * Index every rule `charProducers` could count as a producer under each
+ * character it could produce: a char item of a store an index()/outs() output
+ * reads, or an all-literal output as a whole. A superset — `charProducers`
+ * still applies its own matching to each candidate — so passing the index
+ * changes nothing but cost. Deadkey triggers are memoised in it too, so build
+ * a fresh one for each IR rather than keeping one across edits. Build it once when asking about many characters
+ * of the same IR (the docs' typing guide asks about every produced
+ * character, and a full rule scan per character made that quadratic).
+ */
+export function charProducerCandidates(ir: KeyboardIR): CharProducerCandidates {
+  const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
+  const index = new Map<string, IRRule[]>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (isDeadkeyTriggerRule(rule) || isTouchOnlyTriggerRule(rule) || isNotAForwardTypingPath(rule)) continue;
+      const keys = new Set<string>();
+      for (const el of rule.output) {
+        if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+        for (const item of storeMap.get(el.storeRef)?.items ?? []) {
+          if (item.kind === 'char') keys.add(item.value.normalize('NFC'));
+        }
+      }
+      if (rule.output.length > 0 && rule.output.every((el) => el.kind === 'char')) {
+        keys.add(rule.output.map((el) => (el.kind === 'char' ? el.value : '')).join('').normalize('NFC'));
+      }
+      for (const key of keys) {
+        const list = index.get(key);
+        if (list === undefined) index.set(key, [rule]);
+        else list.push(rule);
+      }
+    }
+  }
+  return { rulesByChar: index, deadkeyTriggers: new Map() };
+}
+
+/**
  * Enumerate every faithful "way to type" `ch` across the whole IR — one
  * `CharProducer` per producing rule (or producing store slot, for a
  * parallel-fan-out / sequence rule). See the module-doc block above this
- * section for the full contract.
+ * section for the full contract. `candidates` (from
+ * {@link charProducerCandidates} over the same IR) narrows the scan to the
+ * rules that could match; the result is the same.
  */
-export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
+export function charProducers(ir: KeyboardIR, ch: string, candidates?: CharProducerCandidates): CharProducer[] {
   const target = ch.normalize('NFC');
   const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
   const producers: CharProducer[] = [];
@@ -1682,7 +1744,7 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
       outStore.items.forEach((item, i) => {
         if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
         matchedViaStore = true;
-        push(rule, () => resolveStoreSlotSteps(rule, ir, el, i, storeMap), `${rule.nodeId}#${i}`, false);
+        push(rule, () => resolveStoreSlotSteps(rule, ir, el, i, storeMap, candidates?.deadkeyTriggers), `${rule.nodeId}#${i}`, false);
       });
     }
     return matchedViaStore;
@@ -1705,7 +1767,7 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
       // the first one — a little reinforcement, not misleading, unlike
       // the store-slot case above where a multi-item store would be
       // actively wrong for a single specific character).
-      push(rule, () => keySequenceLabel(rule, ir), rule.nodeId, true);
+      push(rule, () => keySequenceLabel(rule, ir, undefined, candidates?.deadkeyTriggers), rule.nodeId, true);
       return true;
     }
     // A rule whose literal output merely CONTAINS `target` as part of a
@@ -1724,14 +1786,13 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
   // character whose only producer is such a rule simply has no producer here
   // (empty waysToType) — that is the correct, honest state; it is never
   // backfilled with a "press Backspace" step.
-  for (const group of ir.groups) {
-    for (const rule of group.rules) {
-      if (isDeadkeyTriggerRule(rule)) continue;
-      if (isTouchOnlyTriggerRule(rule)) continue;
-      if (isNotAForwardTypingPath(rule)) continue;
-      if (tryProduceStoreMatch(rule)) continue;
-      tryProduceLiteralMatch(rule);
-    }
+  const rules = candidates !== undefined ? (candidates.rulesByChar.get(target) ?? []) : ir.groups.flatMap((g) => g.rules);
+  for (const rule of rules) {
+    if (isDeadkeyTriggerRule(rule)) continue;
+    if (isTouchOnlyTriggerRule(rule)) continue;
+    if (isNotAForwardTypingPath(rule)) continue;
+    if (tryProduceStoreMatch(rule)) continue;
+    tryProduceLiteralMatch(rule);
   }
 
   return producers;

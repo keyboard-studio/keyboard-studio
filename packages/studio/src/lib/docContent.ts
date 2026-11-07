@@ -27,7 +27,8 @@ import {
 } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "@keyboard-studio/contracts/unicode";
 import { escapeDocHtml, parseTouchLayout, type GeneratedDocSlots } from "@keyboard-studio/engine";
-import { charProducers, displayChar, ruleModifier } from "./irToCarveNodes.ts";
+import { charProducerCandidates, charProducers, displayChar, ruleModifier } from "./irToCarveNodes.ts";
+import type { CharProducerCandidates } from "./irToCarveNodes.ts";
 
 export interface DocContentInput {
   /** The working-copy IR. */
@@ -121,15 +122,18 @@ interface GuideRow {
 }
 
 /** The fewest-step way to type `ch`. A producer with only a trigger floor counts as one step; ties go to the joined label in code-point order. */
-function shortestKeys(ir: KeyboardIR, ch: string): string {
-  const parts = shortestKeySteps(ir, ch);
+function shortestKeys(ir: KeyboardIR, ch: string, candidates: CharProducerCandidates): string {
+  const parts = shortestKeySteps(ir, ch, candidates);
   return parts === undefined ? "" : parts.map((p) => `<kbd>${escapeDocHtml(p)}</kbd>`).join(" then ");
 }
 
-/** {@link shortestKeys} as plain keystroke labels ("AltGr + n"), or undefined when no faithful path exists. Shared with the README facts. */
-export function shortestKeySteps(ir: KeyboardIR, ch: string): string[] | undefined {
+/**
+ * {@link shortestKeys} as plain keystroke labels ("AltGr + n"), or undefined when no faithful path exists. Shared with the
+ * README facts. Pass `candidates` (one `charProducerCandidates(ir)`) when asking about many characters.
+ */
+export function shortestKeySteps(ir: KeyboardIR, ch: string, candidates?: CharProducerCandidates): string[] | undefined {
   let best: { steps: number; label: string; parts: string[] } | undefined;
-  for (const producer of charProducers(ir, ch)) {
+  for (const producer of charProducers(ir, ch, candidates)) {
     const parts = producer.steps.length > 0 ? producer.steps : producer.triggerFloor !== undefined ? [producer.triggerFloor] : [];
     if (parts.length === 0) continue;
     const label = parts.join(" ");
@@ -145,9 +149,10 @@ export function shortestKeySteps(ir: KeyboardIR, ch: string): string[] | undefin
 }
 
 function guideRows(ir: KeyboardIR): GuideRow[] {
+  const candidates = charProducerCandidates(ir);
   return producedChars(ir)
     .filter((ch) => !isBaseCharacter(ch))
-    .map((ch) => ({ ch, keys: shortestKeys(ir, ch) }));
+    .map((ch) => ({ ch, keys: shortestKeys(ir, ch, candidates) }));
 }
 
 function renderGuideTable(rows: readonly GuideRow[]): string {
