@@ -319,7 +319,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
     ...(onBack !== undefined
       ? {
           back: {
-            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
             onClick: onBack,
             testId: "seed-source-back",
             ariaLabel: t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms" }),

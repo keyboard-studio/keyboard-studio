@@ -80,7 +80,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
     ...(onBack !== undefined
       ? {
           back: {
-            label: t({ id: "editor.deadkey.backButton", message: "← Back" }),
+            label: t({ id: "editor.deadkey.backButton", message: "Back" }),
             onClick: onBack,
             testId: "deadkeys-back",
           },

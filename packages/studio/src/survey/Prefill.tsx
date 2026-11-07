@@ -406,7 +406,7 @@ export function Prefill({ identity, base, startIr, onConfirm, onBack, remapConfi
     ...(onBack !== undefined
       ? {
           back: {
-            label: t({ id: "survey.prefill.backButton", message: "← Back" }),
+            label: t({ id: "survey.prefill.backButton", message: "Back" }),
             onClick: onBack,
             testId: "prefill-back",
           },
