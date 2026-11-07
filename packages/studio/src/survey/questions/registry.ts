@@ -49,8 +49,8 @@ import helpDocsModule from "./gallery/helpDocs.ts";
 import welcomeHtmModule from "./gallery/welcomeHtm.ts";
 import iconModule from "./gallery/icon.ts";
 
-import { flowModules, demotedPhaseFModules } from "./flowModules.ts";
-export { flowModules, demotedPhaseFModules };
+import { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS } from "./flowModules.ts";
+export { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS };
 import pb_mark_input_order from "./reserve/pb_mark_input_order.ts";
 
 
