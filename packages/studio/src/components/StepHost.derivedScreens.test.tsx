@@ -55,6 +55,7 @@ vi.mock("../steps/registerEditorSteps.ts", () => ({
   deadkeysStep: trivialStep("deadkeys"),
   rulesStep: trivialStep("rules"),
   mechanismsStep: trivialStep("mechanisms"),
+  fallbackPolicyStep: trivialStep("fallback_policy"),
   oskStep: trivialStep("osk"),
   touchSeedSourceStep: trivialStep("touch_seed_source"),
   touchStep: trivialStep("touch"),

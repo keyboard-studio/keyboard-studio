@@ -32,6 +32,7 @@ import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { STEP_ORDER } from "../steps/stepOrder.ts";
+import { resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
 import { draftKey, loadDraft, type DurableDraft } from "./draftPersistence.ts";
 
 vi.mock("./serverDraftStore.ts", () => ({
@@ -59,14 +60,16 @@ describe("pre-reordering draft loads on the current build", () => {
     useSurveyAnswerStore.getState().reset();
   });
 
-  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485)", () => {
+  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485; fallback_policy, #2549; deliberate removal: track, #2568 — its decision lives on choose_base)", () => {
     // The 091 reordering itself changed no ids. #1901 deliberately ADDED
     // one step (attribution), spec 111 added open_languages (Open only),
-    // open_missing_letters and open_upgrades, and #2485 added icon --
-    // every pre-reordering id still exists, so a draft persisted before
-    // any of these changes names only known steps.
+    // open_missing_letters and open_upgrades, #2485 added icon, and #2549
+    // added fallback_policy — and #2568 deliberately REMOVED the track
+    // step, whose decision now lives on choose_base. Every other
+    // pre-reordering id still exists, so a draft persisted before any of
+    // these changes names only known (or legacy-mapped) steps.
     expect([...STEP_ORDER].sort()).toEqual(
-      [...PRE_REORDER_STEP_IDS, "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon"].sort(),
+      [...PRE_REORDER_STEP_IDS.filter((id) => id !== "track"), "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon", "fallback_policy"].sort(),
     );
   });
 
@@ -78,18 +81,26 @@ describe("pre-reordering draft loads on the current build", () => {
       ...Object.keys(fixture.surveyAnswers?.steps ?? {}),
     ]);
     expect(persisted.size).toBeGreaterThan(5);
-    for (const id of persisted) expect(STEP_ORDER).toContain(id);
+    // "Known" means the id resolves through the frozen legacy map to a
+    // step in the current order: the fixture's history still names the
+    // retired "track" step verbatim (traversal restores verbatim — see the
+    // test below), and the map resolves it to choose_base.
+    for (const id of persisted) expect(STEP_ORDER).toContain(resolveLegacyStepId(id));
   });
 
-  it("loadDraft restores traversal verbatim; answers restore per the spec 088 migration contract", () => {
+  it("loadDraft restores traversal (legacy ids mapped through the frozen map); answers restore per the spec 088 migration contract", () => {
     localStorage.setItem(draftKey(fixture.projectKey), fixtureText);
 
     expect(loadDraft(fixture.projectKey)).toBe(true);
 
     const session = useSurveySessionStore.getState();
     expect(session.activeStepId).toBe(fixture.traversal.activeStepId);
-    expect(session.history).toEqual(fixture.traversal.history);
-    expect(session.visited).toEqual(fixture.traversal.visited);
+    // Not verbatim for legacy ids: the fixture's history names the retired
+    // "track" step, which the frozen map lands on choose_base (#2568) —
+    // collapsing into the choose_base entry that precedes it. Everything
+    // else restores verbatim.
+    expect(session.history).toEqual(["identity", "layout", "choose_base", "project_name", "characters"]);
+    expect(session.visited).toEqual(["identity", "layout", "choose_base", "project_name", "characters", "marks"]);
     expect(useWorkingCopyStore.getState().instantiationMode).toBe(fixture.workingCopy.instantiationMode);
 
     const restored = useSurveyAnswerStore.getState().steps;

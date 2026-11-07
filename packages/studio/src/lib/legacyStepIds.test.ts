@@ -61,9 +61,11 @@ function ctxAllWalked(): ResolveContext {
 }
 
 describe("SC-005 inventory — every pre-091 step id resolves to its screen", () => {
-  it("the frozen map covers exactly the 18 inventoried ids", () => {
+  it("the frozen map covers exactly the 18 inventoried ids plus fallback_policy", () => {
+    // #2549 added the fallback_policy step after the 18e63aa4 inventory;
+    // it maps to itself like every other current step.
     expect(Object.keys(LEGACY_STEP_ID_MAP).sort()).toEqual(
-      [...MAIN_STEP_IDS_AT_18E63AA4].sort(),
+      [...MAIN_STEP_IDS_AT_18E63AA4, "fallback_policy"].sort(),
     );
   });
 
@@ -129,9 +131,14 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
     for (const id of MAIN_STEP_IDS_AT_18E63AA4) {
       const loc: Location = { route: "survey", step: id as never };
       const result = resolveLocation(loc, ctx);
-      // The track step is gated off once a track is recorded (spec 111 start screen).
+      // #2568: the track step is gone; its decision lives on choose_base,
+      // so an old "track" deep link lands on choose_base instead of
+      // degrading (the pre-#2568 behaviour was step-not-in-build).
       if (id === "track") {
-        expect(result.kind, id).toBe("degraded");
+        expect(result.kind, id).toBe("reachable");
+        if (result.kind === "reachable") {
+          expect(result.location.step, id).toBe("choose_base");
+        }
         continue;
       }
       expect(result.kind, id).toBe("reachable");

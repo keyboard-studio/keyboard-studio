@@ -10,7 +10,7 @@
 import { effectiveEntries } from "@keyboard-studio/contracts";
 import type { DecisionRecord } from "@keyboard-studio/contracts";
 import { parseDecisionRecord } from "@keyboard-studio/engine";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { questionRegistry, RETIRED_QUESTION_DECISIONS } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { DECISION_POINTS, type DecisionPoint } from "./decisionPointBases.ts";
 
@@ -91,11 +91,29 @@ export function recordToDecisionSet(
       // that owns the question and `provides` the decision. Answers with no
       // such module (the marks series' own sub-answers, invisibles, phase B
       // bookkeeping) are carried by their composite decision entry instead.
+      // A retired question whose answer still maps onto a live decision
+      // resolves through RETIRED_QUESTION_DECISIONS instead — `track_choice`
+      // was removed with the track step (#2568), but a record's answer is
+      // the only record of an "adapt" walk, and orphaning it would replay
+      // that walk on the copy track (same rule as the v1 draft migration).
       const mod = questionRegistry[p.questionId];
-      for (const id of mod?.provides ?? []) {
+      const provides = mod?.provides ?? RETIRED_QUESTION_DECISIONS[p.questionId] ?? [];
+      for (const id of provides) {
         if (allowed.has(id)) out[id] = asDecision(id, p.value);
       }
     }
+  }
+
+  // Copy defaults where unrecorded (#2568): a record with no track answer
+  // at all is a copy walk by construction — the track question only ever
+  // existed to choose, and StudioShell defaults the live walk the same way
+  // (provenance "default", step "choose_base" there; here the replay cut).
+  if (allowed.has("authoring-track") && out["authoring-track"] === undefined) {
+    out["authoring-track"] = {
+      id: "authoring-track",
+      value: "copy",
+      provenance: "default",
+    } as Decision<unknown>;
   }
   return out;
 }
