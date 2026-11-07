@@ -427,7 +427,9 @@ Live and passing:
   gating specs, written and recorded RED against the pre-fix tree before the fix landed
   ([evidence](../specs/_archive/057-bulletproof-navigation/evidence/gating-red.md))
 - [decision-deeplink.spec.ts](../packages/studio/e2e/decision-deeplink.spec.ts) and
-  [footer-progress.spec.ts](../packages/studio/e2e/footer-progress.spec.ts)
+  [footer-progress.spec.ts](../packages/studio/e2e/footer-progress.spec.ts) — decision-deeplink
+  retargeted at attribution's `il_author_name` per #2521 (2026-11-07); the track step is
+  skipped on every path post-111, so its trail entry renders no jump link.
 - [convenience-loanwords.spec.ts](../packages/studio/e2e/convenience-loanwords.spec.ts) — Bafut
   copy-track walk; the convenience question must offer its loanword-only letters (strict
   `driveConvenienceStep`). Manual/local only, not in the CI `e2e` job
