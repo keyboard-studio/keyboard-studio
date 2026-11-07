@@ -8,7 +8,7 @@
 // not a decision id at all -- it is `marks-treatment.value.contextTolerance`.
 
 import { effectiveEntries } from "@keyboard-studio/contracts";
-import type { DecisionRecord } from "@keyboard-studio/contracts";
+import type { DecisionRecord, MarksContextToleranceDecision } from "@keyboard-studio/contracts";
 import { parseDecisionRecord } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
@@ -59,12 +59,33 @@ function asDecision(id: string, value: unknown): Decision<unknown> {
 }
 
 /**
- * The marks-treatment value with the tolerance sub-field masked. The decision
- * point `tolerance` is the only one that carries it.
+ * The default tolerance decision (spec 106 FR-060) a pre-US6 record stands
+ * for, as a fresh object per call. A record that predates the tolerance
+ * decision carries `null` (the walk pressed Continue before the analysis
+ * arrived, or the station did not exist yet); the cut records the same default
+ * the station records on Continue: accept, provenance default. The sites and
+ * fingerprint are deferred — only the replay's live analysis knows them, so
+ * the marker carries empty ones and the fixture derives the concrete decision
+ * from its analysis (`installToleranceOverlay`).
  */
+export function defaultToleranceMarker(): MarksContextToleranceDecision {
+  return {
+    decision: "accept",
+    acceptedSiteIds: [],
+    proposedSiteIds: [],
+    fingerprint: "",
+    origin: "default",
+  };
+}
+
 function withToleranceMask(value: unknown, keepTolerance: boolean): unknown {
-  if (keepTolerance || typeof value !== "object" || value === null) return value;
-  return { ...(value as Record<string, unknown>), contextTolerance: null };
+  if (typeof value !== "object" || value === null) return value;
+  if (!keepTolerance) return { ...(value as Record<string, unknown>), contextTolerance: null };
+  const v = value as Record<string, unknown>;
+  if (v.contextTolerance === null || v.contextTolerance === undefined) {
+    return { ...v, contextTolerance: defaultToleranceMarker() };
+  }
+  return value;
 }
 
 export function recordToDecisionSet(

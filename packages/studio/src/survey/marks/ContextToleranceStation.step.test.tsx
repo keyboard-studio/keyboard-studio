@@ -83,6 +83,7 @@ describe("ContextToleranceStation, normalization step", () => {
       acceptedSiteIds: ["normalization-step"],
       proposedSiteIds: ["normalization-step"],
       fingerprint: FINGERPRINT,
+      origin: "asked",
     });
   });
 
@@ -94,6 +95,7 @@ describe("ContextToleranceStation, normalization step", () => {
       acceptedSiteIds: [],
       proposedSiteIds: ["normalization-step"],
       fingerprint: FINGERPRINT,
+      origin: "asked",
     });
   });
 
@@ -150,5 +152,55 @@ describe("ContextToleranceStation, fallback after a refusal", () => {
       />,
     );
     expect(screen.queryByTestId("context-tolerance-fallback-reason")).toBeNull();
+  });
+});
+
+describe("ContextToleranceStation, normalization step — pre-accepted default (spec 106 FR-060)", () => {
+  const gaps: RuleToleranceFinding[] = [
+    { ruleId: "r10", location: { file: "k.kmn", line: 10 }, status: "not-analysed", failingKeystrokes: [{ vkey: "K_LBRKT", modifiers: [] }] },
+  ];
+
+  it("with gap findings and no decision, shows the step as included by default and records nothing on render", () => {
+    const onDecide = vi.fn();
+    render(
+      <ContextToleranceStation
+        proposal={stepProposal()}
+        disclosures={{}}
+        ruleLines={{}}
+        fingerprint={FINGERPRINT}
+        step={{ ruleCount: 9, examples: [{ pasted: "ẹ", result: "ẹ" }] }}
+        gapFindings={gaps}
+        loadNames={loadNames}
+        onDecide={onDecide}
+      />,
+    );
+    const station = screen.getByTestId("context-tolerance-station");
+    expect(station.getAttribute("data-default")).toBe("accepted");
+    expect(screen.getByText(/is included by default/)).toBeTruthy();
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.getByTestId("context-tolerance-change")).toBeTruthy();
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it("the change control re-opens the step panel, where accepting is an asked accept", () => {
+    const onDecide = vi.fn();
+    render(
+      <ContextToleranceStation
+        proposal={stepProposal()}
+        disclosures={{}}
+        ruleLines={{}}
+        fingerprint={FINGERPRINT}
+        step={{ ruleCount: 9, examples: [{ pasted: "ẹ", result: "ẹ" }] }}
+        gapFindings={gaps}
+        loadNames={loadNames}
+        onDecide={onDecide}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Change this decision" }));
+    expect(screen.getByTestId("context-tolerance-station").getAttribute("data-default")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add this step" }));
+    expect(onDecide).toHaveBeenCalledWith(
+      expect.objectContaining({ decision: "accept", acceptedSiteIds: ["normalization-step"], origin: "asked" }),
+    );
   });
 });

@@ -661,6 +661,8 @@ export const MarksContextToleranceDecisionSchema = z.object({
   proposedSiteIds: z.array(z.string()),
   fingerprint: z.string(),
   appliedFingerprint: z.string().optional(),
+  // Spec 106 FR-060: how the decision was reached. Absent pre-US6.
+  origin: z.enum(["default", "asked"]).optional(),
 });
 
 // The single authoritative key-budget determination (spec 052, keyBudget.ts).

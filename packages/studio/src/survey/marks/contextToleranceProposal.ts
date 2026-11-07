@@ -179,3 +179,17 @@ export function decisionFromProposal(
     acceptedSiteIds.length === proposedSiteIds.length ? "accept" : acceptedSiteIds.length === 0 ? "decline" : "partial";
   return { decision, acceptedSiteIds, proposedSiteIds, fingerprint };
 }
+
+/**
+ * The default-accepted decision for a proposal (spec 106 FR-060): every site
+ * accepted, provenance default. The station records this on Continue when the
+ * author takes the pre-accepted normalization without changing it; the
+ * decision-point fixture derives the same one from its live analysis when the
+ * record predates the decision.
+ */
+export function defaultToleranceDecision(
+  proposal: TransformProposal,
+  fingerprint: string,
+): Omit<MarksContextToleranceDecision, "appliedFingerprint"> {
+  return { ...decisionFromProposal(proposal, fingerprint), origin: "default" };
+}

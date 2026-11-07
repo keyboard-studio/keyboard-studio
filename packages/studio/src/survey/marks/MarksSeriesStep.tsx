@@ -108,7 +108,7 @@ import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
-import { toleranceProposalFor, toleranceStationShown } from "./contextToleranceProposal.ts";
+import { defaultToleranceDecision, toleranceProposalFor, toleranceStationShown } from "./contextToleranceProposal.ts";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -936,7 +936,24 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       // Stamp the final station as the position before completing, so the
       // entries step completion records are attributed to it.
       setPosition(STEP_ID, activeStation);
-      complete(toleranceOverride);
+      // Spec 106 FR-060: the tolerance station shows the normalization as
+      // pre-accepted; pressing Continue without changing it records the
+      // default decision here — on Continue, never on render (Art. X). The
+      // tolerance station is always last (visibleMarksStations), so this is
+      // the only Continue it can take; an explicit confirm/decline arrives
+      // as the override instead, and a prior decision is carried forward by
+      // resolvedToleranceDecision.
+      const defaultDecision =
+        toleranceOverride === undefined &&
+        activeStation === "marks_context_tolerance" &&
+        toleranceDecision === null &&
+        priorTolerance === undefined &&
+        toleranceProposal !== null &&
+        toleranceFingerprint !== undefined &&
+        toleranceGapFindings.length > 0
+          ? defaultToleranceDecision(toleranceProposal, toleranceFingerprint)
+          : undefined;
+      complete(toleranceOverride ?? defaultDecision);
     }
   }
 

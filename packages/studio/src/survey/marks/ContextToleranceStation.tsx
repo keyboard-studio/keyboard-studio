@@ -218,6 +218,11 @@ export function ContextToleranceStation({
   const priorStillValid = prior !== undefined && prior.fingerprint === fingerprint;
   const [changing, setChanging] = useState(false);
   const siteCount = proposal.affectedSites.length;
+  // Spec 106 FR-060: with gap findings and no decision recorded, the
+  // normalization is pre-accepted — shown as the default, with a change
+  // control to revisit it. Nothing is recorded here: the step records the
+  // default decision on Continue (Art. X).
+  const isDefaultAccepted = prior === undefined && gapFindings !== undefined && gapFindings.length > 0;
 
   if (priorStillValid && !changing) {
     const accepted = prior.acceptedSiteIds.length;
@@ -263,6 +268,31 @@ export function ContextToleranceStation({
     );
   }
 
+  if (isDefaultAccepted && !changing) {
+    return (
+      <div data-testid="context-tolerance-station" data-default="accepted" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <StationHeading />
+        <p style={mutedParaFlush}>
+          {step !== undefined
+            ? t({
+                id: "marks.contextTolerance.step.default.accepted",
+                message: "The step that converts pasted letters and marks to the form this keyboard produces is included by default.",
+              })
+            : t({
+                id: "marks.contextTolerance.station.default.accepted",
+                message: plural(siteCount, {
+                  one: "# rule is fixed by default so it also works when the letter and its mark are separate characters.",
+                  other: "# rules are fixed by default so they also work when the letter and its mark are separate characters.",
+                }),
+              })}
+        </p>
+        <button type="button" data-testid="context-tolerance-change" onClick={() => setChanging(true)} style={{ alignSelf: "flex-start" }}>
+          <Trans id="marks.contextTolerance.station.prior.change">Change this decision</Trans>
+        </button>
+      </div>
+    );
+  }
+
   if (step !== undefined) {
     const { ruleCount } = step;
     return (
@@ -287,8 +317,8 @@ export function ContextToleranceStation({
           }
           confirmLabel={<Trans id="marks.contextTolerance.step.action.accept">Add this step</Trans>}
           cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
-          onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
-          onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
+          onConfirm={(confirmed) => onDecide({ ...decisionFromProposal(confirmed, fingerprint), origin: "asked" })}
+          onCancel={() => onDecide({ ...declineDecision(proposal, fingerprint), origin: "asked" })}
         >
           <h4 style={{ margin: "4px 0 0 0", fontSize: 13 }}>
             <Trans id="marks.contextTolerance.step.examples.heading">Examples of text it converts</Trans>
@@ -325,8 +355,8 @@ export function ContextToleranceStation({
         }
         confirmLabel={<Trans id="marks.contextTolerance.station.confirm">Add these rules</Trans>}
         cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
-        onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
-        onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
+        onConfirm={(confirmed) => onDecide({ ...decisionFromProposal(confirmed, fingerprint), origin: "asked" })}
+        onCancel={() => onDecide({ ...declineDecision(proposal, fingerprint), origin: "asked" })}
       >
         {fallbackReason !== undefined && <FallbackReasonLine reason={fallbackReason} />}
         <DisclosureRows proposal={proposal} disclosures={disclosures} ruleLines={ruleLines} />

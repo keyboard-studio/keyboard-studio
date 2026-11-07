@@ -4963,7 +4963,13 @@
         "migrationNeeded": false,
         "guardReevaluation": []
       },
-      "contextTolerance": null
+      "contextTolerance": {
+        "decision": "accept",
+        "acceptedSiteIds": [],
+        "proposedSiteIds": [],
+        "fingerprint": "",
+        "origin": "default"
+      }
     },
     "provenance": "asked"
   },

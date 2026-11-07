@@ -101,6 +101,20 @@ describe("recordToDecisionSet on the p1 record", () => {
     expect(tol("caps")).toBeNull();
     expect(tol("tolerance")).not.toBeNull();
   });
+
+  it("records the default tolerance decision at tolerance when the record has none (spec 106 FR-060)", () => {
+    const tol = (p: DecisionPoint): unknown =>
+      (recordToDecisionSet(record, p)["marks-treatment"]?.value as { contextTolerance: unknown }).contextTolerance;
+    // This record predates the decision: null at every earlier point.
+    expect(tol("caps")).toBeNull();
+    expect(tol("tolerance")).toEqual({
+      decision: "accept",
+      acceptedSiteIds: [],
+      proposedSiteIds: [],
+      fingerprint: "",
+      origin: "default",
+    });
+  });
 });
 
 describe("the committed decision-point fixtures", () => {
