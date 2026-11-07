@@ -61,7 +61,9 @@ describe("manifest per-step preview-pane decision", () => {
   });
 
   it("later pane steps keep a preview pane", () => {
-    for (const id of ["track", "attribution", "project_name", "help"]) {
+    // "track" was removed with the track question (#2568); the remaining
+    // later steps still pin the preview pane.
+    for (const id of ["attribution", "project_name", "help"]) {
       const step = byId(id);
       expect(step, id).toBeDefined();
       expect(shouldShowPreviewPane(step), id).toBe(true);

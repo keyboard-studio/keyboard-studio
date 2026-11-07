@@ -31,7 +31,7 @@ import {
 
 type WalkStep =
   | "identity" | "layout" | "choose_base" | "attribution" | "project_name" | "open_languages" | "characters"
-  | "carve" | "deadkeys" | "rules" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "osk" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
+  | "carve" | "deadkeys" | "rules" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "fallback_policy" | "osk" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
@@ -160,8 +160,12 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("rules")).toBe("mechanisms");
   });
 
-  it("mechanisms → osk", () => {
-    expect(nextMainLineStepAfter("mechanisms")).toBe("osk");
+  it("mechanisms → fallback_policy (#2539: fallback policy step sits after mechanisms, before OSK)", () => {
+    expect(nextMainLineStepAfter("mechanisms")).toBe("fallback_policy");
+  });
+
+  it("fallback_policy → osk", () => {
+    expect(nextMainLineStepAfter("fallback_policy")).toBe("osk");
   });
 
   it("osk → touch (skips touch_seed_source which is a derived side trail)", () => {
@@ -198,13 +202,13 @@ describe("nextMainLineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> osk -> touch_seed_source -> touch -> help -> html -> icon -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> html -> icon -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     expect(sequence).toEqual([
       // No "track": the question is removed; the start screen records the
       // track (or it defaults to copy at instantiation).
       "identity", "layout", "choose_base", "attribution", "project_name", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "icon", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch_seed_source", "touch", "css", "help", "html", "icon", "done",
     ]);
     // "... -> done -> output": icon -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
@@ -213,7 +217,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "osk", "touch", "css", "icon", "done",
+      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "fallback_policy", "osk", "touch", "css", "icon", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     // Open ends at Review (the criteria view), whose Continue opens Output.
@@ -223,12 +227,14 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-5: the physical -> touch -> docs tail is never reordered (touch after osk, css after touch, help after css)", () => {
     const { sequence } = walkSpine(copyCtx);
     const mech = sequence.indexOf("mechanisms");
+    const fallback = sequence.indexOf("fallback_policy");
     const osk = sequence.indexOf("osk");
     const touch = sequence.indexOf("touch");
     const css = sequence.indexOf("css");
     const help = sequence.indexOf("help");
     expect(mech).toBeGreaterThan(-1);
-    expect(osk).toBeGreaterThan(mech);
+    expect(fallback).toBeGreaterThan(mech);
+    expect(osk).toBeGreaterThan(fallback);
     expect(touch).toBeGreaterThan(osk);
     expect(css).toBeGreaterThan(touch);
     expect(help).toBeGreaterThan(css);
@@ -249,8 +255,8 @@ describe("spec 034 SR-3 — osk advances to touch, never past it", () => {
     expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
 
-  it("advance(mechanisms) always lands on osk first", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("osk");
+  it("advance(mechanisms) always lands on fallback_policy first (then osk)", () => {
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
   });
 
   it("touch is reached and advances onward to css (never bypassed)", () => {
@@ -276,7 +282,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
       "identity", "layout", "choose_base", "attribution",
       // Spec 111: Open's gated pages sit on the spine; Copy's gates skip them.
       "open_languages", "open_missing_letters", "open_upgrades", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "css", "help", "html", "icon", "package",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch", "css", "help", "html", "icon", "package",
     ]);
   });
 });
@@ -410,8 +416,12 @@ describe("advance: spine hops", () => {
     expect(advance("rules", undefined, copyCtx).next).toBe("mechanisms");
   });
 
-  it("mechanisms → osk", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("osk");
+  it("mechanisms → fallback_policy (#2539)", () => {
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
+  });
+
+  it("fallback_policy → osk", () => {
+    expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
   });
 
   it("osk → touch_seed_source when no fork choice is recorded (spec 035 R4/R12)", () => {
@@ -704,7 +714,7 @@ describe("spec 091 T021 — derived screens in the walk", () => {
   });
 
   it("the touch_seed_source screen is walked while unrecorded and skipped once its decision exists", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("osk");
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
     const unrecorded = advance("osk", undefined, copyCtx);
     expect(unrecorded.next).toBe("touch_seed_source");
     const recorded = advance("osk", undefined, {

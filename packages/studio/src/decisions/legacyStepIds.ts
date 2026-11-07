@@ -18,7 +18,10 @@ export const LEGACY_STEP_ID_MAP: Readonly<Record<string, string>> = {
   identity: "identity",
   layout: "layout",
   choose_base: "choose_base",
-  track: "track",
+  // "track" was retired with the track question (#2568): no screen holds
+  // the authoring-track decision anymore (the start screen records it), so
+  // old track ids pass through the resolver unchanged and degrade in
+  // resolveLocation instead of resolving to a screen.
   project_name: "project_name",
   characters: "characters",
   marks: "marks",

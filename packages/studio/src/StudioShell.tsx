@@ -2123,8 +2123,14 @@ function StudioShellContent() {
       )}
       {/* Spec 111 US5: consistency suggestions raised by an applied change.
           Always mounted (it watches the working copy); the list shows only
-          off the criteria page, which lists them itself. */}
-      <AfterApplySuggestions showPanel={route !== "criteria"} />
+          off the criteria page, which lists them itself. #2528: on the
+          survey route the panel withholds fixes owned by a later step. */}
+      <AfterApplySuggestions
+        showPanel={route !== "criteria"}
+        route={route}
+        activeStepId={surveyActiveStepId}
+        stepOrder={manifest.map((s) => s.id)}
+      />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns

@@ -431,10 +431,13 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
   // test that names the nodes, not just a count.
   //
   // "osk" is the branch-defining spine step before the off-spine touch_seed_source
-  // fork (mechanisms -> osk -> [touch_seed_source] -> touch).
+  // fork (mechanisms -> fallback_policy -> osk -> [touch_seed_source] -> touch).
   it("osk is branch-defining: spine -> touch (direct), fork -> touch_seed_source, which joins back to touch (spec 035 FR-013/M4)", () => {
     const fromMechanisms = graph.edges.filter((e) => e.from === "mechanisms");
-    expect(fromMechanisms.find((e) => e.kind === "spine")?.to).toBe("osk");
+    expect(fromMechanisms.find((e) => e.kind === "spine")?.to).toBe("fallback_policy");
+
+    const fromFallbackPolicy = graph.edges.filter((e) => e.from === "fallback_policy");
+    expect(fromFallbackPolicy.find((e) => e.kind === "spine")?.to).toBe("osk");
 
     const fromOsk = graph.edges.filter((e) => e.from === "osk");
 

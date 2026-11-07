@@ -51,6 +51,12 @@ const PRE_REORDER_STEP_IDS = [
   "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "package",
 ];
 
+// Step ids a pre-reordering draft may name that the current manifest no
+// longer lists: "track" was retired with the track question (#2568). The
+// loader restores them verbatim (see the loadDraft test below); they are
+// known-retired, not unknown.
+const RETIRED_STEP_IDS = ["track"];
+
 describe("pre-reordering draft loads on the current build", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -59,14 +65,16 @@ describe("pre-reordering draft loads on the current build", () => {
     useSurveyAnswerStore.getState().reset();
   });
 
-  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485)", () => {
+  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485; fallback_policy, #2549 — and one deliberate removal: track, #2568)", () => {
     // The 091 reordering itself changed no ids. #1901 deliberately ADDED
     // one step (attribution), spec 111 added open_languages (Open only),
-    // open_missing_letters and open_upgrades, and #2485 added icon --
-    // every pre-reordering id still exists, so a draft persisted before
-    // any of these changes names only known steps.
+    // open_missing_letters and open_upgrades, #2485 added icon, and #2549
+    // added fallback_policy — while #2568 deliberately RETIRED the track
+    // step with the track question. Every other pre-reordering id still
+    // exists, so a draft persisted before any of these changes names only
+    // known steps (plus the retired track, covered below).
     expect([...STEP_ORDER].sort()).toEqual(
-      [...PRE_REORDER_STEP_IDS, "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon"].sort(),
+      [...PRE_REORDER_STEP_IDS.filter((id) => !RETIRED_STEP_IDS.includes(id)), "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon", "fallback_policy"].sort(),
     );
   });
 
@@ -78,7 +86,9 @@ describe("pre-reordering draft loads on the current build", () => {
       ...Object.keys(fixture.surveyAnswers?.steps ?? {}),
     ]);
     expect(persisted.size).toBeGreaterThan(5);
-    for (const id of persisted) expect(STEP_ORDER).toContain(id);
+    for (const id of persisted) {
+      expect(STEP_ORDER.includes(id) || RETIRED_STEP_IDS.includes(id)).toBe(true);
+    }
   });
 
   it("loadDraft restores traversal verbatim; answers restore per the spec 088 migration contract", () => {
