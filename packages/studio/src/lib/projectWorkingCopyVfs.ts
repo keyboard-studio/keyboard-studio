@@ -60,6 +60,7 @@
 //                         before 2.7 because that step repoints the entry group
 //   2.7 Context tolerance — applyContextToleranceOverlay (spec 078)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
+//   3.1 Targets         — applyTargetsAnyMutation (always store(&TARGETS) 'any')
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
 //                         display name into source/<keyboardId>.kps, generating
@@ -101,6 +102,7 @@ import {
   applyStoreSlotRemovals,
   applyAssignmentsToVfs,
   applyIdentityStubMutation,
+  applyTargetsAnyMutation,
   applyKeycapLabelsToVfs,
   applyTouchKeycapRemovalsToVfs,
   applyKeyEditsToVfs,
@@ -1132,6 +1134,16 @@ export function projectWorkingCopyVfs(
         );
       }
     }
+  }
+
+  // Step 3.1: Target platforms — always `store(&TARGETS) 'any'` (product owner
+  // ruling, 2026-11-07). Every produced keyboard ships desktop and touch, the
+  // two outputs that adapt per OS, so none picks individual platforms; and the
+  // preview, the Layout tab, and the outputs all need the web build a
+  // 'windows'-only keyboard never gets. Unconditional, unlike identity: it is
+  // not an author choice. Same seam, so preview and outputs cannot disagree.
+  if (vfs.get(`source/${keyboardId}.kmn`) !== undefined) {
+    applyTargetsAnyMutation(vfs, keyboardId);
   }
 
   // Step 3.5: Keycap label projection — patch .kvks and .keyman-touch-layout so

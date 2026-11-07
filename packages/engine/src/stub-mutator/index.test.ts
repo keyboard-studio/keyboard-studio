@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { VirtualFS } from "@keyboard-studio/contracts";
-import { applyIdentityStubMutation } from "./index.js";
+import { applyIdentityStubMutation, applyTargetsAnyMutation } from "./index.js";
 import { textVfs } from "../test-support/vfs.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -221,3 +221,37 @@ describe.skipIf(!SIBLING_REPO_PRESENT)(
     });
   }
 );
+
+describe("applyTargetsAnyMutation", () => {
+  const kmn = (lines: string[]): VirtualFS => createVirtualFS([{ path: "source/k.kmn", content: lines.join("\n"), isBinary: false }]);
+  const read = (vfs: VirtualFS): string => vfs.get("source/k.kmn")!.content as string;
+
+  it("rewrites a platform list to 'any', leaving every other line alone", () => {
+    const vfs = kmn(["store(&NAME) 'K'", "store(&TARGETS) 'windows macosx'", "begin Unicode > use(main)"]);
+    applyTargetsAnyMutation(vfs, "k");
+    expect(read(vfs)).toBe(["store(&NAME) 'K'", "store(&TARGETS) 'any'", "begin Unicode > use(main)"].join("\n"));
+  });
+
+  it("leaves a file that already says 'any' byte-identical", () => {
+    const text = ["store(&TARGETS) 'any'", "begin Unicode > use(main)"];
+    const vfs = kmn(text);
+    applyTargetsAnyMutation(vfs, "k");
+    expect(read(vfs)).toBe(text.join("\n"));
+  });
+
+  it("inserts the store after the last system store when there is none", () => {
+    const vfs = kmn(["store(&NAME) 'K'", "store(&VERSION) '10.0'", "c rules", "begin Unicode > use(main)"]);
+    applyTargetsAnyMutation(vfs, "k");
+    expect(read(vfs).split("\n")).toEqual(["store(&NAME) 'K'", "store(&VERSION) '10.0'", "store(&TARGETS) 'any'", "c rules", "begin Unicode > use(main)"]);
+  });
+
+  it("inserts before begin when there are no system stores, keeping CRLF endings", () => {
+    const vfs = kmn(["c header\r", "begin Unicode > use(main)\r", ""]);
+    applyTargetsAnyMutation(vfs, "k");
+    expect(read(vfs)).toBe("c header\r\nstore(&TARGETS) 'any'\r\nbegin Unicode > use(main)\r\n");
+  });
+
+  it("throws when the keyboard file is missing", () => {
+    expect(() => applyTargetsAnyMutation(createVirtualFS([]), "k")).toThrow(/not found/);
+  });
+});

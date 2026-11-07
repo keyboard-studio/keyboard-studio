@@ -427,7 +427,7 @@ export { detectMarkInputOrderFromImport } from "./strategy-selector/import-mark-
 export { deriveRemapPosture } from "./strategy-selector/derive-remap-posture.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
-export { applyIdentityStubMutation } from "./stub-mutator/index.js";
+export { applyIdentityStubMutation, applyTargetsAnyMutation } from "./stub-mutator/index.js";
 
 // Issue #141 — character discovery service (Phase B).
 // Public surface: factory + injectable types only.

@@ -395,7 +395,39 @@ describe("projectWorkingCopyVfs — in-place mutation", () => {
       identity: null,
     });
     // The VFS was mutated in-place by the mock.
-    expect(vfs.get("source/test_kb.kmn")?.content).toBe("c mutated\n");
+    // (The always-on TARGETS step then prepends store(&TARGETS) 'any'.)
+    expect(vfs.get("source/test_kb.kmn")?.content).toContain("c mutated\n");
+  });
+});
+
+describe("projectWorkingCopyVfs — target platforms (step 3.1)", () => {
+  const project = async (kmn: string): Promise<string> => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([{ path: "source/test_kb.kmn", content: kmn, isBinary: false }]);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      startIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+    return vfs.get("source/test_kb.kmn")?.content as string;
+  };
+
+  it("rewrites a start keyboard's store(&TARGETS) 'windows' to 'any'", async () => {
+    const out = await project("store(&NAME) 'K'\nstore(&TARGETS) 'windows'\nbegin Unicode > use(main)\n");
+    expect(out).toContain("store(&TARGETS) 'any'");
+    expect(out).not.toContain("'windows'");
+  });
+
+  it("inserts store(&TARGETS) 'any' when the start keyboard declares none", async () => {
+    const out = await project("store(&NAME) 'K'\nbegin Unicode > use(main)\n");
+    expect(out.match(/store\(&TARGETS\) 'any'/g)).toHaveLength(1);
+    // After the last system store, before `begin`.
+    expect(out.indexOf("store(&TARGETS)")).toBeGreaterThan(out.indexOf("store(&NAME)"));
+    expect(out.indexOf("store(&TARGETS)")).toBeLessThan(out.indexOf("begin Unicode"));
   });
 });
 

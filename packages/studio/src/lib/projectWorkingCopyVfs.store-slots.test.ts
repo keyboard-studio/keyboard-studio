@@ -94,6 +94,10 @@ function makeParallelIr(opts: {
 // AC#1: Slot-only deletion — irRewritten path
 // ---------------------------------------------------------------------------
 
+// The projection always writes store(&TARGETS) 'any'; a stub already saying so
+// stays byte-identical, which is what the no-edit assertion below pins.
+const ANYSTUB = "store(&TARGETS) 'any'\nc stub\n";
+
 describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock", () => {
   it("AC#1: slot deletion nulls the store at the carved position; body rule and input store survive", () => {
     const ir = makeParallelIr();
@@ -138,7 +142,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
 
   it("AC#1 complement: empty deletedItemIds leaves VFS with the original stub content", () => {
     const ir = makeParallelIr();
-    const vfs = stubKmnVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb", ANYSTUB);
 
     projectWorkingCopyVfs({
       vfs,
@@ -153,7 +157,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
 
     // No re-emit — original stub content unchanged
     const content = vfs.get("source/test_kb.kmn")?.content as string;
-    expect(content).toBe("c stub\n");
+    expect(content).toBe(ANYSTUB);
   });
 
   // ---------------------------------------------------------------------------
