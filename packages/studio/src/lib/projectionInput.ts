@@ -59,6 +59,7 @@ export type ProjectionState = Pick<
   | "contextToleranceOverlay"
   | "touchLayoutJson"
   | "customCss"
+  | "iconIcoBase64"
 > & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
@@ -149,6 +150,7 @@ export function projectionInputFromState(
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
+    iconIcoBase64: state.iconIcoBase64,
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     capsHandling: capsHandling ?? null,

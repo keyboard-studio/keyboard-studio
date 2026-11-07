@@ -1169,7 +1169,7 @@ export type {
 } from "./deadkey-lifecycle/index.js";
 export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
 export type { RgbaImage } from "./icon/icoEncoder.js";
-export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
+export { setKeyboardIcon, setKeyboardIconBytes, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
 
 // LDML keyboard export (spec 108). The barrel exposes the public API only; it
 // exposes no test tooling (`ldml-export/__testing__` is never re-exported).

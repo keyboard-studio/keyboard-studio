@@ -437,6 +437,10 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     sequenceFlaggedChars: s.sequenceFlaggedChars,
     touchLayoutJson: s.touchLayoutJson,
     customCss: s.customCss,
+    // #1550: plain base64 strings, straight passthrough like customCss
+    // above — a resumed draft must ship the icon its author chose.
+    iconIcoBase64: s.iconIcoBase64,
+    iconPngDataUrl: s.iconPngDataUrl,
     touchDraft: s.touchDraft,
     galleryIntrosSeen: s.galleryIntrosSeen,
     staleSteps: [...s.staleSteps],
@@ -618,6 +622,9 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     touchLayoutJson: snapshot.touchLayoutJson,
     // Drafts saved before the CSS step wrote a value carry no key.
     customCss: snapshot.customCss ?? null,
+    // Drafts saved before the icon step wrote a value carry no key.
+    iconIcoBase64: snapshot.iconIcoBase64 ?? null,
+    iconPngDataUrl: snapshot.iconPngDataUrl ?? null,
     touchDraft: snapshot.touchDraft,
     galleryIntrosSeen: snapshot.galleryIntrosSeen,
     staleSteps: new Set(snapshot.staleSteps),

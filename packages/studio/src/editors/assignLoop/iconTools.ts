@@ -225,6 +225,10 @@ export function drawCircle(
  * (e.g. 16/24/32). Text is drawn 1:1 (no smoothing tricks) so it stays
  * crisp when downscaled to 16×16.
  */
+export function iconFont(pixelSize: number): string {
+  return `${pixelSize}px "Courier New", ui-monospace, monospace`;
+}
+
 export function drawText(
   px: PixelBuffer,
   text: string,
@@ -237,7 +241,7 @@ export function drawText(
   // Measure first so the canvas is exactly sized.
   const meas = document.createElement("canvas").getContext("2d");
   if (!meas) return;
-  meas.font = `${pixelSize}px "Courier New", ui-monospace, monospace`;
+  meas.font = iconFont(pixelSize);
   const w = Math.max(1, Math.ceil(meas.measureText(text).width));
   canvas.width = w;
   canvas.height = pixelSize + 8;
@@ -245,7 +249,7 @@ export function drawText(
   if (!ctx) return;
   // Crisp low-res rendering: no smoothing, hard alpha.
   ctx.imageSmoothingEnabled = false;
-  ctx.font = `${pixelSize}px "Courier New", ui-monospace, monospace`;
+  ctx.font = iconFont(pixelSize);
   ctx.textBaseline = "top";
   ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${c[3] / 255})`;
   ctx.fillText(text, 0, 4);
@@ -260,6 +264,70 @@ export function drawText(
       setPixel(px, ox + dx, oy + dy, c);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Initials generator (#1550)
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive display initials for the icon generator: the first letters of
+ * the first two words ("Ewondo Keyboard" → "EK"), else the first two
+ * letters of a single word ("Ewondo" → "EW"). Letters only — digits and
+ * punctuation are skipped; an empty name yields "".
+ */
+export function deriveInitials(displayName: string): string {
+  const words = displayName
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}]/gu, ""))
+    .filter((w) => w.length > 0);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
+  return `${words[0]![0]!}${words[1]![0]!}`.toUpperCase();
+}
+
+/**
+ * Contrasting text colour for a flat background: white on dark, black on
+ * light (relative luminance, Rec. 709 weights, 0.5 midpoint).
+ */
+export function initialsTextColor(background: Rgba): Rgba {
+  const [r, g, b] = background;
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.5 ? [0, 0, 0, 255] : [255, 255, 255, 255];
+}
+
+/**
+ * The pixel size for generated initials: one big letter, two medium,
+ * three or more small — every length fits the 48px canvas.
+ */
+export function initialsFontSize(initials: string): number {
+  if (initials.length <= 1) return 28;
+  if (initials.length === 2) return 20;
+  return 14;
+}
+
+/**
+ * Fill a fresh canvas with a flat background and draw `initials` centred
+ * in a contrasting colour — the "give it a face" generator (#1550). The
+ * raster is `drawText`'s monospace font, so the letters stay crisp at
+ * 16×16. A blank/whitespace `initials` yields the flat background alone.
+ * (The -4 on the vertical centre compensates `drawText`'s +4 glyph offset.)
+ */
+export function generateInitialsIcon(initials: string, background: Rgba): PixelBuffer {
+  const px = createBlankIcon();
+  drawRect(px, 0, 0, ICON_SIZE - 1, ICON_SIZE - 1, background, true);
+  const text = initials.trim().toUpperCase();
+  if (text === "") return px;
+  const size = initialsFontSize(text);
+  const meas = document.createElement("canvas").getContext("2d");
+  let x = 0;
+  if (meas !== null) {
+    meas.font = iconFont(size);
+    x = Math.round((ICON_SIZE - meas.measureText(text).width) / 2);
+  }
+  const y = Math.round((ICON_SIZE - size) / 2) - 4;
+  drawText(px, text, x, y, initialsTextColor(background), size);
+  return px;
 }
 
 /** A small, low-res-friendly palette (plus transparent). */

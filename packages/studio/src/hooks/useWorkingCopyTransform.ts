@@ -232,6 +232,10 @@ export function useWorkingCopyTransform(
   const liveCss = opts?.liveCss;
   const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
   const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
+  // The icon step's recorded bytes (#1550): the preview projection carries
+  // them exactly like the download does, so the OSK preview and the shipped
+  // artifact agree on the icon.
+  const iconIcoBase64 = useWorkingCopyStore((s) => s.iconIcoBase64);
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
@@ -530,6 +534,7 @@ export function useWorkingCopyTransform(
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
             customCss,
+            iconIcoBase64,
           },
           {
             vfs,
@@ -575,5 +580,6 @@ export function useWorkingCopyTransform(
     marksGuardsKey,
     capsHandlingMode,
     customCss,
+    iconIcoBase64,
   ]);
 }

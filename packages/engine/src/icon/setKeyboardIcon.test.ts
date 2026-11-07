@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
-import { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./setKeyboardIcon.js";
+import { setKeyboardIcon, setKeyboardIconBytes, removeKeyboardIcon, ensureBitmapStore } from "./setKeyboardIcon.js";
+import { encodeIconSet } from "./icoEncoder.js";
 
 function makeVfs(files: Record<string, string>): VirtualFS {
   const entries = new Map<string, VirtualFSEntry>();
@@ -64,6 +65,32 @@ describe("setKeyboardIcon", () => {
     const updated = setKeyboardIcon(vfs, "source/test.kmn", "test", solidImage());
     expect(updated).not.toContain("old.ico");
     expect(updated.match(/store\(&BITMAP\)/g)).toHaveLength(1);
+  });
+});
+
+describe("setKeyboardIconBytes", () => {
+  it("writes already-encoded bytes byte-identical (no re-encode) and adds the BITMAP store", () => {
+    const vfs = makeVfs({ "source/test.kmn": KMN });
+    // A hand-built .ico (not produced by our encoder): arbitrary valid
+    // header + payload the function must NOT touch.
+    const authored = new Uint8Array([0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 32, 0, 0, 0, 0, 0, 22, 0, 0, 0, 9, 9, 9, 9]);
+    const updated = setKeyboardIconBytes(vfs, "source/test.kmn", "test", authored);
+
+    const ico = vfs.get("source/test.ico");
+    expect(ico).toBeDefined();
+    expect(ico!.isBinary).toBe(true);
+    expect(ico!.content).toEqual(authored);
+    expect(updated).toContain("store(&BITMAP) 'test.ico'");
+  });
+
+  it("keeps a kept template icon byte-identical over an existing .ico", () => {
+    const kept = encodeIconSet({ width: 48, height: 48, data: new Uint8Array(48 * 48 * 4).fill(200) });
+    const vfs = makeVfs({ "source/test.kmn": KMN });
+    setKeyboardIconBytes(vfs, "source/test.kmn", "test", kept);
+    // A second set with the same bytes is a byte-identical no-op.
+    setKeyboardIconBytes(vfs, "source/test.kmn", "test", kept);
+    expect(vfs.get("source/test.ico")!.content).toEqual(kept);
+    expect((vfs.get("source/test.kmn")!.content as string).match(/store\(&BITMAP\)/g)).toHaveLength(1);
   });
 });
 

@@ -356,13 +356,25 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "CssEditor's Continue writes the stylesheet text to workingCopyStore.customCss, which projectWorkingCopyVfs step 0b projects into the VFS; no decision module records it yet (NO-DECISION-SOURCE)",
     ],
   },
+  {
+    id: "icon",
+    label: "Icon step (keyboard .ico + preview PNG)",
+    phase: 6,
+    status: "pending",
+    storeActions: ["setIcon"],
+    fields: ["iconIcoBase64", "iconPngDataUrl"],
+    decisionIds: [],
+    evidence: [
+      "IconEditor's Continue writes the .ico bytes + preview PNG to workingCopyStore.iconIcoBase64/iconPngDataUrl, which the projection applies after the id-rename pass into the VFS (issue 1550); no decision module records it yet (NO-DECISION-SOURCE)",
+    ],
+  },
 ];
 
 /**
  * Every member of WorkingCopyState, classified by its backbone source.
- * Transcribed exactly from inventory-store-backbone.md §1 (130 members:
- * 56 fields + 74 actions; class counts STARTING-POINT 33,
- * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 24,
+ * Transcribed exactly from inventory-store-backbone.md §1 (133 members:
+ * 58 fields + 75 actions; class counts STARTING-POINT 33,
+ * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 27,
  * SURVEY-SLOT 15, EPHEMERAL 18, UNCLASSIFIED 6). The gate's census arm
  * verifies these keys against the live interface, so a transcription
  * slip — or a new store member — fails loudly.
@@ -422,6 +434,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   sequenceFlaggedChars: { kind: "field", class: "SURVEY-SLOT" },
   touchLayoutJson: { kind: "field", class: "SURVEY-SLOT" },
   customCss: { kind: "field", class: "EDITOR-AUTHORED" },
+  iconIcoBase64: { kind: "field", class: "EDITOR-AUTHORED" },
+  iconPngDataUrl: { kind: "field", class: "EDITOR-AUTHORED" },
   touchDraft: { kind: "field", class: "EDITOR-AUTHORED" },
   galleryIntrosSeen: { kind: "field", class: "EPHEMERAL" },
   keyEditOverlay: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -463,6 +477,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   unlockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   setTouchLayoutJson: { kind: "action", class: "SURVEY-SLOT" },
   setCustomCss: { kind: "action", class: "EDITOR-AUTHORED" },
+  setIcon: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchDraft: { kind: "action", class: "EDITOR-AUTHORED" },
   markGalleryIntroSeen: { kind: "action", class: "EPHEMERAL" },
   commitKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },

@@ -822,6 +822,16 @@ export interface WorkingCopyState {
    */
   customCss: string | null;
   /**
+   * The keyboard's icon as the author left it in the icon step (#1550):
+   * base64-encoded `.ico` bytes (16/32/48 px) plus a 48px PNG data URL
+   * for preview. Null = untouched (the start keyboard's own icon, if any,
+   * ships as-is). Projected into the VFS by projectWorkingCopyVfs (applied
+   * after the id-rename pass), so the icon the author chose is the icon
+   * the zip and the pull request carry — byte-identical, never re-encoded.
+   */
+  iconIcoBase64: string | null;
+  iconPngDataUrl: string | null;
+  /**
    * In-progress Phase E (touch gallery) draft state — persisted across
    * unmount/remount when the user navigates back to Phase C and returns.
    *
@@ -1137,6 +1147,8 @@ export interface WorkingCopyState {
   setTouchLayoutJson: (json: string | null) => void;
   /** Record the CSS step's result (null = untouched, "" = cleared). */
   setCustomCss: (css: string | null) => void;
+  /** Record the icon step's result (null = untouched). */
+  setIcon: (icoBase64: string | null, pngDataUrl: string | null) => void;
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever
@@ -1703,6 +1715,8 @@ function freshInstantiationTail() {
     sequenceFlaggedChars: [],
     touchLayoutJson: null,
     customCss: null,
+    iconIcoBase64: null,
+    iconPngDataUrl: null,
     touchDraft: null,
     galleryIntrosSeen: { mechanism: false, touch: false },
     // Fresh instance, not carried from any preceding working copy — see
@@ -1829,6 +1843,7 @@ export type WorkingCopyData = Omit<
   | "unlockDesktop"
   | "setTouchLayoutJson"
   | "setCustomCss"
+  | "setIcon"
   | "setTouchDraft"
   | "markGalleryIntroSeen"
   | "reset"
@@ -1934,6 +1949,8 @@ const INITIAL_STATE: WorkingCopyData = {
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
   customCss: null,
+  iconIcoBase64: null,
+  iconPngDataUrl: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
   // key edit overlay + touch editor mode (spec 063) — empty log, character
@@ -2363,6 +2380,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setTouchLayoutJson: (json) => set({ touchLayoutJson: json }),
 
   setCustomCss: (css) => set({ customCss: css }),
+  setIcon: (iconIcoBase64, iconPngDataUrl) => set({ iconIcoBase64, iconPngDataUrl }),
 
   setTouchDraft: (draft) => set({ touchDraft: draft }),
 

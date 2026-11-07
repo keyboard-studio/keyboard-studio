@@ -31,12 +31,31 @@ export function setKeyboardIcon(
   image: RgbaImage,
 ): string {
   const icoBytes = encodeIconSet(image);
+  return setKeyboardIconBytes(vfs, kmnPath, keyboardId, icoBytes);
+}
+
+/**
+ * Set the keyboard's icon from already-encoded .ico bytes — the studio
+ * projection path (#1550). The bytes pass through UNRE-ENCODED, so an icon
+ * the author kept from the template stays byte-identical and an icon the
+ * editor encoded ships exactly as encoded. Writes the bytes to
+ * `source/<keyboardId>.ico` as a binary VFS entry and ensures the .kmn
+ * header contains `store(&BITMAP) '<keyboardId>.ico'`.
+ *
+ * @returns The updated .kmn text.
+ */
+export function setKeyboardIconBytes(
+  vfs: VirtualFS,
+  kmnPath: string,
+  keyboardId: string,
+  icoBytes: Uint8Array,
+): string {
   const icoPath = `source/${keyboardId}.ico`;
   vfs.set(icoPath, icoBytes, true);
 
   const entry = vfs.get(kmnPath);
   if (entry === undefined) {
-    throw new Error(`setKeyboardIcon: ${kmnPath} not found in VFS`);
+    throw new Error(`setKeyboardIconBytes: ${kmnPath} not found in VFS`);
   }
   const kmn = typeof entry.content === "string" ? entry.content : new TextDecoder().decode(entry.content);
   const updated = ensureBitmapStore(kmn, `${keyboardId}.ico`);

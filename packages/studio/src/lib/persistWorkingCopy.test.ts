@@ -1174,4 +1174,61 @@ describe("persistWorkingCopy", () => {
       expect(intent.narrowedGuardQuestions.size).toBe(0);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Icon persistence (#1550): the icon step's recorded bytes + preview PNG
+  // round-trip through the draft snapshot, so a resumed draft ships the
+  // icon its author chose — and a pre-icon draft reads as "untouched".
+  // -------------------------------------------------------------------------
+  describe("icon persistence (#1550)", () => {
+    it("round-trips iconIcoBase64 + iconPngDataUrl through snapshot/rehydrate", () => {
+      const ir = makeScaffoldedIR();
+      const vfs = createVirtualFS([
+        { path: "source/test.kmn", content: "c test\n", isBinary: false },
+      ]);
+      useWorkingCopyStore.setState({
+        instantiationMode: "new-from-base",
+        startVfs: vfs,
+        ir,
+        startKeyboard: null,
+        startIr: null,
+        identity: null,
+        iconIcoBase64: "AAEAAQABABA=",
+        iconPngDataUrl: "data:image/png;base64,iVBORw0KGgo=",
+      });
+
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+
+      const s = useWorkingCopyStore.getState();
+      expect(s.iconIcoBase64).toBe("AAEAAQABABA=");
+      expect(s.iconPngDataUrl).toBe("data:image/png;base64,iVBORw0KGgo=");
+    });
+
+    it("tolerates a snapshot written before icon persistence existed", () => {
+      const ir = makeScaffoldedIR();
+      const vfs = createVirtualFS([
+        { path: "source/test.kmn", content: "c test\n", isBinary: false },
+      ]);
+      useWorkingCopyStore.setState({
+        instantiationMode: "new-from-base",
+        startVfs: vfs,
+        ir,
+        startKeyboard: null,
+        startIr: null,
+        identity: null,
+      });
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.iconIcoBase64;
+      delete legacy.iconPngDataUrl;
+      sessionStorage.setItem("ks.working-copy.draft", JSON.stringify(legacy));
+      useWorkingCopyStore.getState().reset();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.iconIcoBase64).toBeNull();
+      expect(s.iconPngDataUrl).toBeNull();
+    });
+  });
 });

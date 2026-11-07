@@ -205,6 +205,19 @@ export function OutputScreen() {
   // downloadKeyboardId below.
   const identity = useWorkingCopyStore((s) => s.identity);
 
+  // The author's icon (#1550), as the icon step recorded it: the 48px PNG
+  // preview for this screen; the .ico bytes ship via the projection.
+  const iconPngDataUrl = useWorkingCopyStore((s) => s.iconPngDataUrl);
+
+  // Back to the icon step with the return-to-Output seam (same as
+  // OutputSectionList's revise-a-section jump).
+  const handleChangeIcon = () => {
+    jumpToLocation(
+      { route: "survey", step: "icon" as ActiveStepId },
+      { returnTo: { route: "output" } },
+    );
+  };
+
   // ---------------------------------------------------------------------------
   // Coverage-blocked explanation (P0 fix) — mirrors PhaseFGate's display
   // exactly, off the SAME shared gate. Named string locals computed BEFORE
@@ -483,6 +496,52 @@ export function OutputScreen() {
             to install or submit it for publication.
           </Trans>
         </p>
+        {/* The author's icon (#1550) as it will ship — shown here so the
+            output panel, not only the icon step, previews it. Nothing
+            renders before the icon step has been completed. */}
+        {iconPngDataUrl !== null && (
+          <section
+            aria-label={t({ id: "output.icon.regionLabel", message: "Keyboard icon" })}
+            data-testid="output-icon-preview"
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
+            <img
+              src={iconPngDataUrl}
+              alt={t({ id: "output.icon.alt", message: "Keyboard icon" })}
+              width={48}
+              height={48}
+              style={{
+                width: 48,
+                height: 48,
+                imageRendering: "pixelated",
+                border: "1px solid var(--app-border)",
+                borderRadius: 4,
+              }}
+            />
+            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--app-text)" }}>
+                <Trans id="output.icon.label">Keyboard icon</Trans>
+              </span>
+              <button
+                type="button"
+                onClick={handleChangeIcon}
+                style={{
+                  alignSelf: "flex-start",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  color: "var(--app-accent)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  textDecoration: "underline",
+                  fontFamily: "inherit",
+                }}
+              >
+                <Trans id="output.icon.change">Change icon</Trans>
+              </button>
+            </span>
+          </section>
+        )}
         {startKeyboard !== null && (
           <>
             {/* spec 094 FR-001: revise any completed section and come back. */}

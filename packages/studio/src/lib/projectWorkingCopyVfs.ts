@@ -86,6 +86,7 @@
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
 import { applyCustomCssToVfs } from "./customCss.ts";
+import { applyIconToVfs } from "./applyIconToVfs.ts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
@@ -315,6 +316,13 @@ export interface ProjectWorkingCopyVfsInput {
    * it (and its `&KMW_EMBEDCSS` store line).
    */
   customCss?: string | null;
+  /**
+   * The author's icon from the icon step (#1550), base64-encoded `.ico`
+   * bytes, applied after the id-rename pass under the final id. Omit or
+   * pass `null` to leave the start keyboard's own icon as-is. The bytes
+   * are written unre-encoded, so a kept template icon stays byte-identical.
+   */
+  iconIcoBase64?: string | null;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
@@ -531,6 +539,7 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     customCss = null,
+    iconIcoBase64 = null,
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
@@ -1447,6 +1456,18 @@ export function projectWorkingCopyVfs(
     }
     renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
+
+  // Keyboard icon (#1550) — the icon step's `.ico` bytes become
+  // `source/<effectiveId>.ico` with its `store(&BITMAP)` line. Applied
+  // LAST, after the id rename, under the final id: step 1's carve emit
+  // rebuilds the `.kmn` from a startIr-derived IR, so an icon written
+  // before it (as step 0c did) loses its store line whenever a carve
+  // forces a full re-emit — the file survives orphaned and the keyboard
+  // ships with no icon. Nothing after this point rewrites the `.kmn`,
+  // so the line cannot be dropped downstream either.
+  warnings.push(
+    ...applyIconToVfs(vfs, effectiveKeyboardId ?? keyboardId, iconIcoBase64),
+  );
 
   return {
     warnings,

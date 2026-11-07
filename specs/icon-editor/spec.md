@@ -15,6 +15,15 @@ modern reimagining of TIKE's bitmap editor, not a port. The step emits the
 icon payload on Continue; the output pipeline writes the `.ico` file into
 the package.
 
+The pipeline half landed with #1550 (2026-11-07): Continue records the
+payload in the working-copy store (`setIcon`); `projectWorkingCopyVfs`
+applies it after the id-rename pass, writing the bytes to
+`source/<id>.ico` as a flagged binary VFS entry and ensuring
+`store(&BITMAP)` — byte-identical, never re-encoded — so the `.zip` and
+the fork+PR tree carry the author's icon. The icon step also offers an
+opt-in initials generator (initials over a flat background) and the
+Output screen previews the authored icon.
+
 ## Placement
 
 The `icon` step sits on the manifest spine after Documentation (`html`) and
@@ -49,6 +58,16 @@ lands in the decision record for downstream serialization paths.
 - Import: SVG, PNG, ICO (decoded and resampled to 48px).
 - On Continue: passes `{ iconIcoBase64, iconPngDataUrl }` via onComplete —
   Keep passes the source `.ico` bytes through with a 48px PNG; Edit/Create
-  encode the working canvas at 16 / 32 / 48 with a 48px PNG.
+  encode the working canvas at 16 / 32 / 48 with a 48px PNG. Continue ALSO
+  records the payload in the working-copy store (`setIcon`); the output
+  projection applies it after the id-rename pass, writing the bytes to
+  `source/<id>.ico` and ensuring `store(&BITMAP)`. Re-entering the step
+  shows the recorded icon, not the template's; a resumed draft restores
+  it from the draft snapshot.
+- Initials generator (opt-in, never a default): initials derived from the
+  display name over a flat background colour, drawn with the text tool's
+  monospace raster.
+- Output screen previews the authored icon (48px PNG) with a Change link
+  back to the icon step.
 - Out of scope: bitmap export beyond the `.ico` + PNG payload, dotted-circle
   diacritic base handling.

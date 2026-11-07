@@ -12,6 +12,8 @@
  * (SVG <text> rasterizes as-is, per Matthew's ruling).
  * - Pixel editing with pen, eraser, line, fill, box, circle
  * - Text tool with a low-res-friendly monospace font (crisp at 16×16)
+ * - Initials generator (#1550): script/language initials over a flat
+ *   background, for authors with no artwork — opt-in, never a default
  * - Live multi-size preview (16 / 32 / 48 px)
  * - 1-bit transparency via the alpha channel + AND mask on ICO encode
  *
@@ -21,10 +23,12 @@
  *   big pixels
  * - Hand-rolled ICO codec (icoCodec.ts), no new dependencies
  *
- * On Continue: passes { iconIcoBase64, iconPngDataUrl } via onComplete.
- * Keep passes the source bytes through; Edit/Create encode the working
- * canvas at 16 / 32 / 48. The output pipeline writes the .ico file into
- * the package.
+ * On Continue: passes { iconIcoBase64, iconPngDataUrl } via onComplete
+ * AND records them in the working-copy store (`setIcon`) — the output
+ * pipeline projects the stored bytes into `source/<id>.ico` (applied
+ * after the id-rename pass, #1550). Keep passes the source bytes
+ * through; Edit/Create encode the working canvas at 16 / 32 / 48. The
+ * output pipeline writes the .ico file into the package.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33,6 +37,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import {
+  base64ToIco,
   decodeIco,
   encodeIco,
   icoToBase64,
@@ -45,11 +50,13 @@ import {
   ICON_SIZE,
   type PixelBuffer,
   createBlankIcon,
+  deriveInitials,
   drawCircle,
   drawLine,
   drawRect,
   drawText,
   floodFill,
+  generateInitialsIcon,
   getPixel,
   setPixel,
   type Rgba,
@@ -190,6 +197,12 @@ function SizePreview({
 export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   const { t } = useLingui();
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const setIcon = useWorkingCopyStore((s) => s.setIcon);
+  // The display name seeds the initials generator ("Ewondo Keyboard" →
+  // "EK"); the author's identity override wins over the base's name.
+  const displayName = useWorkingCopyStore(
+    (s) => s.identity?.displayName ?? s.startKeyboard?.displayName ?? "",
+  );
 
   // The three options — Keep is the default when the template has an icon.
   // The source icon is found on mount; until then the step shows loading.
@@ -211,6 +224,11 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   const [importError, setImportError] = useState<string | null>(null);
   const [textDraft, setTextDraft] = useState<string | null>(null);
   const [textPos, setTextPos] = useState<{ x: number; y: number } | null>(null);
+  // Initials generator (#1550): initials over a flat background, for
+  // authors with no artwork. Prefilled from the keyboard's display name;
+  // the author can edit them. Blue is the default background.
+  const [initials, setInitials] = useState(() => deriveInitials(displayName));
+  const [genBg, setGenBg] = useState<Rgba>([37, 99, 235, 255]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -262,6 +280,28 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
       if (cancelled) return;
       setSourceIcon(found);
       setSourceChecked(true);
+      // A recorded icon (this session, or a resumed draft) wins over the
+      // template: the author already chose this icon, so re-entering the
+      // step shows their icon, not the base's (#1550 round-trip). Bytes
+      // equal to the template's mean Keep; anything else re-opens as Edit
+      // (template exists) or Create (no template) on the recorded pixels.
+      const recordedB64 = useWorkingCopyStore.getState().iconIcoBase64;
+      if (recordedB64 !== null && recordedB64 !== "") {
+        try {
+          const recordedBytes = base64ToIco(recordedB64);
+          const decoded = await decodeIco(recordedBytes);
+          const recordedPixels = resample(decoded, ICON_SIZE, ICON_SIZE);
+          if (cancelled) return;
+          const kept =
+            found !== null && icoToBase64(found.bytes) === recordedB64;
+          setPixels(clonePixels(recordedPixels));
+          setHistory({ stack: [clonePixels(recordedPixels)], index: 0 });
+          setMode(kept ? "keep" : found !== null ? "edit" : "create");
+          return;
+        } catch {
+          // A corrupt recorded icon falls through to the template default.
+        }
+      }
       if (found) {
         setMode("keep");
       }
@@ -463,10 +503,14 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
           0,
         );
       }
-      onComplete({
+      const payload = {
         iconIcoBase64: icoToBase64(sourceIcon.bytes),
         iconPngDataUrl: canvas.toDataURL("image/png"),
-      });
+      };
+      // Recorded in the store as well as the completion: the projection
+      // writes these bytes to source/<id>.ico (#1550).
+      setIcon(payload.iconIcoBase64, payload.iconPngDataUrl);
+      onComplete(payload);
       return;
     }
     // Edit / Create: encode the working canvas at 16 / 32 / 48.
@@ -482,10 +526,12 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     if (ctx) {
       ctx.putImageData(new ImageData(pixels, ICON_SIZE, ICON_SIZE), 0, 0);
     }
-    onComplete({
+    const payload = {
       iconIcoBase64: icoToBase64(ico),
       iconPngDataUrl: canvas.toDataURL("image/png"),
-    });
+    };
+    setIcon(payload.iconIcoBase64, payload.iconPngDataUrl);
+    onComplete(payload);
   };
 
   // Footer nav (spec 081, #2527): Back / Continue publish to the footer
@@ -898,6 +944,123 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
                 {importError}
               </p>
             )}
+          </div>
+
+          <div>
+            <h2
+              style={{
+                margin: "0 0 8px",
+                fontSize: 14,
+                color: "var(--app-text)",
+              }}
+            >
+              {t({ id: "editor.assignLoop.icon.generateTitle", message: "Generate initials" })}
+            </h2>
+            <p
+              style={{
+                margin: "0 0 8px",
+                fontSize: 12,
+                color: "var(--app-text-muted)",
+              }}
+            >
+              {t({
+                id: "editor.assignLoop.icon.generateHint",
+                message:
+                  "No artwork? Put the keyboard's initials over a flat background.",
+              })}
+            </p>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                color: "var(--app-text)",
+              }}
+            >
+              {t({
+                id: "editor.assignLoop.icon.generateInitials",
+                message: "Initials",
+              })}
+              <input
+                value={initials}
+                maxLength={3}
+                onChange={(e) => setInitials(e.target.value)}
+                aria-label={t({
+                  id: "editor.assignLoop.icon.generateInitials",
+                  message: "Initials",
+                })}
+                style={{
+                  width: 64,
+                  fontSize: 14,
+                  padding: "6px 8px",
+                  borderRadius: 4,
+                  border: "1px solid var(--app-border)",
+                  background: "var(--app-backdrop)",
+                  color: "var(--app-text)",
+                  textTransform: "uppercase",
+                }}
+              />
+            </label>
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                marginTop: 8,
+                maxWidth: 220,
+              }}
+            >
+              {ICON_PALETTE.filter((entry) => entry.rgba[3] === 255).map(
+                (entry) => (
+                  <button
+                    key={entry.name}
+                    type="button"
+                    title={entry.name}
+                    aria-pressed={
+                      genBg[0] === entry.rgba[0] &&
+                      genBg[1] === entry.rgba[1] &&
+                      genBg[2] === entry.rgba[2]
+                    }
+                    onClick={() => setGenBg(entry.rgba)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      border:
+                        genBg[0] === entry.rgba[0] &&
+                        genBg[1] === entry.rgba[1] &&
+                        genBg[2] === entry.rgba[2]
+                          ? "2px solid var(--app-accent)"
+                          : "1px solid var(--app-border)",
+                      background: rgbaToCss(entry.rgba),
+                      cursor: "pointer",
+                    }}
+                  />
+                ),
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={initials.trim() === ""}
+              onClick={() => applyPixels(generateInitialsIcon(initials, genBg))}
+              style={{
+                marginTop: 8,
+                padding: "6px 12px",
+                fontSize: 13,
+                borderRadius: 6,
+                border: "1px solid var(--app-accent)",
+                background: "var(--app-accent-bg)",
+                color: "var(--app-text)",
+                cursor: initials.trim() === "" ? "default" : "pointer",
+                opacity: initials.trim() === "" ? 0.4 : 1,
+              }}
+            >
+              {t({
+                id: "editor.assignLoop.icon.generateButton",
+                message: "Generate icon",
+              })}
+            </button>
           </div>
 
           <div>
