@@ -109,7 +109,7 @@ describe("applyDecisionEffects — A7: answers without an apply write nothing", 
     const h = makeHarness(makeTestIR([]));
     applyDecisionEffects(
       result([
-        { questionId: "track_choice", answerType: "select", value: "copy" },
+        { questionId: "il_script_not_supported", answerType: "select", value: "x" },
         { questionId: "il_author_name", answerType: "text", value: "A" },
         { questionId: "not_a_question", answerType: "text", value: "x" },
       ]),
@@ -354,9 +354,9 @@ describe("applyDecisionEffects — pass 2: composed apply with an unanswered que
     });
 
     const completion = result([
-      { questionId: "track_choice", answerType: "select", value: "copy" },
+      { questionId: "il_script_not_supported", answerType: "select", value: "x" },
     ]);
-    recordAnswersAsDecisions(completion, "track", h.deps);
+    recordAnswersAsDecisions(completion, "identity", h.deps);
     applyDecisionEffects(completion, h.deps);
 
     expect(calls).toHaveLength(0);

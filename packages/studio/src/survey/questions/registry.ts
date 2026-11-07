@@ -29,6 +29,7 @@ import { hasOpenIssue, openIssueGate, openLettersGate, openMechanismsGate } from
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
 import capsHandlingModule from "./gallery/capsHandling.ts";
 import startKeyboardModule from "./gallery/baseKeyboard.ts";
+import { authoringTrackProviderModule } from "./authoringTrackProvider.ts";
 import characterInventoryModule from "./gallery/characterInventory.ts";
 import marksTreatmentModule from "./gallery/marksTreatment.ts";
 import punctuationInventoryModule from "./gallery/punctuationInventory.ts";
@@ -173,11 +174,16 @@ const withGroup = (
   modules.map((m) => (m.group === undefined ? { ...m, group } : m));
 
 export const decisionModules: readonly QuestionModule[] = [
+  // The track question is gone, but the authoring-track decision still
+  // orders the walk: the start screen records it before the walk, so it
+  // is declared first here. Grouped under "choose_base" — intra-step to
+  // the base picker's custom screen, so it forms no screen of its own
+  // (see authoringTrackProvider.ts).
+  ...withGroup([authoringTrackProviderModule], "choose_base"),
   ...withGroup(flowModules.identity_lite, "identity"),
   ...withGroup(flowModules.phase_b_characters, "characters"),
   ...withGroup(flowModules.phase_f_helpdocs, "help"),
-  ...withGroup(flowModules.track, "track"),
-  // #1901: the attribution screen sits between track and project_name.
+  // #1901: the attribution screen sits between choose_base and project_name.
   // Declaration order here is the sort's tie-break: both screens
   // screen-require "authoring-track", and attribution walks first.
   ...withGroup(flowModules.attribution, "attribution"),
@@ -187,7 +193,7 @@ export const decisionModules: readonly QuestionModule[] = [
 
 /**
  * Screens that do not appear in the walk on Open (spec 111 FR-016, research R6).
- * The first four are the identity-first steps (the keyboard already exists);
+ * The first three are the identity-first steps (the keyboard already exists);
  * the rest are the remove tool and the feature galleries, which stay reachable
  * from the menu. (The Mechanisms and Touch galleries are walked, so they are not here.) Declared here once; the gates below and the advance policy
  * (steps/advance.ts) both read this set.
@@ -196,7 +202,6 @@ export const openHiddenScreens: ReadonlySet<string> = new Set([
   "identity",
   "layout",
   "choose_base",
-  "track",
   // The character survey: Open's Missing letters page replaces it (spec 111 FR-031).
   "characters",
   "marks",
@@ -272,9 +277,6 @@ function openedKeyboardLacksTouchLayout(d: DecisionSet): boolean {
 export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
   new Map<string, (decisions: DecisionSet) => boolean>([
     ...[...openHiddenScreens].map((id) => [id, notOpen] as const),
-    // The start screen records the track (New = copy, Open = adapt), so the track
-    // step only asks a walk that has none yet: a draft from before the start screen.
-    ["track", (d) => d["authoring-track"] === undefined],
     // Spec 111: the Open walk's own pages. Their gates are decisions (the track, the
     // recorded problem kinds, whether the keyboard is basic); where they sit in the walk
     // comes from the modules' provides / requires / screenRequires, not from this file.
@@ -313,7 +315,6 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = module
   ...flowModules.identity_lite,
   ...flowModules.phase_b_characters,
   ...phaseFLibraryModules,
-  ...flowModules.track,
   ...flowModules.attribution,
   ...flowModules.project_name,
   ...reserveModules,

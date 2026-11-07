@@ -118,19 +118,17 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
   //   identity_lite   -> "identity" step    (1 drill-down)
   //   phase_b_chars   -> "characters" step  (1 drill-down)
   //   phase_f_helpdocs -> "help" step       (1 drill-down)
-  //   track           -> "track" step       (1 drill-down)
   //   attribution     -> "attribution" step (1 drill-down; #1901)
   //   project_name    -> "project_name" step (1 drill-down)
   //   phase_a_identity -> status:"proposed" — excluded from live drill-downs
-  it("FR-004 — modular graphs hang under their manifest step id (identity/characters/help/track/attribution/project_name)", () => {
+  it("FR-004 — modular graphs hang under their manifest step id (identity/characters/help/attribution/project_name)", () => {
     expect(Object.keys(drillDowns).sort()).toEqual(
-      ["identity", CHARACTERS_STEP_ID, "help", "project_name", "track", "attribution"].sort(),
+      ["identity", CHARACTERS_STEP_ID, "help", "project_name", "attribution"].sort(),
     );
     // Each step now has exactly one drill-down flow.
     expect(drillDowns["identity"]!.length).toBe(1);
     expect(drillDowns[CHARACTERS_STEP_ID]!.length).toBe(1);
     expect(drillDowns["help"]!.length).toBe(1);
-    expect(drillDowns["track"]!.length).toBe(1);
     expect(drillDowns["attribution"]!.length).toBe(1);
     expect(drillDowns["project_name"]!.length).toBe(1);
     // Every live flow is accounted for across the buckets — none dropped.
@@ -210,10 +208,12 @@ interface MapNodeCase {
 
 const MAP_NODE_CASES: readonly MapNodeCase[] = [
   {
-    id: "track",
+    id: "attribution",
     writes: [],
     writePaths: [],
-    inputPaths: ["header.bcp47", "header.name"],
+    // The retired track step read header.bcp47/header.name to label the
+    // base being copied; attribution declares no inputs of its own.
+    inputPaths: [],
   },
   {
     id: "carve",
@@ -260,12 +260,12 @@ describe.each(MAP_NODE_CASES)("map node $id", ({ id, writes, writePaths, inputPa
 });
 
 // The mechanisms -> touch_seed_source fork is pinned by name in buildStepGraph.test.ts.
-it("track's spine now runs to attribution; attribution is branch-defining: a spine edge onward, fork -> project_name (#1901)", () => {
+it("choose_base's spine now runs to attribution; attribution is branch-defining: a spine edge onward, fork -> project_name (#1901)", () => {
   const graph = buildManifestStepGraph();
-  const fromTrack = graph.edges.filter((e) => e.from === "track");
-  expect(fromTrack.find((e) => e.kind === "spine")?.to).toBe("attribution");
+  const fromChooseBase = graph.edges.filter((e) => e.from === "choose_base");
+  expect(fromChooseBase.find((e) => e.kind === "spine")?.to).toBe("attribution");
   // The copy-track fork used to leave from track; since #1901 it leaves
-  // from the attribution step (asked on both tracks, after the choice).
+  // from the attribution step (asked on both tracks, after the base choice).
   const fromAttribution = graph.edges.filter((e) => e.from === "attribution");
   // The spine edge leaves for the next ungated screen (Open's first page, gated off on Copy).
   expect(fromAttribution.find((e) => e.kind === "spine")?.to).toBe(graph.nodes.find((n) => n.id === "open_languages")?.id);

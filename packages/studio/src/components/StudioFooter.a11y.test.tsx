@@ -50,7 +50,7 @@ function seedProject(): void {
   useWorkingCopyStore.setState({ startKeyboard: BASE });
   useSurveySessionStore.setState({
     activeStepId: "characters",
-    history: ["identity", "choose_base", "track"],
+    history: ["identity", "choose_base", "attribution"],
     selectedTrack: "adapt",
   });
   useDecisionLogStore.setState({
@@ -265,8 +265,8 @@ describe("StudioFooter — within-step walk dots", () => {
   it("collapses a gallery's character walk to a single stage dot", () => {
     useSurveySessionStore.setState({
       activeStepId: "mechanisms",
-      history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
-      visited: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
+      history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve"],
+      visited: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms"],
       selectedTrack: "adapt",
     });
     useStepWalkStore.getState().publishStepWalk("mechanisms", [
@@ -289,8 +289,8 @@ describe("StudioFooter — within-step walk dots", () => {
   it("keeps ONE dot per question for a flow's walk — the marks battery is not a gallery", () => {
     useSurveySessionStore.setState({
       activeStepId: "marks",
-      history: ["identity", "choose_base", "track", "characters"],
-      visited: ["identity", "choose_base", "track", "characters", "marks"],
+      history: ["identity", "choose_base", "attribution", "characters"],
+      visited: ["identity", "choose_base", "attribution", "characters", "marks"],
       selectedTrack: "adapt",
     });
     useStepWalkStore.getState().publishStepWalk("marks", [
@@ -330,8 +330,8 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
   function seedDeepWalk(): void {
     useSurveySessionStore.setState({
       activeStepId: "touch",
-      history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
-      visited: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms", "touch"],
+      history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms"],
+      visited: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms", "touch"],
       selectedTrack: "adapt",
     });
   }
@@ -374,7 +374,7 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
 
     // Nothing was dropped from the high-water mark on either leg.
     expect(useSurveySessionStore.getState().visited).toEqual([
-      "identity", "choose_base", "track", "characters",
+      "identity", "choose_base", "attribution", "characters",
       "marks", "convenience", "carve", "mechanisms", "touch",
     ]);
 
@@ -428,11 +428,11 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
 
   it("still refuses a stage the author has genuinely never reached", async () => {
     const user = userEvent.setup();
-    // Only as far as `track`; the galleries are ahead and unvisited.
+    // Only as far as `attribution`; the galleries are ahead and unvisited.
     useSurveySessionStore.setState({
-      activeStepId: "track",
+      activeStepId: "attribution",
       history: ["identity", "choose_base"],
-      visited: ["identity", "choose_base", "track"],
+      visited: ["identity", "choose_base", "attribution"],
       selectedTrack: "adapt",
     });
 
@@ -448,7 +448,7 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
 
     // The gate held, with a stated reason, and the author did not move.
     expect(screen.getByRole("status").textContent ?? "").not.toBe("");
-    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("attribution");
   });
 });
 
@@ -564,7 +564,7 @@ describe("StudioFooter — §5 jump target (badged vs. unbadged collapsed sectio
     useSurveySessionStore.setState({
       activeStepId: "carve",
       history: [
-        "identity", "choose_base", "track", "characters",
+        "identity", "choose_base", "attribution", "characters",
         "marks", "punctuation", "invisibles", "convenience",
       ],
       selectedTrack: "adapt",

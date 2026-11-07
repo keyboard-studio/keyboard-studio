@@ -261,10 +261,5 @@
   "content.flowQuestion.project_display_name.help_text": "Donnez à votre clavier un nom lisible, par exemple « Haoussa (QWERTY) » ou « Clavier ewondo ». Ce nom apparaît dans l'application Keyman et le dépôt de claviers. Il peut contenir des espaces, des accents et des caractères non ASCII.",
   "content.flowQuestion.project_display_name.prompt": "Quel est le nom d'affichage de votre nouveau clavier ?",
   "content.flowQuestion.project_keyboard_id.help_text": "L'identifiant du clavier est un court identifiant en minuscules utilisé comme nom de dossier dans le dépôt de claviers (par exemple « hausa_qwerty », « ewondo »). Il doit commencer par une lettre minuscule ou un tiret bas et ne peut contenir que des lettres minuscules, des chiffres et des tirets bas. 254 caractères au maximum. Une suggestion a été remplie à partir de votre nom d'affichage — modifiez-la si nécessaire.",
-  "content.flowQuestion.project_keyboard_id.prompt": "Confirmez l'identifiant du clavier",
-  "content.flowQuestion.track_choice.audit_label": "Approche de rédaction",
-  "content.flowQuestion.track_choice.help_text": "« Copier » crée un nouveau clavier indépendant que vous pouvez entièrement renommer et posséder. Pour mettre à jour un clavier existant sur place, ouvrez-le plutôt depuis l'écran d'accueil.",
-  "content.flowQuestion.track_choice.option.copy.label": "Copier — créer un nouveau clavier fondé sur cette disposition",
-  "content.flowQuestion.track_choice.option.copy.note": "Vous lui attribuerez un nouveau nom et un nouvel identifiant de clavier. L'original ne sera pas modifié.",
-  "content.flowQuestion.track_choice.prompt": "Comment voulez-vous travailler avec {{base_name}} ?"
+  "content.flowQuestion.project_keyboard_id.prompt": "Confirmez l'identifiant du clavier"
 }

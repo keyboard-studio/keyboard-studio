@@ -14,7 +14,7 @@
 
 ### Session 2026-10-14
 
-- Q: Should Copy vs Adapt be a new question? → A: No. The studio already asks it: the track question (`track_choice`, recorded as the `authoring-track` decision) offers Copy (a new keyboard, Track 1) and Adapt (modify this keyboard in place, Track 2). That one answer drives the version and the documentation. In this spec "Copy" means Track 1 and "Adapt" means Track 2. The new-ID "variant" mode, its 1.0 fallback notice and the provisional-proposal handling for old drafts are dropped.
+- Q: Should Copy vs Adapt be a new question? → A: No. The studio already records it: the start screen records the track (New = Copy, Open = Adapt) as the `authoring-track` decision — the track question itself was removed 2026-11-06 (it had only the Copy option left); an unrecorded track defaults to Copy. That one answer drives the version and the documentation. In this spec "Copy" means Track 1 and "Adapt" means Track 2. The new-ID "variant" mode, its 1.0 fallback notice and the provisional-proposal handling for old drafts are dropped.
 
 **Ownership** (Constitution Art. VI): Engine owns version resolution, the derived documentation content, the form renderer and the studio wiring. Content owns the wording, headings and section order of the documentation forms and the new question's text.
 
@@ -22,7 +22,7 @@
 
 ### User Story 1 - A new keyboard starts at the right version (Priority: P1)
 
-An author picks an existing keyboard to start from and answers the existing track question: **Copy** (start a new keyboard from it) or **Adapt** (modify it in place). A copy ships as version 1.0. An adaptation keeps today's behaviour: the keyboard's version with its last number increased by one (2.3 → 2.4). Whatever the version, every place in the package that states it agrees.
+An author picks an existing keyboard to start from and the start screen records the track: **Copy** (start a new keyboard from it) or **Adapt** (modify it in place). A copy ships as version 1.0. An adaptation keeps today's behaviour: the keyboard's version with its last number increased by one (2.3 → 2.4). Whatever the version, every place in the package that states it agrees.
 
 **Why this priority**: Today a keyboard copied from a v3.2 keyboard ships as "3.2", a first release that claims a history it doesn't have. The version is visible to every user who installs the keyboard and to every reviewer, and it is cheap to get right.
 

@@ -132,7 +132,7 @@ describe("OutputScreen — left-pane scope", () => {
     // the commit gate the way a real confirmed base does.
     const session = useSurveySessionStore.getState();
     session.advance("choose_base");
-    session.advance("track");
+    session.advance("attribution");
     session.advance("characters");
     session.setStartConfirmed(true);
 

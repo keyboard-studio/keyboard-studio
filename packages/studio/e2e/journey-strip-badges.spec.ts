@@ -15,7 +15,7 @@ import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -54,7 +54,7 @@ async function startToCharacters(page: Page): Promise<void> {
     script: FIXTURE.targetScript,
   });
   await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);

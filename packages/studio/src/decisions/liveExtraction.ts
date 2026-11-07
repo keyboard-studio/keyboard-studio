@@ -25,6 +25,7 @@ import type { QuestionModule } from "../survey/types.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
 import type { ExtractContext } from "./extractContext.ts";
@@ -338,7 +339,11 @@ export function buildLiveExtractContext(): ExtractContext {
  */
 export function runLiveExtractionFromStores(): LiveExtractionResult {
   return runLiveExtraction({
-    modules: Object.values(questionRegistry),
+    // The authoring-track provider rides along: the registry no longer
+    // has a question providing authoring-track (the track question is
+    // gone), and orderDecisions throws on the character-inventory
+    // module's requires edge without it.
+    modules: [...Object.values(questionRegistry), authoringTrackProviderModule],
     ctx: buildLiveExtractContext(),
     store: useDecisionStore.getState(),
   });

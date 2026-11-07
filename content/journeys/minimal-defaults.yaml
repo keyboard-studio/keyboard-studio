@@ -19,6 +19,10 @@
 
 journey_id: minimal-defaults
 
+# The walk's authoring track, declared up front (the track question is
+# gone — see survey/journeyFixture.ts). Absent means \"copy\".
+track: adapt
+
 persona:
   language: English (US)
   script: Latn
@@ -35,9 +39,6 @@ events:
 
   # --- choose_base (Track 2: adapt basic_kbdus — skips project_name) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
-
-  # --- track (adapt) ---
-  - { stepId: track, questionId: track_choice, value: "adapt" }
 
   # --- attribution (attribution flow, #1901: asked after the track choice) ---
   - { stepId: attribution, questionId: il_author_name, value: "Studio Author" }

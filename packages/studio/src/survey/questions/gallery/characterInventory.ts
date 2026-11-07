@@ -58,7 +58,7 @@ const characterInventory: GalleryModule<CharacterInventoryValue> = {
   // the FR-002 coverage test pins module.requires EQUAL to the baseline
   // step requires (the 091 parity).
   // Subset decision flows that include this module must therefore also
-  // include the providers of these three (track_choice,
+  // include the providers of these three (the authoring-track provider,
   // project_keyboard_id, il_target_script).
   requires: ["target-script", "authoring-track", "project-keyboard-id"],
   inputs: [],

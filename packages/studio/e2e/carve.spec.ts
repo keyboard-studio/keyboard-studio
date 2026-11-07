@@ -64,7 +64,7 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -188,7 +188,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       script: "other",
     });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -367,7 +367,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       script: "other",
     });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

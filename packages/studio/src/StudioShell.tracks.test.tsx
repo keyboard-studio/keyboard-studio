@@ -54,7 +54,7 @@ import { SurveyView } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { advanceToTrack, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToAttribution, advanceToAttributionAdapt, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks({ warmLazySteps: true });
 
@@ -166,8 +166,9 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // Track 2 (Adapt) routing — issue #388
 // ---------------------------------------------------------------------------
 //
-// The Track 2 path clicks "track-adapt" instead of "track-copy", which skips
-// the project-name step and calls instantiateFromExisting (not instantiateFromStart).
+// The Track 2 path records "adapt" on the start screen (the Open entry),
+// which skips the project-name step and calls instantiateFromExisting
+// (not instantiateFromStart).
 //
 // useKeyboardArtifact is mocked to return { stage: { kind: "idle" } } which means
 // onInstantiate never fires in this shallow test. We can still verify the ROUTING
@@ -176,31 +177,29 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // require a real VFS/IR compile cycle — that belongs in a separate integration test.
 //
 // What this test covers:
-//   - Clicking "track-adapt" advances to "attribution" (#1901: author/
-//     copyright are asked after the track choice, on both tracks), and
-//     from there to "prefill" (skips project-name).
+//   - Recording "adapt" advances to "attribution" (#1901: author/
+//     copyright are asked on both tracks), and from there to the Open
+//     language list (skips project-name).
 //   - The project-name stage is NOT rendered on the adapt path.
-//   - After clicking track-adapt, instantiationMode remains null (onInstantiate
+//   - After recording adapt, instantiationMode remains null (onInstantiate
 //     never fires in this mock — the routing test confirms stage progression, not
 //     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
 
 describe("SurveyView — Track 2 (adapt) routing", () => {
-  it("clicking track-adapt advances through attribution and the language list to fallback policy then the on-screen keyboard, skipping project-name", async () => {
+  it("recording adapt advances through attribution and the language list to fallback policy then the on-screen keyboard, skipping project-name", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Drive to the track stage.
-    advanceToTrack();
-    expect(screen.getByTestId("stage-track")).toBeTruthy();
-
-    // Click adapt (Track 2).
-    fireEvent.click(screen.getByTestId("track-adapt"));
+    // The adapt track is recorded by the start screen's Open entry, before
+    // the walk reaches the attribution fork (see advanceToAttributionAdapt:
+    // recorded between the base preview and confirm, so the identity-first
+    // screens are already walked and the Open gates don't skip them).
+    advanceToAttributionAdapt();
 
     // Should be at attribution (#1901), not project-name.
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
-    expect(screen.queryByTestId("stage-track")).toBeNull();
 
     // Advance through attribution and the Open language list (spec 111) to
     // fallback policy then the OSK: Open hides the character survey.
@@ -218,13 +217,12 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 
-  it("track-copy still advances through attribution and project-name to prefill (regression guard)", async () => {
+  it("copy (the default) still advances through attribution and project-name to prefill (regression guard)", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    advanceToTrack();
-    fireEvent.click(screen.getByTestId("track-copy"));
+    advanceToAttribution();
 
     // Should be at attribution first (#1901), not project-name yet.
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
@@ -255,8 +253,7 @@ describe("SurveyView — Open walk back-navigation (spec 111)", () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    advanceToTrack();
-    fireEvent.click(screen.getByTestId("track-adapt"));
+    advanceToAttributionAdapt();
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-open-languages")).toBeTruthy();

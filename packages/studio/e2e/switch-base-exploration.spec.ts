@@ -19,7 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   driveIdentityLite,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -313,7 +313,7 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   h.note("base confirmed; at track step");
   if (level === "L3-base-confirmed") return;
 
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 30_000 });

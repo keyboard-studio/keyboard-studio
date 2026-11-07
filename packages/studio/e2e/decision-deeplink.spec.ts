@@ -9,9 +9,9 @@
  * FR-015/supersession (053 FR-015, unchanged by this feature): the trail
  * shows the old entry marked replaced, alongside the new one.
  *
- * TARGET QUESTION, AND WHY: the "track" step (question `track_choice`,
- * audit label "Authoring approach" — content/i18n/en/flowQuestions.json) is
- * chosen deliberately because it is a SINGLE-question step. Landing "on the
+ * TARGET QUESTION, AND WHY: this spec's target used to be the "track" step
+ * (question `track_choice`, audit label "Authoring approach"), chosen
+ * deliberately because it was a SINGLE-question step. Landing "on the
  * step" and landing "on the question" are the same event for it, which
  * sidesteps an open architecture gap this feature does not close: no shared
  * store today records which question a MULTI-question step (e.g. "identity")
@@ -19,6 +19,11 @@
  * guarantee the right STEP, not necessarily the right sub-question inside a
  * multi-question flow (see decisions/progressDots.ts's own comment on this
  * same gap). A single-question step has no such ambiguity to paper over.
+ *
+ * The track question is GONE (removed: the start screen records the track,
+ * or it defaults to copy), so this spec is skipped until it is retargeted
+ * at another single-question step. The skipped test below still walks the
+ * old target; do not un-skip it without retargeting.
  *
  * STALENESS, AND WHY THIS SPEC DOES NOT ASSERT A VISIBLE CUE FOR IT: SC-008
  * asks that a deep-linked revision "mark the same steps stale as the
@@ -40,7 +45,7 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   seedReturningVisitor,
@@ -55,11 +60,11 @@ const FIXTURE = {
   targetScript: "other",
 };
 
-/** The audit label track_choice's decision entries render under (FR-008)
- * — content/i18n/en/flowQuestions.json's `track_choice.audit_label`. Used
- * to locate the entry without depending on the internal entryId sequence,
- * which shifts with how many identity sub-answers happened to get recorded
- * this run. */
+/** The audit label the authoring-track decision entries render under (FR-008)
+ * — the retired-decision label ("Authoring approach"), kept for the trail
+ * even though the track question is gone. Used to locate the entry without
+ * depending on the internal entryId sequence, which shifts with how many
+ * identity sub-answers happened to get recorded this run. */
 const TRACK_QUESTION_LABEL = /Authoring approach/i;
 
 /**
@@ -91,11 +96,11 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
       script: FIXTURE.targetScript,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
 
-    // Past "track" now, so the prefill summary is the phase boundary landmark.
+    // Past the base choice now, so the prefill summary is the phase boundary landmark.
     await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 30_000 });
 
     // ---- Open Decisions and find the early "track" answer ------------------
@@ -131,7 +136,7 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     });
 
     // ---- Revise the answer ---------------------------------------------------
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
 
     // FR-034's default (Q3): confirming returns the author to where the link
     // was activated, not onward through the ordinary walk.

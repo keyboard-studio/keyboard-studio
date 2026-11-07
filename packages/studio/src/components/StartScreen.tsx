@@ -19,7 +19,7 @@ import {
 import { loadServerDraftMeta } from "../lib/serverDraftStore.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { startFreshSession } from "../lib/freshSession.ts";
-import { useDecisionStore } from "../stores/decisionStore.ts";
+import { recordAuthoringTrack } from "../lib/recordAuthoringTrack.ts";
 import {
   BG_PAGE,
   BG_CARD,
@@ -39,12 +39,7 @@ import { START_ROUTE_NAV_STEP_ID } from "../stores/stepNavStore.ts";
 /** Start a new keyboard: a clean session whose walk is the Copy track. */
 export function createNewKeyboard(): void {
   startFreshSession();
-  useDecisionStore.getState().record({
-    id: "authoring-track",
-    value: "copy",
-    provenance: "asked",
-    step: "start",
-  });
+  recordAuthoringTrack("copy", "start");
   markVisited();
   navigateTo("survey");
 }

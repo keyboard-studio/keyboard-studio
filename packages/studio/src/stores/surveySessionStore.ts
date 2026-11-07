@@ -108,7 +108,6 @@ export type ActiveStepId =
   | "identity"
   | "layout"
   | "choose_base"
-  | "track"
   | "attribution"
   | "project_name"
   | "open_languages"

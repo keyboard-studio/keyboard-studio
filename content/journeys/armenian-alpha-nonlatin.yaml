@@ -22,6 +22,10 @@
 
 journey_id: armenian-alpha-nonlatin
 
+# The walk's authoring track, declared up front (the track question is
+# gone — see survey/journeyFixture.ts). Absent means \"copy\".
+track: copy
+
 persona:
   language: Armenian
   script: Armn
@@ -36,9 +40,6 @@ events:
 
   # --- choose_base (Track 1: copy from basic_kbdus, a Latin letter base) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
-
-  # --- track (track flow) ---
-  - { stepId: track, questionId: track_choice, value: "copy" }
 
   # --- attribution (attribution flow) ---
   - { stepId: attribution, questionId: il_author_name, value: "Armenian Language Committee" }

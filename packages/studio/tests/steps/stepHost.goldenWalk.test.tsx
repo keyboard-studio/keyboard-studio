@@ -90,7 +90,7 @@ import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 // ---------------------------------------------------------------------------
 // Mock child survey components — the shared StudioShell harness
 // (src/test/studioShellMocks/), the same stubs StudioShell.test.tsx mounts.
-// The track, project_name and phase_f_helpdocs flows go through the
+// The project_name and phase_f_helpdocs flows go through the
 // FlowStepHost stub (spec 029); see that module for what each emits.
 // ---------------------------------------------------------------------------
 
@@ -334,9 +334,9 @@ interface WalkEntry {
   workingCopyMutations: string[];
   /**
    * Decision-store mutator names in call order (spec 088). The completion
-   * writer (recordAll via StudioShell's injected deps) and the flow
-   * onCommit record for the track step land here — this is where the track
-   * choice is visible now that the session store no longer carries it.
+   * writer (recordAll via StudioShell's injected deps) and the
+   * authoring-track record land here — this is where the track choice is
+   * visible now that the session store no longer carries it.
    */
   decisionMutations: string[];
   navigateTo: string[];
@@ -573,7 +573,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> layout -> choose_base -> track(copy) -> attribution ->
+ * identity -> layout -> choose_base -> attribution (copy is the default) ->
  * project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
@@ -601,7 +601,6 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "identity", testId: "survey-advance" },
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
-    { stepId: "track", testId: "track-copy" },
     // #1901: author/copyright are asked here now (FlowStepHost stub emits
     // the same answers the identity stub used to).
     { stepId: "attribution", testId: "survey-advance" },
@@ -635,7 +634,8 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 
 /**
  * Drive the full adapt-track walk.
- * identity -> layout -> choose_base -> track(adapt) -> attribution ->
+ * identity -> layout -> choose_base -> attribution (adapt, recorded up
+ * front the way the start screen's Open entry records it) ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
  * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
@@ -644,11 +644,30 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
  * separate "sequences" step.
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
+  // The track question is gone: adapt is recorded between the base preview
+  // and the base confirm. It must be known by the time the base is
+  // confirmed (so StudioShell's instantiation effect does not default it
+  // to copy), but recording it before the walk starts would gate the
+  // identity-first screens off (spec 111 hides them on Open) and the walk
+  // would skip straight to attribution. The split choose_base window below
+  // is the price: the recorder opens one window for the preview and a
+  // second for the confirm, so the fixture shows choose_base twice — and
+  // the adapt record itself falls between the two windows, so it is in
+  // the decision store (the fork reads it) but attributed to neither
+  // window in the ledger.
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
     { stepId: "layout", testId: "layout-continue" },
-    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
-    { stepId: "track", testId: "track-adapt" },
+    { stepId: "choose_base", testIds: ["base-preview"] },
+  ]);
+  useDecisionStore.getState().record({
+    id: "authoring-track",
+    value: "adapt",
+    provenance: "asked",
+    step: "start",
+  });
+  await driveSteps(recorder, [
+    { stepId: "choose_base", testIds: ["base-confirm"] },
     { stepId: "attribution", testId: "survey-advance" },
     // Open (spec 111): the editable language list rides the adapt track only.
     // Open (spec 111) hides the character survey, punctuation, invisibles, carve,

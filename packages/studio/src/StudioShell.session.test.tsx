@@ -47,7 +47,7 @@ import { deriveIdentityResult } from "./decisions/identitySelectors.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { SurveyView, StudioShell } from "./StudioShell.tsx";
-import { advanceToTrack, advanceToPrefill, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToAttribution, advanceToPrefill, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks();
 
@@ -92,13 +92,13 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
   it("keeps activeStepId and history across a remount", async () => {
     useSurveySessionStore.getState().reset();
     await mountSurvey();
-    advanceToTrack();
+    advanceToAttribution();
 
     const before = {
       activeStepId: useSurveySessionStore.getState().activeStepId,
       history: [...useSurveySessionStore.getState().history],
     };
-    expect(before.activeStepId).toBe("track");
+    expect(before.activeStepId).toBe("attribution");
     expect(before.history.length).toBeGreaterThan(0);
 
     await routeRoundTrip();
@@ -137,11 +137,12 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
   it("keeps the answers the walk recorded — the identity and track decisions (spec 089)", async () => {
     useSurveySessionStore.getState().reset();
     await mountSurvey();
-    advanceToTrack();
-    fireEvent.click(screen.getByTestId("track-copy"));
+    advanceToAttribution();
 
     // Spec 089: identity and track live in the decision store now; the
-    // session fields this test used to read are deleted.
+    // session fields this test used to read are deleted. The track step is
+    // gone — the copy default is recorded by StudioShell's instantiation
+    // effect when the base is confirmed, so it is already "copy" here.
     const identityBefore = deriveIdentityResult(getDecisionSnapshot());
     const trackBefore = selectTrack(getDecisionSnapshot());
     expect(identityBefore).not.toBeNull();
@@ -156,13 +157,13 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
   it("survives repeated round trips — the loss is not merely deferred by one", async () => {
     useSurveySessionStore.getState().reset();
     await mountSurvey();
-    advanceToTrack();
+    advanceToAttribution();
 
     await routeRoundTrip();
     await routeRoundTrip();
     await routeRoundTrip();
 
-    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("attribution");
   });
 });
 
@@ -181,8 +182,8 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
     await act(async () => {
       render(<StudioShell />);
     });
-    advanceToTrack();
-    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+    advanceToAttribution();
+    expect(useSurveySessionStore.getState().activeStepId).toBe("attribution");
 
     // The real SurveyResetButton — arm, then confirm.
     fireEvent.click(screen.getByTestId("survey-reset-arm"));

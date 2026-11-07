@@ -120,6 +120,21 @@ function formatAgency(label: string, diffs: AgencyDiff[]): string {
 const formatStale = (stale: ParityAllowEntry[]): string =>
   stale.map((e) => `  - ${e.caseId} / ${e.decisionId} (${e.explainedBy}): ${e.reason}`).join("\n");
 
+type RecordedDecisions = Record<string, { value: unknown } | undefined>;
+
+/**
+ * The agency keys one allow-list entry explains: its decision id, plus every
+ * survey answer its recorded value carries (T044's rule, shared by T045).
+ */
+function entryAgencyKeys(e: ParityAllowEntry, recorded: RecordedDecisions): Set<string> {
+  const keys = new Set([e.decisionId]);
+  const answers = (
+    recorded[e.decisionId]?.value as { answers?: Record<string, unknown> } | undefined
+  )?.answers;
+  for (const questionId of Object.keys(answers ?? {})) keys.add(questionId);
+  return keys;
+}
+
 describe.skipIf(!sc004GatesEnabled)("headless author parity with recorded walks (T043-T046)", () => {
   const targets = [...committedTargets(), ...onDemandTargets()];
   const runs = new Map<string, AuthorRun>();
@@ -153,12 +168,10 @@ describe.skipIf(!sc004GatesEnabled)("headless author parity with recorded walks 
       if (run === undefined) throw new Error(`no run for ${caseId}`);
       // An allow-list entry explains the decision, its agency included: the
       // decision's own key and every survey answer its recorded value carries.
+      const recorded = recordToDecisionSet(record, "tolerance") as RecordedDecisions;
       const allowed = new Set<string>();
-      const recorded = recordToDecisionSet(record, "tolerance") as Record<string, { value: unknown } | undefined>;
       for (const e of PARITY_ALLOW_LIST.filter((x) => x.caseId === caseId)) {
-        allowed.add(e.decisionId);
-        const answers = (recorded[e.decisionId]?.value as { answers?: Record<string, unknown> } | undefined)?.answers;
-        for (const questionId of Object.keys(answers ?? {})) allowed.add(questionId);
+        for (const key of entryAgencyKeys(e, recorded)) allowed.add(key);
       }
       const diffs = compareAgency(run, record).filter((d) => !allowed.has(d.key));
       expect(diffs, formatAgency(label, diffs)).toEqual([]);
@@ -168,7 +181,17 @@ describe.skipIf(!sc004GatesEnabled)("headless author parity with recorded walks 
       const run = runs.get(caseId);
       if (run === undefined) throw new Error(`no run for ${caseId}`);
       const { stale } = compareParity(run, record, PARITY_ALLOW_LIST);
-      expect(stale, `stale allow-list entries (remove them):\n${formatStale(stale)}`).toEqual([]);
+      // compareParity only sees values, so an entry that explains an agency
+      // difference alone (retired track_choice: the values still match) looks
+      // stale to it. An entry is live when it explains a value difference or
+      // an agency difference for its decision or one of its recorded answers.
+      const agencyDiffKeys = new Set(compareAgency(run, record).map((d) => d.key));
+      const recorded = recordToDecisionSet(record, "tolerance") as RecordedDecisions;
+      const stillStale = stale.filter((e) => {
+        const keys = entryAgencyKeys(e, recorded);
+        return ![...keys].some((k) => agencyDiffKeys.has(k));
+      });
+      expect(stillStale, `stale allow-list entries (remove them):\n${formatStale(stillStale)}`).toEqual([]);
     });
   });
 

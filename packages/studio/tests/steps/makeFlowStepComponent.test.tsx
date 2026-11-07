@@ -1,7 +1,7 @@
 // makeFlowStepComponent factory unit test (spec 029 Stage 6, T012 / SC-006).
 //
 // Proves:
-//   (a) resolve → run → extract → complete for the "track" flow ref (US3).
+//   (a) resolve → run → extract → complete for the "project_name" flow ref (US3).
 //   (b) stay-on-step when extract returns undefined.
 //   (c) loud throw for an unknown flowRef (FR-010 / "no default is a defect").
 //   (d) completion forwards the UNTOUCHED result to onComplete after the
@@ -66,9 +66,14 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
               phase: "G" as const,
               answers: [
                 {
-                  questionId: "track_choice",
-                  answerType: "select" as const,
-                  value: "copy",
+                  questionId: "project_display_name",
+                  answerType: "text" as const,
+                  value: "Hausa (new)",
+                },
+                {
+                  questionId: "project_keyboard_id",
+                  answerType: "text" as const,
+                  value: "hausa_new",
                 },
               ],
               confirmedInventory: [],
@@ -159,22 +164,18 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-type TrackPayload = { track: "copy" | "adapt" };
+type ProjectNamePayload = { displayName: string; keyboardId: string };
 
-function buildTrackOptions(overrides?: Partial<FlowStepOptions<TrackPayload>>): FlowStepOptions<TrackPayload> {
+function buildProjectNameOptions(overrides?: Partial<FlowStepOptions<ProjectNamePayload>>): FlowStepOptions<ProjectNamePayload> {
   return {
-    flowRef: "track",
-    title: "Authoring Track",
+    flowRef: "project_name",
+    title: "Name your keyboard",
     buildContext: () => ({ base_name: "Test Base" }),
-    extract(result: SurveyPhaseResult): TrackPayload | undefined {
-      const answer = result.answers.find((a) => a.questionId === "track_choice");
-      const v =
-        answer !== undefined &&
-        (answer.answerType === "select" || answer.answerType === "text")
-          ? String(answer.value)
-          : undefined;
-      if (v === "copy" || v === "adapt") return { track: v };
-      return undefined;
+    extract(result: SurveyPhaseResult): ProjectNamePayload | undefined {
+      const name = result.answers.find((a) => a.questionId === "project_display_name");
+      const id = result.answers.find((a) => a.questionId === "project_keyboard_id");
+      if (name === undefined || id === undefined) return undefined;
+      return { displayName: String(name.value), keyboardId: String(id.value) };
     },
     ...overrides,
   };
@@ -208,33 +209,33 @@ describe("makeFlowStepComponent", () => {
       } catch (e) {
         message = String((e as Error).message);
       }
-      // Should name at least one known ref (e.g. "track") in the error.
-      expect(message).toMatch(/track|project_name|identity_lite/);
+      // Should name at least one known ref (e.g. "project_name") in the error.
+      expect(message).toMatch(/project_name|identity_lite/);
     });
   });
 
   describe("resolve → run → extract → complete (SC-006)", () => {
-    it("mounts the factory component for 'track', renders FlowStepHost with correct title", async () => {
-      const TrackComponent = makeFlowStepComponent(buildTrackOptions());
+    it("mounts the factory component for 'project_name', renders FlowStepHost with correct title", async () => {
+      const ProjectNameComponent = makeFlowStepComponent(buildProjectNameOptions());
       const onComplete = vi.fn();
       const onBack = vi.fn();
 
       await act(async () => {
-        render(<TrackComponent onComplete={onComplete} onBack={onBack} />);
+        render(<ProjectNameComponent onComplete={onComplete} onBack={onBack} />);
       });
 
       screen.getByTestId("flow-step-host");
-      expect(screen.getByTestId("flow-step-title").textContent).toBe("Authoring Track");
+      expect(screen.getByTestId("flow-step-title").textContent).toBe("Name your keyboard");
     });
 
     it("forwards the UNTOUCHED SurveyPhaseResult to onComplete when extract succeeds (spec 089)", async () => {
       const onCompleteSpy = vi.fn();
 
 
-      const TrackComponent = makeFlowStepComponent(buildTrackOptions());
+      const ProjectNameComponent = makeFlowStepComponent(buildProjectNameOptions());
 
       await act(async () => {
-        render(<TrackComponent onComplete={onCompleteSpy} />);
+        render(<ProjectNameComponent onComplete={onCompleteSpy} />);
       });
 
       await act(async () => {
@@ -243,7 +244,7 @@ describe("makeFlowStepComponent", () => {
 
 
       // onComplete receives the UNTOUCHED SurveyPhaseResult, not the extracted
-      // `{ track: "copy" }` — StepHost's generic completion path (recordPhase /
+      // `{ displayName, keyboardId }` — StepHost's generic completion path (recordPhase /
       // recordStepCompletion / advance) needs the real, answers-bearing result.
       // `extract()`'s reshaping exists for the no-advance guard only; the
       // completion's store effects are the modules' applies, run by StepHost's
@@ -253,7 +254,10 @@ describe("makeFlowStepComponent", () => {
       expect(onCompleteSpy).toHaveBeenCalledTimes(1);
       expect(onCompleteSpy).toHaveBeenCalledWith({
         phase: "G",
-        answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
+        answers: [
+          { questionId: "project_display_name", answerType: "text", value: "Hausa (new)" },
+          { questionId: "project_keyboard_id", answerType: "text", value: "hausa_new" },
+        ],
         confirmedInventory: [],
       });
     });
@@ -262,14 +266,14 @@ describe("makeFlowStepComponent", () => {
       const extractReturnsUndefined = vi.fn(() => undefined);
       const onCompleteSpy = vi.fn();
 
-      const TrackComponent = makeFlowStepComponent(
-        buildTrackOptions({
+      const ProjectNameComponent = makeFlowStepComponent(
+        buildProjectNameOptions({
           extract: extractReturnsUndefined,
         }),
       );
 
       await act(async () => {
-        render(<TrackComponent onComplete={onCompleteSpy} />);
+        render(<ProjectNameComponent onComplete={onCompleteSpy} />);
       });
 
       await act(async () => {
@@ -289,7 +293,7 @@ describe("makeFlowStepComponent", () => {
         title: "Name your keyboard",
         buildContext: () => ({}),
         extract(result: SurveyPhaseResult): { name: string } | undefined {
-          const a = result.answers.find((x) => x.questionId === "track_choice");
+          const a = result.answers.find((x) => x.questionId === "project_display_name");
           return a !== undefined ? { name: String(a.value) } : undefined;
         },
         seeds: {

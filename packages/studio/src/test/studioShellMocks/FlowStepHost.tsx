@@ -7,10 +7,6 @@
 // the footer nav the way SurveyRunner does, under SurveyRunner's handles
 // (survey-back / survey-advance, spec 081).
 //
-//   track: track-copy / track-adapt buttons complete with a SurveyPhaseResult
-//     carrying track_choice. Spec 089: the factory forwards the result
-//     untouched; the host records the authoring-track decision, from which
-//     the track is derived at advance.
 //   project_name: survey-advance completes with project_display_name
 //     "Test Keyboard" + project_keyboard_id "test_keyboard"; the host
 //     records the project decisions and project_keyboard_id's apply lands
@@ -42,7 +38,7 @@ export function FlowStepHost({
   onComplete: (result: unknown) => void;
   onBack?: () => void;
 }) {
-  const stubbed = ["track", "attribution", "project_name", "phase_f_helpdocs"].includes(flow.flow_id);
+const stubbed = ["attribution", "project_name", "phase_f_helpdocs"].includes(flow.flow_id);
   const advance: Record<string, () => void> = {
     attribution: () => onComplete(fakeAttributionPhaseResult),
     project_name: () => onComplete(PROJECT_NAME_RESULT),
@@ -53,44 +49,11 @@ export function FlowStepHost({
     ...(stubbed && onBack !== undefined
       ? { back: { label: "survey-back", onClick: onBack, testId: "survey-back" } }
       : {}),
-    // The track stub completes from its in-page choice buttons, so it offers no Next.
     ...(onAdvance !== undefined
       ? { forward: { label: "survey-advance", onClick: onAdvance, testId: "survey-advance" } }
       : {}),
   });
 
-  if (flow.flow_id === "track") {
-    return (
-      <div data-testid="stage-track">
-        <button
-          type="button"
-          data-testid="track-copy"
-          onClick={() =>
-            onComplete({
-              phase: "G",
-              answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
-              confirmedInventory: [],
-            })
-          }
-        >
-          track-copy
-        </button>
-        <button
-          type="button"
-          data-testid="track-adapt"
-          onClick={() =>
-            onComplete({
-              phase: "G",
-              answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
-              confirmedInventory: [],
-            })
-          }
-        >
-          track-adapt
-        </button>
-      </div>
-    );
-  }
   if (flow.flow_id === "attribution") return <div data-testid="stage-attribution" />;
   if (flow.flow_id === "project_name") return <div data-testid="stage-project-name" />;
   if (flow.flow_id === "phase_f_helpdocs") return <div data-testid="stage-F" />;

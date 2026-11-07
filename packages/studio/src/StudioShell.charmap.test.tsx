@@ -143,8 +143,8 @@ describe("SurveyView — right pane gating on the characters step", () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Set discoveryMethod pre-emptively while still on "track" — activeRightPane
-    // for the track step is "preview" (default), so showCharacterMap must stay
+    // Set discoveryMethod pre-emptively while still on "attribution" — activeRightPane
+    // for the attribution step is "preview" (default), so showCharacterMap must stay
     // false even though discoveryMethod is already "build-list".
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("layout-continue"));
@@ -157,9 +157,8 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
     // Now advance into "characters" — the same discoveryMethod value gates
     // the pane swap on ONLY once activeRightPane flips to "character-map".
-    // (#1901: the attribution step sits between track and characters.)
+    // (The attribution step sits between the base choice and characters.)
     // (Spec 111: Open hides the character survey, so this takes the Copy path.)
-    fireEvent.click(screen.getByTestId("track-copy"));
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByLabelText("Character map")).toBeTruthy();

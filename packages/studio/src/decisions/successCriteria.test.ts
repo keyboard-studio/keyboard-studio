@@ -13,6 +13,8 @@ import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 import { buildExtractContext } from "./extractContext.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
+import { baseKeyboardProviderModule } from "../test/baseKeyboardProvider.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -112,14 +114,18 @@ const SC001_MODULES = [...IDENTITY_MODULES, characterInventoryModule as unknown 
 // project-keyboard-id (which itself requires project-display-name).
 // runDecisionFlow orders by requires and throws when one is unprovided,
 // so the flow includes the providers — but they are NOT part of SC-001's
-// measured set and must not enter the rate's denominator.
-const REQUIRES_CLOSURE = ["track_choice", "project_keyboard_id", "project_display_name"].map(
-  (id) => {
+// measured set and must not enter the rate's denominator. authoring-track
+// has no question module any more (the track question is gone); the start
+// screen provides it — see survey/questions/authoringTrackProvider.ts.
+const REQUIRES_CLOSURE = [
+  authoringTrackProviderModule,
+  baseKeyboardProviderModule,
+  ...["project_keyboard_id", "project_display_name"].map((id) => {
     const mod = questionRegistry[id];
     if (!mod) throw new Error(`question "${id}" not in registry`);
     return mod;
-  },
-);
+  }),
+];
 const SC001_FLOW_MODULES = [...SC001_MODULES, ...REQUIRES_CLOSURE];
 /** The decision ids SC-001 measures (the measured modules' provides). */
 const SC001_MEASURED_IDS = SC001_MODULES.flatMap((m) => [...(m.provides ?? [])]);
