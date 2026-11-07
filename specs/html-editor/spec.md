@@ -165,6 +165,12 @@ generated render, reusing the exact renderers the download uses
 holder, exactly as `ensurePackageFiles` writes it). `licenseMd` is newly
 exported from `@keyboard-studio/engine` for this. Regression tests cover
 both the slices-only and the nothing-carried cases on the Open track.
+Layering note: the generated HISTORY preview needs the test-builds flag
+for the publish version, but the step must NOT import `testingStore` —
+that is a depcruise `no-circular` violation (`HtmlEditor` sits downstream
+of `decisionLogStore` via the `welcomeHtm` decision renderer), so
+`StepHost` passes `hasTestBuilds` down as an `EditorStepProps` prop
+(absent outside StepHost — treated as false).
 
 ### HISTORY.md and LICENSE.md are read-only in this step
 

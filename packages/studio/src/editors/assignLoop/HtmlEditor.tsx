@@ -43,7 +43,6 @@ import {
 } from "@keyboard-studio/engine";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
-import { useHasTestBuilds } from "../../stores/testingStore.ts";
 import { BREAKPOINTS } from "../../ui/breakpoints.ts";
 import { useDocsPreview } from "../../hooks/useDocsPreview.ts";
 import { useDocMemberStates } from "../../hooks/useDocMemberStates.ts";
@@ -113,7 +112,7 @@ function isEditable(member: SelectorMember): member is EditableDocMember {
 
 type EditorMode = "rich" | "code" | "preview";
 
-export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
+export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: EditorStepProps) {
   const { t } = useLingui();
   const preview = useDocsPreview();
   const memberStates = useDocMemberStates();
@@ -130,7 +129,6 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
   const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
   const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
   const startIr = useWorkingCopyStore((s) => s.startIr);
-  const testBuildsExist = useHasTestBuilds();
   const authoredWelcomeHtm = useWorkingCopyStore((s) => s.authoredWelcomeHtm);
   const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
   const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
@@ -393,7 +391,7 @@ export function HtmlEditor({ onComplete, onBack }: EditorStepProps) {
   const publishVersion = resolvePublishVersion({
     mode: isAdaptation ? "adapt-existing" : "new-from-base",
     rawVersion,
-    hasTestBuilds: testBuildsExist,
+    hasTestBuilds,
   });
   const readOnlyText = useMemo((): string | null => {
     if (isEditable(selected)) return null;
