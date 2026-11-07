@@ -307,6 +307,8 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "deadkeys",
       "rules",
       "mechanisms",
+      // #2549: the fallback-policy step walks after mechanisms, before OSK.
+      "fallback_policy",
       "osk",
       "touch_seed_source",
       "touch",

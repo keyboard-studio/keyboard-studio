@@ -45,6 +45,7 @@ import {
 } from "./replayKeyboard.ts";
 import { assertPatchChannelsAuthorized } from "../steps/applyAuthorization.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import {
   applyDecisionSnapshot,
@@ -190,7 +191,11 @@ function captureFromReplayState(state: ReplayState): DerivedCapture {
  * is not exercised here: no carved-layout decision is recorded.
  */
 function manualFold(startingPointIR: KeyboardIR, decisions: DecisionSet): ReplayState {
-  const modules = Object.values(questionRegistry) as QuestionModule[];
+  // The same module list the live rebuild folds (rebuildWorkingCopy.ts):
+  // the registry plus the authoring-track provider, which is deliberately
+  // not a registry module (no flow renders it) but must be present or the
+  // sort throws on the characterInventory module's authoring-track edge.
+  const modules = [...Object.values(questionRegistry), authoringTrackProviderModule];
   const order = decisionOrderFor(modules);
   const providerFor = providerFromModules(modules);
   let state: ReplayState = { ir: startingPointIR, overlay: emptyOverlay() };
