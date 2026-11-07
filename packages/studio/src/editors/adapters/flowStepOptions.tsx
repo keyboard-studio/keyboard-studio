@@ -7,7 +7,6 @@
 
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import {
-  trackOptions,
   attributionOptions,
   projectNameOptions,
   phaseFOptions,
@@ -15,7 +14,6 @@ import {
 
 export * from "./flowStepOptionRecords.ts";
 
-export const TrackStepFactoryComponent = makeFlowStepComponent(trackOptions);
 export const AttributionStepFactoryComponent = makeFlowStepComponent(attributionOptions);
 export const ProjectNameStepFactoryComponent = makeFlowStepComponent(projectNameOptions);
 export const PhaseFStepFactoryComponent = makeFlowStepComponent(phaseFOptions);

@@ -24,7 +24,7 @@ import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   seedReturningVisitor,
@@ -55,7 +55,7 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
 
   await driveIdentityLite(page, { languageCode: "fr" });
   await pickStartKeyboard(page, "basic_kbdfr");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
 
@@ -85,7 +85,7 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
   );
   for (const id of persistedAnswerIds) {
     expect(id.startsWith("il_")).toBe(false);
-    expect(["track_choice", "project_display_name", "project_keyboard_id"]).not.toContain(id);
+    expect(["project_display_name", "project_keyboard_id"]).not.toContain(id);
   }
 
   await page.reload();

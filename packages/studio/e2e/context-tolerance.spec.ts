@@ -24,7 +24,7 @@
 
 import { test, expect, type Page } from "playwright/test";
 import {
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -42,7 +42,7 @@ async function adapt(page: Page, keyboardId: string): Promise<void> {
   await page.goto("/");
   await driveIdentityLite(page);
   await pickStartKeyboard(page, keyboardId);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);

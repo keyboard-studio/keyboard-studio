@@ -592,7 +592,7 @@ export function FlowMapView({
 
           {/* Spec 015 (FR-004): per-phase modular graphs as registry-keyed drill-downs
               under their manifest question-step nodes. Phase A/B/F hang under
-              "characters"; Phase G flows hang under "track" and "project_name". */}
+              "characters"; Phase G flows hang under "project_name". */}
           {drillDownStepIds.map((stepId) => {
             const stepDrillDowns = drillDowns[stepId] ?? [];
             return (

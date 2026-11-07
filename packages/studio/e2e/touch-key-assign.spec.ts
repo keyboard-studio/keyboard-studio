@@ -46,7 +46,7 @@ test.skip(true, "retired KeyGrid UI — needs a TouchBuilderPane rewrite");
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -251,7 +251,7 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 063 SC-004)"
     //     assign action itself, not the survey walk to reach it). ---
     await driveIdentityLite(page);
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

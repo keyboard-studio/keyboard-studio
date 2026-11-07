@@ -4,9 +4,12 @@
 // and the headless author completes a flow with the very record the UI uses.)
 //
 // Each record replaces the bespoke logic of the corresponding survey wrapper:
-//   trackOptions        ← TrackStepAdapter / PhaseTrack
 //   projectNameOptions  ← ProjectNameStepAdapter / PhaseProjectName
 //   phaseFOptions       ← PhaseFAdapter / PhaseF
+//
+// (trackOptions is gone with the track step: the start screen records the
+// track, and a walk without one defaults to copy — see StudioShell's
+// single-instantiation effect.)
 //
 // Parity table (contract §3): every store effect, every extraction guard, and
 // every context shape exactly reproduces the pre-Stage-6 wrapper behaviour.
@@ -44,53 +47,6 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
   const value = decisions[id]?.value;
   return typeof value === "string" ? value : undefined;
 }
-
-// ---------------------------------------------------------------------------
-// track options — reproduces TrackStepAdapter + PhaseTrack behaviour exactly.
-//
-// Context: { base_name: localStart.displayName }
-// Guard: localStart must be non-null (adapter rendered null if null; factory
-//   will produce a null return to match).
-// Seeds: track_choice from the session's currently-recorded selectedTrack, so
-//   arriving at this step by deep link or by walking Back shows the recorded
-//   answer instead of an empty radio group (spec 057 FR-031). Otherwise the
-//   seed is "copy", the step's only option since spec 111 (Open is chosen on
-//   the start screen, which records the track and so hides this step).
-// Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
-// Effects: none here (spec 089) — the recorded authoring-track decision IS
-//   the effect; routing reads it via selectTrack and the scaffold
-//   consequence via deriveScaffoldSpec. track_choice's own apply is
-//   deliberately empty (see the module).
-// Payload: { track }.
-// ---------------------------------------------------------------------------
-
-export type TrackPayload = { track: "copy" | "adapt" };
-
-export const trackOptions: FlowStepOptions<TrackPayload> = {
-  flowRef: "track",
-  title: "Authoring Track",
-
-  buildContext(deps: FlowStepDeps) {
-    // Match TrackStepAdapter: base_name from localStart.displayName.
-    return { base_name: deps.localStart?.displayName ?? "" };
-  },
-
-  seeds: {
-    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      if (questionId !== "track_choice") return undefined;
-      return deps.selectedTrack ?? "copy";
-    },
-  },
-
-  extract(result: SurveyPhaseResult): TrackPayload | undefined {
-    const answer = result.answers.find((a) => a.questionId === "track_choice");
-    if (!answer || (answer.answerType !== "select" && answer.answerType !== "text")) {
-      return undefined;
-    }
-    const v = String(answer.value);
-    return v === "copy" || v === "adapt" ? { track: v } : undefined;
-  },
-};
 
 // ---------------------------------------------------------------------------
 // projectNameOptions — reproduces ProjectNameStepAdapter + PhaseProjectName.
@@ -148,8 +104,8 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
           ? identity.autonym || identity.english
           : "";
       // FR-031 (spec 057): the recorded project-display-name decision is the
-      // durable record of this step's own completion — the same role
-      // `selectedTrack` plays for the track step. Once it exists the
+      // durable record of this step's own completion — the same role the
+      // recorded authoring-track decision plays for the walk. Once it exists the
       // author has committed a name/id at least once, so a fresh arrival at
       // this step (deep link, or Back after an earlier visit unmounted it)
       // must show THAT, not re-propose the identity-derived default it

@@ -66,10 +66,8 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
   registry: Readonly<Record<string, QuestionModule>>;
   order: readonly string[];
 }> = [
-  // Frozen from the deleted content/flows/track.modular.yaml.
-  { flowId: "track", phase: "G", registry: moduleRecord(flowModules.track), order: ["track_choice"] },
-  // #1901: the attribution flow (author/copyright, post-track). Never a
-  // YAML flow — the frozen order is the identity_lite legacy tail's.
+  // #1901: the attribution flow (author/copyright). Never a YAML flow —
+  // the frozen order is the identity_lite legacy tail's.
   {
     flowId: "attribution",
     phase: "G",

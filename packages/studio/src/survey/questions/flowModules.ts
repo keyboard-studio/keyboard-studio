@@ -96,7 +96,6 @@ import pfFurtherReadingMod from "./f/pf_further_reading.ts";
 import pfProjectUrlMod from "./f/pf_project_url.ts";
 import pfCreditsMod from "./f/pf_credits.ts";
 import pfContactInfoMod from "./f/pf_contact_info.ts";
-import trackChoiceMod from "./g/track_choice.ts";
 import projectDisplayNameMod from "./g/project_display_name.ts";
 import projectKeyboardIdMod from "./g/project_keyboard_id.ts";
 import desktop_first_notice from "./reserve/desktop_first_notice.ts";
@@ -149,12 +148,14 @@ export const flowModules = {
     il_script_not_supported,
   ],
 
-  track: [
-    trackChoiceMod,
-  ],
+  // The track question is gone: the start screen records the track
+  // (New = copy, Open = adapt), and a walk that reaches the base choice
+  // without one defaults to copy when the base is confirmed (StudioShell's
+  // single-instantiation effect records it, provenance "default") — so
+  // there is no track flow left to walk.
 
   // Attribution capture (spec 064 US1's questions, re-homed by #1901): the
-  // author name / email / copyright holder are asked AFTER the track
+  // author name / email / copyright holder are asked AFTER the base
   // choice, in their own flow, because what they should propose depends
   // on the track (confirm-from-profile on copy; the base's holder seeded
   // on update — see il_copyright_holder's seedWhen). Separate ids from

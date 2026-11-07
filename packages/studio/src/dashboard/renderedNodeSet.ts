@@ -114,7 +114,7 @@ const flowScreenByFlowId: ReadonlyMap<string, string> = new Map(
  * The drill-down hangs under the screen holding the flow's modules:
  *   identity_lite -> "identity"    phase_f_helpdocs -> "help"
  *   phase_b_characters -> "characters"
- *   track -> "track"               project_name -> "project_name"
+ *   project_name -> "project_name"
  */
 export function buildFlowSources(): BuiltFlowSource[] {
   const results: BuiltFlowSource[] = [];

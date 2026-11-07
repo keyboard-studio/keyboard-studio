@@ -37,7 +37,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -155,7 +155,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
     script: "other",
   });
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
 
   // The post-track attribution step (#1901): author name (blank for a
   // guest — type it), email blank, and the copyright holder pre-filled
@@ -224,7 +224,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
 
   // ---- Forward again through the re-completions. ----
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   // Re-walk through attribution: the asked records render pre-filled
   // (author name from the first pass, holder preserved from the base) —
   // confirm as-is.

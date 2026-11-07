@@ -435,7 +435,7 @@ describe("draftPersistence", () => {
 
     it("T029: a session-field/answer disagreement migrates with the session value winning, and logs it", () => {
       const variant = fixtureVariant((draft) => {
-        if (draft.traversal) draft.traversal.selectedTrack = "adapt"; // track_choice answer stays "copy"
+        if (draft.traversal) draft.traversal.selectedTrack = "adapt"; // the retired track_choice answer stays "copy"
       });
       const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
       try {

@@ -60,7 +60,7 @@ import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -218,7 +218,7 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
 
     await driveIdentityLite(page);
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

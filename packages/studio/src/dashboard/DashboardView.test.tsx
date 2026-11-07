@@ -72,9 +72,9 @@ describe("FlowMapView — manifest-spine step metadata rendering", () => {
     const lockTouch = screen.queryAllByText("lock·touch");
     expect(lockTouch.length).toBeGreaterThan(0);
 
-    // A Form-3 node (track or project_name) must paint a non-empty inputs: line.
-    // track reads header.bcp47 and header.name; project_name reads header.bcp47.
-    // "header" appears in the formatted IRPath for both (e.g. "header.bcp47").
+    // A Form-3 node (project_name) must paint a non-empty inputs: line.
+    // project_name reads header.bcp47. "header" appears in the formatted
+    // IRPath for it (e.g. "header.bcp47").
     expect(bodyText).toMatch(/header\./);
   });
 });
@@ -83,16 +83,7 @@ describe("FlowMapView — manifest-spine step metadata rendering", () => {
 // DOM-render test: Phase G drill-down sections render under their manifest steps
 // ---------------------------------------------------------------------------
 
-describe("FlowMapView — Phase G drill-down sections (track / project_name)", () => {
-  it("renders a drill-down section under the 'track' manifest step", () => {
-    renderFlowMap();
-    const bodyText = document.body.textContent ?? "";
-    // The drill-down heading for the "track" manifest step must appear.
-    expect(bodyText).toMatch(/Drill-downs under\s*track/);
-    // track_choice is the question id in the track flow — its node must render.
-    expect(bodyText).toContain("track_choice");
-  });
-
+describe("FlowMapView — Phase G drill-down sections (project_name)", () => {
   it("renders a drill-down section under the 'project_name' manifest step", () => {
     renderFlowMap();
     const bodyText = document.body.textContent ?? "";

@@ -33,7 +33,7 @@ import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -63,7 +63,7 @@ async function reachBafutAlphabet(page: Page): Promise<void> {
   // language tag onto the working copy. The adapt track skips that step, so
   // the needed set never consults the exemplar index there and this walk
   // would pass whether or not loanword letters are counted as needed.
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);

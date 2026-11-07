@@ -41,7 +41,6 @@ import {
   IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
 import {
-  TrackStepFactoryComponent,
   AttributionStepFactoryComponent,
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
@@ -107,7 +106,9 @@ export const layoutStep: EditorStep = step({
 
 /**
  * Choose-base step: StartResolution (keyboard base picker ONLY).
- * Track selection is a separate manifest step (trackStep).
+ * There is no track step anymore: the start screen records the track
+ * (New = copy, Open = adapt), and a walk that reaches the base choice
+ * without one defaults to copy when the base is confirmed.
  *
  * spec 080: this step also surfaces the documentation-completeness badge on
  * suggestion cards / MetadataCard (FR-008) — a DISPLAY-ONLY addition; it adds
@@ -122,23 +123,8 @@ export const chooseStartStep: EditorStep = step({
 });
 
 /**
- * Track step: TrackStepFactoryComponent (copy vs adapt choice).
- * Every author chooses a track.
- * Reads session-derived header.bcp47 + resolved base display name (header.name).
- * DEC-D2: branch selection only — no IR leaf in Phase 1, so writes is [].
- */
-export const trackStep: EditorStep = step({
-  id: "track",
-  title: "Authoring Track",
-  component: TrackStepFactoryComponent,
-  inputs: [irPath("header", "bcp47"), irPath("header", "name")],
-  specRef: ["§8", "specs/018-qu-wire-track"],
-  persistence: "answer-store",
-});
-
-/**
  * Attribution step: author name / email / copyright holder (#1901).
- * Asked AFTER the track choice, on both tracks — what the questions
+ * Asked AFTER the base choice, on both tracks — what the questions
  * propose is track-shaped (profile confirmation on copy; the base's
  * copyright holder seeded by the extraction pass on update). The
  * questions were the identity step's tail until #1901; their decisions

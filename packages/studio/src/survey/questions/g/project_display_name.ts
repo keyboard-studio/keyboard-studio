@@ -69,8 +69,8 @@ const mod: QuestionModule = {
   // manifest-level). The gate is declared for the SCREEN in the registry's
   // `declaredScreenGates` — not on this module (spec 087 FR-005: no
   // module-level gatedBy) — and the step's track ordering edge as a
-  // screen-order requirement (see track_choice.ts for why it is not a
-  // module `requires`).
+  // screen-order requirement (see authoringTrackProvider.ts for why it is
+  // not a module `requires`).
   screenRequires: ["authoring-track"],
 };
 export default mod;

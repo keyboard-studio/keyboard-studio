@@ -10,7 +10,7 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -32,7 +32,7 @@ test.describe("Fallback policy (keyboard-wide)", () => {
 
     await driveIdentityLite(page, { english: "Test", autonym: "Nehiyawewin", script: "other" });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

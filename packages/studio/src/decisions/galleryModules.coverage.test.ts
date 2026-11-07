@@ -153,7 +153,7 @@ describe("gallery module coverage (FR-002)", () => {
   });
 
   it("question-only screens settle nothing (the recorder's negative case)", () => {
-    for (const id of ["identity", "track", "project_name", "package", "no-such-step"]) {
+    for (const id of ["identity", "project_name", "package", "no-such-step"]) {
       expect(settlesForStep(id), id).toEqual([]);
       expect(stepHasSettles(id), id).toBe(false);
     }

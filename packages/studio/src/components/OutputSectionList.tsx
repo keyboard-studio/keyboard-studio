@@ -31,7 +31,7 @@ import { manifest } from "../steps/manifest.ts";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
 
 /** Steps that pick the starting point. Revising one would replace the working copy (FR-005). */
-const STARTING_POINT_STEPS: ReadonlySet<string> = new Set(["layout", "choose_base", "track"]);
+const STARTING_POINT_STEPS: ReadonlySet<string> = new Set(["layout", "choose_base"]);
 
 export interface OutputSection {
   stepId: string;
