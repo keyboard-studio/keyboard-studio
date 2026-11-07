@@ -27,7 +27,7 @@ import * as fs from "node:fs";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -70,7 +70,7 @@ test.describe("spec 102 US1: a Copy starts at 1.0", () => {
     });
     await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

@@ -49,7 +49,6 @@ vi.mock("../steps/registerEditorSteps.ts", () => ({
   upgradesStep: trivialStep("open_upgrades"),
   layoutStep: trivialStep("layout"),
   chooseStartStep: trivialStep("choose_base"),
-  trackStep: trivialStep("track"),
   attributionStep: trivialStep("attribution"),
   projectNameStep: trivialStep("project_name"),
   carveStep: trivialStep("carve"),

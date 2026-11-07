@@ -64,8 +64,8 @@ export function surveyAdvance(page: Page) {
  *
  * A returning visitor with no draft lands on the New-or-Open start screen (spec
  * 111), so the script also points an empty hash at `#survey`: the walks below
- * start at identity as before, with no track recorded, so the track step still
- * asks (Copy only). The start screen itself is covered by
+ * start at identity as before, with no track recorded, so the walk defaults
+ * to copy at the base choice. The start screen itself is covered by
  * open-existing-keyboard.spec.ts.
  *
  * This is draft-safe: it only sets the visited flag, unlike clicking
@@ -161,8 +161,8 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *
  * (#1901: the author/copyright questions — il_author_name, il_author_email,
  * il_copyright_holder — are no longer part of this flow. They form the
- * post-track attribution step; see driveAttributionStep, which walks call
- * after chooseTrackCopy.)
+ * attribution step; see driveAttributionStep, which walks call
+ * after confirmCopyTrack.)
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -240,7 +240,7 @@ export async function driveIdentityLite(
 
   // The identity flow ends here (#1901): a supported script completes the
   // step and hands off to the layout step. The author/copyright questions
-  // are the post-track attribution step's (driveAttributionStep).
+  // are the attribution step's (driveAttributionStep).
 
   // Community-layout step (spec 076 A4): sits between identity and the base
   // picker. Confirm the studio's suggested Windows layout (the default,
@@ -393,21 +393,23 @@ export function zipSourceEntry(
 }
 
 /**
- * Choose the "Copy" track (Track 1, copy-edit path) and advance.
+ * Confirm the walk is on the Copy track (Track 1, copy-edit path) past the
+ * base choice.
  *
- * The track step renders as a survey radio question. For the copy-edit variant,
- * select the "Copy" option.
+ * The track question is gone: after the base is confirmed the walk lands
+ * on attribution directly, with copy in force (the start screen records
+ * copy for New, or StudioShell defaults it). There is nothing to click —
+ * this waits for the attribution step's author-name field as the proof
+ * the walk arrived there on the copy track.
  */
-export async function chooseTrackCopy(page: Page): Promise<void> {
-  const copyRadio = page.getByRole("radio", { name: /^Copy/i });
-  await copyRadio.waitFor({ state: "visible", timeout: 15_000 });
-  await copyRadio.check();
-  await surveyAdvance(page).click();
+export async function confirmCopyTrack(page: Page): Promise<void> {
+  const nameField = page.locator("#il_author_name");
+  await nameField.waitFor({ state: "visible", timeout: 15_000 });
 }
 
 /**
  * Drive the attribution step (#1901) — the author/copyright questions,
- * asked AFTER the track choice (call after chooseTrackCopy, before acceptProjectName / confirmPrefill):
+ * asked after the base choice (call after confirmCopyTrack, before acceptProjectName / confirmPrefill):
  *
  *   1. il_author_name (text) — REQUIRED (validate() rejects blank). Unseeded
  *      in an unauthenticated e2e run (the profile seed comes from
@@ -419,10 +421,7 @@ export async function chooseTrackCopy(page: Page): Promise<void> {
  *      email must never block emission per spec 064). Left blank unless
  *      `authorEmail` is passed.
  *   3. il_copyright_holder (text) — optional, terminal for the flow. On the
- *      update track it arrives PRE-FILLED with the base keyboard's own
- *      copyright (the 092 extraction pass seeded it at setup) and is kept
- *      as-is unless `copyrightHolder` is passed; on the copy track it is
- *      blank, and blank defaults to the author name (D1).
+ *      copy track it is blank, and blank defaults to the author name (D1).
  */
 export async function driveAttributionStep(
   page: Page,

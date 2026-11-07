@@ -57,6 +57,7 @@ import { manifest } from "../../steps/manifest.ts";
 import { bindManifest, useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { getDecisionSnapshot } from "../../stores/decisionStore.ts";
+import { recordAuthoringTrack } from "../../lib/recordAuthoringTrack.ts";
 import { completeStep } from "../../lib/completeStep.ts";
 import { deriveInventoryCoverageGate } from "../../lib/inventoryDiff.ts";
 import {
@@ -150,6 +151,14 @@ async function walk(base: DriverContext, point: StartingPoint, onStep?: (step: s
     recordDecision: recorder,
   });
   const ctx: DriverContext = { ...base, recorder };
+
+  // The track question is gone: the start screen records the track before
+  // the walk (New = copy, Open = adapt), so the headless walk records the
+  // case's track the same way, before the first step — via the shared
+  // start-screen helper (FR-040), never a direct store write — and
+  // commitStartKeyboard below waits for it, exactly as StudioShell's
+  // instantiation effect does.
+  recordAuthoringTrack(base.case.track, "start");
 
   let committed = false;
   let step: string = useSurveySessionStore.getState().activeStepId;

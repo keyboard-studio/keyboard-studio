@@ -104,8 +104,7 @@ describe("gates", () => {
     for (const id of openHiddenScreens) {
       const gate = openScreenGates.get(id)!;
       expect(gate(open), id).toBe(false);
-      // The track step also hides on Copy: the start screen recorded the track.
-      expect(gate(decisionsFor("copy")), id).toBe(id !== "track");
+      expect(gate(decisionsFor("copy")), id).toBe(true);
       expect(gate(decisionsFor(null)), id).toBe(true);
     }
   });

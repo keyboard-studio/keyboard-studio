@@ -9,8 +9,7 @@ export function advanceToCharactersStep(): void {
   fireEvent.click(screen.getByTestId("survey-advance")); // identity -> layout
   fireEvent.click(screen.getByTestId("layout-continue")); // confirm layout -> base
   fireEvent.click(screen.getByTestId("base-preview")); // preview (separate click)
-  fireEvent.click(screen.getByTestId("base-confirm")); // commit -> track
-  fireEvent.click(screen.getByTestId("track-copy")); // track -> attribution (#1901)
+  fireEvent.click(screen.getByTestId("base-confirm")); // commit -> attribution (copy is the default; no track step)
   fireEvent.click(screen.getByTestId("survey-advance")); // attribution -> project_name (Copy)
   fireEvent.click(screen.getByTestId("survey-advance")); // project_name -> characters (prefill substage)
 }

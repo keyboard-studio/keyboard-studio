@@ -148,10 +148,10 @@ describe("M2 — spine order matches FR-012", () => {
     expect(spine[1]?.id).toBe("layout");
   });
 
-  it("'track' is a spine step between 'choose_base' and 'characters'", () => {
+  it("'choose_base' precedes 'characters' on the spine with no track step between them (track question removed)", () => {
     const spine = spineSteps(manifest);
-    assertStepOrder(spine, "choose_base", "track");
-    assertStepOrder(spine, "track", "characters");
+    assertStepOrder(spine, "choose_base", "characters");
+    expect(spine.some((s) => s.id === "track")).toBe(false);
   });
 
   it("'mechanisms' appears before 'touch' on the spine", () => {
@@ -308,8 +308,8 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
     expect(spineOf(targetStep)).toBe(true);
   });
 
-  it("project_name appears in the manifest between track and characters", () => {
-    assertStepOrder(manifest, "track", "project_name");
+  it("project_name appears in the manifest between choose_base and characters", () => {
+    assertStepOrder(manifest, "choose_base", "project_name");
     assertStepOrder(manifest, "project_name", "characters");
   });
 });

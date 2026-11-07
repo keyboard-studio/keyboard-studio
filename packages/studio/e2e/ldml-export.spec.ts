@@ -20,7 +20,7 @@ import * as fs from "node:fs";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -63,7 +63,7 @@ test.describe("LDML export E2E", () => {
     // A cold dev server enumerates the whole local keyboards clone before the picker appears.
     await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

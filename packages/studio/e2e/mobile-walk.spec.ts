@@ -36,7 +36,7 @@ import {
   surveyAdvance,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -166,7 +166,7 @@ test("authoring walk: identity to base to carve to the mechanisms OSK sheet", as
   // project name → prefill → Phase B build-list).
   await driveIdentityLite(page);
   await pickStartKeyboard(page, "basic_kbdfr");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);

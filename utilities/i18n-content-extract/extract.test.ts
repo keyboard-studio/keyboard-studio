@@ -21,7 +21,7 @@ import {
 const phaseARegistry = moduleRecord(flowModules.identity_lite);
 const phaseBRegistry = moduleRecord(flowModules.phase_b_characters);
 const phaseFRegistry = moduleRecord([...flowModules.phase_f_helpdocs, ...demotedPhaseFModules]);
-const phaseGRegistry = moduleRecord([...flowModules.track, ...flowModules.project_name]);
+const phaseGRegistry = moduleRecord(flowModules.project_name);
 const reserveRegistry = moduleRecord(reserveModules);
 
 const dirs: string[] = [];

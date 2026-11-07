@@ -36,7 +36,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -94,7 +94,7 @@ test("spec 090 SC-003: full walk leaves exactly one live log entry per decision"
 
   await driveIdentityLite(page, { languageCode: "fr" });
   await pickStartKeyboard(page, "basic_kbdfr");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);

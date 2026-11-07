@@ -60,7 +60,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   openExistingKeyboard,
   continueOpenWalkUntil,
   driveAttributionStep,
@@ -161,7 +161,7 @@ async function driveToBasicKbdusTouchStep(page: Page): Promise<void> {
     languageCode: "en",
   });
   await pickStartKeyboard(page, "basic_kbdus");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -260,7 +260,7 @@ test.describe("spec 104 walk 1: creation with the start-of-line default", () => 
       languageCode: "fr",
     });
     await pickStartKeyboard(page, "basic_kbdfr");
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -365,7 +365,7 @@ test.describe("spec 104 walk 2: copy parity and the repair list", () => {
       languageCode: "agq",
     });
     await pickStartKeyboard(page, "sil_cameroon_qwerty");
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

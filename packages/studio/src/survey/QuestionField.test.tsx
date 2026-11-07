@@ -101,7 +101,7 @@ describe("QuestionField content-i18n wiring", () => {
 
 describe("QuestionField content-i18n wiring — option labels (radio)", () => {
   const radioQuestion: FlowQuestion = {
-    id: "track_choice",
+    id: "choose_base",
     type: "radio",
     prompt: "How would you like to start?",
     options: [
@@ -119,8 +119,8 @@ describe("QuestionField content-i18n wiring — option labels (radio)", () => {
   it("resolves an option label whose value contains a literal dot via the slugified key", () => {
     _setContentCatalogForTesting("fr", {
       flowQuestions: {
-        "content.flowQuestion.track_choice.option.copy.label": "Partir d'un clavier similaire",
-        "content.flowQuestion.track_choice.option.0_6.label": "Variante zéro virgule six",
+        "content.flowQuestion.choose_base.option.copy.label": "Partir d'un clavier similaire",
+        "content.flowQuestion.choose_base.option.0_6.label": "Variante zéro virgule six",
       },
     });
 
@@ -150,7 +150,7 @@ describe("QuestionField content-i18n wiring — option notes (radio)", () => {
   // resolve through the same flowQuestions catalog path as the label —
   // extracted as option.<slug>.note. Before spec 073 it rendered raw English.
   const notedRadio: FlowQuestion = {
-    id: "track_choice",
+    id: "choose_base",
     type: "radio",
     prompt: "How do you want to work with this keyboard?",
     options: [
@@ -174,9 +174,9 @@ describe("QuestionField content-i18n wiring — option notes (radio)", () => {
   it("resolves the fr option notes from the seeded catalog", () => {
     _setContentCatalogForTesting("fr", {
       flowQuestions: {
-        "content.flowQuestion.track_choice.option.copy.note":
+        "content.flowQuestion.choose_base.option.copy.note":
           "Vous lui donnerez un nouveau nom et un nouvel identifiant. L'original n'est pas modifié.",
-        "content.flowQuestion.track_choice.option.adapt.note":
+        "content.flowQuestion.choose_base.option.adapt.note":
           "Conservez le nom et l'identifiant existants du clavier.",
       },
     });
@@ -218,10 +218,10 @@ describe("QuestionField content-i18n wiring — placeholder interpolation", () =
   // Regression test for the confirmed P0: interpolation must run AFTER Tier-B
   // catalog resolution, for every locale including English — a translated
   // catalog string carries its own {{token}} placeholders (e.g. fr's
-  // track_choice.prompt), and only the resolved string (not the pre-resolved
+  // choose_base.prompt), and only the resolved string (not the pre-resolved
   // English value) is what actually renders.
-  const trackChoiceQuestion: FlowQuestion = {
-    id: "track_choice",
+  const chooseBaseQuestion: FlowQuestion = {
+    id: "choose_base",
     type: "notice",
     prompt: "How do you want to work with {{base_name}}?",
   };
@@ -233,14 +233,14 @@ describe("QuestionField content-i18n wiring — placeholder interpolation", () =
   it("interpolates the resolved French template (does not leave the literal token)", () => {
     _setContentCatalogForTesting("fr", {
       flowQuestions: {
-        "content.flowQuestion.track_choice.prompt":
+        "content.flowQuestion.choose_base.prompt":
           "Comment voulez-vous travailler avec {{base_name}} ?",
       },
     });
 
     renderAtLocale(
       <QuestionField
-        question={trackChoiceQuestion}
+        question={chooseBaseQuestion}
         value=""
         onChange={() => {}}
         context={{ base_name: "Yoruba" }}
@@ -255,7 +255,7 @@ describe("QuestionField content-i18n wiring — placeholder interpolation", () =
   it("interpolates the English prompt too (locale en, same context)", () => {
     renderAtLocale(
       <QuestionField
-        question={trackChoiceQuestion}
+        question={chooseBaseQuestion}
         value=""
         onChange={() => {}}
         context={{ base_name: "Yoruba" }}

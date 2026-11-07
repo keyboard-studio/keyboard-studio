@@ -15,29 +15,16 @@
  * `audit_label` (decisions/lookupQuestionLabel.ts falls back audit_label ->
  * prompt).
  *
- * The original target was the track step's `track_choice`, chosen because
- * it is a SINGLE-question step. After spec 111 the track step is skipped on
- * every path and its trail entry renders no jump link, so that target is
- * gone. `il_author_name` is the retarget (issue #2521; ruling in
- * ~/workspace/keyboard-studio-notes/2521-ruling.md):
- *
  * - It is the first question of the attribution step, so landing "on the
  *   step" and landing "on the question" are the same event for it.
  * - The multi-question gap the old header cited is closed: lib/stepWalk.ts
  *   closes the "CURRENT QUESTION" gap, and SurveyRunner honours a jump's
  *   parked question cursor on mount, so a deep link naming a question lands
  *   on that question even in a completed multi-question step.
- * - The "both paths" half of #2521's ask is not satisfiable as written:
- *   the Open walk contains no survey-question step at all (galleries and
- *   editors only), so no single-question step is walked by both real paths.
- *   The deeplink machinery under test is path-independent, so this
- *   Copy-walk retarget restores the lost coverage; Open-side deeplink
- *   coverage is a separate follow-up.
- *
- * The track entry's current state is pinned, not re-tested as a target:
- * once its answer exists the track gate closes behind it, so its location
- * resolves skipped-by-track and the row shows "Your track skips this step"
- * with no jump link (see the ruling; draft PR #2568 removes the step).
+ * - The Open walk contains no survey-question step at all (galleries and
+ *   editors only), so no single-question step is shared by both paths. The
+ *   deeplink machinery under test is path-independent, so this Copy-walk
+ *   test restores its coverage; Open-side gallery deeplinks are separate.
  *
  * STALENESS, AND WHY THIS SPEC DOES NOT ASSERT A VISIBLE CUE FOR IT: SC-008
  * asks that a deep-linked revision "mark the same steps stale as the
@@ -59,7 +46,7 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   seedReturningVisitor,
@@ -80,12 +67,6 @@ const FIXTURE = {
  * the internal entryId sequence, which shifts with how many identity
  * sub-answers happened to get recorded this run. */
 const AUTHOR_QUESTION_LABEL = /Who should be credited as the author/i;
-
-/** The audit label `track_choice`'s decision entries render under (FR-008)
- * — content/i18n/en/flowQuestions.json's `track_choice.audit_label`. Used
- * only to pin the retired track entry's no-jump-link state (see the module
- * header), not as the revision target. */
-const TRACK_QUESTION_LABEL = /Authoring approach/i;
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -114,11 +95,11 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
       script: FIXTURE.targetScript,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
 
-    // Past "track" now, so the prefill summary is the phase boundary landmark.
+    // Past the base choice now, so the prefill summary is the phase boundary landmark.
     await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 30_000 });
 
     // ---- Open Decisions and find the author-name answer --------------------
@@ -134,22 +115,6 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     await expect(authorEntry).toBeVisible({ timeout: 15_000 });
     // Nothing superseded yet — this is the entry the revision below creates.
     await expect(authorEntry.getByTestId("decision-entry-superseded")).toHaveCount(0);
-
-    // ---- The retired track entry: reason, no jump link ---------------------
-    // Once its answer exists the track gate closes behind it, so the trail
-    // records it with no jump link (issue #2521; ruling in
-    // keyboard-studio-notes/2521-ruling.md). Pinned, not revised: the step
-    // is unrevisitable by design, and draft PR #2568 removes it.
-    const trackEntry = page
-      .locator('[data-testid="decision-entry"]')
-      .filter({ hasText: TRACK_QUESTION_LABEL })
-      .first();
-    await expect(trackEntry).toBeVisible({ timeout: 15_000 });
-    await expect(trackEntry.getByTestId("decision-entry-jump")).toHaveCount(0);
-    await expect(trackEntry.getByTestId("decision-entry-jump-unreachable")).toHaveCount(1);
-    await expect(trackEntry.getByTestId("decision-entry-jump-unreachable")).toContainText(
-      /skips this step/i,
-    );
 
     // ---- Activate the jump --------------------------------------------------
     await authorEntry.getByTestId("decision-entry-jump").click();

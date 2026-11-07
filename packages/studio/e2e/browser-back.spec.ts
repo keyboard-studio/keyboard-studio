@@ -28,7 +28,7 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   seedReturningVisitor,
@@ -59,7 +59,7 @@ test.describe("browser Back mid-survey (F7)", () => {
       script: FIXTURE.targetScript,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
 

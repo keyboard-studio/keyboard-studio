@@ -10,6 +10,8 @@ import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
 import { runLiveExtraction, type LiveExtractionStore } from "./liveExtraction.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
+import { baseKeyboardProviderModule } from "../test/baseKeyboardProvider.ts";
 
 function fixtureIR(overrides: Partial<KeyboardIR["header"]> = {}): KeyboardIR {
   return {
@@ -148,8 +150,10 @@ describe("runLiveExtraction — seeding", () => {
       "authoring-track": { id: "authoring-track", value: "adapt", provenance: "asked" },
     });
     const authorName = stubModule("il_author_name", { provides: ["author-name"] });
-    const track = stubModule("track_choice", { provides: ["authoring-track"] });
-    runLiveExtraction({ modules: [authorName, track, holder], ctx: ctx(), store });
+    // The track question is gone; the start screen provides authoring-track.
+    // The provider requires base-keyboard, so the stub provider rides along.
+    const track = authoringTrackProviderModule;
+    runLiveExtraction({ modules: [authorName, track, baseKeyboardProviderModule, holder], ctx: ctx(), store });
     expect(store.decisions["copyright-holder"]?.inputs).toEqual({
       "author-name": "Test Author",
       "authoring-track": "adapt",

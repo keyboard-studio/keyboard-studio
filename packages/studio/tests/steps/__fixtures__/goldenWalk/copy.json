@@ -33,26 +33,13 @@
     "storeMutations": [
       "setLocalStart",
       "record",
-      "advance"
+      "advance",
+      "record"
     ],
     "workingCopyMutations": [],
     "decisionMutations": [
+      "record",
       "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "track",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "recordAll",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "recordAll"
     ],
     "navigateTo": []
   },

@@ -56,7 +56,6 @@ function loadFlowForEntry(entry: { flowDef: FlowDef }): FlowDef {
 const phaseARegistry = flowSources["identity_lite"]!.registry;
 const phaseBRegistry = flowSources["phase_b_characters"]!.registry;
 const phaseFRegistry = flowSources["phase_f_helpdocs"]!.registry;
-const phaseTrackRegistry = flowSources["track"]!.registry;
 const phaseProjectRegistry = flowSources["project_name"]!.registry;
 const reserveRegistry = flowSources["phase_a_identity"]!.registry;
 
@@ -70,7 +69,6 @@ const ALL_FLOWS = [
   // phase_f_helpdocs derives its order (spec 087) � built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry },
   // Phase G flows derive their order (spec 087) — built through flowSources.
-  { flowDef: loadFlowSourceDef(flowSources["track"]!), title: "Track selection", registry: phaseTrackRegistry },
   { flowDef: loadFlowSourceDef(flowSources["project_name"]!), title: "Project name", registry: phaseProjectRegistry },
 ];
 
@@ -428,7 +426,7 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
 
   // T025 (spec 035 polish): the generic tests above cover touch_seed_source only
   // via aggregate/loop assertions. Pin the fork by name — mirrors the spec-018
-  // "track is branch-defining: fork -> project_name" case in manifestProjection.test.ts
+  // "attribution is branch-defining: fork -> project_name" case in manifestProjection.test.ts
   // — so a regression in the mechanisms/touch_seed_source/touch wiring fails a
   // test that names the nodes, not just a count.
   //

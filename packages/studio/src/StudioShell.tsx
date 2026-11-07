@@ -275,7 +275,7 @@ function useRoute(): RouteId {
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Derived main line (FR-012; pinned by steps/stepOrder.parity.test.ts):
-//   identity → layout → choose_base → track → characters → marks →
+//   identity → layout → choose_base → attribution → characters → marks →
 //   punctuation → invisibles → convenience → carve → deadkeys → rules →
 //   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
 //   (sequences build inline in the mechanism gallery — no spine step)
@@ -285,9 +285,11 @@ function useRoute(): RouteId {
 //   touch_seed_source — touch-seed fork; rejoins at "touch"
 //
 // Track/project_name routing (#1901: the attribution step sits between
-// track and the fork — author/copyright are asked after the track choice):
-//   copy-track:  choose_base → track → attribution → project_name → characters
-//   adapt-track: choose_base → track → attribution → (skip project_name) → characters
+// choose_base and the fork — author/copyright are asked after the base
+// choice, and the track is recorded on the start screen, defaulting to
+// copy when a walk reaches the base choice without one):
+//   copy-track:  choose_base → attribution → project_name → characters
+//   adapt-track: choose_base → attribution → (skip project_name) → characters
 //
 // Characters internal flow (intra-phase — not manifest steps):
 //   prefill → B-questions
@@ -1155,6 +1157,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   //     through the gallery host, which has already synchronously resolved
   //     any rebase-confirm question via confirmRebaseTo BEFORE recording —
   //     F1 fix)
+  //   - the authoring track is recorded — the start screen records it
+  //     (New = copy, Open = adapt); a walk without one defaults to copy,
+  //     recorded here with provenance "default" (see the effect body).
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
@@ -1182,10 +1187,20 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     if (decisionId === undefined) return;
     // Spec 092 FR-004: the setup decision requires the authoring track as
     // well as the base — do not instantiate until both are recorded. The
-    // track step follows choose_base in the flow, so on a fresh walk this
-    // gate is what moves instantiation from the base confirmation (track
-    // still null — the G7 hazard) to the track's completion.
-    if (authoringTrackDecision === undefined) return;
+    // start screen records the track (New = copy, Open = adapt), so on a
+    // fresh walk it is already there. A walk that reaches here without one
+    // (a legacy draft, a deep link) defaults to copy — the track question
+    // is gone, and copy is the only track the walk itself can start.
+    // Recorded with provenance "default", so the trail shows it was the
+    // studio's default, not the author's choice.
+    if (authoringTrackDecision === undefined) {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "default",
+        step: "choose_base",
+      });
+    }
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localStart;
     if (art && lb && art.base.id === lb.id && lb.id === decisionId) {

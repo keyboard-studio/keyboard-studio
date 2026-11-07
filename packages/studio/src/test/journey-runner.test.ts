@@ -51,7 +51,6 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: [
       "identity",
       "choose_base",
-      "track",
       "attribution",
       "project_name",
       "characters",
@@ -73,7 +72,6 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: [
       "identity",
       "choose_base",
-      "track",
       "attribution",
       "project_name",
       "characters",

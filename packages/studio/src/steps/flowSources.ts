@@ -125,15 +125,7 @@ const declaredFlowSources = {
     registry: moduleRecord(flowModules.identity_lite),
   },
 
-  track: {
-    id: "track",
-    derivedModules: flowModules.track,
-    phase: "G",
-    title: "Track selection",
-    registry: moduleRecord(flowModules.track),
-  },
-
-  // #1901: author / copyright questions, asked after the track choice
+  // #1901: author / copyright questions, asked after the base choice
   // and seeded per track (profile defaults on copy, the base's holder
   // extracted on update).
   attribution: {
