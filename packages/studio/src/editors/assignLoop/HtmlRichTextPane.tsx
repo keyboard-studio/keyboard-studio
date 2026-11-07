@@ -92,12 +92,24 @@ export function HtmlRichTextPane({ value, format, onChange }: HtmlRichTextPanePr
   // The parent remounts this pane (via `key`) when the selected file or
   // its seed changes, so no live content sync is needed here; this effect
   // only covers the first mount racing the editor's creation.
+  //
+  // The sync must NOT emit an update: `editor.getHTML()` is the parsed and
+  // re-serialised form of `value`, so it near-never string-equals the raw
+  // source (whitespace, attribute order, `<p>` wrapping, dropped
+  // table/kbd nodes) — and any update it emitted would record a phantom
+  // edit the author never made, whose override then beats generation at
+  // serialize time. emitUpdate:false keeps the sync silent; real edits
+  // still flow out through onUpdate. (PR #2569: the golden walk failed
+  // with welcome.htm differing on CI while local walks pass; this silences
+  // the one emission path the mount owns. If the lane still fails, the
+  // mechanism is elsewhere and needs the CI walked bytes to name it.)
   useEffect(() => {
     if (editor === null || editor.isDestroyed) return;
     if (format === "markdown") {
-      if (editor.getMarkdown() !== value) editor.commands.setContent(value, { contentType: "markdown" });
+      if (editor.getMarkdown() !== value)
+        editor.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
     } else if (editor.getHTML() !== value) {
-      editor.commands.setContent(value);
+      editor.commands.setContent(value, { emitUpdate: false });
     }
     // Intentionally once, on mount: live edits flow out through onUpdate.
     // eslint-disable-next-line react-hooks/exhaustive-deps
