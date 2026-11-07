@@ -152,4 +152,46 @@ describe("KmnCodePane", () => {
     // The synchronous lint gate blocks the Apply; the store IR is untouched.
     expect(useWorkingCopyStore.getState().ir).toBe(before);
   });
+
+  it("Apply is blocked when the edit adds a raw-Ctrl rule (issue #2359)", () => {
+    const ir = makeIR();
+    useWorkingCopyStore.setState({ ir });
+    render(<KmnCodePane />);
+    act(() => {
+      fireEvent.change(screen.getByTestId("mock-editor"), {
+        target: {
+          value: `store(&VERSION) '10.0'\nstore(&NAME) 'testkbd'\n\nbegin Unicode > use(main)\n\ngroup(main) using keys\n\n+ [K_A] > 'a'\n+ [CTRL K_A] > 'é'\n`,
+        },
+      });
+    });
+    expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
+    const before = useWorkingCopyStore.getState().ir;
+    act(() => {
+      fireEvent.click(applyButton());
+    });
+    // The synchronous lint gate blocks the Apply; the store IR is untouched.
+    expect(useWorkingCopyStore.getState().ir).toBe(before);
+  });
+
+  it("Apply still goes through for an edit that keeps a grandfathered raw-Ctrl rule", async () => {
+    const { parseKmn } = await import("@keyboard-studio/engine");
+    const ir = parseKmn(
+      `store(&VERSION) '10.0'\nstore(&NAME) 'testkbd'\n\nbegin Unicode > use(main)\n\ngroup(main) using keys\n\n+ [CTRL K_A] > 'é'\n`,
+      "testkbd",
+    ).ir;
+    useWorkingCopyStore.setState({ ir });
+    render(<KmnCodePane />);
+    act(() => {
+      fireEvent.change(screen.getByTestId("mock-editor"), {
+        target: { value: editorText() + "\n" },
+      });
+    });
+    act(() => {
+      fireEvent.click(applyButton());
+    });
+    // The rule was already in the working copy, so it warns but never blocks.
+    const next = useWorkingCopyStore.getState().ir;
+    expect(next).not.toBeNull();
+    expect(next).not.toBe(ir);
+  });
 });
