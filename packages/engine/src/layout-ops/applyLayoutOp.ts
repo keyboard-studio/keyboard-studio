@@ -116,9 +116,12 @@ export function applyLayoutOp(ir: KeyboardIR, op: LayoutOperation): ApplyLayoutO
   const matches = (r: IRRule): boolean =>
     op.op === "set-key" ? ruleIsContextFreeOn(r, op.vkey, op.layer) : ruleOnSlot(r, op.vkey, op.layer, ctx);
 
-  const next = structuredClone(ir);
+  // Copy only the spine the edit changes (the IR, the groups array, the entry group); the rules
+  // are replaced, never mutated, so the rest is shared with the input. A full structuredClone
+  // per op made replaying a long log cost O(entries x IR size) on every rebuild and projection.
+  const next: KeyboardIR = { ...ir, groups: ir.groups.map((g) => (g.nodeId === entry.nodeId ? { ...g } : g)) };
   const group = next.groups.find((g) => g.nodeId === entry.nodeId);
-  if (group === undefined) throw new Error("applyLayoutOp: entry group vanished after clone");
+  if (group === undefined) throw new Error("applyLayoutOp: entry group vanished after copy");
 
   const removed: KmnEditEffect["removed"] = [];
   const kept: IRRule[] = [];
