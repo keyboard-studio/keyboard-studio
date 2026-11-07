@@ -7,6 +7,7 @@
 // wrong and must never return.
 
 import { describe, expect, it } from "vitest";
+import { parseKmn } from "@keyboard-studio/engine";
 import type { IRRule, KeyboardIR } from "@keyboard-studio/contracts";
 import {
   buildFiredRuleResolver,
@@ -159,5 +160,69 @@ describe("buildFiredRuleResolver", () => {
   it("skips the emit check when emittedOutput is absent", () => {
     const resolve = buildFiredRuleResolver(makeIr(), COMPILED_JS);
     expect(resolve(fired("main", 2, undefined))?.sourceLine).toBe(12);
+  });
+});
+
+// The compiled .kmn is the projection of the working copy, not the text the working IR was
+// parsed from: the projection adds lines (target stamp, header stores), so a `// Line N` from
+// the compiled keyboard names a different line of the starting point's source. Matching N
+// against the working IR's `sourceLine` named the neighbouring rule (key Q's Shift rule for
+// key Q), and the Layout tab demoted two keys in every three as changed by a later group.
+describe("buildFiredRuleResolver with the compiled .kmn", () => {
+  const SOURCE = [
+    "store(&VERSION) '10.0'",
+    "begin Unicode > use(main)",
+    "",
+    "group(main) using keys",
+    "",
+    "+ [K_Q] > 'q'",
+    "+ [SHIFT K_Q] > 'Q'",
+    "",
+    "+ [K_W] > 'w'",
+    "+ [SHIFT K_W] > 'W'",
+    "",
+  ].join("\n");
+  // What the preview compiled: one line added above everything, so every rule moves down one.
+  const COMPILED_KMN = `store(&TARGETS) 'any'\n${SOURCE}`;
+  const JS = `
+  this.g_main_0=function(t,e) {
+    var k=KeymanWeb,r=0,m=0;
+    if(k.KKM(e,16384,81)){r=m=1;} // Line 7
+    else if(k.KKM(e,16400,81)){r=m=1;} // Line 8
+    else if(k.KKM(e,16384,87)){r=m=1;} // Line 10
+    else if(k.KKM(e,16400,87)){r=m=1;} // Line 11
+    return r;
+  };
+`;
+  const working = () => parseKmn(SOURCE, "t").ir;
+  const keyOf = (rule: IRRule | undefined) => {
+    const last = rule?.context[rule.context.length - 1];
+    return last?.kind === "vkey" ? `${last.modifiers.join(" ")} ${last.name}`.trim() : undefined;
+  };
+
+  it("names the working copy's own rule for every compiled ordinal", () => {
+    const resolve = buildFiredRuleResolver(working(), JS, COMPILED_KMN);
+    expect(keyOf(resolve(fired("main", 0, "q")))).toBe("K_Q");
+    expect(keyOf(resolve(fired("main", 1, "Q")))).toBe("SHIFT K_Q");
+    expect(keyOf(resolve(fired("main", 2, "w")))).toBe("K_W");
+    expect(keyOf(resolve(fired("main", 3, "W")))).toBe("SHIFT K_W");
+  });
+
+  it("returns the working IR's node, so a node-id comparison holds", () => {
+    const ir = working();
+    const resolve = buildFiredRuleResolver(ir, JS, COMPILED_KMN);
+    expect(resolve(fired("main", 0, "q"))?.nodeId).toBe(ir.groups[0]!.rules[0]!.nodeId);
+  });
+
+  it("returns undefined for a compiled rule the working copy does not have", () => {
+    const ir = working();
+    ir.groups[0]!.rules = ir.groups[0]!.rules.filter((r) => keyOf(r) !== "K_W");
+    const resolve = buildFiredRuleResolver(ir, JS, COMPILED_KMN);
+    expect(resolve(fired("main", 2, "w"))).toBeUndefined();
+  });
+
+  it("returns undefined when the compiled .kmn does not parse to that line", () => {
+    const resolve = buildFiredRuleResolver(working(), JS, "store(&VERSION) '10.0'\n");
+    expect(resolve(fired("main", 0, "q"))).toBeUndefined();
   });
 });

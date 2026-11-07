@@ -111,6 +111,21 @@ export function ruleOnSlot(
   return pre.length === ctx.length && pre.every((k, i) => k === ctx[i]);
 }
 
+/**
+ * True when two rules match the same input: the same match kind, target selector, and context,
+ * with a key's modifiers compared as a set. Output is not compared. Used to find a compiled
+ * keyboard's rule in the working copy, whose node ids and source lines it does not share.
+ */
+export function sameRuleIdentity(a: IRRule, b: IRRule): boolean {
+  if (a.matchKind !== b.matchKind || a.targetSelector !== b.targetSelector) return false;
+  if (a.context.length !== b.context.length) return false;
+  return a.context.every((x, i) => {
+    const y = b.context[i]!;
+    if (x.kind === "vkey" && y.kind === "vkey") return x.name === y.name && sameLayer(x.modifiers, y.modifiers);
+    return JSON.stringify(x) === JSON.stringify(y);
+  });
+}
+
 /** A context-free rule on exactly `vkey` + `layer`. */
 export function ruleIsContextFreeOn(rule: IRRule, vkey: string, layer: LayerCombo): boolean {
   return ruleOnSlot(rule, vkey, layer, []);

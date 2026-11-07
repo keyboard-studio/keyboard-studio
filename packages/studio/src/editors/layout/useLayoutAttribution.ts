@@ -148,8 +148,12 @@ export function notCompiledCells(cells: readonly KeyCellAttribution[]): KeyCellA
  * confidence and is not the row's own rule. When the mapping cannot name it, the check passes
  * (the output comparison in `verifyCells` still applies).
  */
-export function makeFiredRuleCheck(ir: KeyboardIR, jsSource: string): FiredRuleCheck {
-  const resolve = buildFiredRuleResolver(ir, jsSource);
+export function makeFiredRuleCheck(
+  ir: KeyboardIR,
+  jsSource: string,
+  compiledKmn: string | null = null,
+): FiredRuleCheck {
+  const resolve = buildFiredRuleResolver(ir, jsSource, compiledKmn);
   return (step, ruleNodeId) => {
     const fired = extractFiredRule(step);
     if (fired === undefined) return true;
@@ -296,6 +300,7 @@ export function useLayoutAttribution(
   const [failure, setFailure] = useState<string | null>(null);
 
   const url = artifact.status === "ready" ? artifact.jsBlobUrl : null;
+  const compiledKmn = artifact.compiledKmn;
   useEffect(() => {
     if (ir === null || url === null) return;
     let cancelled = false;
@@ -309,7 +314,7 @@ export function useLayoutAttribution(
           vkeys,
           compiled: asCompileResult(bytes, url),
           simulateEach,
-          firedRuleIs: makeFiredRuleCheck(ir, new TextDecoder().decode(bytes)),
+          firedRuleIs: makeFiredRuleCheck(ir, new TextDecoder().decode(bytes), compiledKmn),
           ...(context !== undefined ? { context } : {}),
         });
         if (cancelled) return;
@@ -324,7 +329,7 @@ export function useLayoutAttribution(
     };
     // `layer` and `context` are covered by their ids; the injected seams are test-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ir, url, layerId, contextId, vkeys, opts.jsBytes, opts.simulateEach]);
+  }, [ir, url, compiledKmn, layerId, contextId, vkeys, opts.jsBytes, opts.simulateEach]);
 
   return useMemo((): LayoutAttribution => {
     const mnemonic = ir !== null && isMnemonic(ir);

@@ -1241,6 +1241,7 @@ export {
   invertEffect,
   normaliseKmnEdits,
   replayKmnEdits,
+  sameRuleIdentity,
 } from "./layout-ops/index.js";
 export type {
   ApplyLayoutOpResult,

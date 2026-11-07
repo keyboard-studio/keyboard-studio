@@ -11,9 +11,17 @@
 // The correct bridge is the `// Line N` comment kmc-kmn emits after most
 // markers (the KMN source line of the rule) paired with the codec parser's
 // `IRRule.sourceLine` (the 1-based .kmn line the rule was parsed from).
-// Both refer to the same .kmn text — the one the compile pipeline fed kmc —
+// Both must refer to the same .kmn text — the one the compile pipeline fed kmc —
 // so the mapping is order-independent: marker ordinal k → `// Line N` → the
 // IR rule with `sourceLine === N`, regardless of where kmc moved the rule.
+//
+// The working IR is NOT parsed from that text: the preview compiles the
+// projection of the working copy, which adds and moves lines, while the
+// working IR keeps the starting point's source lines. So when the caller has
+// the compiled .kmn, line N is looked up in a parse of THAT text, and the rule
+// found there is matched back to the working IR by what it matches
+// (`sameRuleIdentity`: group, key, modifiers, context). Matching N against the
+// working IR's own `sourceLine` named the neighbouring rule instead.
 //
 // The marker enumeration below replicates the engine's
 // `instrumentFiredRuleTracking` ordinal semantics
@@ -30,6 +38,7 @@
 // never a misattributed owner, never a bare index.
 
 import type { IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
+import { parseKmn, sameRuleIdentity } from "@keyboard-studio/engine";
 import type { FiredRuleTrace } from "./demoSimulation.ts";
 
 /** Matches `this.g_<name>_<n> = function(` — kmc-kmn's group function shape. */
@@ -100,10 +109,16 @@ function ruleEmitsText(rule: IRRule): boolean {
  * positional indexing. Returns `undefined` for any trace it cannot map
  * confidently — including when `jsSource` is absent, in which case every
  * trace is unresolvable and callers use the trace-context fallback.
+ *
+ * `compiledKmn` is the .kmn text the compiler was fed. Pass it whenever `ir`
+ * was not parsed from exactly that text (the working copy never is: the
+ * preview compiles its projection); without it, `// Line N` is matched
+ * against `ir`'s own source lines.
  */
 export function buildFiredRuleResolver(
   ir: KeyboardIR | null,
   jsSource: string | null,
+  compiledKmn?: string | null,
 ): (fired: FiredRuleTrace) => IRRule | undefined {
   // (group name, ordinal) → KMN source line, mirroring the engine's ordinals.
   const srcLineByGroupOrdinal = new Map<string, Array<number | null>>();
@@ -118,6 +133,8 @@ export function buildFiredRuleResolver(
     }
   }
 
+  const compiledIr = compiledKmn != null ? parseCompiled(compiledKmn) : undefined;
+
   return (fired: FiredRuleTrace): IRRule | undefined => {
     if (ir === null) return undefined;
     const srcLines = srcLineByGroupOrdinal.get(fired.group);
@@ -127,7 +144,13 @@ export function buildFiredRuleResolver(
     if (srcLine === null) return undefined;
     const group = ir.groups.find((g) => g.name === fired.group);
     if (group === undefined) return undefined;
-    const candidates = group.rules.filter((r) => r.sourceLine === srcLine);
+    let candidates = group.rules.filter((r) => r.sourceLine === srcLine);
+    if (compiledIr !== undefined) {
+      const compiledGroup = compiledIr?.groups.find((g) => g.name === fired.group);
+      const compiled = compiledGroup?.rules.filter((r) => r.sourceLine === srcLine) ?? [];
+      if (compiled.length !== 1) return undefined;
+      candidates = group.rules.filter((r) => sameRuleIdentity(r, compiled[0]!));
+    }
     if (candidates.length !== 1) return undefined;
     const candidate = candidates[0]!;
     // Emit-profile consistency guard: a stale sourceLine (the re-emit path
@@ -140,4 +163,22 @@ export function buildFiredRuleResolver(
     }
     return candidate;
   };
+}
+
+// One compiled .kmn is resolved against many times (every layer, every
+// keystroke of the demo), so its parse is kept for the latest text.
+let lastCompiled: { text: string; ir: KeyboardIR | null } | null = null;
+
+/** The compiled .kmn's IR, or null when it does not parse (every trace then stays unresolved). */
+function parseCompiled(text: string): KeyboardIR | null {
+  if (lastCompiled?.text !== text) {
+    let parsed: KeyboardIR | null;
+    try {
+      parsed = parseKmn(text, "compiled").ir;
+    } catch {
+      parsed = null;
+    }
+    lastCompiled = { text, ir: parsed };
+  }
+  return lastCompiled.ir;
 }

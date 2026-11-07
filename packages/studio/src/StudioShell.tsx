@@ -96,6 +96,7 @@ import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
+import { readVfsText } from "./lib/vfsText.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
@@ -1456,6 +1457,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
           artifactStage.jsBlobUrl,
           artifactStage.keyboardId,
           artifactStage.compileResult.diagnostics,
+          // The text the compile read (source/<compile id>.kmn), read now: the VFS is mutated
+          // in place by the next run.
+          readVfsText(artifactStage.vfs, `source/${artifactStage.keyboardId}.kmn`) ?? null,
         );
       case "error":
         return makeErrorRulesDemoArtifact(
