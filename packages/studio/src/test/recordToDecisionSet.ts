@@ -14,18 +14,6 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { DECISION_POINTS, type DecisionPoint } from "./decisionPointBases.ts";
 
-/**
- * Retired questions whose answers still map onto live decisions during
- * record replay. `track_choice` was removed with the track step (#2568),
- * but a record's answer is the only record of an "adapt" walk, and
- * orphaning it would silently resume that record on the copy track — the
- * same mapping as the v1 draft migration's RETIRED_QUESTION_DECISIONS
- * (lib/draftPersistence.ts); keep the two in sync.
- */
-const RETIRED_QUESTION_DECISIONS: Readonly<Record<string, readonly DecisionId[]>> = {
-  track_choice: ["authoring-track"],
-};
-
 /** Identity, inventory and layout: everything before the marks series completes. */
 const MARKS_IDS: readonly string[] = [
   "language-name",
@@ -106,14 +94,6 @@ export function recordToDecisionSet(
       const mod = questionRegistry[p.questionId];
       for (const id of mod?.provides ?? []) {
         if (allowed.has(id)) out[id] = asDecision(id, p.value);
-      }
-      // A retired question's answer still settles its live decision (see
-      // RETIRED_QUESTION_DECISIONS above): the registry has no module for
-      // it anymore, so without this the answer would be orphaned.
-      if (mod === undefined) {
-        for (const id of RETIRED_QUESTION_DECISIONS[p.questionId] ?? []) {
-          if (allowed.has(id)) out[id] = asDecision(id, p.value);
-        }
       }
     }
   }
