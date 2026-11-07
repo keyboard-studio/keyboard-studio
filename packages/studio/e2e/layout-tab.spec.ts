@@ -22,6 +22,7 @@ import {
   confirmPrefill,
   buildOneCharacterList,
   driveDeadkeysStep,
+  driveMechanismsGallery,
   seedReturningVisitor,
   navigateToOutput,
   triggerDownload,
@@ -110,6 +111,20 @@ test.describe("spec 113 Layout tab - US1", () => {
   });
 });
 
+/**
+ * Monaco renders only the lines in view, so a rule further down is not in the DOM. Search the
+ * whole model through the editor's own find widget and expect at least one match.
+ */
+async function expectCodeHas(page: Page, text: string): Promise<void> {
+  await page.locator(".monaco-editor .view-lines").click();
+  await page.keyboard.press("Control+F");
+  await page.locator(".monaco-editor .find-widget textarea").first().fill(text);
+  await expect(page.locator(".monaco-editor .find-widget .matchesCount")).toHaveText(/^\d+ of \d+$/, {
+    timeout: 60_000,
+  });
+  await page.keyboard.press("Escape");
+}
+
 test.describe("spec 113 Layout tab - US2", () => {
   test.setTimeout(600_000);
 
@@ -132,15 +147,18 @@ test.describe("spec 113 Layout tab - US2", () => {
     // The Code tab shows both rules.
     await page.getByTestId("editor-view-tab-code").click();
     await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
-    const code = page.locator(".monaco-editor");
-    await expect(code).toContainText("U+014B", { timeout: 60_000 });
-    await expect(code).toContainText("U+014A");
+    await expectCodeHas(page, "U+014B");
+    await expectCodeHas(page, "U+014A");
 
     // The Assign tab labels the key as set in the Layout tab.
     await page.getByTestId("editor-view-tab-assign").click();
+    // The gallery opens on its one-time intro until the author starts it.
+    const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
+    if (await startButton.isVisible().catch(() => false)) await startButton.click();
     await expect(page.getByTestId("assign-layout-edited-keys")).toContainText(/set in the Layout tab/i);
 
-    // The downloaded source has both rules.
+    // The downloaded source has both rules. Output opens once the Mechanisms step is finished.
+    await driveMechanismsGallery(page, {});
     await navigateToOutput(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
@@ -152,6 +170,7 @@ test.describe("spec 113 Layout tab - US2", () => {
 
     // Reload keeps the edit: the decision persisted with the draft.
     await page.reload();
+    await page.getByRole("button", { name: /^Mechanisms —/ }).click({ timeout: 60_000 });
     await page.getByTestId("editor-view-tabs").waitFor({ state: "visible", timeout: 60_000 });
     await openLayoutTab(page);
     await expect(page.getByTestId("layout-cell-K_Q")).toHaveAttribute("aria-label", /ŋ/, { timeout: 60_000 });
