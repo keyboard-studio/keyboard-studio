@@ -209,21 +209,30 @@ describe("operation parity (gesture → KeyEditOperation → replay)", () => {
     expect(added.pad).toBe(15);
   });
 
-  it("remove {reflow}: key gone, freed width stays as trailing padding (#2360)", () => {
+  it("remove {reflow}: trailing modifier absorbs freed width, no spacer (#2360 follow-up)", () => {
     const ops: PendingKeyEditOperation[] = [
       { address: "phone:default:K_B", kind: "remove", outcome: "reflow" },
     ];
     const out = replay(parityLayout(), ops);
     const row = keyAt(out, "phone", "default", "K_A").row;
-    expect(row.keys.map((k) => k.id)).toEqual(["K_A", "K_C", "T_SPACER"]);
-    const pad = row.keys[2]!;
-    expect(pad.sp).toBe(10);
-    // The removed key carried no explicit geometry, so none is written —
-    // the spacer still holds the default 100/15 at render time, exactly
-    // as the removed key did, so the row keeps its total width and no
-    // remaining key stretches.
-    expect(pad.width).toBeUndefined();
-    expect(pad.pad).toBeUndefined();
+    // K_C opens the "shift" layer, so it is a modifier key under
+    // isTouchModifierKey (PR #2583 follow-up to #2360): the freed width is
+    // absorbed by the trailing modifier instead of being left as a
+    // trailing T_SPACER. This test was written before that follow-up and
+    // still asserted the pre-follow-up spacer — the follow-up updated the
+    // engine reflow tests but not this one, and #2583's PR build never ran
+    // this file, so the stale expectation shipped and failed on main.
+    // The row is the layer maximum, so K_C renders at its declared width.
+    expect(row.keys.map((k) => k.id)).toEqual(["K_A", "K_C"]);
+    const last = row.keys[1]!;
+    // The modifier carries no explicit geometry — the absorption is at
+    // render time (ADR 0002 / FR-012 stretch), not written onto the key.
+    expect(last.width).toBeUndefined();
+    expect(last.pad).toBeUndefined();
+    // Row total drops by the freed 115 (K_B's default 100 + 15).
+    expect(
+      row.keys.reduce((sum, k) => sum + (k.width ?? 100) + (k.pad ?? 15), 0),
+    ).toBe(230);
   });
 
   it("move: direction steps, never no-ops", () => {
