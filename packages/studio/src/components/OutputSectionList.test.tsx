@@ -1,4 +1,4 @@
-// OutputSectionList — Output's "Revise a section" list (spec 094 FR-001, R4).
+// OutputSectionList — Trial's "Revise a section" list (spec 094 FR-001, R4; spec 113).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
@@ -146,13 +146,13 @@ describe("OutputSectionList", () => {
     expect(screen.getByRole("button", { name: "Revise Rules: Kept as it was" })).toBeTruthy();
   });
 
-  it("opens a section with the return-to-Output seam", () => {
+  it("opens a section with the return-to-Trial seam", () => {
     seed([surveyEntry("rules")], ["rules"]);
     render(<OutputSectionList />);
     fireEvent.click(screen.getByRole("button", { name: "Revise a section" }));
     fireEvent.click(screen.getByTestId("output-section-rules"));
 
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "output" } });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "survey", step: "trial" } });
   });
 
   it("states the reason in the live region when the jump is refused", () => {

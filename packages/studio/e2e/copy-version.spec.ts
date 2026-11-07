@@ -33,7 +33,7 @@ import {
   confirmPrefill,
   buildOneCharacterList,
   driveMechanismsGallery,
-  navigateToOutput,
+  navigateToPublish,
   triggerDownload,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
@@ -76,9 +76,9 @@ test.describe("spec 102 US1: a Copy starts at 1.0", () => {
     await confirmPrefill(page);
     await buildOneCharacterList(page, FIXTURE.charToAdd);
     await finishGalleryWork(page);
-    await navigateToOutput(page);
+    await navigateToPublish(page);
 
-    // The Output step: test build 1 sits below a 1.0 publish version.
+    // The Trial step: test build 1 sits below a 1.0 publish version.
     const makeTestBuild = page.getByTestId("make-test-build");
     // Its name is its visible text; the version rides in its description.
     await expect(makeTestBuild).toHaveAccessibleDescription(/version 0\.1\b/, { timeout: 60_000 });

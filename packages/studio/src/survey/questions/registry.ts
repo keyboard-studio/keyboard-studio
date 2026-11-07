@@ -50,6 +50,8 @@ import customCssModule from "./gallery/customCss.ts";
 import helpDocsModule from "./gallery/helpDocs.ts";
 import welcomeHtmModule from "./gallery/welcomeHtm.ts";
 import iconModule from "./gallery/icon.ts";
+import trialModule from "./gallery/trial.ts";
+import publishModule from "./gallery/publish.ts";
 
 import { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS } from "./flowModules.ts";
 export { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS };
@@ -146,6 +148,8 @@ const galleryModuleList: readonly GalleryModule<any>[] = [
   helpDocsModule,
   welcomeHtmModule,
   iconModule,
+  trialModule,
+  publishModule,
 ];
 
 export const galleryModules: readonly QuestionModule[] = galleryModuleList.map(

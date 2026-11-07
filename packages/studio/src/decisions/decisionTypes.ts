@@ -166,7 +166,9 @@ export type DecisionId =
   | "custom-css"
   | "help-docs"
   | "welcome-htm"
-  | "icon";
+  | "icon"
+  | "trial"
+  | "publish";
 
 /**
  * The `caps-handling` decision value (spec 112): how the copied keyboard
@@ -444,4 +446,6 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "help-docs": [],
   "welcome-htm": [],
   "icon": [],
+  "trial": [],
+  "publish": [],
 };

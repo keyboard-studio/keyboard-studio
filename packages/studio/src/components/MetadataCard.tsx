@@ -59,7 +59,7 @@ export function MetadataCard({ kb }: { kb: StartKeyboard }) {
   // spec 080 FR-008: the classification committed to the working copy at base
   // SELECTION (StartResolution.tsx's confirm handler). Guarded against the
   // store's confirmed base — `kb` here can also be a not-yet-confirmed preview
-  // (CompareScreen / PickerPane's "full" variant), and showing a stale
+  // (CompareScreen), and showing a stale
   // classification carried over from a PRIOR confirmed base would misattribute
   // it to whichever keyboard this card currently renders.
   const startDocProfile = useWorkingCopyStore((s) =>

@@ -65,6 +65,24 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "bindManifest", module: "stores/workingCopyStore.ts", callers: ["StudioShell.tsx"] },
   { fn: "useWorkingCopyStore", module: "stores/workingCopyStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
   { fn: "useSurveySessionStore", module: "stores/surveySessionStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
+  {
+    // The decision log the trial driver reads for the test build's cursor
+    // (spec 113) — a store hook like the two above, so it lives in the main
+    // inventory, not the step-proposal inventory: the per-case reset file
+    // imports it too (FR-011's "only stepDrivers import proposals" rule).
+    fn: "useDecisionLogStore",
+    module: "decisions/decisionLogStore.ts",
+    callers: ["components/OutputSectionList.tsx"],
+  },
+  {
+    // The testing store the Trial step driver records a test build into
+    // (spec 113) — a store hook, so it lives in the main inventory, not the
+    // step-proposal inventory: the per-case reset file imports it too
+    // (FR-011's "only stepDrivers import proposals" rule).
+    fn: "useTestingStore",
+    module: "stores/testingStore.ts",
+    callers: ["hooks/usePreviewArtifact.ts"],
+  },
   { fn: "getDecisionSnapshot", module: "stores/decisionStore.ts", callers: ["StudioShell.tsx", "lib/completeStep.ts"] },
   {
     // The start screen's act of recording the track (New = copy, Open =

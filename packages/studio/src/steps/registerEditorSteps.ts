@@ -36,6 +36,8 @@ import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
 import { MissingLettersHost } from "../survey/openWalk/MissingLettersHost.tsx";
 import { UpgradesHost } from "../survey/openWalk/UpgradesHost.tsx";
 import { IconEditor } from "../editors/assignLoop/IconEditor.tsx";
+import { TrialStep } from "../editors/assignLoop/TrialStep.tsx";
+import { PublishStep } from "../editors/assignLoop/PublishStep.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
@@ -425,6 +427,40 @@ export const iconStep: EditorStep = step({
   layout: "full",
   component: IconEditor,
   specRef: ["specs/icon-editor"],
+  persistence: "working-copy",
+});
+
+/**
+ * Trial step (spec 113, #2540): try the keyboard and get it to testers.
+ * Takes over the test-build, tester-report and revise-and-return parts of
+ * spec 094 that used to sit inside the Output screen. Optional — Continue
+ * to Publish is always available; with no test builds the step shows a
+ * nudge, never a gate. On Continue passes `{ buildsAtCompletion }` via
+ * onComplete (recorded in the decision audit; the builds themselves live
+ * in the testingStore slice of the draft envelope).
+ */
+export const trialStep: EditorStep = step({
+  id: "trial",
+  title: "Trial",
+  layout: "full",
+  component: TrialStep,
+  specRef: ["specs/113-trial-and-publish-steps"],
+  persistence: "working-copy",
+});
+
+/**
+ * Publish step (spec 113, #2540): get the finished keyboard out. Takes
+ * over the release checks, final downloads (.kmp / source .zip / LDML)
+ * and the managed GitHub PR that used to sit inside the Output screen.
+ * On Finish passes `{ submitted }` via onComplete (whether the project
+ * was submitted, i.e. testingStore `frozen`, at completion).
+ */
+export const publishStep: EditorStep = step({
+  id: "publish",
+  title: "Publish",
+  layout: "full",
+  component: PublishStep,
+  specRef: ["specs/113-trial-and-publish-steps"],
   persistence: "working-copy",
 });
 

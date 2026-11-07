@@ -62,7 +62,7 @@ vi.mock("./hooks/useWorkingCopyTransform.ts", () => import("./test/studioShellMo
 vi.mock("./lib/confirmRebase.ts", () => import("./test/studioShellMocks/confirmRebase.ts"));
 vi.mock("./lib/buildTouchLayoutJson.ts", () => import("./test/studioShellMocks/buildTouchLayoutJson.ts"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts"));
 

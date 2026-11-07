@@ -218,6 +218,8 @@ exports[`live question modules > gallery/oskLayout.ts > definition contract 1`] 
 
 exports[`live question modules > gallery/physicalLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
+exports[`live question modules > gallery/publish.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
 exports[`live question modules > gallery/punctuationInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/retainedConvenienceChars.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
@@ -227,6 +229,8 @@ exports[`live question modules > gallery/ruleSet.ts > definition contract 1`] = 
 exports[`live question modules > gallery/touchLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/touchSeedSource.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/trial.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/upgrades.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 

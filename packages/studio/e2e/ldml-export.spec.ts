@@ -26,7 +26,7 @@ import {
   confirmPrefill,
   buildOneCharacterList,
   driveMechanismsGallery,
-  navigateToOutput,
+  navigateToPublish,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -69,7 +69,7 @@ test.describe("LDML export E2E", () => {
     await confirmPrefill(page);
     await buildOneCharacterList(page, FIXTURE.charToAdd);
     await finishGalleryWork(page);
-    await navigateToOutput(page);
+    await navigateToPublish(page);
 
     // The LDML panel is its own region with a labelled profile picker; 46 is the default.
     const panel = page.getByTestId("ldml-download-panel");

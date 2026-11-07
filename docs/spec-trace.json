@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-06",
+  "lastUpdated": "2026-11-07",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1216,6 +1216,14 @@
     "specs/icon-editor": {
       "title": "Feature Specification: Icon editor step",
       "hash": "sha256:b00bab60c9122b65",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/113-trial-and-publish-steps": {
+      "title": "Feature Specification: Trial and Publish steps (split of the Output screen)",
+      "hash": "sha256:697628078cf2c793",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

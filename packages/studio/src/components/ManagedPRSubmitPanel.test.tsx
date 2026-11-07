@@ -443,7 +443,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
 
   // spec 034 T014 (FR-008, PP-2/PP-3): when the managed-PR backend is
   // unreachable the panel shows an honest error and NEVER a fake success — the
-  // ZIP path (a separate control in OutputScreen, not gated on the backend)
+  // ZIP path (a separate control in PublishStep, not gated on the backend)
   // stays functional.
   it("T014: backend unreachable → honest error, no success panel (never fakes success)", async () => {
     mockedProject.mockResolvedValueOnce(makeProjectResult());

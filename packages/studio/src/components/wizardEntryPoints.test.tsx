@@ -14,8 +14,8 @@
 //
 // Deliberately at the store/primitive level rather than through the full
 // screens: what each entry point promises is "the wizard is at X when you
-// arrive", and X is the traversal store. Rendering OutputScreen or
-// ProfileScreen to click their buttons would test their layout, not their
+// arrive", and X is the traversal store. Rendering the Trial/Publish banners
+// or ProfileScreen to click their buttons would test their layout, not their
 // promise — the end-to-end version of that is `e2e/tab-roundtrip.spec.ts`.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -90,7 +90,7 @@ describe("entry point 1 — the coverage-blocked banner's 'go finish them now'",
   it("lands on the gallery it names, not on the identity question", async () => {
     seedWalkedSession();
 
-    // What OutputScreen.handleGoToGallery does, in order: set the target step,
+    // What OutputGateBanners' handleGoToGallery does, in order: set the target step,
     // then navigate. The navigate is what remounts the wizard.
     useSurveySessionStore.getState().backToUnfinishedGallery("mechanisms");
     await leaveAndReturn();

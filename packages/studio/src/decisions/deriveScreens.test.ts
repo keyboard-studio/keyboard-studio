@@ -317,6 +317,10 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "html",
       // #2485: the icon editor step walks after Documentation.
       "icon",
+      // spec 113 (#2540): the Trial and Publish steps walk after the icon
+      // step (trial requires icon, publish requires trial).
+      "trial",
+      "publish",
     ]);
   });
 

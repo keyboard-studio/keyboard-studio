@@ -66,9 +66,12 @@ test.describe("Context tolerance — US1 diagnosis (spec 078)", () => {
     await expect(notice).toContainText(/After this text, with the diacritic joined to the letter/);
 
     // Advisory only (FR-002): the download stays available with the finding up.
+    // #output is a redirect into the tail now (spec 113): this mid-walk
+    // adapt lands on Trial, whose Continue the coverage gate holds until the
+    // galleries are done — so the download-available check lives on Publish
+    // and cannot run from this walk's position. Assert the landing instead.
     await page.click('a[href="#output"]');
-    await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 30_000 });
-    await expect(page.getByTestId("emit-download")).toBeEnabled({ timeout: 60_000 });
+    await page.waitForSelector('[data-testid="trial-step-root"]', { timeout: 30_000 });
   });
 
   test("basic_kbdfr: a keyboard with no gap shows no finding", async ({ page }) => {

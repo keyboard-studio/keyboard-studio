@@ -173,7 +173,7 @@ export interface ManagedPRSubmitPanelProps {
    * mechanics edit after the Touch step was completed re-opens touch
    * staleness, and the emitted side-car would ship stale). When true the
    * Submit button is force-disabled regardless of form validity or
-   * `canSubmit`. OutputScreen renders the explanatory banner above this
+   * `canSubmit`. PublishStep renders the explanatory banner above this
    * panel; this panel only needs to explain itself via aria-label.
    */
   outputBlocked?: boolean;
@@ -186,7 +186,7 @@ export interface ManagedPRSubmitPanelProps {
   outputBlockedReason?: string;
   /**
    * Prefill values from the established identity session.
-   * Passed in from OutputScreen which reads the auth hooks; the panel reacts
+   * Passed in from PublishStep which reads the auth hooks; the panel reacts
    * to changes via useEffect so signing in after the panel mounts prefills
    * the still-empty fields.
    */
@@ -196,7 +196,7 @@ export interface ManagedPRSubmitPanelProps {
   };
   /**
    * Lint/criteria results for the auto-generated PR body (#506, spec §12).
-   * Passed in from OutputScreen, which owns the artifact pipeline that
+   * Passed in from PublishStep, which owns the artifact pipeline that
    * resolves them. The panel feeds them to generatePRBody and shows the
    * result as the editable default in the PR-description field. Optional:
    * a caller without results gets the "no lint results" body.
@@ -314,7 +314,7 @@ export function ManagedPRSubmitPanel({
     !ratchetBlocked &&
     submitState.kind !== "submitting";
 
-  // Fallback text for outputBlockedReason — normally the caller (OutputScreen)
+  // Fallback text for outputBlockedReason — normally the caller (PublishStep)
   // always passes a localized reason when outputBlocked is true, but the prop
   // is optional so a caller that never blocks doesn't need to pass one.
   const blockedFallbackReason = t({
