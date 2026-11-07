@@ -61,9 +61,9 @@ describe("manifest per-step preview-pane decision", () => {
   });
 
   it("later pane steps keep a preview pane", () => {
-    // "track" was removed with the track question (#2568); the remaining
-    // later steps still pin the preview pane.
-    for (const id of ["attribution", "project_name", "help"]) {
+    // No "track": the step was removed by #2568; fallback_policy is the
+    // current mid-walk step after the base choice.
+    for (const id of ["fallback_policy", "attribution", "project_name", "help"]) {
       const step = byId(id);
       expect(step, id).toBeDefined();
       expect(shouldShowPreviewPane(step), id).toBe(true);

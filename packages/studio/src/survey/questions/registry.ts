@@ -53,6 +53,19 @@ import iconModule from "./gallery/icon.ts";
 
 import { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS } from "./flowModules.ts";
 export { flowModules, demotedPhaseFModules, PHASE_F_HELPDOCS_QUESTION_IDS };
+
+/**
+ * Retired questions whose answers still map onto live decisions. `track_choice`
+ * asked the authoring track before the track step was removed (#2568); its
+ * answer is the only record of an "adapt" walk in an old draft or decision
+ * record, so it maps onto `authoring-track` instead of orphaning. The registry
+ * is the only question→decision map, so the retired map lives here: the v1
+ * draft migration (lib/draftPersistence.ts) and the decision-record replay
+ * (test/recordToDecisionSet.ts) both resolve through it.
+ */
+export const RETIRED_QUESTION_DECISIONS: Readonly<Record<string, readonly DecisionId[]>> = {
+  track_choice: ["authoring-track"],
+};
 import pb_mark_input_order from "./reserve/pb_mark_input_order.ts";
 
 

@@ -65,7 +65,7 @@ import {
 } from "../decisions/decisionLogStore.ts";
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { questionRegistry, RETIRED_QUESTION_DECISIONS } from "../survey/questions/registry.ts";
 import {
   applyDecisionSnapshot,
   getDecisionSnapshot,
@@ -1283,13 +1283,9 @@ export interface MigrateDraftResult {
  */
 /**
  * Retired questions whose answers still map onto live decisions during v1
- * migration. `track_choice` asked the authoring track before the track
- * step was removed; its answer is the only record of an "adapt" walk in
- * an old draft, so it maps onto `authoring-track` instead of orphaning.
+ * migration — see `RETIRED_QUESTION_DECISIONS` in survey/questions/registry.ts
+ * (the one map, shared with the decision-record replay).
  */
-const RETIRED_QUESTION_DECISIONS: Readonly<Record<string, readonly DecisionId[]>> = {
-  track_choice: ["authoring-track"],
-};
 
 export function migrateDraftEnvelope(raw: unknown): MigrateDraftResult | null {
   if (!isPlainRecord(raw)) return null;

@@ -10,9 +10,8 @@
 // Amendments to the frozen inventory, each a deliberate merged change:
 //   - fallback_policy ADDED (#2549, spec 109): the map gained the identity
 //     entry, so the inventory gains it too.
-//   - track RETIRED (#2568, track_choice removal): no screen holds the
-//     authoring-track decision anymore, so track leaves the inventory and
-//     the map; old track deep links degrade (asserted separately below).
+//   - track RETIRED (#2568, track_choice removal): old track ids map to
+//     choose_base, where the authoring-track decision now lives.
 
 import { describe, it, expect } from "vitest";
 import { LEGACY_STEP_ID_MAP, resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
@@ -68,9 +67,11 @@ function ctxAllWalked(): ResolveContext {
 }
 
 describe("SC-005 inventory — every pre-091 step id resolves to its screen", () => {
-  it("the frozen map covers exactly the 18 inventoried ids", () => {
+  it("the frozen map covers the inventoried ids and the retired track alias", () => {
+    // fallback_policy replaced the removed track id in the current step set;
+    // the legacy track id remains as an alias to choose_base.
     expect(Object.keys(LEGACY_STEP_ID_MAP).sort()).toEqual(
-      [...MAIN_STEP_IDS_AT_18E63AA4].sort(),
+      [...MAIN_STEP_IDS_AT_18E63AA4, "track"].sort(),
     );
   });
 
@@ -146,12 +147,16 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
     }
   });
 
-  it("a pre-091 deep link to the retired track step degrades (track removed #2568)", () => {
-    // The track step is gone, so an old track link cannot resolve to a
-    // screen; it degrades instead of stranding the author.
+  it("a pre-091 deep link to the retired track step resolves to choose_base", () => {
+    // The track step is gone; its authoring-track decision now lives on
+    // choose_base, so old links land on the step that replaced it.
     const ctx = ctxAllWalked();
     const loc: Location = { route: "survey", step: "track" as never };
-    expect(resolveLocation(loc, ctx).kind).toBe("degraded");
+    const result = resolveLocation(loc, ctx);
+    expect(result.kind).toBe("reachable");
+    if (result.kind === "reachable") {
+      expect(result.location.step).toBe("choose_base");
+    }
   });
 
   it("the declared screen gates cover the two gated legacy steps", () => {

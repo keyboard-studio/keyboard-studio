@@ -257,6 +257,7 @@ describe("spec 034 SR-3 — osk advances to touch, never past it", () => {
 
   it("advance(mechanisms) always lands on fallback_policy first (then osk)", () => {
     expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
+    expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
   });
 
   it("touch is reached and advances onward to css (never bypassed)", () => {
@@ -715,6 +716,7 @@ describe("spec 091 T021 — derived screens in the walk", () => {
 
   it("the touch_seed_source screen is walked while unrecorded and skipped once its decision exists", () => {
     expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
+    expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
     const unrecorded = advance("osk", undefined, copyCtx);
     expect(unrecorded.next).toBe("touch_seed_source");
     const recorded = advance("osk", undefined, {
