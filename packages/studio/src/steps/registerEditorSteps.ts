@@ -29,6 +29,7 @@ import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
+import { FallbackPolicyAdapter } from "../editors/adapters/fallbackPolicyAdapter.tsx";
 import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
 import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
 import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
@@ -233,6 +234,20 @@ export const mechanismsStep: EditorStep = step({
   surface: "physical",
   writes: [...ADD_GALLERY_WRITES],
   specRef: ["§8", "specs/007-strategy-selection"],
+  persistence: "working-copy",
+});
+
+/**
+ * Fallback policy step (issue #2539): keys the template keyboard does not define
+ * may fall through to the typist's computer layout or be blocked — asked after
+ * Assign Mechanisms, before the OSK step.
+ */
+export const fallbackPolicyStep: EditorStep = step({
+  id: "fallback_policy",
+  title: "Fallback policy",
+  layout: "full",
+  component: FallbackPolicyAdapter,
+  specRef: ["specs/076-rule-behaviours", "specs/109-base-keyboard-fallback"],
   persistence: "working-copy",
 });
 

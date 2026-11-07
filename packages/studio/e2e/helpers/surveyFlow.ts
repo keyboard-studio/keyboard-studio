@@ -1000,6 +1000,10 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  * characters is never misread as "the gallery already completed".
  */
 export async function driveOskEditor(page: Page): Promise<void> {
+  const fallbackContinue = page.getByTestId("fallback-policy-continue");
+  if (await waitVisible(fallbackContinue, 30_000)) {
+    await fallbackContinue.click();
+  }
   const oskContinue = page.getByTestId("osk-continue");
   if (await waitVisible(oskContinue, 30_000)) {
     await oskContinue.click();

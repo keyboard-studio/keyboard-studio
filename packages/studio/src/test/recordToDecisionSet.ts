@@ -39,7 +39,9 @@ const MARKS_IDS: readonly string[] = [
 const ADDED_AT: Record<DecisionPoint, readonly string[]> = {
   marks: MARKS_IDS,
   carve: ["carved-layout"],
-  assignments: ["deadkeys-defined", "rule-set", "physical-layout"],
+  // `fallback-policy` is absent from records that predate it; the fixture
+  // replays those with DEFAULT_FALLBACK_POLICY.
+  assignments: ["deadkeys-defined", "rule-set", "physical-layout", "fallback-policy"],
   // Absent from records that predate the caps-handling decision; the harness
   // seeds the module default in that case.
   caps: ["caps-handling"],

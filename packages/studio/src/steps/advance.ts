@@ -48,6 +48,7 @@ type ActiveStepId =
   | "invisibles"
   | "convenience"
   | "mechanisms"
+  | "fallback_policy"
   | "osk"
   | "touch_seed_source"
   | "touch"
@@ -351,6 +352,9 @@ function advanceStep(
 
     case "mechanisms":
       return { next: nextMainLineStepAfter("mechanisms", ctx) };
+
+    case "fallback_policy":
+      return { next: nextMainLineStepAfter("fallback_policy", ctx) };
 
     case "osk":
       // Same touch-seed fork as the former post-mechanisms hop (spec 035 R4/R12).

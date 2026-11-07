@@ -247,7 +247,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
   },
   {
     id: "fallback-policy",
-    label: "Keyboard-wide fallback policy (Assign Mechanisms step)",
+    label: "Keyboard-wide fallback policy (Fallback policy step)",
     phase: 3,
     status: "pending",
     storeActions: ["setFallbackPolicy"],
@@ -258,7 +258,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     decisionIds: [],
     evidence: [
       "specs/076-rule-behaviours/fallback-surface-design.md §5: one keyboard-wide setting replaces the per-combination carveDispositions store and the closed-keyboard card",
-      "EDITOR-AUTHORED: written by the fallback-policy section of the Assign Mechanisms step, no decision record",
+      "EDITOR-AUTHORED: written by the Fallback policy manifest step; `fallback-policy` gallery decision recorded on Continue (issue 2539), restored by the decision-point replay (issue 2366)",
     ],
   },
   {

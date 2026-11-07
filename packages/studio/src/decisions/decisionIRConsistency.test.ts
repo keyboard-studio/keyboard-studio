@@ -164,6 +164,7 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   // rule-set left it at T034 (its apply splices additions into
   // groups/stores — decisionIRPaths maps it).
   "physical-layout",
+  "fallback-policy",
   "touch-seed-source",
   "touch-layout",
   "help-docs",

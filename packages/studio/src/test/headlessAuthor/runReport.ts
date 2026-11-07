@@ -17,7 +17,7 @@ export interface RunReportAccumulator {
   setTiming(timing: RunReport["timingMs"]): void;
 }
 
-export function createRunReport(fallbackPolicy: string): RunReportAccumulator {
+export function createRunReport(): RunReportAccumulator {
   const report: RunReport = {
     steps: [],
     placeholders: [],
@@ -25,7 +25,6 @@ export function createRunReport(fallbackPolicy: string): RunReportAccumulator {
     skippedSteps: [],
     knownGaps: [],
     notCovered: [...NOT_COVERED],
-    fallbackPolicy,
     timingMs: { author: 0, replay: 0 },
   };
   return {

@@ -21,7 +21,7 @@ const oskLayout: GalleryModule<OskLayoutValue> = {
   definition,
   provides: ["osk-layout"],
   screen: "osk",
-  requires: ["physical-layout"],
+  requires: ["physical-layout", "fallback-policy"],
   inputs: [],
   writes: [],
   apply: () => ({}),
