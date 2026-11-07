@@ -44,6 +44,7 @@ import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { welcomePagePath } from "./welcomeFolder.ts";
+import { isOpenedWithDescriptor } from "./openMode.ts";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -64,8 +65,10 @@ export type ProjectionState = Pick<
   | "authoredReadmeHtm"
   | "authoredReadmeMd"
   | "authoredHelpPhp"
-> &
-  Partial<Pick<WorkingCopyState, "startWelcomeConvention">> & { startIr: KeyboardIR };
+  | "instantiationMode"
+  | "startVfs"
+  | "startWelcomeConvention"
+> & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
 export interface ProjectionExtras {
@@ -161,7 +164,12 @@ export function projectionInputFromState(
       authoredReadmeMd: state.authoredReadmeMd,
       authoredHelpPhp: state.authoredHelpPhp,
     },
-    welcomePath: welcomePagePath(callSite.openMode !== undefined, state.startWelcomeConvention ?? null),
+    // Open is read from the store, not from `openMode`: the preview passes no
+    // openMode, and the authored welcome page must land at the same path on both.
+    welcomePath: welcomePagePath(
+      isOpenedWithDescriptor(state.instantiationMode, state.startVfs, callSite.keyboardId),
+      state.startWelcomeConvention,
+    ),
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     capsHandling: capsHandling ?? null,

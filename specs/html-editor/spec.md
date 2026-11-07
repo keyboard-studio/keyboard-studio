@@ -245,10 +245,15 @@ touched file over regeneration:
 
 Untouched files keep exactly their current generated/carried behavior at
 all three points. The `welcomeHtm` gallery module becomes a real recorded
-decision: `writes` names the members it records, `apply` stores the
-authored values, and the `UnmigratedGalleryRenderer` is replaced (follow
-the OSK precedent: `lib/oskStepCompletion.ts` + `driftGuard.ts` INVENTORY
-entry + headless-author step driver). The other members' `provides` stay
+decision, recorded step-side on the OSK precedent
+(`lib/htmlStepCompletion.ts` beside `lib/oskStepCompletion.ts`, plus the
+`driftGuard.ts` INVENTORY entry and the headless-author step driver):
+`HtmlEditor` writes the authored values to the working-copy store and
+Continue records the `welcome-htm` decision. The module itself keeps
+`writes: []` and a no-op `apply` — `writes` names IR paths and the doc
+members are VFS files, and `WorkingCopyPatch` has no authored-docs channel
+for an `apply` to store them through. The `UnmigratedGalleryRenderer` is
+replaced. The other members' `provides` stay
 with their owning modules unless the implementer shows they belong here;
 do not invent new decision providers silently.
 
@@ -394,7 +399,7 @@ the partial satisfaction on it when the PR lands.
   read-only HTML preview retained.
 - Per-file seeding per the matrix above; per-file authored overrides in the
   store; override wins at projection, serialization, and preview.
-- `welcomeHtm` becomes a real recorded decision with writes.
+- `welcomeHtm` becomes a real recorded decision (recorded step-side; see above).
 - `.php` body editing with PHP preserved per the decision above.
 - Regression tests: edit survives into the serialized download on BOTH
   tracks (see handoff), PHP byte-identical round-trip, seed-never-blank on

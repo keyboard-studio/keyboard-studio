@@ -582,6 +582,7 @@
   "editor.assignLoop.html.files.absent": "absent",
   "editor.assignLoop.html.files.label": "Fichiers de documentation",
   "editor.assignLoop.html.files.readOnly": "lecture seule",
+  "editor.assignLoop.html.htm.fragmentsUnpreserved": "Le code ou les blocs de style intégrés à cette page ne peuvent pas être conservés exactement ; elle est donc en code seul.",
   "editor.assignLoop.html.member.helpPhp": "Page d'aide en ligne",
   "editor.assignLoop.html.member.historyMd": "Historique des versions",
   "editor.assignLoop.html.member.licenseMd": "Licence",

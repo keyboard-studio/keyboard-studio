@@ -582,6 +582,7 @@
   "editor.assignLoop.html.files.absent": "absent",
   "editor.assignLoop.html.files.label": "Documentation files",
   "editor.assignLoop.html.files.readOnly": "read-only",
+  "editor.assignLoop.html.htm.fragmentsUnpreserved": "This page's embedded code or style blocks cannot be preserved exactly, so it is code-only.",
   "editor.assignLoop.html.member.helpPhp": "Online help page",
   "editor.assignLoop.html.member.historyMd": "Version history",
   "editor.assignLoop.html.member.licenseMd": "License",

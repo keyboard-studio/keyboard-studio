@@ -137,6 +137,17 @@ describe("HtmlEditor", () => {
     expect((await screen.findByTestId("rich-seed")).textContent).toContain("Authored welcome.");
   });
 
+  it("a welcome body that already carries a data-doc-fragment span opens code-only, not in a rich mode that refuses every edit", async () => {
+    seedStore({
+      authoredWelcomeHtm:
+        '<!DOCTYPE html><html><head><title>T</title></head><body><p>Hi</p><span data-doc-fragment="0">x</span></body></html>',
+    });
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect(await screen.findByTestId("code-seed")).toBeTruthy();
+    expect(screen.queryByTestId("rich-seed")).toBeNull();
+    expect(screen.getByText(/cannot be preserved exactly, so it is code-only/)).toBeTruthy();
+  });
+
   it("a read-only history tab shows the carried text with no editor", async () => {
     const startVfs = createVirtualFS();
     startVfs.set("HISTORY.md", "# Version history here", false);

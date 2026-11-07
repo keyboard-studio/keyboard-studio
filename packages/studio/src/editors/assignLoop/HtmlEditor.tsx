@@ -33,7 +33,7 @@
  *   is unchanged for an untouched step.
  */
 
-import { lazy, Suspense, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { lazy, Suspense, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
 import {
   licenseMd,
@@ -148,8 +148,13 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
   // deleted opaque placeholder), restoring the last good text.
   const [generation, setGeneration] = useState(0);
   const [richWarning, setRichWarning] = useState<string | null>(null);
+  // The latest edits for the event handlers (member switch, Continue), which
+  // the footer nav may hold from an earlier render. Synced after commit, not
+  // during render.
   const textsRef = useRef(texts);
-  textsRef.current = texts;
+  useLayoutEffect(() => {
+    textsRef.current = texts;
+  }, [texts]);
 
   const keyboardId = resolveOutputKeyboardId(identity, startKeyboard);
   const isOpen = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId);
@@ -288,11 +293,21 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     return extractOpaqueBlocks(splitHtmlDocument(full).body).body;
   };
 
-  // A file whose PHP cannot round-trip exactly is code-mode-only, with a
-  // visible note — never a silent mangle, never a dropped block.
+  // A file whose PHP or style blocks cannot round-trip exactly is
+  // code-mode-only, with a visible note — never a silent mangle, never a
+  // dropped block. For an .htm page this catches a body that already
+  // carries a `data-doc-fragment` span: it would collide with the
+  // placeholders and every rich edit would be refused.
   const codeOnlyReason = (member: EditableDocMember): string | null => {
-    if (member !== "help-php") return null;
+    if (member === "readme-md") return null;
     const full = currentText(member);
+    if (member !== "help-php") {
+      if (opaqueBlocksRoundTrip(splitHtmlDocument(full).body)) return null;
+      return t({
+        id: "editor.assignLoop.html.htm.fragmentsUnpreserved",
+        message: "This page's embedded code or style blocks cannot be preserved exactly, so it is code-only.",
+      });
+    }
     if (!phpPageRoundTrips(full)) {
       return t({
         id: "editor.assignLoop.html.php.headerUnpreserved",

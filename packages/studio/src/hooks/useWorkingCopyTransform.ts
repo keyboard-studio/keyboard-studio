@@ -239,6 +239,11 @@ export function useWorkingCopyTransform(
   const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
   const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
   const authoredHelpPhp = useWorkingCopyStore((s) => s.authoredHelpPhp);
+  // Where an authored welcome edit lands (welcomePagePath): the flat path
+  // only on an Open walk over a flat-convention base, as in the download.
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
@@ -541,6 +546,9 @@ export function useWorkingCopyTransform(
             authoredReadmeHtm,
             authoredReadmeMd,
             authoredHelpPhp,
+            instantiationMode,
+            startVfs,
+            startWelcomeConvention,
           },
           {
             vfs,
@@ -590,5 +598,8 @@ export function useWorkingCopyTransform(
     authoredReadmeHtm,
     authoredReadmeMd,
     authoredHelpPhp,
+    instantiationMode,
+    startVfs,
+    startWelcomeConvention,
   ]);
 }
