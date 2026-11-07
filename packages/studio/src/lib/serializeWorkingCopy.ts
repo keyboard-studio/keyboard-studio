@@ -62,6 +62,7 @@ import {
   effectiveChartPreference,
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
+import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
 import { isOpenedWithDescriptor } from "./openMode.ts";
 import { applyOutputHygiene } from "./outputHygiene.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
@@ -265,7 +266,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { startVfs, startIr, startKeyboard, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startDocCssTexts, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr } = state;
+  const { startVfs, startIr, startKeyboard, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startDocCssTexts, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp } = state;
 
   // Not-instantiated guard.
   if (startVfs === null || startIr === null || startKeyboard === null) {
@@ -778,6 +779,25 @@ export async function projectWorkingCopyForOutput(
     }
     clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, inheritedHelpPhpText, inheritedWelcomeHtmText), false);
   }
+
+  // 5c-ii. Documentation overrides (specs/html-editor): step 5c runs after
+  // the projectWorkingCopyVfs call, so regeneration above would otherwise
+  // overwrite the author's edits with a fresh render. A touched file's
+  // authored text wins here too — on the Open path as well, where the
+  // carried file is what the override replaces. Untouched files keep the
+  // regenerated/carried text exactly.
+  const authoredDocs: AuthoredDocs = {
+    authoredWelcomeHtm,
+    authoredReadmeHtm,
+    authoredReadmeMd,
+    authoredHelpPhp,
+  };
+  applyAuthoredDocsToVfs(
+    clonedVfs,
+    resolvedKeyboardId,
+    authoredDocs,
+    state.startWelcomeConvention === "flat" ? FLAT_WELCOME_PATH : WELCOME_PAGE_PATH,
+  );
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is

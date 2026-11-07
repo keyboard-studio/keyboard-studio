@@ -120,3 +120,90 @@ describe("serializeWorkingCopy — shipped docs describe the projected keyboard"
     expect(svg).toContain("ŋ");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Documentation-step overrides (specs/html-editor): an edit made on the
+// Documentation step must survive into the serialized download — the defect
+// PR #2481 shipped, where HtmlEditor's { html } landed nowhere. Untouched
+// members keep exactly their generated text.
+// ---------------------------------------------------------------------------
+
+type AuthoredOverride = {
+  authoredWelcomeHtm?: string;
+  authoredReadmeHtm?: string;
+  authoredReadmeMd?: string;
+  authoredHelpPhp?: string;
+};
+
+async function runSerializeWithOverrides(track: "copy" | "adapt", authored: AuthoredOverride) {
+  capturedVfs = null;
+  useWorkingCopyStore.getState().reset();
+  const { ir } = parseKmn(KMN, "test_kb");
+  const vfs = createVirtualFS([
+    { path: "source/test_kb.kmn", content: KMN, isBinary: false },
+    { path: "source/test_kb.kvks", content: KVKS, isBinary: false },
+  ]);
+  const base = makeStartKeyboard({
+    id: "test_kb",
+    path: "release/test/test_kb",
+    script: "Latn",
+    targets: ["windows"],
+    displayName: "Test KB",
+    version: "1.0",
+    sourceUrl: "https://example.invalid/test_kb",
+    languages: ["en"],
+  });
+  if (track === "copy") {
+    useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir });
+  } else {
+    useWorkingCopyStore.getState().instantiateFromExisting(base, { vfs, ir });
+  }
+  useWorkingCopyStore.setState({
+    authoredWelcomeHtm: authored.authoredWelcomeHtm ?? null,
+    authoredReadmeHtm: authored.authoredReadmeHtm ?? null,
+    authoredReadmeMd: authored.authoredReadmeMd ?? null,
+    authoredHelpPhp: authored.authoredHelpPhp ?? null,
+  });
+  const result = await serializeWorkingCopy();
+  expect(result).not.toBeNull();
+  return {
+    welcome: text("source/welcome/welcome.htm"),
+    readme: text("README.md"),
+    readmeHtm: text("source/readme.htm"),
+    help: text("source/help/test_kb.php"),
+  };
+}
+
+describe("serializeWorkingCopy — Documentation step overrides survive into the download", () => {
+  it.each(["copy", "adapt"] as const)(
+    "an authored welcome edit ships on the %s track, untouched members stay generated",
+    async (track) => {
+      const baseline = await runSerializeWithOverrides(track, {});
+      const edited = await runSerializeWithOverrides(track, {
+        authoredWelcomeHtm:
+          "<!DOCTYPE html><html><head><title>Test KB</title></head><body><p>AUTHORED-WELCOME-MARKER</p></body></html>",
+      });
+      expect(edited.welcome).toContain("AUTHORED-WELCOME-MARKER");
+      expect(baseline.welcome).not.toContain("AUTHORED-WELCOME-MARKER");
+      // Untouched members are byte-identical to the generated render.
+      expect(edited.readme).toBe(baseline.readme);
+      expect(edited.readmeHtm).toBe(baseline.readmeHtm);
+      expect(edited.help).toBe(baseline.help);
+    },
+  );
+
+  it("an authored README.md ships on the copy track instead of the regenerated one", async () => {
+    const edited = await runSerializeWithOverrides("copy", {
+      authoredReadmeMd: "# Test KB\n\nAUTHORED-README-MARKER\n",
+    });
+    expect(edited.readme).toContain("AUTHORED-README-MARKER");
+    expect(edited.readme).not.toContain("- Letters:");
+  });
+
+  it("an authored help .php ships on the copy track instead of the regenerated one", async () => {
+    const edited = await runSerializeWithOverrides("copy", {
+      authoredHelpPhp: "<?php $pagename = 'test_kb'; ?>\n<p>AUTHORED-HELP-MARKER</p>\n",
+    });
+    expect(edited.help).toContain("AUTHORED-HELP-MARKER");
+  });
+});

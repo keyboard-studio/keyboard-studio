@@ -393,11 +393,10 @@ export const helpStep: EditorStep = step({
 // ---------------------------------------------------------------------------
 
 /**
- * HTML/Markdown editor step: edits the keyboard's `welcome.htm` documentation
- * file (Markdown despite the extension). This is the full user manual.
- *
- * `readme.htm`, `README.md`, and `.php` versions are generated exports from
- * this source — the output pipeline handles them, not this editor.
+ * HTML/Markdown editor step: edits the keyboard's documentation files
+ * (welcome.htm, readme.htm, README.md, and the help .php — all HTML except
+ * README.md, which is Markdown). This is the full user manual; author edits
+ * override the generated renders downstream (specs/html-editor).
  */
 export const htmlStep: EditorStep = step({
   id: "html",
