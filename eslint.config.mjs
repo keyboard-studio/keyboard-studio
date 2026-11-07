@@ -139,9 +139,9 @@ function galleryWriteBanRule(identifiers) {
 //     correct path; only JSX button elements are flagged.
 //   - A real in-body exception carries an inline
 //     `// eslint-disable-next-line no-restricted-syntax -- <why this is not
-//     step nav>` (MarksTextSamplePrompt's sub-prompt Back/Skip,
-//     DeadkeyDefineForm's "Back to inventory", PrivacyScreen's history-back
-//     link). Same justification style as the jsx-a11y FR-002 disables.
+//     step nav>` (DeadkeyDefineForm's "Back to inventory", PrivacyScreen's
+//     history-back link). Same justification style as the jsx-a11y FR-002
+//     disables.
 //
 // Named export for the fixture test (scripts/step-nav-lint.test.mjs),
 // which runs the same selectors through the Linter API.
