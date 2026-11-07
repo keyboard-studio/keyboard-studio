@@ -360,6 +360,56 @@ next.
 - Live: the editor applies the entry to the working IR through `applyMutatePatch` (the
   deadkey precedent) and records the decision; it never relies on `record` to apply.
 
+### R12 addendum -- how recording interacts with rebuild (T056, settled 2026-11-07)
+
+**Does recording trigger a replay? No.**
+- `useDecisionStore.record` is a plain zustand `set`. Its only subscriber is the draft saver
+  (`lib/draftPersistence.ts`, which just schedules a save). `rebuildWorkingCopyFromStores` is
+  reached only from `completeStep` -> `ReducerDeps.rebuildFromDecisions`, i.e. at a step
+  completion, never at an edit-time `record`. `usePreviewArtifact` does not subscribe to the
+  decision store for rebuilds; the artifact refresh is driven by working-copy changes.
+- So the live path stays: `applyLayoutOp` -> `applyMutatePatch` -> `setWorkingIR`, then `record`.
+  No double apply, no race.
+- **But a later completion rebuilds and installs over the live IR.** `replayFromCheckpoint`
+  resumes from the cached `sessionTrail` checkpoint before the first changed decision. A
+  checkpoint at or after `kmn-edits` in the order was built before the edit and lacks it, so a
+  rebuild resuming there would silently drop Layout edits. Resolution: `kmn-edits` is the LAST
+  decision in the derived order (it is registered after every other module and `requires` the
+  four rule writers), so every rebuild resumes at or before it and re-folds the recorded
+  entries. This is pinned by `derivedEquivalence.test.ts` (asserts `kmn-edits` is last, then
+  rebuilds from the last other decision and keeps the edit). A module registered later than
+  `kmn-edits`, or one that requires it, fails that test; the fix then is to add `kmn-edits` to
+  the `changed` set in `rebuildWorkingCopyFromStores`.
+- **Undo after a rebuild.** The `l`/`lb` undo entry holds the node ids minted in the live IR; a
+  rebuild re-parses and may mint different ids. `undoKmnEdit` checks that every inserted node is
+  still in the entry group and otherwise returns false, writing nothing and keeping the entry on
+  the stack (tested). A known limit; revisit with spec 105 phase 2.
+
+**Ordering. `requires` is used.**
+- `orderByDependencies` only checks that a requirement has a registered provider; it does not
+  need a recorded value. `replayKeyboard` folds only records that exist. So `kmn-edits`
+  `requires: ["carved-layout", "deadkeys-defined", "rule-set", "physical-layout"]` replays after
+  all four without waiting for them to be recorded.
+- `downstreamClosure` puts `kmn-edits` downstream of those four. `recalculate` on an `asked`
+  record whose module has no `validate` keeps it unchanged (scenario 3), so a closure visit
+  neither re-proposes nor drops it.
+
+**Registration.** The module is registered in `questionRegistry` (so `decisionIndex`, replay, and
+`rebuildWorkingCopy` see it) but NOT in `galleryModules` / `decisionModules`: a gallery module
+forms its own wizard screen (`deriveScreens`), and `kmn-edits` is not a wizard step. It is a
+separate `layoutEditModules` list in `survey/questions/registry.ts`; `galleryModuleFor` also
+searches it so the trail label resolves. `galleryModules.coverage.test.ts` is therefore unchanged
+and stays green.
+
+**Re-recording `deadkeys-defined` mid-step (T080).** `record` is inert (above), so a mid-step
+re-record does not mark downstream decisions for re-proposal; only a completion's
+`rebuildFromDecisions(changed)` does, and the Deadkeys step's own completion already records it.
+T080 may record `deadkeys-defined` at each Layout-tab deadkey confirm. `recalculate` keeps an
+`asked` value with no `validate` unchanged, so there is no re-proposal push.
+
+**`LAYOUT_WRITES`.** `applyMutatePatch` treats an array as a leaf, so the patch leaf is `groups`
+itself; the declared path is `irPath("groups")` (the whole array), not `groups[].rules`.
+
 ## R13. Code-tab import (ruling 7, 2026-11-05)
 
 **Finding.**

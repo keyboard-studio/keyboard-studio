@@ -312,3 +312,23 @@ describe("LayoutPane", () => {
     it.todo("T101: reflects a Code-tab Apply after the artifact is republished (needs US8)");
   });
 });
+
+describe("LayoutPane undo (spec 113 US2)", () => {
+  it("offers undo only when the top undo entry is a Layout edit, and undoes it", async () => {
+    load(KMN);
+    publish();
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    await settle();
+    const undo = screen.getByTestId("layout-undo") as HTMLButtonElement;
+    expect(undo.disabled).toBe(true);
+    act(() => {
+      useWorkingCopyStore
+        .getState()
+        .commitKmnEdit({ op: "set-key", vkey: "K_B", layer: [], output: { kind: "text", text: "z" } });
+    });
+    expect((screen.getByTestId("layout-undo") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByTestId("layout-undo"));
+    expect((screen.getByTestId("layout-undo") as HTMLButtonElement).disabled).toBe(true);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([]);
+  });
+});

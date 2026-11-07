@@ -94,6 +94,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import type { FallbackPolicy } from "@keyboard-studio/contracts";
+import type { KmnEditsValue } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
@@ -117,6 +118,7 @@ import {
   applyIdentityToKps,
   applyContextToleranceOverlay,
   applyMarkGuards,
+  replayKmnEdits,
   removedTouchKeyRuleIds,
   TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
@@ -340,6 +342,11 @@ export interface ProjectWorkingCopyVfsInput {
    * `.kmn`, never rewrite the no-edit fast path.
    */
   ruleAdditions?: DerivedRuleAdditions;
+  /**
+   * The Layout tab's `kmn-edits` decision value (spec 113). Replayed at step 2.2, only when it
+   * has entries, so an unedited keyboard keeps a byte-identical artifact.
+   */
+  kmnEdits?: KmnEditsValue;
 }
 
 /** Step 2.6's input: the marks completion payload (buffer-start behaviour is per mark on the worklist, issue #2374). */
@@ -458,6 +465,7 @@ export function projectWorkingCopyVfs(
     marksGuards = null,
     contextToleranceOverlay = null,
     ruleAdditions,
+    kmnEdits,
   } = input;
 
   const warnings: string[] = [];
@@ -961,6 +969,30 @@ export function projectWorkingCopyVfs(
         warnings.push(
           `[project-working-copy] add-gallery mutate-seam derivation skipped: ${msg}`,
         );
+      }
+    }
+  }
+
+  // Step 2.2: Layout-tab edits (spec 113, research R12). Replays the `kmn-edits` log over the
+  // projected .kmn: parse, replayKmnEdits, emit. After the deadkey ops (1.8) and the assignments
+  // (2), so a key-first edit wins over an earlier character-first one on the same key; before
+  // layer propagation (2.5), mark guards (2.6) and context tolerance (2.7), so those see the
+  // edited keyboard (a tolerance batch anchored on a rule an edit removed is skipped there, with
+  // its own warning). Only when the log has entries: the .kmn is re-emitted, so an unedited
+  // keyboard must not pass through it (the step 1.7b precedent).
+  if (kmnEdits !== undefined && kmnEdits.entries.length > 0) {
+    const kmnPathForLayout = `source/${keyboardId}.kmn`;
+    const kmnTextForLayout = readVfsText(vfs, kmnPathForLayout);
+    if (kmnTextForLayout !== undefined) {
+      try {
+        const replayed = replayKmnEdits(parseKmn(kmnTextForLayout, keyboardId).ir, kmnEdits.entries);
+        vfs.set(kmnPathForLayout, emitKmn(replayed.ir), false);
+        warnings.push(
+          ...replayed.misses.map((m) => `[project-working-copy] layout edit ${m.seq} skipped: ${m.reason}`),
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] layout edit projection skipped: ${msg}`);
       }
     }
   }

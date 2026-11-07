@@ -45,13 +45,14 @@
 
 import type {
   KeyboardIR,
+  KmnEdit,
   MechanismAssignment,
 } from "@keyboard-studio/contracts";
 import {
   collectFromElements,
   contextHasDirectBackspace,
 } from "@keyboard-studio/contracts";
-import { parseKeySpec } from "@keyboard-studio/engine";
+import { normaliseKmnEdits, parseKeySpec } from "@keyboard-studio/engine";
 import { isAlwaysKeepCategory } from "../lib/irToCarveNodes.ts";
 
 // ---------------------------------------------------------------------------
@@ -101,10 +102,18 @@ function isDeadkeyOnlyOutput(output: readonly { kind: string }[]): boolean {
  * @param ir           The working IR (carve state), or null before the
  *                     working copy exists — the session overlay still runs.
  * @param assignments  This session's physical MechanismAssignments.
+ * @param kmnEdits     The Layout tab edit log (spec 113), overlaid LAST: the projection replays
+ *                     it after the assignments (step 2.2), so an edit wins over an assignment on
+ *                     the same slot. A set-key of one grapheme names the slot occupant; any other
+ *                     output (a deadkey, several glyphs, nothing) leaves the slot with no single
+ *                     named glyph, so it is dropped from the ledger. The live working IR already
+ *                     carries applied edits; this overlay serves callers holding an IR that does
+ *                     not (the starting point, a rebuild).
  */
 export function buildSlotOccupancy(
   ir: KeyboardIR | null,
   assignments: readonly MechanismAssignment[],
+  kmnEdits: readonly KmnEdit[] = [],
 ): Map<string, SlotOccupant> {
   const occupancy = new Map<string, SlotOccupant>();
 
@@ -148,6 +157,17 @@ export function buildSlotOccupancy(
         occupancy.set(entry.key, { char: entry.char, source: "session" });
       }
       // S-02 / S-03: not slot occupants (see module doc).
+    }
+  }
+
+  for (const entry of normaliseKmnEdits(kmnEdits)) {
+    if (entry.op !== "set-key") continue;
+    const key = slotKeyFor(entry.vkey, entry.layer);
+    const glyph = entry.output.kind === "text" ? entry.output.text.normalize("NFC") : null;
+    if (glyph !== null && [...graphemes.segment(glyph)].length === 1) {
+      occupancy.set(key, { char: glyph, source: "session" });
+    } else {
+      occupancy.delete(key);
     }
   }
 

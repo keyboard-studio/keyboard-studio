@@ -67,6 +67,7 @@ import {
 } from "react";
 import type { I18n } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { LayoutEditedKeys } from "./LayoutEditedKeys.tsx";
 import { msg, plural } from "@lingui/core/macro";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { useShallow } from "zustand/react/shallow";
@@ -4374,6 +4375,9 @@ export function MechanismGallery({
             </div>
           </>
         )}
+
+        {/* Keys the Layout tab set key-first (spec 113): not assignments, so labelled here. */}
+        <LayoutEditedKeys />
 
         {/* Added chip row — characters already configured, removable */}
         {coveredChars.size > 0 && (

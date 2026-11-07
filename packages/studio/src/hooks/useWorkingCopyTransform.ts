@@ -77,7 +77,7 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
-import { marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
+import { marksGuardsFromValue, projectionInputFromState, selectKmnEdits } from "../lib/projectionInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -290,6 +290,10 @@ export function useWorkingCopyTransform(
   const marksTreatment = useDecisionStore(
     (s) => s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined,
   );
+  // spec 113: the Layout tab's edit log. Every confirmed edit and undo re-records it, so the
+  // projection closure rebuilds (and the one compile cycle re-runs) when it changes.
+  const kmnEdits = useDecisionStore((s) => selectKmnEdits(s.decisions));
+  const kmnEditsKey = useMemo(() => JSON.stringify(kmnEdits?.entries ?? []), [kmnEdits]);
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
     [marksTreatment],
@@ -522,6 +526,7 @@ export function useWorkingCopyTransform(
             getPattern: (id) => patternMap?.get(id),
             identity: identityArg,
             marksTreatment,
+            kmnEdits,
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
@@ -555,5 +560,6 @@ export function useWorkingCopyTransform(
     deadkeyOpsKey,
     storeContextToleranceOverlay,
     marksGuardsKey,
+    kmnEditsKey,
   ]);
 }

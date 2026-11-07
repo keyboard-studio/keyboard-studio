@@ -144,6 +144,24 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     ],
   },
   {
+    id: "kmn-edits",
+    label: "Layout-tab key edits (replayable edit log)",
+    // Born derived (spec 113): the edit list is the decision itself, never a store slice,
+    // so there is no pending gap to close; phase 0 as survey-decision-replay.
+    phase: 0,
+    status: "equivalence-proven",
+    storeActions: ["commitKmnEdit", "undoKmnEdit"],
+    // No field of its own: the live IR half goes through setWorkingIR's `ir` (claimed by the
+    // deadkeys surface); the undo entries ride the shared undoStack (claimed by carve).
+    fields: [],
+    decisionIds: ["kmn-edits"],
+    evidence: [
+      "specs/113-layout-studio/research.md R12: each confirmed Layout-tab edit is recorded at edit time as the kmn-edits decision; its apply() replays the entries through replayKmnEdits",
+      "Gate arm C (derivedEquivalence.test.ts): a rebuild from decisions reproduces the entry group's rules after Layout edits, and a later completion's rebuild keeps them",
+      "Gate arm D (derivedEquivalence.test.ts): the kmn-edits value reloads from the draft envelope",
+    ],
+  },
+  {
     id: "carve",
     label: "Carve editor overlay",
     phase: 3,
@@ -453,6 +471,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   commitKeyEditBatch: { kind: "action", class: "EDITOR-AUTHORED" },
   undoKeyEditBatch: { kind: "action", class: "EDITOR-AUTHORED" },
   commitDeadkeyOp: { kind: "action", class: "EDITOR-AUTHORED" },
+  commitKmnEdit: { kind: "action", class: "EDITOR-AUTHORED" },
+  undoKmnEdit: { kind: "action", class: "EDITOR-AUTHORED" },
   commitTouchKeyRename: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchEditorMode: { kind: "action", class: "EPHEMERAL" },
   flagCharForSequence: { kind: "action", class: "SURVEY-SLOT" },

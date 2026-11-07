@@ -42,7 +42,7 @@
 // edit / <2 s resume) are recorded there as PROPOSED, pending Matthew's
 // ruling — this harness asserts nothing about them.
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { cpus, platform, release } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,6 +78,12 @@ const KB = { id: "sil_euro_latin", group: "sil", script: "Latn" } as const;
  *  for T021 so the before/after comparison is like-for-like. */
 const RUNS = 15;
 const WARMUPS = 3;
+
+/** Spec 113 T063: when set (e.g. KMN_EDITS_COUNT=20), the decision set also carries that many
+ *  `kmn-edits` entries (set-key on distinct keys), so the same two scenarios measure replay
+ *  with the Layout tab's log. Unset or 0 reproduces the 093 baseline setup exactly. */
+const KMN_EDITS_COUNT = Number(process.env["KMN_EDITS_COUNT"] ?? "0");
+const EDIT_VKEYS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((c) => `K_${c}`);
 
 /** The package's files as the base browser would hand them over — mirrors
  *  src/test/sc004Harness.ts loadVfs (whole package, shared/ staging, header
@@ -198,8 +204,16 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
       }
       // ---------------- setup (untimed) ----------------
       const vfs = loadVfs();
-      const kmnText = readVfsText(vfs, `source/${KB.id}.kmn`);
+      let kmnText = readVfsText(vfs, `source/${KB.id}.kmn`);
       if (kmnText === undefined) throw new Error("fixture .kmn present in VFS");
+      // sil_euro_latin is mnemonic, which the Layout tab refuses to edit (spec 113 FR-018), so a
+      // kmn-edits replay on it throws. KMN_EDITS_STRIP_MNEMONIC=1 drops the mnemonic store from
+      // the source for the whole run (set it for BOTH the baseline and the with-edits run so the
+      // comparison is like for like).
+      if (process.env["KMN_EDITS_STRIP_MNEMONIC"] === "1") {
+        kmnText = kmnText.replace(/^.*&mnemoniclayout.*$/gim, "");
+        vfs.set(`source/${KB.id}.kmn`, kmnText, false);
+      }
       const { ir } = parseKmn(kmnText, KB.id);
       const base = makeStartKeyboard({
         id: KB.id,
@@ -232,7 +246,7 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
       if (!extractedInventory) {
         throw new Error("character inventory extraction empty");
       }
-      const decisions: DecisionSet = {
+      const baseDecisions: DecisionSet = {
         ...flowDecisions,
         "character-inventory": {
           id: "character-inventory" as DecisionId,
@@ -240,6 +254,23 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
           provenance: "extracted",
           source: KB.id,
         },
+      };
+      const decisions: DecisionSet = KMN_EDITS_COUNT <= 0 ? baseDecisions : {
+        ...baseDecisions,
+        "kmn-edits": {
+          id: "kmn-edits" as DecisionId,
+          value: {
+            entries: Array.from({ length: KMN_EDITS_COUNT }, (_, i) => ({
+              seq: i + 1,
+              at: 0,
+              op: "set-key",
+              vkey: EDIT_VKEYS[i % EDIT_VKEYS.length]!,
+              layer: i < EDIT_VKEYS.length ? [] : ["SHIFT"],
+              output: { kind: "text", text: String.fromCodePoint(0x0250 + i) },
+            })),
+          },
+          provenance: "asked",
+        } as Decision,
       };
       const recordedIds = Object.keys(decisions) as DecisionId[];
       expect(recordedIds.length).toBeGreaterThan(0);
@@ -325,6 +356,7 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
         irGroups: ir.groups.length,
         projectedKmnChars: setupKmnLength,
         decisionCount: recordedIds.length,
+        kmnEditsEntries: KMN_EDITS_COUNT,
         warmups: WARMUPS,
         conditions: {
           node: process.version,
@@ -337,6 +369,10 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
         edit: summarise(editSeries),
         resume: summarise(resumeSeries),
       };
+      // The suite's console setup can swallow the log below; REBUILD_PERF_OUT names a file to
+      // receive the same JSON.
+      const outFile = process.env["REBUILD_PERF_OUT"];
+      if (outFile !== undefined) writeFileSync(outFile, JSON.stringify(report, null, 2));
       // eslint-disable-next-line no-console -- a measurement harness's
       // console output IS its product: the JSON report transcribed into
       // specs/093-derived-keyboard/perf-baseline.md.

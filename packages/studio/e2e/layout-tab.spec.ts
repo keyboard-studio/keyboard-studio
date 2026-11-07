@@ -23,7 +23,11 @@ import {
   buildOneCharacterList,
   driveDeadkeysStep,
   seedReturningVisitor,
+  navigateToOutput,
+  triggerDownload,
 } from "./helpers/surveyFlow";
+import { unzipSync } from "fflate";
+import * as fs from "node:fs";
 
 /** Walk identity -> copy a starting keyboard -> carve -> deadkeys -> rules, landing on the Mechanical Gallery. */
 async function reachMechanicalGallery(
@@ -103,5 +107,60 @@ test.describe("spec 113 Layout tab - US1", () => {
     expect(lineBox).not.toBeNull();
     expect(selBox).not.toBeNull();
     expect(Math.abs(selBox!.y - lineBox!.y), "selection is on the any(Input) rule line").toBeLessThan(lineBox!.height / 2);
+  });
+});
+
+test.describe("spec 113 Layout tab - US2", () => {
+  test.setTimeout(600_000);
+
+  test("assign eng and accept its capital in one confirm; both tabs, the download, undo and reload agree", async ({ page }) => {
+    await reachMechanicalGallery(page, "basic_kbdus", "en", "é");
+    await openLayoutTab(page);
+
+    // Interaction 1: select the key. Interaction 2: enter the text. Interaction 3: confirm.
+    await page.getByTestId("layout-cell-K_Q").click();
+    await page.getByTestId("key-edit-text").fill("ŋ");
+    await expect(page.getByTestId("key-edit-preview")).toContainText("ŋ");
+    // The case partner (the capital on Shift) is proposed and accepted by default.
+    await expect(page.getByTestId("key-edit-partner")).toContainText("Ŋ");
+    // The default also keeps the displaced "q" on AltGr: one confirm, still one undo.
+    await page.getByTestId("key-edit-confirm").click();
+
+    // The Layout tab shows both once the keyboard recompiles (one validation cycle).
+    await expect(page.getByTestId("layout-cell-K_Q")).toHaveAttribute("aria-label", /ŋ/, { timeout: 60_000 });
+
+    // The Code tab shows both rules.
+    await page.getByTestId("editor-view-tab-code").click();
+    await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
+    const code = page.locator(".monaco-editor");
+    await expect(code).toContainText("U+014B", { timeout: 60_000 });
+    await expect(code).toContainText("U+014A");
+
+    // The Assign tab labels the key as set in the Layout tab.
+    await page.getByTestId("editor-view-tab-assign").click();
+    await expect(page.getByTestId("assign-layout-edited-keys")).toContainText(/set in the Layout tab/i);
+
+    // The downloaded source has both rules.
+    await navigateToOutput(page);
+    const download = await triggerDownload(page);
+    const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
+    const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "the download carries a .kmn").toBeDefined();
+    const kmnText = new TextDecoder().decode(kmn![1]);
+    expect(kmnText).toContain("U+014B");
+    expect(kmnText).toContain("U+014A");
+
+    // Reload keeps the edit: the decision persisted with the draft.
+    await page.reload();
+    await page.getByTestId("editor-view-tabs").waitFor({ state: "visible", timeout: 60_000 });
+    await openLayoutTab(page);
+    await expect(page.getByTestId("layout-cell-K_Q")).toHaveAttribute("aria-label", /ŋ/, { timeout: 60_000 });
+
+    // One undo removes both rules.
+    await page.getByTestId("layout-undo").click();
+    await expect(page.getByTestId("layout-cell-K_Q")).not.toHaveAttribute("aria-label", /ŋ/, { timeout: 60_000 });
+    await page.getByTestId("layout-cell-K_Q").click();
+    await page.getByTestId("layout-undo").waitFor();
+    await expect(page.getByTestId("layout-undo")).toBeDisabled();
   });
 });

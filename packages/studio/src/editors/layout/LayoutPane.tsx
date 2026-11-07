@@ -26,6 +26,7 @@ import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
 import { AddLayerDialog } from "./AddLayerDialog.tsx";
 import { DesktopKeyGrid } from "./DesktopKeyGrid.tsx";
 import { KeyDetailPanel } from "./KeyDetailPanel.tsx";
+import { KeyEditPanel } from "./KeyEditPanel.tsx";
 import { DEFAULT_LAYER_KEY, isUnsavedLayer, layerKey, listAvailableLayers } from "./layerList.ts";
 import { DESKTOP_VKEYS, useLayoutAttribution } from "./useLayoutAttribution.ts";
 import { useLayoutCopy } from "./useLayoutCopy.ts";
@@ -42,6 +43,12 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
   const bases = usePickedWindowsLayouts();
+  // The top undo entry is a Layout edit: undo is offered here (the shared stack also holds the
+  // carve and touch entries, which their own tabs undo).
+  const canUndoEdit = useWorkingCopyStore((st) => {
+    const top = st.undoStack[st.undoStack.length - 1];
+    return top !== undefined && (top.k === "l" || top.k === "lb");
+  });
 
   const [addedLayers, setAddedLayers] = useState<readonly LayerCombo[]>([]);
   const [layerId, setLayerId] = useState<string>(DEFAULT_LAYER_KEY);
@@ -257,6 +264,16 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         >
           {t({ id: "editor.layout.pane.addLayer", message: "Add layer" })}
         </button>
+        <button
+          type="button"
+          onClick={() => useWorkingCopyStore.getState().undoKmnEdit()}
+          disabled={!canUndoEdit}
+          data-testid="layout-undo"
+          className="ks-focus-ring ks-hit-target ks-press"
+          style={addButtonStyle}
+        >
+          {t({ id: "editor.layout.pane.undo", message: "Undo last change" })}
+        </button>
       </div>
 
       {unsaved && (
@@ -279,7 +296,15 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         })}
       />
 
-      <KeyDetailPanel cell={selected} onViewInCode={onViewInCode} />
+      <KeyDetailPanel
+        cell={selected}
+        onViewInCode={onViewInCode}
+        editSlot={
+          selected !== null && selected.editable ? (
+            <KeyEditPanel key={`${selected.vkey}|${layerId}`} cell={selected} onViewInCode={onViewInCode} />
+          ) : undefined
+        }
+      />
 
       <AddLayerDialog
         open={addOpen}

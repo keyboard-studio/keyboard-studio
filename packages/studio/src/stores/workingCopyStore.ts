@@ -47,13 +47,20 @@ import type {
   DocFixProposals,
   StartDocumentationProfile,
   RepairProposal,
+  KmnEdit,
+  KmnEditsValue,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
   deriveRemapPosture,
   renameTouchKey,
   deriveFacets,
+  attributeLayer,
+  applyLayoutOp,
+  clearKeyLive,
+  invertEffect,
 } from "@keyboard-studio/engine";
+import type { KmnEditEffect } from "@keyboard-studio/engine";
 import type {
   ContextToleranceOverlay,
   KeyEditOperation,
@@ -80,6 +87,9 @@ import {
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { useDecisionStore } from "./decisionStore.ts";
+import { useRulesDemoArtifactStore } from "./rulesDemoArtifactStore.ts";
+import { applyMutatePatch } from "../steps/mutateApply.ts";
+import { LAYOUT_WRITES } from "../steps/editorMutate.ts";
 import {
   emptyCharacterInventoryValue,
   emptyInventoryDecisionValue,
@@ -227,7 +237,24 @@ export type UndoEntry =
   | { k: "t"; id: string }
   | { k: "batch"; nodeIds: string[]; itemIds: string[]; chars: string[] }
   | { k: "k"; seq: number }
-  | { k: "kb"; seqs: number[] };
+  | { k: "kb"; seqs: number[] }
+  // Spec 113: one Layout-tab edit (`l`) or one edit plus its accepted case partner (`lb`). The
+  // effect is what the edit did to the live IR, so undo is a local inverse, never a rebuild.
+  | { k: "l"; seq: number; effect: KmnEditEffect }
+  | { k: "lb"; seqs: number[]; effects: KmnEditEffect[] };
+
+/** A Layout-tab edit as the caller states it; the store assigns `seq` and `at` at commit. */
+export type KmnEditInput = DistributiveOmit<KmnEdit, "seq" | "at">;
+
+/** Why `commitKmnEdit` wrote nothing (FR-025). */
+export type KmnEditRefusal =
+  | "no-working-copy"
+  | "locked"
+  | "not-compiled"
+  | "read-only"
+  | "refused";
+
+export type CommitKmnEditResult = { ok: true; seqs: number[] } | { ok: false; reason: KmnEditRefusal };
 
 // ---------------------------------------------------------------------------
 // Key edit overlay (spec 063) — the ordered op log for the touch key grid,
@@ -1189,6 +1216,27 @@ export interface WorkingCopyState {
    */
   commitDeadkeyOp: (op: DeadkeyOperation) => void;
   /**
+   * Commit a Layout-tab edit (spec 113, research R12): applies `op` (and the accepted case
+   * `partner`, same confirm) to the live IR through `applyMutatePatch` / `LAYOUT_WRITES`, then
+   * records the `kmn-edits` decision with the entries appended (provenance `asked`) and pushes
+   * one undo entry (`l`, or `lb` with a partner). Recording does not rebuild (R12); the live IR
+   * is the source of truth until a completion rebuild re-folds the recorded entries.
+   *
+   * Refused, writing nothing, when there is no working copy, the step is locked, the artifact
+   * is not compiled, the target cell is read-only, or the engine refuses the op (FR-025).
+   */
+  commitKmnEdit: (
+    op: KmnEditInput,
+    options?: { partner?: KmnEditInput; extra?: readonly KmnEditInput[] },
+  ) => CommitKmnEditResult;
+  /**
+   * Undo the most recent Layout-tab edit (an `l` or `lb` entry): records `kmn-edits` without
+   * its entries and restores the live IR from the held effects. Returns false, writing nothing,
+   * when the top undo entry is not a Layout edit or its inserted rules are no longer in the IR
+   * (a rebuild re-minted them).
+   */
+  undoKmnEdit: () => boolean;
+  /**
    * The complete key-rename reference fix-up (spec 063 T091;
    * key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). ONE
    * call:
@@ -1817,6 +1865,8 @@ export type WorkingCopyData = Omit<
   | "commitKeyEditBatch"
   | "undoKeyEditBatch"
   | "commitDeadkeyOp"
+  | "commitKmnEdit"
+  | "undoKmnEdit"
   | "commitTouchKeyRename"
   | "setTouchEditorMode"
 >;
@@ -1899,6 +1949,106 @@ const INITIAL_STATE: WorkingCopyData = {
 // Store
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Layout-tab edits (spec 113, research R12): commitKmnEdit / undoKmnEdit
+// ---------------------------------------------------------------------------
+
+type StoreGet = () => WorkingCopyState;
+type StoreSet = (
+  partial: Partial<WorkingCopyState> | ((s: WorkingCopyState) => Partial<WorkingCopyState>),
+) => void;
+
+function recordedKmnEdits(): KmnEdit[] {
+  const value = useDecisionStore.getState().decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
+  return value?.entries ?? [];
+}
+
+function recordKmnEdits(entries: KmnEdit[]): void {
+  useDecisionStore.getState().record({
+    id: "kmn-edits",
+    value: { entries } satisfies KmnEditsValue,
+    provenance: "asked",
+  });
+}
+
+/** True when the static attribution says the target slot cannot be edited (FR-025). */
+function slotIsReadOnly(ir: KeyboardIR, entry: KmnEdit): boolean {
+  if (entry.op !== "set-key" && entry.op !== "clear-key") return false;
+  const cell = attributeLayer(ir, entry.layer, [entry.vkey])[0];
+  if (cell === undefined || cell.frame) return true;
+  return cell.plain !== null && !cell.plain.editable;
+}
+
+function commitKmnEditImpl(
+  get: StoreGet,
+  set: StoreSet,
+  op: KmnEditInput,
+  options: { partner?: KmnEditInput; extra?: readonly KmnEditInput[] } | undefined,
+): CommitKmnEditResult {
+  const s = get();
+  if (s.ir === null || s.startIr === null) return { ok: false, reason: "no-working-copy" };
+  if (s.desktopLocked) return { ok: false, reason: "locked" };
+  if (useRulesDemoArtifactStore.getState().artifact.status !== "ready") {
+    return { ok: false, reason: "not-compiled" };
+  }
+
+  const earlier = recordedKmnEdits();
+  let seq = earlier.reduce((max, e) => Math.max(max, e.seq), 0);
+  const at = Date.now();
+  const inputs = [op, ...(options?.partner === undefined ? [] : [options.partner]), ...(options?.extra ?? [])];
+  const added: KmnEdit[] = [];
+  const effects: KmnEditEffect[] = [];
+  let ir = s.ir;
+  for (const input of inputs) {
+    const entry = { ...input, seq: ++seq, at } as KmnEdit;
+    if (slotIsReadOnly(ir, entry)) return { ok: false, reason: "read-only" };
+    try {
+      const result =
+        entry.op === "clear-key"
+          ? clearKeyLive(ir, entry, s.startIr, [...earlier, ...added])
+          : applyLayoutOp(ir, entry);
+      ir = applyMutatePatch(ir, { groups: result.ir.groups }, LAYOUT_WRITES);
+      effects.push(result.effect);
+    } catch {
+      return { ok: false, reason: "refused" };
+    }
+    added.push(entry);
+  }
+
+  const seqs = added.map((e) => e.seq);
+  const undoEntry: UndoEntry =
+    added.length === 1 && effects[0] !== undefined
+      ? { k: "l", seq: seqs[0]!, effect: effects[0] }
+      : { k: "lb", seqs, effects };
+  set((cur) => ({ ir, undoStack: [...cur.undoStack, undoEntry] }));
+  recordKmnEdits([...earlier, ...added]);
+  return { ok: true, seqs };
+}
+
+function undoKmnEditImpl(get: StoreGet, set: StoreSet): boolean {
+  const s = get();
+  const top = s.undoStack[s.undoStack.length - 1];
+  if (top === undefined || (top.k !== "l" && top.k !== "lb") || s.ir === null) return false;
+  const effects = top.k === "l" ? [top.effect] : top.effects;
+  const seqs = top.k === "l" ? [top.seq] : top.seqs;
+
+  // A rebuild re-mints node ids; refuse rather than invert against the wrong rules.
+  for (const effect of effects) {
+    if (effect.groupNodeId === "") continue;
+    const group = s.ir.groups.find((g) => g.nodeId === effect.groupNodeId);
+    if (group === undefined) return false;
+    const present = new Set(group.rules.map((r) => r.nodeId));
+    if (!effect.inserted.every((id) => present.has(id))) return false;
+  }
+
+  let ir = s.ir;
+  for (const effect of [...effects].reverse()) ir = invertEffect(ir, effect);
+  ir = applyMutatePatch(s.ir, { groups: ir.groups }, LAYOUT_WRITES);
+  set((cur) => ({ ir, undoStack: cur.undoStack.slice(0, -1) }));
+  recordKmnEdits(recordedKmnEdits().filter((e) => !seqs.includes(e.seq)));
+  return true;
+}
+
 export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   ...INITIAL_STATE,
 
@@ -1954,7 +2104,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return { disabledFamilyIds: next };
     }),
 
-  undoDelete: () =>
+  undoDelete: () => {
+    // A Layout-tab edit (spec 113) is undone through its own action: it also records the
+    // `kmn-edits` decision without the entry, which this store's set() cannot do.
+    const top = get().undoStack[get().undoStack.length - 1];
+    if (top !== undefined && (top.k === "l" || top.k === "lb")) {
+      get().undoKmnEdit();
+      return;
+    }
     set((s) => {
       if (s.undoStack.length === 0) return s;
       const last = s.undoStack[s.undoStack.length - 1]!;
@@ -2005,6 +2162,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -n) },
           undoStack: s.undoStack.slice(0, -1),
         };
+      } else if (last.k === "l" || last.k === "lb") {
+        // Handled by undoKmnEdit above; unreachable through this action.
+        return s;
       } else {
         // Batch entry: reverse all node AND item deletions in this cascade atomically.
         const nextNodes = new Set(s.deletedNodeIds);
@@ -2039,7 +2199,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           ),
         };
       }
-    }),
+    });
+  },
+
+  commitKmnEdit: (op, options) => commitKmnEditImpl(get, set, op, options),
+
+  undoKmnEdit: () => undoKmnEditImpl(get, set),
 
   restoreNode: (nodeId) =>
     set((s) => {

@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Layout tab — a visual desktop-layout editor that never shows what it can't produce",
   "branch": "km/113-layout-studio",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -32,6 +32,327 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-05T17:47:54.617Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-07T17:00:00.931Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:25.749Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.027Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.292Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.561Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.830Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.098Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.364Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.632Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.901Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.173Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.436Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.704Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.977Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:29.250Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:29.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:29.783Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.051Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.317Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.586Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.861Z"
     }
-  ]
+  ],
+  "unattended": true,
+  "currentTask": "T069",
+  "task_summaries": {
+    "T049": {
+      "status": "DONE",
+      "did": "kmnEdits module test: replay, compose from decisions, empty list, registration",
+      "files": [
+        "packages/studio/src/survey/questions/gallery/kmnEdits.test.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "commitKmnEdit/undoKmnEdit store tests incl. refusals and undo after re-mint",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.kmnEdits.test.ts"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "projection step 2.2 tests: no-entry byte parity, set-key, after deadkeys/assignments, tolerance skip (2.5 ordering not separately tested)",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.kmnEdits.test.ts"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "case partner tests",
+      "files": [
+        "packages/studio/src/editors/layout/casePartner.test.ts"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "key-first displacement tests",
+      "files": [
+        "packages/studio/src/editors/layout/keyFirstDisplacement.test.ts"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "KeyEditPanel tests",
+      "files": [
+        "packages/studio/src/editors/layout/KeyEditPanel.test.tsx"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "SC-004 one-spine static guard with planted-violation self-test",
+      "files": [
+        "packages/studio/src/editors/layout/oneSpine.test.ts"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "settled recording-vs-rebuild and ordering; recorded in research R12",
+      "files": [
+        "specs/113-layout-studio/research.md"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "added kmn-edits DecisionId and IR paths",
+      "files": [
+        "packages/studio/src/decisions/decisionTypes.ts"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "kmn-edits module and trail renderer, registered in layoutEditModules (not a wizard step)",
+      "files": [
+        "packages/studio/src/survey/questions/gallery/kmnEdits.ts",
+        "packages/studio/src/survey/questions/gallery/KmnEditsRenderer.tsx",
+        "packages/studio/src/survey/questions/registry.ts"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "LAYOUT_WRITES",
+      "files": [
+        "packages/studio/src/steps/editorMutate.ts"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "commitKmnEdit/undoKmnEdit and undo kinds l/lb",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "derived surface kmn-edits equivalence-proven with replay and draft arms",
+      "files": [
+        "packages/studio/src/decisions/derivedSurfaceRegistry.ts",
+        "packages/studio/src/decisions/derivedEquivalence.test.ts"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "projection input and step 2.2",
+      "files": [
+        "packages/studio/src/lib/projectionInput.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/hooks/useWorkingCopyTransform.ts"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "casePartner",
+      "files": [
+        "packages/studio/src/editors/layout/casePartner.ts"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "keyFirstDisplacement and ledger kmn-edits overlay",
+      "files": [
+        "packages/studio/src/editors/layout/keyFirstDisplacement.ts",
+        "packages/studio/src/survey/slotOccupancy.ts"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "KeyEditPanel wired into LayoutPane, plus undo button",
+      "files": [
+        "packages/studio/src/editors/layout/KeyEditPanel.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "LayoutEditedKeys label mounted in MechanismGallery",
+      "files": [
+        "packages/studio/src/editors/assignLoop/LayoutEditedKeys.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.layoutEdits.test.tsx"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "SC-003 round trip test",
+      "files": [
+        "packages/studio/src/editors/layout/roundTrip.test.ts"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "i18n extract, French, catalog lint",
+      "files": [
+        "packages/studio/src/locales/fr/messages.json",
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    }
+  }
 }

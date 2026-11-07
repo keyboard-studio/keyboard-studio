@@ -158,7 +158,10 @@ export type DecisionId =
   | "touch-layout"
   | "custom-css"
   | "help-docs"
-  | "welcome-htm";
+  | "welcome-htm"
+  // Spec 113: the Layout tab's replayable edit log. Recorded at each confirm (edit time),
+  // not at a step completion; registered outside the wizard's gallery modules.
+  | "kmn-edits";
 
 /**
  * Where a decision's value came from.
@@ -415,4 +418,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "custom-css": [],
   "help-docs": [],
   "welcome-htm": [],
+  // spec 113: the module's apply replays the Layout-tab edit log over the groups array
+  // (LAYOUT_WRITES; an array is one patch leaf, so the declared path is the whole array).
+  "kmn-edits": [["groups"]],
 };

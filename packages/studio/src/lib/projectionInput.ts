@@ -26,6 +26,7 @@
 
 import type {
   KeyboardIR,
+  KmnEditsValue,
   MechanismAssignment,
   PackageFontSet,
   Pattern,
@@ -39,6 +40,7 @@ import type {
   ProjectWorkingCopyVfsInput,
 } from "./projectWorkingCopyVfs.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 
@@ -68,6 +70,11 @@ export interface ProjectionExtras {
   identity: IdentityOverlay | null;
   /** The recorded marks-treatment value, or undefined when none is recorded. */
   marksTreatment: MarksTreatmentValue | undefined;
+  /**
+   * The recorded `kmn-edits` value (spec 113), or undefined when none is recorded. Required for
+   * the same reason as `marksTreatment`: the preview and the download must both pass it.
+   */
+  kmnEdits: KmnEditsValue | undefined;
   baseDisplayName?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
@@ -76,6 +83,11 @@ export interface ProjectionExtras {
     touchLayoutJson: string | null;
     keyEditOps: readonly KeyEditOperation[];
   };
+}
+
+/** The `kmn-edits` value out of a decision set (undefined when none is recorded). */
+export function selectKmnEdits(decisions: DecisionSet): KmnEditsValue | undefined {
+  return decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
 }
 
 /**
@@ -98,7 +110,7 @@ export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
-  const { liveLayoutOverride, marksTreatment, ...callSite } = extras;
+  const { liveLayoutOverride, marksTreatment, kmnEdits, ...callSite } = extras;
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
@@ -127,5 +139,6 @@ export function projectionInputFromState(
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     ruleAdditions: deriveRuleAdditions(state.ir, state.startIr),
+    ...(kmnEdits !== undefined ? { kmnEdits } : {}),
   };
 }

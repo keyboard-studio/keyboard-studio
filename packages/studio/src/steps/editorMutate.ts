@@ -336,3 +336,16 @@ export const DEADKEY_WRITES: readonly IRPath[] = [
   irPath("stores", ARRAY_INDEX),
   irPath("raw", ARRAY_INDEX),
 ];
+
+// ---------------------------------------------------------------------------
+// Layout-tab key edits (spec 113)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Layout-tab write surface: the entry group's rules, which live inside `groups[]`. The
+ * patch helper treats an array as one leaf, so a patch that replaces the groups array is
+ * authorised by the `groups` path itself -- the declaration cannot be narrower than that.
+ * `stores`, `raw`, `header`, `comments`, and `touchLayout` are never touched by a layout op, so
+ * a patch reaching them fails the M3 containment check. Mirrored by `decisionIRPaths["kmn-edits"]`.
+ */
+export const LAYOUT_WRITES: readonly IRPath[] = [irPath("groups")];

@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import { formatIRPath, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { questionRegistry, galleryModules } from "../../src/survey/questions/registry.ts";
+import { questionRegistry, galleryModules, layoutEditModules } from "../../src/survey/questions/registry.ts";
 import { flowSources } from "../../src/steps/flowSources.ts";
 import { orderDecisions } from "../../src/decisions/orderDecisions.ts";
 
@@ -199,7 +199,8 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     // RELOCATED/RESERVE: their content IS author-reachable (through the
     // hosting steps), and membership derives from the registry's gallery
     // group so the exemption cannot drift from the module list.
-    const HOSTED_EXEMPT = new Set(galleryModules.map((m) => m.definition.id));
+    // Spec 113: the kmn-edits module is likewise hosted (recorded by the Layout tab at edit time).
+    const HOSTED_EXEMPT = new Set([...galleryModules, ...layoutEditModules].map((m) => m.definition.id));
     const registryIds = Object.keys(questionRegistry);
     const nonManifested = registryIds.filter(
       (id) =>
