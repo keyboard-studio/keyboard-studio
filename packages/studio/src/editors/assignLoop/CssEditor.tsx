@@ -11,6 +11,9 @@
  *   recompiles with it exactly as the zip will carry it.
  * - Continue records the result in the working copy (`customCss`); a step left
  *   untouched leaves the start keyboard's stylesheet alone.
+ * - The editor shows `.kmw-keyboard-` selectors under the author's keyboard id,
+ *   as the output will; the working copy keeps them under the start id, as the
+ *   start files do, so the projection can relink them to whatever id is current.
  */
 
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -20,6 +23,7 @@ import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
+import { rewriteKmwKeyboardSelectors } from "@keyboard-studio/engine";
 import { readKeyboardCss } from "../../lib/customCss.ts";
 import { galleryGhostBtn, TEXT_DIM } from "../../lib/galleryTheme.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -38,6 +42,10 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   const identity = useWorkingCopyStore((s) => s.identity);
   const committedCss = useWorkingCopyStore((s) => s.customCss);
   const setCustomCss = useWorkingCopyStore((s) => s.setCustomCss);
+
+  const startId = startKeyboard?.id ?? "";
+  const keyboardId = identity?.keyboardId ?? startId;
+  const toDisplay = (css: string | null) => (css === null ? null : rewriteKmwKeyboardSelectors(css, startId, keyboardId));
 
   // The start keyboard's own stylesheet, as the working copy holds it (null when it has none there).
   const startCssText = useMemo(
@@ -69,7 +77,8 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   }, [stage, previewCssText, applied]);
 
   // What the editor opens on: this step's earlier result, else the keyboard's own stylesheet. Null while the preview has yet to say.
-  const seedText = committedCss ?? startCssText ?? previewCssText ?? (stage.kind === "error" ? "" : null);
+  // The preview's text is already relinked (it is the projected VFS); the other two are stored under the start id.
+  const seedText = toDisplay(committedCss ?? startCssText) ?? previewCssText ?? (stage.kind === "error" ? "" : null);
 
   // Back to what the step opened on: the preview and the editor both drop this visit's edits.
   const handleDiscard = () => {
@@ -79,7 +88,7 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
 
   // Clearing the editor and applying it removes the keyboard's stylesheet; an untouched step leaves it as it was.
   const handleContinue = () => {
-    if (applied !== null) setCustomCss(applied);
+    if (applied !== null) setCustomCss(rewriteKmwKeyboardSelectors(applied, keyboardId, startId));
     onComplete({ css: applied ?? seedText ?? "" });
   };
 
