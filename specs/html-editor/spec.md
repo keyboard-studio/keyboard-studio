@@ -257,6 +257,28 @@ replaced. The other members' `provides` stay
 with their owning modules unless the implementer shows they belong here;
 do not invent new decision providers silently.
 
+### Effective welcome path (triage F1, landed via PR #2580, 2026-11-07)
+
+The welcome override ships at ONE effective path, used at both application
+points — serialize step 5c-ii and projection step 0b-ii
+(`applyAuthoredDocsToVfs` via a `welcomePath` field on
+`ProjectWorkingCopyVfsInput`, fed from `projectionInputFromState`):
+`welcomePagePath(isOpen, convention)` in `lib/welcomeFolder.ts` — the
+flat path `source/welcome.htm` only on an Open walk of a flat-convention
+base, the folder path `source/welcome/welcome.htm` otherwise. Before this
+fix the two points disagreed: 5c-ii wrote a copy-track edit back to the
+flat path (resurrecting a file spec 079 FR-002 says output must never
+carry, while the folder page kept generated text) and 0b-ii defaulted to
+the folder path on Open (a spurious folder page beside the carried flat
+file). `projectionInputFromState` reads Open from the store
+(`instantiationMode` + `startVfs` + `keyboardId`, the
+`isOpenedWithDescriptor` rule serialize uses) instead of from `openMode`,
+which the preview never passes — so the preview and the download agree on
+the path (follow-up in fad4b87e, 2026-11-07). Regression
+tests: `serializeWorkingCopy.docsFromProjection.test.ts` — copy-track flat
+case (edit at the folder path, no flat file) and Open-track flat case
+(edit replaces the carried flat file, no folder page).
+
 ## WYSIWYG choice — TipTap v3
 
 **Pick: TipTap v3** (`@tiptap/react` + `@tiptap/pm` + `@tiptap/starter-kit`
@@ -283,6 +305,48 @@ TipTap's React peer range (`^17 || ^18 || ^19`) accepts the repo's React
 (Milkdown core ~261k weekly downloads, Sep 2026). The editor must be
 lazy-loaded (`React.lazy`, same as the existing `HtmlCodePane`) so it never
 lands in the main chunk, exactly as Monaco already is.
+
+### Table + `<kbd>` support in rich mode (option A, Matthew 2026-11-07)
+
+StarterKit alone cannot represent the generated welcome.htm's typing-guide
+`<table>` or `<kbd>` elements (`lib/docContent.ts`: `renderGuideTable`
+emits a plain `<table>` — `<thead>` with Character/Name/Keys, `<tbody>`
+rows of glyph / name / `shortestKeys` — and `shortestKeys` emits
+`<kbd>{label}</kbd>` joined by `" then "`; no attributes anywhere).
+Parsing flattened the table into a paragraph and dropped the kbd tags, so a
+real rich edit to welcome.htm silently lost the guide. Matthew chose
+option A (add the nodes) over option B (force code-mode-only for
+table-bearing files).
+
+- Extensions, HTML mode only: `@tiptap/extension-table` (+ `TableRow`,
+  `TableHeader`, `TableCell`, pinned `^3.33.0` in lockstep) and a small
+  custom `Kbd` mark (`parseHTML [{tag:"kbd"}]`, `renderHTML ["kbd", 0]`),
+  factored as `richTextExtensions(format)` in `HtmlRichTextPane.tsx`.
+- The table renders with `Table.extend({ renderHTML: () => ["table",
+  ["tbody", 0]] })` and inline cells (`content: "inline*"`) so the
+  serialization carries no `<p>` wrappers, no `style`, no `<colgroup>`.
+  The one residual normalization is the `<thead>` fold: TipTap's table
+  model has no thead, so the header row serializes as `<th>` cells in the
+  first `<tbody>` row — same rows, cells, and kbd, only the thead wrapper
+  is gone. That is accepted: the guide's meaning is the rows, and the
+  no-edit path stays byte-identical through the mount sync (see below).
+- No table editor toolbar and no kbd toolbar button: acceptance is
+  round-trip fidelity, not a table editor. Cells are editable because the
+  extension supports it for free.
+- Markdown mode needs no table support: `README.md` has no tables (only
+  `**Version:** 1.0 | **Updated:**` separator pipes), and
+  `@tiptap/markdown` only tokenizes tables when the table extensions are
+  registered — markdown mode stays `[StarterKit, Markdown, DocFragment]`.
+- The mount sync stays `{ emitUpdate: false }`; the new extensions emit no
+  update on mount (regression-tested headlessly and end to end — the
+  golden-walk lane is the regression test for the no-edit path, which must
+  stay byte-identical).
+- Regression tests: `editors/assignLoop/HtmlRichTextPane.test.tsx` — (a)
+  unedited guide serializes to the expected normalized form, (b) an edit
+  elsewhere preserves table and kbd exactly, (c) cell text is editable,
+  (d) the mount sequence emits no updates, (e) markdown mode has no table
+  node and round-trips a README fragment, plus a pane-mount test emitting
+  no change.
 
 ## .php decision
 
@@ -396,9 +460,13 @@ the partial satisfaction on it when the PR lands.
 - File selector for all six doc members (presence from the projected VFS;
   absent members shown absent, never as dead files).
 - TipTap WYSIWYG (lazy-loaded) as primary mode; Monaco code as secondary;
-  read-only HTML preview retained.
+  read-only HTML preview retained. Rich mode represents the generated
+  typing-guide `<table>` and `<kbd>` (option A, 2026-11-07) — round-trip
+  fidelity, no table toolbar; the only normalization is the `<thead>` fold.
 - Per-file seeding per the matrix above; per-file authored overrides in the
-  store; override wins at projection, serialization, and preview.
+  store; override wins at projection, serialization, and preview. The
+  welcome override ships at the effective path (flat only on an Open walk
+  of a flat-convention base).
 - `welcomeHtm` becomes a real recorded decision (recorded step-side; see above).
 - `.php` body editing with PHP preserved per the decision above.
 - Regression tests: edit survives into the serialized download on BOTH

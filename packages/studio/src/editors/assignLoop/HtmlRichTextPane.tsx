@@ -17,10 +17,68 @@ import { useEffect } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
-import { Node } from "@tiptap/core";
+import { Node, Mark, type Extensions } from "@tiptap/core";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { TableCell } from "@tiptap/extension-table-cell";
 import { useLingui } from "@lingui/react/macro";
 
 export type RichTextFormat = "html" | "markdown";
+
+/**
+ * Inline `<kbd>` mark: the generated typing guide wraps key labels in
+ * `<kbd>` (lib/docContent.ts `shortestKeys`). StarterKit has no kbd mark,
+ * so parsing dropped them; this mark round-trips them byte-for-byte.
+ * There is no toolbar button for it — it exists to preserve the generated
+ * markup, not to author new key labels.
+ */
+const Kbd = Mark.create({
+  name: "kbd",
+  parseHTML: () => [{ tag: "kbd" }],
+  renderHTML: () => ["kbd", 0],
+});
+
+/**
+ * The generated typing guide is a plain `<table>` (no attributes) whose
+ * cells hold text and `<kbd>` (lib/docContent.ts `renderGuideTable`).
+ * Stock TipTap tables need two adjustments so a rich edit does not dirty it:
+ * - Cells hold inline content, not blocks: the default `block+` cells wrap
+ *   every cell in `<p>` on serialize (`<td><p>ŋ</p></td>`). `inline*`
+ *   keeps `<td>ŋ</td>` as-is, and cell text stays directly editable.
+ * - Stock `renderHTML` always emits a `style` + `<colgroup>` (min-width
+ *   bookkeeping for resizable columns, on even with `resizable: false`).
+ *   This override serializes a clean table.
+ * The one residual normalization is the `<thead>` fold: TipTap's table
+ * model has no thead, so the header row serializes as `<th>` cells in the
+ * first `<tbody>` row. It renders identically and carries the same content.
+ */
+const GuideTable = Table.extend({
+  renderHTML: () => ["table", ["tbody", 0]],
+});
+const InlineTableCell = TableCell.extend({ content: "inline*" });
+const InlineTableHeader = TableHeader.extend({ content: "inline*" });
+
+/**
+ * The pane's exact extension set, shared with the round-trip tests so the
+ * tests pin what the pane actually parses and serializes. Tables and `<kbd>`
+ * apply to HTML only: the generated README.md carries no tables, and
+ * `@tiptap/markdown` serializes tables only when the table extensions are
+ * registered — registering them in markdown mode would change the README
+ * round-trip for no generated content.
+ */
+export function richTextExtensions(format: RichTextFormat): Extensions {
+  if (format === "markdown") return [StarterKit, Markdown, DocFragment];
+  return [
+    StarterKit,
+    Kbd,
+    GuideTable.configure({ resizable: false }),
+    TableRow,
+    InlineTableHeader,
+    InlineTableCell,
+    DocFragment,
+  ];
+}
 
 /**
  * An opaque, non-editable inline atom for one extracted fragment
@@ -80,8 +138,7 @@ export interface HtmlRichTextPaneProps {
 export function HtmlRichTextPane({ value, format, onChange }: HtmlRichTextPaneProps) {
   const { t } = useLingui();
   const editor = useEditor({
-    extensions:
-      format === "markdown" ? [StarterKit, Markdown, DocFragment] : [StarterKit, DocFragment],
+    extensions: richTextExtensions(format),
     content: value,
     ...(format === "markdown" ? { contentType: "markdown" as const } : {}),
     onUpdate: ({ editor: next }) => {
@@ -95,14 +152,14 @@ export function HtmlRichTextPane({ value, format, onChange }: HtmlRichTextPanePr
   //
   // The sync must NOT emit an update: `editor.getHTML()` is the parsed and
   // re-serialised form of `value`, so it near-never string-equals the raw
-  // source (whitespace, attribute order, `<p>` wrapping, dropped
-  // table/kbd nodes) — and any update it emitted would record a phantom
-  // edit the author never made, whose override then beats generation at
-  // serialize time. emitUpdate:false keeps the sync silent; real edits
-  // still flow out through onUpdate. (PR #2569: the golden walk failed
-  // with welcome.htm differing on CI while local walks pass; this silences
-  // the one emission path the mount owns. If the lane still fails, the
-  // mechanism is elsewhere and needs the CI walked bytes to name it.)
+  // source (whitespace, attribute order, `<p>` wrapping, the table's
+  // `<thead>` folded into `<tbody>`) — and any update it emitted would
+  // record a phantom edit the author never made, whose override then beats
+  // generation at serialize time. emitUpdate:false keeps the sync silent;
+  // real edits still flow out through onUpdate. (PR #2569: the golden walk
+  // failed with welcome.htm differing on CI while local walks pass; this
+  // silences the one emission path the mount owns. If the lane still fails,
+  // the mechanism is elsewhere and needs the CI walked bytes to name it.)
   useEffect(() => {
     if (editor === null || editor.isDestroyed) return;
     if (format === "markdown") {
@@ -146,7 +203,7 @@ export function HtmlRichTextPane({ value, format, onChange }: HtmlRichTextPanePr
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%" }}>
-      <style>{`.tiptap{outline:none;min-height:280px}.tiptap p{margin:0 0 8px}.tiptap h1,.tiptap h2,.tiptap h3{margin:12px 0 8px}.tiptap ul,.tiptap ol{margin:0 0 8px;padding-left:24px}.tiptap blockquote{margin:0 0 8px;padding-left:12px;border-left:3px solid var(--app-border)}.tiptap pre{background:var(--app-surface);padding:8px;border-radius:6px;overflow:auto}.tiptap span[data-doc-fragment]{background:var(--app-accent-bg);border:1px dashed var(--app-accent);border-radius:4px;padding:0 6px;font-size:12px;white-space:nowrap}`}</style>
+      <style>{`.tiptap{outline:none;min-height:280px}.tiptap p{margin:0 0 8px}.tiptap h1,.tiptap h2,.tiptap h3{margin:12px 0 8px}.tiptap ul,.tiptap ol{margin:0 0 8px;padding-left:24px}.tiptap blockquote{margin:0 0 8px;padding-left:12px;border-left:3px solid var(--app-border)}.tiptap pre{background:var(--app-surface);padding:8px;border-radius:6px;overflow:auto}.tiptap span[data-doc-fragment]{background:var(--app-accent-bg);border:1px dashed var(--app-accent);border-radius:4px;padding:0 6px;font-size:12px;white-space:nowrap}.tiptap table{border-collapse:collapse;margin:0 0 8px}.tiptap th,.tiptap td{border:1px solid var(--app-border);padding:4px 8px;text-align:left}.tiptap th{background:var(--app-surface)}.tiptap kbd{font-family:inherit;border:1px solid var(--app-border);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--app-surface)}`}</style>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }} role="toolbar" aria-label={t({ id: "editor.assignLoop.html.rich.toolbar", message: "Formatting" })}>
         {button(t({ id: "editor.assignLoop.html.rich.bold", message: "Bold" }), editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "rich-bold")}
         {button(t({ id: "editor.assignLoop.html.rich.italic", message: "Italic" }), editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "rich-italic")}
