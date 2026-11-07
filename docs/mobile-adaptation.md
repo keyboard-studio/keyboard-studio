@@ -78,7 +78,13 @@ import { BREAKPOINTS } from "../ui/breakpoints.ts";
   first, then Contents, locale, theme, account, reset) and, on the survey, the
   compact phase summary in place of the wordmark. There is no bottom tab bar;
   the journey footer (Back / Next / Contents) is the only bottom chrome, and the
-  shell uses `100dvh` so the footer is never pushed below the visible screen.
+  shell uses `100dvh` so the URL bar never pushes the footer below the visible
+  screen. `100dvh` is URL-bar-aware, never keyboard-aware: with the virtual
+  keyboard open, only `interactive-widget=resizes-content` in the viewport meta
+  (`packages/studio/index.html`) resizes the layout viewport so the shell — and
+  the footer — shrink to sit just above the keyboard. Without it, Android
+  Chrome/Brave leave the layout viewport full-height and the footer hides under
+  the keyboard (#2570). iOS Safari silently ignores the property.
 - **Secondary views open from a button, not a tab.** A live preview (or the
   character map) opens from the floating `PreviewButton` into a `PreviewSheet`
   (`flush` for an edge-to-edge keyboard). The button renders only when there is
