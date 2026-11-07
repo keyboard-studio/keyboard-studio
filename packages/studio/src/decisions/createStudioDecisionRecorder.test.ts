@@ -10,7 +10,7 @@ import { createStudioDecisionRecorder } from "./createStudioDecisionRecorder.ts"
 import { snapshotDecisionRecord, useDecisionLogStore } from "./decisionLogStore.ts";
 import type { SavedAnswer } from "../steps/answerTypes.ts";
 import { completeFallbackPolicyStep } from "../lib/fallbackPolicyStepCompletion.ts";
-import { useDecisionStore } from "../stores/decisionStore.ts";
+import { getDecisionSnapshot, useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 type Saved = Pick<SavedAnswer, "answerType" | "proposal">;
@@ -20,7 +20,7 @@ function recorderWith(saved: Record<string, Record<string, Saved>>) {
     getWorkingCopyState: () => useWorkingCopyStore.getState(),
     snapshotter: { captureAtBoundary: () => Promise.resolve(null), reset: () => {} },
     getSavedAnswer: (stepId, questionId) => saved[stepId]?.[questionId],
-    getDecisions: () => useDecisionStore.getState().decisions,
+    getDecisions: () => getDecisionSnapshot(),
   });
 }
 
