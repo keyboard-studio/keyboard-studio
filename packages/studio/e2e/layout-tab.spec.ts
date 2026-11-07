@@ -119,7 +119,9 @@ async function expectCodeHas(page: Page, text: string): Promise<void> {
   await page.locator(".monaco-editor .view-lines").click();
   await page.keyboard.press("Control+F");
   await page.locator(".monaco-editor .find-widget textarea").first().fill(text);
-  await expect(page.locator(".monaco-editor .find-widget .matchesCount")).toHaveText(/^\d+ of \d+$/, {
+  // Monaco announces each search with the term it ran, so a count left over from the previous
+  // term cannot satisfy this.
+  await expect(page.getByRole("alert").filter({ hasText: `found for '${text}'` })).toHaveCount(1, {
     timeout: 60_000,
   });
   await page.keyboard.press("Escape");
