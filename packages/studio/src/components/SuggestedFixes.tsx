@@ -9,11 +9,14 @@
 //     raised by applied changes (suggestedFixesStore) with any fixes the host
 //     derives (e.g. "add character" fixes from criterion 18.6), drops the ones
 //     already accepted or declined in the 053 decision record, and records the
-//     author's accept / skip there so they are not offered again.
+//     author's accept / skip there so they are not offered again. When the
+//     host passes `activeStepId` (#2528), fixes owned by a LATER survey step
+//     are withheld until the author reaches that step.
 
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import type { SuggestedFix } from "../lib/consistencySuggestions.ts";
+import { isSuggestedFixVisibleAtStep } from "../lib/suggestedFixStepOrder.ts";
 import {
   decidedSuggestions,
   recordSuggestionDisposition,
@@ -159,9 +162,22 @@ export interface SuggestedFixesPanelProps {
   /** What accepting does: the host routes to where the change is made. */
   onAccept: (fix: SuggestedFix) => void;
   testId?: string;
+  /**
+   * Active survey step id (#2528): when set, only fixes whose owning step
+   * is at or before this step render — a fix about a LATER step stays
+   * hidden until the author reaches it. When unset (the Criteria roll-up),
+   * everything renders.
+   */
+  activeStepId?: string;
+  /**
+   * Manifest step-id order for the #2528 filter, supplied by the caller
+   * (StudioShell). Required when `activeStepId` is set; without it the
+   * filter cannot order steps, so everything renders (fail open).
+   */
+  stepOrder?: readonly string[];
 }
 
-export function SuggestedFixesPanel({ extra = [], onAccept, testId }: SuggestedFixesPanelProps) {
+export function SuggestedFixesPanel({ extra = [], onAccept, testId, activeStepId, stepOrder }: SuggestedFixesPanelProps) {
   const offered = useSuggestedFixesStore((s) => s.offered);
   const settle = useSuggestedFixesStore((s) => s.settle);
   const record = useDecisionLogStore((s) => s.record);
@@ -173,6 +189,13 @@ export function SuggestedFixesPanel({ extra = [], onAccept, testId }: SuggestedF
   const fixes = withoutPhysicalFixes([...offered, ...extra], basicOpen).filter((f) => {
     if (decided.has(f.id) || seen.has(f.id)) return false;
     seen.add(f.id);
+    // #2528: never show a follow-up for a step the author has not reached.
+    if (
+      activeStepId !== undefined &&
+      stepOrder !== undefined &&
+      !isSuggestedFixVisibleAtStep(f, activeStepId, stepOrder)
+    )
+      return false;
     return true;
   });
 
