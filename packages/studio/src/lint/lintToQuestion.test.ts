@@ -63,6 +63,15 @@ describe("buildFindingsByQuestionId", () => {
     expect(result["touch-layout"]).toEqual([dead, orphan]);
     expect(Object.keys(result)).toHaveLength(1);
   });
+
+  it("questionIdFilter drops mapped findings that are not for the current flow", () => {
+    const inv = makeFinding("KM_LINT_INVENTORY_UNCOVERED");
+    const region = makeFinding("KM_LINT_KPS_NUMERIC_REGION_TAG");
+    const filter = new Set<string>(["pb_standard_letters"]);
+    expect(buildFindingsByQuestionId([inv, region], undefined, { questionIdFilter: filter })).toEqual({
+      pb_standard_letters: [inv],
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
