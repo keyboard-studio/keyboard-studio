@@ -1174,4 +1174,60 @@ describe("persistWorkingCopy", () => {
       expect(intent.narrowedGuardQuestions.size).toBe(0);
     });
   });
+
+  describe("Documentation step authored overrides (specs/html-editor)", () => {
+    function seedAuthoredDraft() {
+      const ir = makeScaffoldedIR();
+      const vfs = createVirtualFS([
+        { path: "source/test.kmn", content: "c Test keyboard\nstore(&NAME) 'Test'\n", isBinary: false },
+      ]);
+      useWorkingCopyStore.setState({
+        instantiationMode: "new-from-base",
+        startKeyboard: { id: "test_keyboard", displayName: "Test Keyboard", languages: ["en"] } as import("@keyboard-studio/contracts").StartKeyboard,
+        startVfs: vfs,
+        startIr: ir,
+        ir,
+        identity: { keyboardId: "test_keyboard", bcp47: "en", displayName: "Test Keyboard" },
+        authoredWelcomeHtm: "<p>Authored welcome.</p>",
+        authoredReadmeHtm: "<p>Authored readme page.</p>",
+        authoredReadmeMd: "# Authored README\n",
+        authoredHelpPhp: "<?php $pagename = 'test_keyboard'; ?>\n<p>Authored help.</p>\n",
+      });
+    }
+
+    it("round-trips the four authored doc fields through snapshot/rehydrate", () => {
+      seedAuthoredDraft();
+      snapshotWorkingCopyToSession();
+      expect(sessionStorage.getItem("ks.working-copy.draft")).not.toBeNull();
+
+      useWorkingCopyStore.getState().reset();
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.authoredWelcomeHtm).toBe("<p>Authored welcome.</p>");
+      expect(s.authoredReadmeHtm).toBe("<p>Authored readme page.</p>");
+      expect(s.authoredReadmeMd).toBe("# Authored README\n");
+      expect(s.authoredHelpPhp).toBe("<?php $pagename = 'test_keyboard'; ?>\n<p>Authored help.</p>\n");
+    });
+
+    it("restores a pre-existing snapshot missing the authored fields as untouched (null)", () => {
+      seedAuthoredDraft();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.authoredWelcomeHtm;
+      delete legacy.authoredReadmeHtm;
+      delete legacy.authoredReadmeMd;
+      delete legacy.authoredHelpPhp;
+      sessionStorage.setItem("ks.working-copy.draft", JSON.stringify(legacy));
+
+      useWorkingCopyStore.getState().reset();
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.authoredWelcomeHtm).toBeNull();
+      expect(s.authoredReadmeHtm).toBeNull();
+      expect(s.authoredReadmeMd).toBeNull();
+      expect(s.authoredHelpPhp).toBeNull();
+    });
+  });
 });
