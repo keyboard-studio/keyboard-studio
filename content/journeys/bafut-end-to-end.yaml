@@ -17,6 +17,10 @@
 
 journey_id: bafut-end-to-end
 
+# The walk's authoring track, declared up front (the track question is
+# gone — see survey/journeyFixture.ts). Absent means \"copy\".
+track: copy
+
 persona:
   language: Bafut
   script: Latn
@@ -31,9 +35,6 @@ events:
 
   # --- choose_base (Track 1: copy from basic_kbdus) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
-
-  # --- track (track flow) ---
-  - { stepId: track, questionId: track_choice, value: "copy" }
 
   # --- attribution (attribution flow, #1901: asked after the track choice) ---
   - { stepId: attribution, questionId: il_author_name, value: "Bafut Language Committee" }

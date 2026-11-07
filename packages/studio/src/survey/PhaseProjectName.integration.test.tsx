@@ -19,8 +19,7 @@
 // the same module the production component uses). No mocks.
 //
 // Flow-parity coverage:
-//   Both the track and project_name derived flows are covered here
-//   (track in the identity assertion block; project_name by the full
+//   The project_name derived flow is covered here (by the full
 //   render/flow-through). This satisfies the flow-parity coverage
 //   requirement alongside the drift guardrail (driftGuardrail.test.ts) which
 //   checks the bijection over all FLOW_SOURCES.
@@ -49,20 +48,10 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Flow-parity: both derived flows load without error
+// Flow-parity: the project_name derived flow loads without error
 // ---------------------------------------------------------------------------
 
-describe("flow-parity: track + project_name derived flows load cleanly", () => {
-  it("track derives to a FlowDef with flow_id 'track' and question 'track_choice'", () => {
-    const flow = loadFlowSourceDef(flowSources["track"]!);
-    expect(flow.flow_id).toBe("track");
-    expect(flow.phase).toBe("G");
-    expect(flow.questions).toHaveLength(1);
-    expect(flow.questions[0]?.id).toBe("track_choice");
-    // track_choice is terminal (next: null) — the branch is handled by PhaseTrack.
-    expect(flow.questions[0]?.next).toBeNull();
-  });
-
+describe("flow-parity: project_name derived flow loads cleanly", () => {
   it("project_name derives to a FlowDef with flow_id 'project_name' and 2 questions", () => {
     const flow = loadFlowSourceDef(flowSources["project_name"]!);
     expect(flow.flow_id).toBe("project_name");

@@ -24,7 +24,6 @@ const MARKS_IDS: readonly string[] = [
   "author-name",
   "author-email",
   "copyright-holder",
-  "authoring-track",
   "project-display-name",
   "project-keyboard-id",
   "windows-layout",
@@ -91,8 +90,15 @@ export function recordToDecisionSet(
       // that owns the question and `provides` the decision. Answers with no
       // such module (the marks series' own sub-answers, invisibles, phase B
       // bookkeeping) are carried by their composite decision entry instead.
+      // Retired questions with no registry module do not replay a decision.
+      // The authoring track is recorded by the start screen, not derived
+      // from the record's retired `track_choice` answer.
+      // The replay reproduces the decisions the record contains — "copy
+      // defaults where unrecorded" is a live-walk rule (StudioShell), not
+      // a replay default.
       const mod = questionRegistry[p.questionId];
-      for (const id of mod?.provides ?? []) {
+      const provides = mod?.provides ?? [];
+      for (const id of provides) {
         if (allowed.has(id)) out[id] = asDecision(id, p.value);
       }
     }

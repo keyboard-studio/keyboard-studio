@@ -2,8 +2,8 @@
 // flowStepOptions.tsx (spec 029 Stage 6, T005).
 //
 // makeFlowStepComponent.test.tsx exercises the FACTORY against synthetic
-// buildTrackOptions()/buildSeedOptions() records, so trackOptions.extract
-// and the whole of phaseFOptions were never run at all. This file drives
+// buildProjectNameOptions()/buildSeedOptions() records, so the whole of
+// phaseFOptions was never run at all. This file drives
 // the exported records directly against the REAL zustand stores, reset
 // between tests by the global test setup.
 //
@@ -21,7 +21,6 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  trackOptions,
   phaseFOptions,
   projectNameOptions,
   slugRetainsMostLetters,
@@ -81,70 +80,6 @@ function buildResult(
 ): SurveyPhaseResult {
   return { phase: "G", answers, confirmedInventory: [] };
 }
-
-// ---------------------------------------------------------------------------
-// trackOptions.buildContext
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.buildContext", () => {
-  it("returns base_name from localBase.displayName", () => {
-    const { deps } = buildDeps({ localStart: { displayName: "English (US)" } });
-    expect(trackOptions.buildContext(deps)).toEqual({ base_name: "English (US)" });
-  });
-
-  it("falls back to empty string when localBase is null", () => {
-    const { deps } = buildDeps({ localStart: null });
-    expect(trackOptions.buildContext(deps)).toEqual({ base_name: "" });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions.seeds — FR-031 (spec 057): arriving at the step (deep link or
-// Back) shows the currently-recorded answer, never an empty radio group.
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () => {
-  it("seeds track_choice from the recorded track (deps.selectedTrack)", () => {
-    const { deps } = buildDeps({ selectedTrack: "adapt" });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
-  });
-
-  it("a recorded track always wins, and names no proposal source", () => {
-    const { deps } = buildDeps({
-      selectedTrack: "copy",
-      surveyContext: { bcp47_tag: "ewo" },
-      localStart: { displayName: "Ewondo", languages: ["ewo"] },
-    });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("copy");
-    expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBeUndefined();
-  });
-
-  it("returns undefined for any other questionId", () => {
-    const { deps } = buildDeps({ selectedTrack: "copy" });
-    expect(trackOptions.seeds!.getSeedValue("some_other_question", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedSource?.("some_other_question", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedCaption?.("some_other_question", deps)).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions.seeds — with no recorded track the seed is Copy, the step's only
-// option since spec 111 (Open is chosen on the start screen).
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.seeds — first arrival", () => {
-  it("seeds copy when no track is recorded, with no proposal source or caption", () => {
-    const { deps } = buildDeps({
-      selectedTrack: null,
-      surveyContext: { bcp47_tag: "ewo" },
-      localStart: { displayName: "Ewondo", languages: ["ewo"] },
-    });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("copy");
-    expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBeUndefined();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // projectNameOptions.seeds — English-preferred keyboard id (#1777) + FR-031
@@ -251,57 +186,6 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
     expect(projectNameOptions.seeds!.getSeedValue("project_display_name", deps)).toBe(
       "My Bafut Keyboard",
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions.extract
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.extract", () => {
-  it("extracts {track:'copy'} from a select answer", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "select", value: "copy" },
-    ]);
-    expect(trackOptions.extract(result)).toEqual({ track: "copy" });
-  });
-
-  it("extracts {track:'adapt'} from a text answer", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "text", value: "adapt" },
-    ]);
-    expect(trackOptions.extract(result)).toEqual({ track: "adapt" });
-  });
-
-  it("returns undefined for a value other than 'copy'/'adapt'", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "select", value: "something_else" },
-    ]);
-    expect(trackOptions.extract(result)).toBeUndefined();
-  });
-
-  it("returns undefined when track_choice is missing entirely", () => {
-    const result = buildResult([]);
-    expect(trackOptions.extract(result)).toBeUndefined();
-  });
-
-  it("returns undefined when the answerType is neither select nor text (e.g. boolean)", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "boolean", value: true },
-    ]);
-    expect(trackOptions.extract(result)).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions — record shape (spec 089: no onCommit; effects are the
-// recorded authoring-track decision + track_choice's empty apply)
-// ---------------------------------------------------------------------------
-
-describe("trackOptions — record shape", () => {
-  it("declares no onCommit", () => {
-    expect("onCommit" in trackOptions).toBe(false);
-
   });
 });
 

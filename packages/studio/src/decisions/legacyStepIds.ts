@@ -5,9 +5,13 @@
 // the step declaration table in force at that commit, inventoried in
 // research.md). Screen ids were seeded with today's step names (the
 // gallery modules' declared screen keys; the question screens' groups),
-// so every entry is an identity mapping today — the map exists so a
-// future rename is a data change here, not a code path change in the
-// deep-link resolver or the draft-history sanitiser.
+// so every entry was an identity mapping until #2568 — the map exists so
+// a future rename is a data change here, not a code path change in the
+// deep-link resolver or the draft-history sanitiser. `track` is the first
+// non-identity entry: the track step was removed by #2568 and its decision
+// (authoring-track) now lives on the choose_base screen, so an old
+// "track" deep link or draft history entry lands there instead of
+// degrading.
 //
 // `done` and `unsupported` are addressable terminals in the location
 // model, not screens: they are deliberately absent from the map and pass
@@ -18,7 +22,8 @@ export const LEGACY_STEP_ID_MAP: Readonly<Record<string, string>> = {
   identity: "identity",
   layout: "layout",
   choose_base: "choose_base",
-  track: "track",
+  // #2568: the track step is gone; its decision lives on choose_base now.
+  track: "choose_base",
   project_name: "project_name",
   characters: "characters",
   marks: "marks",

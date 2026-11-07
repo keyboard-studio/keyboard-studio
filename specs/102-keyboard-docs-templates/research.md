@@ -3,7 +3,7 @@
 ## R1. Copy vs Adapt comes from the existing track answer
 
 **Decision**: no new question or decision. `instantiationMode` (`"new-from-base"` = Copy, `"adapt-existing"` = Adapt) is already derived from the `authoring-track` decision and persisted, so version and docs read it.
-**Rationale**: user ruling, 2026-10-14. The existing `track_choice` already offers Copy and Adapt, and a second Copy/Adapt question would give "Adapt" two meanings.
+**Rationale**: user ruling, 2026-10-14. The start screen already records Copy vs Adapt (New vs Open) as the `authoring-track` decision, and a second Copy/Adapt question would give "Adapt" two meanings.
 **Alternatives considered**: a new `start-relationship` decision (the design note's Q3), dropped by the ruling. A three-way track question, also dropped by the ruling.
 
 ## R2. Fix the version at the resolver, keep the wire names

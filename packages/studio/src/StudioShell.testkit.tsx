@@ -6,6 +6,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import { SurveyView } from "./StudioShell.tsx";
+import { useDecisionStore } from "./stores/decisionStore.ts";
 import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 import { artifactHoisted } from "./test/studioShellMocks/useKeyboardArtifact.ts";
 
@@ -24,29 +25,66 @@ export function advanceToStart() {
 }
 
 /**
- * Drive from "identity" to "track" (identity → base → track).
+ * Drive from "identity" to "attribution" (identity → base → attribution).
  * Two SEPARATE fireEvent.click calls (preview, then confirm) — mirrors two
  * real user clicks with a render flush in between (preview-before-commit).
+ * The track question is gone: after base-confirm the walk lands on
+ * attribution directly, and the track is the start screen's recording (copy
+ * by default) — see recordAdaptTrack() for the adapt path.
  */
-export function advanceToTrack() {
+export function advanceToAttribution() {
   advanceToStart();
   fireEvent.click(screen.getByTestId("base-preview"));
   fireEvent.click(screen.getByTestId("base-confirm"));
 }
 
 /**
+ * Record the adapt track the way the start screen's Open entry does, before
+ * the walk reaches the attribution fork. Call right after render, before
+ * driving — the attribution fork reads the recorded decision.
+ */
+export function recordAdaptTrack() {
+  useDecisionStore.getState().record({
+    id: "authoring-track",
+    value: "adapt",
+    provenance: "asked",
+    step: "start",
+  });
+}
+
+/**
+ * Drive from "identity" to "attribution" on the adapt track: identity →
+ * base → attribution, with adapt recorded between the base preview and
+ * the base confirm.
+ *
+ * The recording point matters: adapt must be known by the time the base
+ * is confirmed (so StudioShell's instantiation effect does not default
+ * it to copy), but recording it before the walk starts would gate the
+ * identity-first screens off (spec 111 hides them on Open) and the
+ * walk would skip straight to attribution. The identity-first steps are
+ * already walked by the time the base preview is showing, so recording
+ * here is safe.
+ */
+export function advanceToAttributionAdapt() {
+  advanceToStart();
+  fireEvent.click(screen.getByTestId("base-preview"));
+  recordAdaptTrack();
+  fireEvent.click(screen.getByTestId("base-confirm"));
+}
+
+/**
  * Drive from "identity" to "prefill" via the default Track 1 (Copy) path:
- * identity → base → track → attribution (#1901) → project-name → prefill.
+ * identity → base → attribution (#1901) → project-name → prefill.
  *
  * Track 2 (Adapt) skips project-name; tests that need that path should
- * click "track-adapt" instead (attribution still applies — it sits
- * before the fork).
+ * drive with advanceToAttributionAdapt() instead (attribution still
+ * applies — it sits before the fork; recording adapt before the walk
+ * would gate the identity-first screens off, spec 111).
  */
 export function advanceToPrefill() {
-  advanceToTrack();
-  fireEvent.click(screen.getByTestId("track-copy"));
+  advanceToAttribution();
   // The attribution step's stub completes on survey-advance, like
-  // project_name's — two advances now stand between track and prefill.
+  // project_name's — two advances now stand between attribution and prefill.
   fireEvent.click(screen.getByTestId("survey-advance"));
   fireEvent.click(screen.getByTestId("survey-advance"));
 }

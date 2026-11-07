@@ -64,7 +64,7 @@ afterEach(() => {
 });
 
 const STEP_IDS: ReadonlySet<string> = new Set([
-  "identity", "layout", "choose_base", "track", "characters", "rules", "mechanisms", "touch_seed_source", "touch",
+  "identity", "layout", "choose_base", "attribution", "characters", "rules", "mechanisms", "touch_seed_source", "touch",
 ]);
 
 describe("completedSections", () => {
@@ -72,19 +72,19 @@ describe("completedSections", () => {
     const entries = [
       surveyEntry("identity"),
       surveyEntry("choose_base"),
-      surveyEntry("track"),
+      surveyEntry("attribution"),
       surveyEntry("characters"),
       editorEntry("mechanisms", { mechanismsAssigned: 3 }),
       surveyEntry("rules"),
     ];
     const groups = buildStageGroups({ entries });
     const sections = completedSections(
-      ["identity", "layout", "choose_base", "track", "characters", "rules", "mechanisms", "touch"],
+      ["identity", "layout", "choose_base", "attribution", "characters", "rules", "mechanisms", "touch"],
       groups,
       { activeStepId: "touch_seed_source", stepIds: STEP_IDS },
     );
     // "touch" was finished with nothing recorded: listed, with no roll-up.
-    expect(sections.map((s) => s.stepId)).toEqual(["identity", "characters", "rules", "mechanisms", "touch"]);
+    expect(sections.map((s) => s.stepId)).toEqual(["identity", "attribution", "characters", "rules", "mechanisms", "touch"]);
     expect(sections.find((s) => s.stepId === "touch")?.group).toBeUndefined();
   });
 

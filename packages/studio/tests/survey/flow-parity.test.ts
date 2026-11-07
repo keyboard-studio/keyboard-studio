@@ -214,7 +214,7 @@ describe("flow-parity: identity_lite — routing shape", () => {
   });
 
   // #1901: the supported path ENDS the identity flow here — the
-  // author/copyright questions are the post-track attribution flow's
+  // author/copyright questions are the attribution flow's
   // (next describe). The gated path terminates on the notice; an author
   // who cannot make a keyboard is never asked who owns it (the session's
   // "unsupported" terminal enforces it one layer up).
@@ -253,7 +253,7 @@ describe("flow-parity: identity_lite — routing shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Attribution — the post-track author/copyright flow (#1901; spec 064 US1's
+// Attribution — the author/copyright flow (#1901; spec 064 US1's
 // questions, re-homed from identity_lite above)
 // ---------------------------------------------------------------------------
 
@@ -280,43 +280,6 @@ describe("flow-parity: attribution — routing shape", () => {
     expect(byId.get("il_author_name")?.required).toBe(true);
     expect(byId.get("il_author_email")?.required).toBe(false);
     expect(byId.get("il_copyright_holder")?.required).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Phase G — track selection (T003 coverage for new flow)
-// ---------------------------------------------------------------------------
-
-describe("flow-parity: track — questions[]", () => {
-  const modular = loadFlowSourceDef(flowSources["track"]!);
-
-  it("has questions", () => {
-    expect(modular.questions.length).toBeGreaterThan(0);
-  });
-
-  it("flow_id is track", () => {
-    expect(modular.flow_id).toBe("track");
-  });
-
-  it("phase is G", () => {
-    expect(modular.phase).toBe("G");
-  });
-
-  it("contains track_choice question", () => {
-    expect(modular.questions.map((q) => q.id)).toContain("track_choice");
-  });
-
-  it("no provenance_questions in track flow", () => {
-    expect(modular.provenance_questions).toBeUndefined();
-  });
-
-  it("all questions have id, type, and at least prompt or label", () => {
-    for (const q of modular.questions) {
-      expect(q.id, "question missing id").toBeTruthy();
-      expect(q.type, `question "${q.id}" missing type`).toBeTruthy();
-      const hasText = q.prompt !== undefined || q.label !== undefined || q.body !== undefined;
-      expect(hasText, `question "${q.id}" has neither prompt, label, nor body`).toBe(true);
-    }
   });
 });
 

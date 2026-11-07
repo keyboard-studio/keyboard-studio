@@ -17,7 +17,7 @@ import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -80,7 +80,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // Answering the track question ("Authoring approach") appends its dot —
     // the growth half of FR-042/FR-061, measured across a question the
     // decision record actually captures as a `survey-answer` entry.
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     // #1901: attribution stands between track and prefill now; its
     // questions append their own dots, which only strengthens the
     // growth comparison below.

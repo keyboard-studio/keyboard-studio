@@ -46,7 +46,6 @@ import {
   identityStep,
   layoutStep,
   chooseStartStep,
-  trackStep,
   attributionStep,
   projectNameStep,
   languageListStep,
@@ -143,11 +142,8 @@ const stepPool: readonly Step[] = [
   // --- Base selection (base picker only) ---
   chooseStartStep,
 
-  // --- Track selection (copy vs adapt) ---
-  trackStep,
-
   // --- Attribution (author / copyright, #1901) ---
-  // Both tracks walk it, immediately after the track choice: the
+  // Both tracks walk it, immediately after the base choice: the
   // questions' proposals are track-shaped (profile confirmation on
   // copy; the base's copyright holder seeded on update).
   attributionStep,

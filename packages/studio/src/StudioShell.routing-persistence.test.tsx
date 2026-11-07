@@ -434,7 +434,7 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
     window.location.hash = "";
     localStorage.clear();
 
-    // Reach an L4-equivalent position (base confirmed, track chosen, on the
+    // Reach an L4-equivalent position (base confirmed, track recorded, on the
     // characters/prefill step) via the top-level stores.
     useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs: createVirtualFS([]),
@@ -453,7 +453,7 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
     useSurveySessionStore.getState().setLocalStart(basicKbdus);
     useSurveySessionStore.getState().setStartConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
-    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("attribution");
     useSurveySessionStore.getState().advance("characters");
 
     const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());

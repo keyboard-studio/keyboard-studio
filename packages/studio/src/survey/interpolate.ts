@@ -7,7 +7,7 @@
 // Interpolation must run AFTER Tier-B content-i18n catalog resolution
 // (resolveContentString in ../lib/contentI18n.ts), for every locale including
 // English — a translated catalog string carries its own `{{token}}`
-// placeholders (e.g. fr's `track_choice.prompt`), and only the resolved
+// placeholders (e.g. fr's `project_display_name.prompt`), and only the resolved
 // string (not the English value that fed resolveContentString) is what
 // actually renders.
 import type { SurveyContext } from "./types.ts";

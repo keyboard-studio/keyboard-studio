@@ -577,7 +577,9 @@ describe("draftPersistence", () => {
       // the spec-035 touch-seed fork choice — since spec 088 that choice is
       // the `touch-seed-source` decision, not a session field.
       useSurveySessionStore.getState().advance("choose_base");
-      useSurveySessionStore.getState().advance("track");
+      // No "track": the step was removed by #2568; attribution is the
+      // next step after choose_base on the copy track.
+      useSurveySessionStore.getState().advance("attribution");
       useDecisionStore.getState().record({
         id: "touch-seed-source",
         value: "import-adapt",
@@ -618,7 +620,7 @@ describe("draftPersistence", () => {
       expect(wc.phaseResults[0]?.phase).toBe("B");
 
       const session = useSurveySessionStore.getState();
-      expect(session.activeStepId).toBe("track");
+      expect(session.activeStepId).toBe("attribution");
       expect(session.history).toEqual(["identity", "choose_base"]);
       // (a) the touch-seed choice round-trips through the draft's decisions
       // slice (spec 088 — it no longer rides the traversal snapshot).

@@ -69,7 +69,7 @@ function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",
-      history: ["identity", "layout", "choose_base", "track"],
+      history: ["identity", "layout", "choose_base", "attribution"],
       selectedTrack: "copy",
     }),
     decisions: decisionsForTrack("copy"),
@@ -217,7 +217,7 @@ describe("section marks — one per non-active manifest step", () => {
 
   it("every manifest step up to and including 'help' earns exactly one mark on this author's path", () => {
     // #1901: the author's history runs through the attribution step
-    // (track -> attribution -> project_name -> characters on this copy path) — a
+    // (attribution -> project_name -> characters on this copy path) — a
     // traversal that reached characters without it can no longer occur,
     // and a behind-active step absent from history reads as not-on-path.
     const dots = buildProgressDots({
@@ -231,10 +231,9 @@ describe("section marks — one per non-active manifest step", () => {
       }),
       lookupQuestionLabel: stubLabel,
     });
-    // open_languages is Open-only (spec 111), and the track step is gated off once
-    // the start screen records the track — every OTHER on-path step has a mark.
+    // open_languages is Open-only (spec 111) — every OTHER on-path step has a mark.
     const onPathIds = manifest
-      .filter((s) => !s.id.startsWith("open_") && s.id !== "track" && s.id !== "package")
+      .filter((s) => !s.id.startsWith("open_") && s.id !== "package")
       .map((s) => s.id);
     for (const id of onPathIds) {
       expect(dots.some((d) => d.id === id || d.location.step === id)).toBe(true);
@@ -253,7 +252,7 @@ describe("upcoming section marks — the projected remaining path", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({ activeStepId: "track", history: ["identity", "choose_base"], selectedTrack: "adapt" }),
+        traversal: traversal({ activeStepId: "attribution", history: ["identity", "choose_base"], selectedTrack: "adapt" }),
       }),
       lookupQuestionLabel: stubLabel,
     });
@@ -264,7 +263,7 @@ describe("upcoming section marks — the projected remaining path", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({ activeStepId: "track", history: ["identity", "choose_base"], selectedTrack: "copy" }),
+        traversal: traversal({ activeStepId: "attribution", history: ["identity", "choose_base"], selectedTrack: "copy" }),
       }),
       lookupQuestionLabel: stubLabel,
     });
@@ -303,7 +302,7 @@ describe("upcoming section marks — the projected remaining path", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "touch",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms"],
           selectedTrack: "copy",
         }),
       }),
@@ -445,7 +444,7 @@ describe("within-step walk dots — the active section's question marks", () => 
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "mechanisms",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve"],
           selectedTrack: "copy",
         }),
         stepPositions: { mechanisms: ["u00e1", "u00e9", "u00ed"] },
@@ -650,7 +649,7 @@ describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "carve",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience"],
           selectedTrack: "copy",
         }),
         stepPositions: { mechanisms: ["u00e1"] },
@@ -669,7 +668,7 @@ describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "carve",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience"],
           selectedTrack: "copy",
         }),
       }),
@@ -771,7 +770,7 @@ describe("§5 jump target — badged collapsed section vs. unbadged", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "carve",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience"],
           selectedTrack: "copy",
         }),
         stepPositions: { mechanisms: ["u00e1"] },
@@ -827,7 +826,7 @@ describe("jumping back (T065, FR-063)", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "touch",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms"],
           selectedTrack: "copy",
         }),
       }),
@@ -841,7 +840,7 @@ describe("jumping back (T065, FR-063)", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "characters",
-          history: ["identity", "choose_base", "track"],
+          history: ["identity", "choose_base", "attribution"],
           selectedTrack: "copy",
         }),
       }),
@@ -862,7 +861,7 @@ describe("optional screens left blank, and outcome-satisfied steps", () => {
     ctxWith({
       traversal: traversal({
         activeStepId: "marks",
-        history: ["identity", "choose_base", "track", "characters"],
+        history: ["identity", "choose_base", "attribution", "characters"],
       }),
     });
 

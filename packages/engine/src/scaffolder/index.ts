@@ -167,6 +167,21 @@ function rewriteKpjFilePaths(xml: string, startId: string, keyboardId: string): 
   );
 }
 
+/**
+ * Rewrite `.kmw-keyboard-<fromId>` — the wrapper class KeymanWeb puts around a
+ * keyboard — to `.kmw-keyboard-<toId>`, so a stylesheet written for one id
+ * still matches after a rename. After the literal id, require a token boundary
+ * that does NOT treat `-` as a boundary (\b does — `r` and `-` are word vs
+ * non-word), so compound classes like `.kmw-keyboard-<id>-variant` are not
+ * half-rewritten. Still block `from_id_extra` (\w continues with `_`). Escaped
+ * `fromId` avoids regex metacharacters in ids.
+ */
+export function rewriteKmwKeyboardSelectors(css: string, fromId: string, toId: string): string {
+  if (fromId === toId) return css;
+  const re = new RegExp(`kmw-keyboard-${escapeForRegex(fromId)}(?![\\w-])`, "g");
+  return css.replace(re, `kmw-keyboard-${toId}`);
+}
+
 /** @internal Exported for unit testing only. */
 export function renameFilesInVfs(vfs: VirtualFS, startId: string, keyboardId: string): void {
   // Sibling-file extensions that conventionally use the keyboard id as
@@ -223,19 +238,12 @@ export function renameFilesInVfs(vfs: VirtualFS, startId: string, keyboardId: st
   }
 
   // Rewrite `.kmw-keyboard-<startId>` selectors in every *.css entry.
-  // After the literal id, require a token boundary that does NOT treat `-` as a
-  // boundary (\b does — `r` and `-` are word vs non-word), so compound classes
-  // like `.kmw-keyboard-<id>-variant` are not half-rewritten. Still block
-  // `start_id_extra` (\w continues with `_`). Escaped `startId` avoids regex
-  // metacharacters in ids.
   // Iterated AFTER the file-rename pass so the matched *.css files already
   // live at their new <keyboardId>.css paths.
-  const escapedStart = escapeForRegex(startId);
-  const cssBaseClassRe = new RegExp(`kmw-keyboard-${escapedStart}(?![\\w-])`, "g");
   for (const cssPath of vfs.list("").filter((p) => p.endsWith(".css"))) {
     const cssEntry = vfs.get(cssPath);
     if (cssEntry === undefined || typeof cssEntry.content !== "string") continue;
-    const rewritten = cssEntry.content.replace(cssBaseClassRe, `kmw-keyboard-${keyboardId}`);
+    const rewritten = rewriteKmwKeyboardSelectors(cssEntry.content, startId, keyboardId);
     if (rewritten !== cssEntry.content) {
       vfs.set(cssPath, rewritten, false);
     }

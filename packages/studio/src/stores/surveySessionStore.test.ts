@@ -1,10 +1,10 @@
 // Unit tests for surveySessionStore (spec 026 SC-001).
 //
 // Covers:
-//   (a) copy-track back-walk: identity->choose_base->track->project_name->characters
+//   (a) copy-track back-walk: identity->choose_base->attribution->project_name->characters
 //       then popHistory() -> project_name (history top was project_name).
-//   (b) adapt-track back-walk: identity->choose_base->track->characters
-//       then popHistory() -> track (project_name skipped, history top was track).
+//   (b) adapt-track back-walk: identity->choose_base->attribution->characters
+//       then popHistory() -> attribution (project_name skipped, history top was attribution).
 //   (c) reset() clears every slot to initial, including empty history.
 //   (d) double-advance idempotence: advance(x) twice does not corrupt the stack;
 //       a later popHistory still returns to the prior distinct step (D-R4).
@@ -26,35 +26,35 @@ describe("surveySessionStore", () => {
   // (a) copy-track back-walk
   it("copy-track back-walk: popHistory from characters lands on project_name", () => {
     const store = getStore();
-    // Walk: identity -> choose_base -> track -> project_name -> characters
+    // Walk: identity -> choose_base -> attribution -> project_name -> characters
     store.advance("choose_base");
-    store.advance("track");
+    store.advance("attribution");
     store.advance("project_name");
     store.advance("characters");
 
     expect(getStore().activeStepId).toBe("characters");
-    expect(getStore().history).toEqual(["identity", "choose_base", "track", "project_name"]);
+    expect(getStore().history).toEqual(["identity", "choose_base", "attribution", "project_name"]);
 
     getStore().popHistory();
 
     expect(getStore().activeStepId).toBe("project_name");
-    expect(getStore().history).toEqual(["identity", "choose_base", "track"]);
+    expect(getStore().history).toEqual(["identity", "choose_base", "attribution"]);
   });
 
   // (b) adapt-track back-walk
-  it("adapt-track back-walk: popHistory from characters lands on track", () => {
+  it("adapt-track back-walk: popHistory from characters lands on attribution", () => {
     const store = getStore();
-    // Walk: identity -> choose_base -> track -> characters (no project_name)
+    // Walk: identity -> choose_base -> attribution -> characters (no project_name)
     store.advance("choose_base");
-    store.advance("track");
+    store.advance("attribution");
     store.advance("characters");
 
     expect(getStore().activeStepId).toBe("characters");
-    expect(getStore().history).toEqual(["identity", "choose_base", "track"]);
+    expect(getStore().history).toEqual(["identity", "choose_base", "attribution"]);
 
     getStore().popHistory();
 
-    expect(getStore().activeStepId).toBe("track");
+    expect(getStore().activeStepId).toBe("attribution");
     expect(getStore().history).toEqual(["identity", "choose_base"]);
   });
 
@@ -62,11 +62,11 @@ describe("surveySessionStore", () => {
   it("reset() returns every slot to initial, including empty history", () => {
     const store = getStore();
     store.advance("choose_base");
-    store.advance("track");
+    store.advance("attribution");
 
 
     // Confirm non-initial state
-    expect(getStore().activeStepId).toBe("track");
+    expect(getStore().activeStepId).toBe("attribution");
     expect(getStore().history.length).toBe(2);
 
 
@@ -94,7 +94,7 @@ describe("surveySessionStore", () => {
   it("hydrate() restores all value slots and copies the history array", () => {
     const history = ["identity", "choose_base"] as const;
     const snapshot = {
-      activeStepId: "track" as const,
+      activeStepId: "attribution" as const,
       history,
 
       localStart: null,
@@ -104,7 +104,7 @@ describe("surveySessionStore", () => {
     getStore().hydrate(snapshot);
 
     const s = getStore();
-    expect(s.activeStepId).toBe("track");
+    expect(s.activeStepId).toBe("attribution");
     expect(s.history).toEqual(["identity", "choose_base"]);
 
     expect(s.charactersSubStage).toBe("B");
@@ -117,21 +117,21 @@ describe("surveySessionStore", () => {
   // (d) double-advance idempotence — no stack corruption
   it("double-advance: advancing to the same step twice does not corrupt the stack", () => {
     const store = getStore();
-    // Walk to choose_base, then advance to "track" twice (simulates an accidental double-fire).
+    // Walk to choose_base, then advance to "attribution" twice (simulates an accidental double-fire).
     store.advance("choose_base");
-    store.advance("track");
-    store.advance("track"); // second advance to same step id
+    store.advance("attribution");
+    store.advance("attribution"); // second advance to same step id
 
     // History should record both advances honestly (D-R4: no silent de-dup).
-    expect(getStore().activeStepId).toBe("track");
-    expect(getStore().history).toEqual(["identity", "choose_base", "track"]);
+    expect(getStore().activeStepId).toBe("attribution");
+    expect(getStore().history).toEqual(["identity", "choose_base", "attribution"]);
 
-    // Now advance to a distinct step and pop back — must land on "track" (not "track" twice).
+    // Now advance to a distinct step and pop back — must land on "attribution" (not "attribution" twice).
     getStore().advance("characters");
     getStore().popHistory();
 
-    // popped to the last history entry — "track" was pushed when advance("characters") ran.
-    expect(getStore().activeStepId).toBe("track");
+    // popped to the last history entry — "attribution" was pushed when advance("characters") ran.
+    expect(getStore().activeStepId).toBe("attribution");
   });
 
   // (e) empty-history popHistory() is a no-op
@@ -232,7 +232,7 @@ describe("surveySessionStore", () => {
     it("rewinds to the prefix walked BEFORE the picker, so Back from it lands where it did the first time", () => {
       const store = getStore();
       store.advance("choose_base");
-      store.advance("track");
+      store.advance("attribution");
       store.advance("project_name");
       store.advance("characters");
 
@@ -250,7 +250,7 @@ describe("surveySessionStore", () => {
     it("leaves nothing at-or-after the picker on the stack for a later Back to walk forward into", () => {
       const store = getStore();
       store.advance("choose_base");
-      store.advance("track");
+      store.advance("attribution");
       store.advance("mechanisms");
       store.advance("touch");
 
@@ -258,7 +258,7 @@ describe("surveySessionStore", () => {
 
       // The regression an advance("choose_base") would have caused: every step
       // the author just left still sitting on the stack, so Back walks FORWARD.
-      for (const stale of ["choose_base", "track", "mechanisms", "touch"] as const) {
+      for (const stale of ["choose_base", "attribution", "mechanisms", "touch"] as const) {
         expect(getStore().history).not.toContain(stale);
       }
     });
@@ -266,7 +266,7 @@ describe("surveySessionStore", () => {
     it("clears baseConfirmed so a stale confirmation cannot instantiate on the next compile settle", () => {
       const store = getStore();
       store.advance("choose_base");
-      store.advance("track");
+      store.advance("attribution");
       store.setStartConfirmed(true);
 
       getStore().backToChooseStart();
@@ -351,7 +351,7 @@ describe("surveySessionStore", () => {
     const historyBefore = [...getStore().history];
     const stepBefore = getStore().activeStepId; // "choose_base"
 
-    store.advance("track");
+    store.advance("attribution");
     getStore().popHistory();
 
     expect(getStore().activeStepId).toBe(stepBefore);
@@ -384,7 +384,7 @@ describe("surveySessionStore", () => {
       applyTraversalSnapshot({
         ...snapshot,
         activeStepId: "mechanisms",
-        history: ["identity", "choose_base", "track", "characters", "marks", "carve", "help"],
+        history: ["identity", "choose_base", "attribution", "characters", "marks", "carve", "help"],
       });
 
       // Sanitized the moment the draft is restored — "help" never lands in
@@ -392,7 +392,7 @@ describe("surveySessionStore", () => {
       expect(getStore().activeStepId).toBe("mechanisms");
       expect(getStore().history).not.toContain("help");
       expect(getStore().history).toEqual([
-        "identity", "choose_base", "track", "characters", "marks", "carve",
+        "identity", "choose_base", "attribution", "characters", "marks", "carve",
       ]);
     });
 
@@ -401,7 +401,7 @@ describe("surveySessionStore", () => {
       applyTraversalSnapshot({
         ...snapshot,
         activeStepId: "mechanisms",
-        history: ["identity", "choose_base", "track", "characters", "marks", "carve", "help"],
+        history: ["identity", "choose_base", "attribution", "characters", "marks", "carve", "help"],
       });
 
       getStore().popHistory();
@@ -416,7 +416,7 @@ describe("surveySessionStore", () => {
       // fix, in case `history` is ever corrupted by some other path.
       useSurveySessionStore.setState({
         activeStepId: "mechanisms",
-        history: ["identity", "choose_base", "track", "characters", "marks", "carve", "help"],
+        history: ["identity", "choose_base", "attribution", "characters", "marks", "carve", "help"],
       });
 
       getStore().popHistory();
@@ -435,7 +435,7 @@ describe("surveySessionStore", () => {
         ...snapshot,
         activeStepId: "mechanisms",
         history: [
-          "identity", "help", "choose_base", "track", "characters", "marks", "carve", "help",
+          "identity", "help", "choose_base", "attribution", "characters", "marks", "carve", "help",
         ],
       });
 
@@ -443,7 +443,7 @@ describe("surveySessionStore", () => {
       // and the entries around them keep their relative order.
       expect(getStore().history).not.toContain("help");
       expect(getStore().history).toEqual([
-        "identity", "choose_base", "track", "characters", "marks", "carve",
+        "identity", "choose_base", "attribution", "characters", "marks", "carve",
       ]);
 
       // popHistory from what's left still lands on "carve" (the new top),
@@ -457,7 +457,7 @@ describe("surveySessionStore", () => {
     it("does not disturb a well-formed history stack (no false-positive sanitization)", () => {
       const store = getStore();
       store.advance("choose_base");
-      store.advance("track");
+      store.advance("attribution");
       store.advance("characters");
       store.advance("marks");
       store.advance("carve");
@@ -465,7 +465,7 @@ describe("surveySessionStore", () => {
 
       const snapshot = snapshotTraversal();
       expect(snapshot.history).toEqual([
-        "identity", "choose_base", "track", "characters", "marks", "carve",
+        "identity", "choose_base", "attribution", "characters", "marks", "carve",
       ]);
 
       applyTraversalSnapshot(snapshot);

@@ -289,8 +289,8 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "identity",
       "layout",
       "choose_base",
-      "track",
-      // #1901: the author/copyright screen walks after the track choice.
+      // #1901: the author/copyright screen walks after the base choice
+      // (the track is recorded by the start screen, not asked).
       "attribution",
       "project_name",
       // spec 111: the Open language list, a gated side trail.
@@ -307,6 +307,8 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "deadkeys",
       "rules",
       "mechanisms",
+      // #2549: the fallback-policy step walks after mechanisms, before OSK.
+      "fallback_policy",
       "osk",
       "touch_seed_source",
       "touch",

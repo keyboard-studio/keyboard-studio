@@ -19,6 +19,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
 import { isBasicKeyboard } from "../lib/basicKeyboard.ts";
+import { recordAuthoringTrack } from "../lib/recordAuthoringTrack.ts";
 import {
   forkIsNewer,
   replacesCuratedCopy,
@@ -44,11 +45,13 @@ export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef 
     const decisions = useDecisionStore.getState();
     decisions.recordAll([
       { id: "base-keyboard", value, provenance: "asked", step: "open" },
-      { id: "authoring-track", value: "adapt", provenance: "asked", step: "open" },
       // Whether the keyboard is a basic one decides which walk pages apply (its physical
       // layout is fixed); gates read this decision, never the keyboard itself.
       { id: "open-basic-keyboard", value: isBasicKeyboard(keyboard), provenance: "derived", step: "open" },
     ]);
+    // The authoring track, recorded alongside the base (same step, same
+    // confirmation) — via the shared start-screen helper, not inline.
+    recordAuthoringTrack("adapt", "open");
   });
   if (confirmed === null) return false;
   useSurveySessionStore.getState().setLocalStart(keyboard);
@@ -60,7 +63,7 @@ export function openExistingKeyboard(keyboard: StartKeyboard, source: SourceRef 
   useSurveySessionStore.setState({
     activeStepId: "open_languages",
     history: [],
-    visited: ["identity", "layout", "choose_base", "track", "attribution"],
+    visited: ["identity", "layout", "choose_base", "attribution"],
   });
   // Opening a keyboard leaves the welcome screen, so the first-visit gate must lift
   // or the route would be forced back to welcome.

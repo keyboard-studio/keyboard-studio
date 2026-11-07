@@ -65,7 +65,7 @@ import {
 } from "../decisions/decisionLogStore.ts";
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { questionRegistry, RETIRED_QUESTION_DECISIONS } from "../survey/questions/registry.ts";
 import {
   applyDecisionSnapshot,
   getDecisionSnapshot,
@@ -1258,7 +1258,12 @@ export interface MigrateDraftResult {
  * A v1 envelope's survey-question answers become decision records: each
  * answer's question id resolves through `questionRegistry[qid].provides`
  * (research D-08 — the registry is the only question→decision map), with
- * provenance per the D-05 mapping and `step` set from the v1 step key. The
+ * provenance per the D-05 mapping and `step` set from the v1 step key. A
+ * retired question whose answer still maps onto a live decision resolves
+ * through `RETIRED_QUESTION_DECISIONS` instead — `track_choice` was
+ * removed with the track step, but a v1 draft's answer is the only record
+ * of an "adapt" walk, and orphaning it would silently resume that draft
+ * on the copy track. The
  * session copies become records too: `traversal.selectedTrack` →
  * `authoring-track`, `traversal.touchSeedSource` → `touch-seed-source`; on a
  * disagreement with an answer-derived record the session field wins (it is
@@ -1276,6 +1281,12 @@ export interface MigrateDraftResult {
  * unchanged (tasks T010 before T018); once the writer flips to 2, migrated
  * envelopes are indistinguishable from native v2 envelopes downstream.
  */
+/**
+ * Retired questions whose answers still map onto live decisions during v1
+ * migration — see `RETIRED_QUESTION_DECISIONS` in survey/questions/registry.ts
+ * (the one map, shared with the decision-record replay).
+ */
+
 export function migrateDraftEnvelope(raw: unknown): MigrateDraftResult | null {
   if (!isPlainRecord(raw)) return null;
   const source = raw as unknown as DurableDraft;
@@ -1311,9 +1322,13 @@ export function migrateDraftEnvelope(raw: unknown): MigrateDraftResult | null {
         const answer = step.answers[questionId] as SavedAnswer | undefined;
         if (answer === undefined) continue;
         const mod = questionRegistry[questionId];
-        if (mod !== undefined && mod.provides !== undefined && mod.provides.length > 0) {
+        const provides =
+          mod !== undefined && mod.provides !== undefined && mod.provides.length > 0
+            ? mod.provides
+            : RETIRED_QUESTION_DECISIONS[questionId];
+        if (provides !== undefined && provides.length > 0) {
           const mapped = answerProvenance(answer.value, answer.proposal, baseSourceName);
-          for (const id of mod.provides) {
+          for (const id of provides) {
             decisions[id] = {
               id,
               value: answer.value,

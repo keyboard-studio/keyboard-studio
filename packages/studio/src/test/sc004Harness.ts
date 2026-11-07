@@ -17,6 +17,8 @@ import { applyDecisionEffects, type ReducerDeps } from "../steps/reducer.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { identityLanguagePatch } from "../lib/identityLanguagePatch.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
+import { baseKeyboardProviderModule } from "./baseKeyboardProvider.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -127,7 +129,6 @@ const ADAPT_MODULES = [
   "il_target_script",
   "il_author_name",
   "il_copyright_holder",
-  "track_choice",
   "pb_standard_letters",
   // The character-inventory provider is the gallery module (spec 090 T021
   // retired the pb_character_inventory spike into it); it is in the
@@ -138,6 +139,10 @@ const ADAPT_MODULES = [
   "project_keyboard_id",
   "project_display_name",
 ].map(mod);
+// The track question is gone: authoring-track has no question module any
+// more, but characterInventory requires it — the start screen provides it
+// (see survey/questions/authoringTrackProvider.ts).
+const ADAPT_MODULES_WITH_TRACK = [...ADAPT_MODULES, authoringTrackProviderModule, baseKeyboardProviderModule];
 
 /** Instantiate Track 1, run the decision flow, apply answers. Returns the decisions. */
 export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
@@ -161,12 +166,12 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
 
     // --- 2. unified decision flow with fixture answers ----------------
     const decisions = runDecisionFlow({
-      modules: ADAPT_MODULES,
+      modules: ADAPT_MODULES_WITH_TRACK,
       context: buildExtractContext(ir, base),
       answers: {
         il_language_english: "Test Language",
         il_author_name: "Test Author",
-        track_choice: "adapt",
+        "authoring-track": "adapt",
         pb_standard_letters: "basic-az",
       },
     });
@@ -203,7 +208,6 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
         answers: [
           { questionId: "il_language_english", answerType: "text", value: "Test Language" },
           { questionId: "il_author_name", answerType: "text", value: "Test Author" },
-          { questionId: "track_choice", answerType: "select", value: "adapt" },
           { questionId: "pb_standard_letters", answerType: "select", value: "basic-az" },
         ],
       },

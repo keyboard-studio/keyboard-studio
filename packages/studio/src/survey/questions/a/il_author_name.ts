@@ -59,9 +59,9 @@ const mod: QuestionModule = {
   // the track choice the attribution screen walks after (what the trio
   // proposes depends on it: profile confirmation on copy; the base's
   // copyright seeded on update). Declared as SCREEN-order requirements,
-  // not module `requires` — the same treatment track_choice gives its
-  // base-keyboard edge and project_display_name gives the track edge:
-  // deriveScreens folds them into the full-list sort only, so this
+  // not module `requires` — the same treatment the authoring-track
+  // provider gives its edge and project_display_name gives the track
+  // edge: deriveScreens folds them into the full-list sort only, so this
   // flow's own per-flow sort (orderParity) never sees an edge it cannot
   // resolve in-flow. (In identity_lite, target-script was an in-flow
   // `requires`; the move is what reclassifies it.)

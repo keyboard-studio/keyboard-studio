@@ -67,6 +67,14 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "useWorkingCopyStore", module: "stores/workingCopyStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
   { fn: "useSurveySessionStore", module: "stores/surveySessionStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
   { fn: "getDecisionSnapshot", module: "stores/decisionStore.ts", callers: ["StudioShell.tsx", "lib/completeStep.ts"] },
+  {
+    // The start screen's act of recording the track (New = copy, Open =
+    // adapt), now the track question is gone — the headless author records
+    // the case's track the same way before its first step (FR-040).
+    fn: "recordAuthoringTrack",
+    module: "lib/recordAuthoringTrack.ts",
+    callers: ["components/StartScreen.tsx", "components/OpenKeyboardEntry.tsx"],
+  },
   { fn: "useSurveyAnswerStore", module: "stores/surveyAnswerStore.ts", callers: ["survey/CharactersStep.tsx", "survey/punctuation/PunctuationStep.tsx"] },
   {
     // The Phase F hard gate StepHost reads through useInventoryCoverageGate.

@@ -86,7 +86,7 @@ import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -424,7 +424,7 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
 
     await driveIdentityLite(page, { autonym: "Piaroa", code: "pid", script: "Latn" });
     await pickStartKeyboard(page, PIAROA_START_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -560,7 +560,7 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
 
     await driveIdentityLite(page, { autonym: "Bamanankan", code: "bm", script: "Latn" });
     await pickStartKeyboard(page, BAMBARA_START_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

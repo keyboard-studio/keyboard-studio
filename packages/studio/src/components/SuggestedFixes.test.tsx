@@ -89,6 +89,90 @@ describe("SuggestedFixesPanel", () => {
     render(<SuggestedFixesPanel extra={[fix("a", "One"), fix("b", "Two")]} onAccept={vi.fn()} />);
     expect(screen.getAllByTestId("suggested-fix")).toHaveLength(2);
   });
+  describe("SuggestedFixesPanel — later-step fixes stay hidden (#2528)", () => {
+    // The exact production titles from suggestionsFromDelta()
+    // (lib/consistencySuggestions.ts), seeded as the store would offer them.
+    const DOCS_CHARS = "Refresh the generated character section of the help";
+    const DOCS_LAYERS = "Update the help page layer list (data-states)";
+    const TOUCH_FIX = "Add U+0254 ɔ to the touch layout";
+    const PHYSICAL_FIX = "Add U+0254 ɔ to the physical keys";
+    // Manifest-order subsequence, as StudioShell supplies it at runtime.
+    const STEP_ORDER = ["rules", "mechanisms", "touch", "css", "help", "html"];
+
+    function targetedFix(
+      id: string,
+      title: string,
+      target: "physical" | "touch" | "docs",
+    ): SuggestedFix {
+      return {
+        id,
+        kind: "consistency",
+        findingKey: null,
+        preview: [],
+        status: "pending",
+        title,
+        action: { target, change: target === "docs" ? "refresh" : "add", subject: "ɔ" },
+      };
+    }
+
+    function seedAll(): void {
+      useSuggestedFixesStore.getState().offer([
+        targetedFix("consistency:refresh:docs:characters", DOCS_CHARS, "docs"),
+        targetedFix("consistency:refresh:docs:layers", DOCS_LAYERS, "docs"),
+        targetedFix("consistency:add:touch:ɔ", TOUCH_FIX, "touch"),
+        targetedFix("consistency:add:physical:ɔ", PHYSICAL_FIX, "physical"),
+      ]);
+    }
+
+    it("on touch, hides both docs notes while showing the touch and physical fixes", () => {
+      seedAll();
+      render(<SuggestedFixesPanel activeStepId="touch" stepOrder={STEP_ORDER} onAccept={vi.fn()} />);
+      expect(screen.queryByText(DOCS_CHARS)).toBeNull();
+      expect(screen.queryByText(DOCS_LAYERS)).toBeNull();
+      expect(screen.getByText(TOUCH_FIX)).toBeTruthy();
+      expect(screen.getByText(PHYSICAL_FIX)).toBeTruthy();
+    });
+
+    it("on mechanisms, hides the touch fix while showing the physical fix", () => {
+      seedAll();
+      render(<SuggestedFixesPanel activeStepId="mechanisms" stepOrder={STEP_ORDER} onAccept={vi.fn()} />);
+      expect(screen.queryByText(DOCS_CHARS)).toBeNull();
+      expect(screen.queryByText(TOUCH_FIX)).toBeNull();
+      expect(screen.getByText(PHYSICAL_FIX)).toBeTruthy();
+    });
+
+    it("on help, shows the docs notes (the Documentation step owns them)", () => {
+      seedAll();
+      render(<SuggestedFixesPanel activeStepId="help" stepOrder={STEP_ORDER} onAccept={vi.fn()} />);
+      expect(screen.getByText(DOCS_CHARS)).toBeTruthy();
+      expect(screen.getByText(DOCS_LAYERS)).toBeTruthy();
+      expect(screen.getByText(TOUCH_FIX)).toBeTruthy();
+      expect(screen.getByText(PHYSICAL_FIX)).toBeTruthy();
+    });
+
+    it("with no active step (Criteria roll-up), shows everything", () => {
+      seedAll();
+      render(<SuggestedFixesPanel onAccept={vi.fn()} />);
+      expect(screen.getByText(DOCS_CHARS)).toBeTruthy();
+      expect(screen.getByText(DOCS_LAYERS)).toBeTruthy();
+      expect(screen.getByText(TOUCH_FIX)).toBeTruthy();
+      expect(screen.getByText(PHYSICAL_FIX)).toBeTruthy();
+    });
+
+    it("fails open: a fix with no action target still renders on an early step", () => {
+      const untargeted: SuggestedFix = {
+        id: "consistency:refresh:docs:characters",
+        kind: "consistency",
+        findingKey: null,
+        preview: [],
+        status: "pending",
+        title: DOCS_CHARS,
+      };
+      useSuggestedFixesStore.getState().offer([untargeted]);
+      render(<SuggestedFixesPanel activeStepId="touch" stepOrder={STEP_ORDER} onAccept={vi.fn()} />);
+      expect(screen.getByText(DOCS_CHARS)).toBeTruthy();
+    });
+  });
 });
 
 describe("missingCharacterFixes", () => {

@@ -11,14 +11,14 @@
 // decision values written through the gallery host. No existing headless
 // harness replays that flow — this file is that harness.
 //
-// Method: the pre-characters setup (identity -> choose_base -> track ->
+// Method: the pre-characters setup (identity -> choose_base ->
 // attribution -> project_name) is driven at store level through the REAL
 // StepHost completion sequence (recordPhase -> recordAnswersAsDecisions ->
 // applyDecisionEffects -> rebuildFromDecisions -> applyStepCompletion ->
 // recordStepCompletion -> advance) with StudioShell-faithful ReducerDeps
 // over the real stores, a real corpus keyboard (basic_kbdfr, Track 1 copy),
 // the real instantiation, and the real live-extraction pass at the setup
-// commit (doCommit's position, after the track decision — the setup gate
+// commit (doCommit's position, after the track is recorded — the setup gate
 // spec 092 added). From "characters" on, the REAL SurveyView + StepHost +
 // step components render and are driven by DOM, exactly as the e2e walk
 // drives them (prefill confirm -> intro -> build list, add "é" -> Done ->
@@ -426,7 +426,7 @@ describe("T028 convenience-gate reproduction (union)", () => {
 
       // 3. choose_base — the base-keyboard decision recorded through the real
       // gallery host write path (StartKeyboardRenderer's confirm path), then
-      // the track completion, then doCommit's dispatch: applyStepCompletion
+      // the track recording, then doCommit's dispatch: applyStepCompletion
       // (instantiation) + the live extraction pass, in the setup commit's
       // position (track known — spec 092's setup gate).
       decideGalleryValue(
@@ -437,19 +437,18 @@ describe("T028 convenience-gate reproduction (union)", () => {
         buildGalleryHostDeps(),
       );
       recordStepCompletion("choose_base", { base: basicKbdfr }, deps);
-      useSurveySessionStore.getState().advance("track");
+      useSurveySessionStore.getState().advance("attribution");
       await dumpGateState("setup post-choose_base");
 
-      handleComplete(
-        "track",
-        {
-          phase: "G",
-          answers: [
-            { questionId: "track_choice", answerType: "select", value: "copy" },
-          ],
-        } satisfies SurveyPhaseResult,
-        deps,
-      );
+      // The track question is gone: the start screen records the track
+      // (copy here) before the walk, so the harness records authoring-track
+      // directly instead of completing a track step.
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "asked",
+        step: "start",
+      });
 
       // doCommit equivalent: instantiate the working copy from the real
       // corpus base (parsed + recognized with the real engine), then run

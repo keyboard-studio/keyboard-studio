@@ -328,6 +328,14 @@ export interface ProjectWorkingCopyVfsInput {
    * download's step 5c-ii write the same file.
    */
   welcomePath?: string;
+  /**
+   * The start keyboard's id. `customCss` is stored against it, so step 0b
+   * relinks its `.kmw-keyboard-<startKeyboardId>` selectors to `keyboardId`.
+   * That matters when the VFS was scaffolded under the new id already (the
+   * Track 1 preview), where step 4 has nothing to rename. Omit when
+   * `keyboardId` is the start id (the output path: step 4 relinks).
+   */
+  startKeyboardId?: string;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
@@ -546,6 +554,7 @@ export function projectWorkingCopyVfs(
     customCss = null,
     authoredDocs,
     welcomePath,
+    startKeyboardId,
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
@@ -607,7 +616,7 @@ export function projectWorkingCopyVfs(
   // Step 0b: OSK stylesheet — the CSS step's text becomes the keyboard's
   // `&KMW_EMBEDCSS` file. Before the identity pass so a Track-1 id rename
   // carries the file and its store line along with the other siblings.
-  warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss));
+  warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss, startKeyboardId));
 
   // Step 0b-ii: Documentation overrides — the author's edited doc files
   // replace the generated/carried text in the projected VFS, so the OSK

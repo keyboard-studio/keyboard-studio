@@ -44,9 +44,8 @@ export interface FlowStepDeps {
    * The currently-recorded track choice (`selectTrack` over `decisions`),
    * or `null` before the author has ever chosen one. Spec 057 FR-031: a step
    * reached by deep link (or by walking Back into it) must show the
-   * currently-recorded answer, not an empty field —
-   * trackOptions.seeds.getSeedValue reads this to seed track_choice's radio
-   * group on arrival (flowStepOptions.tsx).
+   * currently-recorded answer, not an empty field — projectNameOptions.seeds
+   * reads this to seed project_display_name on arrival (flowStepOptions.tsx).
    */
   selectedTrack: "copy" | "adapt" | null;
   /**
