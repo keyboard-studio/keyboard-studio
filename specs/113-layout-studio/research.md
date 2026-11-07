@@ -469,3 +469,29 @@ so the original noise-band gate failed. Ruling 8 replaces it with a ≤ 30 ms me
    with the change for this), so the list stays append-only and nothing is rebuilt (FR-064).
 6. **Stamping** — rules a code entry inserts or replaces carry `authorEdit: "code-tab"`, so the
    Layout tab labels them hand-set and the owning editors show "changed in code".
+
+**D3 review of the Apply error gate (T088).** Verdict: **accepted, no amendment**. This is the
+author's own reasoning against CLAUDE.md decision D3 (the session could not spawn km-validator);
+it is pending km-validator's confirmation and nothing downstream depends on it.
+- D3 forbids a second *debounce timer* in the validation cycle: the TS-check and the WASM oracle
+  share one 300 ms cycle. The Apply gate starts no timer. It is one candidate compile, run once,
+  on the author's explicit click, through the same compile service the download path uses
+  (`lib/buildOutputBundle.ts`, which R13 already places outside the D3 cycle). It races nothing.
+- The Code pane's existing `LINT_DEBOUNCE_MS` timer is the pane's own lint and is left untouched;
+  Phase 6 adds no timer.
+- Because the compile is asynchronous, Apply disables itself while it runs, and before committing
+  re-reads the working IR and the editor text; a result for text that has since changed is
+  discarded, never recorded.
+- The candidate is compiled from a clone of the VFS (the same staging rule as `buildKmp`), so the
+  shared projection and the caller's VFS are never mutated, and nothing touches host disk.
+- The fallback (Layer A only at Apply, compile failure offered as one-click undo) is therefore not
+  invoked, and FR-061's compile half stands as written.
+
+**Contract corrections found while writing the types (T090).** `IRNode`, `IRBegin`, and
+`StoreValue` did not exist in `keyboard-ir.ts`: `IRNode` is `IRRule | IRComment | RawKmnFragment`;
+`IRBegin` is `{ encoding, main }` (the emitted `begin` line); `StoreValue` is an `IRStore` without
+its node id and source line. The header is one object, so there is no "headers" container:
+`set-header` carries a patch of the changed fields and `set-store` / `remove-store` carry
+`after` (the preceding store) for position. A group container's anchor also records `usingKeys`
+(rule text depends on it), and `add-group` / `remove-group` carry the group with empty `rules`;
+a group's items travel as ordinary insert / remove changes.
