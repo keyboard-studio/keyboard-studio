@@ -470,9 +470,9 @@ so the original noise-band gate failed. Ruling 8 replaces it with a ≤ 30 ms me
 6. **Stamping** — rules a code entry inserts or replaces carry `authorEdit: "code-tab"`, so the
    Layout tab labels them hand-set and the owning editors show "changed in code".
 
-**D3 review of the Apply error gate (T088).** Verdict: **accepted, no amendment**. This is the
-author's own reasoning against CLAUDE.md decision D3 (the session could not spawn km-validator);
-it is pending km-validator's confirmation and nothing downstream depends on it.
+**D3 review of the Apply error gate (T088).** Verdict: **accepted, no amendment**. km-validator
+reviewed the gate against CLAUDE.md decision D3 and confirmed it (guards: Apply disabled while the
+compile runs; a result is discarded if the working-copy revision changed).
 - D3 forbids a second *debounce timer* in the validation cycle: the TS-check and the WASM oracle
   share one 300 ms cycle. The Apply gate starts no timer. It is one candidate compile, run once,
   on the author's explicit click, through the same compile service the download path uses

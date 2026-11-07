@@ -335,10 +335,66 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-07T23:10:03.800Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T088",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:30:10.545Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T090",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:30:10.807Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T089",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:48.979Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:49.678Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:50.029Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:50.374Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:50.725Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T087",
+  "currentTask": "T097",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -624,6 +680,55 @@
       "did": "US3 E2E row runs green: new deadkey on a typed key with disclosure, three rows plus space row, after-this-deadkey via simulator, download carries the rules",
       "files": [
         "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T088": {
+      "status": "DONE",
+      "did": "km-validator approved the Apply gate against D3; recorded in R13, no amendment",
+      "files": [
+        "specs/113-layout-studio/research.md"
+      ]
+    },
+    "T090": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "kmnEdits.ts"
+      ]
+    },
+    "T089": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "diffIR.test.ts"
+      ]
+    },
+    "T091": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "applyIRChanges.test.ts"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "diffIR.ts"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "replayKmnEdits.ts"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "kmn-diff.corpus.test.ts"
       ]
     }
   }
