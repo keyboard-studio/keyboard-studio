@@ -60,6 +60,7 @@ import {
   welcomeFolderFileNames,
   missingInheritedImageRefs,
   effectiveChartPreference,
+  welcomePagePath,
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
 import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
@@ -796,7 +797,7 @@ export async function projectWorkingCopyForOutput(
     clonedVfs,
     resolvedKeyboardId,
     authoredDocs,
-    state.startWelcomeConvention === "flat" ? FLAT_WELCOME_PATH : WELCOME_PAGE_PATH,
+    welcomePagePath(isOpen, state.startWelcomeConvention),
   );
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
@@ -899,10 +900,7 @@ export async function projectWorkingCopyForOutput(
       if (text !== null && text !== undefined && clonedVfs.get(path) === undefined) clonedVfs.set(path, text, false);
     };
     carryIfAbsent("README.md", startReadmeMdText);
-    carryIfAbsent(
-      state.startWelcomeConvention === "flat" ? FLAT_WELCOME_PATH : WELCOME_PAGE_PATH,
-      startWelcomeHtmText,
-    );
+    carryIfAbsent(welcomePagePath(isOpen, state.startWelcomeConvention), startWelcomeHtmText);
     carryIfAbsent(`source/help/${resolvedKeyboardId}.php`, startHelpPhpText);
     for (const img of carriedImages) {
       if (clonedVfs.get(`source/${img.path}`) === undefined) clonedVfs.set(`source/${img.path}`, img.bytes, true);

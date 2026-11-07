@@ -207,3 +207,73 @@ describe("serializeWorkingCopy — Documentation step overrides survive into the
     expect(edited.help).toContain("AUTHORED-HELP-MARKER");
   });
 });
+
+// A flat-convention base (pre-076 `source/welcome.htm`): an authored welcome
+// edit ships at the one path this production carries the page — the folder
+// path on copy (FR-002 removes the flat copy), the carried flat file on Open
+// (spec 111 FR-010 regenerates nothing) — and never at both.
+// ---------------------------------------------------------------------------
+
+const FLAT_KPS = [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  "<Package>",
+  "  <Info>",
+  '    <Name URL="">Test KB</Name>',
+  '    <Version URL="">1.0</Version>',
+  "  </Info>",
+  "  <Files>",
+  "    <File><Name>welcome.htm</Name></File>",
+  "  </Files>",
+  "</Package>",
+  "",
+].join("\n");
+
+const FLAT_WELCOME = "<!DOCTYPE html><html><head><title>Test KB</title></head><body><p>CARRIED-FLAT</p></body></html>";
+const AUTHORED_FLAT_WELCOME =
+  "<!DOCTYPE html><html><head><title>Test KB</title></head><body><p>AUTHORED-WELCOME-MARKER</p></body></html>";
+
+async function runFlatBase(track: "copy" | "open") {
+  capturedVfs = null;
+  useWorkingCopyStore.getState().reset();
+  const { ir } = parseKmn(KMN, "test_kb");
+  const vfs = createVirtualFS([
+    { path: "source/test_kb.kmn", content: KMN, isBinary: false },
+    { path: "source/test_kb.kvks", content: KVKS, isBinary: false },
+    { path: "source/welcome.htm", content: FLAT_WELCOME, isBinary: false },
+    ...(track === "open" ? [{ path: "source/test_kb.kps", content: FLAT_KPS, isBinary: false }] : []),
+  ]);
+  const base = makeStartKeyboard({
+    id: "test_kb",
+    path: "release/test/test_kb",
+    script: "Latn",
+    targets: ["windows"],
+    displayName: "Test KB",
+    version: "1.0",
+    sourceUrl: "https://example.invalid/test_kb",
+    languages: ["en"],
+  });
+  if (track === "copy") {
+    useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir });
+  } else {
+    useWorkingCopyStore.getState().instantiateFromExisting(base, { vfs, ir });
+  }
+  useWorkingCopyStore.setState({ startWelcomeConvention: "flat", authoredWelcomeHtm: AUTHORED_FLAT_WELCOME });
+  const result = await serializeWorkingCopy();
+  expect(result).not.toBeNull();
+  return capturedVfs!;
+}
+
+describe("serializeWorkingCopy — authored welcome on a flat-convention base", () => {
+  it("copy: the edit ships at the folder path and the flat page is not in the output", async () => {
+    const out = await runFlatBase("copy");
+    expect(text("source/welcome/welcome.htm")).toContain("AUTHORED-WELCOME-MARKER");
+    expect(out.get("source/welcome.htm")).toBeUndefined();
+  });
+
+  it("open: the edit replaces the carried flat page and no folder page is created", async () => {
+    const out = await runFlatBase("open");
+    expect(text("source/welcome.htm")).toContain("AUTHORED-WELCOME-MARKER");
+    expect(text("source/welcome.htm")).not.toContain("CARRIED-FLAT");
+    expect(out.get("source/welcome/welcome.htm")).toBeUndefined();
+  });
+});

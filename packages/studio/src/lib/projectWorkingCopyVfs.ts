@@ -322,6 +322,12 @@ export interface ProjectWorkingCopyVfsInput {
    * generated/carried docs as-is.
    */
   authoredDocs?: AuthoredDocs;
+  /**
+   * Where an authored welcome edit is written (`welcomePagePath`); defaults to
+   * the folder path. Set by projectionInputFromState so the projection and the
+   * download's step 5c-ii write the same file.
+   */
+  welcomePath?: string;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
@@ -539,6 +545,7 @@ export function projectWorkingCopyVfs(
     touchLayoutJson,
     customCss = null,
     authoredDocs,
+    welcomePath,
     baseDisplayName,
     marksGuards = null,
     contextToleranceOverlay = null,
@@ -605,7 +612,7 @@ export function projectWorkingCopyVfs(
   // Step 0b-ii: Documentation overrides — the author's edited doc files
   // replace the generated/carried text in the projected VFS, so the OSK
   // preview and the zip read the same text. Untouched members change nothing.
-  if (authoredDocs !== undefined) applyAuthoredDocsToVfs(vfs, keyboardId, authoredDocs);
+  if (authoredDocs !== undefined) applyAuthoredDocsToVfs(vfs, keyboardId, authoredDocs, welcomePath);
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //

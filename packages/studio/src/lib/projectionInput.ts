@@ -43,6 +43,7 @@ import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.
 import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
+import { welcomePagePath } from "./welcomeFolder.ts";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -63,7 +64,8 @@ export type ProjectionState = Pick<
   | "authoredReadmeHtm"
   | "authoredReadmeMd"
   | "authoredHelpPhp"
-> & { startIr: KeyboardIR };
+> &
+  Partial<Pick<WorkingCopyState, "startWelcomeConvention">> & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
 export interface ProjectionExtras {
@@ -159,6 +161,7 @@ export function projectionInputFromState(
       authoredReadmeMd: state.authoredReadmeMd,
       authoredHelpPhp: state.authoredHelpPhp,
     },
+    welcomePath: welcomePagePath(callSite.openMode !== undefined, state.startWelcomeConvention ?? null),
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     capsHandling: capsHandling ?? null,
