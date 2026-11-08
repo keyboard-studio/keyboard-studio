@@ -86,6 +86,7 @@
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
 import { applyCustomCssToVfs } from "./customCss.ts";
+import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
@@ -316,6 +317,18 @@ export interface ProjectWorkingCopyVfsInput {
    */
   customCss?: string | null;
   /**
+   * The Documentation step's authored overrides (specs/html-editor), written
+   * at step 0b beside the custom CSS. Omit or pass all-null to leave the
+   * generated/carried docs as-is.
+   */
+  authoredDocs?: AuthoredDocs;
+  /**
+   * Where an authored welcome edit is written (`welcomePagePath`); defaults to
+   * the folder path. Set by projectionInputFromState so the projection and the
+   * download's step 5c-ii write the same file.
+   */
+  welcomePath?: string;
+  /**
    * The start keyboard's id. `customCss` is stored against it, so step 0b
    * relinks its `.kmw-keyboard-<startKeyboardId>` selectors to `keyboardId`.
    * That matters when the VFS was scaffolded under the new id already (the
@@ -539,6 +552,8 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     customCss = null,
+    authoredDocs,
+    welcomePath,
     startKeyboardId,
     baseDisplayName,
     marksGuards = null,
@@ -602,6 +617,11 @@ export function projectWorkingCopyVfs(
   // `&KMW_EMBEDCSS` file. Before the identity pass so a Track-1 id rename
   // carries the file and its store line along with the other siblings.
   warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss, startKeyboardId));
+
+  // Step 0b-ii: Documentation overrides — the author's edited doc files
+  // replace the generated/carried text in the projected VFS, so the OSK
+  // preview and the zip read the same text. Untouched members change nothing.
+  if (authoredDocs !== undefined) applyAuthoredDocsToVfs(vfs, keyboardId, authoredDocs, welcomePath);
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //

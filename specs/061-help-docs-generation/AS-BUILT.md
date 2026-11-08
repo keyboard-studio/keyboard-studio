@@ -9,7 +9,7 @@
 - Phase F documentation answers now drive the shipped documentation files: `README.md`, `source/readme.htm`, `source/welcome.htm`, `source/help/<keyboardId>.php`.
 - Adaptation merges the copied keyboard's existing welcome and help text with the author's answers instead of overwriting it.
 - The author's project home URL lands in the `.kps` as `<Info><WebSite>`.
-- A live docs preview panel in the studio shows the generated output before download.
+- The Documentation step is the only place to read and edit the generated docs — its file selector shows all six doc members, seeded from the current working copy (PR #2569). The Help & Tips step no longer carries a preview panel (issue #2531, PR #2580): the author reads the docs where they can edit them.
 - An opt-in "additional detail" battery of Phase F questions appends sections in a fixed order.
 
 ## Public contracts
@@ -20,7 +20,7 @@
 - `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts`: result gains optional `baseWelcomeHtmText`, `baseHelpPhpText`.
 - `packages/engine/src/package-descriptor/build.ts`: `PackageDescriptorIdentity.websiteUrl?`; `buildKpsContent` emits `<WebSite URL=".."></WebSite>` after `<Description>` only when non-blank.
 - `packages/studio/src/lib/serializeWorkingCopy.ts` `projectWorkingCopyForOutput` writes the four VFS paths above; no new paths.
-- Studio: `packages/studio/src/hooks/useDocsPreview.ts`, `components/DocsPreviewPanel.tsx`; `flowStepOptions.tsx` `phaseFOptions.onCommit` calls `extractHelpDocs` then `setHelpDocs`.
+- Studio: `packages/studio/src/hooks/useDocsPreview.ts` (consumed by `OutputScreen.tsx` and `useDocumentationFindings.ts`); `flowStepOptions.tsx` `phaseFOptions.onCommit` calls `extractHelpDocs` then `setHelpDocs`.
 
 ## Key decisions
 
@@ -44,6 +44,8 @@
 None at retirement. Data-model interface and contract identifiers matched the code.
 
 ## Amendments after retirement
+
+- **Docs preview moved off Help & Tips (2026-11-07, issue #2531).** The "Preview documentation" panel (`components/DocsPreviewPanel.tsx`, mounted from `PhaseFGate`) is removed; the Help & Tips step shows only its questions plus the inherited-page fix proposals. The Documentation step (`HtmlEditor`) is the only place to read and edit the help docs — it opens on the working copy's current `welcome.htm` with a file selector over all six doc members (PR #2569, the precondition for this removal). `useDocsPreview` stays: `OutputScreen` and `useDocumentationFindings` still consume it. The `editor.help.docsPreview.*` message ids are deleted from the en/fr catalogs.
 
 - **FR-006, help-page language (2026-10-08).** FR-006 originally tagged the shipped welcome and help pages with the keyboard's own primary language. It now reads: the page's declared language is the language the author says the help prose is written in, falling back to the keyboard's primary language when the author hasn't said. In code:
   - `pf_doc_language` asks for the main language: English, the keyboard's language, or another language through `pf_doc_language_other`, a langtags picker. `pf_doc_language_second` (with `pf_doc_language_second_other`) adds an optional second language, so any two of English, the keyboard's language and another language can be paired (sil_yi EN+ZH, sil_cameroon_azerty EN+FR, winchus ES alone).

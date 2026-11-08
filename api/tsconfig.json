@@ -10,7 +10,12 @@
     // strict: false, which breaks narrowing and extensionless re-exports.
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    // Vercel's builder type-checks each function resolving modules through the
+    // symlinked path, not pnpm's realpath. Match it, so a transitive type dep that
+    // pnpm doesn't hoist (e.g. @types/node's undici-types, which types global
+    // fetch Request/Response) fails here instead of only in the Vercel log.
+    "preserveSymlinks": true
   },
   "exclude": ["node_modules", "**/*.test.ts"],
   "extends": "../tsconfig.base.json",

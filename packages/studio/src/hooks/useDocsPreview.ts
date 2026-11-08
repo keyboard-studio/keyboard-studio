@@ -26,6 +26,7 @@ import { readmeFactsInputFrom } from "../lib/readmeFactsInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { applyCarveMutate } from "../steps/editorMutate.ts";
+import { resolveDocMemberText, type AuthoredDocs } from "../lib/authoredDocs.ts";
 
 export interface DocsPreview {
   readmeMd: string;
@@ -73,6 +74,13 @@ export function useDocsPreview(): DocsPreview {
   const docFixProposals = useWorkingCopyStore((s) =>
     s.instantiationMode === "adapt-existing" ? s.docFixProposals : null,
   );
+  // Documentation-step overrides (specs/html-editor): a touched member's
+  // authored text replaces the rendered preview, so preview cannot disagree
+  // with the produced package (spec 061 FR-005/FR-010).
+  const authoredWelcomeHtm = useWorkingCopyStore((s) => s.authoredWelcomeHtm);
+  const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
+  const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
+  const authoredHelpPhp = useWorkingCopyStore((s) => s.authoredHelpPhp);
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? startKeyboard?.displayName ?? "";
@@ -140,12 +148,26 @@ export function useDocsPreview(): DocsPreview {
       ),
       ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
     };
+    const authored: AuthoredDocs = {
+      authoredWelcomeHtm,
+      authoredReadmeHtm,
+      authoredReadmeMd,
+      authoredHelpPhp,
+    };
     return {
-      readmeMd: renderReadmeMd(input),
-      readmeHtm: renderReadmeHtm(input),
-      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
-      helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
+      readmeMd: resolveDocMemberText("readme-md", renderReadmeMd(input), authored),
+      readmeHtm: resolveDocMemberText("readme-htm", renderReadmeHtm(input), authored),
+      welcomeHtm: resolveDocMemberText(
+        "welcome-htm",
+        renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
+        authored,
+      ),
+      helpPhp: resolveDocMemberText(
+        "help-php",
+        renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
+        authored,
+      ),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp]);
 }

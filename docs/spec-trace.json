@@ -1190,8 +1190,8 @@
       "notes": ""
     },
     "specs/html-editor": {
-      "title": "Feature Specification: HTML editor step",
-      "hash": "sha256:07f105927dcf0953",
+      "title": "Feature Specification: HTML editor step — Documentation with file selector + WYSIWYG",
+      "hash": "sha256:612a25f258b9820c",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

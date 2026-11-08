@@ -43,6 +43,8 @@ import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.
 import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
+import { welcomePagePath } from "./welcomeFolder.ts";
+import { isOpenedWithDescriptor } from "./openMode.ts";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -59,6 +61,13 @@ export type ProjectionState = Pick<
   | "contextToleranceOverlay"
   | "touchLayoutJson"
   | "customCss"
+  | "authoredWelcomeHtm"
+  | "authoredReadmeHtm"
+  | "authoredReadmeMd"
+  | "authoredHelpPhp"
+  | "instantiationMode"
+  | "startVfs"
+  | "startWelcomeConvention"
 > & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
@@ -150,6 +159,18 @@ export function projectionInputFromState(
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
+    authoredDocs: {
+      authoredWelcomeHtm: state.authoredWelcomeHtm,
+      authoredReadmeHtm: state.authoredReadmeHtm,
+      authoredReadmeMd: state.authoredReadmeMd,
+      authoredHelpPhp: state.authoredHelpPhp,
+    },
+    // Open is read from the store, not from `openMode`: the preview passes no
+    // openMode, and the authored welcome page must land at the same path on both.
+    welcomePath: welcomePagePath(
+      isOpenedWithDescriptor(state.instantiationMode, state.startVfs, callSite.keyboardId),
+      state.startWelcomeConvention,
+    ),
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     capsHandling: capsHandling ?? null,
