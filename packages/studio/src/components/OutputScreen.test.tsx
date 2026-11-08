@@ -23,6 +23,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../hooks/useKeyboardArtifact";
 
@@ -732,6 +733,55 @@ describe("OutputScreen — unreadable base copyright notice (D5)", () => {
     fireEvent.click(screen.getByTestId("resolve-base-holder"));
 
     expect(mockRetry, "the pipeline must re-run or the emitted notice stays wrong").toHaveBeenCalled();
+  });
+
+  describe("holder choices from the &COPYRIGHT header", () => {
+    const HOLDER = "SIL  International"; // double space: must round-trip verbatim
+
+    function seedWithHeader(copyright: string) {
+      seedWithUnreadableLicense();
+      const ir = makeTestIR();
+      useWorkingCopyStore.setState({
+        startIr: { ...ir, header: { ...ir.header, copyright } } as KeyboardIR,
+      });
+    }
+
+    it("hides the choices and renders as before when nothing parses", () => {
+      seedWithUnreadableLicense();
+      useWorkingCopyStore.setState({ startIr: null });
+      render(<OutputScreen />);
+      expect(screen.queryByTestId("start-holder-choices")).toBeNull();
+      expect(screen.getByLabelText("Original copyright holder")).toBeTruthy();
+      expect(screen.getByTestId("resolve-base-holder")).toBeTruthy();
+    });
+
+    it("offers a labelled radio group; a pick alone does not confirm", () => {
+      seedWithHeader(`(c) 2016 ${HOLDER}`);
+      render(<OutputScreen />);
+      expect(screen.getByRole("radiogroup").getAttribute("aria-labelledby")).toBeTruthy();
+      mockRetry.mockClear();
+      fireEvent.click(screen.getAllByRole("radio")[0]!);
+      expect(useWorkingCopyStore.getState().startHolderOverride).toBeNull();
+      expect(mockRetry).not.toHaveBeenCalled();
+    });
+
+    it("pick + Confirm resolves with the exact string", () => {
+      seedWithHeader(`(c) 2016 ${HOLDER}`);
+      render(<OutputScreen />);
+      fireEvent.click(screen.getAllByRole("radio")[0]!);
+      fireEvent.click(screen.getByTestId("resolve-base-holder"));
+      expect(useWorkingCopyStore.getState().startHolderOverride).toBe(HOLDER);
+    });
+
+    it("typing still works when choices are shown", () => {
+      seedWithHeader(`(c) 2016 ${HOLDER}`);
+      render(<OutputScreen />);
+      fireEvent.change(screen.getByLabelText("Original copyright holder"), {
+        target: { value: "Someone Else" },
+      });
+      fireEvent.click(screen.getByTestId("resolve-base-holder"));
+      expect(useWorkingCopyStore.getState().startHolderOverride).toBe("Someone Else");
+    });
   });
 
   it("does NOT re-scaffold on a blank submission", () => {

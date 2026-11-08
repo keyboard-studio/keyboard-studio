@@ -72,6 +72,8 @@ import { ReformatConsentDialog } from "./ReformatConsentDialog.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { LdmlDownloadPanel } from "./output/LdmlDownloadPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
+import { StartHolderResolver } from "./StartHolderResolver.tsx";
+import { startCopyrightHolders } from "../lib/startCopyrightHolders.ts";
 import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { AdvancedKmnEditor } from "./AdvancedKmnEditor.tsx";
@@ -204,6 +206,14 @@ export function OutputScreen() {
   // single source for the download control's announced id — see
   // downloadKeyboardId below.
   const identity = useWorkingCopyStore((s) => s.identity);
+  // D5 holder choices: exact strings from the RAW sources (override passed as
+  // null, so the author's own D5 answer never feeds back into its candidates).
+  const startLicenseTextRaw = useWorkingCopyStore((s) => s.startLicenseText);
+  const startIrRaw = useWorkingCopyStore((s) => s.startIr);
+  const startHolderCandidates = useMemo(
+    () => startCopyrightHolders(startLicenseTextRaw, null, startIrRaw),
+    [startLicenseTextRaw, startIrRaw],
+  );
 
   // ---------------------------------------------------------------------------
   // Coverage-blocked explanation (P0 fix) — mirrors PhaseFGate's display
@@ -733,53 +743,10 @@ export function OutputScreen() {
                     it needs confirming before it can be downloaded.
                   </Trans>
                 </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const input = e.currentTarget.elements.namedItem(
-                      "startHolder",
-                    ) as HTMLInputElement | null;
-                    if (input !== null) resolveStartHolder(input.value);
-                  }}
-                  style={{ display: "flex", gap: 6, alignItems: "center" }}
-                >
-                  <input
-                    name="startHolder"
-                    type="text"
-                    aria-label={t({
-                      id: "output.status.licenseUnreadable.holderLabel",
-                      message: "Original copyright holder",
-                    })}
-                    placeholder={t({
-                      id: "output.status.licenseUnreadable.holderPlaceholder",
-                      message: "Original copyright holder",
-                    })}
-                    style={{
-                      flex: 1,
-                      padding: "5px 8px",
-                      background: "var(--app-bg)",
-                      color: "var(--app-text)",
-                      border: "1px solid var(--app-border)",
-                      borderRadius: 4,
-                      fontSize: 12,
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    data-testid="resolve-base-holder"
-                    style={{
-                      padding: "5px 12px",
-                      background: "var(--app-accent)",
-                      color: "var(--app-text-on-accent)",
-                      border: "1px solid var(--app-border)",
-                      borderRadius: 4,
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Trans id="output.status.licenseUnreadable.confirm">Confirm</Trans>
-                  </button>
-                </form>
+                <StartHolderResolver
+                  candidates={startHolderCandidates}
+                  onResolve={resolveStartHolder}
+                />
               </div>
             )}
             {/* spec 064 D6 — no attribution captured at all. Not an error the
