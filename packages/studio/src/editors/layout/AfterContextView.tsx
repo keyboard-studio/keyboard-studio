@@ -6,22 +6,35 @@
 // actually happens instead. A key that starts another deadkey (a chain) links to "after" that one.
 // A named deadkey cannot be seeded (the compiler numbers it), so nothing is guessed for it. The
 // view reads the shared compile artifact and starts no timer (decision D3).
+//
+// Literal-context mode (spec 113 US4, FR-029, FR-029a): with no deadkey given, the view lists the
+// contexts the keyboard uses (literal text and deadkeys, with how many keys each affects) and lets
+// the author enter a new one, flagged before it is used when no listed layer can type it. Once a
+// context is chosen each key is shown the same way, and its row can be set, changed, or removed
+// with the "becomes" editor; a second rule for the same context and key that never fires is shown
+// read-only with "view in code".
 
-import { useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import type { LayerCombo, LayoutContext } from "@keyboard-studio/contracts";
+import { plural } from "@lingui/core/macro";
+import { listDeadkeys } from "@keyboard-studio/contracts";
+import type { LayerCombo, LayoutBecomes, LayoutContext } from "@keyboard-studio/contracts";
+import { isContextReachable, listContexts } from "@keyboard-studio/engine";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
 import { codepointLabel } from "../../survey/codepointLabel.ts";
-import { hexId } from "./deadkeyTable.ts";
+import { deadkeyRefOf, hexId } from "./deadkeyTable.ts";
+import { BecomesEditor } from "./BecomesEditor.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { contextToSeed, deadkeyOrdinals, useLayoutAttribution } from "./useLayoutAttribution.ts";
 import type { UseLayoutAttributionOptions } from "./useLayoutAttribution.ts";
 import { useLayoutCopy } from "./useLayoutCopy.ts";
 
 export interface AfterContextViewProps {
-  /** The deadkey, by its id as the keyboard names it in contexts (`0001`, or a name). */
-  deadkeyId: string;
+  /** The deadkey, by its id as the keyboard names it in contexts (`0001`, or a name). Omit for literal-context mode. */
+  deadkeyId?: string;
   layer: LayerCombo;
+  /** The layers a new context may be typed on (literal-context mode); defaults to `layer`. */
+  layers?: readonly LayerCombo[];
   /** What the deadkey looks like to the author (its display character), when it has one. */
   displayChar?: string;
   /** Follow a chain: show the keys after the deadkey this key starts. */
@@ -33,67 +46,119 @@ export interface AfterContextViewProps {
   options?: UseLayoutAttributionOptions;
 }
 
+function contextKey(context: LayoutContext): string {
+  return context.map((el) => (el.kind === "text" ? `t:${el.text}` : `d:${el.deadkeyId.toLowerCase()}`)).join("\u0001");
+}
+
+function contextLabel(context: LayoutContext, deadkeyText: (id: string) => string): string {
+  return context.map((el) => (el.kind === "text" ? el.text : deadkeyText(el.deadkeyId))).join(" ");
+}
+
 type KeyResult =
   | { kind: "row"; text: string }
   | { kind: "chain"; deadkeyId: string }
   | { kind: "none"; text: string }
   | { kind: "nothing" };
 
-export function AfterContextView({ deadkeyId, layer, displayChar, onFollow, onViewInCode, onClose, options }: AfterContextViewProps) {
+export function AfterContextView({ deadkeyId, layer, layers, displayChar, onFollow, onViewInCode, onClose, options }: AfterContextViewProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
-  const context = useMemo((): LayoutContext => [{ kind: "deadkey", deadkeyId }], [deadkeyId]);
+  const ids = { newContext: useId() };
+  const literal = deadkeyId === undefined;
+  const [chosen, setChosen] = useState<LayoutContext | null>(null);
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const context = useMemo(
+    (): LayoutContext | null => (deadkeyId !== undefined ? [{ kind: "deadkey", deadkeyId }] : chosen),
+    [deadkeyId, chosen],
+  );
   const storeIr = useWorkingCopyStore((st) => st.ir);
   const ir = options?.ir !== undefined ? options.ir : storeIr;
   const ordinals = useMemo(() => (ir === null ? new Map<number, number>() : deadkeyOrdinals(ir)), [ir]);
-  const seedable = contextToSeed(context, ordinals) !== null;
-  const attribution = useLayoutAttribution(layer, context, options);
+  const seedable = context !== null && contextToSeed(context, ordinals) !== null;
+  const attribution = useLayoutAttribution(layer, context ?? undefined, options);
+  const deadkeyText = (id: string): string => t({ id: "editor.layout.after.contextDeadkey", message: `Deadkey ${{ id }}` });
+  const knownContexts = useMemo(() => (literal && ir !== null ? listContexts(ir) : []), [literal, ir]);
+  const deadkeys = useMemo(
+    () =>
+      ir === null
+        ? []
+        : listDeadkeys(ir).flatMap((info) => {
+            const ref = deadkeyRefOf(info);
+            return ref === null ? [] : [{ ref, label: info.displayChar ?? ref }];
+          }),
+    [ir],
+  );
+  const draftContext = useMemo((): LayoutContext | null => (draft === "" ? null : [{ kind: "text", text: draft.normalize("NFC") }]), [draft]);
+  const draftUnreachable = literal && ir !== null && draftContext !== null && !isContextReachable(ir, layers ?? [layer], draftContext);
+  const contextText = context === null ? "" : contextLabel(context, (id) => id);
+  const seedText = context === null ? "" : context.map((el) => (el.kind === "text" ? el.text : "")).join("");
 
-  const heading = t({
-    id: "editor.layout.after.heading",
-    message: `Keys after deadkey ${{ name: displayChar ?? deadkeyId }} (${{ layer: copy.layerName(layer) }} layer)`,
-  });
+  const heading =
+    deadkeyId !== undefined
+      ? t({
+          id: "editor.layout.after.heading",
+          message: `Keys after deadkey ${{ name: displayChar ?? deadkeyId }} (${{ layer: copy.layerName(layer) }} layer)`,
+        })
+      : context === null
+        ? t({ id: "editor.layout.after.headingChoose", message: "Keys after typed text" })
+        : t({
+            id: "editor.layout.after.headingText",
+            message: `Keys after ${{ name: contextText }} (${{ layer: copy.layerName(layer) }} layer)`,
+          });
 
   const results = useMemo(() => {
-    const out: Array<{ vkey: string; label: string; result: KeyResult; ruleNodeId: string | null; editable: boolean }> = [];
-    const want = deadkeyId.toLowerCase();
+    const out: Array<{
+      vkey: string;
+      label: string;
+      result: KeyResult;
+      ruleNodeId: string | null;
+      editable: boolean;
+      becomes: LayoutBecomes | null;
+      neverFires: Array<{ ruleNodeId: string }>;
+    }> = [];
+    if (context === null) return out;
+    const wanted = contextKey(context);
+    const inContext = new Set(context.flatMap((el) => (el.kind === "deadkey" ? [el.deadkeyId.toLowerCase()] : [])));
     for (const cell of attribution.cells) {
       if (cell.frame) continue;
-      const step = attribution.steps.find(
-        (s) =>
-          s.vkey === cell.vkey &&
-          s.context !== undefined &&
-          s.context.length === 1 &&
-          s.context[0]?.kind === "deadkey" &&
-          s.context[0].deadkeyId.toLowerCase() === want,
-      );
+      const step = attribution.steps.find((s) => s.vkey === cell.vkey && s.context !== undefined && contextKey(s.context) === wanted);
       if (step === undefined) continue;
-      const row = cell.rows.find(
-        (r) => r.context.length === 1 && r.context[0]?.kind === "deadkey" && r.context[0].deadkeyId.toLowerCase() === want,
-      );
+      const matching = cell.rows.filter((r) => contextKey(r.context) === wanted);
+      const row = matching.find((r) => r.readOnlyReason !== "never-fires");
+      const neverFires = matching.filter((r) => r.readOnlyReason === "never-fires").map((r) => ({ ruleNodeId: r.ruleNodeId }));
       // The simulator reports the compiler's numbers; name them by the working copy's ids.
       const idOf = (n: number): string => {
         for (const [id, ordinal] of ordinals) if (ordinal === n) return hexId(id);
         return hexId(n);
       };
-      const started = step.step.pendingDeadkeys.find((p) => idOf(p.id) !== want);
+      const started = step.step.pendingDeadkeys.find((p) => !inContext.has(idOf(p.id)));
       let result: KeyResult;
       if (started !== undefined) result = { kind: "chain", deadkeyId: idOf(started.id) };
       else if (step.step.outputAfter === "") result = row !== undefined ? { kind: "nothing" } : { kind: "none", text: "" };
-      else result = row !== undefined ? { kind: "row", text: step.step.outputAfter } : { kind: "none", text: step.step.outputAfter };
+      else if (row !== undefined) result = { kind: "row", text: step.step.outputAfter };
+      else {
+        // The simulator reports the whole text after the keystroke, the context text included.
+        const after = step.step.outputAfter;
+        result = { kind: "none", text: seedText !== "" && after.startsWith(seedText) ? after.slice(seedText.length) : after };
+      }
       out.push({
         vkey: cell.vkey,
         label: cell.vkey.replace(/^K_/, ""),
         result,
         ruleNodeId: row?.ruleNodeId ?? null,
         editable: row?.editable ?? false,
+        becomes: row !== undefined && row.editable && row.output !== null ? (row.output as LayoutBecomes) : null,
+        neverFires,
       });
     }
     return out;
-  }, [attribution, deadkeyId, ordinals]);
+  }, [attribution, context, ordinals, seedText]);
 
   let status: string | null = null;
-  if (!seedable) {
+  if (context === null) {
+    status = null;
+  } else if (!seedable) {
     status = t({
       id: "editor.layout.after.namedDeadkey",
       message: "This deadkey has a name rather than a number, so the studio cannot try it out here. Nothing is shown rather than a guess. You can change it in the Code tab.",
@@ -118,6 +183,83 @@ export function AfterContextView({ deadkeyId, layer, displayChar, onFollow, onVi
           {t({ id: "editor.layout.after.close", message: "Back to the grid" })}
         </button>
       </div>
+
+      {literal && chosen === null && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {knownContexts.length > 0 && (
+            <ul style={listStyle} data-testid="after-context-list" aria-label={t({ id: "editor.layout.after.listAria", message: "Contexts the keyboard uses" })}>
+              {knownContexts.map((c) => {
+                const only = c.context.length === 1 ? c.context[0] : undefined;
+                return (
+                  <li key={contextKey(c.context)}>
+                    <button
+                      type="button"
+                      onClick={() => (only?.kind === "deadkey" ? onFollow(only.deadkeyId) : setChosen(c.context))}
+                      data-testid="after-context-choice"
+                      className="ks-focus-ring ks-hit-target ks-press"
+                      style={buttonStyle}
+                    >
+                      {contextLabel(c.context, deadkeyText)}{" "}
+                      <span style={{ color: TEXT_DIM }}>
+                        {t({ id: "editor.layout.after.keyCount", message: `(${plural(c.keyCount, { one: "# key", other: "# keys" })})` })}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div style={rowStyle} role="group" aria-label={t({ id: "editor.layout.after.newAria", message: "Enter a new context" })}>
+            <label htmlFor={ids.newContext} style={{ fontSize: 12, color: TEXT_DIM }}>
+              {t({ id: "editor.layout.after.newLabel", message: "Text typed before the key (for example n)" })}
+            </label>
+            <input
+              id={ids.newContext}
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              data-testid="after-context-new-input"
+              className="ks-focus-ring"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              disabled={draftContext === null}
+              onClick={() => {
+                if (draftContext !== null) setChosen(draftContext);
+              }}
+              data-testid="after-context-new-use"
+              className="ks-focus-ring ks-hit-target ks-press"
+              style={buttonStyle}
+            >
+              {t({ id: "editor.layout.after.newUse", message: "Show keys after it" })}
+            </button>
+          </div>
+          {draftUnreachable && (
+            <p role="status" style={noteStyle} data-testid="after-context-unreachable">
+              {t({
+                id: "editor.layout.after.unreachable",
+                message: "No layer in the list can type this text, so the rule you add would not be reached. You can still add it.",
+              })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {literal && chosen !== null && (
+        <button
+          type="button"
+          onClick={() => {
+            setChosen(null);
+            setEditing(null);
+          }}
+          data-testid="after-context-change"
+          className="ks-focus-ring ks-hit-target ks-press"
+          style={buttonStyle}
+        >
+          {t({ id: "editor.layout.after.change", message: "Choose another context" })}
+        </button>
+      )}
 
       {status !== null && (
         <p role="status" style={noteStyle} data-testid="after-context-status">
@@ -167,6 +309,19 @@ export function AfterContextView({ deadkeyId, layer, displayChar, onFollow, onVi
                   </button>
                 </>
               )}
+              {literal && context !== null && (r.editable || r.ruleNodeId === null) && editing !== r.vkey && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(r.vkey)}
+                  data-testid="after-context-edit"
+                  className="ks-focus-ring ks-hit-target ks-press"
+                  style={buttonStyle}
+                >
+                  {r.ruleNodeId === null
+                    ? t({ id: "editor.layout.after.add", message: `Add a result for ${{ key: r.label }}` })
+                    : t({ id: "editor.layout.after.edit", message: `Change the result for ${{ key: r.label }}` })}
+                </button>
+              )}
               {r.ruleNodeId !== null && !r.editable && (
                 <button
                   type="button"
@@ -177,6 +332,31 @@ export function AfterContextView({ deadkeyId, layer, displayChar, onFollow, onVi
                 >
                   {t({ id: "editor.layout.after.viewInCode", message: "View in code" })}
                 </button>
+              )}
+              {r.neverFires.map((n) => (
+                <span key={n.ruleNodeId} style={rowStyle} data-testid="after-context-never-fires">
+                  <span style={{ color: TEXT_DIM }}>{copy.readOnlyReasonText("never-fires")}</span>
+                  <button
+                    type="button"
+                    onClick={() => onViewInCode(n.ruleNodeId)}
+                    data-testid="after-context-view-in-code"
+                    className="ks-focus-ring ks-hit-target ks-press"
+                    style={linkButtonStyle}
+                  >
+                    {t({ id: "editor.layout.after.viewInCode", message: "View in code" })}
+                  </button>
+                </span>
+              ))}
+              {literal && context !== null && editing === r.vkey && (
+                <BecomesEditor
+                  vkey={r.vkey}
+                  layer={layer}
+                  context={context}
+                  current={r.becomes}
+                  deadkeys={deadkeys}
+                  onDone={() => setEditing(null)}
+                  onCancel={() => setEditing(null)}
+                />
               )}
             </li>
           ))}
@@ -209,6 +389,7 @@ const buttonStyle = {
   background: "transparent",
   color: TEXT_MAIN,
 } as const;
+const inputStyle = { padding: "4px 8px", fontSize: 14, fontFamily: FONT, border: `1px solid ${BORDER}`, borderRadius: 4, width: 120 } as const;
 const linkButtonStyle = {
   background: "none",
   border: "none",

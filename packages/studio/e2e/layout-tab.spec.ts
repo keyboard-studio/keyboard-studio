@@ -1,4 +1,4 @@
-// E2E: spec 113 (Layout Studio) T048 — US1 row; US2 (T070), US3 (T087), US6 (T115) and US8 (T105) rows below.
+// E2E: spec 113 (Layout Studio) T048 — US1 row; US2 (T070), US3 (T087), US4 (T121), US6 (T115) and US8 (T105) rows below.
 //
 // Copy a simple positional keyboard, open Mechanical Gallery -> Layout, and check that:
 //   - the default-layer cells show the copied keyboard's characters, labelled "from the starting
@@ -12,7 +12,7 @@
 // Run:
 //   cd packages/studio && npx playwright test layout-tab.spec.ts --project=desktop
 
-import { test, expect, type Page } from "playwright/test";
+import { test, expect, type Locator, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
@@ -301,6 +301,64 @@ async function codeApply(page: Page): Promise<void> {
   await page.getByTestId("kmn-code-apply").click();
   await expect(page.getByTestId("kmn-code-dirty")).toHaveCount(0, { timeout: 120_000 });
 }
+
+/** Open the "after typed text" view on `context` (the Layout tab's literal-context mode). */
+async function openAfterText(page: Page, context: string): Promise<Locator> {
+  await page.getByTestId("layout-after-select").selectOption({ value: "__literal__" });
+  await page.getByTestId("after-context-new-input").fill(context);
+  await page.getByTestId("after-context-new-use").click();
+  const after = page.getByTestId("after-context-view");
+  await expect(after.locator('[data-vkey="K_G"]')).toBeVisible({ timeout: 60_000 });
+  return after;
+}
+
+test.describe("spec 113 Layout tab - US4", () => {
+  test.setTimeout(600_000);
+
+  test("after n, set g to eng; typing n g gives it; the download has the rule; a never-fires duplicate shows read-only", async ({ page }) => {
+    await reachMechanicalGallery(page, "basic_kbdus", "en", "é");
+    await openLayoutTab(page);
+
+    // Choose "after n", select g, say what n then g becomes.
+    const after = await openAfterText(page, "n");
+    await after.locator('[data-vkey="K_G"] [data-testid="after-context-edit"]').click();
+    await page.getByTestId("becomes-input").fill("ŋ");
+    await page.getByTestId("becomes-set").click();
+
+    // The simulator, seeded with n, types the entered text for g (one validation cycle).
+    const result = (): Promise<string> =>
+      after.locator('[data-vkey="K_G"] [data-testid="after-context-result"]').first().textContent({ timeout: 60_000 }).then((t) => t ?? "");
+    await expect.poll(result, { timeout: 60_000 }).toContain("ŋ");
+
+    // A second rule for the same context and key, written in the Code tab, never fires.
+    await page.getByTestId("editor-view-tab-code").click();
+    await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
+    await codeSelect(page, "U+006E + [K_G] > U+014B");
+    await page.keyboard.press("End");
+    await page.keyboard.insertText("\nU+006E + [K_G] > U+0272");
+    await codeApply(page);
+
+    await page.getByTestId("editor-view-tab-layout").click();
+    // The pane keeps the chosen context while the author is in the Code tab.
+    await expect(after.locator('[data-vkey="K_G"]')).toBeVisible({ timeout: 60_000 });
+    const row = after.locator('[data-vkey="K_G"]');
+    await expect(row.getByTestId("after-context-never-fires")).toContainText("never fires", { timeout: 60_000 });
+    await expect(row.getByTestId("after-context-edit")).toHaveCount(1);
+    await expect(row.getByTestId("after-context-never-fires").getByTestId("after-context-view-in-code")).toBeVisible();
+
+    // The download has the rule. Output opens once the Mechanisms step is finished.
+    await page.getByTestId("editor-view-tab-assign").click();
+    const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
+    if (await startButton.isVisible().catch(() => false)) await startButton.click();
+    await driveMechanismsGallery(page, {});
+    await navigateToOutput(page);
+    const download = await triggerDownload(page);
+    const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
+    const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "the download carries a .kmn").toBeDefined();
+    expect(new TextDecoder().decode(kmn![1])).toMatch(/U\+006E \+ \[K_G\] > U\+014B/);
+  });
+});
 
 test.describe("spec 113 Layout tab - US6", () => {
   test.setTimeout(600_000);

@@ -4,15 +4,17 @@
 // every DESKTOP_ISO_GEOMETRY key in every layer, simulate the grid with an
 // empty context, and verify the cells against it. Asserts the honesty rule
 // (SC-001, SC-002) and prints per-keyboard cell counts by class.
-import { beforeAll, describe, expect, it } from "vitest";
-import type { LayerCombo, LayoutContext, SimulationStep, SimulatorContextSeed } from "@keyboard-studio/contracts";
-import { DESKTOP_ISO_GEOMETRY } from "../layout-chart/geometry.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { isPlusSeparator } from "@keyboard-studio/contracts";
+import type { KeyboardIR, LayerCombo, LayoutContext, SimulationStep, SimulatorContextSeed } from "@keyboard-studio/contracts";
+import { DESKTOP_ISO_GEOMETRY, isFrameKey } from "../layout-chart/geometry.js";
 import { simulateEach } from "../simulator/node.js";
 import { chordToSimKeyInput } from "../validator/layer-a-prime.js";
 import { buildCorpusKeyboard } from "./__fixtures__/compileCorpus.js";
 import type { CorpusKeyboardBuild } from "./__fixtures__/compileCorpus.js";
 import { CORPUS_SET, NO_WEB_TARGET, RELEASE_ROOT, corpusAvailable } from "./__fixtures__/corpusSet.js";
-import { attributeLayer, isMnemonic, listLayers, verifyCells } from "./index.js";
+import { classifyEntryRules } from "./entryRules.js";
+import { attributeLayer, findShadowedRules, isMnemonic, listLayers, verifyCells } from "./index.js";
 import type { CellStep, KeyCellAttribution, RowAttribution } from "./index.js";
 
 const VKEYS = DESKTOP_ISO_GEOMETRY.map((k) => k.id);
@@ -80,6 +82,40 @@ describe("layout attribution corpus: precondition", () => {
     expect(corpusAvailable, `${RELEASE_ROOT} is missing: the attribution suite proves nothing without it`).toBe(true);
   });
 });
+
+/** The editable share of one keyboard's entry-group rules (SC-009), for the printed baseline. */
+interface ShareRow {
+  id: string;
+  category: string;
+  rules: number;
+  editable: number;
+  /** True when no rule is in an FR-013 read-only shape (so 100% is required). */
+  noReadOnlyShapes: boolean;
+}
+const shares: ShareRow[] = [];
+
+/**
+ * True when the entry group has a rule in an FR-013 read-only shape, found from the IR's element
+ * kinds rather than from the classifier: a store (`any`, `notany`, `index`, `outs`), `context()`,
+ * `beep`, `use()`, a condition or other raw element, a match/nomatch rule, an opaque fragment in
+ * the group, a readonly group, or a rule that can never fire (a second rule for one keystroke).
+ */
+function hasReadOnlyShapes(ir: KeyboardIR): boolean {
+  const group = classifyEntryRules(ir)[0]?.group;
+  if (group === undefined) return true;
+  if (group.readonly) return true;
+  // A rule on a frame key (Tab, Enter, ...) is outside the editable layout block.
+  const frame = new Set(DESKTOP_ISO_GEOMETRY.filter((k) => k.frame).map((k) => k.id));
+  if (group.rules.some((r) => r.context.some((el) => el.kind === "vkey" && (frame.has(el.name) || isFrameKey(el.name))))) return true;
+  if (ir.raw.some((f) => f.groupNodeId === group.nodeId && f.sourceText.includes(">"))) return true;
+  if (findShadowedRules(ir).some((sh) => group.rules.some((r) => r.nodeId === sh.ruleNodeId))) return true;
+  const plain = new Set(["char", "vkey", "deadkey", "namedDeadkey", "nul"]);
+  return group.rules.some(
+    (r) =>
+      r.matchKind !== undefined ||
+      [...r.context, ...r.output].some((el) => !plain.has(el.kind) && !isPlusSeparator(el as { kind: string; text?: string })),
+  );
+}
 
 for (const entry of CORPUS_SET) {
   describe(`${entry.id} (${entry.category})`, () => {
@@ -214,5 +250,100 @@ for (const entry of CORPUS_SET) {
         expect(checked, `${entry.id}: no deadkey row was actually simulated`).toBeGreaterThan(0);
       }
     });
+
+    // SC-007 (context half): every editable row whose context is literal text (no deadkey) types
+    // exactly what the row says when the simulator is seeded with that text and the row's
+    // keystroke is pressed. Checked against the simulator directly, not through verifyCells.
+    it("every editable literal-context row matches the simulator seeded with its context (SC-007)", () => {
+      if (NO_WEB_TARGET.has(entry.id)) return;
+      const layers = listLayers(build.ir);
+      let checked = 0;
+      let demoted = 0;
+      let hasLiteralRows = false;
+      const mismatches: string[] = [];
+      for (const layer of layers) {
+        const cells = attributeLayer(build.ir, layer, VKEYS);
+        const seeded: Array<{ ci: number; ri: number; seed: SimulatorContextSeed }> = [];
+        cells.forEach((cell, ci) => {
+          cell.rows.forEach((row, ri) => {
+            if (row.shape !== "literal-context" || row.context.some((el) => el.kind === "deadkey")) return;
+            hasLiteralRows = true;
+            if (!row.editable) return;
+            const seed = seedFor(row.context, new Map());
+            if (seed !== null) seeded.push({ ci, ri, seed });
+          });
+        });
+        const modifiers = layer.filter((m) => m !== "NCAPS");
+        const flat: CellStep[] = [];
+        const typed = new Map<string, SimulationStep>();
+        for (const { ci, ri, seed } of seeded) {
+          const cell = cells[ci]!;
+          const row = cell.rows[ri]!;
+          const input = chordToSimKeyInput({ vkey: cell.vkey, modifiers: [...modifiers] });
+          if (input === null) continue;
+          const step = simulateEach(build.compiled, [input], seed)[0]!;
+          typed.set(`${ci}:${ri}`, step);
+          flat.push({ vkey: cell.vkey, layer, context: row.context, step });
+        }
+        const verified = verifyCells(cells, flat);
+        for (const { ci, ri } of seeded) {
+          const cell = verified[ci]!;
+          const row = cell.rows[ri]!;
+          const step = typed.get(`${ci}:${ri}`);
+          const want = rowWants(row);
+          if (!row.editable) demoted += 1;
+          if (!row.editable || step === undefined || want === null) continue;
+          checked += 1;
+          if (step.outputAfter !== want.text || step.pendingDeadkeys.length !== want.deadkeys) {
+            mismatches.push(`[${[...layer, cell.vkey].join(" ")}] ${JSON.stringify(row.context)}: row ${JSON.stringify(want)}, typed ${JSON.stringify(step.outputAfter)}+${step.pendingDeadkeys.length}dk`);
+          }
+        }
+      }
+      console.info(`[INFO] ${entry.id}: SC-007 literal-context rows checked=${checked} demoted-by-verification=${demoted}`);
+      expect(mismatches).toEqual([]);
+      if (entry.category === "literal-context" && hasLiteralRows) {
+        expect(checked + demoted, `${entry.id}: no literal-context row was actually simulated`).toBeGreaterThan(0);
+      }
+    });
+
+    // SC-009: for a positional keyboard with no FR-013 read-only shape, 100% of its rules are
+    // editable (after the verification pass); the share is recorded for every other keyboard as
+    // the store-based next-frontier baseline.
+    it("every rule of a keyboard with no read-only shapes is editable (SC-009)", () => {
+      const ir = build.ir;
+      const rules = classifyEntryRules(ir);
+      const editable = new Set<string>();
+      if (!isMnemonic(ir)) {
+        for (const layer of listLayers(ir)) {
+          const cells = attributeLayer(ir, layer, VKEYS);
+          const steps = NO_WEB_TARGET.has(entry.id) ? [] : gridSteps(build, layer);
+          const verified = steps.length === 0 ? cells : verifyCells(cells, steps);
+          for (const cell of verified) for (const row of [cell.plain, ...cell.rows]) if (row?.editable === true) editable.add(row.ruleNodeId);
+        }
+      }
+      const noReadOnlyShapes = !isMnemonic(ir) && !hasReadOnlyShapes(ir);
+      shares.push({ id: entry.id, category: entry.category, rules: rules.length, editable: editable.size, noReadOnlyShapes });
+      if (noReadOnlyShapes) {
+        const missed = rules.filter((r) => !editable.has(r.nodeId)).map((r) => r.nodeId);
+        expect(missed, `${entry.id} has no read-only shapes but these rules are not editable`).toEqual([]);
+      }
+    });
   });
 }
+
+// The printed SC-009 baseline: the editable share of each non-mnemonic keyboard's rules.
+afterAll(() => {
+  if (shares.length === 0) return;
+  const lines = [
+    "| Keyboard | Category | Rules | Editable | Share | No read-only shapes |",
+    "|---|---|---:|---:|---:|---|",
+    ...shares
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((r) => {
+        const pct = r.rules === 0 ? "n/a" : `${((100 * r.editable) / r.rules).toFixed(1)}%`;
+        return `| ${r.id} | ${r.category} | ${r.rules} | ${r.editable} | ${pct} | ${r.noReadOnlyShapes ? "yes" : "no"} |`;
+      }),
+  ];
+  console.info(`[INFO] SC-009 editable share per keyboard\n${lines.join("\n")}`);
+});

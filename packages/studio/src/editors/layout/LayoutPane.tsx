@@ -68,6 +68,8 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   // made (its space row is proposed). All three are ids as contexts name them (`0001`).
   const [openDeadkey, setOpenDeadkey] = useState<string | null>(null);
   const [afterDeadkey, setAfterDeadkey] = useState<string | null>(null);
+  // The "after typed text" view (literal contexts); mutually exclusive with `afterDeadkey`.
+  const [afterLiteral, setAfterLiteral] = useState(false);
   const [newDeadkey, setNewDeadkey] = useState<string | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -322,17 +324,22 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         >
           {t({ id: "editor.layout.pane.addLayer", message: "Add layer" })}
         </button>
-        {deadkeys.length > 0 && (
+        {(
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             {t({ id: "editor.layout.pane.afterLabel", message: "Show keys after" })}
             <select
-              value={afterDeadkey ?? ""}
-              onChange={(e) => setAfterDeadkey(e.target.value === "" ? null : e.target.value)}
+              value={afterLiteral ? "__literal__" : (afterDeadkey ?? "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setAfterLiteral(v === "__literal__");
+                setAfterDeadkey(v === "" || v === "__literal__" ? null : v);
+              }}
               data-testid="layout-after-select"
               className="ks-focus-ring"
               style={addButtonStyle}
             >
               <option value="">{t({ id: "editor.layout.pane.afterNone", message: "Nothing (the plain grid)" })}</option>
+              <option value="__literal__">{t({ id: "editor.layout.pane.afterText", message: "Typed text" })}</option>
               {deadkeys.map((d) => (
                 <option key={d.ref} value={d.ref}>
                   {t({ id: "editor.layout.pane.afterDeadkey", message: `Deadkey ${{ label: d.label }}` })}
@@ -363,17 +370,24 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         </p>
       )}
 
-      {afterDeadkey !== null ? (
+      {afterDeadkey !== null || afterLiteral ? (
         <AfterContextView
-          key={`${afterDeadkey}|${layerId}`}
-          deadkeyId={afterDeadkey}
+          key={`${afterDeadkey ?? "literal"}|${layerId}`}
+          {...(afterDeadkey !== null ? { deadkeyId: afterDeadkey } : {})}
           layer={layer}
-          {...(deadkeys.find((d) => d.ref.toLowerCase() === afterDeadkey.toLowerCase()) !== undefined
+          layers={layers}
+          {...(afterDeadkey !== null && deadkeys.find((d) => d.ref.toLowerCase() === afterDeadkey.toLowerCase()) !== undefined
             ? { displayChar: deadkeys.find((d) => d.ref.toLowerCase() === afterDeadkey.toLowerCase())!.label }
             : {})}
-          onFollow={setAfterDeadkey}
+          onFollow={(id) => {
+            setAfterLiteral(false);
+            setAfterDeadkey(id);
+          }}
           onViewInCode={onViewInCode}
-          onClose={() => setAfterDeadkey(null)}
+          onClose={() => {
+            setAfterLiteral(false);
+            setAfterDeadkey(null);
+          }}
         />
       ) : (
         <>
@@ -414,7 +428,10 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
           deadkeyId={openDeadkey}
           layers={layers}
           onViewInCode={onViewInCode}
-          onShowAfter={setAfterDeadkey}
+          onShowAfter={(id) => {
+            setAfterLiteral(false);
+            setAfterDeadkey(id);
+          }}
           proposeSpaceRow={newDeadkey === openDeadkey}
         />
       )}

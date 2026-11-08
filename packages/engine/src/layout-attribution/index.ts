@@ -11,6 +11,7 @@ export { attributeLayer } from "./attributeLayer.js";
 export { listLayers } from "./listLayers.js";
 export { listContexts } from "./listContexts.js";
 export { isMnemonic } from "./isMnemonic.js";
+export { isContextReachable } from "./isContextReachable.js";
 export { findShadowedRules } from "./findShadowedRules.js";
 export { verifyCells } from "./verifyCells.js";
 export type { CellStep, FiredRuleCheck } from "./verifyCells.js";

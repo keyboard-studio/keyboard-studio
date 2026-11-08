@@ -327,12 +327,12 @@ never-fires duplicates shown read-only.
 replacement matches the simulator seeded with `n`; add "after `a`, `e` becomes `æ`"; typing `a e`
 gives `æ`.
 
-- [ ] T116 [P] [US4] Add `isContextReachable(ir, layers, context)` to `EN/layout-attribution/` (can some listed layer type the context's characters?) with tests in `EN/layout-attribution/isContextReachable.test.ts`
-- [ ] T117 [P] [US4] Extend `LY/AfterContextView.test.tsx` with literal-context mode: the context list (literal contexts and deadkeys, with key counts, from `listContexts`); entering a new context, with an unreachable one flagged before confirm (FR-029a); a "becomes" edit writes exactly the entered text, optionally with deadkeys, and never guesses what is kept; two rules for one context and key show the firing one editable and the other "never fires", read-only, with "view in code"
-- [ ] T118 [US4] Implement literal-context mode in `LY/AfterContextView.tsx` and the "becomes" editor `LY/BecomesEditor.tsx` writing `set-row` / `remove-row` `kmn-edits` entries (undo kind `l`); passes T117
-- [ ] T119 [US4] SC-007 context half and SC-009 in `EN/layout-attribution/layout-attribution.corpus.test.ts`: every editable literal-context row matches `simulateEach` seeded with its context; for every positional corpus keyboard with no FR-013 read-only shapes, 100% of rules editable; print the editable share per keyboard for the rest and paste the table into [research.md](research.md) as the store-based next-frontier baseline
-- [ ] T120 [US4] i18n for Phase 9 (as T045)
-- [ ] T121 [US4] E2E US4 row in `E2E`: "after `n`", set `g` → `ŋ`; typing `n g` gives `ŋ`; the download has the rule; a never-fires duplicate shows read-only
+- [x] T116 [P] [US4] Add `isContextReachable(ir, layers, context)` to `EN/layout-attribution/` (can some listed layer type the context's characters?) with tests in `EN/layout-attribution/isContextReachable.test.ts`
+- [x] T117 [P] [US4] Extend `LY/AfterContextView.test.tsx` with literal-context mode: the context list (literal contexts and deadkeys, with key counts, from `listContexts`); entering a new context, with an unreachable one flagged before confirm (FR-029a); a "becomes" edit writes exactly the entered text, optionally with deadkeys, and never guesses what is kept; two rules for one context and key show the firing one editable and the other "never fires", read-only, with "view in code"
+- [x] T118 [US4] Implement literal-context mode in `LY/AfterContextView.tsx` and the "becomes" editor `LY/BecomesEditor.tsx` writing `set-row` / `remove-row` `kmn-edits` entries (undo kind `l`); passes T117
+- [x] T119 [US4] SC-007 context half and SC-009 in `EN/layout-attribution/layout-attribution.corpus.test.ts`: every editable literal-context row matches `simulateEach` seeded with its context; for every positional corpus keyboard with no FR-013 read-only shapes, 100% of rules editable; print the editable share per keyboard for the rest and paste the table into [research.md](research.md) as the store-based next-frontier baseline
+- [x] T120 [US4] i18n for Phase 9 (as T045)
+- [x] T121 [US4] E2E US4 row in `E2E`: "after `n`", set `g` → `ŋ`; typing `n g` gives `ŋ`; the download has the rule; a never-fires duplicate shows read-only
 
 **Checkpoint**: Commit `spec 113 T116-T121`.
 

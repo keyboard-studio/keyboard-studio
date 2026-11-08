@@ -559,10 +559,58 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-08T06:24:43.311Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T116",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:36:09.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T117",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:43.999Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T118",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:44.273Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T119",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:44.544Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T120",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:44.814Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T121",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:45.085Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T115",
+  "currentTask": "T121",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -1078,6 +1126,55 @@
     "T115": {
       "status": "DONE",
       "did": "E2E US6 row (written, not run)",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T116": {
+      "status": "DONE",
+      "did": "isContextReachable added to engine layout-attribution with tests",
+      "files": [
+        "packages/engine/src/layout-attribution/isContextReachable.ts",
+        "packages/engine/src/layout-attribution/isContextReachable.test.ts",
+        "packages/engine/src/layout-attribution/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T117": {
+      "status": "DONE",
+      "did": "literal-context mode tests added to AfterContextView.test.tsx",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.test.tsx"
+      ]
+    },
+    "T118": {
+      "status": "DONE",
+      "did": "literal-context mode in AfterContextView plus BecomesEditor writing set-row/remove-row; LayoutPane Typed text option",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.tsx",
+        "packages/studio/src/editors/layout/BecomesEditor.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T119": {
+      "status": "DONE",
+      "did": "SC-007 literal-context half and SC-009 corpus cases; editable-share table in research.md R14",
+      "files": [
+        "packages/engine/src/layout-attribution/layout-attribution.corpus.test.ts",
+        "specs/113-layout-studio/research.md"
+      ]
+    },
+    "T120": {
+      "status": "DONE",
+      "did": "i18n ids extracted and French written for Phase 9; i18n-catalog-lint passes",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T121": {
+      "status": "DONE",
+      "did": "E2E US4 row added and passing",
       "files": [
         "packages/studio/e2e/layout-tab.spec.ts"
       ]

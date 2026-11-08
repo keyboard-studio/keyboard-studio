@@ -495,3 +495,43 @@ its node id and source line. The header is one object, so there is no "headers" 
 `after` (the preceding store) for position. A group container's anchor also records `usingKeys`
 (rule text depends on it), and `add-group` / `remove-group` carry the group with empty `rules`;
 a group's items travel as ordinary insert / remove changes.
+
+## R14. Editable share per corpus keyboard (SC-009 baseline, T119)
+
+Printed by `layout-attribution.corpus.test.ts` (the SC-009 case). A rule counts as editable when some
+layer shows it as an editable row after the verification pass against the compiled keyboard; the
+total is every rule (and opaque rule fragment) in the entry group. The last column is true when an
+independent scan of the IR finds no FR-013 read-only shape (store, `context()`, `beep`, `use()`,
+condition, match rule, opaque fragment, readonly group, frame-key rule, or never-fires duplicate);
+those keyboards are asserted at 100%. Everything else is the store-based next-frontier baseline.
+A mnemonic keyboard is read-only throughout (FR-018), so it reads 0%.
+
+| Keyboard | Category | Rules | Editable | Share | No read-only shapes |
+|---|---|---:|---:|---:|---|
+| akha_lahu | store-based | 7 | 3 | 42.9% | no |
+| basic_kbdfr | simple-positional | 110 | 109 | 99.1% | no |
+| basic_kbdgr | iso | 111 | 110 | 99.1% | no |
+| basic_kbduk | iso | 111 | 111 | 100.0% | yes |
+| basic_kbdus | simple-positional | 97 | 97 | 100.0% | yes |
+| cs_pinyin | opaque | 7 | 0 | 0.0% | no |
+| dzardzongke | deadkey-fanout | 4 | 2 | 50.0% | no |
+| enga | conditional | 12 | 4 | 33.3% | no |
+| enggano | mnemonic | 23 | 0 | 0.0% | no |
+| koalibrere | deadkey-keystroke | 23 | 23 | 100.0% | no |
+| korean_phonetic | opaque | 13 | 0 | 0.0% | no |
+| maltese | deadkey-fanout | 8 | 6 | 75.0% | no |
+| northern_sierra_miwok | literal-context | 30 | 30 | 100.0% | yes |
+| pau_cin_hau | store-based | 1 | 0 | 0.0% | no |
+| persian_phonetic | later-group | 72 | 71 | 98.6% | no |
+| postmodern_english_us_dualstroke | deadkey-keystroke | 138 | 138 | 100.0% | yes |
+| sil_cameroon_qwerty | simple-positional | 264 | 175 | 66.3% | no |
+| sil_euro_latin | opaque | 131 | 0 | 0.0% | no |
+| sil_madurese | conditional | 3 | 0 | 0.0% | no |
+| sil_sgaw_karen | later-group | 96 | 95 | 99.0% | no |
+| sil_wayuu | deadkey-fanout | 12 | 5 | 41.7% | no |
+| sil_yoruba8 | conditional | 147 | 0 | 0.0% | no |
+| sxava_eo | iso | 34 | 34 | 100.0% | yes |
+| taiwan_austronesian | literal-context | 20 | 6 | 30.0% | no |
+| thai_kedmanee_mattix | literal-context | 101 | 101 | 100.0% | yes |
+| txo_toto | literal-context | 52 | 51 | 98.1% | no |
+

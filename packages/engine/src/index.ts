@@ -1220,6 +1220,7 @@ export {
   attributeLayer,
   classifyRule,
   findShadowedRules,
+  isContextReachable,
   isMnemonic,
   listContexts,
   listLayers,
