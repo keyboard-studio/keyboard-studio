@@ -399,10 +399,22 @@ async function fetchCldrKeyboardSourceToVfs(
     ],
   );
   if (touchReport !== undefined) {
-    summarize("phone touch", touchReport.skipped.length, []);
+    summarize(
+      "phone touch",
+      touchReport.skipped.length,
+      touchReport.skippedKeyMaps.length > 0
+        ? [`skipped keyMaps: ${touchReport.skippedKeyMaps.join(", ")}`]
+        : [],
+    );
   }
   if (tabletReport !== undefined) {
-    summarize("tablet touch", tabletReport.skipped.length, []);
+    summarize(
+      "tablet touch",
+      tabletReport.skipped.length,
+      tabletReport.skippedKeyMaps.length > 0
+        ? [`skipped keyMaps: ${tabletReport.skippedKeyMaps.join(", ")}`]
+        : [],
+    );
   }
 
   return {
