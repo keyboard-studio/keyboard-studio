@@ -115,14 +115,14 @@ after PR 1 merges.
 ```text
 specs/113-layout-studio/
 ├── plan.md              # This file
-├── research.md          # Phase 0 (R1–R11)
+├── research.md          # Phase 0 (R1–R14)
 ├── data-model.md        # Phase 1
 ├── quickstart.md        # Phase 1
 ├── contracts/
 │   ├── layout-ops.md    # kmn-edits value, LayoutOperation + applyLayoutOp + seams
 │   ├── code-edits.md    # CodeEdit, IRChange, diffIR / applyIRChanges, review flags (US8)
 │   └── attribution.md   # attribution API, simulateEach, verification, base join
-└── tasks.md             # /speckit-tasks (not created here)
+└── tasks.md             # /speckit-tasks
 ```
 
 ### Source Code (repository root)

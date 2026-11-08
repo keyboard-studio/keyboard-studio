@@ -841,7 +841,7 @@ recorded.
   data (FR-030), and its `swallowUndefined` compile (FR-010) before a "Do nothing" class can show
   as "types nothing" on never-defined keys. Until the enumerator and data ship, unhandled keys show
   "base keyboard fallback — character not yet available" rather than a guessed character. US1–US5
-  for handled keys do not wait for 109.
+  for handled keys do not wait for 109. Owner of the interim wording: the Engine team. Trigger: when spec 109's enumerator and base data ship, the fallback cells show the base keyboard character and "types nothing" states; until then the interim wording stays.
 - **Assign-tab rules in the Code tab** (ruling 9; Art XI: owner and trigger). The Code tab shows
   the working copy, which does not hold Assign-tab assignments; they are added at projection
   step 2. Showing them, and letting a code edit win over them, means putting assignments into the
@@ -854,7 +854,7 @@ recorded.
   US1–US6 have shipped, the product owner decides go or no-go on US7. If no-go, or if no decision
   is recorded by this spec's retirement pass, FR-050 and US7 are removed from the spec rather than
   rolled forward.
-- **Plan-phase research** (not decided here): how a character edit reaches the IR through
+- **Plan-phase research** (settled in [research.md](research.md) R1–R14; listed here as the questions it answered): how a character edit reaches the IR through
   `mutate()` for a direct key mapping; the shape of `kmn-edits` entries (ruling 6); how a
   structural difference is computed and located by content (FR-060, FR-065); how FR-061's
   compile check runs without a validation timer; how FR-013's attribution is computed from the IR and the simulator's fired-rule tracking; how

@@ -72,6 +72,12 @@ starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ aut
   `instantiateFromExisting`), recalculated from the decision set as above.
   It is what renders and what output projects from — never what is stored
   directly (see Persistence).
+- **KMN edits (spec 113).** Every Layout-tab or Code-tab edit to the `.kmn` is one entry in the
+  `kmn-edits` decision (`KmnEditsValue`, `packages/contracts/src/kmnEdits.ts`), the single record of
+  KMN edits; entries replay in order and later entries win. The projection replays the log at
+  step 2.2 (`replayKmnEdits`: parse, replay, emit), after the deadkey ops and assignments, and only
+  when the list is non-empty. The working IR is never mutated by the replay.
+  → `packages/engine/src/{layout-ops,kmn-diff,layout-attribution}/`, `lib/projectWorkingCopyVfs.ts`
 - **Step host.** Every step renders through one generic host — no per-step
   `switch` in the shell. `StepHost` resolves the manifest entry, renders its
   component in the declared layout's chrome, and runs the single completion

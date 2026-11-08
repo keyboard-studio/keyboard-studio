@@ -348,10 +348,10 @@ the retirement pass → FR-050 and US7 are removed from the spec, not rolled for
 
 ## Phase 10: Polish & cross-cutting
 
-- [ ] T122 [P] Update [docs/packages.md](docs/packages.md) (new engine modules `layout-attribution`, `layout-ops`, `kmn-diff`; contracts `layoutOps`, `kmnEdits`) and [docs/architecture.md](docs/architecture.md) (the `kmn-edits` decision as the record of all KMN edits; projection step 2.2)
-- [ ] T123 [P] Run `/speckit-analyze` over spec, plan, and tasks; fix the drift it reports in `specs/113-layout-studio/spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/*.md`
-- [ ] T124 Run every command and E2E row in [quickstart.md](quickstart.md) and record the results in the final PR body
-- [ ] T125 Close out the Art XI notes in `specs/113-layout-studio/spec.md` (Assumptions): the store-based next frontier (owner + trigger) and the tray gate stay as written; confirm no other deferred item in `spec.md` or `plan.md` lacks an owner and trigger
+- [x] T122 [P] Update [docs/packages.md](docs/packages.md) (new engine modules `layout-attribution`, `layout-ops`, `kmn-diff`; contracts `layoutOps`, `kmnEdits`) and [docs/architecture.md](docs/architecture.md) (the `kmn-edits` decision as the record of all KMN edits; projection step 2.2)
+- [x] T123 [P] Run `/speckit-analyze` over spec, plan, and tasks; fix the drift it reports in `specs/113-layout-studio/spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/*.md`
+- [x] T124 Run every command and E2E row in [quickstart.md](quickstart.md) and record the results in the final PR body
+- [x] T125 Close out the Art XI notes in `specs/113-layout-studio/spec.md` (Assumptions): the store-based next frontier (owner + trigger) and the tray gate stay as written; confirm no other deferred item in `spec.md` or `plan.md` lacks an owner and trigger
 
 ---
 

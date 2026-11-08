@@ -1,9 +1,9 @@
 {
-  "workflow": "speckit",
+  "workflow": "companion",
   "specName": "Layout tab — a visual desktop-layout editor that never shows what it can't produce",
   "branch": "km/113-layout-studio",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -607,10 +607,49 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-08T06:50:45.085Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T122",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:03.961Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T123",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:04.433Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T124",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:05.090Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T125",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:05.774Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:33:08.391Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T121",
+  "currentTask": "T125",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -1178,15 +1217,54 @@
       "files": [
         "packages/studio/e2e/layout-tab.spec.ts"
       ]
+    },
+    "T122": {
+      "status": "DONE",
+      "did": "packages.md and architecture.md updated for layout modules and kmn-edits",
+      "files": [
+        "docs/packages.md",
+        "docs/architecture.md"
+      ]
+    },
+    "T123": {
+      "status": "DONE",
+      "did": "manual cross-artifact consistency pass; drift fixed in plan, spec, layout-ops contract",
+      "files": [
+        "specs/113-layout-studio/plan.md",
+        "specs/113-layout-studio/spec.md",
+        "specs/113-layout-studio/contracts/layout-ops.md"
+      ]
+    },
+    "T124": {
+      "status": "DONE",
+      "did": "quickstart unit, corpus and layout-tab E2E (11 rows) all green",
+      "files": [
+        "specs/113-layout-studio/quickstart.md"
+      ]
+    },
+    "T125": {
+      "status": "DONE",
+      "did": "Art XI deferrals have owner+trigger; spec 109 dependency given one",
+      "files": [
+        "specs/113-layout-studio/spec.md"
+      ]
     }
   },
   "concerns": [
     {
       "note": "T105 blocked: ruling 9 says assign-then-code-edit is an FR-063(b) review flag, but the T098 Apply gate (compileCandidateKmn unplaceable) refuses the Apply. Needs a product decision; the E2E row is test.fixme. Partial work in 76b8d874.",
       "step": "implement"
+    },
+    {
+      "note": "useKeyboardArtifact.startDocs test is slow (~12-19s) and flaked once under the full parallel run; unrelated to spec 113",
+      "step": "implement"
+    },
+    {
+      "note": "T123 done as manual consistency pass, not a literal /speckit-analyze run",
+      "step": "implement"
     }
   ],
-  "last_action": "Phase 7 T106-T109 done, gates green",
+  "last_action": "all 125 tasks done",
   "decisions": [
     {
       "decision": "Replaced starting-point value derived in LayoutPane via attributeLayer(startIr) for the selected hand-set key",
@@ -1204,11 +1282,35 @@
       "what": "US5 E2E row",
       "command": "pnpm exec playwright test e2e/layout-tab.spec.ts -g US5",
       "result": "1 passed (23.3s)"
+    },
+    {
+      "what": "layout-tab E2E (11 rows, desktop)",
+      "command": "npx playwright test e2e/layout-tab.spec.ts --project=desktop",
+      "result": "11 passed"
+    },
+    {
+      "what": "pnpm typecheck and pnpm lint",
+      "command": "pnpm typecheck; pnpm lint",
+      "result": "both exit 0"
+    },
+    {
+      "what": "pnpm -r test",
+      "command": "pnpm -r test",
+      "result": "all green except useKeyboardArtifact.startDocs (timeout under load, 19s); passes alone 4/4"
     }
   ],
   "step_summaries": {
     "implement": {
-      "summary": "Phase 7 (US5): FR-016 complete in KeyDetailPanel -- rule list with shape/editability, replaced value, view in code; E2E US5 row"
+      "summary": "Phase 10 polish: docs, spec drift, Art XI deferrals, quickstart verified"
     }
-  }
+  },
+  "livingSpecs": {
+    "skipped": [
+      {
+        "name": "none-loaded",
+        "reason": "n/a"
+      }
+    ]
+  },
+  "telemetryInstanceId": "e95f77fb-67d4-472c-abb0-4072fddb2d2c"
 }

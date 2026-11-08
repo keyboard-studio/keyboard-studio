@@ -83,8 +83,8 @@ the live `commitKmnEdit` for a `clear-key` needs both. It rebuilds the slot from
 
 **Refusals (throw, caller shows the reason):** the target rule is inside a `readonly` group or a
 `RawKmnFragment`; the keyboard is mnemonic; the deadkey id is unknown. As built, a refusal during
-`replayKmnEdits` propagates as a throw, and `misses` stays empty. Whether replay turns a refusal
-into a miss is settled in Phase 6 (US8), where misses first carry entries.
+`replayKmnEdits` for a Layout-tab entry propagates as a throw. `misses` carries only `code-apply`
+entries whose content anchors no longer fit (FR-063 b); a Layout-tab refusal is not turned into a miss.
 
 **Idempotence and order:** replaying the same log on the same IR yields the same IR; later ops on
 the same `(vkey, layer[, context])` win.
