@@ -72,9 +72,11 @@ test.describe("spec 113 Layout tab - US1", () => {
     // K_A's unshifted output on a US layout is "a", drawn from the copied keyboard.
     const cellA = page.getByTestId("layout-cell-K_A");
     await expect(cellA).toBeVisible();
-    const name = (await cellA.getAttribute("aria-label")) ?? "";
-    expect(name, "K_A's name gives key, default layer, character and provenance").toMatch(
+    // The name says "not compiled yet" until the artifact compiles, so wait for it.
+    await expect(cellA, "K_A's name gives key, default layer, character and provenance").toHaveAttribute(
+      "aria-label",
       /^Key A, layer Default, types a \(U\+0061\).*From the starting point/,
+      { timeout: 60_000 },
     );
     await expect(cellA).toContainText("a");
     await expect(page.getByTestId("layout-cell-K_A-provenance")).toBeVisible();
