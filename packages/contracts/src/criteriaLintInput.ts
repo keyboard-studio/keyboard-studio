@@ -11,6 +11,7 @@
 // are CHECK-NOW inputs (spec 084 triage), never precertification.
 
 import type { KvksIR } from "./keyboard-ir.js";
+import type { FontCoverage } from "./fontGlyphCoverage.js";
 
 /** Where the judged keyboard sits in the keyboards repository tree. */
 export type CriteriaPlacement =
@@ -60,6 +61,17 @@ export interface CriteriaLintInput {
    * family — its absence is itself the 8.7 finding's substance.
    */
   kpsFontFamilies: readonly string[];
+  /**
+   * cmap coverage of the .kps-listed font files that are present in the
+   * judged VFS (issue #2593, criterion 18.13). Same extraction point
+   * as kpsFontFamilies — the studio assembly reads the raw VFS
+   * binaries (fontCmap.ts) and only the covered ranges cross into
+   * keyboard-lint. A font file the .kps lists but the VFS does not
+   * carry contributes no entry; a present file whose cmap cannot be
+   * read (TTC, truncated, unsupported format) contributes no entry
+   * either — never a false "missing glyph" finding.
+   */
+  kpsFontCoverage: readonly FontCoverage[];
   /**
    * The author has attested that this keyboard's numeric region subtag
    * is explicitly contrastive (Batch 3, criterion 12.3's exception

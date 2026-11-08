@@ -22,6 +22,7 @@ afterEach(cleanup);
 
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { VirtualFS } from "@keyboard-studio/contracts";
+import { ALL_CRITERIA } from "@keyboard-studio/contracts";
 
 import { useCompareCriteria } from "./useCompareCriteria.ts";
 import type { CompareArtifact } from "./useCompareArtifact.ts";
@@ -97,8 +98,9 @@ describe("useCompareCriteria", () => {
 
     const judged = result.current.result;
     expect(judged).not.toBeNull();
-    expect(judged?.total).toBe(208);
-    expect(judged?.rows).toHaveLength(208);
+    // No pinned census (lists grow): the judged catalog is the catalog.
+    expect(judged?.total).toBe(ALL_CRITERIA.length);
+    expect(judged?.rows).toHaveLength(ALL_CRITERIA.length);
 
     // Foreign mode offers no controls on any row (FR-023 / plan D2).
     expect(judged?.rows.every((row) => row.controls === null)).toBe(true);

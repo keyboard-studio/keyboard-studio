@@ -88,6 +88,7 @@ export {
   checkIndustryFonts,
   checkWoffInPackage,
 } from "./checks/criteria/check-package-fonts.js";
+export { checkFontGlyphCoverage } from "./checks/criteria/check-font-glyph-coverage.js";
 export {
   checkStrayScratchFiles,
   isScratchPath,

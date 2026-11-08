@@ -136,4 +136,5 @@ export * from "./axisPriors";
 export * from "./docForms";
 export * from "./criteriaData";
 export * from "./fontEntry";
+export * from "./fontGlyphCoverage";
 export * from "./langtags";
