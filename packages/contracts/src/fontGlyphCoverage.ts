@@ -29,6 +29,7 @@
 
 import type { KeyboardIR } from "./keyboard-ir.js";
 import { buildReachableProducedSet } from "./ir/reachableProducedSet.js";
+import { toHex4 } from "./utils/charUtils.js";
 
 /** One inclusive codepoint interval a font's cmap covers. */
 export interface CodepointRange {
@@ -101,7 +102,7 @@ export function auditFontGlyphCoverage(
   return gaps;
 }
 
-/** `U+` + uppercase hex, minimum 4 digits (e.g. U+025B, U+1D400). */
+/** `U+` + uppercase hex, minimum 4 digits (e.g. U+025B, U+1D400) — via the canonical toHex4 primitive. */
 export function formatCodepoint(cp: number): string {
-  return `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`;
+  return `U+${toHex4(cp)}`;
 }
