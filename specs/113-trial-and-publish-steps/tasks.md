@@ -52,7 +52,7 @@ Task line format: `- [ ] **T###** [P?] Description · file`. `[P]` marks a task 
 
 - [x] **T040** Fresh-main repro check: the pre-change tail (`icon → done → #output`) is the behaviour this PR replaces — verified by the updated tail tests, not by hand-waving · (this file)
 - [x] **T041** Local verification: `pnpm -r build`, eslint on touched files, targeted vitest single-worker (`--pool=forks --maxWorkers=1`, `NODE_OPTIONS=--max-old-space-size=5120`) · (this file)
-- [ ] **T042** Full non-draft PR on `km/2540-trial-publish-steps` with diagnosis + resolution in a GitHub comment, ready for review; "Over and out!" on #2540 when feature-complete. NEVER merge · (this file)
+- [x] **T042** Full non-draft PR on `km/2540-trial-publish-steps` with diagnosis + resolution in a GitHub comment, ready for review; "Over and out!" on #2540 when feature-complete. NEVER merge · (this file) — PR #2614, comment https://github.com/keyboard-studio/keyboard-studio/pull/2614#issuecomment-6714854058; "Over and out!" https://github.com/keyboard-studio/keyboard-studio/issues/2540#issuecomment-6714854414
 
 ## Verification findings (2026-11-07, found while verifying, fixed in this PR)
 
