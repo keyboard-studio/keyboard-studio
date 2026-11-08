@@ -408,7 +408,9 @@ describe("createStartBrowser", () => {
   it("search filters by id substring case-insensitively", async () => {
     const service = createStartBrowser({ fetch: createFixtureFetch() });
 
-    const results = await service.search("DEVANAGARI");
+    // "DEVANAGARI" also matches the CLDR Devanagari keyboards now (#2599),
+    // so the case-insensitivity probe uses the corpus-only id prefix.
+    const results = await service.search("SIL_DEVANAGARI");
     expect(results).toHaveLength(1);
     expect(results[0]!.id).toBe("sil_devanagari_phonetic");
   });
