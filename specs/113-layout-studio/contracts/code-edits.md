@@ -79,7 +79,10 @@ function findOwners(ir: KeyboardIR, startIr: KeyboardIR, changes: readonly IRCha
 
 `reviewFlags(value, replayResult, ir)` (studio, pure): flag (a) per `CodeEdit` with `overrides`
 and no `ReviewKept` targeting it; (b) per replay miss; (c) per `findShadowedRules` hit on a rule a
-code entry inserted. Shown as a list in the Code tab (count on the tab) and on the `kmn-edits`
+code entry inserted, run on the working IR **and** on the projected (built) keyboard the misses
+come from, since only the projection holds Assign-tab rules (ruling 9). Assign-tab assignments
+are never an owner in `findOwners`: they are not in the working IR, and a code edit on a rule an
+assignment claims surfaces as a replay miss (b). Shown as a list in the Code tab (count on the tab) and on the `kmn-edits`
 trail entry. **Keep** → `commitKmnEdit({ op: "review-kept", target })`. **Revert** → for the
 latest entry, `undoKmnEdit`; for an older one, `invertChanges(entry.changes)` (engine, pure:
 insert ↔ remove, replace swaps `old` and `node`, store and header changes carry their previous

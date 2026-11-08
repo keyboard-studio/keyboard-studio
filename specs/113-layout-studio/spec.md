@@ -83,6 +83,16 @@ Mechanical Gallery and use it, not when the component exists.
    the warm-edit and cold-resume medians are each **≤ 30 ms**. The design's ~4.7 ms replay cost
    (two replays per R12, step 2.2's parse and re-emit) is accepted as measured (research R12,
    "Replay cost"); one-replay and no-re-parse designs are not pursued in this spec.
+9. **On a key the Assign tab assigns, the assignment wins over a Code-tab edit, and the edit is
+   flagged, never lost silently.** The Code tab shows the working copy, and Assign-tab
+   assignments enter the keyboard only when the output is built (projection step 2, which also
+   drops the starting rule the assignment claims). So the Code tab can never edit an
+   assignment's rule, and a code edit aimed at the rule an assignment replaces does not fit in
+   the built keyboard. This is acceptance scenario 4 and FR-063 (b), whichever tab was used
+   first; Assign-tab assignments are therefore not an owner under FR-062. A rule a code edit
+   adds that an assignment's rule shadows in the built keyboard is flagged under FR-063 (c).
+   Showing Assign-tab rules in the Code tab is deferred (Assumptions, "Assign-tab rules in the
+   Code tab").
 
 ## Clarifications
 
@@ -406,8 +416,8 @@ reuses the decision and replay that User Story 2 builds.
 
 **Independent Test**: On a simple positional keyboard, change one rule, add one, and delete one in
 the Code tab, and Apply. Download the source; the `.kmn` has exactly those changes. Reload; they
-are still there. Change an Assign-tab assignment the edit overrode; the edit still wins and is
-flagged. Introduce a syntax error and a compile error; Apply is refused both times and nothing is
+are still there. Re-assign one of the edited keys in the Assign tab; that code edit is no longer
+applied there and is flagged with the reason (scenario 4, ruling 9). Introduce a syntax error and a compile error; Apply is refused both times and nothing is
 recorded.
 
 **Acceptance Scenarios**:
@@ -418,8 +428,8 @@ recorded.
 2. **Given** edited text that does not parse, fails a validator error check, or does not compile,
    **When** the author tries to Apply, **Then** nothing is recorded, the working copy is unchanged,
    and the errors are shown at their lines.
-3. **Given** an edit that changes or removes a rule another editor produced (an Assign-tab
-   assignment, a deadkey, a Layout-tab edit), **When** the author Applies, **Then** they are told
+3. **Given** an edit that changes or removes a rule another editor produced (a deadkey, a rules
+   step addition, a Layout-tab edit; not an Assign-tab assignment, ruling 9), **When** the author Applies, **Then** they are told
    before confirming which editor owns it; on confirm the code edit wins, the owning editor shows
    the rule as "changed in code", and the edit is flagged for review.
 4. **Given** a recorded code edit whose rule an earlier decision later changes or removes (the
@@ -672,8 +682,9 @@ recorded.
   unchanged when the edited text does not parse, has a validator error (Layer A), or does not
   compile. The errors are shown at their lines. Warnings do not block.
 - **FR-062**: **The code edit wins.** When the difference changes or removes a node another
-  decision produced — an Assign-tab assignment, a deadkey (spec 083), a Layout-tab edit, a rules
-  step addition, identity's header stores — the author MUST be told which editor owns it before
+  decision produced — a deadkey (spec 083), a Layout-tab edit, a rules step addition,
+  identity's header stores; an Assign-tab assignment is never in the working copy, so it is
+  handled by FR-063 instead (ruling 9) — the author MUST be told which editor owns it before
   confirming. On confirm, the code edit is applied and wins; the owning editor shows the node as
   "changed in code"; the entry is flagged for review. Rules from the starting point are the
   author's to change and are not flagged.
@@ -681,7 +692,8 @@ recorded.
   flagged when: (a) it overrides another decision's node (FR-062); (b) on replay, a change in it
   no longer fits because an earlier decision changed — its anchor is gone — in which case that
   change is not applied and the reason is shown; (c) it leaves a rule that can never fire (an
-  earlier rule with the same context and key always matches first). A flagged entry stays in
+  earlier rule with the same context and key always matches first), in the working copy or in
+  the built keyboard, where Assign-tab rules are present (ruling 9). A flagged entry stays in
   effect where it fits.
 - **FR-064**: Flagged entries MUST be listed for review in the Code tab, with a count on the tab,
   and shown on the `kmn-edits` entry in the decision trail. Each item shows what changed, why it
@@ -806,6 +818,14 @@ recorded.
   as "types nothing" on never-defined keys. Until the enumerator and data ship, unhandled keys show
   "base keyboard fallback — character not yet available" rather than a guessed character. US1–US5
   for handled keys do not wait for 109.
+- **Assign-tab rules in the Code tab** (ruling 9; Art XI: owner and trigger). The Code tab shows
+  the working copy, which does not hold Assign-tab assignments; they are added at projection
+  step 2. Showing them, and letting a code edit win over them, means putting assignments into the
+  working copy, which changes how output is built. Owner: the product owner with the Engine team.
+  Trigger: an author report of a Code-tab edit flagged because an Assign-tab assignment replaced
+  its rule, or any spec that moves assignments into the working copy; decide then whether a
+  follow-up spec is opened. If neither has happened by this spec's retirement pass, this note is
+  carried into the AS-BUILT as a known limit, not rolled forward as a plan.
 - **Placement tray gate** (Art XI: owner and trigger). Owner: the product owner. Trigger: when
   US1–US6 have shipped, the product owner decides go or no-go on US7. If no-go, or if no decision
   is recorded by this spec's retirement pass, FR-050 and US7 are removed from the spec rather than
