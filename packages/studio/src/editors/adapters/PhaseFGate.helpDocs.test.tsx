@@ -15,6 +15,19 @@ import type { EditorStepProps } from "../../steps/types.ts";
 
 beforeAll(installDialogShim);
 
+// The PhaseFGate module graph is heavy to transform + import on this VM
+// (~17s import, ~34s transform — #2581): importing it inside a test put
+// ~21s of that cost under vitest's 30s per-test timeout, so the first test
+// timed out whenever a build ran concurrently, and the timed-out render
+// then leaked into the second test ("Found multiple elements"). The import
+// therefore happens once in a beforeAll — outside any test's clock — with
+// a 60s hook budget for the one-time transform; each test then runs in
+// milliseconds against the cached module.
+let PhaseFGate: typeof import("./PhaseFGate.tsx").PhaseFGate;
+beforeAll(async () => {
+  ({ PhaseFGate } = await import("./PhaseFGate.tsx"));
+}, 60_000);
+
 // The Phase F content is stubbed to a button that completes with a fixed
 // phase result — this test isolates the gate's completion wrap.
 const PHASE_RESULT = {
@@ -47,7 +60,6 @@ describe("PhaseFGate — help-docs registration (spec 090 T052)", () => {
   it("records the composite help-docs decision at gate completion, then hands the result on", async () => {
     seedInstantiatedWorkingCopy(["á"]);
     const onComplete = vi.fn();
-    const { PhaseFGate } = await import("./PhaseFGate.tsx");
     render(<PhaseFGate onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId("phasef-complete"));
@@ -71,7 +83,6 @@ describe("PhaseFGate — help-docs registration (spec 090 T052)", () => {
     // wrap must add help-docs and nothing else.
     const seededKeys = Object.keys(getDecisionSnapshot());
     const onComplete = vi.fn();
-    const { PhaseFGate } = await import("./PhaseFGate.tsx");
     render(<PhaseFGate onComplete={onComplete} />);
     fireEvent.click(screen.getByTestId("phasef-complete"));
     fireEvent.click(screen.getByTestId("phasef-complete"));
