@@ -92,7 +92,24 @@ Mechanical Gallery and use it, not when the component exists.
    first; Assign-tab assignments are therefore not an owner under FR-062. A rule a code edit
    adds that an assignment's rule shadows in the built keyboard is flagged under FR-063 (c).
    Showing Assign-tab rules in the Code tab is deferred (Assumptions, "Assign-tab rules in the
-   Code tab").
+   Code tab"). *Amended by ruling 10 for the order "assign first, then code edit".*
+10. **On an assigned key, the most recent edit wins; a character it displaces returns to be
+    placed** (amends ruling 9). The order is decided when the later edit is made and is recorded
+    in it, so the projection needs no timestamps:
+    - **Assign first, then a code edit on that key:** Apply accepts it (the T098 gate does not
+      refuse it). The confirm names the Assign tab as the owner (FR-062, owner `assign-tab`). The
+      change is recorded **keyed to the keystroke** (the rule's key and modifiers), so in the
+      built keyboard it replaces whatever rule is on that keystroke — the assignment's rule. The
+      entry is flagged for review under FR-063 (a), and the Assign tab shows that key as changed
+      in code. Only a rule whose context is exactly one key can be keyed this way; any other
+      change keeps its content anchor.
+    - **Code edit first, then assign that key:** unchanged from ruling 9 — the assignment wins,
+      and the code edit no longer fits and is flagged under FR-063 (b).
+    - **Displaced characters:** a confirmed-inventory character that the built keyboard no longer
+      types after an edit (replace `g` with `ĝ`: `g` is now typed nowhere) returns to the letters
+      to place through the **existing** inventory coverage, exactly as when an assignment is
+      removed in the galleries. That coverage reads the starting keyboard plus assignments today,
+      so it is extended to count `kmn-edits`; no new reminder surface is built.
 
 ## Clarifications
 
@@ -429,13 +446,19 @@ recorded.
    **When** the author tries to Apply, **Then** nothing is recorded, the working copy is unchanged,
    and the errors are shown at their lines.
 3. **Given** an edit that changes or removes a rule another editor produced (a deadkey, a rules
-   step addition, a Layout-tab edit; not an Assign-tab assignment, ruling 9), **When** the author Applies, **Then** they are told
+   step addition, a Layout-tab edit, or an Assign-tab assignment made before the edit, ruling
+   10), **When** the author Applies, **Then** they are told
    before confirming which editor owns it; on confirm the code edit wins, the owning editor shows
    the rule as "changed in code", and the edit is flagged for review.
 4. **Given** a recorded code edit whose rule an earlier decision later changes or removes (the
    author switches the starting point, or re-assigns that key), **When** the keyboard is rebuilt,
    **Then** the edit is not applied where it no longer fits, is flagged for review with the reason,
    and is never dropped silently.
+4a. **Given** a key the Assign tab already assigns, **When** the author changes that key's rule in
+   the Code tab and confirms the owner warning, **Then** the code edit is in the download in
+   place of the assignment's rule, the edit is flagged for review, the Assign tab shows the key
+   as changed in code, and any confirmed-inventory character no longer typed anywhere returns to
+   the letters to place (ruling 10).
 5. **Given** flagged edits, **When** the author opens the review list, **Then** each shows what it
    changed, why it is flagged, and "view in code"; the author can keep it (the flag clears, on
    record) or revert it.
@@ -683,8 +706,9 @@ recorded.
   compile. The errors are shown at their lines. Warnings do not block.
 - **FR-062**: **The code edit wins.** When the difference changes or removes a node another
   decision produced — a deadkey (spec 083), a Layout-tab edit, a rules step addition,
-  identity's header stores; an Assign-tab assignment is never in the working copy, so it is
-  handled by FR-063 instead (ruling 9) — the author MUST be told which editor owns it before
+  identity's header stores, an Assign-tab assignment on the edited key (ruling 10: the change
+  is then keyed to the keystroke so it replaces the assignment's rule in the built keyboard) —
+  the author MUST be told which editor owns it before
   confirming. On confirm, the code edit is applied and wins; the owning editor shows the node as
   "changed in code"; the entry is flagged for review. Rules from the starting point are the
   author's to change and are not flagged.

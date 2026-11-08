@@ -14,6 +14,10 @@ interface ContentAnchor {
   text: string;            // the node's canonical emitted text ("" for an insert at the start)
   prev?: string;           // previous sibling's canonical text, when there is one
   next?: string;           // next sibling's canonical text, when there is one
+  /** Ruling 10: set only at Apply when the target rule's key is assigned in the Assign tab and
+   *  the rule's context is exactly one key. Replay then targets the rule on this keystroke in
+   *  the group, whatever its text (the assignment's rule in the built keyboard). */
+  keystroke?: { vkey: string; modifiers: string[] };
 }
 
 type IRChange =
@@ -30,7 +34,7 @@ type IRChange =
 /** FR-062: who produced a node the change overrides. */
 interface OwnerRef {
   change: number;          // index into `changes`
-  owner: "deadkeys" | "rules-step" | "layout-tab" | "code-tab" | "identity" | "another-step";
+  owner: "deadkeys" | "rules-step" | "layout-tab" | "code-tab" | "identity" | "assign-tab" | "another-step";
 }
 
 interface CodeEdit   { seq: number; at: number; op: "code-apply"; changes: IRChange[]; overrides: OwnerRef[] }
@@ -80,9 +84,17 @@ function findOwners(ir: KeyboardIR, startIr: KeyboardIR, changes: readonly IRCha
 `reviewFlags(value, replayResult, ir)` (studio, pure): flag (a) per `CodeEdit` with `overrides`
 and no `ReviewKept` targeting it; (b) per replay miss; (c) per `findShadowedRules` hit on a rule a
 code entry inserted, run on the working IR **and** on the projected (built) keyboard the misses
-come from, since only the projection holds Assign-tab rules (ruling 9). Assign-tab assignments
-are never an owner in `findOwners`: they are not in the working IR, and a code edit on a rule an
-assignment claims surfaces as a replay miss (b). Shown as a list in the Code tab (count on the tab) and on the `kmn-edits`
+come from, since only the projection holds Assign-tab rules (ruling 9).
+
+**Assigned keys (ruling 10).** At Apply, a `replace` or `remove` whose `old` rule's keystroke is
+claimed by a current Assign-tab assignment (`claimedInputRuleIds`) and whose context is exactly
+one key gets `at.keystroke`, and `overrides` gains `{ change, owner: "assign-tab" }` (so the
+confirm names the Assign tab, and flag (a) applies); the T098 gate's projection check then finds
+no miss for it. `applyIRChanges` resolves a keystroke anchor by key and modifiers in the named
+group, falling back to it only when the text anchor is not found. A code edit recorded before
+the key was assigned has no keystroke anchor, so a later assignment still wins and the edit is a
+replay miss (b). The inventory coverage (`useInventoryDiff` / `inventoryCoverageGate`) counts
+`kmn-edits` so a displaced inventory character returns to the letters to place. Shown as a list in the Code tab (count on the tab) and on the `kmn-edits`
 trail entry. **Keep** → `commitKmnEdit({ op: "review-kept", target })`. **Revert** → for the
 latest entry, `undoKmnEdit`; for an older one, `invertChanges(entry.changes)` (engine, pure:
 insert ↔ remove, replace swaps `old` and `node`, store and header changes carry their previous
