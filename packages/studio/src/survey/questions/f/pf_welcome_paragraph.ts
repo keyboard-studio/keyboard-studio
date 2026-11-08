@@ -45,7 +45,16 @@ export const definition = {
   // Routing: the font note (pf_font_guidance) follows the description — it is
   // core intro matter (element spec §2), asked of every author, not part of
   // the opt-in battery. Its own `next` converges back on pf_usage_tip_1.
-  next: "pf_font_guidance",
+  // Issue #2530: when the welcome/help body-parity finding is live, the
+  // body-parity question (pf_body_parity) is asked first — both concern the
+  // help page's opening text — and routes on to the font note. The
+  // `body_parity_live` token is computed by phaseFOptions.buildContext
+  // (flowStepOptions.tsx); a `ctx.*` condition fails open in filterGated,
+  // so the extraction pass still seeds pf_body_parity.
+  next: [
+    { condition: "ctx.body_parity_live == 'true'", goto: "pf_body_parity" },
+    { goto: "pf_font_guidance", default: true },
+  ],
 } satisfies import("../../types.ts").FlowQuestion;
 
 // ---------------------------------------------------------------------------

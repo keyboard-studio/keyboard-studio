@@ -126,7 +126,7 @@ export function createStudioReducerDeps(input: StudioReducerDepsInput): ReducerD
     // MutatePatchContainmentError throws before any overlay setter runs,
     // so a patch is never partially applied. Channels then land in the
     // contract's order (identity → attribution → helpDocs →
-    // historyEntryState), each a whole-value replace. A null working IR
+    // historyEntryState → docFixProposals), each a whole-value replace. A null working IR
     // (not yet instantiated) skips only the `ir` channel; the overlay
     // channels still apply.
     applyWorkingCopyPatch: (patch, writes) => {
@@ -138,9 +138,13 @@ export function createStudioReducerDeps(input: StudioReducerDepsInput): ReducerD
       if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
       if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
       if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+      // Issue #2530: the body-parity answer's slice write (same whole-value
+      // replace as the other overlay channels, same order in the contract).
+      if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
     },
     getDecisions: () => getDecisionSnapshot(),
     getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
+    getDocFixProposals: () => useWorkingCopyStore.getState().docFixProposals,
     getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
     getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
   };

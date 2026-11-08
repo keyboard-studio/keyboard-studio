@@ -48,6 +48,7 @@ function makeHarness(initialIr: KeyboardIR | null, decisions: DecisionSet = {}):
     },
     getDecisions: () => decisions,
     getHistoryEntryState: () => null,
+    getDocFixProposals: () => null,
     // The production sink composition (StudioShell), over the cells above.
     applyWorkingCopyPatch: (patch, writes) => {
       sinkCalls.push({ patch, writes });
@@ -378,5 +379,38 @@ describe("applyDecisionEffects — pass 2: composed apply with an unanswered que
 
     expect(calls).toEqual([{ value: "Some Holder" }]);
     expect(h.sinkCalls).toHaveLength(1);
+  });
+});
+
+describe("applyDecisionEffects — pf_body_parity (issue #2530)", () => {
+  function bodyParityDecisions(value: string): DecisionSet {
+    return {
+      "help-body-parity": { id: "help-body-parity", value, provenance: "asked" },
+    };
+  }
+
+  it("writes the recorded answer into the doc-fix-proposals slice, preserving siblings", () => {
+    const h = makeHarness(makeTestIR([]), bodyParityDecisions("help"));
+    h.deps.getDocFixProposals = () => ({ pagename: "accepted" });
+    applyDecisionEffects(
+      result([{ questionId: "pf_body_parity", answerType: "select", value: "help" }]),
+      h.deps,
+    );
+    expect(h.sinkCalls).toHaveLength(1);
+    expect(h.sinkCalls[0]?.patch).toEqual({
+      docFixProposals: { pagename: "accepted", bodySync: "help" },
+    });
+  });
+
+  it("writes nothing when the recorded answer already matches the slice", () => {
+    const h = makeHarness(makeTestIR([]), bodyParityDecisions("welcome"));
+    h.deps.getDocFixProposals = () => ({ bodySync: "welcome" });
+    applyDecisionEffects(
+      result([{ questionId: "pf_body_parity", answerType: "select", value: "welcome" }]),
+      h.deps,
+    );
+    // The module returns an empty patch, and the runner does not call the
+    // sink for an empty patch (assertPatchChannelsAuthorized: no channels).
+    expect(h.sinkCalls).toHaveLength(0);
   });
 });

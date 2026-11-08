@@ -74,6 +74,9 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "indic-onset-vowels-wanted",
   "syllabic-finals-wanted",
   "help-welcome-paragraph",
+  // Issue #2530: the body-parity answer reaches the shipped pages through
+  // the doc-fix-proposals slice, not the IR.
+  "help-body-parity",
   "help-usage-tip-1",
   "help-usage-tip-2",
   "help-history-bullets",

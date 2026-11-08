@@ -88,12 +88,15 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
   // left the opt-in battery for the core flow — it no longer requires
   // help-more-detail, so the derived order places it right after the welcome
   // paragraph, matching its routing.
+  // Issue #2530: pf_body_parity sits between the welcome paragraph and the
+  // font note, matching its routing (conditional next on pf_welcome_paragraph).
   {
     flowId: "phase_f_helpdocs",
     phase: "F",
     registry: moduleRecord(flowModules.phase_f_helpdocs),
     order: [
       "pf_welcome_paragraph",
+      "pf_body_parity",
       "pf_font_guidance",
       "pf_usage_tip_1",
       "pf_history_entry",
