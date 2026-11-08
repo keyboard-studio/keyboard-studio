@@ -479,10 +479,42 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-08T05:55:52.860Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T106",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:10.938Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T107",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:11.207Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T108",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:11.474Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T109",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:11.758Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T105",
+  "currentTask": "T109",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -920,6 +952,36 @@
         "packages/studio/src/hooks/useInventoryDiff.ts",
         "packages/studio/e2e/layout-tab.spec.ts"
       ]
+    },
+    "T106": {
+      "status": "DONE",
+      "did": "Extended KeyDetailPanel tests: rule count, every rule with shape and editability, replaced value, view-in-code default",
+      "files": [
+        "packages/studio/src/editors/layout/KeyDetailPanel.test.tsx"
+      ]
+    },
+    "T107": {
+      "status": "DONE",
+      "did": "KeyDetailPanel lists plain rule and rows with shape/editability, shows replaced starting-point value (derived in LayoutPane from startIr)",
+      "files": [
+        "packages/studio/src/editors/layout/KeyDetailPanel.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T108": {
+      "status": "DONE",
+      "did": "Extracted Phase 7 messages and wrote French; catalog lint passes",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T109": {
+      "status": "DONE",
+      "did": "E2E US5 row: read-only key detail and view in code reveals the rule line",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
     }
   },
   "concerns": [
@@ -928,5 +990,29 @@
       "step": "implement"
     }
   ],
-  "last_action": "T105 partial committed 76b8d874; blocked on ruling 9 vs Apply gate"
+  "last_action": "Phase 7 T106-T109 done, gates green",
+  "decisions": [
+    {
+      "decision": "Replaced starting-point value derived in LayoutPane via attributeLayer(startIr) for the selected hand-set key",
+      "why": "working-copy rules do not keep the replaced value; avoids changing the attribution contract",
+      "rejected": "adding a replaced field to RowAttribution in the engine"
+    }
+  ],
+  "verified": [
+    {
+      "what": "Phase 7 gates",
+      "command": "pnpm typecheck; pnpm lint; vitest run src/editors/layout (studio)",
+      "result": "TC=0, LINT=0, 16 files / 293 tests pass"
+    },
+    {
+      "what": "US5 E2E row",
+      "command": "pnpm exec playwright test e2e/layout-tab.spec.ts -g US5",
+      "result": "1 passed (23.3s)"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Phase 7 (US5): FR-016 complete in KeyDetailPanel -- rule list with shape/editability, replaced value, view in code; E2E US5 row"
+    }
+  }
 }

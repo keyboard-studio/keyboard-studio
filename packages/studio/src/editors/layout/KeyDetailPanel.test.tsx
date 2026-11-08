@@ -196,3 +196,46 @@ describe("KeyDetailPanel changed in code (spec 113 US8)", () => {
     expect(screen.queryByTestId("key-detail-changed-in-code")).toBeNull();
   });
 });
+
+describe("KeyDetailPanel rules and replaced value (spec 113 US5, FR-016)", () => {
+  it("counts the matching rules and lists each with its shape and editability", () => {
+    show(
+      cellOf(
+        attribution("K_E", {
+          plain: row({ ruleNodeId: "p1" }),
+          rows: [
+            row({ ruleNodeId: "dk1", shape: "deadkey-keystroke", context: [{ kind: "deadkey", deadkeyId: "acute" }] }),
+            row({ ruleNodeId: "st1", shape: "store-based", output: null, editable: false, readOnlyReason: "store-based" }),
+          ],
+        }),
+      ),
+    );
+    expect(screen.getByTestId("key-detail-rule-count").textContent).toBe("3 rules");
+    expect(screen.getByTestId("key-detail-row-p1").textContent).toContain("plain key rule");
+    expect(screen.getByTestId("key-detail-row-p1-status").textContent).toBe("editable");
+    expect(screen.getByTestId("key-detail-row-dk1").textContent).toContain("deadkey combination");
+    expect(screen.getByTestId("key-detail-row-st1").textContent).toContain("list of characters");
+    expect(screen.getByTestId("key-detail-row-st1-status").textContent).toBe("read-only");
+  });
+
+  it("view in code defaults to the rule that fires with nothing before it", () => {
+    const onView = show(
+      cellOf(attribution("K_E", { plain: row({ ruleNodeId: "p1" }), rows: [row({ ruleNodeId: "dk1", shape: "deadkey-keystroke", context: [{ kind: "deadkey", deadkeyId: "acute" }] })] })),
+    );
+    const buttons = screen.getAllByTestId("key-detail-view-in-code");
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[0]!);
+    expect(onView).toHaveBeenCalledWith("p1");
+  });
+
+  it("shows the replaced starting-point value only for a hand-set key", () => {
+    const hand = cellOf(attribution("K_A", { plain: row({ provenance: "hand-set", authorEdit: "layout-tab" }) }));
+    show(hand, vi.fn());
+    cleanup();
+    render(<KeyDetailPanel cell={hand} onViewInCode={vi.fn()} replaced={{ kind: "text", text: "a" }} />);
+    expect(screen.getByTestId("key-detail-replaced").textContent).toContain("U+0061");
+    cleanup();
+    render(<KeyDetailPanel cell={cellOf(attribution("K_A"))} onViewInCode={vi.fn()} replaced={{ kind: "text", text: "a" }} />);
+    expect(screen.queryByTestId("key-detail-replaced")).toBeNull();
+  });
+});

@@ -7,14 +7,14 @@
 // The edit controls of the next phase attach through `editSlot`, rendered under the plain
 // output; this component does not decide how an edit starts.
 //
-// FR-016's "the value a hand-set key replaced" is not shown: attribution does not carry the
-// replaced starting-point value yet.
+// The value a hand-set key replaced comes from the caller (`replaced`): the starting point's own
+// attribution for the same key and layer, since the working copy's rules do not keep it.
 
 import type { ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { LayoutBecomes, LayoutContext, LayoutOutput } from "@keyboard-studio/contracts";
-import type { RowAttribution } from "@keyboard-studio/engine";
+import type { RowAttribution, RowShape } from "@keyboard-studio/engine";
 import type { BaseFallbackResult } from "./baseFallbackCells.ts";
 import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
 import { codepointLabel } from "../../survey/codepointLabel.ts";
@@ -27,11 +27,13 @@ export interface KeyDetailPanelProps {
   cell: DesktopCellViewModel | null;
   /** Switch to the Code tab with this rule's source line in view. */
   onViewInCode: (nodeId: string) => void;
+  /** What the starting point typed on this key before a hand-set value replaced it, when known. */
+  replaced?: LayoutOutput | LayoutBecomes | null;
   /** Where the next phase's edit controls go. */
   editSlot?: ReactNode;
 }
 
-export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelProps) {
+export function KeyDetailPanel({ cell, onViewInCode, editSlot, replaced }: KeyDetailPanelProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
 
@@ -65,6 +67,29 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelP
       return t({ id: "editor.layout.detail.outputDeadkey", message: `deadkey ${{ id: out.deadkeyId }}` });
     }
     return t({ id: "editor.layout.detail.outputNothing", message: "types nothing" });
+  }
+
+  function shapeWords(shape: RowShape): string {
+    switch (shape) {
+      case "context-free":
+        return t({ id: "editor.layout.detail.shapeContextFree", message: "a plain key rule" });
+      case "deadkey-keystroke":
+        return t({ id: "editor.layout.detail.shapeDeadkeyKeystroke", message: "a deadkey combination" });
+      case "deadkey-fanout":
+        return t({ id: "editor.layout.detail.shapeDeadkeyFanout", message: "a deadkey list of combinations" });
+      case "literal-context":
+        return t({ id: "editor.layout.detail.shapeLiteralContext", message: "a rule that depends on the text before" });
+      case "store-based":
+        return t({ id: "editor.layout.detail.shapeStoreBased", message: "a rule that picks from a list of characters" });
+      case "conditional":
+        return t({ id: "editor.layout.detail.shapeConditional", message: "a rule that only applies under a condition" });
+      case "opaque":
+        return t({ id: "editor.layout.detail.shapeOpaque", message: "code the studio cannot show here" });
+      default: {
+        const unreachable: never = shape;
+        return unreachable;
+      }
+    }
   }
 
   function fallbackWords(result: BaseFallbackResult): string {
@@ -174,6 +199,14 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelP
             </dd>
           </>
         )}
+        {replaced !== undefined && replaced !== null && cell.provenance === "hand-set" && (
+          <>
+            <dt style={dtStyle}>{t({ id: "editor.layout.detail.replacedLabel", message: "Replaced from the starting point" })}</dt>
+            <dd style={ddStyle} data-testid="key-detail-replaced">
+              {becomesWords(replaced)}
+            </dd>
+          </>
+        )}
         <dt style={dtStyle}>{t({ id: "editor.layout.detail.editableLabel", message: "Editable here" })}</dt>
         <dd style={ddStyle} data-testid="key-detail-editable">
           {cell.editable
@@ -247,12 +280,13 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelP
         </div>
       )}
 
-      {rows.length > 0 && (
+      {(rows.length > 0 || (plain !== null && !cell.frame)) && (
         <div data-testid="key-detail-rows">
           <h4 style={subheadingStyle}>
-            {t({ id: "editor.layout.detail.rowsHeading", message: "Also used by these rules" })}
+            {t({ id: "editor.layout.detail.rowsHeading", message: "Rules that match this key in this layer" })}
           </h4>
           <ul style={listStyle}>
+            {plain !== null && !cell.frame && renderPlain(plain)}
             {rows.map((row) => (
               renderRow(row)
             ))}
@@ -261,6 +295,25 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelP
       )}
     </section>
   );
+
+  function renderPlain(rule: RowAttribution): ReactNode {
+    return (
+      <li key={rule.ruleNodeId} data-testid={`key-detail-row-${rule.ruleNodeId}`} style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 2 }}>
+        <span>
+          {t({
+            id: "editor.layout.detail.plainRule",
+            message: `Fires with nothing before it: ${{ shape: shapeWords(rule.shape) }}`,
+          })}
+          {", "}
+          <span data-testid={`key-detail-row-${rule.ruleNodeId}-status`}>
+            {rule.editable
+              ? t({ id: "editor.layout.detail.rowEditable", message: "editable" })
+              : t({ id: "editor.layout.detail.rowReadOnly", message: "read-only" })}
+          </span>
+        </span>
+      </li>
+    );
+  }
 
   function renderRow(row: RowAttribution): ReactNode {
     const when =
@@ -275,6 +328,8 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelP
       <li key={row.ruleNodeId} data-testid={`key-detail-row-${row.ruleNodeId}`} style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 2 }}>
         <span>
           {what}
+          {", "}
+          {shapeWords(row.shape)}
           {", "}
           <span data-testid={`key-detail-row-${row.ruleNodeId}-status`}>
             {row.editable

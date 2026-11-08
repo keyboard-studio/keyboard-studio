@@ -113,6 +113,34 @@ test.describe("spec 113 Layout tab - US1", () => {
   });
 });
 
+test.describe("spec 113 Layout tab - US5", () => {
+  test.setTimeout(600_000);
+
+  test("a read-only key's detail shows its rules and view in code reveals the rule's line", async ({ page }) => {
+    await reachMechanicalGallery(page, "akha_lahu", "ahk", "é");
+    await openLayoutTab(page);
+
+    const readOnly = page.getByTestId("layout-cell-K_LBRKT-readonly");
+    await expect(readOnly, "akha_lahu has an any()/index() key rule, so some cell is read-only").toBeVisible({
+      timeout: 60_000,
+    });
+    await readOnly.click();
+
+    await expect(page.getByTestId("key-detail-output")).toBeVisible();
+    await expect(page.getByTestId("key-detail-rule-count")).toContainText(/\d+ rules?/);
+    await expect(page.getByTestId("key-detail-editable")).toHaveText("No, read-only");
+    await expect(page.getByTestId("key-detail-reason")).toContainText(/list of characters/i);
+    await expect(page.getByTestId("key-detail-rows")).toContainText(/read-only/);
+
+    await page.getByTestId("key-detail-view-in-code").first().click();
+    await expect(page.getByTestId("editor-view-tab-code")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
+    const ruleLine = page.locator(".monaco-editor .view-line").filter({ hasText: "any(Input)" });
+    await expect(ruleLine, "the rule that fires is in view").toBeVisible();
+    await expect(page.locator(".monaco-editor .selected-text").first()).toBeVisible();
+  });
+});
+
 /**
  * Monaco renders only the lines in view, so a rule further down is not in the DOM. Search the
  * whole model through the editor's own find widget and expect at least one match.

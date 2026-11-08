@@ -289,10 +289,10 @@ tab and the edit still wins, flagged; a syntax error and a compile error each re
 **Independent Test**: on a context-heavy keyboard, open the detail of three read-only keys and
 follow "view in code"; the Code tab opens at the rule that fires.
 
-- [ ] T106 [P] [US5] Extend `LY/KeyDetailPanel.test.tsx`: the number of rules that match the key in this layer; every matching rule listed with its shape and editability; the replaced starting-point value when a hand-set value replaced it; "view in code" per rule, defaulting to the rule that fires
-- [ ] T107 [US5] Extend `LY/KeyDetailPanel.tsx` to pass T106 (FR-016 complete)
-- [ ] T108 [US5] i18n for Phase 7 (as T045)
-- [ ] T109 [US5] E2E US5 row in `E2E`: open a read-only key's detail; "view in code" reveals the rule's line
+- [x] T106 [P] [US5] Extend `LY/KeyDetailPanel.test.tsx`: the number of rules that match the key in this layer; every matching rule listed with its shape and editability; the replaced starting-point value when a hand-set value replaced it; "view in code" per rule, defaulting to the rule that fires
+- [x] T107 [US5] Extend `LY/KeyDetailPanel.tsx` to pass T106 (FR-016 complete)
+- [x] T108 [US5] i18n for Phase 7 (as T045)
+- [x] T109 [US5] E2E US5 row in `E2E`: open a read-only key's detail; "view in code" reveals the rule's line
 
 **Checkpoint**: Commit `spec 113 T106-T109`.
 

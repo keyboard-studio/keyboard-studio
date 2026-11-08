@@ -11,7 +11,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { listContexts } from "@keyboard-studio/engine";
+import { attributeLayer, listContexts } from "@keyboard-studio/engine";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -108,6 +108,16 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   }, [attribution, fallback, contexts, desktopLocked, layerId]);
 
   const selected = cells.find((c) => c.vkey === selectedVkey) ?? null;
+
+  // What the starting point typed on the selected key, shown when a hand-set value replaced it.
+  const replaced = useMemo(() => {
+    if (selected === null || selected.provenance !== "hand-set" || startIr === null) return null;
+    const before = attributeLayer(startIr, layer, [selected.vkey])[0]?.plain ?? null;
+    if (before === null || before.output === null) return null;
+    return JSON.stringify(before.output) === JSON.stringify(selected.attribution.plain?.output) ? null : before.output;
+    // `layer` is covered by `layerId`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, startIr, layerId]);
 
   const layerLabels = useMemo(() => {
     const labels = new Map<string, string>();
@@ -352,6 +362,7 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
           <KeyDetailPanel
             cell={selected}
             onViewInCode={onViewInCode}
+            replaced={replaced}
             editSlot={
               selected !== null && selected.editable ? (
                 <KeyEditPanel
