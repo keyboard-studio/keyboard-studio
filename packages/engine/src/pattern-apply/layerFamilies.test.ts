@@ -781,5 +781,11 @@ describe("keyEditAffectsFamilyParallelism", () => {
         0,
       ),
     ).toBe(false);
+    // `copyToLayer` adds a key to another layer like `add` does — it
+    // resizes/reclassifies no existing key, so it is not a parallelism
+    // question either (#2596 item 1).
+    expect(
+      keyEditAffectsFamilyParallelism({ address: AT, kind: "copyToLayer", toLayer: "shift" }, 0),
+    ).toBe(false);
   });
 });

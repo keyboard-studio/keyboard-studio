@@ -445,6 +445,95 @@ export function applyKeyEditsToLayout(
         break;
       }
 
+      case "copyToLayer": {
+        // CLONE, not splice: the source key stays where it is and the target
+        // layer gains a deep copy — sub-keys (`sk`, `flick`, `multitap`),
+        // geometry, `provenance` and `keycapAuthored` travel because the
+        // object is cloned whole, so the guarantee cannot rot the next time
+        // `TouchKeyIR` grows a field (the FR-021 strategy, applied to a
+        // copy). The clone is a NEW node occurrence, so it gets a fresh
+        // `nodeId` (as `add` does) — the id itself is kept, which is what
+        // keeps the key's `.kmn` rules covering the copy (spec 104 FR-007).
+        // Refusals, anchor/append and `scope: "family"` mirror `moveToLayer`.
+        if (op.scope === "family") {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}" carries scope "family", which has no shared referent across a layer family — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const platform = layout.platforms[platformIndex]!;
+        const targetLayerIndex = platform.layers.findIndex((l) => l.id === op.toLayer);
+        if (targetLayerIndex === -1) {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}" names unknown layer "${op.toLayer}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        if (targetLayerIndex === layerIndex) {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}" targets its own layer "${op.toLayer}" — no change`,
+          );
+          break;
+        }
+        const targetState = getOrCreateLayerState(platformIndex, targetLayerIndex);
+        // Id collision on the target layer: two keys with one id cannot be
+        // told apart, so the copy is refused rather than half-applied (a
+        // fresh id would need a rule transplant per spec 104 FR-008).
+        const collides = targetState.workingRows.some((r) =>
+          r.keys.some((k) => k.id === key.id),
+        );
+        if (collides) {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}": target layer "${op.toLayer}" already has a key with id "${key.id}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const copiedKey: TouchKeyIR = {
+          ...structuredClone(key),
+          nodeId: minter.mint("touchKey"),
+        };
+        // Anchor: insert before/after a key on the target layer. Resolved
+        // against the live view; falls back to append when absent or
+        // unresolvable. (Unlike the move, no splice-out precedes this, so a
+        // stale anchor pointing at the SOURCE key still resolves — on its
+        // own layer, so the layer check below correctly declines it.)
+        let inserted = false;
+        if (op.anchorAddress !== undefined) {
+          const anchorParts = parseTouchKeyAddress(op.anchorAddress);
+          const anchorResolved =
+            anchorParts !== undefined ? resolveKeyAddress(liveView(), anchorParts) : undefined;
+          if (
+            anchorResolved !== undefined &&
+            anchorResolved.platformIndex === platformIndex &&
+            anchorResolved.layerIndex === targetLayerIndex
+          ) {
+            const anchorRow = targetState.workingRows[anchorResolved.rowIndex];
+            if (anchorRow !== undefined) {
+              const at =
+                anchorResolved.keyIndex + (op.position === "after" ? 1 : 0);
+              anchorRow.keys.splice(at, 0, copiedKey);
+              inserted = true;
+            }
+          } else {
+            warnings.push(
+              `[key-edit-apply] copyToLayer at "${op.address}": anchor "${op.anchorAddress}" did not resolve on layer "${op.toLayer}" — appended instead`,
+            );
+          }
+        }
+        if (!inserted) {
+          const lastRow = targetState.workingRows[targetState.workingRows.length - 1];
+          if (lastRow === undefined) {
+            targetState.workingRows.push({ keys: [copiedKey] });
+          } else {
+            lastRow.keys.push(copiedKey);
+          }
+        }
+        break;
+      }
+
       case "suppress": {
         // The compound sp+id derivation is shared, exactly once, in
         // keyEditOps.ts (FR-029b) — see applySuppressSemantics's doc for why

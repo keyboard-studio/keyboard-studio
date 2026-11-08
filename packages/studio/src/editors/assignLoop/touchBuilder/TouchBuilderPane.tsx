@@ -10,7 +10,7 @@
 // secondary `{ kind, id }` held locally and reset whenever the main-key
 // selection changes.
 //
-// Every gesture decomposes per slice-spec §4 into the 8 `KeyEditOperation`
+// Every gesture decomposes per slice-spec §4 into the 10 `KeyEditOperation`
 // kinds. Key-level ops only (Q1): no row/layer structural UI, no
 // per-platform font editing.
 
@@ -29,8 +29,6 @@ import type { PendingKeyEditOperation } from "../../../stores/workingCopyStore.t
 import {
   BUILDER_DEFAULT_KEY_WIDTH,
   BUILDER_KEY_MARGIN,
-  BUILDER_MAX_KEY_WIDTH,
-  BUILDER_MIN_KEY_WIDTH,
   BUILDER_PRESENTATIONS,
   BUILDER_ROW_HEIGHT,
   FLICK_GRID,
@@ -43,7 +41,10 @@ import {
   mintBuilderKeyId,
   parseBuilderTemplate,
   resolveBuilderKey,
+  rightEdgeUnits,
+  snapBuilderWidth,
   subKeyEntriesOf,
+  suggestKeyIdFromText,
   type BuilderSubKeyEntry,
   type BuilderSubKeyKind,
 } from "./touchBuilderModel.ts";
@@ -285,10 +286,26 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     const plan =
       source.type === "tray"
         ? buildPanelDropOps(selectedKeyAddress, resolved.key, source.letter, spec, mintBuilderKeyId(layout))
-        : buildSubkeyMoveOps(selectedKeyAddress, resolved.key, source.payload, spec);
+        : buildSubkeyMoveOps(
+            selectedKeyAddress,
+            resolved.key,
+            source.payload,
+            spec,
+            mintBuilderKeyId(layout),
+          );
     if (plan.ops.length === 0) return;
     for (const op of plan.ops) {
       if (!commitOp(op)) break;
+    }
+    if (source.type === "subkey") {
+      // A cross-kind move leaves the moved entry under a different kind (and
+      // possibly a fresh id) — the subkey selection would dangle, so clear
+      // it. Within-family moves keep the entry resolvable and keep it.
+      const crossKind =
+        (source.payload.kind === "sk" && spec.area !== "lp") ||
+        (source.payload.kind === "flick" && spec.area !== "flick") ||
+        (source.payload.kind === "multitap" && spec.area !== "mt");
+      if (crossKind) setSubSel(null);
     }
     if (plan.displacedBackToTray !== null) {
       const back = plan.displacedBackToTray;
@@ -461,6 +478,18 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     commitOp({ address: selectedKeyAddress, kind: "moveToLayer", toLayer });
   };
 
+  // -- copy key to another layer (#2596 item 1) ------------------------------
+  const handleCopyKeyToLayer = (toLayer: string): void => {
+    if (selectedOnActiveLayer === undefined || selectedKeyAddress === null) return;
+    if (toLayer === activeLayerId) return;
+    // `copyToLayer` clones the whole key (subkeys included) onto the target
+    // layer. Switch the display there so the author sees the copy;
+    // selection-follow in TouchGallery tracks its address.
+    if (commitOp({ address: selectedKeyAddress, kind: "copyToLayer", toLayer })) {
+      onSelectLayer(toLayer);
+    }
+  };
+
   // -- drag reorder → direction-step `move` ops, or `moveToLayer` --------------
   const handleDropOnKey = (targetAddress: string): void => {
     const srcAddress = dragSrcRef.current;
@@ -581,11 +610,9 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     if (resizeDrag === null) return;
     const { address, previewWidthUnits } = resizeDrag;
     setResizeDrag(null);
-    // TIKE clamp (10–500 units); the studio validates width as integer > 0.
-    const width = Math.min(
-      BUILDER_MAX_KEY_WIDTH,
-      Math.max(BUILDER_MIN_KEY_WIDTH, previewWidthUnits),
-    );
+    // Snap to the 10-unit alignment grid (#2596 item 4), clamped to TIKE's
+    // 10–500 range; the studio validates width as integer > 0.
+    const width = snapBuilderWidth(previewWidthUnits);
     const resolved = resolveBuilderKey(layout, address);
     if (resolved === undefined || resolved.key.width === width) return;
     commitSet(address, { width });
@@ -609,6 +636,22 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   };
 
   const selectedKey = selectedOnActiveLayer?.key;
+
+  // Right-edge position of the selected key (#2596 item 4): the running
+  // width+pad sum of its row up to and including it, in units — the number
+  // an author lines rows up against. `geomRows` already carries the
+  // narrow-aware pad, so this matches the rendered row.
+  const selectedRowIndex = rowViews.findIndex((row) =>
+    row.some((v) => v.address === selectedKeyAddress),
+  );
+  const selectedColIndex =
+    selectedRowIndex >= 0
+      ? rowViews[selectedRowIndex]!.findIndex((v) => v.address === selectedKeyAddress)
+      : -1;
+  const selectedRightEdge =
+    selectedRowIndex >= 0 && selectedColIndex >= 0
+      ? rightEdgeUnits(geomRows[selectedRowIndex]!, selectedColIndex)
+      : null;
   const _selectedSubKeyEntry: BuilderSubKeyEntry | undefined =
     selectedKey !== undefined && subSel !== null
       ? subKeyEntriesOf(selectedKey)[subSel.kind].find((e) =>
@@ -1021,11 +1064,59 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           </div>
 
           {/* Move key to another layer — item 2. */}
-          <MoveKeyToLayer
+          <KeyToLayerControl
             currentLayerId={activeLayerId}
             layerIds={layerIds}
-            onMove={handleMoveKeyToLayer}
+            testIdPrefix="touch-builder-move-layer"
+            label={t({
+              id: "editor.assignLoop.touch.builder.moveKeyToLabel",
+              message: "Move key to…",
+            })}
+            placeholder={t({
+              id: "editor.assignLoop.touch.builder.moveKeyToPlaceholder",
+              message: "Select layer",
+            })}
+            applyLabel={t({
+              id: "editor.assignLoop.touch.builder.moveKeyToApply",
+              message: "Apply",
+            })}
+            onTransfer={handleMoveKeyToLayer}
           />
+
+          {/* Copy key to another layer — #2596 item 1: the whole key, subkeys
+              included, cloned onto the target layer; the original stays. */}
+          <KeyToLayerControl
+            currentLayerId={activeLayerId}
+            layerIds={layerIds}
+            testIdPrefix="touch-builder-copy-layer"
+            label={t({
+              id: "editor.assignLoop.touch.builder.copyKeyToLabel",
+              message: "Copy key to…",
+            })}
+            placeholder={t({
+              id: "editor.assignLoop.touch.builder.copyKeyToPlaceholder",
+              message: "Select layer",
+            })}
+            applyLabel={t({
+              id: "editor.assignLoop.touch.builder.copyKeyToApply",
+              message: "Apply",
+            })}
+            onTransfer={handleCopyKeyToLayer}
+          />
+
+          {/* Right-edge position (#2596 item 4): where this key ends in its
+              row, so rows line up without trial and error. */}
+          {selectedRightEdge !== null && (
+            <p
+              data-testid="touch-builder-right-edge"
+              style={{ margin: "12px 0 0", fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+            >
+              {t({
+                id: "editor.assignLoop.touch.builder.rightEdge",
+                message: `Right edge: ${selectedRightEdge} units`,
+              })}
+            </p>
+          )}
 
           {/* Subkeys — item 3: a visually nested child of the Key section,
               the three groups side by side. */}
@@ -1092,6 +1183,13 @@ function KeyToolbar(props: {
   };
   const inputKey = (field: string): string => `${address}:${field}:${fieldEpoch}`;
 
+  // Key-id suggestion (#2596 item 5): a fresh `T_new_N` key whose text is a
+  // single plain character can take its id from that text
+  // (`suggestKeyIdFromText` — combining marks and multi-character strings
+  // get no suggestion, per spec 104 FR-005).
+  const suggestedId =
+    /^T_new_\d+$/i.test(key.id) ? suggestKeyIdFromText(key.text ?? "") : null;
+
   const handleSpChange = (value: string): void => {
     const sp = parseInt(value, 10);
     if (sp === 9 || sp === 10) {
@@ -1138,7 +1236,8 @@ function KeyToolbar(props: {
           onCommit={(v) => {
             const n = parseInt(v, 10);
             if (!Number.isInteger(n) || n <= 0) { onInvalid(); return; }
-            set({ width: n });
+            // Snap to the 10-unit alignment grid (#2596 item 4).
+            set({ width: snapBuilderWidth(n) });
           }}
         />
         <LabeledInput
@@ -1181,6 +1280,23 @@ function KeyToolbar(props: {
             if (v !== key.id) commitOp({ address, kind: "rename", toId: v });
           }}
         />
+        {/* Suggest the key id from the keycap text (#2596 item 5). Offered
+            as a button, never auto-applied: identity changes are presented,
+            never silent. */}
+        {suggestedId !== null && suggestedId !== key.id && (
+          <button
+            type="button"
+            data-testid="touch-builder-suggest-id"
+            title={t({
+              id: "editor.assignLoop.touch.builder.suggestIdTitle",
+              message: `Suggest key ID ${suggestedId} from the keycap text`,
+            })}
+            onClick={() => commitOp({ address, kind: "rename", toId: suggestedId })}
+            style={{ ...ghostBtn, alignSelf: "end" }}
+          >
+            {t({ id: "editor.assignLoop.touch.builder.suggestId", message: "Suggest ID" })}
+          </button>
+        )}
         <label style={fieldStyle}>
           <span style={labelStyle}>
             {t({ id: "editor.assignLoop.touch.builder.nextLayerLabel", message: "Next layer" })}
@@ -1263,16 +1379,25 @@ function LabeledInput(props: {
 }
 
 // ---------------------------------------------------------------------------
-// Move key to another layer (item 2)
+// Move / copy a key to another layer (item 2; copy is #2596 item 1)
 // ---------------------------------------------------------------------------
 
-function MoveKeyToLayer(props: {
+/**
+ * One layer-transfer control: a target-layer select + Apply. Shared by
+ * "Move key to…" and "Copy key to…" — same chrome, different op behind
+ * `onTransfer`. The dropdown resets whenever the selected key's layer
+ * changes.
+ */
+function KeyToLayerControl(props: {
   currentLayerId: string;
   layerIds: readonly string[];
-  onMove: (toLayer: string) => void;
+  testIdPrefix: string;
+  label: string;
+  placeholder: string;
+  applyLabel: string;
+  onTransfer: (toLayer: string) => void;
 }) {
-  const { t } = useLingui();
-  const { currentLayerId, layerIds, onMove } = props;
+  const { currentLayerId, layerIds, testIdPrefix, label, placeholder, applyLabel, onTransfer } = props;
   const [target, setTarget] = useState("");
   // The dropdown resets whenever the selected key's layer changes.
   useEffect(() => setTarget(""), [currentLayerId]);
@@ -1287,28 +1412,15 @@ function MoveKeyToLayer(props: {
         flexWrap: "wrap",
       }}
     >
-      <span style={labelStyle}>
-        {t({
-          id: "editor.assignLoop.touch.builder.moveKeyToLabel",
-          message: "Move key to…",
-        })}
-      </span>
+      <span style={labelStyle}>{label}</span>
       <select
-        data-testid="touch-builder-move-layer-select"
-        aria-label={t({
-          id: "editor.assignLoop.touch.builder.moveKeyToLabel",
-          message: "Move key to…",
-        })}
+        data-testid={`${testIdPrefix}-select`}
+        aria-label={label}
         value={target}
         onChange={(e) => setTarget(e.target.value)}
         style={selectStyle}
       >
-        <option value="">
-          {t({
-            id: "editor.assignLoop.touch.builder.moveKeyToPlaceholder",
-            message: "Select layer",
-          })}
-        </option>
+        <option value="">{placeholder}</option>
         {options.map((id) => (
           <option key={id} value={id}>
             {id}
@@ -1317,12 +1429,12 @@ function MoveKeyToLayer(props: {
       </select>
       <button
         type="button"
-        data-testid="touch-builder-move-layer-apply"
+        data-testid={`${testIdPrefix}-apply`}
         disabled={target === ""}
-        onClick={() => onMove(target)}
+        onClick={() => onTransfer(target)}
         style={ghostBtn}
       >
-        {t({ id: "editor.assignLoop.touch.builder.moveKeyToApply", message: "Apply" })}
+        {applyLabel}
       </button>
     </div>
   );
@@ -1696,7 +1808,7 @@ function SubkeyPanel(props: {
               </select>
             </label>
             {/* The `default` longpress preselect is readable but NOT writable
-                through the 8 op kinds (`default` is absent from
+                through the 10 op kinds (`default` is absent from
                 `EditableKeyFields`) — the checkbox reflects state and stays
                 disabled until the contract admits the field. */}
             {selectedEntry.kind === "sk" && (

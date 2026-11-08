@@ -321,6 +321,11 @@ function collectDiscardTargets(
       // future op kind IS lossy.
       return [];
 
+    case "copyToLayer":
+      // A copy discards nothing either: the source key stays, and the target
+      // layer gains a clone of it. No production is lost on either layer.
+      return [];
+
     case "remove":
     case "suppress": {
       const targets: DiscardTarget[] = [

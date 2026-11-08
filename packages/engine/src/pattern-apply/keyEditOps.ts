@@ -308,10 +308,40 @@ export interface MoveToLayerOp extends KeyEditOperationBase {
 }
 
 /**
+ * Copy a key to a different layer on the same platform (touch-builder
+ * "Copy key to…", issue #2596 item 1), keeping the original where it is.
+ *
+ * The twin of `moveToLayer` with one difference: the target gains a CLONE,
+ * not the existing node. The clone carries the whole key — sub-keys (`sk`,
+ * `flick`, `multitap`), geometry, `provenance`, `keycapAuthored` — because a
+ * remove+add composition could not: `NewKeySpec` carries no sub-keys, so
+ * "copy with its longpress keys" is exactly what the op exists to express
+ * (FR-021's identity preservation, extended across layers to a copy). The
+ * clone is a NEW node occurrence, so the IR applier mints it a fresh
+ * `nodeId` (as `add` does); the id itself is KEPT — the same id on two
+ * layers is normal (e.g. `K_a` on default and shift) and keeps the key's
+ * `.kmn` rules covering the copy with no rule work (spec 104 FR-007).
+ *
+ * Refusals mirror `moveToLayer`: unknown target layer, own layer, and — the
+ * copy's own rule — id collision on the target layer (two keys with one id
+ * cannot be told apart; minting a fresh id instead would need a rule
+ * transplant per spec 104 FR-008, so the op refuses rather than half-apply).
+ * Anchor/append and `scope: "family"` rejection follow `moveToLayer`.
+ */
+export interface CopyToLayerOp extends KeyEditOperationBase {
+  readonly kind: "copyToLayer";
+  /** Target layer id on the key's platform. Must exist. */
+  readonly toLayer: string;
+  /** Optional anchor key address on the target layer for before/after insert. */
+  readonly anchorAddress?: string;
+  readonly position?: "before" | "after";
+}
+
+/**
  * A single committed key-level edit (contract §3). Row and layer operations
- * are deliberately NOT admitted — see the module docstring — with the one
- * exception of `moveToLayer`, which relocates a single key without touching
- * row/layer structure itself.
+ * are deliberately NOT admitted — see the module docstring — with the
+ * exceptions of `moveToLayer` and `copyToLayer`, which relocate / duplicate
+ * a single key without touching row/layer structure itself.
  */
 export type KeyEditOperation =
   | SetKeyOp
@@ -322,7 +352,8 @@ export type KeyEditOperation =
   | SuppressKeyOp
   | SetSubKeyOp
   | RemoveSubKeyOp
-  | MoveToLayerOp;
+  | MoveToLayerOp
+  | CopyToLayerOp;
 
 
 // ---------------------------------------------------------------------------
@@ -334,12 +365,12 @@ export type KeyEditOperation =
  * its own fields — no layout lookup, no resolver. `undefined` (never `""`)
  * when the operation carries no declared output of its own.
  *
- * Exactly three of the nine kinds ever author `output` directly:
+ * Exactly three of the ten kinds ever author `output` directly:
  * - `add` — a brand-new key's `key.output`;
  * - `set` / `setSubKey` — a patch that happens to touch `fields.output`.
  *
- * The other six — `rename`, `remove`, `move`, `moveToLayer`, `suppress`,
- * `removeSubKey` — name
+ * The other seven — `rename`, `remove`, `move`, `moveToLayer`,
+ * `copyToLayer`, `suppress`, `removeSubKey` — name
  * an EXISTING key or sub-entry by address/sub-ref only; they never repeat its
  * content, so this function returns `undefined` for them even though the key
  * they touch may well produce a character. That gap is deliberate: this
@@ -905,6 +936,7 @@ export type UnsequencedKeyEditOperation =
   | Omit<RemoveKeyOp, "seq">
   | Omit<MoveKeyOp, "seq">
   | Omit<MoveToLayerOp, "seq">
+  | Omit<CopyToLayerOp, "seq">
   | Omit<SuppressKeyOp, "seq">
   | Omit<SetSubKeyOp, "seq">
   | Omit<RemoveSubKeyOp, "seq">;
