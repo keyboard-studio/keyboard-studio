@@ -616,6 +616,11 @@ export function projectWorkingCopyVfs(
   // Step 0b: OSK stylesheet — the CSS step's text becomes the keyboard's
   // `&KMW_EMBEDCSS` file. Before the identity pass so a Track-1 id rename
   // carries the file and its store line along with the other siblings.
+  // NOTE (#2578): this is NOT the final word on the line — any later step
+  // that rebuilds the `.kmn` header from the IR (step 1 carve re-emit, steps
+  // 2.6/2.7/2.8, step 4 itself) drops this text-level line, so step 4b
+  // re-applies the CSS after the rename. Keep this call: steps 2–3.6 and the
+  // preview's intermediate reads see the line from here on.
   warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss, startKeyboardId));
 
   // Step 0b-ii: Documentation overrides — the author's edited doc files
@@ -1476,6 +1481,25 @@ export function projectWorkingCopyVfs(
     }
     renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
+
+  // Step 4b: Custom CSS repair pass (#2578) — re-apply the author's CSS
+  // AFTER the id rename, the last `.kmn` writer in this projection. Any
+  // earlier step that rebuilds the `.kmn` header from the IR (step 1 carve
+  // re-emit, steps 2.6/2.7/2.8, step 4 itself) drops the text-level
+  // `&KMW_EMBEDCSS` line step 0b added, while the `.css` file survives —
+  // an orphaned stylesheet nothing references. `applyCustomCssToVfs` is
+  // idempotent: when the line survived, this writes the same file bytes and
+  // changes nothing, so the no-carve path stays byte-identical. The
+  // effective (post-rename) id names the renamed stylesheet; the stored
+  // text is relinked from the start id, exactly as step 0b does.
+  warnings.push(
+    ...applyCustomCssToVfs(
+      vfs,
+      effectiveKeyboardId ?? keyboardId,
+      customCss,
+      startKeyboardId ?? keyboardId,
+    ),
+  );
 
   return {
     warnings,
