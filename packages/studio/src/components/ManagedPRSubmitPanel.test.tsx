@@ -30,12 +30,14 @@ vi.mock("../lib/serializeWorkingCopy.ts", () => ({
 
 vi.mock("../lib/services.ts", () => ({
   getManagedPROutputService: vi.fn(),
+  getGitHubOutputService: vi.fn(),
   getManagedPRProxyEndpoint: vi.fn(() => "https://example.com/submit/managed-pr"),
 }));
 
 // useGitHubAuth mocked at the module boundary — same idiom as
 // ProfileScreen.test.tsx / AccountControl.test.tsx.
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
+vi.mock("../hooks/useGoogleAuth.ts", () => ({ useGoogleAuth: vi.fn() }));
 
 // recordProjectSubmission mocked so the "My keyboards" submission-transition
 // call can be asserted without exercising the real localStorage/index/server
@@ -43,13 +45,43 @@ vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 vi.mock("../lib/draftPersistence.ts", () => ({ recordProjectSubmission: vi.fn(async () => {}) }));
 
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
-import { getManagedPROutputService } from "../lib/services.ts";
+import { getGitHubOutputService, getManagedPROutputService } from "../lib/services.ts";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
+import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
 import { recordProjectSubmission } from "../lib/draftPersistence.ts";
 
 const mockedProject = projectWorkingCopyForOutput as Mock;
 const mockedGetService = getManagedPROutputService as Mock;
 const mockedUseGitHubAuth = vi.mocked(useGitHubAuth);
+const mockedUseGoogleAuth = vi.mocked(useGoogleAuth);
+const mockedGetGitHubService = getGitHubOutputService as Mock;
+
+const GOOGLE_SESSION = "kss1.payload.sig";
+
+/**
+ * Default: signed in with Google (session token present), so the pre-existing
+ * tests keep a sign-in the server would accept. Pass `null` to sign out.
+ */
+function mockGoogleAuth(sessionToken: string | null = GOOGLE_SESSION): void {
+  mockedUseGoogleAuth.mockReturnValue({
+    status: sessionToken === null ? "idle" : "connected",
+    identity:
+      sessionToken === null
+        ? null
+        : {
+            provider: "google",
+            sub: "1",
+            email: "author@example.com",
+            emailVerified: true,
+            name: "Test Author",
+            picture: "https://example.com/p.png",
+          },
+    sessionToken,
+    error: null,
+    connect: vi.fn(async () => {}),
+    disconnect: vi.fn(),
+  } satisfies UseGoogleAuthResult);
+}
 const mockedRecordProjectSubmission = vi.mocked(recordProjectSubmission);
 
 /** Default: signed out (token null) — matches the pre-existing test posture. */
@@ -70,6 +102,7 @@ function mockGitHubAuth(overrides: Partial<UseGitHubAuthResult> = {}): void {
 
 beforeEach(() => {
   mockGitHubAuth();
+  mockGoogleAuth();
 });
 
 // Minimal VirtualFS-shaped object — the panel passes it through to publishManagedPR.
@@ -295,7 +328,7 @@ describe("ManagedPRSubmitPanel — success state", () => {
     fireEvent.click(btn);
 
     await waitFor(() => {
-      expect(screen.getByText(/your submission is being reviewed/i)).toBeTruthy();
+      expect(screen.getByText(/your test submission was received/i)).toBeTruthy();
     });
     expect(
       screen.getByRole("link", { name: /view your keyboard submission/i }),
@@ -322,7 +355,7 @@ describe("ManagedPRSubmitPanel — success state", () => {
     });
   });
 
-  it("passes null to recordProjectSubmission when signed out", async () => {
+  it("passes null to recordProjectSubmission when not signed in with GitHub", async () => {
     mockedProject.mockResolvedValueOnce(makeProjectResult());
     const svc = makeService();
     mockedGetService.mockResolvedValueOnce(svc);
@@ -464,7 +497,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
       expect(screen.getByRole("alert").textContent).toMatch(/temporarily unavailable/i);
     });
     // The success affordance must NOT appear on a failed submit.
-    expect(screen.queryByText(/your submission is being reviewed/i)).toBeNull();
+    expect(screen.queryByText(/your test submission was received/i)).toBeNull();
     expect(screen.queryByRole("link", { name: /view your keyboard submission/i })).toBeNull();
   });
 
@@ -616,5 +649,98 @@ describe("ManagedPRSubmitPanel — #506 generated PR body", () => {
     const opts = svc.publishManagedPR.mock.calls[0]?.[1] as { prBody: string };
     expect(opts.prBody).toContain("### Green — checks passed");
     expect(opts.prBody).toContain("**Copyright attestation:** The submitter has confirmed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sign-in requirement, testing notice, and the own-GitHub-account route
+// ---------------------------------------------------------------------------
+
+const GH_TOKEN = { accessToken: "gho_test", tokenType: "bearer", scope: "", client: "github_app" } as const;
+
+describe("ManagedPRSubmitPanel — sign-in and routes", () => {
+  it("says submissions go to the testing copy and that Keyman submission is coming soon", () => {
+    renderPanel({ canSubmit: true });
+    const notice = screen.getByTestId("submit-testing-phase-notice");
+    expect(notice.textContent).toMatch(/keyboard-studio\/keyboards/);
+    expect(notice.textContent).toMatch(/coming soon/i);
+  });
+
+  it("blocks submission when nobody is signed in", () => {
+    mockGoogleAuth(null);
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    expect(screen.getByTestId("submit-sign-in-required")).toBeTruthy();
+    const btn = screen.getByRole("button", { name: /sign in with github or google/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("sends the Google session token as proof of sign-in", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: /submit keyboard to community repository/i }));
+    await waitFor(() => expect(svc.publishManagedPR).toHaveBeenCalled());
+    expect((svc.publishManagedPR.mock.calls[0]?.[1] as { authToken?: string }).authToken).toBe(GOOGLE_SESSION);
+  });
+
+  it("sends the GitHub token when signed in with GitHub only", async () => {
+    mockGoogleAuth(null);
+    mockGitHubAuth({ token: GH_TOKEN, login: "octo", status: "connected" });
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: /submit keyboard to community repository/i }));
+    await waitFor(() => expect(svc.publishManagedPR).toHaveBeenCalled());
+    expect((svc.publishManagedPR.mock.calls[0]?.[1] as { authToken?: string }).authToken).toBe("gho_test");
+  });
+
+  it("asks for GitHub permission before submitting from the author's own account", () => {
+    const connect = vi.fn(async () => {});
+    mockGitHubAuth({ token: GH_TOKEN, login: "octo", status: "connected", canSubmit: false, connect });
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    fireEvent.click(screen.getByRole("radio", { name: /my own github account/i }));
+    const btn = screen.getByRole("button", { name: /^give permission on github$/i });
+    expect(btn).toBeTruthy();
+    const submit = screen.getByRole("button", { name: /until you give permission/i }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(connect).toHaveBeenCalledWith("submit");
+  });
+
+  it("opens the pull request from the author's fork on the own-account route", async () => {
+    mockGitHubAuth({
+      token: { ...GH_TOKEN, client: "oauth_app", scope: "public_repo" },
+      login: "octo",
+      status: "connected",
+      canSubmit: true,
+    });
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const publishPR = vi.fn(async () => ({ prUrl: "https://github.com/keyboard-studio/keyboards/pull/7", commitSha: "abc" }));
+    mockedGetGitHubService.mockResolvedValueOnce({ publishPR, verifyToken: vi.fn() });
+    const managed = makeService();
+    mockedGetService.mockResolvedValueOnce(managed);
+
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    fireEvent.click(screen.getByRole("radio", { name: /my own github account/i }));
+    fireEvent.click(screen.getByRole("button", { name: /submit keyboard from my github account/i }));
+
+    await waitFor(() => expect(publishPR).toHaveBeenCalled());
+    const opts = publishPR.mock.calls[0]?.[1] as unknown as {
+      token: string; forkOwner: string; prTitle: string; branchName: string; prBody: string;
+    };
+    expect(opts.token).toBe("gho_test");
+    expect(opts.forkOwner).toBe("octo");
+    expect(opts.prTitle).toBe("[test_keyboard] Test Keyboard");
+    expect(opts.branchName).toMatch(/^add\/test_keyboard-/);
+    expect(opts.prBody).toContain("from their own GitHub account");
+    expect(managed.publishManagedPR).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/your test submission was received/i)).toBeTruthy());
   });
 });

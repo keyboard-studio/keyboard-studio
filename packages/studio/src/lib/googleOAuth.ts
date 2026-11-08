@@ -71,6 +71,12 @@ export interface StoredGoogleIdentity {
   readonly emailVerified: boolean;
   readonly name: string;
   readonly picture: string;
+  /**
+   * Keyboard Studio session token from the exchange (present when the backend
+   * has SESSION_SIGNING_KEY). The managed-PR submit sends it as proof of
+   * sign-in; it is not a Google credential.
+   */
+  readonly sessionToken?: string;
 }
 
 /** Persist the Google identity in sessionStorage. */
@@ -99,6 +105,9 @@ function validateIdentityFields(
     emailVerified: data.emailVerified === true,
     name: data.name,
     picture: data.picture,
+    ...(typeof data.sessionToken === "string" && data.sessionToken !== ""
+      ? { sessionToken: data.sessionToken }
+      : {}),
   };
 }
 
@@ -230,6 +239,7 @@ interface BackendGoogleIdentityResponse {
   email_verified: boolean;
   name: string;
   picture: string;
+  sessionToken?: string;
 }
 
 /** A typed error from the Google identity-exchange step. */
@@ -287,6 +297,7 @@ export async function exchangeGoogleCode(
     emailVerified: data.email_verified,
     name: data.name,
     picture: data.picture,
+    ...(data.sessionToken !== undefined ? { sessionToken: data.sessionToken } : {}),
   });
 
   if (identity === null) {

@@ -29,9 +29,12 @@ import type { EditorStepProps } from "../../steps/types.ts";
 import { OutputSectionList } from "../../components/OutputSectionList.tsx";
 import { TestBuildPanel } from "../../components/TestBuildPanel.tsx";
 import { OutputGateBanners } from "../../components/OutputGateBanners.tsx";
+import { SourceDownloads } from "../../components/output/SourceDownloads.tsx";
+import { ReformatConsentDialog } from "../../components/ReformatConsentDialog.tsx";
+import { resolveOutputKeyboardId } from "../../lib/outputKeyboardId.ts";
 
 export function TrialStep({ onComplete, onBack }: EditorStepProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   // Each step runs its own independent artifact pipeline — see
   // usePreviewArtifact.ts's module comment for why this is deliberate (do
   // not "dedupe" across steps). The Zustand working-copy store persists
@@ -66,6 +69,12 @@ export function TrialStep({ onComplete, onBack }: EditorStepProps) {
   // below carry `string`, never `string | undefined`, under
   // exactOptionalPropertyTypes.
   const touchBlockerStep = blockerStepId("touchStale");
+  // The source .zip and LDML sit behind the release gate, as on Publish.
+  const identity = useWorkingCopyStore((s) => s.identity);
+  const downloadKeyboardId = resolveOutputKeyboardId(identity, startKeyboard);
+  const firstBlocker = outputGate.blockers[0];
+  const downloadGatedAria =
+    outputGate.blocked && firstBlocker !== undefined ? i18n.t(firstBlocker.downloadAria) : null;
   const attributionBlockerStep = blockerStepId("attribution");
 
   // The coverage gate disables Continue (see the module comment). The hint
@@ -156,6 +165,14 @@ export function TrialStep({ onComplete, onBack }: EditorStepProps) {
         busy={artifact.buildingKmp || artifact.downloading || artifact.downloadingLdml}
         onMakeTestBuild={artifact.handleMakeTestBuild}
       />
+      {/* Testers may want the source or the LDML alongside a test build. */}
+      {startKeyboard !== null && (
+        <SourceDownloads
+          artifact={artifact}
+          keyboardId={downloadKeyboardId}
+          gatedAriaLabel={downloadGatedAria}
+        />
+      )}
       <OutputGateBanners
         returnToStep="trial"
         touchStale={touchStale}
@@ -166,6 +183,7 @@ export function TrialStep({ onComplete, onBack }: EditorStepProps) {
         {...(attributionBlockerStep !== undefined ? { attributionBlockerStep } : {})}
         resolveStartHolder={resolveStartHolder}
       />
+      <ReformatConsentDialog {...artifact.reformatConsent} />
     </div>
   );
 }

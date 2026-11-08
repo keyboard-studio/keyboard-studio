@@ -4,7 +4,7 @@
 // docs/github-integration.md §1a. The user provides attribution (display name
 // + email), confirms copyright, and clicks Submit. The studio POSTs the
 // keyboard to the backend proxy which opens the PR via the org account and
-// returns a PR URL. The user sees "your submission is being reviewed" + the
+// returns a PR URL. The user sees "your test submission was received" + the
 // PR link — never a branch, fork, or PR thread.
 //
 // Identity prefill:
@@ -35,7 +35,13 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
-import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
+import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
+import {
+  getGitHubOutputService,
+  getManagedPROutputService,
+  getManagedPRProxyEndpoint,
+} from "../lib/services.ts";
+import { isPublishPRError, publishPRErrorMessage } from "../lib/publishPRErrorMessage.ts";
 import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
@@ -151,6 +157,8 @@ const successPanelStyle: React.CSSProperties = {
   lineHeight: 1.6,
 };
 
+const HINT_STYLE: React.CSSProperties = { margin: 0, fontSize: 12, color: "var(--app-text-subtle)", lineHeight: 1.5 };
+
 const errorStyle: React.CSSProperties = {
   fontSize: 12,
   color: "var(--app-danger-text)",
@@ -228,11 +236,54 @@ function shippedVersionOf(
 // Submission state discriminated union
 // ---------------------------------------------------------------------------
 
+type SubmitRoute = "managed" | "own";
+
 type SubmitState =
   | { kind: "idle" }
   | { kind: "submitting" }
   | { kind: "success"; prUrl: string }
   | { kind: "error"; message: string };
+
+// ---------------------------------------------------------------------------
+// Testing-phase notice
+// ---------------------------------------------------------------------------
+
+/**
+ * Every submission path currently targets the studio's own testing copy of
+ * the keyboards repository (`keyboard-studio/keyboards`), not
+ * keymanapp/keyboards. Say so before the author submits. Exported so the
+ * own-GitHub-account path shows the same words.
+ */
+export function TestingPhaseNotice() {
+  return (
+    <div
+      role="note"
+      data-testid="submit-testing-phase-notice"
+      style={{
+        padding: "8px 12px",
+        background: "var(--app-warning-bg)",
+        border: "1px solid var(--app-warning-border)",
+        borderRadius: 6,
+        fontSize: 12,
+        lineHeight: 1.5,
+        color: "var(--app-warning-text)",
+      }}
+    >
+      <div style={{ fontWeight: 600 }}>
+        {"[WARN] "}
+        <Trans id="output.submit.testing.heading">Testing phase</Trans>
+      </div>
+      <Trans id="output.submit.testing.body">
+        Submissions currently go to our testing copy of the keyboards repository
+        (keyboard-studio/keyboards), not to the official Keyman repository. We use
+        them to test the submission process; they are not published in Keyman.
+      </Trans>{" "}
+      <Trans id="output.submit.testing.comingSoon">
+        Submitting to the official Keyman keyboards repository is coming soon.
+      </Trans>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -251,6 +302,8 @@ export function ManagedPRSubmitPanel({
   const emailId = useId();
   const copyrightId = useId();
   const prBodyId = useId();
+  const routeManagedId = useId();
+  const routeOwnId = useId();
 
   // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList) so
   // this panel can transition the active "My keyboards" project to
@@ -258,8 +311,19 @@ export function ManagedPRSubmitPanel({
   // down as a prop. `accessToken` (the primitive, not the whole `token`
   // object) is what recordProjectSubmission below actually needs, and is
   // what the handleSubmit dependency array tracks.
-  const { token } = useGitHubAuth();
+  const { token, login: ghLogin, canSubmit: ghCanSelfSubmit, connect: connectGitHub } = useGitHubAuth();
   const accessToken = token?.accessToken ?? null;
+  // Submitting requires a sign-in the server can check (spec 113 revision):
+  // the Keyboard Studio session token from Google sign-in, else the GitHub
+  // user token. A Google sign-in with no session token (backend without
+  // SESSION_SIGNING_KEY) cannot submit; GitHub still can.
+  const { identity: googleIdentity, sessionToken: googleSessionToken } = useGoogleAuth();
+  const authToken = googleSessionToken ?? accessToken;
+  const signedIn = authToken !== null;
+  // Who opens the pull request: the studio's bot on the author's behalf
+  // ("managed"), or the author's own GitHub account ("own", fork + PR).
+  const [route, setRoute] = useState<SubmitRoute>("managed");
+  const ownRoute = route === "own" && ghLogin !== null;
 
   const [authorName, setAuthorName] = useState<string>(
     prefill?.displayName ?? "",
@@ -307,8 +371,10 @@ export function ManagedPRSubmitPanel({
   const emailValid = isValidEmail(email);
   const formReady = nameValid && emailValid && copyrightChecked;
   const ratchetBlocked = openRatchet?.gate.blocked === true;
+  const routeReady = ownRoute ? ghCanSelfSubmit && accessToken !== null : signedIn;
   const submitEnabled =
     formReady &&
+    routeReady &&
     canSubmit &&
     !outputBlocked &&
     !ratchetBlocked &&
@@ -441,17 +507,40 @@ export function ManagedPRSubmitPanel({
       const prTitle =
         displayName.trim() !== "" ? displayName.trim() : keyboardId;
 
-      const svc = await getManagedPROutputService();
-      const result = await svc.publishManagedPR(vfs, {
-        attribution: {
-          displayName: authorName.trim(),
-          email: email.trim(),
-        },
-        keyboardId,
-        prTitle,
-        prBody,
-        proxyEndpoint: getManagedPRProxyEndpoint(),
-      });
+      let result: { prUrl: string };
+      if (ownRoute && accessToken !== null && ghLogin !== null) {
+        // Own account (Option A): fork keyboard-studio/keyboards to the
+        // author's account, push a branch, open a draft PR in their name.
+        // English and unlocalized, like the rest of the PR body.
+        const fullTitle = prTitle.startsWith(`[${keyboardId}]`) ? prTitle : `[${keyboardId}] ${prTitle}`;
+        const svc = await getGitHubOutputService();
+        result = await svc.publishPR(vfs, {
+          token: accessToken,
+          forkOwner: ghLogin,
+          branchName: `add/${keyboardId}-${Date.now().toString(36)}`,
+          commitMessage: fullTitle,
+          prTitle: fullTitle,
+          prBody: [
+            // eslint-disable-next-line lingui/no-unlocalized-strings -- PR body is deliberately English (see above).
+            `> Submitted through **Keyboard Studio** by **${authorName.trim()}** (${email.trim()}) from their own GitHub account.`,
+            "",
+            prBody,
+          ].join("\n"),
+        });
+      } else {
+        const svc = await getManagedPROutputService();
+        result = await svc.publishManagedPR(vfs, {
+          attribution: {
+            displayName: authorName.trim(),
+            email: email.trim(),
+          },
+          keyboardId,
+          prTitle,
+          prBody,
+          proxyEndpoint: getManagedPRProxyEndpoint(),
+          ...(authToken !== null ? { authToken } : {}),
+        });
+      }
       setSubmitState({ kind: "success", prUrl: result.prUrl });
 
       // Transition the active "My keyboards" project to status:"submitted"
@@ -463,7 +552,9 @@ export function ManagedPRSubmitPanel({
       void recordProjectSubmission(result.prUrl, accessToken);
     } catch (err: unknown) {
       let message: string;
-      if (isPublishManagedPRError(err)) {
+      if (ownRoute && isPublishPRError(err)) {
+        message = publishPRErrorMessage(err, i18n);
+      } else if (isPublishManagedPRError(err)) {
         message = publishManagedPRErrorMessage(err as PublishManagedPRError, i18n);
       } else {
         message =
@@ -478,7 +569,7 @@ export function ManagedPRSubmitPanel({
     } finally {
       useTestingStore.getState().setSubmitInFlight(false);
     }
-  }, [submitEnabled, authorName, email, t, i18n, accessToken, prBodyDraft, openRatchet, reformatConsent.guard]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken, authToken, ownRoute, ghLogin, prBodyDraft, openRatchet, reformatConsent.guard]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -495,12 +586,12 @@ export function ManagedPRSubmitPanel({
         </div>
         <div style={successPanelStyle} role="status" aria-live="polite">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            <Trans id="output.submit.success.heading">Your submission is being reviewed.</Trans>
+            <Trans id="output.submit.success.heading.testing">Your test submission was received.</Trans>
           </div>
           <div style={{ fontSize: 12, color: "var(--app-text-subtle)" }}>
-            <Trans id="output.submit.success.body">
-              The keyboard studio team will review your keyboard and may reach out
-              via the email you provided.{" "}
+            <Trans id="output.submit.success.body.testing">
+              It opened a pull request on our testing copy of the keyboards
+              repository. It will not be published in Keyman yet.{" "}
               <a
                 href={submitState.prUrl}
                 target="_blank"
@@ -541,6 +632,97 @@ export function ManagedPRSubmitPanel({
           statement, and submit. We handle the technical side.
         </Trans>
       </p>
+      <TestingPhaseNotice />
+
+      {/* A server-checkable sign-in is required to submit. */}
+      {!signedIn && (
+        <p role="status" data-testid="submit-sign-in-required" style={{ margin: 0, fontSize: 12, color: "var(--app-warning-text)", lineHeight: 1.5 }}>
+          {"[WARN] "}
+          {googleIdentity !== null ? (
+            <Trans id="output.submit.signIn.googleUnavailable">
+              Submitting with a Google sign-in is not available on this server yet.
+              Sign in with GitHub to submit.
+            </Trans>
+          ) : (
+            <Trans id="output.submit.signIn.required">
+              Sign in with GitHub or Google to submit, so reviewers know who sent
+              the keyboard.
+            </Trans>
+          )}
+        </p>
+      )}
+
+      {/* With a GitHub sign-in, the author may open the PR themselves. */}
+      {ghLogin !== null && (
+        <fieldset
+          data-testid="submit-route"
+          disabled={isSubmitting}
+          style={{ margin: 0, padding: "8px 12px", border: "1px solid var(--app-border)", borderRadius: 6, display: "flex", flexDirection: "column", gap: 6 }}
+        >
+          <legend style={fieldLabelStyle}>
+            <Trans id="output.submit.route.legend">Who opens the pull request</Trans>
+          </legend>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13 }}>
+            <input
+              id={routeManagedId}
+              type="radio"
+              name="submit-route"
+              value="managed"
+              checked={route === "managed"}
+              onChange={() => { setRoute("managed"); }}
+              style={{ marginTop: 3 }}
+            />
+            <label htmlFor={routeManagedId}>
+              <Trans id="output.submit.route.managed">Keyboard Studio, on my behalf</Trans>
+              <br />
+              <span style={{ fontSize: 12, color: "var(--app-text-muted)" }}>
+                <Trans id="output.submit.route.managed.help">
+                  Easiest. Our account opens the pull request and names you as the author.
+                </Trans>
+              </span>
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13 }}>
+            <input
+              id={routeOwnId}
+              type="radio"
+              name="submit-route"
+              value="own"
+              checked={route === "own"}
+              onChange={() => { setRoute("own"); }}
+              style={{ marginTop: 3 }}
+            />
+            <label htmlFor={routeOwnId}>
+              <Trans id="output.submit.route.own">My own GitHub account (@{ghLogin})</Trans>
+              <br />
+              <span style={{ fontSize: 12, color: "var(--app-text-muted)" }}>
+                <Trans id="output.submit.route.own.help">
+                  The pull request is yours: it is opened from a fork in your account,
+                  and you answer reviewers on GitHub.
+                </Trans>
+              </span>
+            </label>
+          </div>
+          {route === "own" && !ghCanSelfSubmit && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <p style={HINT_STYLE}>
+                <Trans id="output.submit.route.own.permission">
+                  To open a pull request from your account, Keyboard Studio needs your
+                  permission to fork the keyboards repository and push a branch.
+                </Trans>
+              </p>
+              <button
+                type="button"
+                data-testid="submit-own-grant"
+                onClick={() => { void connectGitHub("submit"); }}
+                style={{ ...submitButtonStyle(true), marginTop: 0 }}
+              >
+                <Trans id="output.submit.route.own.grant">Give permission on GitHub</Trans>
+              </button>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* Author display name */}
       <div>
@@ -742,20 +924,37 @@ export function ManagedPRSubmitPanel({
                   id: "output.submit.button.ariaNotReady",
                   message: "Submit unavailable until the keyboard compile is complete",
                 })
+              : !routeReady
+                ? ownRoute
+                  ? t({
+                      id: "output.submit.button.ariaOwnNeedsPermission",
+                      message: "Submit unavailable until you give permission on GitHub",
+                    })
+                  : t({
+                      id: "output.submit.button.ariaSignInRequired",
+                      message: "Submit unavailable until you sign in with GitHub or Google",
+                    })
               : !formReady
                 ? t({
                     id: "output.submit.button.ariaFormIncomplete",
                     message: "Fill in your name, email, and copyright confirmation to submit",
                   })
-                : t({
-                    id: "output.submit.button.ariaReady",
-                    message: "Submit keyboard to community repository",
-                  })
+                : ownRoute
+                  ? t({
+                      id: "output.submit.button.ariaReadyOwn",
+                      message: "Submit keyboard from my GitHub account",
+                    })
+                  : t({
+                      id: "output.submit.button.ariaReady",
+                      message: "Submit keyboard to community repository",
+                    })
         }
         style={submitButtonStyle(submitEnabled)}
       >
         {isSubmitting ? (
           <Trans id="output.submit.button.submitting">Submitting...</Trans>
+        ) : ownRoute ? (
+          <Trans id="output.submit.button.submitOwn">Submit from my GitHub account</Trans>
         ) : (
           <Trans id="output.submit.button.submit">Submit to community repository</Trans>
         )}

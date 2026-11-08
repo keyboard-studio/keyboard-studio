@@ -72,7 +72,18 @@ Phases: G "Trial" (`trial`), H "Publish" (`publish`); letters are A–H.
   copy's own version. No automatic HISTORY.md bump.
 - **Publish is every final output.** `.kmp`, source `.zip`, LDML export,
   and the managed PR. The "just download it" author ends up in Publish and
-  never touches the PR panel.
+  never touches the PR panel. *Revised 2026-11-08 (owner walk-through):*
+  Trial also offers the source `.zip` and LDML export (shared
+  `SourceDownloads` component, release gate), so a tester can take them with
+  a numbered test build. The released `.kmp` stays Publish-only.
+- **Publish leads with GitHub submission** (*2026-11-08*). Gate banners,
+  then the submit panel and sign-in, then the downloads. Submitting requires
+  a sign-in the server checks (GitHub token, or the session token Google
+  sign-in issues). A GitHub user may open the PR from their own account
+  instead of the studio's. Every route targets the testing copy
+  `keyboard-studio/keyboards`, and the panel says so, with a note that
+  submission to keymanapp/keyboards is coming soon. Status and setup:
+  [docs/github_flow.md](../../docs/github_flow.md).
 - **Track 2: same split.** On adapt, Publish means an update PR. The
   `advance()` Open override is preserved (`done` → `criteria` Review).
 - **Persistence unchanged.** `testingStore` keeps its shape (additive draft
@@ -95,6 +106,7 @@ Phases: G "Trial" (`trial`), H "Publish" (`publish`); letters are A–H.
   (spec 094 FR-001); `returnTo` is now `{ route: "survey", step: "trial" }`.
 - `TestBuildPanel` (incl. `TesterReports` once builds exist) behind the
   test-build gate — the same gate as today.
+- Source `.zip` and LDML export (`SourceDownloads`) behind the release gate.
 - Shared gate banners (coverage / attribution / licence / touch-stale)
   from the new `OutputGateBanners` component; each names the step that
   fixes it with an "Open" control returning to Trial.

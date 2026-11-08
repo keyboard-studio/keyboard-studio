@@ -41,7 +41,7 @@ import { selectUnmappedFindings } from "../../lint/lintToQuestion.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { OutputGateBanners } from "../../components/OutputGateBanners.tsx";
-import { LdmlDownloadPanel } from "../../components/output/LdmlDownloadPanel.tsx";
+import { SourceDownloads } from "../../components/output/SourceDownloads.tsx";
 import { DocumentationFindingsSummary } from "../../components/DocumentationFindingsSummary.tsx";
 import { UnappliedRepairList } from "../../components/TouchKeyIdentityList.tsx";
 import { LintSummary } from "../../lint/LintSummary.tsx";
@@ -100,12 +100,9 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
   const documentationFindings = useDocumentationFindings();
   const publishedFindings = useWorkingCopyStore((s) => s.validatorFindings);
   const route = useRouteStepIds();
-  // spec 108 FR-015: every LDML finding is listed with the LDML download, so the generic
-  // panel below excludes them and no finding appears twice on this page.
-  const ldmlFindings = useMemo(
-    () => publishedFindings.filter((f) => isLdmlLintCode(f.code)),
-    [publishedFindings],
-  );
+  // spec 108 FR-015: every LDML finding is listed with the LDML download
+  // (SourceDownloads), so the generic panel below excludes them and no
+  // finding appears twice on this page.
   const otherOutputFindings = useMemo(() => {
     const docCodes = new Set(documentationFindings.map((f) => f.code));
     return selectUnmappedFindings(publishedFindings, route).filter(
@@ -121,16 +118,11 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
     startKeyboard,
     canDownload,
     downloading,
-    downloadError,
-    downloadWarnings,
-    handleDownload,
     buildingKmp,
     kmpError,
     kmpDiagnostics,
     handleDownloadKmp,
     downloadingLdml,
-    ldmlError,
-    handleDownloadLdml,
     coverageGate,
     showIdentityWarn,
     // spec 064: the two attribution hard-blocks and the D5 escape hatch.
@@ -232,7 +224,6 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
   // projection + compile, so overlapping clicks would do the same work twice.
   // The LDML export (spec 108) is a third download and joins the same busy state.
   const kmpActionable = !outputGate.blocked && !buildingKmp && !downloading && !downloadingLdml;
-  const zipActionable = !outputGate.blocked && !downloading && !buildingKmp && !downloadingLdml;
 
   // "Change starting keyboard" — relocates re-basing to the survey's choose_base
   // step rather than mutating the working copy from here. A BACK action (see
@@ -285,12 +276,71 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
       </h1>
       <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
         <Trans id="publish.intro">
-          Review your finished keyboard and the checks below, then download it
-          to install or submit it for publication.
+          Submit your finished keyboard for publication through GitHub, or
+          download it to install and share yourself.
         </Trans>
       </p>
       {startKeyboard !== null && (
         <>
+          <OutputGateBanners
+            returnToStep="publish"
+            touchStale={touchStale}
+            {...(touchBlockerStep !== undefined ? { touchBlockerStep } : {})}
+            coverageGate={coverageGate}
+            licenseUnparseable={licenseUnparseable}
+            attributionMissing={attributionMissing}
+            {...(attributionBlockerStep !== undefined ? { attributionBlockerStep } : {})}
+            resolveStartHolder={resolveStartHolder}
+          />
+          {/* Option B (org-mediated PR) submit — PRIMARY submit action per
+              docs/github-integration.md §1a. Calls the backend proxy; the
+              user never sees a branch or PR workflow. Gated on canDownload
+              (compile ready + working copy instantiated + inventory
+              coverage — same P0 gate as the zip download), plus the
+              touchStale/coverageBlocked flags below purely for the
+              explanatory aria-label (canSubmit already forbids the
+              emission either way). Attribution prefill from whichever
+              identity provider is active. */}
+          {/* spec 094 FR-016: after test builds, one "Testing done, publish"
+              step says what changed since the last build and lists open
+              reports before the unchanged submit panel appears. */}
+          <PublishHandover>
+            <ManagedPRSubmitPanel
+              canSubmit={canDownload}
+              outputBlocked={submitBlocker !== undefined}
+              {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
+              prefill={submitPrefill}
+              openRatchet={
+                openRatchet !== null && criteriaResult !== null
+                  ? {
+                      gate: openRatchet.gate,
+                      review: buildReviewInput(
+                        criteriaResult,
+                        openRatchet.baseline,
+                        openRatchet.notes,
+                      ),
+                    }
+                  : null
+              }
+              lintResults={{
+                criteria:
+                  criteriaResult?.rows.map((r) => ({
+                    criterion: r.criterion,
+                    status: r.status,
+                  })) ?? null,
+                findings: publishedFindings,
+              }}
+            />
+          </PublishHandover>
+
+          {/* Decoupled "Sign up with GitHub / Google" identity step (docs/github-integration.md
+              §1a). Establishes who the user is — NOT a submit/PR action, and not
+              gated on artifact readiness (you can sign up any time). */}
+          <SignUpPanel />
+          {/* Downloads come second: Publish points the author at submission. */}
+          <h2 style={{ margin: "16px 0 0", fontSize: "1rem", color: "var(--app-text)" }}>
+            <Trans id="publish.downloads.heading">Download</Trans>
+          </h2>
           {/* PRIMARY download: the installable package. A user double-clicks
               this and the keyboard installs on Keyman for Windows, macOS,
               Linux, iOS, or Android — no Keyman Developer, no unzipping, no
@@ -368,102 +418,12 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
             </div>
           )}
 
-          {/* SECONDARY download: source, for editing or contributing. */}
-          <button
-            type="button"
-            data-testid="emit-download"
-            disabled={!zipActionable}
-            onClick={() => { void handleDownload(); }}
-            aria-label={downloadAriaLabel}
-            style={{
-              alignSelf: "flex-start",
-              marginTop: 4,
-              padding: "9px 18px",
-              background: "var(--app-surface)",
-              color: zipActionable ? "var(--app-accent-text)" : "var(--app-text-disabled)",
-              border: `1px solid ${zipActionable ? "var(--app-accent)" : "var(--app-border)"}`,
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: zipActionable ? "pointer" : "not-allowed",
-              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-            }}
-          >
-            {downloading ? (
-              <Trans id="output.download.button.downloading">Downloading...</Trans>
-            ) : (
-              <Trans id="output.download.button.download">Download source .zip</Trans>
-            )}
-          </button>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 12,
-              color: "var(--app-text-muted)",
-              lineHeight: 1.5,
-              maxWidth: "46ch",
-            }}
-          >
-            <Trans id="output.download.zip.help">
-              The keyboard&apos;s source files, for editing in Keyman Developer or
-              contributing upstream.
-            </Trans>
-          </p>
-          {/* spec 108 FR-002: the LDML export, a third download behind the same gate. */}
-          <LdmlDownloadPanel
+          {/* SECONDARY downloads: source .zip and LDML (shared with Trial). */}
+          <SourceDownloads
+            artifact={artifact}
             keyboardId={downloadKeyboardId}
             gatedAriaLabel={outputGate.blocked ? downloadAriaLabel : null}
-            otherBusy={buildingKmp || downloading}
-            downloading={downloadingLdml}
-            error={ldmlError}
-            onDownload={() => { void handleDownloadLdml(); }}
-            findings={ldmlFindings}
           />
-          <OutputGateBanners
-            returnToStep="publish"
-            touchStale={touchStale}
-            {...(touchBlockerStep !== undefined ? { touchBlockerStep } : {})}
-            coverageGate={coverageGate}
-            licenseUnparseable={licenseUnparseable}
-            attributionMissing={attributionMissing}
-            {...(attributionBlockerStep !== undefined ? { attributionBlockerStep } : {})}
-            resolveStartHolder={resolveStartHolder}
-          />
-          {downloadError !== null && (
-            <div role="alert" style={{ fontSize: 11, color: "var(--app-danger-text)", marginTop: 4 }}>
-              {downloadError}
-            </div>
-          )}
-          {downloadWarnings.length > 0 && (
-            <div
-              role="status"
-              aria-live="polite"
-              aria-label={t({
-                id: "output.download.warnings.ariaLabel",
-                message: "Download projection warnings",
-              })}
-              style={warningBannerStyle}
-            >
-              <div style={{ color: "var(--app-warning-text)", fontWeight: 600, marginBottom: 4 }}>
-                {"[WARN] "}
-                <Trans id="output.download.warnings.header">
-                  Download completed with warnings:
-                </Trans>
-              </div>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 18,
-                  color: "var(--app-warning-text)",
-                  lineHeight: 1.6,
-                }}
-              >
-                {downloadWarnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </div>
-          )}
           {showIdentityWarn && (
             <div
               role="status"
@@ -600,51 +560,6 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
             )}
           </section>
 
-          {/* Option B (org-mediated PR) submit — PRIMARY submit action per
-              docs/github-integration.md §1a. Calls the backend proxy; the
-              user never sees a branch or PR workflow. Gated on canDownload
-              (compile ready + working copy instantiated + inventory
-              coverage — same P0 gate as the zip download), plus the
-              touchStale/coverageBlocked flags below purely for the
-              explanatory aria-label (canSubmit already forbids the
-              emission either way). Attribution prefill from whichever
-              identity provider is active. */}
-          {/* spec 094 FR-016: after test builds, one "Testing done, publish"
-              step says what changed since the last build and lists open
-              reports before the unchanged submit panel appears. */}
-          <PublishHandover>
-            <ManagedPRSubmitPanel
-              canSubmit={canDownload}
-              outputBlocked={submitBlocker !== undefined}
-              {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
-              prefill={submitPrefill}
-              openRatchet={
-                openRatchet !== null && criteriaResult !== null
-                  ? {
-                      gate: openRatchet.gate,
-                      review: buildReviewInput(
-                        criteriaResult,
-                        openRatchet.baseline,
-                        openRatchet.notes,
-                      ),
-                    }
-                  : null
-              }
-              lintResults={{
-                criteria:
-                  criteriaResult?.rows.map((r) => ({
-                    criterion: r.criterion,
-                    status: r.status,
-                  })) ?? null,
-                findings: publishedFindings,
-              }}
-            />
-          </PublishHandover>
-
-          {/* Decoupled "Sign up with GitHub / Google" identity step (docs/github-integration.md
-              §1a). Establishes who the user is — NOT a submit/PR action, and not
-              gated on artifact readiness (you can sign up any time). */}
-          <SignUpPanel />
 
           {/* Keyboard details — the Output screen's left-pane tools, which
               had no other home: the keyboard's identity, re-basing, and

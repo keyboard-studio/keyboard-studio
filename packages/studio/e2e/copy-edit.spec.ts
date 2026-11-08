@@ -674,7 +674,26 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
   test("T016 [US2]: publish step exposes both publish paths; PR degrades honestly, ZIP still works", async ({
     page,
   }) => {
+    // Submitting needs a sign-in the server can check. Seed a Google identity
+    // carrying a session token (its validity is the backend's concern, and
+    // there is no backend in e2e), so the submit button is reachable.
+    await page.addInitScript(() => {
+      sessionStorage.setItem(
+        "ks.google.identity",
+        JSON.stringify({
+          sub: "e2e",
+          email: "e2e@example.com",
+          emailVerified: true,
+          name: "E2E Author",
+          picture: "https://example.com/p.png",
+          sessionToken: "kss1.e2e.sig",
+        }),
+      );
+    });
     await walkToPublish(page, FIXTURE);
+
+    // The testing-phase notice names the testing copy and the coming Keyman route.
+    await expect(page.getByTestId("submit-testing-phase-notice")).toContainText(/coming soon/i);
 
     // PP-1: ZIP download affordance is present and (once compiled) enabled.
     const downloadBtn = page.getByTestId("emit-download");
@@ -694,10 +713,10 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: /submit keyboard to community repository/i }).click();
 
-    // An error alert appears; the "your submission is being reviewed" success
+    // An error alert appears; the "your test submission was received" success
     // panel must NOT appear.
     await expect(page.getByRole("alert").first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/your submission is being reviewed/i)).toHaveCount(0);
+    await expect(page.getByText(/your test submission was received/i)).toHaveCount(0);
 
     // PP-1 (independence): the ZIP path is still functional after a failed PR submit.
     const [download] = await Promise.all([
